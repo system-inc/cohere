@@ -13,6 +13,10 @@ type Dependence struct {
 	unitDependent []bool
 	bits          []bool
 	counts        Counts
+
+	// declarationsOnly says the graph judged collects declarations only (NewDeclarationsGraph), so unitDependent and
+	// counts are unset, and UnitDependent, Units, Counts and CallIndex.Dependent refuse (refuseDeclarationsOnly).
+	declarationsOnly bool
 }
 
 // Bits are an object's two bits in one build. A named type has both; any other object only Name.
@@ -30,8 +34,11 @@ type Counts struct {
 // UnitDependent reports whether the unit of the package packageId that starts at offset is build-dependent: file is the
 // one a reader sees, as the unit's start's position names it past any //line directive, and offset is in the file the
 // host parsed. A unit the graph does not hold, one in a file only the build compiles, is
-// dependent by definition, and any other place is no unit the graph knows, which is never read as independent.
+// dependent by definition, and any other place is no unit the graph knows, which is never read as independent. A
+// declarations-only graph's judgment panics (refuseDeclarationsOnly), having judged no unit.
 func (dependence *Dependence) UnitDependent(packageId string, file string, offset int) bool {
+	refuseDeclarationsOnly(dependence.declarationsOnly, "read a unit's verdict from", "the verdict would rest on the "+
+		"unit's declared objects alone")
 	index, isUnit := dependence.resolved.unitStartingAt(packageId, file, offset)
 	if !isUnit {
 		return true
@@ -39,8 +46,11 @@ func (dependence *Dependence) UnitDependent(packageId string, file string, offse
 	return dependence.unitDependent[index]
 }
 
-// Counts are the build's counts.
+// Counts are the build's counts. A declarations-only graph's judgment panics (refuseDeclarationsOnly), having counted
+// no unit.
 func (dependence *Dependence) Counts() Counts {
+	refuseDeclarationsOnly(dependence.declarationsOnly, "read the counts of", "its dependent units would be counted "+
+		"by their declared objects alone")
 	return dependence.counts
 }
 
@@ -138,8 +148,11 @@ type ObjectName struct {
 
 // Units are every unit of the graph, as the build judged it, in the graph's order, which their indexes name. The
 // units' calls and external calls are read out of the resolution's packed rows into one slice of each that all the
-// units share, each unit's its own part of it, nil for a unit with none.
+// units share, each unit's its own part of it, nil for a unit with none. A declarations-only graph's judgment panics
+// (refuseDeclarationsOnly), having judged no unit and collected no call.
 func (dependence *Dependence) Units() []Unit {
+	refuseDeclarationsOnly(dependence.declarationsOnly, "read every unit's verdict and calls from", "each verdict "+
+		"would rest on its unit's declared objects alone, and no unit would have a call")
 	resolved := dependence.resolved
 	units := make([]Unit, 0, resolved.unitCount())
 	calls := make([]int, len(resolved.calls.entries))

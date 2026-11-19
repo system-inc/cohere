@@ -36,6 +36,17 @@ const (
 	nameDeclared
 )
 
+// receiverResolution is what a build-only method's receiver resolves to (receiverTypeName).
+type receiverResolution uint8
+
+// The resolutions of a build-only method's receiver: a type name of the host's package, a type a build-only file
+// defines, or nothing the syntax can follow.
+const (
+	receiverHostType receiverResolution = iota
+	receiverDefinedByBuild
+	receiverUnresolved
+)
+
 // flagWhen is flag when isSet holds, else none.
 func flagWhen(isSet bool, flag uint8) uint8 {
 	if isSet {
@@ -82,9 +93,13 @@ func (judging *judgment) seedFiles() {
 }
 
 // seedMethodSets is rule 2: a method in a file only the host compiles, or in one only the build compiles, on a type the
-// host declares, moves that type's method set, which sets its name bit. A build-only file's receiver is found by its
-// base name among the host package's type names, as its record holds them (packageRecord.typeNames), since the file
-// was parsed for its syntax alone; a package-level type's local name is its name.
+// host declares, moves that type's method set, which sets its name bit. A build-only file's receiver is resolved by its
+// base name, since the file was parsed for its syntax alone (receiverTypeName): an alias a build-only file declares is
+// followed to the name it stands for, a type a build-only file defines moves no method set the host has, and the rest
+// is found among the host package's type names, as its record holds them (packageRecord.typeNames), a package-level
+// type's local name being its name. The name found may be a host alias's, whose method set is its target's, so the
+// target's name bit is seeded too (seedAliasTargets). A receiver that resolves to none of these seeds the name bit of
+// every type name of the package, failing wide.
 func (judging *judgment) seedMethodSets() {
 	for index, receiver := range judging.resolved.unitReceiver {
 		if judging.seedUnit[index] && receiver >= 0 {
@@ -97,21 +112,138 @@ func (judging *judgment) seedMethodSets() {
 			continue
 		}
 		record := judging.resolved.packages[packageIndex]
+		var buildOnlyTypes map[string]*ast.TypeSpec
+		var receivers map[int32]bool
 		for _, file := range differing.BuildOnlyFiles {
 			for _, declaration := range file.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
 				if !isFunction || function.Recv == nil || len(function.Recv.List) == 0 {
 					continue
 				}
-				name := receiverBaseName(function.Recv.List[0].Type)
-				if !slices.Contains(record.typeNames, name) {
+				if buildOnlyTypes == nil {
+					buildOnlyTypes = typeSpecs(differing.BuildOnlyFiles)
+				}
+				name, resolution := receiverTypeName(receiverBaseName(function.Recv.List[0].Type), buildOnlyTypes,
+					record.typeNames)
+				switch resolution {
+				case receiverDefinedByBuild:
+					continue
+				case receiverUnresolved:
+					judging.seedTypeNames(packageIndex)
 					continue
 				}
 				key := nodeKey{packageIndex: int32(packageIndex), local: name}
 				if node, isNode := judging.resolved.nodes[key]; isNode {
 					judging.seedBits = append(judging.seedBits, bit(node, false))
+					if receivers == nil {
+						receivers = judging.packageReceivers(packageIndex)
+					}
+					judging.seedAliasTargets(packageIndex, node, receivers)
 				}
 			}
+		}
+	}
+}
+
+// packageReceivers are the nodes of the package at packageIndex that a unit of it has for its receiver, each a defined
+// type, since a method's receiver is found through its named type and never through an alias (collectFunction).
+func (judging *judgment) packageReceivers(packageIndex int) map[int32]bool {
+	receivers := map[int32]bool{}
+	span := judging.resolved.packageUnits[packageIndex]
+	for index := span[0]; index < span[1]; index++ {
+		if receiver := judging.resolved.unitReceiver[index]; receiver >= 0 {
+			receivers[receiver] = true
+		}
+	}
+	return receivers
+}
+
+// seedAliasTargets seeds the name bit of what a build-only method's receiver, at node, may alias: `type A = T` makes a
+// method declared on A one of T's, which moves T's method set, and A's bits depend on T's, never T's on A's. A record
+// keeps no mark of an alias, only its kind edges, which resolution turns into the bits that depend on each bit
+// (resolvedGraph.dependents), and a live record and a decoded one must judge alike, so the alias is not read from the
+// live types. Each type of the package whose name bit the receiver's name bit depends on directly is seeded, and so on
+// through each of those in turn, for a chain of aliases: an alias's target, and for a defined type the types it embeds
+// or constrains its parameters by, a larger set, which a doubt takes. A type some unit of the host has for its receiver
+// is defined, no alias (packageReceivers), so nothing is seeded through it. A receiver must be of the method's own
+// package, so no other package's type is looked at.
+func (judging *judgment) seedAliasTargets(packageIndex int, node int32, receivers map[int32]bool) {
+	seen := map[int32]bool{node: true}
+	pending := []int32{node}
+	for len(pending) > 0 {
+		current := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if receivers[current] {
+			continue
+		}
+		for _, name := range judging.resolved.packages[packageIndex].typeNames {
+			target, isNode := judging.resolved.nodes[nodeKey{packageIndex: int32(packageIndex), local: name}]
+			if !isNode || seen[target] ||
+				!slices.Contains(judging.resolved.dependents.row(int(bit(target, false))), bit(current, false)) {
+				continue
+			}
+			seen[target] = true
+			judging.seedBits = append(judging.seedBits, bit(target, false))
+			pending = append(pending, target)
+		}
+	}
+}
+
+// receiverTypeName resolves name, a build-only method's receiver's base name, by syntax alone: a name a build-only file
+// declares is the build's, an alias followed through its right-hand side's base name and a defined type the build's
+// own, and any other is a type name of the host's package when typeNames holds it. A build-only file declares nothing
+// a file both builds compile does, so a name both declare is a host-only file's, which the build does not compile. An
+// alias of a name nothing declares, of another package's type, or of one no base name names, and a chain of aliases
+// that comes back on itself, resolve to nothing, as a receiver the type checker refuses does.
+func receiverTypeName(
+	name string,
+	buildOnlyTypes map[string]*ast.TypeSpec,
+	typeNames []string,
+) (string, receiverResolution) {
+	followed := map[string]bool{}
+	current := name
+	for current != "" && !followed[current] {
+		followed[current] = true
+		spec, isBuildOnly := buildOnlyTypes[current]
+		switch {
+		case !isBuildOnly && slices.Contains(typeNames, current):
+			return current, receiverHostType
+		case !isBuildOnly:
+			return "", receiverUnresolved
+		case !spec.Assign.IsValid():
+			return "", receiverDefinedByBuild
+		}
+		current = receiverBaseName(spec.Type)
+	}
+	return "", receiverUnresolved
+}
+
+// typeSpecs are the type specs files declare at package level, by name.
+func typeSpecs(files []*ast.File) map[string]*ast.TypeSpec {
+	specs := map[string]*ast.TypeSpec{}
+	for _, file := range files {
+		for _, declaration := range file.Decls {
+			general, isGeneral := declaration.(*ast.GenDecl)
+			if !isGeneral || general.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range general.Specs {
+				if typeSpec, isTypeSpec := spec.(*ast.TypeSpec); isTypeSpec {
+					specs[typeSpec.Name.Name] = typeSpec
+				}
+			}
+		}
+	}
+	return specs
+}
+
+// seedTypeNames seeds the name bit of every type name of the package at packageIndex, as its record holds them
+// (packageRecord.typeNames), for a build-only method whose receiver resolves to none of them: any of their method sets
+// may be the one that moves.
+func (judging *judgment) seedTypeNames(packageIndex int) {
+	for _, name := range judging.resolved.packages[packageIndex].typeNames {
+		if node, isNode := judging.resolved.nodes[nodeKey{packageIndex: int32(packageIndex), local: name}]; isNode {
+			judging.seedBits = append(judging.seedBits, bit(node, false))
 		}
 	}
 }

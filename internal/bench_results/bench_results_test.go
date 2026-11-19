@@ -423,3 +423,25 @@ func TestADishonestRecordIsRefused(test *testing.T) {
 		})
 	}
 }
+
+// Read refuses a directory holding a record from a release that carried the standard library's table, naming the field
+// Record no longer has (#znqfjw2), rather than read it as a table-less record.
+func TestReadRefusesATableEraRecord(test *testing.T) {
+	test.Parallel()
+	record := coldOnlyRecord()
+	encoded, encodeError := Encode(record)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	spliced := strings.Replace(string(encoded), "{", `{"standardLibraryTable":{"releaseStamp":"x","bytes":1},`, 1)
+	directory := test.TempDir()
+	path := filepath.Join(directory, FileName(record))
+	if writeError := os.WriteFile(path, []byte(spliced), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	records, readError := Read(directory)
+	if readError == nil || !strings.Contains(readError.Error(), "standardLibraryTable") {
+		test.Errorf("read a table-era record as %d records, %v; want it refused, naming the field", len(records),
+			readError)
+	}
+}

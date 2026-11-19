@@ -3,6 +3,7 @@ package build_dependence
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"maps"
@@ -293,7 +294,7 @@ func TestDependentObjectsAnswerForAPackageTheGraphDoesNotHold(test *testing.T) {
 }
 
 // restoredFromExportData is host's workspace packages checked again against the dependency's types read from export
-// data, as the engine's host reads a package it restored from the binary's table: each object the workspace reads of
+// data, as the engine's host reads a package it restored from the system cache: each object the workspace reads of
 // the dependency is another than the one the dependency's own load declares, and a graph of these packages holds
 // nothing of the dependency.
 func restoredFromExportData(test *testing.T, host loadedBuild) loadedBuild {
@@ -518,6 +519,197 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 	test.Fatal("the layout fixture has no unit Mapped")
 }
 
+// An array's length in a spelled type is a value, so whatever it reads is read in full, as a constant's value is:
+// runtime's mPadded pads itself past `unsafe.Sizeof(m{})`, and m's layout moves by platform. In the lengths fixture
+// inner is one int64 on the host and two on windows, so Shared's field Pad, an array of `64 - unsafe.Sizeof(inner{})`
+// bytes, is a [56]byte on the host and a [48]byte on windows, and Sized's result, an array of `unsafe.Sizeof(inner{})`
+// bytes, a [8]byte and a [16]byte: both are dependent, and Shared's underlying bit is set. Steady and Even read a
+// steady the same way, one int64 in every build, and are not; inner, declared in a file only the host compiles, is a
+// seed. An array's length inside a body is the body's to read (bodyWalk): Buffered declares a local [platformSize]byte
+// and a local type of platformSize ints, 4 on the host and 8 on windows, so its unit is dependent by the
+// body's read of platformSize, a seed, while its own bits, its signature's, which names no type, stay unset.
+func TestAnArrayLengthInASpelledTypeIsReadInFull(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "lengths", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
+	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
+		"type Shared":        true,
+		"func Sized":         true,
+		"type steady":        false,
+		"func Steady":        false,
+		"type Even":          false,
+		"type inner":         true,
+		"func Buffered":      true,
+		"value platformSize": true,
+	})
+	for _, name := range []struct {
+		local string
+		want  Bits
+	}{
+		{"Shared", Bits{Name: false, Underlying: true}},
+		{"Sized", Bits{Name: true}},
+		{"Steady", Bits{}},
+		{"Even", Bits{}},
+		{"Buffered", Bits{}},
+	} {
+		bits, isDeclared := judged.dependence.NameBits("example.com/lengths/p", name.local)
+		if !isDeclared {
+			test.Errorf("%s: no unit of the lengths fixture declares it", name.local)
+			continue
+		}
+		if bits != name.want {
+			test.Errorf("%s: want its bits %+v on windows, got %+v", name.local, name.want, bits)
+		}
+	}
+}
+
+// A var with no declared type takes its type from whatever its initializer passes through, a named type's underlying
+// included, so its bit reads every type there in full. In the inferred fixture Length is 4 on the host and 8 on
+// windows, and Rows, two arrays of Length ints, is a literal, so its name bit stays unset: on windows Row, `rows[0]`,
+// is an [8]int where the host's is a [4]int, and so are RowThrough, the same element through a pointer to rows,
+// RowDeclared, the same through a pointer whose type is declared, so its own bit stays unset and only a walk that
+// enters the pointer reaches Rows' underlying, and RowInferred, a generic's result inferred from Rows' underlying, so
+// each is dependent. PairRow, an element of a Pair whose length no build changes, is not.
+func TestAnInferredVariableReadsTheTypesItsInitializerPasses(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "inferred", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
+	for _, name := range []struct {
+		local     string
+		dependent bool
+	}{
+		{"Rows", false},
+		{"Row", true},
+		{"RowThrough", true},
+		{"RowDeclared", true},
+		{"RowInferred", true},
+		{"PairRow", false},
+	} {
+		bits, isDeclared := judged.dependence.NameBits("example.com/inferred/p", name.local)
+		if !isDeclared {
+			test.Errorf("%s: no unit of the inferred fixture declares it", name.local)
+			continue
+		}
+		if bits.Name != name.dependent {
+			test.Errorf("%s: want its name bit %t on windows, got %t", name.local, name.dependent, bits.Name)
+		}
+	}
+}
+
+// On linux, Target gains Describe in a file only the build compiles, declared on an alias of it, so it is Target's
+// method set that moves: Target's name bit is set, in the live graph and in one read back from its records alike, and
+// so every use of Target counts, its conversion to an interface among them. In the aliases fixture the alias is the
+// host's, `type Alias = Target` in a shared file, so Target's name bit is seeded through Alias's, which depends on it,
+// and Alias, whose bits are Target's, counts too; the sharedlocalaliases fixture spells it the same way, unexported,
+// `type local = Target` in a shared file. In the localaliases fixture it is declared in linux's file beside the
+// method, `type local = Target`, which the host's package never declares, so the receiver is found through the alias's
+// right-hand side. Other, a type of the same package the alias does not name, stays as the host has it in each.
+func TestABuildOnlyMethodOnAnAliasMovesItsTargetsMethodSet(test *testing.T) {
+	test.Parallel()
+
+	for _, step := range []struct {
+		fixture string
+		want    map[string]bool
+	}{
+		{fixture: "aliases", want: map[string]bool{
+			"type Target": true,
+			"type Alias":  true,
+			"func Boxed":  true,
+			"type Other":  false,
+			"func Others": false,
+		}},
+		{fixture: "sharedlocalaliases", want: map[string]bool{
+			"type Target": true,
+			"type local":  true,
+			"func Boxed":  true,
+			"type Other":  false,
+			"func Others": false,
+		}},
+		{fixture: "localaliases", want: map[string]bool{
+			"type Target": true,
+			"func Boxed":  true,
+			"type Other":  false,
+			"func Others": false,
+		}},
+	} {
+		test.Run(step.fixture, func(test *testing.T) {
+			test.Parallel()
+
+			judged := judge(test, step.fixture, linuxBuild)
+			expectVerdicts(test, verdicts(test, judged.host, judged.dependence), step.want)
+			path := "example.com/" + step.fixture
+			host := judged.host[path]
+			if host == nil {
+				test.Fatalf("the %s fixture's host holds no %s", step.fixture, path)
+			}
+			if bits := judged.dependence.ObjectBits(host.Types.Scope().Lookup("Target")); !bits.Name {
+				test.Errorf("want Target's name bit set on linux, got %+v", bits)
+			}
+			recorded := recordedGraphOf(test, graphOf(judged.host, nil)).Against(judged.difference)
+			if bits, isDeclared := recorded.NameBits(path, "Target"); !isDeclared || !bits.Name {
+				test.Errorf("want Target's name bit set on linux in the graph read back from its records, got %+v, "+
+					"declared %t", bits, isDeclared)
+			}
+		})
+	}
+}
+
+// A method in a file only the build compiles whose receiver the judgment cannot resolve to a type of the host's
+// package seeds every type name of the package, failing wide: a receiver no file declares, an alias that file declares
+// of a name no file declares, and an alias of another package's type, each a build the type checker refuses, stand
+// for any receiver the syntax alone cannot follow. Target and Other then have their name bits set, and every unit of
+// the localaliases fixture is dependent, in the live graph and in one read back from its records alike. A method on a
+// type the file declares itself, defined there, moves no method set the host has, and seeds nothing.
+func TestABuildOnlyMethodOnAReceiverThatResolvesNowhereSeedsEveryTypeName(test *testing.T) {
+	test.Parallel()
+
+	for _, step := range []struct {
+		name      string
+		source    string
+		dependent bool
+	}{
+		{name: "an undeclared receiver", source: "func (Missing) Describe() string { return \"\" }\n",
+			dependent: true},
+		{name: "an alias of an undeclared name", source: "type local = Missing\n\n" +
+			"func (local) Describe() string { return \"\" }\n", dependent: true},
+		{name: "an alias of another package's type", source: "import \"strings\"\n\ntype local = strings.Builder\n\n" +
+			"func (local) Describe() string { return \"\" }\n", dependent: true},
+		{name: "a type the file defines", source: "type local struct{}\n\n" +
+			"func (local) Describe() string { return \"\" }\n", dependent: false},
+	} {
+		test.Run(step.name, func(test *testing.T) {
+			test.Parallel()
+
+			judged := judge(test, "localaliases", linuxBuild)
+			file, parseError := parser.ParseFile(token.NewFileSet(), "describe_linux.go",
+				"package localaliases\n\n"+step.source, 0)
+			if parseError != nil {
+				test.Fatal(parseError)
+			}
+			difference := judged.difference
+			difference.Packages = maps.Clone(difference.Packages)
+			differing := difference.Packages["example.com/localaliases"]
+			differing.BuildOnlyFiles = []*ast.File{file}
+			difference.Packages["example.com/localaliases"] = differing
+			dependence := graphOf(judged.host, nil).Against(difference)
+			expectVerdicts(test, verdicts(test, judged.host, dependence), map[string]bool{
+				"type Target": step.dependent,
+				"func Boxed":  step.dependent,
+				"type Other":  step.dependent,
+				"func Others": step.dependent,
+			})
+			recorded := recordedGraphOf(test, graphOf(judged.host, nil)).Against(difference)
+			for _, name := range []string{"Target", "Other"} {
+				if bits, isDeclared := recorded.NameBits("example.com/localaliases", name); !isDeclared ||
+					bits.Name != step.dependent {
+					test.Errorf("want %s's name bit %t in the graph read back from its records, got %+v, declared %t",
+						name, step.dependent, bits, isDeclared)
+				}
+			}
+		})
+	}
+}
+
 // Each unit carries the units it calls statically: CallsReadsSize calls ReadsSize, PassesHolder calls Forward,
 // NewHolder and the method Capacity, and Untouched calls nothing. An object's position finds its declaring unit, as
 // another build's fact on it is matched (#0ghk7vj): Length's name sits in Length's unit, and no unit holds the package
@@ -565,6 +757,110 @@ func TestUnitsCarryTheirStaticCallsAndHoldTheirObjects(test *testing.T) {
 	} {
 		if got := callsOf(name); !slices.Equal(got, want) {
 			test.Errorf("%s: want the calls %q, got %q", name, want, got)
+		}
+	}
+}
+
+// A type defined from another type's name, `type Extra platformExtra`, has that type's shape: its fields and the
+// methods its embedded fields promote are the named type's, so they move with it though the declaration reads alike
+// in every build. In the definedfrom fixture platformExtra has no field on the host and a Name, a string, on linux,
+// and platformPart embeds nothing on the host and Gadget, with its Spin, on linux. Inner embeds Wrap and a pointer to
+// Extra, so its Name is Wrap's Base's, an int two levels down, on the host and Extra's own string on linux; Holder
+// embeds a pointer to Part, so it has Spin, and implements Spinner, on linux alone.
+//
+// The bit that must be set on Extra, Part, Inner and Holder is the name bit: it carries a type's method set and what
+// its embedded fields promote, a pointer or a conversion to an interface reads a type by that bit alone, as Boxed
+// reads Holder, and a field selection reads every type on its path by it, as Label reads Inner. So Label and Boxed are
+// dependent, and Label's records really differ between the builds (checkUnits). Steady, defined from Base, which no
+// build changes, keeps both bits unset, and so do Kept, which embeds a pointer to it, and Named, which reads its Name.
+//
+// An alias on either side is the same: FromAlias, defined from Target, an alias of platformExtra, has platformExtra's
+// shape through the alias, so its name bit is set, and AliasInner's and AliasLabel's with it; and Embeds, which embeds
+// a pointer to ExtraAlias, an alias of Extra, promotes Extra's fields through the alias, so its name bit is set, where
+// its underlying bit alone would be set by the pointer it holds. The graph read back from its records resolves and
+// judges alike.
+func TestATypeDefinedFromAPlatformTypeReadsItsShape(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "definedfrom", linuxBuild)
+	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
+		"type platformExtra": true,
+		"type platformPart":  true,
+		"type Base":          false,
+		"type Wrap":          false,
+		"type Extra":         true,
+		"type Inner":         true,
+		"func Label":         true,
+		"type Gadget":        false,
+		"method Gadget.Spin": false,
+		"type Part":          true,
+		"type Holder":        true,
+		"type Spinner":       false,
+		"func Boxed":         true,
+		"type Steady":        false,
+		"type Kept":          false,
+		"func Named":         false,
+		"type Target":        true,
+		"type FromAlias":     true,
+		"type AliasInner":    true,
+		"func AliasLabel":    true,
+		"type ExtraAlias":    true,
+		"type Embeds":        true,
+		"func EmbedsLabel":   true,
+	})
+
+	checked := checkUnits(judged.host, judged.build, judged.dependence)
+	for _, miss := range checked.misses {
+		test.Errorf("independent and records differently: %s", miss)
+	}
+	if len(checked.unexportedUntouched) > 0 {
+		test.Errorf("want no unit differing only in unexported fields it never selects, got %q",
+			checked.unexportedUntouched)
+	}
+	if checked.dependentDiffer == 0 {
+		test.Error("no dependent unit records differently, so the comparison does not see Label's Name move")
+	}
+
+	live := graphOf(judged.host, nil)
+	expectNoUnnameable(test, "definedfrom", live)
+	recorded := recordedGraphOf(test, live)
+	expectAlike(test, "definedfrom resolved", resolvedLines(live), resolvedLines(recorded))
+	recordedDependence := recorded.Against(judged.difference)
+	expectAlike(test, "definedfrom under linux", unitVerdicts(judged.dependence), unitVerdicts(recordedDependence))
+	for _, graph := range []struct {
+		name       string
+		dependence *Dependence
+	}{
+		{"the live graph", judged.dependence},
+		{"the graph read back from its records", recordedDependence},
+	} {
+		for _, name := range []struct {
+			local string
+			named bool
+		}{
+			{"Extra", true},
+			{"Part", true},
+			{"Inner", true},
+			{"Holder", true},
+			{"FromAlias", true},
+			{"AliasInner", true},
+			{"ExtraAlias", true},
+			{"Embeds", true},
+			{"Steady", false},
+			{"Kept", false},
+		} {
+			bits, isDeclared := graph.dependence.NameBits("example.com/definedfrom", name.local)
+			if !isDeclared {
+				test.Errorf("%s: no unit of the definedfrom fixture declares it in %s", name.local, graph.name)
+				continue
+			}
+			switch {
+			case name.named && !bits.Name:
+				test.Errorf("%s: want its name bit set on linux in %s, got %+v", name.local, graph.name, bits)
+			case !name.named && bits != (Bits{}):
+				test.Errorf("%s: want neither bit set on linux in %s, as no build changes it, got %+v", name.local,
+					graph.name, bits)
+			}
 		}
 	}
 }

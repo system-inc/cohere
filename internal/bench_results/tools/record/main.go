@@ -10,8 +10,7 @@
 // The Go settings are what the benchmark saw in its environment, each empty when unset, and -project-engine
 // names the one engine whose project every run checked alone, absent for a run of the whole root. -no-fix says the
 // cold and idle runs checked without fixing, and -every-build that every run asked to check every build the Go files
-// name. The builds the cold and idle runs checked are read from the runs table, and whether the engine carries the
-// standard library's table from its --version.
+// name. The builds the cold and idle runs checked are read from the runs table.
 //
 // The engine's commit and whether its tree was modified come from the binary's own build info, not from
 // its --version prose, so a binary that names no commit is refused rather than recorded as clean.
@@ -31,7 +30,6 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/bench_results"
-	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
 )
 
 func main() {
@@ -101,7 +99,7 @@ func record(
 	goEnvironment *bench_results.GoEnvironment,
 	out string,
 ) (string, error) {
-	cohere, table, engineProvenanceError := engineProvenance(engine)
+	cohere, engineProvenanceError := engineProvenance(engine)
 	if engineProvenanceError != nil {
 		return "", engineProvenanceError
 	}
@@ -114,26 +112,25 @@ func record(
 		return "", readRunsError
 	}
 	result := bench_results.Record{
-		Schema:               bench_results.SchemaVersion,
-		RecordedAt:           time.Now().UTC().Format(time.RFC3339),
-		Cohere:               cohere,
-		Project:              bench_results.Project{Name: project, Commit: projectCommit},
-		Machine:              machine,
-		IdleFloor:            idleFloor,
-		SettleSeconds:        settle,
-		Rounds:               rounds,
-		MeasuredModes:        measured,
-		Band:                 band,
-		StoppedEarly:         stoppedEarly,
-		Edit:                 edit,
-		Engine:               projectEngine,
-		NoFix:                noFix,
-		EveryBuild:           everyBuild,
-		Builds:               builds,
-		GoEnvironment:        goEnvironment,
-		StandardLibraryTable: table,
-		Runs:                 runs,
-		Modes:                bench_results.Summarize(measured, runs),
+		Schema:        bench_results.SchemaVersion,
+		RecordedAt:    time.Now().UTC().Format(time.RFC3339),
+		Cohere:        cohere,
+		Project:       bench_results.Project{Name: project, Commit: projectCommit},
+		Machine:       machine,
+		IdleFloor:     idleFloor,
+		SettleSeconds: settle,
+		Rounds:        rounds,
+		MeasuredModes: measured,
+		Band:          band,
+		StoppedEarly:  stoppedEarly,
+		Edit:          edit,
+		Engine:        projectEngine,
+		NoFix:         noFix,
+		EveryBuild:    everyBuild,
+		Builds:        builds,
+		GoEnvironment: goEnvironment,
+		Runs:          runs,
+		Modes:         bench_results.Summarize(measured, runs),
 	}
 	encoded, encodeError := bench_results.Encode(result)
 	if encodeError != nil {
@@ -152,28 +149,15 @@ func record(
 	return path, os.WriteFile(path, encoded, 0o644)
 }
 
-// engineProvenance is the engine's commit, its first --version line, whether it was built from a modified tree, and the
-// standard library's table it carries and reads, nil for none, as the engine states them (internal/release/packaging's
-// Provenance). The launcher builds from a committed snapshot with VCS stamping off and stamps the commit itself, so the
-// commit comes from the `commit:` line, lengthened to the full commit by this repository, and the tree was modified
-// when the `source:` line is printed or the binary's own vcs.modified stamp says so.
-func engineProvenance(engine string) (bench_results.Cohere, *bench_results.StandardLibraryTable, error) {
+// engineProvenance is the engine's commit, its first --version line and whether it was built from a modified tree, as
+// the engine states them (internal/release/packaging's Provenance). The launcher builds from a committed snapshot with
+// VCS stamping off and stamps the commit itself, so the commit comes from the `commit:` line, lengthened to the full
+// commit by this repository, and the tree was modified when the `source:` line is printed or the binary's own
+// vcs.modified stamp says so.
+func engineProvenance(engine string) (bench_results.Cohere, error) {
 	output, outputError := exec.Command(engine, "--version").Output()
 	if outputError != nil {
-		return bench_results.Cohere{}, nil, fmt.Errorf("%s --version: %w", engine, outputError)
-	}
-	stamp, size, carries, found := standard_library_table.ReadVersionLine(string(output))
-	if !found {
-		// A release candidate from before the line carries a table and says nothing, so read as a local build it
-		// would be compared with a local build's number.
-		return bench_results.Cohere{}, nil, fmt.Errorf("%s does not say whether it carries a standard library "+
-			"table (no %q line in its --version that it can read), so its record could not say what its cold runs "+
-			"computed",
-			engine, strings.TrimSpace(standard_library_table.VersionPrefix))
-	}
-	var table *bench_results.StandardLibraryTable
-	if carries {
-		table = &bench_results.StandardLibraryTable{ReleaseStamp: stamp, Bytes: size}
+		return bench_results.Cohere{}, fmt.Errorf("%s --version: %w", engine, outputError)
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	cohere := bench_results.Cohere{Version: strings.TrimSpace(lines[0])}
@@ -191,11 +175,11 @@ func engineProvenance(engine string) (bench_results.Cohere, *bench_results.Stand
 		}
 	}
 	if short == "" {
-		return cohere, nil, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", engine)
+		return cohere, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", engine)
 	}
 	full, outputError := exec.Command("git", "rev-parse", "--verify", "--quiet", short+"^{commit}").Output()
 	if outputError != nil {
-		return cohere, nil, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
+		return cohere, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
 	}
 	cohere.Commit = strings.TrimSpace(string(full))
 	if info, readFileError := buildinfo.ReadFile(engine); readFileError == nil {
@@ -205,7 +189,7 @@ func engineProvenance(engine string) (bench_results.Cohere, *bench_results.Stand
 			}
 		}
 	}
-	return cohere, table, nil
+	return cohere, nil
 }
 
 // thisMachine is the hardware, read from sysctl and sw_vers. The host's name is never read.

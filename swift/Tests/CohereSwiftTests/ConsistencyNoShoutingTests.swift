@@ -58,6 +58,32 @@ struct ConsistencyNoShoutingTests {
         #expect(try Self.flagged("// NEVERmind the URLs.\nlet value = 1\n").isEmpty)
     }
 
+    /*
+     Words a hyphen or an ampersand joins are read whole first, as nexus reads them (#1z7kbtz): a digit anywhere or a
+     one-letter part makes the run an identifier, and a run with neither is read a word at a time. The cases are
+     nexus's own for the rule, with the shapes the task named beside them.
+     */
+    @Test func joinedRunsAreReadWholeAsNexusReadsThem() throws {
+        for identifier in ["F-PROMISE-13", "F-RULES", "F-HW", "F-STORY-07", "BEN-UNG-00-001", "X-RAY", "A-TEAM"] {
+            #expect(try Self.flagged("// This rests on \(identifier) and nothing else.\nlet value = 1\n").isEmpty)
+        }
+        #expect(try Self.flagged("// Cancel the AT&T lines, then file the R&D notes.\nlet value = 1\n").isEmpty)
+        #expect(try Self.flagged("// The Q&A with P&G ran long.\nlet value = 1\n").isEmpty)
+
+        #expect(try Self.flagged("// That is a LOAD-BEARING wall.\nlet value = 1\n") == ["1:LOAD", "1:BEARING"])
+        #expect(try Self.flagged("// This one is MUST-HAVE for launch.\nlet value = 1\n") == ["1:MUST", "1:HAVE"])
+        #expect(try Self.flagged("// We WILL-NOT ship it.\nlet value = 1\n") == ["1:WILL", "1:NOT"])
+        #expect(try Self.flagged("// That was pure ROCK&ROLL tonight.\nlet value = 1\n") == ["1:ROCK", "1:ROLL"])
+        #expect(
+            try Self.located("// Per F-PROMISE-13 this is LOAD-BEARING.\nlet value = 1\n")
+                == ["1:29:LOAD", "1:34:BEARING"]
+        )
+        /* A space beside the ampersand leaves no run, so the two-letter word stands alone. */
+        #expect(try Self.flagged("// Cancel the AT &T lines.\nlet value = 1\n") == ["1:AT"])
+        /* A part holding a lowercase letter ends the run before it. */
+        #expect(try Self.flagged("// The F-Promise is NOT kept.\nlet value = 1\n") == ["1:NOT"])
+    }
+
     @Test func codeIsMasked() throws {
         #expect(try Self.flagged("// the `NOT_FOUND` and `KEEP GOING` branches\nlet value = 1\n").isEmpty)
         #expect(

@@ -1,7 +1,6 @@
 package check
 
 import (
-	"cmp"
 	"fmt"
 	"go/types"
 	"maps"
@@ -15,9 +14,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
-// kindAnswers is one kind's answers in one package, as the stores and the release's table hold them (#w7zmvat wave
-// 3): each answer by its object's objectpath, sorted, and whether the package was computed whole in the kind, so an
-// object with no answer has no fact.
+// kindAnswers is one kind's answers in one package, as the stores hold them (#w7zmvat wave 3): each answer by its
+// object's objectpath, sorted, and whether the package was computed whole in the kind, so an object with no answer has
+// no fact.
 type kindAnswers struct {
 	Kind     string
 	Complete bool
@@ -42,19 +41,6 @@ func sortedAnswers(answers map[string]map[objectpath.Path][]byte, complete bool)
 		sorted = append(sorted, held)
 	}
 	return sorted
-}
-
-// sortAnswers sorts answers in place, by kind's name and then each kind's by objectpath.
-func sortAnswers(answers []kindAnswers) {
-	slices.SortFunc(
-		answers,
-		func(left kindAnswers, right kindAnswers) int { return cmp.Compare(left.Kind, right.Kind) },
-	)
-	for index := range answers {
-		slices.SortFunc(answers[index].Answers, func(left pathAnswer, right pathAnswer) int {
-			return cmp.Compare(left.Path, right.Path)
-		})
-	}
 }
 
 // addAnswers adds held to answers, the fact_resolver's shape of what a store holds.
@@ -278,12 +264,9 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 
 // entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, by objectpath and
 // by place, the answers its analysis read of other packages, with whether those could all be named, and what it
-// declares without a body, with whether the load recorded that (see cacheEntry's Bodiless). answersWhole is whether
-// the answers are every answer of the package, computed whole, as the release's table must hold them
-// (standardLibraryEntryWhole), rather than those the run's questions happened to compute in it.
+// declares without a body, with whether the load recorded that (see cacheEntry's Bodiless).
 type entryDemand struct {
 	answers         []kindAnswers
-	answersWhole    bool
 	placed          []fact_resolver.PlacedAnswer
 	reads           []storedRead
 	readsIncomplete bool
@@ -299,13 +282,12 @@ func (session *CacheSession) withBodiless(saved *packages.Package, demanded entr
 }
 
 // demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are every answer of its
-// package, computed whole, as the release's table holds them, so a later run that restores it never reloads it to
-// answer a question, when the resolver can compute them all without a reload and Caching's AnswersInPart does not
-// name it; otherwise those held before, the entry's before a reload or the first wave's (held), with every answer the
-// run computed in it. Its placed answers, in either case, are every answer the run holds about the package's declared
-// functions and their parameters (fact_resolver's PlacedIn), whatever its kind, with those held before at every place
-// the run holds no answer of that kind at. Its reads are those held before with every read the run's analysis of it
-// made.
+// package, computed whole, so a later run that restores it never reloads it to answer a question, when the resolver can
+// compute them all without a reload and Caching's AnswersInPart does not name it; otherwise those held before, the
+// entry's before a reload or the first wave's (held), with every answer the run computed in it. Its placed answers, in
+// either case, are every answer the run holds about the package's declared functions and their parameters
+// (fact_resolver's PlacedIn), whatever its kind, with those held before at every place the run holds no answer of that
+// kind at. Its reads are those held before with every read the run's analysis of it made.
 func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand) entryDemand {
 	if session.readAfterKeep("demandOf, the saved answers of "+saved.ID) || session.resolver == nil ||
 		saved.Types == nil {
@@ -315,7 +297,7 @@ func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand)
 	home := session.resolver.Package(saved.Types)
 	if !session.caching.AnswersInPart[saved.PkgPath] && home != nil {
 		if whole, complete := session.resolver.WholeIfComplete(home); complete {
-			demanded.answers, demanded.answersWhole = sortedAnswers(whole, true), true
+			demanded.answers = sortedAnswers(whole, true)
 		}
 	}
 	if demanded.answers == nil {
