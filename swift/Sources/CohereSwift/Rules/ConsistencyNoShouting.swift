@@ -162,8 +162,15 @@ public struct ConsistencyNoShouting: FileRule {
     }
 
     /*
-     Each uppercase word in masked text, as the range of its bytes: Go's `\b[A-Z][A-Z0-9_]*\b`, which matches only a
-     whole run of ASCII word characters, so a run is a word when it opens with a capital and holds no lowercase.
+     Each uppercase word in masked text the run rule leaves to be judged, as the range of its bytes, the shared Go
+     package's `uppercaseTokens` (#1z7kbtz). A word is Go's `\b[A-Z][A-Z0-9_]*\b`, which matches only a whole run of
+     ASCII word characters, so a run of them is a word when it opens with a capital and holds no lowercase.
+
+     Words a hyphen or an ampersand joins are read whole first, as nexus's `findUppercaseTokens` reads them, its
+     `\b[A-Z][A-Z0-9_]*(?:[-&][A-Z0-9_]+)*\b`: a word, then each joiner whose following run of word characters is not
+     empty and holds no lowercase. A joined run with a digit anywhere or a part one letter long is an identifier and
+     gives up no word, so a fact id, `F-PROMISE-13`, and a name, `AT&T`, are not shouting, while `WILL-NOT` has neither
+     and each of its words is judged alone.
      */
     static func words(in masked: [UInt8]) -> [Range<Int>] {
         var words: [Range<Int>] = []
@@ -173,18 +180,52 @@ public struct ConsistencyNoShouting: FileRule {
                 index += 1
                 continue
             }
-            var end = index
-            while end < masked.count, CommentText.isWordCharacter(masked[end]) {
-                end += 1
-            }
-            if masked[index] >= UInt8(ascii: "A"), masked[index] <= UInt8(ascii: "Z"),
-                masked[index..<end].allSatisfy(isUppercaseWordCharacter)
-            {
-                words.append(index..<end)
+            var end = wordEnd(in: masked, from: index)
+            if isUppercaseWord(masked[index..<end]) {
+                var parts = [index..<end]
+                while end < masked.count, isJoiner(masked[end]) {
+                    let partEnd = wordEnd(in: masked, from: end + 1)
+                    guard partEnd > end + 1, masked[(end + 1)..<partEnd].allSatisfy(isUppercaseWordCharacter) else {
+                        break
+                    }
+                    parts.append((end + 1)..<partEnd)
+                    end = partEnd
+                }
+                if !isJoinedIdentifier(parts, in: masked) {
+                    words.append(contentsOf: parts.filter { isUppercaseWord(masked[$0]) })
+                }
             }
             index = end
         }
         return words
+    }
+
+    /* Where the run of ASCII word characters at `start` ends, `start` itself when there is none. */
+    static func wordEnd(in bytes: [UInt8], from start: Int) -> Int {
+        var end = start
+        while end < bytes.count, CommentText.isWordCharacter(bytes[end]) {
+            end += 1
+        }
+        return end
+    }
+
+    /* Whether a run of word characters is an uppercase word: it opens with a capital and holds no lowercase. */
+    static func isUppercaseWord(_ bytes: ArraySlice<UInt8>) -> Bool {
+        guard let first = bytes.first, first >= UInt8(ascii: "A"), first <= UInt8(ascii: "Z") else { return false }
+        return bytes.allSatisfy(isUppercaseWordCharacter)
+    }
+
+    /* A byte that joins the parts of an uppercase run, a hyphen or an ampersand. */
+    static func isJoiner(_ byte: UInt8) -> Bool {
+        byte == UInt8(ascii: "-") || byte == UInt8(ascii: "&")
+    }
+
+    /* nexus's `isJoinedIdentifier`, given a run's parts: joined, with a digit anywhere or a part one letter long. */
+    static func isJoinedIdentifier(_ parts: [Range<Int>], in bytes: [UInt8]) -> Bool {
+        guard parts.count > 1 else { return false }
+        return parts.contains { part in
+            part.count == 1 || bytes[part].contains { $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") }
+        }
     }
 
     /*

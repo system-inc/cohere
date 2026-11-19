@@ -8,6 +8,7 @@
 package shouting
 
 import (
+	"iter"
 	"regexp"
 	"strings"
 
@@ -438,7 +439,7 @@ type ShoutedToken struct {
 // word, or inside code masked before it, included.
 func ShoutedTokensInMasked(masked string) []ShoutedToken {
 	var tokens []ShoutedToken
-	for start, end := nextUppercaseToken(masked, 0); start >= 0; start, end = nextUppercaseToken(masked, end) {
+	for start, end := range uppercaseTokens(masked) {
 		token := masked[start:end]
 		if isShoutedToken(token) {
 			tokens = append(tokens, ShoutedToken{Text: token, Offset: start})
@@ -454,15 +455,99 @@ func ShoutedTokensInMasked(masked string) []ShoutedToken {
 // offset. Masking only blanks, and every mask blanks a run that opens on a quote, a backtick or a line's start and
 // closes on a quote, a backtick or a line's end. None of those is a word character, so a mask never cuts into a word:
 // a word left in the masked text has the same bytes as before, and its neighbours are word characters or not just as
-// they were, so it is a token after masking exactly when it was one before. TestMaskingMakesNoNewToken pins that
-// against every mask, so a mask taught to blank inside a word fails there before it silences a shout here.
+// they were, so it is a token after masking exactly when it was one before. A run of tokens a hyphen or an ampersand
+// joins is the same: no run crosses a line, and a mask's ends are a line's ends or bytes no run holds, so a mask
+// blanks a run whole or none of it, and a run left in the masked text is joined to just what it was before.
+// TestMaskingMakesNoNewToken pins that against every mask, so a mask taught to blank inside a word or a run fails
+// there before it silences a shout here.
 func HasShoutedToken(text string) bool {
-	for start, end := nextUppercaseToken(text, 0); start >= 0; start, end = nextUppercaseToken(text, end) {
+	for start, end := range uppercaseTokens(text) {
 		if isShoutedToken(text[start:end]) {
 			return true
 		}
 	}
 	return false
+}
+
+// uppercaseTokens is where each uppercase token of text the run rule leaves to be judged starts and ends, in order.
+//
+// A run of capitals joined by a hyphen or an ampersand is read whole before it is read by token, as nexus's
+// findUppercaseTokens reads it (#1z7kbtz). Read by token alone, a fact id cited in prose, `F-PROMISE-13`, gave up
+// `PROMISE`, and a company's name, `AT&T`, gave up `AT`, each a shout in a sentence that was only naming something.
+// Whole, the run shows its shape: a digit anywhere in it, or a part one letter long, marks a code or a name rather than
+// words, so `F-HW`, `X-RAY`, `R&D` and `BEN-UNG-00-001` give up no token. `LOAD-BEARING` and `ROCK&ROLL` have neither,
+// so each of their tokens is judged as it always was, and still shouts. A run with no join is its one token.
+func uppercaseTokens(text string) iter.Seq2[int, int] {
+	return func(yield func(int, int) bool) {
+		for from := 0; ; {
+			runStart, runEnd := nextUppercaseRun(text, from)
+			if runStart < 0 {
+				return
+			}
+			from = runEnd
+			if isJoinedIdentifier(text[runStart:runEnd]) {
+				continue
+			}
+			// A run ends on a word boundary, so the tokens of the text cut there, from the run's start, are the ones
+			// nexus's uppercaseTokenPattern finds in the run alone.
+			run := text[:runEnd]
+			for start, end := nextUppercaseToken(run, runStart); start >= 0; start, end = nextUppercaseToken(run, end) {
+				if !yield(start, end) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// isJoinedIdentifier reports whether a run is joined and reads as an identifier: a digit anywhere, or a part one
+// letter long. nexus's isJoinedIdentifier, condition for condition.
+func isJoinedIdentifier(run string) bool {
+	if !strings.ContainsAny(run, "-&") {
+		return false
+	}
+	if strings.ContainsAny(run, "0123456789") {
+		return true
+	}
+	// A run's parts are never empty, since each joiner sits between two of them.
+	for part := range strings.FieldsFuncSeq(run, isJoiner) {
+		if len(part) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// isJoiner reports whether a character joins the parts of an uppercase run, a hyphen or an ampersand.
+func isJoiner(character rune) bool {
+	return character == '-' || character == '&'
+}
+
+// nextUppercaseRun is where the first match of nexus's `\b[A-Z][A-Z0-9_]*(?:[-&][A-Z0-9_]+)*\b` at or after from
+// starts and ends in text, or -1 for both when there is none, by hand as nextUppercaseToken is.
+//
+// The run opens on an uppercase token, the pattern's first part, and takes each joiner after it whose following run of
+// `ASCII` word characters is not empty and holds no lowercase letter, as `[A-Z0-9_]+` and the closing `\b` demand. The
+// first joiner that fails ends the run before it, where the pattern backtracks to, since a word character before a
+// joiner is a boundary. TestNextUppercaseRunMatchesThePattern holds the two equal.
+func nextUppercaseRun(text string, from int) (int, int) {
+	start, end := nextUppercaseToken(text, from)
+	if start < 0 {
+		return -1, -1
+	}
+	for end < len(text) && (text[end] == '-' || text[end] == '&') {
+		partEnd := end + 1
+		holdsLowercase := false
+		for partEnd < len(text) && isAsciiWordCharacter(text[partEnd]) {
+			holdsLowercase = holdsLowercase || (text[partEnd] >= 'a' && text[partEnd] <= 'z')
+			partEnd++
+		}
+		if partEnd == end+1 || holdsLowercase {
+			break
+		}
+		end = partEnd
+	}
+	return start, end
 }
 
 // nextUppercaseToken is where the first match of uppercaseToken at or after from starts and ends in text, or -1 for

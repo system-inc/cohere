@@ -122,7 +122,8 @@ func TestShoutingUppercaseGatePreservesTokens(test *testing.T) {
 		masked := MaskCodeAndCommands(body)
 		var tokens []string
 		seen := map[string]bool{}
-		for _, token := range uppercaseToken.FindAllString(masked, -1) {
+		for _, span := range referenceUppercaseTokens(masked) {
+			token := masked[span[0]:span[1]]
 			if seen[token] || !isShoutedToken(token) {
 				continue
 			}
