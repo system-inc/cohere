@@ -241,8 +241,11 @@
 // dispatcher's and a rule's own after its dispatcher. Where that action
 // failed, the dispatcher runs all the same with nothing standing, and a
 // failure of the added edge is no part of its own nor of what it reads
-// under Options.Failed. The checker never reads the answer. With
-// StandingBodies unset, the graph and every pass are as they were.
+// under Options.Failed. The checker never reads the answer. Analyze
+// refuses a StandingAfter that is a dispatcher, or requires one through
+// what it requires, since every dispatcher's action would then wait on
+// one that waits on it. With StandingBodies unset, the graph and every
+// pass are as they were.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -467,7 +470,8 @@ type Options struct {
 	// action failed, no pass holds one, and a failure of the edge Analyze
 	// added fails no action and is not under Failed. StandingAfter must
 	// not require a dispatcher, itself or through what it requires, since
-	// the dispatcher would then wait on itself. With StandingBodies
+	// the dispatcher would then wait on itself, and Analyze refuses one
+	// that does, naming it. With StandingBodies
 	// unset, no action is added, and unset or where it answers nil,
 	// ResultOf holds no standing bodies.
 	Standing       *analysis.Analyzer
@@ -742,6 +746,16 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 
 	if err := analysis.Validate(analyzers); err != nil {
 		return nil, err
+	}
+
+	// cohere: refuse an Options.StandingAfter that is a dispatcher or
+	// requires one, whose edge would have each dispatcher wait on itself.
+	if opts.StandingBodies != nil && opts.StandingAfter != nil && opts.Tolerant != nil {
+		if dispatcher := requiredDispatcher(opts.StandingAfter, opts.Tolerant); dispatcher != nil {
+			return nil, fmt.Errorf("the analyzer every dispatcher follows for its standing bodies, %s, "+
+				"requires the dispatcher %s, itself or through what it requires, so each dispatcher's action "+
+				"would wait on itself", opts.StandingAfter.Name, dispatcher.Name)
+		}
 	}
 
 	// Construct the action graph.
@@ -1314,6 +1328,30 @@ func requiredByAny(acts []*Action, dep *Action) bool {
 		}
 	}
 	return false
+}
+
+// cohere: requiredDispatcher is the first analyzer tolerant names that
+// after is or requires, depth first through what each requires, and nil
+// when there is none.
+func requiredDispatcher(after *analysis.Analyzer, tolerant func(*analysis.Analyzer) bool) *analysis.Analyzer {
+	seen := map[*analysis.Analyzer]bool{}
+	var find func(current *analysis.Analyzer) *analysis.Analyzer
+	find = func(current *analysis.Analyzer) *analysis.Analyzer {
+		if seen[current] {
+			return nil
+		}
+		seen[current] = true
+		if tolerant(current) {
+			return current
+		}
+		for _, required := range current.Requires {
+			if found := find(required); found != nil {
+				return found
+			}
+		}
+		return nil
+	}
+	return find(after)
 }
 
 // cohere: tolerant is whether act runs past a failed prerequisite on its
