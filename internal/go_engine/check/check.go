@@ -563,6 +563,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		}
 		result.Reads = options.Reads
 	}
+	// Beside the load, nothing is read, saved or kept of a package before the load has made it final, and nothing at
+	// all once the pass is abandoned (awaitLoaded): a restored package's facts and answers read its types, which the
+	// load sets from export data on its own goroutine (#641hyrh).
+	if session != nil && options.Ready != nil && !session.awaitLoaded(options.Ready, options.Abandon) {
+		return nil, ErrAbandoned
+	}
 	// A restored package's facts by path and its answers are read before the run keeps its packages for the extra
 	// builds, which lets the session's answers go.
 	var unnamedFacts []ExportedFact

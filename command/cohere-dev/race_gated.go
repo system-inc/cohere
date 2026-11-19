@@ -36,7 +36,10 @@ var raceGated = []raceEntry{
 		"(function_uses_judgment_test.go, #kr1m304)"},
 	{"internal/go_engine/cache", "TestConcurrentPutsOfOneKeyLeaveAWholeEntry writes one key from several goroutines"},
 	{"internal/go_engine/check", "dependence sets and type graph digests are computed at once over one host " +
-		"(dependence_concurrency_test.go, type_graph_concurrency_test.go)"},
+		"(dependence_concurrency_test.go, type_graph_concurrency_test.go), and a run beside the load saves and " +
+		"keeps only what the load has made final (cache_session_beside_load_test.go: " +
+		"TestARunBesideTheLoadSavesAPackageOnlyOnceTheLoadHasMadeItFinal, " +
+		"TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal, #641hyrh)"},
 	{"internal/go_engine/check/checker", "the scheduler runs groups and actions at once, up to its slots and workers"},
 	{"internal/go_engine/fact_resolver", "TestObjectsAskedAtOnceAreNamedAsObjectpathNamesThem asks the resolver's " +
 		"objectpath encoders from several goroutines while each indexes its package (object_path_test.go, #8d9r2rh)"},
