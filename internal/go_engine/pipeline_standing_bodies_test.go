@@ -332,3 +332,56 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 			"PlantedKept's by the host's alone", offHeard, onHeard)
 	}
 }
+
+// standingGates are the modules of testdata/standing-gates, the body differential's five of a package-wide gate (the
+// seat's h-shadow return, #zvwfe26): in each, windows's own file flips or keeps a gate another file's function is
+// judged by, and that function's body is one the difference never reaches. sort-win and sort-host flip whether a
+// method of package sort is used, which opens SA4029, beside a shared file that imports sort itself; sort-alias-win
+// and sort-alias-host flip it through an alias, from a shared file that imports no sort; import-unsafe imports unsafe
+// in windows's file alone, which closes unusedwrite on the whole package.
+var standingGates = []string{"sort-win", "sort-host", "sort-alias-win", "sort-alias-host", "import-unsafe"}
+
+// runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
+// body reach census with `--no-cache --no-fix --build-dependence`, with the standing bodies' switch as switched, and
+// returns the pipeline, its stream, normalized, and the copy's root.
+func runStandingGate(test *testing.T, module string, switched bool) (*pipeline, string, string) {
+	test.Helper()
+	root := copyFixture(test, filepath.Join("testdata", "standing-gates", module))
+	engine, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(engine *pipeline) {
+		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		engine.standingBodies = switched
+	}, "--no-cache", "--no-fix", "--build-dependence")
+	return engine, normalize(stream, root), root
+}
+
+// A body left standing keeps no package-wide gate that another file of windows's build flips: over each standing gate
+// module, windows's own findings, and the stream's, with the standing bodies' switch on are those with it off, and on,
+// something stood. A rule whose finding in a body hangs on such a gate is Composes in the inputs table, so it is never
+// confined, and windows judges the shared body itself, where the host's findings there would be wrong.
+func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
+	test.Parallel()
+
+	for _, module := range standingGates {
+		test.Run(module, func(test *testing.T) {
+			test.Parallel()
+			off, offStream, offRoot := runStandingGate(test, module, false)
+			on, onStream, onRoot := runStandingGate(test, module, true)
+			if len(off.buildRuns) != 2 || len(on.buildRuns) != 2 {
+				test.Fatalf("want the host's build and windows's in both runs, got %d and %d runs", len(off.buildRuns),
+					len(on.buildRuns))
+			}
+			onWindows, offWindows := rawFindings(on.buildRuns[1], onRoot), rawFindings(off.buildRuns[1], offRoot)
+			if !slices.Equal(onWindows, offWindows) {
+				test.Errorf("windows's own findings with the switch on are\n%s\nwant those with it off\n%s",
+					strings.Join(onWindows, "\n"), strings.Join(offWindows, "\n"))
+			}
+			if !slices.Equal(findingLines(onStream), findingLines(offStream)) {
+				test.Errorf("the findings with the switch on are\n%q\nwant those with it off\n%q",
+					findingLines(onStream), findingLines(offStream))
+			}
+			if on.buildRuns[1].standingDeclarations == 0 {
+				test.Errorf("with the switch on nothing of windows's build stood, so the comparison proves nothing")
+			}
+		})
+	}
+}
