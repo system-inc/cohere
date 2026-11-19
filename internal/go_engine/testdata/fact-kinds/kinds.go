@@ -21,10 +21,17 @@ func (*failure) Error() string {
 	return "failure"
 }
 
-// Purity. size returns platformSize's double, which counts its calls on every platform but windows, so size is pure on
-// windows alone.
+// Purity. size returns what helper returns of 4, so size is pure where helper is, on windows alone. It names only helper,
+// whose signature is the same in every build, so the reach leaves size standing too, and only the facts take it out.
 func size() int {
-	return platformSize(4)
+	return helper(4)
+}
+
+// helper returns platformSize's double, which counts its calls on every platform but windows, so helper is pure on
+// windows alone. No body asks helper's purity: size's judgment reads it from the kind's own state, so the host holds
+// no record of it, and only that a body the build lints holds no record takes size out (#5vbs1np, must 1).
+func helper(base int) int {
+	return platformSize(base)
 }
 
 // Warm discards size's count, a finding only where size is pure, on windows: the reach review's must 6 (#w72zxtq).

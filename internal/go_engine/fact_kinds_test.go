@@ -51,16 +51,6 @@ func settleFactKinds(test *testing.T) *factKindsSettled {
 	return settled
 }
 
-// stands is whether the body named name still stands, which the test fails on when the census lists no such body.
-func (settled *factKindsSettled) stands(test *testing.T, name string) bool {
-	test.Helper()
-	body, isListed := settled.bodies[name]
-	if !isListed {
-		test.Fatalf("the census lists no body %s", name)
-	}
-	return settled.settlement.Standing[fact_reach.Place{File: body.file, Offset: body.offset}]
-}
-
 // removal is why the body named name left the standing set, and whether it did.
 func (settled *factKindsSettled) removal(test *testing.T, name string) (fact_reach.Removal, bool) {
 	test.Helper()
@@ -93,21 +83,26 @@ func (settled *factKindsSettled) requireRemovedBy(
 	}
 }
 
-// The reach review's must 6 (#w72zxtq): Warm discards size's count, a finding only where size is pure, which it is on
-// windows alone, since platformSize counts its calls everywhere else. Warm names only size, whose signature is the
-// same in every build, so the reach leaves it unreached; standing on the host's findings it would lose windows's.
-// The facts' reach asks windows size's purity, recorded under size, which the build lints, finds it differs, and takes
-// Warm out, so Warm's finding is the build's own; Warm's own purity, which Warmer asks, then differs in turn and takes
-// Warmer out. Nothing stands that the second leg (#adq5ahd) could find differing. With the comparison made always
-// equal, Warm stands and the second leg reports its purity: host false, build true.
+// The reach review's must 6 (#w72zxtq), a level deeper (#5vbs1np, must 1): Warm discards size's count, a finding only
+// where size is pure, which it is on windows alone, since size returns helper's and helper platformSize's, which counts
+// its calls everywhere else. Warm names only size and size only helper, whose signatures are the same in every build,
+// so the reach leaves both unreached; standing on the host's findings Warm would lose windows's. The build lints
+// helper, but no body asked helper's purity, which size's judgment read from the kind's own state, so the host holds
+// no record of it: a body the build lints with no record of a kind reads unknown for it, and takes size out. size's own
+// purity, recorded where Warm asked it, then differs and takes Warm out, so Warm's finding is the build's own; Warm's
+// own purity, which Warmer asks, then differs in turn and takes Warmer out. Nothing stands that the second leg
+// (#adq5ahd) could find differing.
 func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 	test.Parallel()
 
 	settled := settleFactKinds(test)
-	if settled.bodies["Warm"].reason != "" {
-		test.Fatalf("the reach reached Warm for %q, want it unreached, so that only the facts can take it out",
-			settled.bodies["Warm"].reason)
+	for _, name := range []string{"Warm", "size"} {
+		if settled.bodies[name].reason != "" {
+			test.Fatalf("the reach reached %s for %q, want it unreached, so that only the facts can take it out", name,
+				settled.bodies[name].reason)
+		}
 	}
+	settled.requireRemovedBy(test, "size", "helper", fact_reach.UnrecordedReason("function_purity"))
 	settled.requireRemovedBy(test, "Warm", "size", fact_reach.DiffersReason("function_purity"))
 	settled.requireRemovedBy(test, "Warmer", "Warm", fact_reach.DiffersReason("function_purity"))
 
@@ -132,15 +127,18 @@ func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 }
 
 // For each fact kind a build compares, the user of a callee whose answer differs on windows leaves the standing set,
-// taken out by that callee for that kind, and the user of a callee whose answer is the same stands (#73k3wge). The
-// no-return fact is compared for every function before any answer is asked; each other kind's answer is asked of the
-// callee, which the reach lints since it names a function or type each platform's file declares.
+// taken out by that callee for that kind (#73k3wge). The no-return fact is compared for every function before any
+// answer is asked; each other kind's answer is asked of the callee, which the reach lints since it names a function or
+// type each platform's file declares.
 //
-// Triviality and the stopping calls are not registered with the resolver (fact_resolver.Register), so the build cannot
-// ask either again and reads every answer of theirs as unknown: the users of their equal callees leave too, as
-// unknown, which is the sound answer until the build can ask them. The day it can, their stable users stand, and this
-// test says so.
-func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndLeavesAnEqualOnesStanding(test *testing.T) {
+// The user of a callee whose answer is the same leaves too, never for that kind: a body the build lints with no
+// record of a kind reads unknown for it (#5vbs1np, must 1), and each equal callee lacks a record of some kind the host
+// answered about the package, the first by the kinds' names after those it holds. Triviality and the stopping calls
+// are not registered with the resolver (fact_resolver.Register), so the build cannot ask either again and reads every
+// answer of theirs as unknown, and their equal callees, which hold a record of their kind, take their users out for
+// that. The day each kind records what its judgments read, and the build can ask every kind, the equal callees' users
+// stand, and this test says so.
+func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndAnEqualOnesForNoRecord(test *testing.T) {
 	test.Parallel()
 
 	settled := settleFactKinds(test)
@@ -149,19 +147,23 @@ func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndLeavesAnEqualOnesStandi
 		user   string
 		callee string
 		reason fact_reach.Reason
-		stable string
-		// stableCallee names the equal callee that still takes stable out, for reason, where the build cannot ask the
-		// kind; empty where stable stands.
+		// stable is the user of an equal callee, stableCallee, which takes it out for stableReason.
+		stable       string
 		stableCallee string
+		stableReason fact_reach.Reason
 	}{
-		{"no-return", "NoReturnUser", "halt", "no-return", "NoReturnStable", ""},
-		{"nil-ness", "NilnessUser", "wrapped", fact_reach.DiffersReason("return_nil_ness"), "NilnessStable", ""},
-		{"purity", "Warm", "size", fact_reach.DiffersReason("function_purity"), "PurityStable", ""},
-		{"odd slice", "OddUser", "pairs", fact_reach.DiffersReason("odd_slice_argument"), "OddStable", ""},
+		{"no-return", "NoReturnUser", "halt", "no-return", "NoReturnStable", "haltAlways",
+			fact_reach.UnrecordedReason("function_triviality")},
+		{"nil-ness", "NilnessUser", "wrapped", fact_reach.DiffersReason("return_nil_ness"), "NilnessStable", "stable",
+			fact_reach.UnrecordedReason("function_purity")},
+		{"purity", "Warm", "size", fact_reach.DiffersReason("function_purity"), "PurityStable", "width",
+			fact_reach.UnrecordedReason("function_triviality")},
+		{"odd slice", "OddUser", "pairs", fact_reach.DiffersReason("odd_slice_argument"), "OddStable", "pairsAlways",
+			fact_reach.UnrecordedReason("function_triviality")},
 		{"triviality", "TrivialUser", "typedNil", fact_reach.UnknownReason("function_triviality"), "TrivialStable",
-			"typedNilAlways"},
+			"typedNilAlways", fact_reach.UnknownReason("function_triviality")},
 		{"stopping calls", "StoppingUser", "stopVia", fact_reach.UnknownReason("test_stopping_calls"),
-			"StoppingStable", "stopAlways"},
+			"StoppingStable", "stopAlways", fact_reach.UnknownReason("test_stopping_calls")},
 	} {
 		test.Run(kind.name, func(test *testing.T) {
 			// The settlement is only read, by every kind at once.
@@ -171,15 +173,7 @@ func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndLeavesAnEqualOnesStandi
 					settled.bodies[kind.user].reason)
 			}
 			settled.requireRemovedBy(test, kind.user, kind.callee, kind.reason)
-			if kind.stableCallee != "" {
-				settled.requireRemovedBy(test, kind.stable, kind.stableCallee, kind.reason)
-				return
-			}
-			if !settled.stands(test, kind.stable) {
-				removal, _ := settled.removal(test, kind.stable)
-				test.Errorf("%s left the standing set, by %q for %q, want it standing", kind.stable, removal.Object,
-					removal.Reason)
-			}
+			settled.requireRemovedBy(test, kind.stable, kind.stableCallee, kind.stableReason)
 		})
 	}
 }
@@ -201,9 +195,11 @@ func TestTheOrderRuleNamesEachShapeSoItsUsersNeverStand(test *testing.T) {
 }
 
 // The first leg reads the facts' reach's settlement: a body it took out is the build's to lint, so its findings are
-// the build's own and never compared with the host's, only counted, on a line of their own. Five of the fourteen it
+// the build's own and never compared with the host's, only counted, on a line of their own. Five of the twenty-one it
 // took out differ by their findings, Warm, Warmer, OddUser, TrivialUser and StoppingUser, each a finding that turns on
-// a callee's answer, and none of them is a failure or a difference owed to a later stage.
+// a callee's answer, and none of them is a failure or a difference owed to a later stage. Seven of the twenty-one left
+// only for a callee the build lints with no record of a kind (#5vbs1np, must 1): size, the four stable users of the
+// registered kinds, InstanceUser and WrapperUser.
 func TestTheFirstLegLeavesTheBodiesTheFactsReachTookOutToTheBuild(test *testing.T) {
 	test.Parallel()
 
@@ -213,8 +209,8 @@ func TestTheFirstLegLeavesTheBodiesTheFactsReachTookOutToTheBuild(test *testing.
 		test.Fatal("windows's build ran no body differential")
 	}
 	if !differential.factsSettled || differential.takenOut != len(settled.settlement.Removed) ||
-		differential.takenOut != 14 {
-		test.Errorf("the first leg read the settlement %t and left %d bodies to the build, want it read and the 14 "+
+		differential.takenOut != 21 {
+		test.Errorf("the first leg read the settlement %t and left %d bodies to the build, want it read and the 21 "+
 			"the facts' reach took out, %d", differential.factsSettled, differential.takenOut,
 			len(settled.settlement.Removed))
 	}
@@ -233,7 +229,7 @@ func TestTheFirstLegLeavesTheBodiesTheFactsReachTookOutToTheBuild(test *testing.
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	if line := "  taken out by the facts' reach 14"; !slices.Contains(strings.Split(string(written), "\n"), line) {
+	if line := "  taken out by the facts' reach 21"; !slices.Contains(strings.Split(string(written), "\n"), line) {
 		test.Errorf("the census file has no line %q:\n%s", line, written)
 	}
 }

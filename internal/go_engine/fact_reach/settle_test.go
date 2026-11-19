@@ -7,16 +7,22 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
 
-// fixture is a package's host side as a test writes it: each object's users, and each body's recorded questions.
+// fixture is a package's host side as a test writes it: each object's users, each body's recorded questions, and the
+// functions declared at each body.
 type fixture struct {
 	users    map[fact_reach.Object][]fact_reach.Place
 	recorded map[fact_reach.Place][]fact_reach.Question
+	declared map[fact_reach.Place][]fact_reach.Object
 }
 
 func (source fixture) Users(object fact_reach.Object) []fact_reach.Place { return source.users[object] }
 
 func (source fixture) Recorded(place fact_reach.Place) []fact_reach.Question {
 	return source.recorded[place]
+}
+
+func (source fixture) Declared(place fact_reach.Place) []fact_reach.Object {
+	return source.declared[place]
 }
 
 // The bodies of the reviewer's example (#w72zxtq, must 6): `size` names `platformSize`, which a build's file declares
@@ -38,6 +44,7 @@ func warmFixture() fixture {
 			size: {purityOfSize},
 			warm: {purityOfWarm},
 		},
+		declared: map[fact_reach.Place][]fact_reach.Object{size: {"size"}, warm: {"Warm"}, outer: {"Outer"}},
 	}
 }
 
@@ -61,7 +68,7 @@ func TestACalleesDifferingAnswerTakesItsCallerOut(test *testing.T) {
 	standing := map[fact_reach.Place]bool{warm: true, outer: true}
 	compare, _ := answering(
 		map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Differs, purityOfWarm.Key: fact_reach.Equal})
-	settlement := fact_reach.Settle(standing, []fact_reach.Place{size}, nil, warmFixture(), compare)
+	settlement := fact_reach.Settle(standing, []fact_reach.Place{size}, nil, nil, warmFixture(), compare)
 	wantRemoved := []fact_reach.Removal{{Place: warm, Object: "size", Reason: "answer function_purity"}}
 	if !reflect.DeepEqual(settlement.Removed, wantRemoved) {
 		test.Errorf("removed %v, want %v", settlement.Removed, wantRemoved)
@@ -84,7 +91,7 @@ func TestAnEqualAnswerMovesNothing(test *testing.T) {
 	test.Parallel()
 	compare, asked := answering(map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Equal})
 	settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size}, nil,
-		warmFixture(), compare)
+		nil, warmFixture(), compare)
 	if len(settlement.Removed) != 0 || !settlement.Standing[warm] || !settlement.Standing[outer] {
 		test.Errorf("removed %v leaving %v, want nothing removed", settlement.Removed, settlement.Standing)
 	}
@@ -99,7 +106,7 @@ func TestAnUnknownAnswerJoinsAndADifferenceCarriesUp(test *testing.T) {
 	// Warm's answer is absent from the answers, so it reads as the zero Comparison, Unknown.
 	compare, _ := answering(map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Differs})
 	settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size}, nil,
-		warmFixture(), compare)
+		nil, warmFixture(), compare)
 	wantRemoved := []fact_reach.Removal{
 		{Place: warm, Object: "size", Reason: "answer function_purity"},
 		{Place: outer, Object: "Warm", Reason: "unknown function_purity"},
@@ -123,7 +130,7 @@ func TestANamedObjectTakesItsUsersOut(test *testing.T) {
 	source.users["os.Exit"] = []fact_reach.Place{size}
 	compare, asked := answering(map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Equal})
 	settlement := fact_reach.Settle(map[fact_reach.Place]bool{size: true, warm: true, outer: true}, nil,
-		[]fact_reach.Named{{Object: "os.Exit", Reason: "no-return"}}, source, compare)
+		[]fact_reach.Named{{Object: "os.Exit", Reason: "no-return"}}, nil, source, compare)
 	wantRemoved := []fact_reach.Removal{{Place: size, Object: "os.Exit", Reason: "no-return"}}
 	if !reflect.DeepEqual(settlement.Removed, wantRemoved) {
 		test.Errorf("removed %v, want %v", settlement.Removed, wantRemoved)
@@ -141,8 +148,8 @@ func TestAQuestionIsAskedOnceAndAReachedUserIsNotRemoved(test *testing.T) {
 	source.recorded[warm] = append(source.recorded[warm], purityOfSize)
 	compare, asked := answering(
 		map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Differs, purityOfWarm.Key: fact_reach.Equal})
-	settlement := fact_reach.Settle(map[fact_reach.Place]bool{outer: true}, []fact_reach.Place{size, warm}, nil, source,
-		compare)
+	settlement := fact_reach.Settle(map[fact_reach.Place]bool{outer: true}, []fact_reach.Place{size, warm}, nil, nil,
+		source, compare)
 	if asked[purityOfSize.Key] != 1 {
 		test.Errorf("size's purity was asked %d times, want once", asked[purityOfSize.Key])
 	}
@@ -157,14 +164,52 @@ func TestAQuestionIsAskedOnceAndAReachedUserIsNotRemoved(test *testing.T) {
 func TestNothingReachedAsksNothing(test *testing.T) {
 	test.Parallel()
 	compare, asked := answering(nil)
-	settlement := fact_reach.Settle(map[fact_reach.Place]bool{size: true, warm: true, outer: true}, nil, nil,
+	settlement := fact_reach.Settle(map[fact_reach.Place]bool{size: true, warm: true, outer: true}, nil, nil, nil,
 		warmFixture(), compare)
 	if settlement.Asked != 0 || len(asked) != 0 || len(settlement.Standing) != 3 {
 		test.Errorf("asked %d, leaving %v, want nothing asked and all three standing", settlement.Asked,
 			settlement.Standing)
 	}
-	none := fact_reach.Settle(nil, nil, nil, warmFixture(), compare)
+	none := fact_reach.Settle(nil, nil, nil, nil, warmFixture(), compare)
 	if none.Standing == nil || len(none.Standing) != 0 {
 		test.Errorf("a nil set left %v standing, want an empty set of the settlement's own", none.Standing)
+	}
+}
+
+// A body that left with no record of a kind reads unknown for it (#5vbs1np, must 1): a kind's judgment may have read
+// its answer from the kind's state for another function's, as size's purity reads its callees', and left no record.
+// size holds a record of purity alone, so the build names it for nil-ness, and Warm, its user, leaves for that; Warm,
+// holding no record of either kind, names itself for both, the first taking Outer out, which names itself for both in
+// turn. A kind a body holds a record of is never named for, whatever the record reads.
+func TestABodyThatLeftWithNoRecordOfAKindReadsUnknownForIt(test *testing.T) {
+	test.Parallel()
+	source := warmFixture()
+	delete(source.recorded, warm)
+	compare, _ := answering(map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Equal})
+	settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size}, nil,
+		[]string{"function_purity", "return_nil_ness"}, source, compare)
+	wantRemoved := []fact_reach.Removal{
+		{Place: warm, Object: "size", Reason: "unrecorded return_nil_ness"},
+		{Place: outer, Object: "Warm", Reason: "unrecorded function_purity"},
+	}
+	if !reflect.DeepEqual(settlement.Removed, wantRemoved) {
+		test.Errorf("removed %v, want %v", settlement.Removed, wantRemoved)
+	}
+	wantUnrecorded := map[string]int{"function_purity": 2, "return_nil_ness": 3}
+	if !reflect.DeepEqual(settlement.Unrecorded, wantUnrecorded) || len(settlement.Unknown) != 0 {
+		test.Errorf("unrecorded %v and unknown %v, want %v and none", settlement.Unrecorded, settlement.Unknown,
+			wantUnrecorded)
+	}
+}
+
+// With every kind recorded where a body left, the rule names nothing: the walk is the one of no kinds.
+func TestABodyRecordedInEveryKindIsNamedForNone(test *testing.T) {
+	test.Parallel()
+	compare, _ := answering(map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Equal})
+	settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size}, nil,
+		[]string{"function_purity"}, warmFixture(), compare)
+	if len(settlement.Removed) != 0 || len(settlement.Unrecorded) != 0 || len(settlement.Standing) != 2 {
+		test.Errorf("removed %v with %v unrecorded, leaving %v, want nothing removed", settlement.Removed,
+			settlement.Unrecorded, settlement.Standing)
 	}
 }

@@ -116,7 +116,8 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 // (standing_facts.Result.Partial), crashed, those it failed to settle on; and, summed over the settled ones, the
 // no-return facts compared and the objects they named, the answers the host read from other packages asked before the
 // walk and the objects they named, the order-bound objects named before anything was asked, the answers the walk asked
-// and those that read differing or unknown, by kind, and the bodies the facts took out of the standing set.
+// and those that read differing or unknown, by kind, the functions of a body that left with no record of a kind, by
+// kind, and the bodies the facts took out of the standing set.
 type buildFactReach struct {
 	sides             int
 	settled           int
@@ -129,6 +130,7 @@ type buildFactReach struct {
 	asked             int
 	differing         map[string]int
 	unknown           map[string]int
+	unrecordedKinds   map[string]int
 	removed           int
 }
 
@@ -136,7 +138,7 @@ type buildFactReach struct {
 // result, the last load's.
 func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *buildFactReach {
 	census := &buildFactReach{sides: len(hosts), crashed: len(result.FactReachCrashes), differing: map[string]int{},
-		unknown: map[string]int{}}
+		unknown: map[string]int{}, unrecordedKinds: map[string]int{}}
 	for identifier, settled := range result.FactReachSettled {
 		packageSettled, isResult := settled.(*standing_facts.Result)
 		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil {
@@ -157,6 +159,9 @@ func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *
 		for kind, count := range packageSettled.Settlement.Unknown {
 			census.unknown[kind] += count
 		}
+		for kind, count := range packageSettled.Settlement.Unrecorded {
+			census.unrecordedKinds[kind] += count
+		}
 		census.removed += len(packageSettled.Settlement.Removed)
 	}
 	return census
@@ -171,6 +176,7 @@ func writeBuildFactReach(written *strings.Builder, census *buildFactReach) {
 		census.orderBoundNamed)
 	fmt.Fprintf(written, "    answers asked %d, differing %s, unknown %s; bodies taken out %d\n", census.asked,
 		byKind(census.differing), byKind(census.unknown), census.removed)
+	fmt.Fprintf(written, "    functions with no record of a kind %s\n", byKind(census.unrecordedKinds))
 }
 
 // byKind is counts written by kind, the kinds in order, or none.

@@ -81,7 +81,11 @@ type factReachPackage struct {
 	// orderBound are the objects whose answers hang on the order the host walked the package in, each named for that.
 	orderBound []fact_reach.Named
 
-	// declared are, by a body's place, the keys of the functions declared there, which the body differential's second
+	// kinds are the fact kinds the host answered about the package's objects, by name, sorted.
+	kinds []string
+
+	// declared are, by a body's place, the keys of the functions declared there, which the fixed point names where a
+	// body that left holds no record of a kind (fact_reach.Source.Declared), and which the body differential's second
 	// leg finds the build's own functions of a standing body by (build_body_differential.go). A cgo package may declare
 	// two at one place.
 	declared map[fact_reach.Place][]fact_reach.Object
@@ -137,6 +141,16 @@ func (hosted *factReachPackage) Asking(key string) (fact_reach.Asking, bool) {
 // OrderBound are the objects whose answers on the host hang on the order it walked the package in.
 func (hosted *factReachPackage) OrderBound() []fact_reach.Named {
 	return hosted.orderBound
+}
+
+// Kinds are the fact kinds the host answered about the package's objects, sorted.
+func (hosted *factReachPackage) Kinds() []string {
+	return hosted.kinds
+}
+
+// Declared are the keys of the functions declared at place.
+func (hosted *factReachPackage) Declared(place fact_reach.Place) []fact_reach.Object {
+	return hosted.declared[place]
 }
 
 // inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build lints

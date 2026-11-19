@@ -106,7 +106,11 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 	}
 	for _, answer := range inputs.answers {
 		builder.answer(answer)
+		if !slices.Contains(builder.hosted.kinds, answer.Analyzer) {
+			builder.hosted.kinds = append(builder.hosted.kinds, answer.Analyzer)
+		}
 	}
+	slices.Sort(builder.hosted.kinds)
 	for _, answer := range inputs.imported {
 		builder.importedAnswer(answer)
 	}

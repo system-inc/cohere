@@ -366,3 +366,41 @@ func TestAPackageLintedWholeAsksNothing(test *testing.T) {
 			result.Partial, result.Settlement, result.Stands(warm.File, warm.Offset))
 	}
 }
+
+// A body the build lints that holds no record of a kind reads unknown for it, for every kind the build registers and
+// every kind the host answered about the package (#5vbs1np, must 1). size's purity is recorded and the build's own, but
+// the host answered triviality about the package, a kind this binary does not register, and size holds no record of
+// it, so Warm leaves for that, and then names itself for both kinds, holding no record at all. With the host answering
+// purity alone, the one kind registered here, Warm stands.
+func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) {
+	test.Parallel()
+	found := loadFacts(test)
+	size, warm := found.place(test, "size"), found.place(test, "Warm")
+	question, asking := purityOf("facts.size", fact_reach.Asking{Function: found.identity("size"), Parameter: -1,
+		Encoded: purityInAnotherRun(test, "size")})
+	host := func(kinds ...string) *fakeHost {
+		return &fakeHost{
+			standing: map[fact_reach.Place]bool{warm: true},
+			places:   []fact_reach.Place{size, warm},
+			asking:   asking,
+			users:    map[fact_reach.Object][]fact_reach.Place{"facts.size": {warm}},
+			recorded: map[fact_reach.Place][]fact_reach.Question{size: {question}},
+			declared: map[fact_reach.Place][]fact_reach.Object{size: {"facts.size"}, warm: {"facts.Warm"}},
+			kinds:    kinds,
+		}
+	}
+	triviality := "function_triviality"
+	result, _ := settle(test, found, host(purity, triviality))
+	requireRemoved(test, result,
+		fact_reach.Removal{Place: warm, Object: "facts.size", Reason: fact_reach.UnrecordedReason(triviality)})
+	if want := map[string]int{purity: 1, triviality: 2}; !reflect.DeepEqual(result.Settlement.Unrecorded, want) {
+		test.Errorf("unrecorded %v, want %v: size's triviality, and Warm's purity and triviality",
+			result.Settlement.Unrecorded, want)
+	}
+	// A run lets go of what it read of the packages below its roots, so the second takes a load of its own.
+	result, _ = settle(test, loadFacts(test), host(purity))
+	requireRemoved(test, result)
+	if !result.Stands(warm.File, warm.Offset) {
+		test.Errorf("Warm does not stand, though size holds a record of the one kind")
+	}
+}

@@ -668,7 +668,7 @@ func TestADifferingAnswerAboutSizeTakesWarmOutAndNothingElse(test *testing.T) {
 	}
 	bodies := len(standing)
 	var asked []string
-	settlement := fact_reach.Settle(standing, fixture.placesOf(test, "size"), nil, host,
+	settlement := fact_reach.Settle(standing, fixture.placesOf(test, "size"), nil, nil, host,
 		func(question fact_reach.Question) fact_reach.Comparison {
 			asking, isAsked := host.Asking(question.Key)
 			if !isAsked {

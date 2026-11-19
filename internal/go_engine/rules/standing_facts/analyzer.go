@@ -126,6 +126,11 @@ func run(pass *analysis.Pass) (any, error) {
 			reached = append(reached, place)
 		}
 	}
-	result.Settlement = fact_reach.Settle(standing, reached, named, host, asked.compare)
+	// Every kind the build can ask again, and every kind the host answered about the package, which a body that leaves
+	// reads unknown for where it holds no record of it (fact_reach.Settle). A kind the build cannot ask is among them
+	// wherever the host answered it, since its judgments read callees' answers from its state as any kind's may.
+	kinds := slices.Concat(fact_resolver.RegisteredNames(), host.Kinds())
+	slices.Sort(kinds)
+	result.Settlement = fact_reach.Settle(standing, reached, named, slices.Compact(kinds), host, asked.compare)
 	return result, nil
 }

@@ -9,8 +9,11 @@
 // The fixed point cuts off at equality and never closes over callers. A body that left is linted by the build, so each
 // answer the host recorded about its function is asked in the build and compared: equal, and nothing above it moves;
 // different, or one the build cannot answer, and the function's users leave in turn. That is sound only while every
-// answer a standing body's rules read was built from answers that each have a record of their own, which each fact kind
-// holds for itself.
+// answer a standing body's rules read was built from answers that each have a record of their own. A kind's judgment
+// can read a callee's answer from the kind's own state, which leaves no record, as purity and odd slice read a callee
+// of their package's and triviality walks into one: a body that left with no record of a kind may have served
+// another's answer of that kind all the same. So such a body reads unknown for every kind it holds no record of, and
+// its function's users leave (#5vbs1np, must 1), until each kind records what its judgments read.
 //
 // This package is the fixed point alone, over places, objects and questions it knows nothing more of. Who fills them,
 // from stage 1's record of what each declaration uses and from the host's facts, is the engine's pipeline.
@@ -73,6 +76,9 @@ type Source interface {
 	// Recorded are the answers the host holds that rest on the function at place: each about it or one of its
 	// parameters, and each whose value names it as a function the answer's judgment entered.
 	Recorded(place Place) []Question
+	// Declared are the functions declared at place, by key: one for a function's body, two where a cgo package
+	// declares two at one place, and none for a body no identity names.
+	Declared(place Place) []Object
 }
 
 // Removal is one body that left the standing set: the object that took it out, and why that object was named.
@@ -83,13 +89,15 @@ type Removal struct {
 }
 
 // Settlement is what Settle found: the bodies that still stand, those that left the standing set, in the order they
-// left, how many questions the build was asked, and how many of them read different or unknown, by kind.
+// left, how many questions the build was asked, how many of them read different or unknown, by kind, and how many
+// functions of a body that left held no record of a kind, by kind, each read unknown for it.
 type Settlement struct {
-	Standing  map[Place]bool
-	Removed   []Removal
-	Asked     int
-	Differing map[string]int
-	Unknown   map[string]int
+	Standing   map[Place]bool
+	Removed    []Removal
+	Asked      int
+	Differing  map[string]int
+	Unknown    map[string]int
+	Unrecorded map[string]int
 }
 
 // DiffersReason is why a body left when an answer of kind, asked in the build, read otherwise than the host's. It and
@@ -100,19 +108,26 @@ func DiffersReason(kind string) Reason { return Reason("answer " + kind) }
 // UnknownReason is why a body left when an answer of kind, asked in the build, could not be read.
 func UnknownReason(kind string) Reason { return Reason("unknown " + kind) }
 
+// UnrecordedReason is why a body left when a function it uses, declared at a body the build lints, holds no record of
+// kind, so its answer of kind reads unknown.
+func UnrecordedReason(kind string) Reason { return Reason("unrecorded " + kind) }
+
 // Settle takes out of standing every body the facts reach, and reports what still stands and what it took (see the
 // package). standing is read and never written: what still stands is the settlement's own map. reached are the bodies
 // of files both builds compile that the build lints already, whose recorded answers are asked first; named are the
-// objects known to differ before any answer is asked. compare asks the build one question and reads its answer beside
-// the host's; it is called once for each question, in the order the bodies leave.
+// objects known to differ before any answer is asked. kinds are the fact kinds a body's findings can turn on, each of
+// which a body that left reads unknown for where it holds no record of it. compare asks the build one question and
+// reads its answer beside the host's; it is called once for each question, in the order the bodies leave.
 func Settle(
 	standing map[Place]bool,
 	reached []Place,
 	named []Named,
+	kinds []string,
 	source Source,
 	compare func(Question) Comparison,
 ) *Settlement {
-	settlement := &Settlement{Standing: maps.Clone(standing), Differing: map[string]int{}, Unknown: map[string]int{}}
+	settlement := &Settlement{Standing: maps.Clone(standing), Differing: map[string]int{}, Unknown: map[string]int{},
+		Unrecorded: map[string]int{}}
 	if settlement.Standing == nil {
 		// A clone of no map is none, and what still stands is the settlement's own to answer of either way.
 		settlement.Standing = map[Place]bool{}
@@ -120,8 +135,9 @@ func Settle(
 	asked := map[string]bool{}
 	left := append([]Place{}, reached...)
 	differing := append([]Named{}, named...)
-	// Both lists only grow, each body and each object entering once, so the walk ends: a body enters as it leaves the
-	// standing set, which it does once, and an object as its one question fails or as its source named it.
+	// Both lists only grow, and only so far, so the walk ends: a body enters as it leaves the standing set, which it
+	// does once, and an object as its source named it, as a question about it fails, or as its body holds no record of
+	// a kind, each read once, since a body's questions and kinds are read as it enters.
 	nextPlace, nextObject := 0, 0
 	for nextPlace < len(left) || nextObject < len(differing) {
 		for ; nextObject < len(differing); nextObject++ {
@@ -137,7 +153,9 @@ func Settle(
 			}
 		}
 		for ; nextPlace < len(left); nextPlace++ {
+			recordedKinds := map[string]bool{}
 			for _, question := range source.Recorded(left[nextPlace]) {
+				recordedKinds[question.Kind] = true
 				if asked[question.Key] {
 					continue
 				}
@@ -151,6 +169,16 @@ func Settle(
 				default:
 					settlement.Unknown[question.Kind]++
 					differing = append(differing, Named{Object: question.About, Reason: UnknownReason(question.Kind)})
+				}
+			}
+			// After the recorded questions, so a function whose recorded answer differs is named for that first.
+			for _, kind := range kinds {
+				if recordedKinds[kind] {
+					continue
+				}
+				for _, object := range source.Declared(left[nextPlace]) {
+					settlement.Unrecorded[kind]++
+					differing = append(differing, Named{Object: object, Reason: UnrecordedReason(kind)})
 				}
 			}
 		}
