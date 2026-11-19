@@ -115,6 +115,12 @@ type Options struct {
 	// digesting every fact of a run is work no finding needs.
 	ExportFacts bool
 
+	// FactReach has the run hand back, in Result.FactReach, what the host's side of each analyzed package is made of
+	// for the facts' reach (#aswfm7a): the answers the run holds, the packages' no-return predicates and the objects
+	// whose answers hang on the order the run walked a package in (captureFactReach). Only a host's run with extra
+	// builds sets it; the findings are the same either way.
+	FactReach bool
+
 	// Inheritance, when not nil, is an extra build's take of the host's run for its syntax-only rules (#y6q1x2j): each
 	// such rule skips each file it inherits and reports the host's findings there as its own (rule.InheritedFiles),
 	// handed every pass under rule.Inherited (see checker.Options.Inheritance). Only an extra build restoring from the
@@ -266,6 +272,10 @@ type Result struct {
 	// as the resolver reads them, so a census can read a restored package's answers by objectpath (#ss4t5g6). Nil
 	// without it, and for a package the store holds none of.
 	RestoredAnswers map[*packages.Package]*fact_resolver.Answers
+
+	// FactReach is what the run held of its facts for the facts' reach under Options.FactReach (captureFactReach), nil
+	// without it.
+	FactReach *FactReachCapture
 
 	// Host is what the run kept for its extra builds under Options.KeepForBuilds, nil without it, and FromHost what an
 	// extra build's session restored from the host's run (CacheSession.RestoreFromHost), all zero without one.
@@ -575,6 +585,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	var restoredAnswers map[*packages.Package]*fact_resolver.Answers
 	if options.ExportFacts && session != nil {
 		unnamedFacts, restoredAnswers = session.unnamedFacts(), session.restoredAnswers()
+	}
+	// Read as the rules' passes left the resolver, before the save computes packages whole for the store: that replays
+	// walks no rule asked for and keeps an answer of every function they judge, which no body's rules read.
+	if options.FactReach {
+		result.FactReach = captureFactReach(resolver, analyzed)
 	}
 	if session != nil {
 		session.save(graph, options.Withheld, files)
