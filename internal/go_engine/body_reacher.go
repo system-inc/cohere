@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"cmp"
 	"go/token"
 	"go/types"
 	"slices"
@@ -47,8 +48,9 @@ type bodyReacher struct {
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
 // and counts those in files it does not, absent. Whether the build compiles a body's file is read by the file as
 // parsed, never as a //line directive renames it, which names no file the build lists (#w72zxtq, the review's must 8);
-// the renamed file is the one the census reports and the graph's units are placed in. The package's variable
-// initializers are then judged as one body (reachInitializers).
+// the renamed file is the one the census reports and the graph's units are placed in. A package whose imports differ
+// is then reached whole (differingImports), and the package's variable initializers are judged as one body
+// (reachInitializers).
 func (reacher *bodyReacher) reachPackage(
 	hosted *packages.Package,
 	record *build_reads.FunctionUses,
@@ -117,8 +119,39 @@ func (reacher *bodyReacher) reachPackage(
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 				declared.Declaration.Offset)})
 	}
+	if differing := differingImports(hosted.Imports, read.imports); len(differing) > 0 {
+		driver := "the package's imports differing, by " + strings.Join(differing, ", ")
+		for index := range bodies {
+			if bodies[index].reason == "" {
+				bodies[index].reason, bodies[index].driver = reachedImports, driver
+			}
+			// The constants-only rule's count reads the general one's beside it, and this reason is either's alike.
+			bodies[index].constantsOnlyReason = cmp.Or(bodies[index].constantsOnlyReason, reachedImports)
+		}
+	}
 	reachInitializers(bodies, initializers, unshared)
 	return bodies, absent
+}
+
+// differingImports are the paths, sorted, that a package's files import in one build and not the other, hosted the
+// host's import graph of it and built the build's, blank imports among them, `unsafe` too, which the graph holds as
+// any other import. A rule may judge every body by them, whatever the body uses (#bed0mnk): unusedwrite stands down
+// in a package that imports `unsafe`, SA1015 in one that imports cobra, a command's, and SA5008 accepts a repeated
+// struct tag key in one that imports go-flags.
+func differingImports(hosted map[string]*packages.Package, built map[string]*packages.Package) []string {
+	var differing []string
+	for path := range hosted {
+		if _, isBuilt := built[path]; !isBuilt {
+			differing = append(differing, path)
+		}
+	}
+	for path := range built {
+		if _, isHosted := hosted[path]; !isHosted {
+			differing = append(differing, path)
+		}
+	}
+	slices.Sort(differing)
+	return differing
 }
 
 // reachInitializers judges a package's variable initializers, the bodies at initializers's indexes, as one body

@@ -33,17 +33,19 @@ import (
 //     path is its own selection in the record, so reads its own name bit the same way.
 //   - ValueType and TypeArgument: both bits, since a value's copy, comparison or conversion and a constraint's check
 //     read its layout and its method set alike.
-// A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, its
-// package's bodies judged not the bodies the build counts in the files both compile (Miscounted), a part of it
-// unknown, its signature reaching (its body type-checks against the signature), its body reaching, by the first use
-// in the record's order that does, and a shadowed name in either part. A package's variable initializers are one body
-// (#bed0mnk): Go lowers them into one synthetic function, in file order, so an initializer that never returns leaves
-// every later one unreachable, and a rule reading the representation reports nothing there. Where any of them sits in
-// a file the builds do not share, or is reached, every initializer of the package is reached, Initializers, whatever
-// the files' order. A build whose word size or maximum alignment differs from the host's (buildSizesDiffer) reaches
-// every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or `math.MaxInt` type-check to other
-// constants there with no file differing, which no bit says, as the restore's own sizes gate refuses such a build
-// every package (check's hostSizesDiffer, #61qj12v).
+// A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, its package's
+// bodies judged not the bodies the build counts in the files both compile (Miscounted), a part of it unknown, its
+// signature reaching (its body type-checks against the signature), its body reaching, by the first use in the record's
+// order that does, and a shadowed name in either part. A package's variable initializers are one body (#bed0mnk): Go
+// lowers them into one synthetic function, in file order, so an initializer that never returns leaves every later one
+// unreachable, and a rule reading the representation reports nothing there. Where any of them sits in a file the builds
+// do not share, or is reached, every initializer of the package is reached, Initializers, whatever the files' order. A
+// package whose files import other paths in the build than on the host, blank imports among them, is reached whole,
+// Imports (#bed0mnk): a rule may judge a body by what its package imports anywhere, as unusedwrite stands down where
+// any file imports `unsafe`, a gate no use of the body reads. A build whose word size or maximum alignment differs from
+// the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or
+// `math.MaxInt` type-check to other constants there with no file differing, which no bit says, as the restore's own
+// sizes gate refuses such a build every package (check's hostSizesDiffer, #61qj12v).
 //
 // What the reach does not stand for, which the census says at its head: a finding that turns on a fact about a
 // function a body calls, its purity, that it never returns or that it wraps printf, is stage 4's (#h0k644s), since the
@@ -77,12 +79,13 @@ const (
 	reachedShadowed     bodyReachReason = "Shadowed"
 	reachedLoadMode     bodyReachReason = "LoadMode"
 	reachedInitializers bodyReachReason = "Initializers"
+	reachedImports      bodyReachReason = "Imports"
 )
 
 // bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by.
 var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reachedMiscounted, reachedUnknown,
 	reachedSignature, reachedNamed, reachedConstant, reachedLoadMode, reachedSelected, reachedValueType,
-	reachedTypeArgument, reachedShadowed, reachedInitializers}
+	reachedTypeArgument, reachedShadowed, reachedImports, reachedInitializers}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
@@ -121,8 +124,8 @@ func newBodyReachHost(
 // taken before its rules let the syntax go: the files it compiles as written, the bodies in the files the host's
 // package of its ID compiles too and in those only the build compiles, every file's when the host has no such package,
 // the names its build-only files declare at package level, the paths each shared file imports by a dot, by the file
-// as parsed, and whether a build-only file declares a variable initializer, which reaches every one of the package's
-// (bodyReacher.reachInitializers).
+// as parsed, whether a build-only file declares a variable initializer, which reaches every one of the package's
+// (bodyReacher.reachInitializers), and the paths its files import, by its load's import graph (differingImports).
 type reachBuiltPackage struct {
 	identifier            string
 	files                 map[string]bool
@@ -131,6 +134,7 @@ type reachBuiltPackage struct {
 	buildOnlyNames        map[string]bool
 	dotImports            map[string][]string
 	buildOnlyInitializers bool
+	imports               map[string]*packages.Package
 }
 
 // reachBuiltPackages are the packages of loaded's whole graph that it checked from source, as the census reads them
@@ -143,7 +147,7 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 		}
 		hosted, isHosted := hostFiles[each.ID]
 		read := &reachBuiltPackage{identifier: each.ID, files: make(map[string]bool, len(each.GoFiles)),
-			buildOnlyNames: map[string]bool{}, dotImports: map[string][]string{}}
+			buildOnlyNames: map[string]bool{}, dotImports: map[string][]string{}, imports: each.Imports}
 		for _, file := range each.GoFiles {
 			read.files[file] = true
 		}

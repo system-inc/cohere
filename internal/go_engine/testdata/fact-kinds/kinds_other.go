@@ -4,6 +4,9 @@ package kinds
 
 import (
 	"os"
+	// Windows's file imports runtime, so both builds import the same paths, and the reach judges the package by its
+	// bodies rather than whole (#bed0mnk).
+	_ "runtime"
 	"testing"
 )
 
