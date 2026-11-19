@@ -1,8 +1,10 @@
 package build_dependence
 
 import (
+	"bytes"
 	"go/ast"
 	"go/types"
+	"os"
 )
 
 // Difference is what one extra build changes against the host, as its file sets say: the graph's judgment of the
@@ -38,11 +40,16 @@ type PackageDifference struct {
 	// they match the graph's units' files, which a reader sees. Every unit in one is build-dependent.
 	HostOnlyFiles []string
 
-	// SharedFiles are the files both compile, as written. A package with a host-only file has every unit build-dependent
-	// whose file, as a reader sees it, is not one of these: a //line directive in a host-only file names its units by
-	// a file the build lists nowhere, which matches no host-only file, and the record keeps no other name of a unit's
-	// file to match instead (#ss4t5g6).
+	// SharedFiles are the files both compile, as written. A package with a host-only file has every unit
+	// build-dependent whose file, as a reader sees it, is not one of these: a //line directive in a host-only file
+	// names its units by a file the build lists nowhere, which matches no host-only file, and the record keeps no
+	// other name of a unit's file to match instead (#ss4t5g6).
 	SharedFiles []string
+
+	// LineDirective says a file the two builds do not share, host-only or build-only, holds a line directive
+	// (HoldsLineDirective), which can name its units by any file, one both builds compile among them, so every unit of
+	// the package is build-dependent, in memory only (#ss4t5g6).
+	LineDirective bool
 
 	// BuildOnlyFiles are the files only the build compiles, parsed for syntax alone: a method one declares changes
 	// its receiver's method set, a name of the universe one declares changes what that name means in the package's
@@ -52,4 +59,22 @@ type PackageDifference struct {
 	// Workspace says whether a package only the build has belongs to the checked modules, which the graph cannot
 	// say of a package it does not hold. A package both builds have is counted where the host's record puts it.
 	Workspace bool
+}
+
+// The two spellings that open a line directive. Either anywhere in a file's bytes counts, in a string or a comment's
+// middle too, an over-approximation of the directive's rules on purpose: a directive missed leaves a unit unseeded,
+// where one too many only seeds a package that needed none.
+var (
+	lineCommentDirective  = []byte("//line ")
+	blockCommentDirective = []byte("/*line ")
+)
+
+// HoldsLineDirective reports whether the file at path holds a line directive anywhere in its bytes
+// (lineCommentDirective, blockCommentDirective). A file that cannot be read is said to hold one, failing wide.
+func HoldsLineDirective(path string) bool {
+	source, readError := os.ReadFile(path)
+	if readError != nil {
+		return true
+	}
+	return bytes.Contains(source, lineCommentDirective) || bytes.Contains(source, blockCommentDirective)
 }

@@ -50,7 +50,8 @@ func findingLines(stream string) []string {
 // libraryDependence is the library's own judgment of the fixture at root: the host and the build loaded whole with
 // go/packages under the environments the engine's run loaded them under, the graph built from every package of the
 // host's, the module's the workspace, and the difference of the two loads' files as written, a build-only file parsed
-// for its syntax alone. It shares appendParsed with the engine, the one parse both must make alike.
+// for its syntax alone. It shares appendParsed with the engine, the one parse both must make alike, and the scan for a
+// line directive in each file of a package both have that the two do not share (build_dependence.HoldsLineDirective).
 func libraryDependence(test *testing.T, root string, hostEnvironment []string, buildEnvironment []string) Counts {
 	test.Helper()
 	load := func(environment []string) map[string]*packages.Package {
@@ -98,6 +99,8 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 		for _, file := range buildPackage.GoFiles {
 			if !isShared || !slices.Contains(hostPackage.GoFiles, file) {
 				differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file)
+				differing.LineDirective = differing.LineDirective ||
+					isShared && build_dependence.HoldsLineDirective(file)
 			}
 		}
 		if isShared {
@@ -106,6 +109,7 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 					differing.SharedFiles = append(differing.SharedFiles, file)
 				} else {
 					differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
+					differing.LineDirective = differing.LineDirective || build_dependence.HoldsLineDirective(file)
 				}
 			}
 		}

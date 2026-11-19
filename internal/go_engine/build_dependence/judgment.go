@@ -66,24 +66,29 @@ func (judging *judgment) seed(index int) {
 // seedFiles is rule 1: every unit of a package only the host has, or in a file the build does not compile, is a seed.
 // A unit is known by the file a reader sees, past any //line directive, which in a file only the host compiles can name
 // a file no build lists, so in a package with a host-only file every unit is a seed unless that file is one both
-// builds compile (PackageDifference.SharedFiles): a unit under a directive in a shared file is seeded with them.
+// builds compile (PackageDifference.SharedFiles): a unit under a directive in a shared file is seeded with them. A
+// directive in a file the builds do not share can name that file too, so a package where one holds a directive
+// (PackageDifference.LineDirective) has every unit seeded, its shared files left unread.
 func (judging *judgment) seedFiles() {
 	sharedFiles := map[string]map[string]bool{}
 	for identifier, differing := range judging.difference.Packages {
-		if len(differing.HostOnlyFiles) == 0 {
-			continue
+		switch {
+		case differing.LineDirective:
+			// No file is shared for the seeding, so every unit's file reads as not shared.
+			sharedFiles[identifier] = nil
+		case len(differing.HostOnlyFiles) > 0:
+			files := make(map[string]bool, len(differing.SharedFiles))
+			for _, file := range differing.SharedFiles {
+				files[file] = true
+			}
+			sharedFiles[identifier] = files
 		}
-		files := make(map[string]bool, len(differing.SharedFiles))
-		for _, file := range differing.SharedFiles {
-			files[file] = true
-		}
-		sharedFiles[identifier] = files
 	}
 	resolved := judging.resolved
 	for packageIndex, record := range resolved.packages {
 		hostOnly := judging.difference.HostOnlyPackages[record.identifier]
-		files, hasHostOnlyFile := sharedFiles[record.identifier]
-		if !hostOnly && !hasHostOnlyFile {
+		files, seedsByFile := sharedFiles[record.identifier]
+		if !hostOnly && !seedsByFile {
 			continue
 		}
 		span := resolved.packageUnits[packageIndex]

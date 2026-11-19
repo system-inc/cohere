@@ -44,6 +44,9 @@ type hostDependence struct {
 	// under callsOnce), since the builds' censuses run at once.
 	calls     *build_dependence.CallIndex
 	callsOnce sync.Once
+	// lineDirectives is whether each file a build's difference scanned holds a line directive, by path as written, a
+	// bool (holdsLineDirective): every build compares the same files, and the builds run at once.
+	lineDirectives sync.Map
 }
 
 // callIndex is the run's call index (hostDependence.calls), built the first time a build's census asks for it,
@@ -58,6 +61,19 @@ func (engine *pipeline) callIndex() *build_dependence.CallIndex {
 		engine.dependence.calls = build_dependence.NewCallIndex(engine.dependence.graph, standardLibrary)
 	})
 	return engine.dependence.calls
+}
+
+// holdsLineDirective is build_dependence.HoldsLineDirective of file, scanned once a run (hostDependence.lineDirectives)
+// whichever build asks first.
+func (engine *pipeline) holdsLineDirective(file string) bool {
+	if scanned, isScanned := engine.dependence.lineDirectives.Load(file); isScanned {
+		if holds, isBool := scanned.(bool); isBool {
+			return holds
+		}
+	}
+	holds := build_dependence.HoldsLineDirective(file)
+	engine.dependence.lineDirectives.Store(file, holds)
+	return holds
 }
 
 // standardLibraryDependence is the standard library's own graph (#ss4t5g6): the host restores the standard library
@@ -341,7 +357,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 			judged.sharedPackages[identifier] = true
 		}
 		// A variant's own test files are the variant's, never the package's it stands in for.
-		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, !asVariant)
+		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, !asVariant, engine.holdsLineDirective)
 		if !asVariant {
 			for _, file := range hostFiles {
 				if slices.Contains(counterpart.GoFiles, file) {
@@ -368,7 +384,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	var standardLibraryJudged *build_dependence.Dependence
 	if standardLibrary != nil && standardLibrary.graph != nil {
 		standardLibraryJudged = standardLibrary.graph.Against(
-			standardLibraryDifference(standardLibrary, built, fileSet))
+			standardLibraryDifference(standardLibrary, built, fileSet, engine.holdsLineDirective))
 	}
 	var standardLibraryGraph *build_dependence.Graph
 	if standardLibraryJudged != nil {
@@ -421,11 +437,13 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 // standardLibraryDifference is what the build changes of the standard library's graph, as dependenceOf compares the
 // host's packages: each side-loaded package's files with the build's package of that ID, and one the build does not
 // have is the host's alone. A package only the build has is no business of this graph's: the host's difference counts
-// it, since the host's files name every package the host reached, the standard library's among them.
+// it, since the host's files name every package the host reached, the standard library's among them. Each file the two
+// do not share is scanned for a line directive by holdsLineDirective, as filesDiffer says.
 func standardLibraryDifference(
 	standardLibrary *standardLibraryDependence,
 	built map[string]*packages.Package,
 	fileSet *token.FileSet,
+	holdsLineDirective func(file string) bool,
 ) build_dependence.Difference {
 	difference := build_dependence.Difference{
 		Packages:          map[string]build_dependence.PackageDifference{},
@@ -438,7 +456,7 @@ func standardLibraryDifference(
 			difference.HostOnlyPackages[identifier] = true
 			continue
 		}
-		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, true)
+		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, true, holdsLineDirective)
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
 			difference.Packages[identifier] = differing
 		}
@@ -448,12 +466,16 @@ func standardLibraryDifference(
 
 // filesDiffer is how one package's files differ, as written: hostFiles the host compiles and builtFiles the build
 // does, each host-only file named and each shared one too, by which a unit a //line directive names apart is seeded,
-// and with buildOnly each build-only file parsed for its syntax alone.
+// and with buildOnly each build-only file parsed for its syntax alone. Each host-only file, and with buildOnly each
+// build-only one, is read by holdsLineDirective, by its path as written, whose directive could name a shared file, so
+// one that holds one marks the package (PackageDifference.LineDirective). A variant's own test files are no build-only
+// files of the package it stands in for, so without buildOnly they are not read.
 func filesDiffer(
 	hostFiles []string,
 	builtFiles []string,
 	fileSet *token.FileSet,
 	buildOnly bool,
+	holdsLineDirective func(file string) bool,
 ) build_dependence.PackageDifference {
 	var differing build_dependence.PackageDifference
 	for _, file := range hostFiles {
@@ -461,12 +483,14 @@ func filesDiffer(
 			differing.SharedFiles = append(differing.SharedFiles, file)
 		} else {
 			differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
+			differing.LineDirective = differing.LineDirective || holdsLineDirective(file)
 		}
 	}
 	if buildOnly {
 		for _, file := range builtFiles {
 			if !slices.Contains(hostFiles, file) {
 				differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file)
+				differing.LineDirective = differing.LineDirective || holdsLineDirective(file)
 			}
 		}
 	}
