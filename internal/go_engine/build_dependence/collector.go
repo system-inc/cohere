@@ -38,11 +38,17 @@ type collector struct {
 	declaresStart int
 	owners        []types.Object
 
-	// unitWalk, membersWalk and usesWalk are newUnit's, collectMembers' and addUses' walks, kept here so none of them
-	// makes a closure for each walk.
-	unitWalk    unitVisitor
-	membersWalk membersVisitor
-	usesWalk    usesVisitor
+	// passedTypes are the types the initializers of the var collectValue is collecting pass through, in the order its
+	// walk met them, each once by passedSeen, for a var that declares no type.
+	passedTypes []types.Type
+	passedSeen  map[types.Type]bool
+
+	// unitWalk, membersWalk, usesWalk and initializerWalk are newUnit's, collectMembers', addUses' and
+	// collectValue's walks, kept here so none of them makes a closure for each walk.
+	unitWalk        unitVisitor
+	membersWalk     membersVisitor
+	usesWalk        usesVisitor
+	initializerWalk initializerVisitor
 }
 
 // collectFile collects every unit of file, whose place tokenFile holds. Imports are no units.
@@ -328,6 +334,15 @@ func (collecting *collector) collectValue(
 		unit.references = collecting.bodies.references(initializers...)
 		unit.callees = collecting.staticCallees(initializers...)
 	}
+	// A var that declares no type takes it from what its initializers pass through, gathered here for every name.
+	collecting.passedTypes = collecting.passedTypes[:0]
+	clear(collecting.passedSeen)
+	if isVariable && spec.Type == nil {
+		collecting.initializerWalk = initializerVisitor{collecting: collecting}
+		for _, value := range spec.Values {
+			ast.Walk(&collecting.initializerWalk, value)
+		}
+	}
 	values := expressionNodes(specValues)
 	// The owners of the members collectMembers declares are the spec's names, gathered here; nothing between reads or
 	// writes them.
@@ -340,11 +355,18 @@ func (collecting *collector) collectValue(
 		collecting.declare(unit, object)
 		collecting.owners = append(collecting.owners, object)
 		if isVariable {
-			// A var's own type, as a name, and the initializer an untyped var takes its type from.
+			// A var's own type, as a name, and the initializer an untyped var takes its type from: each object it
+			// uses by its own bit, and every type it passes through in full, entered behind pointers, slices, maps,
+			// channels and signatures too. Its type as written can differ by what lies under a named type whose name
+			// bit no build sets, `rows[0]` an [8]int where the host's is a [4]int over `type Rows [2][Length]int`, so
+			// the types' names alone would leave its bit unset.
 			collecting.addEdges(object, false, collecting.walker.borrowedReferences(object.Type(), false))
 			collecting.addUses(object, false, false, specType)
 			if spec.Type == nil {
 				collecting.addUses(object, false, false, values...)
+				for _, passed := range collecting.passedTypes {
+					collecting.addEdges(object, false, collecting.walker.borrowedEnteringReferences(passed))
+				}
 			}
 			continue
 		}
@@ -357,9 +379,19 @@ func (collecting *collector) collectValue(
 	collecting.collectMembers(unit, collecting.owners, false, spec.Type)
 }
 
+// passType gathers passed into passedTypes, once, for the var collectValue is collecting (initializerVisitor).
+func (collecting *collector) passType(passed types.Type) {
+	if passed == nil || collecting.passedSeen[passed] {
+		return
+	}
+	collecting.passedSeen[passed] = true
+	collecting.passedTypes = append(collecting.passedTypes, passed)
+}
+
 // addUses makes from's bit depend on the own bit of each object an identifier or selector under roots resolves to.
-// Type names are left to the structural walk of from's type, except where full, in a constant's value, where a type
-// name or a var is read in full. A package name, a builtin, nil and a label are the same in every build.
+// Type names are left to the structural walk of from's type, except where full, in a constant's value or an array's
+// length (usesVisitor.Visit), where a type name or a var is read in full. A package name, a builtin, nil and a label
+// are the same in every build.
 func (collecting *collector) addUses(from types.Object, fromUnderlying bool, full bool, roots ...ast.Node) {
 	collecting.usesWalk = usesVisitor{collecting: collecting, from: from, fromUnderlying: fromUnderlying, full: full}
 	for _, root := range roots {

@@ -41,7 +41,7 @@ func newWorkerScratch() *workerScratch {
 	scratch.bodies = bodyWalk{walker: &scratch.walker, typeReferences: map[walkKey][]reference{},
 		collected: map[reference]bool{}}
 	scratch.collecting = collector{edgeSeen: map[kindEdge]bool{}, walker: &scratch.walker, bodies: &scratch.bodies,
-		calleeSeen: map[types.Object]bool{}}
+		calleeSeen: map[types.Object]bool{}, passedSeen: map[types.Type]bool{}}
 	scratch.naming = namer{declared: map[types.Object]string{}, names: map[types.Object]string{},
 		throughs: map[types.Object][]recordedBit{}, indexes: map[types.Object]int32{}}
 	return scratch
@@ -70,6 +70,7 @@ func (scratch *workerScratch) namer(typesPackage *types.Package, encoder *object
 func (scratch *workerScratch) release() {
 	clear(scratch.walker.seen)
 	scratch.walker.collected = emptied(scratch.walker.collected)
+	scratch.walker.entering = false
 
 	scratch.bodies.typesInformation = nil
 	clear(scratch.bodies.typeReferences)
@@ -89,6 +90,9 @@ func (scratch *workerScratch) release() {
 	scratch.collecting.unitWalk = unitVisitor{}
 	scratch.collecting.membersWalk = membersVisitor{}
 	scratch.collecting.usesWalk = usesVisitor{}
+	scratch.collecting.passedTypes = emptied(scratch.collecting.passedTypes)
+	clear(scratch.collecting.passedSeen)
+	scratch.collecting.initializerWalk = initializerVisitor{}
 
 	scratch.naming.typesPackage = nil
 	scratch.naming.encoder = nil
