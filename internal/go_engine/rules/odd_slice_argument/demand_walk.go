@@ -26,9 +26,9 @@ import (
 // staticcheck's walk visits each function once, in buildir's order, a callee of the same package or of none first, and
 // reads a function already begun, and one it never enters because a stand-in of no package called it, as far as its
 // marks have come. In a cycle of calls, and through an instantiation or a wrapper, its marks then turn on where it
-// entered, which is the order the package declares its functions in, and around a cycle a mark must cross more than
-// once it misses them in every order. Those are the places the port departs from the original, by marking what the
-// original's order left out.
+// entered, which is the order the package declares its functions in, and where a mark must go around a cycle more
+// than once it misses the mark in every order. Those are the places the port departs from the original, by marking
+// what the original's one visit left out.
 type demandWalk struct {
 	resolver  *fact_resolver.Resolver
 	home      *fact_resolver.Package

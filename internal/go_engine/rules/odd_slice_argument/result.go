@@ -72,7 +72,14 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parame
 // sound place to stop comparing two builds only when everything it read is on record beside it, so each mark settled
 // for a parameter of another declared function is asked here in its turn, of home itself, once home's lock is given
 // back: the question finds the mark final, computes nothing, and is memoized, recorded for the store and told to a
-// test's hand exactly as the first was. The resolver has no door for an answer nobody asked, so asking is the door.
+// test's hand exactly as the first was. A package asking of its own parameter is no read (fact_resolver.Ask records
+// one only of another package's object), so its entry never comes to depend on itself, and a judgment that settled no
+// other mark asks nothing.
+//
+// This is an interim, to be replaced and not copied. The resolver has no door for an answer nobody asked: it records,
+// memoizes and tells an answer only inside the one question that computed it. A seam for exactly this, a kind
+// recording the verdicts its walk keeps, is being added to the resolver by another unit, for return_nil_ness, and
+// when it lands these questions give way to it.
 func markIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, parameter *types.Var) bool {
 	marked, settled := judgeIn(resolver, home, parameter)
 	for _, other := range settled {
