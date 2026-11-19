@@ -74,7 +74,7 @@ func placedNames(placed []fact_resolver.PlacedAnswer) []string {
 // is; a parameter's at its index, Method's second at 1, its receiver not counted; and directed's in written.go, the
 // file the //line directive above it names, at its offset in placed.go, where the directive moves its line and not its
 // bytes, carrying placed.go's digest, the bytes its offset counts in. Method's receiver, no parameter, is left out.
-func TestPlacedInPlacesEveryAnswerAtItsDeclarationsFunc(test *testing.T) {
+func TestPlacedInPlacesEveryAnswerAtItsFunctionsKeyword(test *testing.T) {
 	test.Parallel()
 	directory := analysistest.TestData()
 	resolver, home, _ := learnPlacedFixture(test, "placed")

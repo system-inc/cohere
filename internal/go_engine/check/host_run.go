@@ -13,6 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -197,4 +198,18 @@ func (host *HostRun) holdersOf(filename string) []string {
 		}
 	})
 	return host.holders[filename]
+}
+
+// placedOf is the placed answers of the entry the host's run kept of the package identified so, decoded as every build
+// shares the decode, and whether it kept one that decodes.
+func (host *HostRun) placedOf(identifier string) ([]fact_resolver.PlacedAnswer, bool) {
+	kept := host.entries[identifier]
+	if kept == nil || kept.decoded == nil {
+		return nil, false
+	}
+	restored, decodeError := kept.decoded()
+	if decodeError != nil {
+		return nil, false
+	}
+	return restored.placed, true
 }

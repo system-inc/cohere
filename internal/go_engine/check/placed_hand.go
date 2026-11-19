@@ -102,20 +102,8 @@ func (hand *placedHand) Answer(kindName string, object types.Object) ([]byte, bo
 }
 
 // Computed hears an answer the resolver computed, which the hand, answering only from the host's, has no use for.
-func (*placedHand) Computed(string, types.Object, []byte) {}
-
-// placedOf is the placed answers of the entry the host's run kept of the package identified so, decoded as every build
-// shares the decode, and whether it kept one that decodes.
-func (host *HostRun) placedOf(identifier string) ([]fact_resolver.PlacedAnswer, bool) {
-	kept := host.entries[identifier]
-	if kept == nil || kept.decoded == nil {
-		return nil, false
-	}
-	restored, decodeError := kept.decoded()
-	if decodeError != nil {
-		return nil, false
-	}
-	return restored.placed, true
+func (*placedHand) Computed(string, types.Object, []byte) {
+	// Answers only from the host's, so an answer the resolver computed is nothing to keep.
 }
 
 // storedPlacedAt is the placed answers of the entry store holds under key, and whether it holds a whole one whose

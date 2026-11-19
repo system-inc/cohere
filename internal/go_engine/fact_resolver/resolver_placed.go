@@ -45,10 +45,11 @@ func (resolver *Resolver) PlacedIn(home *Package, digestOf func(parsed string) (
 	home.answeredLock.Lock()
 	keys := slices.Collect(maps.Keys(home.answered))
 	home.answeredLock.Unlock()
-	within := func(held *sync.Map) iter.Seq2[any, any] {
-		return func(yield func(any, any) bool) {
+	within := func(held *sync.Map) iter.Seq2[answerKey, []byte] {
+		return func(yield func(answerKey, []byte) bool) {
 			for _, key := range keys {
-				if answer, isHeld := held.Load(key); isHeld && !yield(key, answer) {
+				answer, isHeld := held.Load(key)
+				if isHeld && !yield(key, encodeAnswer(key.kind, key.object, answer)) {
 					return
 				}
 			}

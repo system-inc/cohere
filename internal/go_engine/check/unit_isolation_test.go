@@ -786,6 +786,15 @@ var pinnedFindings = map[string]string{
 	rule.Namespace + "SA4023":     "Typed",
 }
 
+// storedPinnedFindings are the findings the pin through a store keeps: pinnedFindings', and Compares's SA4023, which
+// rests on the nil-ness of typedNil, whose result is never a nil interface because missing's is not. SA4023
+// reads typedNil's body too, to leave a trivial callee alone, so it is missing the variant stubs, never typedNil.
+var storedPinnedFindings = func() map[string]string {
+	findings := maps.Clone(pinnedFindings)
+	findings[rule.Namespace+"SA4023"] = "Compares"
+	return findings
+}()
+
 // pinnedRules are the isolated rules whose findings the pin keeps.
 func pinnedRules(test *testing.T) []rule.Rule {
 	test.Helper()
@@ -924,15 +933,6 @@ func TestAKeptUnitKeepsTheFindingThatRestsOnAStubbedCallee(test *testing.T) {
 		}
 	}
 }
-
-// storedPinnedFindings are the findings the pin through a store keeps: pinnedFindings', and Compares's SA4023, which
-// rests on the nil-ness of typedNil, whose result is never a nil interface because missing's is not. SA4023
-// reads typedNil's body too, to leave a trivial callee alone, so it is missing the variant stubs, never typedNil.
-var storedPinnedFindings = func() map[string]string {
-	findings := maps.Clone(pinnedFindings)
-	findings[rule.Namespace+"SA4023"] = "Compares"
-	return findings
-}()
 
 // runPinnedFromStore is runPinned through a store: the fixture, written as a module of the test's own, is checked by
 // a host's run with a store, keeping its entries for builds, and then by a variant stubbing halt, proceed, double and

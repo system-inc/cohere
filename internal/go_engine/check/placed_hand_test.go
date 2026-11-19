@@ -33,7 +33,8 @@ func diskDigests(test *testing.T) func(parsed string) ([]byte, bool) {
 func TestThePlacedHandAnswersAStandingFunctionByItsPlace(test *testing.T) {
 	test.Parallel()
 	loaded := placedModule(test, test.TempDir(), "func Use() int {\n\treturn bottom.Double(2)\n}\n")
-	var bottom, top *packages.Package
+	var bottom *packages.Package
+	var top *packages.Package
 	for _, each := range loaded {
 		switch each.PkgPath {
 		case "example.com/placed/bottom":

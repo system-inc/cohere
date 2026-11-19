@@ -254,8 +254,8 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 		if !stored {
 			continue
 		}
-		// Placed answers that do not read are left out, as answers the entry never held: the run answers from
-		// source whatever they would have.
+		// Ignored: placed answers that do not read are left out, as answers the entry never held, and the run answers
+		// from source whatever they would have.
 		placed, _ := entry.Placed.placed()
 		session.previous[reloaded] = entryDemand{answers: entry.Answers, placed: placed, reads: entry.Reads,
 			readsIncomplete: entry.ReadsIncomplete}

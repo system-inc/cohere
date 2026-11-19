@@ -290,6 +290,16 @@ func TestAnEntrysPlacedAnswersReadBackExactly(test *testing.T) {
 	}
 }
 
+// gobLength is how many bytes gob encodes value in, a gob of its own.
+func gobLength[Value any](test *testing.T, value Value) int {
+	test.Helper()
+	var encoded bytes.Buffer
+	if encodeError := gob.NewEncoder(&encoded).Encode(value); encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	return encoded.Len()
+}
+
 // A package's placed answers by column cost fewer bytes an answer than a list naming each one's kind and file: 400
 // answers of three kinds over ten files, by the bytes each form adds to a gob that holds none, which is what an entry
 // adds, since every entry's gob describes the type once whether it holds answers or not. The test logs both.
@@ -298,19 +308,13 @@ func TestPlacedAnswersByColumnCostFewerBytesAnAnswer(test *testing.T) {
 	kinds := []string{"function_purity", "return_nil_ness", "odd_slice_argument"}
 	var answers []fact_resolver.PlacedAnswer
 	for index := range 400 {
+		// Not a machine path: a name only encoded, as long as a real one so the bytes compare fairly; nothing reads it.
 		answers = append(answers, fact_resolver.PlacedAnswer{Kind: kinds[index%3],
 			File:   fmt.Sprintf("/Users/someone/Projects/module/internal/package/file_%d.go", index%10),
 			Offset: 120 * index, Parameter: index%4 - 1, Encoded: []byte("true")})
 	}
-	sizeOf := func(value any) int {
-		var encoded bytes.Buffer
-		if encodeError := gob.NewEncoder(&encoded).Encode(value); encodeError != nil {
-			test.Fatal(encodeError)
-		}
-		return encoded.Len()
-	}
-	flat := sizeOf(answers) - sizeOf([]fact_resolver.PlacedAnswer{{}})
-	columns := sizeOf(storedPlacedOf(answers)) - sizeOf(storedPlaced{})
+	flat := gobLength(test, answers) - gobLength(test, []fact_resolver.PlacedAnswer{{}})
+	columns := gobLength(test, storedPlacedOf(answers)) - gobLength(test, storedPlaced{})
 	test.Logf("400 placed answers add %d bytes as a list naming each one's kind and file, %d by column", flat,
 		columns)
 	if columns*2 > flat {

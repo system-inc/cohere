@@ -8,6 +8,7 @@ import (
 	"go/types"
 	"iter"
 	"slices"
+	"sync"
 )
 
 // Answered is one answer a run holds: the kind's name, the object the answer is about, and the answer, as JSON, as Ask
@@ -40,7 +41,7 @@ func (resolver *Resolver) Answered() []Answered {
 		// No package was learned, so no question was asked: a question is asked by a learned package's reader.
 		return nil
 	}
-	answers := heldOnce(resolver.answers.Range, resolver.kept.Range)
+	answers := heldOnce(everyEncoded(&resolver.answers), everyEncoded(&resolver.kept))
 	places := make(map[types.Object]token.Position, len(answers))
 	for _, answer := range answers {
 		places[answer.Object] = program.FileSet.Position(answer.Object.Pos())
@@ -61,31 +62,20 @@ func (resolver *Resolver) Answered() []Answered {
 // and is held once. It is the same answer, since a kept answer is final (see Keep), and so the same bytes, and
 // heldOnce panics when the two differ.
 //
-// Each answer is encoded here from the value held, as an any, and the bytes are the ones encodeAnswer gave for the
+// Each answer comes encoded from the value held, as an any, and the bytes are the ones encodeAnswer gave for the
 // kind's typed value when it recorded it or told a hand of it: encodeAnswer hands json.Marshal its value as an any
 // either way, and an any keeps the value's own type, so a nil slice, no fact, encodes as null from both.
-func heldOnce(memoized iter.Seq2[any, any], kept iter.Seq2[any, any]) []Answered {
+func heldOnce(memoized iter.Seq2[answerKey, []byte], kept iter.Seq2[answerKey, []byte]) []Answered {
 	var answers []Answered
 	memoizedEncoded := map[answerKey][]byte{}
-	keyOf := func(key any) answerKey {
-		answered, isKey := key.(answerKey)
-		if !isKey {
-			// Invariant: answerOf and Keep store every answer under an answerKey.
-			panic(fmt.Sprintf("fact_resolver: an answer is held under a %T", key))
-		}
-		return answered
-	}
 	hold := func(answered answerKey, encoded []byte) {
 		answers = append(answers, Answered{Kind: answered.kind.Name, Object: answered.object, Encoded: encoded})
 	}
-	for key, answer := range memoized {
-		answered := keyOf(key)
-		memoizedEncoded[answered] = encodeAnswer(answered.kind, answered.object, answer)
-		hold(answered, memoizedEncoded[answered])
+	for answered, encoded := range memoized {
+		memoizedEncoded[answered] = encoded
+		hold(answered, encoded)
 	}
-	for key, answer := range kept {
-		answered := keyOf(key)
-		encoded := encodeAnswer(answered.kind, answered.object, answer)
+	for answered, encoded := range kept {
 		held, isMemoized := memoizedEncoded[answered]
 		if !isMemoized {
 			hold(answered, encoded)
@@ -101,8 +91,22 @@ func heldOnce(memoized iter.Seq2[any, any], kept iter.Seq2[any, any]) []Answered
 	return answers
 }
 
+// everyEncoded is every answer held holds, the memo Ask reads or Keep's, by its answerKey and encoded, in no order.
+func everyEncoded(held *sync.Map) iter.Seq2[answerKey, []byte] {
+	return func(yield func(answerKey, []byte) bool) {
+		held.Range(func(key any, answer any) bool {
+			answered, isKey := key.(answerKey)
+			if !isKey {
+				// Invariant: answerOf and Keep store every answer under an answerKey.
+				panic(fmt.Sprintf("fact_resolver: an answer is held under a %T", key))
+			}
+			return yield(answered, encodeAnswer(answered.kind, answered.object, answer))
+		})
+	}
+}
+
 // memoize holds answer under key in the memo Ask reads, and notes it among its object's package's answers.
-func (resolver *Resolver) memoize(key answerKey, answer any) {
+func memoize[Value any](resolver *Resolver, key answerKey, answer Value) {
 	resolver.answers.Store(key, answer)
 	resolver.noteAnswered(key)
 }
