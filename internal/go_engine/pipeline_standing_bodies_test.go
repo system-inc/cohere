@@ -333,14 +333,16 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	}
 }
 
-// standingGates are the modules of testdata/standing-gates, the body differential's four of SA4029's package-wide gate
-// (the seat's h-shadow return, #zvwfe26): in each, windows's own file flips or keeps the gate another file's function
-// is judged by, and that function's body is one the difference never reaches. sort-win and sort-host flip whether a
-// method of package sort is used, which opens SA4029, beside a shared file that imports sort itself; sort-alias-win
-// and sort-alias-host flip it through an alias, from a shared file that imports no sort. The seat's fifth,
-// import-unsafe, where windows's import of unsafe closes unusedwrite, waits on the reach carrying a package whose
-// imports differ between builds, on a branch of its own.
-var standingGates = []string{"sort-win", "sort-host", "sort-alias-win", "sort-alias-host"}
+// standingGates are the modules of testdata/standing-gates, each of a package-wide gate (#zvwfe26): in each, windows's
+// own file flips or keeps the gate another file's function is judged by, and that function's body is one the
+// difference never reaches. Four are the body differential's of SA4029's gate (the seat's h-shadow return): sort-win
+// and sort-host flip whether a method of package sort is used, which opens SA4029, beside a shared file that imports
+// sort itself; sort-alias-win and sort-alias-host flip it through an alias, from a shared file that imports no sort.
+// import-goflags imports go-flags, a stub by its module's replace, in windows's file alone, which lets SA5008 accept a
+// repeated `default` key in a struct tag anywhere in the package. The seat's import-unsafe, unusedwrite's gate, and
+// import-cobra, SA1015's, wait on the reach reaching a package whose files import differently, on a branch of their
+// own.
+var standingGates = []string{"sort-win", "sort-host", "sort-alias-win", "sort-alias-host", "import-goflags"}
 
 // runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
 // body reach census with `--no-cache --no-fix --build-dependence`, with the standing bodies' switch as switched, and
