@@ -289,6 +289,8 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 	lifting.declarations = liftingCleared(lifting.declarations, len(allocations))
 	lifting.blocks = liftingCleared(lifting.blocks, len(function.Blocks))
 	scratch.blockValues = liftingCleared(scratch.blockValues, len(function.Blocks))
+	// Marked before the round writes a block, so release clears what a round wrote however far it got.
+	scratch.blockValuesUsed = max(scratch.blockValuesUsed, len(scratch.blockValues))
 	instructions := 0
 	for _, block := range function.Blocks {
 		instructions += len(block.Instructions)
@@ -488,6 +490,8 @@ type liftingDefinition struct {
 // Mutates: scratch its definitions are the round's
 func liftingResolve(lifting *liftingFunction, scratch *liftingScratch) {
 	scratch.definitions = liftingCleared(scratch.definitions, len(lifting.declarations))
+	// Marked before the resolve writes a definition, so release clears what a resolve wrote however far it got.
+	scratch.definitionsUsed = max(scratch.definitionsUsed, len(scratch.definitions))
 	for _, block := range lifting.blocks {
 		for index, slot := range block.slots {
 			if !slot.isPlace {

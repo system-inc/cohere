@@ -41,20 +41,31 @@ type liftingScratch struct {
 
 	// lifting is the round's function as the core sees it. Its blocks point into blockValues, each block's slots are
 	// carved from slots on its first place or deletion, its placed views from placed, and its order is order.
-	lifting     liftingFunction
-	blockValues []liftingBlock
-	slots       []liftingSlot
-	placed      []int32
-	visited     []bool
-	order       []*liftingBlock
+	// blockValuesUsed is the most blocks a round has prepared since the pool last took the scratch back, which
+	// release reads: a round of fewer blocks leaves an earlier round's tail in blockValues and in order.
+	lifting         liftingFunction
+	blockValues     []liftingBlock
+	blockValuesUsed int
+	slots           []liftingSlot
+	placed          []int32
+	visited         []bool
+	order           []*liftingBlock
 
-	// definitions are the resolve's table, by identifier.
-	definitions []liftingDefinition
+	// definitions are the resolve's table, by identifier. definitionsUsed is the longest a resolve has made it since
+	// the pool last took the scratch back, which release reads.
+	definitions     []liftingDefinition
+	definitionsUsed int
 }
 
-// release clears every pointer scratch holds, to the full capacity of each array, since a round that used less
-// than an earlier one leaves the earlier one's tail, and drops a localsInBlocks that has held more than
-// liftingScratchLocalsLimit.
+// release clears every pointer scratch holds, and drops a localsInBlocks that has held more than
+// liftingScratchLocalsLimit. work, pending, allocations and lifting's blocks are cleared to the full capacity of
+// each array, since a round that used less than an earlier one leaves the earlier one's tail.
+//
+// blockValues, order and definitions are cleared only as far as the function used them (#w5dbvdm): cleared to its
+// capacity, each cost every release as much as the largest function the array ever held. A pooled array is all zero
+// past what the function used, because it was zero when made, every round writes only below its own length, and
+// each release clears the longest length since the one before. An array a round outgrows is replaced by a new
+// zeroed one and the old one is dropped, so nothing stale is kept there either.
 func (scratch *liftingScratch) release() {
 	clear(scratch.work[:cap(scratch.work)])
 	clear(scratch.liftable.pending[:cap(scratch.liftable.pending)])
@@ -70,7 +81,11 @@ func (scratch *liftingScratch) release() {
 		blocks:       scratch.lifting.blocks[:0],
 		declarations: scratch.lifting.declarations[:0],
 	}
-	clear(scratch.blockValues[:cap(scratch.blockValues)])
-	clear(scratch.order[:cap(scratch.order)])
-	clear(scratch.definitions[:cap(scratch.definitions)])
+	clear(scratch.blockValues[:scratch.blockValuesUsed])
+	// A round appends each block it prepared to order once, so blockValuesUsed bounds what order holds too. order
+	// grows by append, apart from blockValues, so a walk that stopped early leaves its capacity the smaller.
+	clear(scratch.order[:min(scratch.blockValuesUsed, cap(scratch.order))])
+	scratch.blockValuesUsed = 0
+	clear(scratch.definitions[:scratch.definitionsUsed])
+	scratch.definitionsUsed = 0
 }
