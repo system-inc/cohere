@@ -1,8 +1,10 @@
 package intermediate_representation
 
-// The lifting options the external tests set on a Program before building it (lifting.go). Compiled into the
-// package's tests only. Each entry is deleted when the test that stored it ends, so the map holds nothing a
-// finished test set.
+// What the package's tests reach of its unexported parts, compiled into the package's tests only. Most are the
+// lifting options the external tests set on a Program before building it (lifting.go): each entry is deleted when
+// the test that stored it ends, so the map holds nothing a finished test set. The rest are unaliasDeeply, for the
+// tests of the instance names it makes canonical, and the build of one function's body alone, on a builder that
+// takes no further turn.
 
 import (
 	"go/types"
@@ -47,6 +49,20 @@ func DropDebugReferenceForTest(test testing.TB, program *Program) {
 
 // UnaliasDeeplyForTest is unaliasDeeply, for the tests of the instance names it makes canonical.
 func UnaliasDeeplyForTest(given types.Type) types.Type { return unaliasDeeply(given) }
+
+// BuildBodyAloneForTest builds function's own body, with the anonymous functions its syntax holds, on a builder that
+// takes no further turn, so the bound method wrappers and thunks the body queued stay unbuilt: what a second caller of
+// Function.Build finds while the first caller's builder has yet to reach them. It is only for a body that makes no
+// shared function, an instance or a method from type information, since a builder that never ends its iteration never
+// marks its task done, and every builder that met such a function would wait for it without end.
+func BuildBodyAloneForTest(function *Function) {
+	var bodyBuilder builder
+	bodyBuilder.buildFunction(function)
+	if bodyBuilder.buildshared != nil {
+		// Invariant: the tests hand this only a body that makes no shared function, as its comment asks.
+		panic("BuildBodyAloneForTest: the body of " + function.String() + " made or met a shared function")
+	}
+}
 
 // HasLiftingOptionsForTest reports whether program has options stored, for the test that the default path has
 // none.

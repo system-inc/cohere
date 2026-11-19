@@ -49,3 +49,14 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, sa4023.Analyzer, Analyzer, analysistest.TestData(), "differences")
 }
+
+// A callee declared in a package the judged package never imports is judged as any other package's function is: not
+// trivial, unread, so the comparison is reported. indirect imports mid alone, and mid.New returns a pointer to deep's
+// Core, whose Err it compares with nil. The original asks its representation for Err's function, is handed none, and
+// passes nil to irutil.IsTrivial, which dereferences it: the panic was seen at irutil's stub.go:49, called from
+// sa4023.go:192. So over the indirect fixture the original must panic, and the port must find exactly what the
+// fixture records with `// port finds:`, the comparison, which is always true.
+func TestPortReportsACalleeOfAPackageNeverImportedWhereTheOriginalPanics(test *testing.T) {
+	test.Parallel()
+	parity.RequirePortWhereOriginalPanics(test, sa4023.Analyzer, Analyzer, analysistest.TestData(), "indirect")
+}
