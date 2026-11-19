@@ -13,15 +13,16 @@ import (
 )
 
 // bodyReacher judges one build's bodies on one goroutine, the build's own: dependence is the build's judgment, whose
-// ObjectBits is safe from one goroutine at a time, and decoded answers, by name, an object of a package the host's
-// graph took from a record, which holds no live object for ObjectBits to find, made at the first such object.
+// ObjectBits is safe from one goroutine at a time, and decoded answers, by its package's ID and its name, an object of
+// a package the host's graph took from a record, which holds no live object for ObjectBits to find, made at the first
+// such object.
 //
 // identities render the identity of the object that reaches each body first, its driver (reachedBody.driver), by the
 // host's file set, made at the first.
 type bodyReacher struct {
 	host       *bodyReachHost
 	dependence *build_dependence.Dependence
-	decoded    *build_dependence.Counterparts
+	decoded    *build_dependence.IdentifiedObjects
 	identities *build_reads.IdentityRenderer
 	fileSet    *token.FileSet
 	// fromSource are the IDs of the packages the build checked from source, against which the load mode rule reads
@@ -223,17 +224,17 @@ func writtenBits(bits build_dependence.Bits) string {
 }
 
 // bits are object's bits in the build: by the build's judgment of the host's graph, or, for an object of a package the
-// graph took from a findings store's record, by its name there (build_dependence.Counterparts), since such a record
-// holds no live object for ObjectBits to find and would read every one as unchanged.
+// graph took from a findings store's record, by its package's ID and its name there
+// (build_dependence.IdentifiedObjects), since such a record holds no live object for ObjectBits to find and would read
+// every one as unchanged. A name is never asked by its path, which a package and its test variants share.
 func (reacher *bodyReacher) bits(object types.Object) build_dependence.Bits {
 	if !reacher.host.dependence.decoded[object.Pkg()] {
 		return reacher.dependence.ObjectBits(object)
 	}
 	if reacher.decoded == nil {
-		reacher.decoded = build_dependence.NewCounterparts(reacher.host.dependence.graph, reacher.dependence)
+		reacher.decoded = build_dependence.NewIdentifiedObjects(reacher.dependence, reacher.host.identifiers)
 	}
-	name, underlying := reacher.decoded.DependentObject(object)
-	return build_dependence.Bits{Name: name, Underlying: underlying}
+	return reacher.decoded.Bits(object)
 }
 
 // shadowed is the first name any of uses names, by an identifier, of an object of the universe or of a package its

@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"cmp"
 	"maps"
 	"os"
 	"path/filepath"
@@ -157,5 +158,103 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	if !slices.Equal(findingLines(normalize(onStream, root)), findingLines(offStream)) {
 		test.Errorf("the findings with the census are\n%q\nwant those without it\n%q",
 			findingLines(normalize(onStream, root)), findingLines(offStream))
+	}
+}
+
+// On a warm run the host's graph takes a package the findings store holds a record of from that record, which holds
+// no live object, so the reach asks of the package's objects by its ID and their names (bodyReacher.bits). A package
+// beside its in-package test variant shares its path with it, so a name asked by its path names no one package and
+// read nothing set (#w72zxtq, the review's must 1). Here reach has a test, so the host holds reach and its variant, and
+// user, changed between the runs and so checked from source with a record of its own uses, calls reach's PlatformLabel,
+// which each build's own file declares: Show is reached by its name bit through the decoded record, and Plain, calling
+// Joined, which no build changes, is unreached.
+func TestAWarmRunReachesABodyThroughADecodedPackageWithATestVariant(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
+	for name, contents := range map[string]string{
+		"reach_test.go": `package reach
+
+import "testing"
+
+// The test makes reach's in-package test variant.
+func TestJoined(test *testing.T) {
+	if Joined("a", "b") != "a/b" {
+		test.Fail()
+	}
+}
+`,
+		"label_other.go": `//go:build !windows
+
+package reach
+
+// PlatformLabel is every platform's but windows's.
+func PlatformLabel() string {
+	return "other"
+}
+`,
+		"label_windows.go": `package reach
+
+// PlatformLabel is windows's.
+func PlatformLabel() int {
+	return 1
+}
+`,
+		filepath.Join("user", "user.go"): `// Package user calls reach.
+package user
+
+import "example.com/reach"
+
+// Show calls a function each build's own file declares.
+func Show() any {
+	return reach.PlatformLabel()
+}
+
+// Plain calls one no build changes.
+func Plain() string {
+	return reach.Joined("a", "b")
+}
+`,
+	} {
+		if writeError := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); writeError != nil {
+			test.Fatal(writeError)
+		}
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	runOverConfigured(test, root, exitFindings, nil, "--no-fix", "--other-builds", "--build-dependence")
+	// user changes, so the warm run checks it from source and records its uses, while reach's record is decoded.
+	userFile := filepath.Join(root, "user", "user.go")
+	contents, readError := os.ReadFile(userFile)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if writeError := os.WriteFile(userFile, append(contents, "\n// Changed for the warm run.\n"...),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	warm, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+	}, "--no-fix", "--other-builds", "--build-dependence")
+
+	hosted, isHosted := warm.bodyReachHost.packages["example.com/reach"]
+	if !isHosted || !warm.dependence.decoded[hosted.Types] {
+		test.Fatal("want reach decoded on the warm run")
+	}
+	if _, isHosted := warm.bodyReachHost.packages["example.com/reach [example.com/reach.test]"]; !isHosted {
+		test.Fatal("want the host to hold reach's test variant beside it")
+	}
+	if len(warm.buildRuns) != 2 || warm.buildRuns[1].bodyReach == nil {
+		test.Fatalf("want windows's census, got %d runs", len(warm.buildRuns))
+	}
+	got := map[string]string{}
+	for _, body := range warm.buildRuns[1].bodyReach.bodies {
+		if body.packageIdentifier == "example.com/reach/user" {
+			got[body.name] = cmp.Or(string(body.reason), "unreached")
+		}
+	}
+	if want := map[string]string{"Show": "Named", "Plain": "unreached"}; !maps.Equal(got, want) {
+		test.Errorf("windows's warm census judges user's bodies\n%v\nwant\n%v", got, want)
 	}
 }
