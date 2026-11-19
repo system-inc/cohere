@@ -214,6 +214,41 @@ func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test 
 	}
 }
 
+// The analyzers that follow Options.StandingAfter are the ones Options.FollowsStanding names, never the ones
+// Options.Tolerant names: a follower that is no dispatcher, as the build of the engine's representation is none, runs
+// after the followed analyzer and holds the answer asked with its result, and a tolerant analyzer FollowsStanding does
+// not name follows nothing, so it may run before the answer and holds none.
+func TestTheFollowersAreTheOnesFollowsStandingNames(test *testing.T) {
+	test.Parallel()
+	roots := timedModule(test)
+	passes := newStandingPasses()
+	follower := passes.analyzer("follower")
+	tolerantOnly := passes.analyzer("tolerant_only")
+	analyzeStanding(test, []*analysis.Analyzer{follower, tolerantOnly}, roots, &Options{
+		Tolerant:        func(analyzer *analysis.Analyzer) bool { return analyzer == tolerantOnly },
+		FollowsStanding: func(analyzer *analysis.Analyzer) bool { return analyzer == follower },
+		Standing:        standingKey,
+		StandingBodies: func(packageId string, after any) rule.StandingBodies {
+			passes.ask(packageId, after)
+			return &standingOf{packageId: packageId, after: after}
+		},
+		StandingAfter: passes.followedAnalyzer(nil),
+	})
+	for _, root := range roots {
+		followed := passes.passes["follower "+root.PkgPath]
+		held, isHeld := followed.standing.(*standingOf)
+		if !followed.followed || !isHeld || held.packageId != root.ID || held.after != "followed on "+root.PkgPath {
+			test.Errorf("the follower's pass on %s ran after the followed analyzer: %t, holding %v, want it after, "+
+				"holding the answer for its package asked with the followed analyzer's result", root.ID,
+				followed.followed, followed.standing)
+		}
+		if tolerant := passes.passes["tolerant_only "+root.PkgPath]; tolerant.keyed {
+			test.Errorf("the pass of a tolerant analyzer FollowsStanding does not name holds %v on %s, want nothing",
+				tolerant.standing, root.ID)
+		}
+	}
+}
+
 // Where the analyzer Options.StandingAfter names failed on a package, the dispatcher there runs all the same, and
 // neither its pass nor its rule's holds anything under Options.Standing, the option never asked: every doubt lints.
 // The failure of the edge Analyze added is no part of what the dispatcher reads under Options.Failed, and it fails no
