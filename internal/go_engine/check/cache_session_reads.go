@@ -92,14 +92,14 @@ func (session *CacheSession) ownerKeyOf(ownerTypes *types.Package) (*packages.Pa
 	return owner, key, keyed
 }
 
-// standardLibraryOwnerOf is the standard-library package whose types are owner, among those the session keyed, or nil.
-// A run beside the load tells the session of a package only as an action restores it, since no package's types are
-// final as the run starts (check.Run), so a standard-library package the run computed is unknown to packageOf when a
-// package above it is saved; its types are final by then, since the read was of them, so it is found by its import
-// path, then by its types. A path may name two packages the standard library's keys hold: a run over the standard
-// library itself loads a package beside its in-package test variant, both with the plain package's path, and the
-// keyer judges both its own (cache's isStandard reads files, module and imports, never the ID). Each has its own key,
-// so the package taken is the one whose types are owner's, never another under the same path.
+// standardLibraryOwnerOf is the package the system cache keeps whose types are owner, among those the session keyed,
+// the standard library's or a module's, or nil. A run beside the load tells the session of a package only as an action
+// restores it, since no package's types are final as the run starts (check.Run), so such a package the run computed is
+// unknown to packageOf when a package above it is saved; its types are final by then, since the read was of them, so it
+// is found by its import path, then by its types. A path may name two packages the system cache's keys hold: a run
+// over the standard library itself loads a package beside its in-package test variant, both with the plain package's
+// path, and the keyer judges both its own (cache's isSystem reads files, module and imports, never the ID). Each has
+// its own key, so the package taken is the one whose types are owner's, never another under the same path.
 func (session *CacheSession) standardLibraryOwnerOf(owner *types.Package) *packages.Package {
 	for _, candidate := range session.standardLibraryByPath[owner.Path()] {
 		if candidate.Types == owner {

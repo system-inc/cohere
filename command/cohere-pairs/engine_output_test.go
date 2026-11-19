@@ -58,23 +58,25 @@ func TestReadEngineOutputKeepsWhatTheRecordReads(test *testing.T) {
 	}
 }
 
-// A record of a binary with the system cache names the standard library it restored by the new name, and says what it
-// wrote to the system cache and why it could not keep it, which the read keeps beside the old name's count
-// (#syscache): a pair's base before the system cache and its branch after it are read alike.
+// A record of a binary with the system cache names the standard library it restored by the new name, the modules'
+// packages it restored apart (#57wgzhp), and says what it wrote to the system cache and why it could not keep it, which
+// the read keeps beside the old name's count (#syscache): a pair's base before the system cache and its branch after
+// it are read alike.
 func TestReadEngineOutputReadsTheSystemCachesNames(test *testing.T) {
 	test.Parallel()
-	stream := `{"kind":"lint","filesWalked":4,"cache":{"standardLibraryFromSystemCache":290,"systemCacheWritten":12,` +
-		`"systemCacheNotKept":"trimming: it is not a directory"}}` + "\n" +
-		`{"kind":"lint","filesWalked":5,"cache":{"systemCacheOff":true}}` + "\n"
+	stream := `{"kind":"lint","filesWalked":4,"cache":{"standardLibraryFromSystemCache":290,` +
+		`"modulesFromSystemCache":31,"systemCacheWritten":12,"systemCacheNotKept":"trimming: it is not a directory"}}` +
+		"\n" + `{"kind":"lint","filesWalked":5,"cache":{"systemCacheOff":true}}` + "\n"
 	read, readError := readEngineOutput(strings.NewReader(stream))
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	if read.StandardLibraryRestored == nil || *read.StandardLibraryRestored != 290 || read.SystemCacheWritten != 12 ||
+	if read.StandardLibraryRestored == nil || *read.StandardLibraryRestored != 290 ||
+		read.ModulesFromSystemCache != 31 || read.SystemCacheWritten != 12 ||
 		read.SystemCacheNotKept != "trimming: it is not a directory" || read.SystemCacheOff {
-		test.Errorf("read %s restored, %d written, not kept %q, off %t; want 290, 12, the reason, false",
-			describeCount(read.StandardLibraryRestored), read.SystemCacheWritten, read.SystemCacheNotKept,
-			read.SystemCacheOff)
+		test.Errorf("read %s restored, %d modules' restored, %d written, not kept %q, off %t; want 290, 31, 12, the "+
+			"reason, false", describeCount(read.StandardLibraryRestored), read.ModulesFromSystemCache,
+			read.SystemCacheWritten, read.SystemCacheNotKept, read.SystemCacheOff)
 	}
 	off, offError := readEngineOutput(strings.NewReader(`{"kind":"lint","cache":{"systemCacheOff":true}}` + "\n"))
 	if offError != nil || !off.SystemCacheOff || off.StandardLibraryRestored == nil ||

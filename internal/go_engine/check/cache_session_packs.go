@@ -67,14 +67,20 @@ func (session *CacheSession) openPacks(loader string) {
 	}
 	if session.KeepsSystemCache() && session.standardLibraryContext != nil &&
 		session.caching.StandardLibrary.System.ShardStamps() != nil {
-		context := session.standardLibraryContext
-		// The system cache's pack is named by every part of the standard library's context its keys hold, and by the
-		// project, so two projects on the machine checking the same build never write over each other's pack each run.
-		packs.open(session.caching.StandardLibrary.System, true, cache.PackPlace{
-			Identity: cache.PackIdentity(context.EngineIdentity),
-			Name: cache.PackName([]string{"system", packs.project},
-				[]string{context.FormatVersion, context.EngineIdentity, context.Loader, context.Goroot}, context.Build,
-				context.Facts, context.CgoToolchain)})
+		packs.open(session.caching.StandardLibrary.System, true,
+			systemPackPlace(*session.standardLibraryContext, packs.project))
+	}
+}
+
+// systemPackPlace is where the system cache's pack of a build is: named by every part of the system cache's context
+// its keys hold, so a build under another context, the module cache among it, never reads it, and by the project, so
+// two projects on the machine checking the same build never write over each other's pack each run.
+func systemPackPlace(context cache.StandardLibraryContext, project string) cache.PackPlace {
+	return cache.PackPlace{
+		Identity: cache.PackIdentity(context.EngineIdentity),
+		Name: cache.PackName([]string{"system", project},
+			[]string{context.FormatVersion, context.EngineIdentity, context.Loader, context.Goroot,
+				context.ModuleCache}, context.Build, context.Facts, context.CgoToolchain),
 	}
 }
 
