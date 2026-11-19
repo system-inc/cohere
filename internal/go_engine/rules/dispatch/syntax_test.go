@@ -355,7 +355,7 @@ func TestTheSyntaxWalkFindsListenersByTheNodesKindNumber(test *testing.T) {
 		}}
 		registered := &registeredRule{name: kind.String(), analyzer: &analysis.Analyzer{}, listener: listener,
 			kinds: []reflect.Type{kind}}
-		started.add(newListenerRun(registered, pass, func(string) bool { return false }, nil, false, nil))
+		started.add(newListenerRun(registered, pass, func(string) bool { return false }, nil, false, nil, nil))
 	}
 	walk := newSyntaxWalk(started)
 	clear(started.byKind)

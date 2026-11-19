@@ -44,6 +44,12 @@ type listenerRun struct {
 	inherited map[*token.File]bool
 	skipping  bool
 
+	// standing is the files the run's rule is confined on, each with its standing spans (rule.StandingFiles), nil for
+	// a rule confined on none, and confined is whether the file the walk is in is one of them, when the syntax walk
+	// calls the run for no node inside a standing body.
+	standing map[*token.File][]rule.StandingSpan
+	confined bool
+
 	// timing is the run's collector under `--timing`, nil otherwise, when each call is the listener's call alone, at
 	// the cost of reading this field. cpu and calls are what the measured calls cost over the package, which finish
 	// bills to the rule and takes out of the dispatcher's own row.
@@ -56,7 +62,8 @@ type listenerRun struct {
 // collect on the run, judging generated files by isGenerated, and each call measured into collector when it is set.
 // A fileLocal run hears only some of the package's files, a shard of a large package's, and its context's State
 // panics (see rule.Listener.FileLocal). A listener marked SyntaxOnly always has a syntax-only context, on every build,
-// and hears none of the inherited files, whose findings are the host's.
+// and hears none of the inherited files, whose findings are the host's. Over the syntax, a run hears nothing inside the
+// standing bodies of the files in standing, whose findings there are the host's too.
 func newListenerRun(
 	registered *registeredRule,
 	pass *analysis.Pass,
@@ -64,8 +71,10 @@ func newListenerRun(
 	collector *timing.Collector,
 	fileLocal bool,
 	inherited map[*token.File]bool,
+	standing map[*token.File][]rule.StandingSpan,
 ) *listenerRun {
-	run := &listenerRun{registered: registered, pass: pass, timing: collector, inherited: inherited}
+	run := &listenerRun{registered: registered, pass: pass, timing: collector, inherited: inherited,
+		standing: standing}
 	newContext := rule.NewContext
 	switch {
 	case registered.listener.SyntaxOnly:

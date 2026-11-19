@@ -56,11 +56,15 @@ type Result map[string]Outcome
 // Outcome is what one rule's listener found over one package: its findings, or the crash that ended its run there,
 // in which case it has no findings, since a run cut short could have reported anything. InheritedFiles are the files a
 // syntax-only rule inherits, which it never walked, and Inherited the host's findings on them (rule.InheritedFiles),
-// none beside a crash.
+// none beside a crash. StandingFiles are the files a rule is confined on, each with its standing spans, and Standing
+// the host's findings inside those spans, which replace the rule's own there (rule.StandingFiles), none beside a crash
+// either.
 type Outcome struct {
 	Diagnostics    []analysis.Diagnostic
 	InheritedFiles map[*token.File]bool
 	Inherited      []analysis.Diagnostic
+	StandingFiles  map[*token.File][]rule.StandingSpan
+	Standing       []analysis.Diagnostic
 	Crash          error
 }
 
@@ -68,6 +72,13 @@ type Outcome struct {
 // findings on them.
 type inheritedTake struct {
 	files       map[*token.File]bool
+	diagnostics []analysis.Diagnostic
+}
+
+// standingTake is what one rule takes of the host over a package's standing declarations, as rule.StandingFiles gives
+// it: the files it is confined on, each with its standing spans, and the host's findings inside them.
+type standingTake struct {
+	files       map[*token.File][]rule.StandingSpan
 	diagnostics []analysis.Diagnostic
 }
 
@@ -183,11 +194,14 @@ func (listeners *listeners) ruleAnalyzer(
 			if outcome.Crash != nil {
 				return nil, outcome.Crash
 			}
-			for _, diagnostic := range outcome.Diagnostics {
+			// The rule's own finding inside a standing declaration is the host's to report (#e4rd5dw).
+			for _, diagnostic := range rule.OutsideStanding(pass.Fset, outcome.StandingFiles, outcome.Diagnostics) {
 				pass.Report(diagnostic)
 			}
-			// After the walk's own, the host's findings on the files the rule inherited, as its own.
+			// After the walk's own, the host's findings on the files the rule inherited, as its own, then the host's
+			// inside the standing declarations of the files it is confined on.
 			rule.ReportInherited(pass, ruleName, outcome.InheritedFiles, outcome.Inherited)
+			rule.ReportStanding(pass, ruleName, outcome.StandingFiles, outcome.Standing)
 			return nil, nil
 		},
 	}
@@ -254,6 +268,13 @@ func (listeners *listeners) register(
 //
 // A started listener marked SyntaxOnly hears none of the files its rule inherits (rule.InheritedFiles), decided here,
 // before any walk, and whole holds the inherited findings, which finish hands its outcome.
+//
+// Every started listener, of either walk, takes the host's findings inside the standing declarations of the files its
+// rule is confined on (rule.StandingFiles), over the package's standing spans, read here once for all of them, and
+// whole holds that take too, which finish hands its outcome and the rule's action swaps for its own findings there.
+// The syntax walk leaves a run confined on a file deaf inside its standing bodies (see syntaxWalk.callNodes). A file
+// the rule inherits stands in no part, being skipped whole. A pass with no standing spans, every host's, takes
+// nothing, at the cost of reading their length for each listener.
 func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns, []*startedRuns, error) {
 	// Absent under a driver that runs nothing past a failure, where the pass runs only once everything it requires
 	// finished, and the nil map reads as nothing failed.
@@ -280,6 +301,7 @@ func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns
 		return &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}, timing: collector,
 			dispatcher: listeners.analyzer.Name, inherited: map[string]inheritedTake{}}
 	}
+	standingSpans := rule.StandingSpans(pass)
 	whole := newStarted()
 	var parts []*startedRuns
 	if shards > 1 {
@@ -307,13 +329,21 @@ func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns
 				whole.inherited[registered.name] = inheritedTake{files: inheritedFiles, diagnostics: inherited}
 			}
 		}
+		standingFiles, standing := rule.StandingFiles(pass, registered.name, standingSpans, inheritedFiles)
+		if len(standingFiles) > 0 {
+			// Made only once a rule takes something, so a pass nothing stands in allocates nothing for it.
+			if whole.standing == nil {
+				whole.standing = map[string]standingTake{}
+			}
+			whole.standing[registered.name] = standingTake{files: standingFiles, diagnostics: standing}
+		}
 		if len(parts) > 0 && registered.listener.FileLocal {
 			for _, part := range parts {
-				part.add(newListenerRun(registered, pass, isGenerated, collector, true, inheritedFiles))
+				part.add(newListenerRun(registered, pass, isGenerated, collector, true, inheritedFiles, standingFiles))
 			}
 			continue
 		}
-		whole.add(newListenerRun(registered, pass, isGenerated, collector, false, inheritedFiles))
+		whole.add(newListenerRun(registered, pass, isGenerated, collector, false, inheritedFiles, standingFiles))
 	}
 	return whole, parts, nil
 }
@@ -388,6 +418,13 @@ func finish(started *startedRuns) Result {
 		outcome := result[name]
 		if outcome.Crash == nil {
 			outcome.InheritedFiles, outcome.Inherited = inherited.files, inherited.diagnostics
+			result[name] = outcome
+		}
+	}
+	for name, standing := range started.standing {
+		outcome := result[name]
+		if outcome.Crash == nil {
+			outcome.StandingFiles, outcome.Standing = standing.files, standing.diagnostics
 			result[name] = outcome
 		}
 	}
