@@ -62,7 +62,7 @@ func (resolver *Resolver) PlacedIn(home *Package, digestOf func(parsed string) (
 		if !isPlaced {
 			continue
 		}
-		answered := PlacedAnswer{Kind: answer.Kind, File: place.File, Offset: place.Offset,
+		answered := PlacedAnswer{Kind: answer.Kind.Name, File: place.File, Offset: place.Offset,
 			Parameter: place.Parameter, Encoded: answer.Encoded}
 		if parsed := home.fileSet.File(answer.Object.Pos()); parsed != nil {
 			answered.FileDigest, _ = digestOf(parsed.Name())

@@ -109,3 +109,21 @@ func TestOrderBoundIsNotKnownWithoutAVerdictOfEveryAnswer(test *testing.T) {
 		test.Errorf("with After, never judged, among the answers held, the order bound is known, naming %v", bound)
 	}
 }
+
+// The kind declares its order bound to whoever reads its answers (fact_resolver.Kind.OrderBound), as OrderBound
+// computes it: asked of CycleOuter, a cycle above its floor, the kind's hook names CycleOuter and CycleInner.
+func TestTheKindDeclaresItsOrderBound(test *testing.T) {
+	test.Parallel()
+	if return_nil_ness.Kind.OrderBound == nil {
+		test.Fatal("the kind declares no order bound, so a reader takes every package it answers of as unknown")
+	}
+	kept := askOnce(test, "differences", "CycleOuter")
+	bound, known := return_nil_ness.Kind.OrderBound(kept.home, slices.Collect(maps.Values(kept.functions)))
+	var names []string
+	for _, function := range bound {
+		names = append(names, function.Name())
+	}
+	if want := []string{"CycleOuter", "CycleInner"}; !known || !slices.Equal(names, want) {
+		test.Errorf("the kind's order bound is known %t and names %v, want known and %v", known, names, want)
+	}
+}

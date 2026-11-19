@@ -107,6 +107,14 @@ const (
 // Kind is one fact a resolver computes, as purity is: it keys the fact's state in each package and its counts.
 type Kind struct {
 	Name string
+
+	// OrderBound, when set, is the kind's word on how its answers in home depend on the order a walk of home takes:
+	// every function of home a read of which may answer otherwise in another order, and whether the kind's state can
+	// say so, given held, the functions of home the caller holds the kind's answers about. Nil is a kind whose order
+	// dependence nobody has argued yet, which a caller must take as not known whenever it holds an answer of the kind
+	// about home's objects, never as order-free: saying a kind is order-free takes an argument of its own (#aswfm7a).
+	// A kind whose answers hang on no order at all says so with a hook answering no functions, known.
+	OrderBound func(home *Package, held []*types.Func) (bound []*types.Func, known bool)
 }
 
 // Counts is what a resolver computed of one kind over its run.

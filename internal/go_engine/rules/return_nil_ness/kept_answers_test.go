@@ -92,7 +92,7 @@ func askOnce(test *testing.T, fixture string, asked string) keptAnswers {
 		kept.recorded[string(path)] = results
 	}
 	for _, answer := range resolver.Answered() {
-		if answer.Kind != return_nil_ness.Kind.Name || answer.Object.Pkg() != kept.home.Types {
+		if answer.Kind != return_nil_ness.Kind || answer.Object.Pkg() != kept.home.Types {
 			continue
 		}
 		// An answer held and recorded both is the same bytes in each, no fact, a nil slice, among them.

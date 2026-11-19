@@ -12,6 +12,9 @@ import (
 var Kind = &fact_resolver.Kind{Name: "return_nil_ness"}
 
 func init() {
+	// Set here rather than in Kind's literal: OrderBound reads the kind's state under Kind, and a literal naming it
+	// would make Kind's initializer depend on itself, which Go refuses as an initialization cycle.
+	Kind.OrderBound = OrderBound
 	fact_resolver.Register(Kind, whole,
 		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) []ValueNilness {
 			function, isFunction := object.(*types.Func)
