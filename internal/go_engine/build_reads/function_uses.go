@@ -198,31 +198,37 @@ func (record *FunctionUses) Used(use PartUse) UsedEntry {
 // the judgment alone, the index it keeps of each package's objectpaths let go once every entry is judged.
 func (record *FunctionUses) judge() {
 	var encoder objectpath.Encoder
-	record.objectsUnknown = make([]bool, len(record.objects))
+	objectsUnknown := make([]bool, len(record.objects))
 	for entry, object := range record.objects {
-		record.objectsUnknown[entry] = rendersUnknown(&encoder, object)
+		objectsUnknown[entry] = rendersUnknown(&encoder, object)
 	}
-	record.selectionsUnknown = make([]bool, len(record.selections))
+	selectionsUnknown := make([]bool, len(record.selections))
 	for entry, selection := range record.selections {
-		record.selectionsUnknown[entry] = rendersUnknown(&encoder, selection.object) ||
+		selectionsUnknown[entry] = rendersUnknown(&encoder, selection.object) ||
 			selection.receiver != nil && rendersUnknown(&encoder, selection.receiver)
 	}
-	record.signaturesUnknown = make([]bool, len(record.declarations))
-	record.bodiesUnknown = make([]bool, len(record.declarations))
+	signaturesUnknown := make([]bool, len(record.declarations))
+	bodiesUnknown := make([]bool, len(record.declarations))
 	for index, declared := range record.declarations {
-		record.signaturesUnknown[index] = declared.signatureUnfollowed ||
-			record.holdsUnknown(record.uses[declared.usesStart:declared.signatureEnd])
-		record.bodiesUnknown[index] = declared.bodyUnfollowed ||
-			record.holdsUnknown(record.uses[declared.signatureEnd:declared.bodyEnd])
+		signaturesUnknown[index] = declared.signatureUnfollowed ||
+			holdsUnknown(record.uses[declared.usesStart:declared.signatureEnd], objectsUnknown, selectionsUnknown)
+		bodiesUnknown[index] = declared.bodyUnfollowed ||
+			holdsUnknown(record.uses[declared.signatureEnd:declared.bodyEnd], objectsUnknown, selectionsUnknown)
 	}
+	// The record takes the judgment only once it is whole: judging never runs judge again, even after a panic, so a
+	// judgment cut short leaves every slice nil, which a later reader fails on, rather than a part of one, whose
+	// missing answers it would read as known.
+	record.objectsUnknown, record.selectionsUnknown = objectsUnknown, selectionsUnknown
+	record.signaturesUnknown, record.bodiesUnknown = signaturesUnknown, bodiesUnknown
 }
 
-// holdsUnknown reports whether any of uses, one part's, is of an entry judged unknown.
-func (record *FunctionUses) holdsUnknown(uses []PartUse) bool {
+// holdsUnknown reports whether any of uses, one part's, is of an entry judged unknown, by objectsUnknown and
+// selectionsUnknown (FunctionUses.judge).
+func holdsUnknown(uses []PartUse, objectsUnknown []bool, selectionsUnknown []bool) bool {
 	for _, use := range uses {
 		entry := uint32(use) >> partUseEntryShift
-		if use&partUseSelected == 0 && record.objectsUnknown[entry] ||
-			use&partUseSelected != 0 && record.selectionsUnknown[entry] {
+		if use&partUseSelected == 0 && objectsUnknown[entry] ||
+			use&partUseSelected != 0 && selectionsUnknown[entry] {
 			return true
 		}
 	}

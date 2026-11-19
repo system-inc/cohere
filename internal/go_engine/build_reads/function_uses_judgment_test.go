@@ -1,6 +1,7 @@
 package build_reads
 
 import (
+	"go/ast"
 	"go/types"
 	"slices"
 	"strconv"
@@ -170,5 +171,165 @@ func TestEachEntrysJudgmentIsTheObjectpathsAlone(test *testing.T) {
 	test.Logf("entries compared %d, judged unknown %d", compared, unknown)
 	if unknown == 0 {
 		test.Error("want an entry judged unknown among the fixtures, got none")
+	}
+}
+
+// The embedded fixture's packages: other, whose exported T holds A, and first, whose unexported holder embeds T in a
+// struct of no name, and whose Promoted reads A through it.
+var embeddedSources = []fixtureFile{
+	{"other", "other.go", `package other
+
+type T struct{ A int }
+`},
+	{"first", "first.go", `package first
+
+import "other"
+
+var holder struct{ other.T }
+
+func Promoted() int { return holder.A }
+`},
+}
+
+// A selection whose embedded step renders unknown marks its part unknown though every object the part uses is known:
+// holder's embedded T is a field no objectpath reaches, holder being unexported, while A is T's own field, which one
+// does, and A, holder and T are the part's objects.
+func TestAnUnknownEmbeddedStepAloneMarksItsPartUnknown(test *testing.T) {
+	test.Parallel()
+
+	_, packagesChecked := checkedFixture(test, embeddedSources)
+	record := recordedUses(test, packagesChecked[len(packagesChecked)-1])
+	got := partsUnknown(record)
+	want := []string{" false false", "Promoted false true"}
+	if !slices.Equal(got, want) {
+		test.Fatalf("want each declaration's parts unknown as\n%q\ngot\n%q", want, got)
+	}
+	for entry, unknown := range record.objectsUnknown {
+		if unknown {
+			test.Errorf("want every object known, got %v unknown", record.objects[entry])
+		}
+	}
+}
+
+// The hand fixture's package: cfg, whose field A no objectpath reaches, Read, which the hand tests record by the
+// recorder's own calls, and Local, whose type local no objectpath reaches either.
+var handSources = []fixtureFile{
+	{"first", "first.go", `package first
+
+var cfg struct{ A int }
+
+func Read() int { return cfg.A }
+
+func Local() int {
+	type local struct{ Count int }
+	return local{}.Count
+}
+`},
+}
+
+// handRecorded is the hand fixture's record of Read alone, as the recorder records what recordSignature records in
+// its signature and recordBody in its body, each handed the recorder and the fixture's checked package: the way to a
+// use no source records alone, since the walk enters a selector's object in both tables, and no selection the type
+// checker makes steps through a type that is no struct. It fails test unless Read alone is recorded.
+func handRecorded(
+	test *testing.T,
+	recordSignature func(recorder *functionUsesRecorder, checked checkedFixturePackage),
+	recordBody func(recorder *functionUsesRecorder, checked checkedFixturePackage),
+) DeclarationUses {
+	test.Helper()
+
+	_, packagesChecked := checkedFixture(test, handSources)
+	checked := packagesChecked[0]
+	recorder := newFunctionUsesRecorder(checked.own, checked.source.info, checked.source.files)
+	recorder.startFile(checked.source.files[0])
+	var read *ast.FuncDecl
+	for _, declaration := range checked.source.files[0].Decls {
+		if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Name.Name == "Read" {
+			read = function
+		}
+	}
+	if read == nil {
+		test.Fatal("want the fixture's Read")
+	}
+	recorder.beginFunction(read)
+	recordSignature(recorder, checked)
+	recorder.reach(read.Body)
+	recordBody(recorder, checked)
+	recorder.end()
+	uses := recorder.finish()
+	if uses == nil {
+		test.Fatal("want the record recorded")
+	}
+	declarations := slices.Collect(uses.Declarations())
+	if len(declarations) != 1 {
+		test.Fatalf("want Read alone recorded, got %d declarations", len(declarations))
+	}
+	return declarations[0]
+}
+
+// recordNothing records nothing in a part (see handRecorded).
+func recordNothing(*functionUsesRecorder, checkedFixturePackage) {
+	// The part is left with no use, so the other part's alone is judged.
+}
+
+// handField is cfg's field A, which no objectpath reaches, failing test when the fixture holds none.
+func handField(test *testing.T, checked checkedFixturePackage) *types.Var {
+	test.Helper()
+
+	structure, isStruct := checked.own.Scope().Lookup("cfg").Type().Underlying().(*types.Struct)
+	if !isStruct {
+		test.Fatal("want cfg of a struct type")
+	}
+	return structure.Field(0)
+}
+
+// An object use whose identity renders unknown marks its part unknown with no selection beside it: the object
+// branch of the part's judgment alone, the body here, the signature known.
+func TestAnUnknownObjectAloneMarksItsPartUnknown(test *testing.T) {
+	test.Parallel()
+
+	declared := handRecorded(test, recordNothing, func(recorder *functionUsesRecorder, checked checkedFixturePackage) {
+		recorder.add(handField(test, checked), UsedNamed)
+	})
+	if declared.SignatureUnknown || !declared.BodyUnknown {
+		test.Errorf("want the body alone unknown, got the signature %t and the body %t", declared.SignatureUnknown,
+			declared.BodyUnknown)
+	}
+}
+
+// A selection of a known object from a receiver whose identity renders unknown, local, a type of another function,
+// marks its part unknown: the receiver's judgment alone, the selected object, a package-level var, named by its name.
+func TestASelectionFromAnUnknownReceiverMarksItsPartUnknown(test *testing.T) {
+	test.Parallel()
+
+	declared := handRecorded(test, recordNothing, func(recorder *functionUsesRecorder, checked checkedFixturePackage) {
+		var local *types.TypeName
+		for _, defined := range checked.source.info.Defs {
+			if typeName, isTypeName := defined.(*types.TypeName); isTypeName && typeName.Name() == "local" {
+				local = typeName
+			}
+		}
+		if local == nil {
+			test.Fatal("want the fixture's local type")
+		}
+		recorder.addSelected(local, checked.own.Scope().Lookup("cfg"), []int{0})
+	})
+	if declared.SignatureUnknown || !declared.BodyUnknown {
+		test.Errorf("want the body alone unknown, got the signature %t and the body %t", declared.SignatureUnknown,
+			declared.BodyUnknown)
+	}
+}
+
+// A step through a type that is no struct in a function's signature marks the signature unknown, kept as the walk
+// reaches the body, where the signature ends, and the body, which starts followed, stays known.
+func TestASelectionThroughNoStructInASignatureMarksTheSignatureUnknown(test *testing.T) {
+	test.Parallel()
+
+	declared := handRecorded(test, func(recorder *functionUsesRecorder, checked checkedFixturePackage) {
+		recorder.selectionAt(types.Typ[types.Int], []int{0, 0}, checked.own.Scope().Lookup("cfg"))
+	}, recordNothing)
+	if !declared.SignatureUnknown || declared.BodyUnknown {
+		test.Errorf("want the signature alone unknown, got the signature %t and the body %t",
+			declared.SignatureUnknown, declared.BodyUnknown)
 	}
 }
