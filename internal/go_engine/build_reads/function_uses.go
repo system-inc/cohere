@@ -4,6 +4,9 @@ import (
 	"go/token"
 	"go/types"
 	"iter"
+	"sync"
+
+	"golang.org/x/tools/go/types/objectpath"
 )
 
 // What each top-level declaration of a package uses, its signature and its body apart (#kr1m304), so an extra build
@@ -16,6 +19,11 @@ import (
 //
 // The record holds the host's own objects, never handed to another build: what crosses builds is each object's
 // identity, rendered on demand (IdentityRenderer).
+//
+// Whether a use's identity renders unknown, which marks its part unknown, is judged when the record is first read
+// (FunctionUses.judge), never as it is recorded: the judgment asks an objectpath of every field used, which indexes
+// each package a field is of, and a run records every package it checks while its builds read the records of only
+// those they check from source, about a hundred of cohere's 1,330 (#kr1m304).
 
 // DeclarationKind is what a top-level declaration declares.
 type DeclarationKind string
@@ -73,6 +81,10 @@ type DeclarationUses struct {
 // FunctionUses is one package's record of what its declarations use, kept compact while it is held through the
 // builds: every thing used once in a table, objects and selections apart, and every part's uses back to back as
 // packed entries and kinds, each declaration holding where its parts lie.
+//
+// Several builds read one package's record at once, so what is judged at the first read is judged under judging, a
+// `sync.Once`: the judgment is the whole package's, written once and only read from then on, so every reader waits
+// for the one judgment and none holds a lock while it reads what was judged.
 type FunctionUses struct {
 	// objects are the objects the parts use other than by a selection, and selections the selections, each once: a
 	// PartUse's entry indexes one or the other.
@@ -84,6 +96,16 @@ type FunctionUses struct {
 	declarations []declarationRecord
 	declared     []types.Object
 	uses         []PartUse
+
+	// judging runs the record's judgment once, at its first read (judge), which makes the rest, nil until then:
+	// objectsUnknown and selectionsUnknown are, by entry, whether its identity renders unknown, its object's or, for a
+	// selection, its receiver's too, and signaturesUnknown and bodiesUnknown, by declaration, whether the part is
+	// unknown, holding a use of such an entry or one the recorder could not follow.
+	judging           sync.Once
+	objectsUnknown    []bool
+	selectionsUnknown []bool
+	signaturesUnknown []bool
+	bodiesUnknown     []bool
 }
 
 // usedSelection is a selection's entry: Object from Receiver at Index (see UsedEntry).
@@ -94,22 +116,23 @@ type usedSelection struct {
 }
 
 // declarationRecord is one declaration as its record holds it: where its objects lie in declared, where its signature's
-// and its body's uses lie in uses, the body's from signatureEnd, whether each part is unknown, and the rest of what
+// and its body's uses lie in uses, the body's from signatureEnd, whether each part holds a use the recorder could not
+// follow (functionUsesRecorder.selectionAt), which marks it unknown whatever its uses render, and the rest of what
 // Declaration names it by, its offset in its file as start, which fits the padding the record had beside its ordinal.
 type declarationRecord struct {
-	file             token.Pos
-	name             string
-	start            uint32
-	objectsStart     uint32
-	objectsEnd       uint32
-	usesStart        uint32
-	signatureEnd     uint32
-	bodyEnd          uint32
-	ordinal          int32
-	kind             declarationKindIndex
-	hasBody          bool
-	signatureUnknown bool
-	bodyUnknown      bool
+	file                token.Pos
+	name                string
+	start               uint32
+	objectsStart        uint32
+	objectsEnd          uint32
+	usesStart           uint32
+	signatureEnd        uint32
+	bodyEnd             uint32
+	ordinal             int32
+	kind                declarationKindIndex
+	hasBody             bool
+	signatureUnfollowed bool
+	bodyUnfollowed      bool
 }
 
 // declarationKindIndex is a DeclarationKind as a record holds it, a byte rather than a string's two words: its index
@@ -127,18 +150,20 @@ const (
 )
 
 // Declarations yields what each declaration uses, in the order its files declare them, each part a view of the
-// record's own uses, which a reader never writes.
+// record's own uses, which a reader never writes. It is the one way to a part's uses, and judges the record before it
+// yields any (judge), so no reader holds a use whose part's flag is not yet told.
 func (record *FunctionUses) Declarations() iter.Seq[DeclarationUses] {
+	record.judging.Do(record.judge)
 	return func(yield func(DeclarationUses) bool) {
-		for _, declared := range record.declarations {
+		for index, declared := range record.declarations {
 			uses := DeclarationUses{
 				Declaration: Declaration{Kind: declarationKinds[declared.kind], File: declared.file,
 					Offset: int(declared.start), Ordinal: int(declared.ordinal), Name: declared.name},
 				Signature:        record.uses[declared.usesStart:declared.signatureEnd:declared.signatureEnd],
 				Body:             record.uses[declared.signatureEnd:declared.bodyEnd:declared.bodyEnd],
 				HasBody:          declared.hasBody,
-				SignatureUnknown: declared.signatureUnknown,
-				BodyUnknown:      declared.bodyUnknown,
+				SignatureUnknown: record.signaturesUnknown[index],
+				BodyUnknown:      record.bodiesUnknown[index],
 			}
 			if declared.objectsEnd > declared.objectsStart {
 				objects := record.declared[declared.objectsStart:declared.objectsEnd:declared.objectsEnd]
@@ -165,4 +190,49 @@ func (record *FunctionUses) Used(use PartUse) UsedEntry {
 	}
 	selection := record.selections[entry]
 	return UsedEntry{Object: selection.object, Receiver: selection.receiver, Index: selection.index}
+}
+
+// judge judges the record, once, under judging: whether each entry's identity renders unknown, and from those whether
+// each declaration's parts are unknown, a part the recorder could not follow a use of unknown whatever its uses
+// render. A const spec that repeats another holds that one's parts, so reads that one's answer. The encoder lives for
+// the judgment alone, the index it keeps of each package's objectpaths let go once every entry is judged.
+func (record *FunctionUses) judge() {
+	var encoder objectpath.Encoder
+	record.objectsUnknown = make([]bool, len(record.objects))
+	for entry, object := range record.objects {
+		record.objectsUnknown[entry] = rendersUnknown(&encoder, object)
+	}
+	record.selectionsUnknown = make([]bool, len(record.selections))
+	for entry, selection := range record.selections {
+		record.selectionsUnknown[entry] = rendersUnknown(&encoder, selection.object) ||
+			selection.receiver != nil && rendersUnknown(&encoder, selection.receiver)
+	}
+	record.signaturesUnknown = make([]bool, len(record.declarations))
+	record.bodiesUnknown = make([]bool, len(record.declarations))
+	for index, declared := range record.declarations {
+		record.signaturesUnknown[index] = declared.signatureUnfollowed ||
+			record.holdsUnknown(record.uses[declared.usesStart:declared.signatureEnd])
+		record.bodiesUnknown[index] = declared.bodyUnfollowed ||
+			record.holdsUnknown(record.uses[declared.signatureEnd:declared.bodyEnd])
+	}
+}
+
+// holdsUnknown reports whether any of uses, one part's, is of an entry judged unknown.
+func (record *FunctionUses) holdsUnknown(uses []PartUse) bool {
+	for _, use := range uses {
+		entry := uint32(use) >> partUseEntryShift
+		if use&partUseSelected == 0 && record.objectsUnknown[entry] ||
+			use&partUseSelected != 0 && record.selectionsUnknown[entry] {
+			return true
+		}
+	}
+	return false
+}
+
+// rendersUnknown reports whether object's identity renders unknown, so a part that uses it can never be matched to
+// another build's. It asks encoder for a field alone, or an object no package's scope holds: a package-level object,
+// a method of a named type, a universe object and an import's name are each named by what they hold already
+// (unplacedIdentity).
+func rendersUnknown(encoder *objectpath.Encoder, object types.Object) bool {
+	return unplacedIdentity(encoder, object).Kind == IdentityUnknown
 }
