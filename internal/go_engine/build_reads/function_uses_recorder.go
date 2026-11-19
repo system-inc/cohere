@@ -6,8 +6,6 @@ import (
 	"go/types"
 	"slices"
 	"strconv"
-
-	"golang.org/x/tools/go/types/objectpath"
 )
 
 // functionUsesRecorder records what each top-level declaration of one package uses as the use walk reaches each node
@@ -21,6 +19,9 @@ import (
 // objectEntries and selectionEntries, and each part's uses are appended to the record's as packed entries, an entry
 // used again in the same part joining its kinds to the use already there, found by lastUses. None of the maps outlive
 // the walk.
+//
+// It judges no entry's identity as it goes: whether one renders unknown is told when the record is first read
+// (FunctionUses.judge), which only the packages a build checks from source ever are.
 type functionUsesRecorder struct {
 	own    *types.Package
 	info   *types.Info
@@ -39,13 +40,9 @@ type functionUsesRecorder struct {
 	lastSelectionUses []uint32
 	partStart         uint32
 
-	// objectsUnknown and selectionsUnknown are, by entry, whether its identity renders unknown, its object's or, for a
-	// selection, its receiver's, as encoder renders it (unplacedIdentity), and partUnknown whether the current part
-	// holds a use of one, which marks the part unknown.
-	encoder           objectpath.Encoder
-	objectsUnknown    []bool
-	selectionsUnknown []bool
-	partUnknown       bool
+	// partUnfollowed is whether the current part holds a use the recorder could not follow (selectionAt), which marks
+	// the part unknown whatever its uses render.
+	partUnfollowed bool
 
 	// namedReached are, by type, the named types its structure reaches (addNamed), and lookedReached those a look
 	// through a value of it reaches (looked), each type walked once a package however many expressions hold it, and
@@ -190,7 +187,7 @@ func (recorder *functionUsesRecorder) begin(
 		recorder.declaration.ordinal = recorder.ordinal
 		recorder.ordinal++
 	}
-	recorder.partStart, recorder.partUnknown = uses, false
+	recorder.partStart, recorder.partUnfollowed = uses, false
 }
 
 // end ends the declaration begun last, if any: its signature, when its body never started, and its body end where
@@ -203,16 +200,17 @@ func (recorder *functionUsesRecorder) end() {
 	if recorder.recording {
 		uses := recorder.usesLength()
 		if recorder.bodyStart != nil {
-			declaration.bodyEnd, declaration.bodyUnknown = uses, recorder.partUnknown
+			declaration.bodyEnd, declaration.bodyUnfollowed = uses, recorder.partUnfollowed
 		} else {
 			declaration.signatureEnd, declaration.bodyEnd = uses, uses
-			declaration.signatureUnknown = recorder.partUnknown
+			declaration.signatureUnfollowed = recorder.partUnfollowed
 		}
 	} else {
 		repeated := recorder.record.declarations[recorder.inherited]
 		declaration.usesStart, declaration.signatureEnd = repeated.usesStart, repeated.signatureEnd
 		declaration.bodyEnd, declaration.hasBody = repeated.bodyEnd, repeated.hasBody
-		declaration.signatureUnknown, declaration.bodyUnknown = repeated.signatureUnknown, repeated.bodyUnknown
+		declaration.signatureUnfollowed, declaration.bodyUnfollowed = repeated.signatureUnfollowed,
+			repeated.bodyUnfollowed
 	}
 	recorder.record.declarations = append(recorder.record.declarations, declaration)
 	recorder.declaring, recorder.recording, recorder.bodyStart = false, false, nil
@@ -248,8 +246,8 @@ func (recorder *functionUsesRecorder) reach(node ast.Node) {
 	}
 	if node == recorder.bodyStart {
 		recorder.declaration.signatureEnd = recorder.usesLength()
-		recorder.declaration.signatureUnknown = recorder.partUnknown
-		recorder.partStart, recorder.partUnknown = recorder.declaration.signatureEnd, false
+		recorder.declaration.signatureUnfollowed = recorder.partUnfollowed
+		recorder.partStart, recorder.partUnfollowed = recorder.declaration.signatureEnd, false
 	}
 	identifier, isIdentifier := node.(*ast.Ident)
 	if !isIdentifier {
@@ -363,7 +361,7 @@ func (recorder *functionUsesRecorder) selectionAt(start types.Type, path []int, 
 		}
 		structure, isStruct := current.Underlying().(*types.Struct)
 		if !isStruct {
-			recorder.partUnknown = true
+			recorder.partUnfollowed = true
 			break
 		}
 		embedded := structure.Field(step)
@@ -385,10 +383,8 @@ func (recorder *functionUsesRecorder) add(object types.Object, kinds UseKinds) {
 		recorder.objectEntries[generic] = entry
 		recorder.record.objects = append(recorder.record.objects, generic)
 		recorder.lastObjectUses = append(recorder.lastObjectUses, 0)
-		recorder.objectsUnknown = append(recorder.objectsUnknown, recorder.unknown(generic))
 	}
 	recorder.lastObjectUses[entry] = recorder.use(entry, 0, recorder.lastObjectUses[entry], kinds)
-	recorder.partUnknown = recorder.partUnknown || recorder.objectsUnknown[entry]
 }
 
 // addSelected records the selection of selected, as its generic declares it, from receiver, nil when the selection
@@ -415,18 +411,9 @@ func (recorder *functionUsesRecorder) addSelected(receiver *types.TypeName, sele
 		recorder.selectionEntries[key] = entry
 		recorder.record.selections = append(recorder.record.selections, key)
 		recorder.lastSelectionUses = append(recorder.lastSelectionUses, 0)
-		recorder.selectionsUnknown = append(recorder.selectionsUnknown,
-			recorder.unknown(generic) || receiver != nil && recorder.unknown(receiver))
 	}
 	recorder.lastSelectionUses[entry] = recorder.use(entry, partUseSelected, recorder.lastSelectionUses[entry],
 		UsedSelected)
-	recorder.partUnknown = recorder.partUnknown || recorder.selectionsUnknown[entry]
-}
-
-// unknown reports whether object's identity renders unknown, so a part that uses it can never be matched to another
-// build's.
-func (recorder *functionUsesRecorder) unknown(object types.Object) bool {
-	return unplacedIdentity(&recorder.encoder, object).Kind == IdentityUnknown
 }
 
 // use records a use of kinds of entry, of the table selected names, in the part being walked: joined to its use

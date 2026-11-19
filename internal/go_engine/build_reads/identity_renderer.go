@@ -46,8 +46,8 @@ func (renderer *IdentityRenderer) object(object types.Object) Identity {
 }
 
 // unplacedIdentity is object's identity (IdentityRenderer.Object) but for the file that declares it, by encoder, which
-// keeps each package's objectpaths. The recorder reads it too, so a part it marks unknown is one holding a use that
-// renders unknown (functionUsesRecorder).
+// keeps each package's objectpaths. A record's judgment reads it too, so a part it marks unknown is one holding a use
+// that renders unknown (FunctionUses.judge).
 func unplacedIdentity(encoder *objectpath.Encoder, object types.Object) Identity {
 	if object.Pkg() == nil {
 		if types.Universe.Lookup(object.Name()) == object {
