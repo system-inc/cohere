@@ -79,6 +79,7 @@ func (scratch *workerScratch) release() {
 	scratch.bodies.referenceStore = emptied(scratch.bodies.referenceStore)
 
 	scratch.collecting.typesInformation = nil
+	scratch.collecting.declarationsOnly = false
 	scratch.collecting.units = emptied(scratch.collecting.units)
 	scratch.collecting.edges = emptied(scratch.collecting.edges)
 	clear(scratch.collecting.edgeSeen)
