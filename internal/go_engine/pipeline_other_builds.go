@@ -72,6 +72,11 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 			engine.factReachSides = newFactReachSides(engine.bodyReachHost, pass.result.FactReach, loaded.Packages)
 			pass.result.FactReach = nil
 		}
+		// The rules confined for the standing bodies, judged once for every build, and only where any body may stand.
+		if engine.leavesBodiesStanding() {
+			enabled, _ := engine.enabledRules()
+			engine.standingConfined = engine.standingConfinedRules(enabled)
+		}
 	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
 	// one again beside the pass; the walks are over, so this waits for the last sets alone.
