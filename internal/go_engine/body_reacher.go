@@ -3,6 +3,7 @@ package go_engine
 import (
 	"go/token"
 	"go/types"
+	"maps"
 	"slices"
 	"strings"
 
@@ -25,10 +26,10 @@ type bodyReacher struct {
 	decoded    *build_dependence.IdentifiedObjects
 	identities *build_reads.IdentityRenderer
 	fileSet    *token.FileSet
-	// fromSource are the IDs of the packages the build checked from source, against which the load mode rule reads
-	// how the host loaded each, and constantsOnly has it reach by an untyped float constant alone, for the census's
+	// graph is what the build's whole graph holds (reachBuiltGraph), against which the load mode rule reads how the
+	// host loaded each package, and constantsOnly has it reach by an untyped float constant alone, for the census's
 	// count of what the general rule costs (loadModeReaches).
-	fromSource    map[string]bool
+	graph         *reachBuiltGraph
 	constantsOnly bool
 	// sizesDiffer is whether the build's sizes are not the host's, which reaches every body (buildSizesDiffer).
 	sizesDiffer bool
@@ -37,11 +38,13 @@ type bodyReacher struct {
 	// carried one it had not, which judges the build again (bodyReachHost.reach).
 	carried     map[types.Object]bool
 	carriedGrew bool
-	// someLoadModeDiffers is whether any package the host holds loads in another mode in the build, which an
-	// unrecorded package's values are carried by (carryUnrecorded), read at the first such package, and
-	// someLoadModeRead whether it has been.
+	// someLoadModeDiffers is whether any package the host holds starts the carry of an unrecorded package's values
+	// (startsCarry, carryUnrecorded), read at the first such package or as the census ends, and someLoadModeRead
+	// whether it has been. lackedImported are the IDs of the host's packages that start it by the check alone, the
+	// build holding nothing of their path and a file it compiles importing it all the same, read with it.
 	someLoadModeDiffers bool
 	someLoadModeRead    bool
+	lackedImported      map[string]bool
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
@@ -65,7 +68,7 @@ func (reacher *bodyReacher) reachPackage(
 			// A record always places its declarations in the host's files; one that does not is called reached, as
 			// a doubt is, and dependent, as the graph calls a place it knows no unit at.
 			bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, name: name, reason: reachedUnknown,
-				constantsOnlyReason: reachedUnknown, unitDependent: true})
+				partReason: reachedUnknown, constantsOnlyReason: reachedUnknown, unitDependent: true})
 			continue
 		}
 		if !read.files[tokenFile.Name()] {
@@ -76,7 +79,7 @@ func (reacher *bodyReacher) reachPackage(
 		if reacher.sizesDiffer {
 			bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
 				line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reachedSizes,
-				driver: "the build's sizes", constantsOnlyReason: reachedSizes,
+				partReason: reachedSizes, driver: "the build's sizes", constantsOnlyReason: reachedSizes,
 				unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 					declared.Declaration.Offset)})
 			continue
@@ -84,7 +87,7 @@ func (reacher *bodyReacher) reachPackage(
 		if reacher.identities == nil || reacher.fileSet != hosted.Fset {
 			reacher.identities, reacher.fileSet = build_reads.NewIdentityRenderer(hosted.Fset, nil), hosted.Fset
 		}
-		reason, driver := reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
+		reason, driver, partReason := reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
 			read.dotImports[tokenFile.Name()])
 		// A body the general rule reaches is judged again under the constants-only load mode rule, the census's count
 		// of what the general one costs: the load mode may have reached it through its signature as well as its body.
@@ -93,13 +96,13 @@ func (reacher *bodyReacher) reachPackage(
 		constantsOnlyReason := reason
 		if reason != "" {
 			reacher.constantsOnly = true
-			constantsOnlyReason, _ = reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
+			constantsOnlyReason, _, _ = reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
 				read.dotImports[tokenFile.Name()])
 			reacher.constantsOnly = false
 		}
 		bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
-			line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reason, driver: driver,
-			constantsOnlyReason: constantsOnlyReason,
+			line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reason,
+			partReason: partReason, driver: driver, constantsOnlyReason: constantsOnlyReason,
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 				declared.Declaration.Offset)})
 	}
@@ -117,36 +120,38 @@ func (reacher *bodyReacher) sizesReason() bodyReachReason {
 // reason is why declared's body is reached in the build, empty when it is not, own being its package's types,
 // shadowing the names the package's build-only files declare at package level, and dotImported the paths its file
 // imports by a dot, and its driver: what reached it first, the object's identity, the kind of use and the bits it
-// found set, or the unknown part or the shadowed name, which the census tallies.
+// found set, or the unknown part or the shadowed name, which the census tallies. The last is the reason the part that
+// reached it gave (reachedBody.partReason), which differs from the first for a signature alone: whatever reaches there
+// is written Signature, the body type-checking against it, and the census counts those by the rule that found each.
 func (reacher *bodyReacher) reason(
 	own *types.Package,
 	record *build_reads.FunctionUses,
 	declared build_reads.DeclarationUses,
 	shadowing map[string]bool,
 	dotImported []string,
-) (bodyReachReason, string) {
+) (bodyReachReason, string, bodyReachReason) {
 	switch {
 	case declared.SignatureUnknown:
-		return reachedUnknown, "an unknown identity in the signature"
+		return reachedUnknown, "an unknown identity in the signature", reachedUnknown
 	case declared.BodyUnknown:
-		return reachedUnknown, "an unknown identity in the body"
+		return reachedUnknown, "an unknown identity in the body", reachedUnknown
 	}
 	if reason, driver := reacher.partReason(record, declared.Signature); reason != "" {
-		return reachedSignature, driver + " in the signature"
+		return reachedSignature, driver + " in the signature", reason
 	}
 	if reason, driver := reacher.partReason(record, declared.Body); reason != "" {
-		return reason, driver + " in the body"
+		return reason, driver + " in the body", reason
 	}
 	if len(shadowing) == 0 {
-		return "", ""
+		return "", "", ""
 	}
 	if name, isShadowed := shadowed(own, record, declared.Signature, shadowing, dotImported); isShadowed {
-		return reachedShadowed, name + " shadowed in the signature"
+		return reachedShadowed, name + " shadowed in the signature", reachedShadowed
 	}
 	if name, isShadowed := shadowed(own, record, declared.Body, shadowing, dotImported); isShadowed {
-		return reachedShadowed, name + " shadowed in the body"
+		return reachedShadowed, name + " shadowed in the body", reachedShadowed
 	}
-	return "", ""
+	return "", "", ""
 }
 
 // partReason is the kind of the first of uses, in the record's order, that reaches a set bit in the build, empty when
@@ -242,14 +247,13 @@ func (reacher *bodyReacher) carryLoadMode(record *build_reads.FunctionUses, decl
 }
 
 // carryUnrecorded carries the load mode through every package-level const and var of own, the types of a package the
-// host recorded no uses of, when any package the host holds loads in another mode in the build (#w72zxtq, the review's
-// must A). The reach judges none of such a package's declarations, reaching its bodies whole, so it cannot tell which
-// of its value specs read what the load mode reaches, as carryLoadMode tells of a recorded one's: `const Scale =
-// math.Pi / 180` in a package checked for its types alone holds the other load's value, and every use of Scale
+// host recorded no uses of, when any package the host holds starts the carry in the build (startsCarry; #w72zxtq, the
+// review's must A). The reach judges none of such a package's declarations, reaching its bodies whole, so it cannot
+// tell which of its value specs read what the load mode reaches, as carryLoadMode tells of a recorded one's: `const
+// Scale = math.Pi / 180` in a package checked for its types alone holds the other load's value, and every use of Scale
 // elsewhere reaches. Carrying each is wider than needed, costing re-checks and never a body left unreached. A build
-// that checks from source exactly the packages the host checked from source carries nothing, since no value can then
-// hold another load's. One that lacks a package the host checked from source carries every value: fromSource names no
-// package the build lacks, so identifiedLoadModeDiffers reads that package as loaded in another mode, failing wide.
+// that loads every package it holds as the host loaded it carries nothing, since no value can then hold another
+// load's, whatever the host holds beside them.
 func (reacher *bodyReacher) carryUnrecorded(own *types.Package) {
 	if own == nil || !reacher.anyLoadModeDiffers() {
 		return
@@ -271,27 +275,81 @@ func (reacher *bodyReacher) carry(object types.Object) {
 	}
 }
 
-// anyLoadModeDiffers reports whether the host and the build load any package the host holds in different modes, by
-// every ID of the host's graph and of its reads, read once a build. A value can hold another load's only through a
-// package so loaded, and every package an unrecorded package's values read is one the host holds, having checked it.
+// anyLoadModeDiffers reports whether any package the host holds starts the carry in the build (startsCarry), by every
+// ID of the host's graph and of its reads, read once a build. A value can hold another load's only through a package
+// loaded in another mode, and every package an unrecorded package's values read is one the host holds, having checked
+// it.
 func (reacher *bodyReacher) anyLoadModeDiffers() bool {
+	reacher.readCarryStarts()
+	return reacher.someLoadModeDiffers
+}
+
+// lackedYetImported are the IDs of the host's packages that start the carry by its check alone (startsCarry), sorted:
+// none, in every run the argument holds of.
+func (reacher *bodyReacher) lackedYetImported() []string {
+	reacher.readCarryStarts()
+	return slices.Sorted(maps.Keys(reacher.lackedImported))
+}
+
+// readCarryStarts asks startsCarry of every package the host holds, once a build: of every ID of its graph, with the
+// path the graph holds it by, and of every ID of its reads, with the package's own.
+func (reacher *bodyReacher) readCarryStarts() {
 	if reacher.someLoadModeRead {
-		return reacher.someLoadModeDiffers
+		return
 	}
 	reacher.someLoadModeRead = true
-	for identifier := range reacher.host.dependence.files {
-		if reacher.identifiedLoadModeDiffers(identifier) {
-			reacher.someLoadModeDiffers = true
-			return true
+	reacher.lackedImported = map[string]bool{}
+	read := func(identifier string, path string) {
+		starts, byImport := reacher.startsCarry(identifier, path)
+		reacher.someLoadModeDiffers = reacher.someLoadModeDiffers || starts
+		if byImport {
+			reacher.lackedImported[identifier] = true
 		}
 	}
-	for identifier := range reacher.host.packages {
-		if reacher.identifiedLoadModeDiffers(identifier) {
-			reacher.someLoadModeDiffers = true
-			return true
+	for identifier, path := range reacher.host.dependence.paths {
+		read(identifier, path)
+	}
+	for identifier, hosted := range reacher.host.packages {
+		read(identifier, hosted.PkgPath)
+	}
+}
+
+// startsCarry reports whether the package the host holds by identifier, of path, starts the carry of an unrecorded
+// package's values in the build (carryUnrecorded), and whether it does so by the check alone (#wzre5eg). The carry
+// exists because such a value may have been computed from a package the two sides loaded in different modes, so the
+// build's graph is read for the package's path, in three cases:
+//   - The build holds its ID: the two loads are compared, as the direct rule compares them (identifiedLoadModeDiffers).
+//   - The build lacks its ID and holds its path under another: every package it holds of the path stands in, and the
+//     carry starts unless each is loaded in the host's mode for the package.
+//   - The build holds nothing of its path: it starts no carry. A file both builds compile has the same imports in
+//     both, so nothing the build compiles imports a package its graph lacks, and no value there was computed from one.
+//
+// The last case's argument is held as a check, never taken on trust: where a file of a package the build checked from
+// source imports the path all the same, by its import spec, read apart from the graph (reachBuiltGraph.imports), the
+// carry starts as it did before the case was told apart, and the census counts the package on a line of its own, 0 in
+// every run the argument holds of.
+//
+// In practice the second case is every command with an in-package test that nothing imports, 31 of cohere's own: an
+// extra build's load leaves such a root p out (load.Caching's AnalyzedRootsOnly) and checks its test variant
+// "p [p.test]", which holds every file of p, in its place, so the host's p is held against that variant. The third is
+// a package only the host's platform compiles, as internal/syscall/unix is to a windows build. Read by its ID alone,
+// either was a package the host checked from source and the build did not, loaded in another mode, and carried every
+// value of every unrecorded package in every run, 9,624 bodies reached at cohere's root that nothing differed for.
+func (reacher *bodyReacher) startsCarry(identifier string, path string) (starts bool, byImport bool) {
+	if reacher.graph.holds(identifier) {
+		return reacher.identifiedLoadModeDiffers(identifier), false
+	}
+	standIns := reacher.graph.identifiers[path]
+	if len(standIns) == 0 {
+		imported := reacher.graph.imports(path)
+		return imported, imported
+	}
+	for _, standIn := range standIns {
+		if reacher.host.dependence.exportData[identifier] == reacher.graph.checkedFromSource(standIn) {
+			return true, false
 		}
 	}
-	return false
+	return false, false
 }
 
 // loadModeReaches reports whether a use of kinds of object reaches its body by the load mode (the soundness contract's
@@ -316,7 +374,9 @@ func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_rea
 }
 
 // loadModeDiffers reports whether the host and the build load own in different modes. A package the host does not
-// hold has no mode to compare, and so differs, failing wide (#w72zxtq).
+// hold has no mode to compare, and so differs, failing wide (#w72zxtq). This is the direct rule, of a body that names
+// an object of own, and it reads a package by its ID alone: one the host checked from source and the build's graph
+// lacks differs here, though it starts no carry (startsCarry).
 func (reacher *bodyReacher) loadModeDiffers(own *types.Package) bool {
 	identifier, isHeld := reacher.host.identifiers[own]
 	if !isHeld {
@@ -328,7 +388,7 @@ func (reacher *bodyReacher) loadModeDiffers(own *types.Package) bool {
 // identifiedLoadModeDiffers reports whether the host and the build load the package the host holds by identifier in
 // different modes: one from export data and the other from source.
 func (reacher *bodyReacher) identifiedLoadModeDiffers(identifier string) bool {
-	return reacher.host.dependence.exportData[identifier] == reacher.fromSource[identifier]
+	return reacher.host.dependence.exportData[identifier] == reacher.graph.checkedFromSource(identifier)
 }
 
 // isUntypedFloatingPoint reports whether typed is the untyped float or untyped complex type, whose constants hold

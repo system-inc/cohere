@@ -12,7 +12,10 @@ type reachedBody struct {
 	offset            int
 	name              string
 	reason            bodyReachReason
-	driver            string
+	// partReason is the reason the part that reached the body gave, which reason writes as Signature when that part is
+	// its signature, hiding the rule that found it (#wzre5eg), and is reason itself for any other body.
+	partReason bodyReachReason
+	driver     string
 	// constantsOnlyReason is reason under the narrower load mode rule the general one replaced (loadModeReaches).
 	constantsOnlyReason bodyReachReason
 	unitDependent       bool
