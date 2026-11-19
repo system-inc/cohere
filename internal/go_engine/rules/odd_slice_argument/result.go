@@ -93,7 +93,7 @@ func judgeIn(
 	state := fact_resolver.StateOf[marks](home, Kind)
 	owner := state.function(resolver, home, parameter)
 	if owner == nil {
-		// A parameter of no function the package declares, as an instantiation's is, which no call names.
+		// A parameter of no function the package declares, which no call names (declaredParameter).
 		return false, nil
 	}
 	if kept, judged := state.functions[owner]; judged {
@@ -109,10 +109,10 @@ func judgeIn(
 
 // declaredSlices is each slice parameter of function, a declared function or method of a package, but for asked: the
 // parameters whose marks are answers of their own. A function literal's parameter is left out, since nothing outside
-// its function can name it, and so is one of a function of no package, whose parameters are another function's, and a
-// receiver, which no call passes a slice to as a parameter.
+// its function can name it, and so are the initializer, which takes none, and a receiver, which no call passes a
+// slice to as a parameter.
 func declaredSlices(function *intermediate_representation.Function, asked *types.Var) []*types.Var {
-	if function.Package == nil || function.Parent() != nil || function.Object() == nil {
+	if function.Parent() != nil || function.Object() == nil {
 		return nil
 	}
 	var declared []*types.Var

@@ -3,6 +3,8 @@ package odd_slice_argument
 import (
 	"go/types"
 
+	"honnef.co/go/tools/go/types/typeutil"
+
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
@@ -57,7 +59,7 @@ func (walk *pushWalk) markIndirectLengthChecks(functions []*intermediate_represe
 				if callee.Package == function.Package || callee.Package == nil {
 					visit(callee)
 				}
-				for _, passed := range passedParameters(call, callee) {
+				for _, passed := range signatureParameters(call, callee) {
 					if walk.facts.marked(passed.calleeParameter) {
 						walk.facts.mark(passed.parameter.Object())
 					}
@@ -68,4 +70,30 @@ func (walk *pushWalk) markIndirectLengthChecks(functions []*intermediate_represe
 	for _, function := range functions {
 		visit(function)
 	}
+}
+
+// signatureParameters is each slice parameter call passes as it is to callee, with the parameter it is passed to as
+// the original names it: the one callee's own signature holds at that place, whatever function declared it. The rule
+// names the declared function's instead (declaredParameter), so this reading is the record's alone.
+func signatureParameters(
+	call *intermediate_representation.Call,
+	callee *intermediate_representation.Function,
+) []passedParameter {
+	var passed []passedParameter
+	for argumentIndex, argument := range call.Call.Arguments {
+		parameterIndex := argumentIndex
+		if callee.Signature.Recv() != nil {
+			if argumentIndex == 0 {
+				continue
+			}
+			parameterIndex--
+		}
+		parameter, isParameter := argument.(*intermediate_representation.Parameter)
+		if !isParameter || !typeutil.All(parameter.Type(), typeutil.IsSlice) {
+			continue
+		}
+		passed = append(passed, passedParameter{parameter: parameter,
+			calleeParameter: callee.Signature.Params().At(parameterIndex)})
+	}
+	return passed
 }

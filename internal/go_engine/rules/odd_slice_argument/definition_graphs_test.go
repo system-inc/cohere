@@ -310,8 +310,10 @@ func (graph generatedGraph) fullName(path string, index int) string {
 //
 // A generic function takes, after its slices, an array of its package's own Holder as long as its index. An
 // instantiation's signature is made canonical by type identity across the program it is built in, so two generic
-// functions whose instantiations had identical signatures would share one's parameters, and a mark of one would be
-// read as the other's. The array keeps every instantiation's signature its own, in every package.
+// functions whose instantiations had identical signatures would share one's parameters. The rule never reads a mark
+// there (declaredParameter, and testdata/src/instance holds it to that), but the push does, as staticcheck does, and
+// would mark one function's parameter by another's check, which is no departure of order. The array keeps every
+// instantiation's signature its own, in every package, so the push stays the record of staticcheck's order alone.
 func (graph generatedGraph) call(qualifier string, index int, throughExpression bool, arguments [2]string) string {
 	switch graph.functions[index].kind {
 	case methodFunction:

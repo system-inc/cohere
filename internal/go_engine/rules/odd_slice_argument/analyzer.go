@@ -22,16 +22,21 @@
 // The push walk stays in push_walk_test.go, the tests' record of what the original's walk marks, and the fact
 // differential beside this file holds that record to the original's facts over whole trees.
 //
-// It differs in two places, each adjudicated. The original reads a call's source as a call expression, and the source
-// of a go or defer statement's call is the statement, so a go or defer passing an odd slice to a marked parameter
-// panics the original's run. The port reads the statement's call and reports the argument there, which
-// TestPortReportsWhereTheOriginalPanics holds, running the original behind a recover and requiring that it panic. And
-// the original's marks turn on the order its walk meets a package's functions in, wherever a cycle of calls or a call
+// It differs in three places, each adjudicated. The original reads a call's source as a call expression, and the
+// source of a go or defer statement's call is the statement, so a go or defer passing an odd slice to a marked
+// parameter panics the original's run. The port reads the statement's call and reports the argument there, which
+// TestPortReportsWhereTheOriginalPanics holds, running the original behind a recover and requiring that it panic.
+//
+// The original's marks turn on the order its walk meets a package's functions in, wherever a cycle of calls or a call
 // through an instantiation or a wrapper lies between a parameter and its check, where the port marks what the
 // definition marks in every order: definition_test.go is the definition's oracle, and the fixtures under
-// testdata/src/order and testdata/src/standin each hold one package in two orders. The registry runs the port in the
-// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
-// both over the same packages, and the two differ nowhere else.
+// testdata/src/order and testdata/src/standin each hold one package in two orders.
+//
+// And the original reads a callee's parameter off the callee's own signature, which for an instantiation of a generic
+// function may hold another function's parameter, or one no function declares, where the port names the declared
+// function's own (declaredParameter): the fixtures under testdata/src/instance record each finding that parts them.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and the two differ nowhere else.
 package odd_slice_argument
 
 import (
@@ -210,6 +215,8 @@ func reportOddLengths(
 				continue
 			}
 			for argumentIndex, argument := range call.Common().Arguments {
+				// The argument's place among the call's own arguments, a method call's receiver left out, where
+				// its syntax is and where a variadic one stands last.
 				parameterIndex := argumentIndex
 				if callee.Signature.Recv() != nil {
 					if argumentIndex == 0 {
@@ -231,8 +238,8 @@ func reportOddLengths(
 				if unreadable == nil && (length < 0 || length%2 == 0) {
 					continue
 				}
-				parameter := callee.Signature.Params().At(parameterIndex)
-				if !marked(parameter) {
+				parameter, isPassed := declaredParameter(callee, argumentIndex)
+				if !isPassed || !marked(parameter) {
 					continue
 				}
 				if unreadable != nil {

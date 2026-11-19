@@ -57,6 +57,19 @@ func TestAStandInReportsTheSameInEitherDeclarationOrder(test *testing.T) {
 	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "standin/first", "standin/last")
 }
 
+// A finding never turns on which generic function was instantiated first (#8d9r2rh). Packages instance/first and
+// instance/last hold three generic functions and a slice of one passed to each, with the one that checks its slice
+// and the one that checks nothing declared and instantiated in either order. The port asks the mark of the declared
+// function's own parameter, and finds in both the slices passed to the two functions that check theirs. The original
+// reads the mark off the instantiation's signature, which two instantiations of identical signatures share, and each
+// package records where that parts the two: a slice it reports by another function's check, dropped, a finding it
+// makes under another function's parameter name, renamed, and the slice it misses, found.
+func TestAnInstantiationReportsByItsDeclaredFunctionInEitherOrder(test *testing.T) {
+	test.Parallel()
+	parity.RequireOnlyAdjudicated(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "instance/first")
+	parity.RequireOnlyAdjudicated(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "instance/last")
+}
+
 // The differences fixture holds the calls where the two could most plausibly part, a slice whose length depends on
 // the path taken, one reaching the call through a loop's phi, arguments spread over lines and slices of slices of an
 // array. It records no difference, since the port parts from the original nowhere it can run, so the two must agree

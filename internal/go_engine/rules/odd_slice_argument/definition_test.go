@@ -34,11 +34,11 @@ type definitionResult map[types.Object]bool
 // only because of marks already there, so that set exists and is one set whatever order finds it, a cycle of calls
 // included, where each member waits on another until one of them is marked from outside the cycle.
 //
-// The functions it reads are the package's source functions and each function of no package, an instantiation or a
-// wrapper, that they reach through such calls. A parameter of another package is marked when its fact says so, as the
-// push reads one and as the resolver answers one. It is the oracle the rule's marks are held to, independent of how
-// the rule finds them: it shares only what the rule reads of one body, directChecks, passedParameters and
-// dominatesEveryReturn.
+// The functions it reads are the package's source functions. A pass to an instantiation or a wrapper is a pass to the
+// declared function it stands for, at the same parameter (declaredParameter), so no function of no package is read. A
+// parameter of another package is marked when its fact says so, as the push reads one and as the resolver answers one.
+// It is the oracle the rule's marks are held to, independent of how the rule finds them: it shares only what the rule
+// reads of one body, directChecks, passedParameters and dominatesEveryReturn.
 var definitionAnalyzer = &analysis.Analyzer{
 	Name:       "odd_slice_argument_definition",
 	Doc:        "marks the parameters that need an even length by the definition, a least fixed point with no order",
@@ -55,7 +55,7 @@ func runDefinition(pass *analysis.Pass) (any, error) {
 	if readError != nil {
 		return nil, readError
 	}
-	functions := definitionFunctions(slices.Collect(built.SourceFunctions()))
+	functions := slices.Collect(built.SourceFunctions())
 	marked := map[types.Object]bool{}
 	holds := func(parameter *types.Var) bool {
 		if parameter.Pkg() == pass.Pkg {
@@ -84,11 +84,6 @@ func runDefinition(pass *analysis.Pass) (any, error) {
 	}
 	result := definitionResult{}
 	for parameter := range marked {
-		// A wrapper built here for another package's function holds that function's parameters as its own. Their
-		// marks are that package's to make, read through its facts, so one made here is neither exported nor kept.
-		if parameter.Pkg() != pass.Pkg {
-			continue
-		}
 		pass.ExportObjectFact(parameter, new(evenByDefinition))
 		result[parameter] = true
 	}
@@ -116,29 +111,4 @@ func definitionCalls(function *intermediate_representation.Function) []*intermed
 		}
 	}
 	return calls
-}
-
-// definitionFunctions is every function the definition reads in a package: its source functions, and each function of
-// no package, which the representation makes where a call needs it and lists nowhere, that one of them reaches through
-// the calls the definition reads, however many such functions lie between.
-func definitionFunctions(
-	sourceFunctions []*intermediate_representation.Function,
-) []*intermediate_representation.Function {
-	functions := slices.Clone(sourceFunctions)
-	listed := map[*intermediate_representation.Function]bool{}
-	for _, function := range functions {
-		listed[function] = true
-	}
-	// The list grows as it is read, so a function of no package is read for the ones it reaches in turn.
-	for index := 0; index < len(functions); index++ {
-		for _, call := range definitionCalls(functions[index]) {
-			callee := call.Call.StaticCallee()
-			if callee.Package != nil || listed[callee] {
-				continue
-			}
-			listed[callee] = true
-			functions = append(functions, callee)
-		}
-	}
-	return functions
 }
