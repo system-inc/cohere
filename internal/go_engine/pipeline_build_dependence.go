@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -320,10 +321,10 @@ func (engine *pipeline) sealDependenceGraphs() {
 // changes from run to run, and the graph names each unit by the file a reader sees. A file only the build compiles is
 // parsed for its syntax alone. A package only one side's load reaches is that side's alone, except a root the build's
 // load leaves out because its in-package test variant is checked in its place (load.Caching's AnalyzedRootsOnly): the
-// variant holds every file of it, so its files are compared with the variant's, and its units are never called
-// dependent for a package the build checks by another name. A build loaded again for a question keeps this judgment,
-// since its files do not change between rounds. Beside the record it returns the judgment and the files both builds
-// compile of each package both have by one ID, which the facts census compares through (compareFacts).
+// variant holds every file of it, so its files are compared with the variant's but its test files, and its units are
+// never called dependent for a package the build checks by another name. A build loaded again for a question keeps
+// this judgment, since its files do not change between rounds. Beside the record it returns the judgment and the files
+// both builds compile of each package both have by one ID, which the facts census compares through (compareFacts).
 //
 // When the host restored packages from export data, which its graph does not hold, the standard library's graph is
 // judged first against the build's files of its packages, and that judgment answers for every object the host's units
@@ -366,8 +367,17 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 		if !asVariant && counterpart.TypesInfo != nil {
 			judged.sharedPackages[identifier] = true
 		}
-		// A variant's own test files are the variant's, never the package's it stands in for.
-		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, !asVariant, engine.holdsLineDirective)
+		builtFiles := counterpart.GoFiles
+		if asVariant {
+			// The variant holds the package's files and its own in-package test files, which are the variant's, never
+			// the package's it stands in for, and a test file is told by its name, as go/build tells it. Every other
+			// file of the variant the host does not compile is a build-only file of the package, parsed and scanned as
+			// any other is, so a method or a line directive in it is judged though the build checks no plain package.
+			builtFiles = slices.DeleteFunc(slices.Clone(counterpart.GoFiles), func(file string) bool {
+				return strings.HasSuffix(file, "_test.go")
+			})
+		}
+		differing := filesDiffer(hostFiles, builtFiles, fileSet, engine.holdsLineDirective)
 		if !asVariant {
 			for _, file := range hostFiles {
 				if slices.Contains(counterpart.GoFiles, file) {
@@ -466,7 +476,7 @@ func standardLibraryDifference(
 			difference.HostOnlyPackages[identifier] = true
 			continue
 		}
-		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, true, holdsLineDirective)
+		differing := filesDiffer(hostFiles, counterpart.GoFiles, fileSet, holdsLineDirective)
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
 			difference.Packages[identifier] = differing
 		}
@@ -476,15 +486,13 @@ func standardLibraryDifference(
 
 // filesDiffer is how one package's files differ, as written: hostFiles the host compiles and builtFiles the build
 // does, each host-only file named and each shared one too, by which a unit a //line directive names apart is seeded,
-// and with buildOnly each build-only file parsed for its syntax alone. Each host-only file, and with buildOnly each
-// build-only one, is read by holdsLineDirective, by its path as written, whose directive could name a shared file, so
-// one that holds one marks the package (PackageDifference.LineDirective). A variant's own test files are no build-only
-// files of the package it stands in for, so without buildOnly they are not read.
+// and each build-only file parsed for its syntax alone. Each host-only file, and each build-only one, is read by
+// holdsLineDirective, by its path as written, whose directive could name a shared file, so one that holds one marks the
+// package (PackageDifference.LineDirective).
 func filesDiffer(
 	hostFiles []string,
 	builtFiles []string,
 	fileSet *token.FileSet,
-	buildOnly bool,
 	holdsLineDirective func(file string) bool,
 ) build_dependence.PackageDifference {
 	var differing build_dependence.PackageDifference
@@ -496,12 +504,10 @@ func filesDiffer(
 			differing.LineDirective = differing.LineDirective || holdsLineDirective(file)
 		}
 	}
-	if buildOnly {
-		for _, file := range builtFiles {
-			if !slices.Contains(hostFiles, file) {
-				differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file)
-				differing.LineDirective = differing.LineDirective || holdsLineDirective(file)
-			}
+	for _, file := range builtFiles {
+		if !slices.Contains(hostFiles, file) {
+			differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file)
+			differing.LineDirective = differing.LineDirective || holdsLineDirective(file)
 		}
 	}
 	return differing

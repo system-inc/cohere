@@ -316,10 +316,11 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheEnginesScan(test *testing.T) {
 // alone compiles v's in-package test, so the host checks v and windows checks v [v.test] in its place, and nothing
 // imports v, so windows's load leaves v out (load.Caching's AnalyzedRootsOnly). v's shape_windows.go, which windows
 // alone compiles, declares String on Shape, a type both builds have, so Shape's method set moves: Shape and Printed,
-// which formats it, are dependent, and Doubled, which reads nothing of it, is not. u has an in-package test in every
-// build, so the host checks u and u [u.test], and windows u [u.test] alone, and kind_windows.go declares String on
-// Kind: the host's u, compared with windows's variant as v is, is judged as u [u.test], compared with its own
-// counterpart, is, Kind and Printed dependent in each, Doubled and the test not.
+// which formats it, are dependent, and Doubled, which reads nothing of it, is not. v's shape_windows_test.go declares
+// String on Label, but a test file is the variant's, never v's, so Label and Labelled, which formats it, are not
+// dependent. u has an in-package test in every build, so the host checks u and u [u.test], and windows u [u.test]
+// alone, and kind_windows.go declares String on Kind: the host's u, compared with windows's variant as v is, is judged
+// as u [u.test], compared with its own counterpart, is, Kind and Printed dependent in each, Doubled and the test not.
 func TestABuildOnlyFileOfAPackageTheBuildChecksAsItsVariantIsJudged(test *testing.T) {
 	test.Parallel()
 
@@ -355,7 +356,7 @@ func TestABuildOnlyFileOfAPackageTheBuildChecksAsItsVariantIsJudged(test *testin
 		got[identifier] = fmt.Sprintf("%d of %d", counted[0], counted[1])
 	}
 	want := map[string]string{
-		shapes:                            "2 of 3",
+		shapes:                            "2 of 5",
 		"example.com/dependencevariant/u": "2 of 3",
 		"example.com/dependencevariant/u [example.com/dependencevariant/u.test]": "2 of 4",
 	}

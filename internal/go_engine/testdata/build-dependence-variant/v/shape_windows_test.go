@@ -10,3 +10,6 @@ func TestPrinted(test *testing.T) {
 		test.Error("want Shape printed")
 	}
 }
+
+// String is a method of Label in v's test alone.
+func (label Label) String() string { return label.Text }
