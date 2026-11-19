@@ -1,0 +1,16 @@
+{
+    "why": "sh31: a space before the ampersand joins nothing, so the two-letter word stands alone and reports, as nexus reads it (#1z7kbtz)",
+    "expect": [
+        {
+            "covers": "AT",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

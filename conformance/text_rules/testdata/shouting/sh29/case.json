@@ -1,0 +1,11 @@
+{
+    "why": "sh29: words a hyphen or an ampersand joins are read whole first, as nexus reads them, and a run with a digit or a one-letter part is an identifier, so a fact id, a company name and a one-letter compound are clean (#1z7kbtz)",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
