@@ -56,7 +56,10 @@ func TestThePlacedHandAnswersAStandingFunctionByItsPlace(test *testing.T) {
 			Encoded: []byte("false")},
 		{Kind: "function_purity", File: file, FileDigest: digest[:], Offset: twiceAt, Parameter: -1,
 			Encoded: []byte("true")},
-	}, func(function fact_resolver.Place) bool { return function.Offset == doubleAt }, diskDigests(test))
+	}, func(function fact_resolver.Place) bool {
+		// Asked of a function, never of a parameter: a parameter's answer stands with its function.
+		return function.Offset == doubleAt && function.Parameter == -1
+	}, diskDigests(test))
 	function := func(scope *types.Scope, name string) *types.Func {
 		declared, isFunction := scope.Lookup(name).(*types.Func)
 		if !isFunction {

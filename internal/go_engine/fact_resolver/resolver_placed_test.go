@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -163,5 +164,24 @@ func TestAPlaceTwoFunctionsShareIsNoPlace(test *testing.T) {
 	}
 	if placed := resolver.PlacedIn(home, noDigests); len(placed) != 2 {
 		test.Errorf("want alone's two answers placed and none of one's or two's, got %+v", placed)
+	}
+}
+
+// ComparePlaced orders by file, the file's digest, offset, parameter, kind and the answer's bytes, in that order: at
+// one place, a function's own answer of a later kind comes before its parameter's of an earlier one, and the answer in
+// the file whose digest sorts first before the one in the other file of that name.
+func TestComparePlacedOrdersByParameterBeforeKind(test *testing.T) {
+	test.Parallel()
+	parameter := fact_resolver.PlacedAnswer{Kind: "function_purity", File: "a.go", FileDigest: []byte("1"), Offset: 9,
+		Parameter: 0, Encoded: []byte("true")}
+	function := fact_resolver.PlacedAnswer{Kind: "return_nil_ness", File: "a.go", FileDigest: []byte("1"), Offset: 9,
+		Parameter: -1, Encoded: []byte("[]")}
+	other := fact_resolver.PlacedAnswer{Kind: "function_purity", File: "a.go", FileDigest: []byte("2"), Offset: 1,
+		Parameter: -1, Encoded: []byte("true")}
+	sorted := slices.SortedFunc(slices.Values([]fact_resolver.PlacedAnswer{other, parameter, function}),
+		fact_resolver.ComparePlaced)
+	want := []fact_resolver.PlacedAnswer{function, parameter, other}
+	if !reflect.DeepEqual(sorted, want) {
+		test.Errorf("want %+v, got %+v", want, sorted)
 	}
 }

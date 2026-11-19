@@ -242,7 +242,7 @@ func placedDisagreeing(left []fact_resolver.PlacedAnswer, right []fact_resolver.
 // An entry holds its placed answers by column, each file's and kind's name once, and reads back exactly what it was
 // given, in PlacedIn's order whatever order they came in: answers in three files, two of one name parsed from other
 // bytes and one with no digest, of three kinds, a function's own and a parameter's, two at one offset. Columns of
-// different lengths, a kind the table does not hold, or an empty answer, are a miss.
+// different lengths, a kind or a file the table does not hold, or an empty answer, are a miss, never a panic.
 func TestAnEntrysPlacedAnswersReadBackExactly(test *testing.T) {
 	test.Parallel()
 	answers := []fact_resolver.PlacedAnswer{
@@ -272,11 +272,18 @@ func TestAnEntrysPlacedAnswersReadBackExactly(test *testing.T) {
 	short.Values = short.Values[1:]
 	unknown := storedPlacedOf(answers)
 	unknown.KindIndexes[0] = len(unknown.Kinds)
+	negativeKind := storedPlacedOf(answers)
+	negativeKind.KindIndexes[0] = -1
+	unknownFile := storedPlacedOf(answers)
+	unknownFile.FileIndexes[0] = len(unknownFile.Files)
+	negativeFile := storedPlacedOf(answers)
+	negativeFile.FileIndexes[0] = -1
 	// An empty answer is no answer: decoded, it would read as the zero value, no fact, never what the run held.
 	empty := storedPlacedOf(answers)
 	empty.Values[0] = nil
 	for name, broken := range map[string]storedPlaced{"a column short": short, "a kind past the table": unknown,
-		"an empty answer": empty} {
+		"a kind before the table": negativeKind, "a file past the table": unknownFile,
+		"a file before the table": negativeFile, "an empty answer": empty} {
 		if _, brokenError := broken.placed(); brokenError == nil {
 			test.Errorf("%s: want a miss, read back without an error", name)
 		}
@@ -349,5 +356,27 @@ func TestAColdEntryReadsBackThePlacedAnswersItsRunHeld(test *testing.T) {
 			test.Errorf("want every answer read back one the run held, got %+v, which is not among %+v", answer,
 				held)
 		}
+	}
+}
+
+// An entry whose placed answers do not read back is a miss as a whole, as one gob refuses is: restoredOf, which every
+// read of an entry goes through, refuses it, and reads one whose answers do read with them.
+func TestAnEntryWhosePlacedAnswersDoNotReadIsAMiss(test *testing.T) {
+	test.Parallel()
+	answers := []fact_resolver.PlacedAnswer{
+		{Kind: "function_purity", File: "/module/a.go", FileDigest: []byte("written"), Offset: 120, Parameter: -1,
+			Encoded: []byte("true")},
+	}
+	restoring := &packages.Package{ID: "example.com/placed/bottom"}
+	whole := cacheEntry{Version: CacheFormatVersion, Placed: storedPlacedOf(answers)}
+	restored, restoreError := restoredOf(&cacheAnalyzers{}, restoring, whole, nil)
+	if restoreError != nil || !reflect.DeepEqual(restored.placed, answers) {
+		test.Fatalf("want the entry read with its placed answers, got %v (%v)", restored, restoreError)
+	}
+	broken := whole
+	broken.Placed = storedPlacedOf(answers)
+	broken.Placed.Values = nil
+	if _, brokenError := restoredOf(&cacheAnalyzers{}, restoring, broken, nil); brokenError == nil {
+		test.Error("want an entry whose placed answers' columns differ in length refused, read without an error")
 	}
 }
