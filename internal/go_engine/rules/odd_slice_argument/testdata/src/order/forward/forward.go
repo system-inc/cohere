@@ -29,9 +29,12 @@ func pairs(values []string) {
 	}
 }
 
-// odd passes back a slice of one. The record is ruled here: the port rightly reports it, since back passes its slice
-// to forward and forward to pairs, which checks it, as package back's same functions are reported by both. staticcheck
-// misses it here only by the order its walk meets the three functions in.
+// odd passes back a slice of one. The record is ruled here. It is true by the least fixed point, the definition
+// the port marks by: back passes its slice to forward and forward to pairs, which checks it, as package back's same
+// functions are reported by both. staticcheck reports it in some orders the package can declare its functions in and
+// not in others, order/back's among the first and this one among the second
+// (TestStaticcheckReportsACyclesFindingsInTheseOrders). At run time back calls forward, and forward calls back before
+// it reaches pairs, so the two call each other without end and the stack overflows before the check could panic.
 func odd() {
 	back([]string{"one"}) // port finds: argument "values" is expected to have even number of elements, but has 1 elements
 }
