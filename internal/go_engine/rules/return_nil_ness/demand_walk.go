@@ -65,7 +65,8 @@ func (walk *demandWalk) returns(function *intermediate_representation.Function) 
 
 // verdict is the nilness of the results of function, a declared function of home: its verdict kept, the defaults of
 // its signature when it has no blocks or no result that may be nil, the defaults while it is judging itself, or judged
-// now and kept.
+// now and kept. Each verdict kept is handed to the resolver too (keepAnswer), except one with no result that may be
+// nil, which its types alone answer.
 func (walk *demandWalk) verdict(function *intermediate_representation.Function) []ValueNilness {
 	declared := declaredFunction(function)
 	if results, judged := walk.state.results[declared]; judged {
@@ -76,9 +77,19 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 		walk.orderDependent = walk.orderDependent || function != walk.stack[len(walk.stack)-1]
 		return defaultNilnessForSignature(function.Signature)
 	}
-	if function.Blocks == nil || !anyPointers(function.Signature) {
+	if !anyPointers(function.Signature) {
+		// Answered from its signature alone, the same in every build with the same types, so it is not handed to the
+		// resolver, as the replay hands over none of these either.
 		results := defaultNilnessForSignature(function.Signature)
 		walk.state.results[declared] = results
+		return results
+	}
+	if function.Blocks == nil {
+		// A function of assembly may be one of Go in another build, with another answer, so this one is handed over,
+		// as the replay hands it over too.
+		results := defaultNilnessForSignature(function.Signature)
+		walk.state.results[declared] = results
+		keepAnswer(walk.resolver, walk.home, declared, results)
 		return results
 	}
 	walk.stack = append(walk.stack, function)
@@ -91,6 +102,7 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 	}
 	walk.state.results[declared] = returned
 	walk.state.callees[declared] = recorder.recorded
+	keepAnswer(walk.resolver, walk.home, declared, returned)
 	walk.resolver.Counts(Kind).Computed.Add(1)
 	return returned
 }
