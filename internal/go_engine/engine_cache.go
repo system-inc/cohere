@@ -17,13 +17,11 @@ import (
 )
 
 // standardLibrarySource is where a run's standard-library entries come from and go, the zero value a plain run's:
-// the system cache, its entries keyed by the executable's identity (see systemCache). stamp, when not empty, stands for
-// that identity in every standard-library key, as the release's generator keys the table it builds before the
-// executable it ships in exists. collected, when it is not nil, gains the standard-library entries a cached run saves
-// (see check.StandardLibraryCaching), for a test, or the release, to write a table from.
+// the system cache, its entries keyed by the executable's identity (see systemCache).
 type standardLibrarySource struct {
-	stamp     string
-	collected map[cache.Key]check.StandardLibraryRunEntry
+	// stamp, when not empty, stands for the executable's identity in every standard-library key, for a test that fills
+	// a system cache under an identity of its own; every run leaves it empty.
+	stamp string
 
 	// toolchain, when not empty, stands for go env's toolchain in the standard library's dependence records' keys,
 	// for a test that fakes a toolchain the records were written under (#6a3kjvz); every run leaves it empty.
@@ -61,9 +59,6 @@ func lintCache(
 	stamps *cache.ShardStamps,
 ) (*check.Caching, error) {
 	source := request.standardLibrary
-	// The standard library is keyed apart when there is a system cache to keep it or entries to collect for the
-	// release's table.
-	keysStandardLibrary := system.store != nil || source.collected != nil
 	noCache := request.switches["no-cache"]
 	if noCache && system.store == nil {
 		return nil, nil
@@ -82,7 +77,8 @@ func lintCache(
 		return nil, fmt.Errorf("identifying the engine: %w", identityError)
 	}
 	var standardLibrary *check.StandardLibraryCaching
-	if keysStandardLibrary {
+	// The standard library is keyed apart when there is a system cache to keep it.
+	if system.store != nil {
 		standardLibrary = &check.StandardLibraryCaching{
 			System: system.store,
 			Context: cache.StandardLibraryContext{
@@ -92,7 +88,6 @@ func lintCache(
 				CgoToolchain:   cgoToolchain(values),
 				Goroot:         values["GOROOT"],
 			},
-			Collected: source.collected,
 			// A standard-library dependence record is written under the toolchain that loaded it (#6a3kjvz).
 			Toolchain: cmp.Or(source.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
 		}
@@ -180,10 +175,10 @@ func processVariable(name string) string {
 // standard library's files by the paths go list names, with it or without it; the key names each file below `GOROOT`
 // besides. -buildvcs decides whether go stamps version control into a main package of the main module, which can refuse
 // that package's build where go cannot read the tree's version control, and no standard-library package is one, so it
-// changes nothing of one either way; with it in the key, a release binary under `GOFLAGS=-buildvcs=false`, as every
-// cohere worktree and cohere-dev set, read nothing from its standard-library table (#30kzgj1). The engine's own key
-// keeps it (load.VerdictFlags). Every other flag stays, as in the engine's key (#s5h4q2t): -tags and -race choose which
-// files a package holds, and -n can decide whether a load succeeds at all.
+// changes nothing of one either way; with it in the key, a run under `GOFLAGS=-buildvcs=false`, as every cohere
+// worktree and cohere-dev set, would key the standard library apart from a run without it (#30kzgj1). The engine's own
+// key keeps it (load.VerdictFlags). Every other flag stays, as in the engine's key (#s5h4q2t): -tags and -race choose
+// which files a package holds, and -n can decide whether a load succeeds at all.
 var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcacherw", "buildvcs"}
 
 // standardLibraryBuild is the build context every standard-library key shares, in cacheBuild's order: of values,

@@ -20,18 +20,16 @@ func TestRenderTableMatchesTheGolden(test *testing.T) {
 	test.Parallel()
 	rendered := renderTable(tableHeader{
 		base: builtBinary{
-			side:      sideBase,
-			commit:    "1111111111111111111111111111111111111111",
-			sha256:    "0a4601b8ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-			tableLine: "go standard library table: release 0.2.0-measure.111111111111 1111 go1.27.3, 51234567 bytes",
+			side:   sideBase,
+			commit: "1111111111111111111111111111111111111111",
+			sha256: "0a4601b8ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 			// A base from before every build was the default, which is asked for them (#qqyq61s).
 			everyBuildArguments: []string{"--other-builds"},
 		},
 		branch: builtBinary{
-			side:      sideBranch,
-			commit:    "2222222222222222222222222222222222222222",
-			sha256:    "bfa25050ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-			tableLine: "go standard library table: release 0.2.0-measure.222222222222 2222 go1.27.3, 51234999 bytes",
+			side:   sideBranch,
+			commit: "2222222222222222222222222222222222222222",
+			sha256: "bfa25050ffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
 		},
 		host:              "pupa",
 		goVersion:         "go version go1.27.3 linux/amd64",
