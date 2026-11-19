@@ -1,0 +1,59 @@
+// Package reach holds a body for each way windows's difference reaches one of the host's bodies, and two it never
+// reaches, for the body reach census (#w72zxtq): platformName, platformInteger and platformPart are each build's own,
+// and windows declares a package-level len.
+package reach
+
+// Gadget spins in every build.
+type Gadget struct{}
+
+// Spin spins, the same in every build, so its body is never reached.
+func (Gadget) Spin() { /* A gadget spins by being called; there is nothing more to it. */ }
+
+// Number's underlying type is each build's own, and nothing else of it differs.
+type Number platformInteger
+
+// Holder reaches Spin through inner and Gadget on the host, and on windows through platformPart, whose windows file
+// declares a Spin of its own.
+type Holder struct {
+	inner
+	platformPart
+}
+
+// inner embeds Gadget.
+type inner struct{ Gadget }
+
+// holder is the Holder Spinner takes Spin from.
+var holder Holder
+
+// settings is of a struct type with no name, whose field no identity reaches.
+var settings struct{ A int }
+
+// PlatformName calls a function only each build's own file declares.
+func PlatformName() string {
+	return platformName()
+}
+
+// Positive converts to Number, whose underlying type alone differs on windows.
+func Positive(value int) bool {
+	return Number(value) > 0
+}
+
+// Spinner takes the method value Spin from holder, whose type gains it on windows through platformPart.
+func Spinner() func() {
+	return holder.Spin
+}
+
+// Size reads the universe's len, which windows's file declares at package level.
+func Size(values []int) int {
+	return len(values)
+}
+
+// Joined uses nothing any build changes.
+func Joined(first string, second string) string {
+	return first + "/" + second
+}
+
+// Configured reads settings's field, whose identity is unknown.
+func Configured() int {
+	return settings.A
+}

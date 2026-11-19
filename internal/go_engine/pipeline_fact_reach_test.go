@@ -11,19 +11,19 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
 
-// Under the body reach census, with `--build-dependence`, the host's lint hands back what its run held
-// of its facts for the facts' reach (#aswfm7a), and the run makes of it, as the builds start, the body-reach fixture's
-// one package's side, from its record and its answers, then lets the capture go. A run without the census asks for
-// none and makes no side, its findings the same as the census's.
+// Under the body reach census, with `--build-dependence`, the host's lint hands back what its run held of its facts
+// for the facts' reach (#aswfm7a), and the run makes of it, as the builds start, the fact-reach-sides fixture's one
+// package's side, from its record and its answers, then lets the capture go. A run without the census asks for none
+// and makes no side, its findings the same as the census's.
 func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testing.T) {
 	test.Parallel()
 
-	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
+	root := copyFixture(test, filepath.Join("testdata", "fact-reach-sides"))
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	on, onStream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyReachCensus = censusFile
 	}, "--no-cache", "--no-fix", "--build-dependence")
-	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
+	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings,
 		"--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || len(off.buildRuns) != 2 {
@@ -59,16 +59,16 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 	}
 }
 
-// Under the body reach census windows's build hands the passes on the body-reach fixture's one package the host's side
-// of it for the facts' reach, with the two bodies its census leaves unreached, Gadget.Spin and Joined, standing, and
-// so lints the package in part (#aswfm7a). The host's run hands none, and nor does a build without the census.
+// Under the body reach census windows's build hands the passes on the fact-reach-sides fixture's one package the host's
+// side of it for the facts' reach, with the two bodies its census leaves unreached, Gadget.Spin and Joined, standing,
+// and so lints the package in part (#aswfm7a). The host's run hands none, and nor does a build without the census.
 func TestEachBuildHandsItsPassesTheHostsSideWithItsUnreachedBodiesStanding(test *testing.T) {
 	test.Parallel()
 
-	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
+	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings,
 		func(engine *pipeline) { engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt") }, "--no-cache",
 		"--no-fix", "--build-dependence")
-	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings, "--no-fix",
+	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings, "--no-fix",
 		"--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyReach == nil {
@@ -97,8 +97,8 @@ func TestEachBuildHandsItsPassesTheHostsSideWithItsUnreachedBodiesStanding(test 
 	}
 }
 
-// Under the body reach census windows's build settles the standing bodies of the body-reach fixture's one package by
-// standing_facts, which reads the side its passes were handed, and the census writes what that took (#aswfm7a): the
+// Under the body reach census windows's build settles the standing bodies of the fact-reach-sides fixture's one package
+// by standing_facts, which reads the side its passes were handed, and the census writes what that took (#aswfm7a): the
 // side used, its 8 functions' no-return facts compared, platformName's named, since windows declares its own in a file
 // of its own, and nothing taken out, since PlatformName, platformName's one user, is reached already. No fact kind
 // answered about the package, so nothing is asked. A build without the census settles nothing.
@@ -106,9 +106,9 @@ func TestEachBuildSettlesItsStandingBodiesAndTheCensusCountsThem(test *testing.T
 	test.Parallel()
 
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
-	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
+	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings,
 		func(engine *pipeline) { engine.bodyReachCensus = censusFile }, "--no-cache", "--no-fix", "--build-dependence")
-	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings, "--no-fix",
+	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings, "--no-fix",
 		"--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].factReach == nil {
@@ -137,12 +137,13 @@ func TestEachBuildSettlesItsStandingBodiesAndTheCensusCountsThem(test *testing.T
 	}
 }
 
-// On a warm run the host restores the body-reach fixture's one package from the findings store, so its run computed
-// nothing there and holds no side of it: the census counts it uncaptured, and every build lints it whole (#aswfm7a).
+// On a warm run the host restores the fact-reach-sides fixture's one package from the findings store, so its run
+// computed nothing there and holds no side of it: the census counts it uncaptured, and every build lints it whole
+// (#aswfm7a).
 func TestAWarmRunGivesARestoredPackageNoSideForTheFactsReach(test *testing.T) {
 	test.Parallel()
 
-	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
+	root := copyFixture(test, filepath.Join("testdata", "fact-reach-sides"))
 	runOverConfigured(test, root, exitFindings, nil, "--no-fix", "--build-dependence")
 	warm, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
