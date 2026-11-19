@@ -571,6 +571,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		unnamedFacts, restoredAnswers = session.unnamedFacts(), session.restoredAnswers()
 	}
 	if session != nil {
+		// Beside the load, nothing is saved or kept of a package before the load has made it final, and nothing at
+		// all once the pass is abandoned (awaitLoaded).
+		if options.Ready != nil && !session.awaitLoaded(options.Ready, options.Abandon) {
+			return nil, ErrAbandoned
+		}
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
 		result.FromHost = session.hostCounts()
