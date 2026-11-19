@@ -144,6 +144,16 @@ type Options struct {
 	// failed run.
 	FactReachSettle *analysis.Analyzer
 
+	// StandingBodies, when not nil, is an extra build's standing bodies (#e4rd5dw): asked once for each package with
+	// StandingAfter's result there, what it answers is handed every pass on the package under rule.Standing (see
+	// checker.Options.StandingBodies), so a confined rule hears no standing body and reports the host's findings there
+	// as its own. StandingAfter, when StandingBodies is set too, is the analyzer every dispatcher's action on a package
+	// follows and whose result there StandingBodies is asked with, standing_facts' on the census path, which this
+	// package never imports. Where it is FactReachSettle and the run roots that nowhere (settlingIn), nothing stands.
+	// Both are called from several actions at once. Only an extra build sets them.
+	StandingBodies func(packageId string, after any) rule.StandingBodies
+	StandingAfter  *analysis.Analyzer
+
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
@@ -389,6 +399,12 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Reads = options.Reads
 	checkerOptions.Inheritance = options.Inheritance
 	checkerOptions.FactHosts = options.FactHosts
+	// The standing bodies follow StandingAfter, on the census path the analyzer the facts' reach settles by, so a run
+	// that roots that nowhere (settlingIn) hands none: following it there would run it, and the answers it learns would
+	// reach the entries.
+	if options.StandingAfter == nil || options.StandingAfter != options.FactReachSettle || settler != nil {
+		checkerOptions.StandingBodies, checkerOptions.StandingAfter = options.StandingBodies, options.StandingAfter
+	}
 	checkerOptions.Beside = settler
 	checkerOptions.ListingsRead = listingsRead
 	checkerOptions.Pool = options.Pool
@@ -794,7 +810,8 @@ func abandoned(abandon <-chan struct{}) bool {
 // store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
 // to record its lookups of other packages in, once Run sets Reads (#b2t9xmf). Inherited hands each syntax-only rule the
 // host's findings it inherits, once Run sets Inheritance (#y6q1x2j). FactHost hands each pass on a package the host's
-// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np).
+// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np). Standing hands each pass on a package what
+// stands there, once Run sets StandingBodies (#e4rd5dw).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
@@ -806,6 +823,7 @@ func DispatchOptions() *checker.Options {
 		Recorded:      rule.Recorded,
 		Inherited:     rule.Inherited,
 		FactHost:      rule.FactHost,
+		Standing:      rule.Standing,
 	}
 }
 

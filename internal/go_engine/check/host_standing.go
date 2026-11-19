@@ -28,7 +28,7 @@ type HostStanding struct {
 	// whose slot the host's entries hold its findings. A rule absent from it is not confined and is answered nothing.
 	analyzerOf map[string]*analysis.Analyzer
 	// stands is the build's judgment of what stands: whether the function declared at offset of filename, in the
-	// package identified so, stands.
+	// package identified so, stands, keyed as rule.StandingBodies.Stands is asked.
 	stands func(packageIdentifier string, filename string, offset int) bool
 
 	lock sync.Mutex

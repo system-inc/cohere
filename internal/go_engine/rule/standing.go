@@ -36,8 +36,9 @@ var Standing = &analysis.Analyzer{
 // Both dispatchers and every rule's own action read it, so every method may be called from several goroutines at
 // once.
 type StandingBodies interface {
-	// Stands is whether the function declared at offset, the offset of its `func` in the file parsed from filename,
-	// stands.
+	// Stands is whether the function declared at offset stands: filename is the file a reader sees, past any `//line`
+	// directive, and offset is that of its `func` in the file as parsed, stage 1's rule for a unit, by which the
+	// facts' reach keys what it settles (fact_reach.Place).
 	Stands(filename string, offset int) bool
 	// Confines is whether the rule named ruleName is confined. Any other rule hears every body, as on the host, and
 	// keeps its own findings.
@@ -93,7 +94,9 @@ func StandingSpans(pass *analysis.Pass) map[*token.File][]StandingSpan {
 			if span.Start > span.Body || span.Body >= span.End {
 				continue
 			}
-			if standing.Stands(tokenFile.Name(), tokenFile.Offset(function.Pos())) {
+			// Asked as the facts' reach keys a body, by the name a `//line` directive gives its file, while the
+			// findings are asked by the name the file was parsed from (StandingFiles), as the host's are kept.
+			if standing.Stands(tokenFile.Position(function.Pos()).Filename, tokenFile.Offset(function.Pos())) {
 				fileSpans = append(fileSpans, span)
 			}
 		}

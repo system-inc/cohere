@@ -32,14 +32,16 @@ func external() int
 `
 
 // everyFunctionStands is a StandingBodies in which every function asked of stands and no rule is confined, which
-// records each offset it was asked of.
+// records each offset it was asked of, and each file name.
 type everyFunctionStands struct {
-	asked []int
+	asked      []int
+	askedFiles []string
 }
 
-// Stands records offset and answers that the function there stands.
-func (standing *everyFunctionStands) Stands(_ string, offset int) bool {
+// Stands records filename and offset and answers that the function there stands.
+func (standing *everyFunctionStands) Stands(filename string, offset int) bool {
 	standing.asked = append(standing.asked, offset)
+	standing.askedFiles = append(standing.askedFiles, filename)
 	return true
 }
 
@@ -122,6 +124,41 @@ func TestAFilesStandingSpansAreSortedByWhereEachStarts(test *testing.T) {
 	if len(inOrder) != 2 || inOrder[0].Start >= inOrder[1].Start || !slices.Equal(reversed, inOrder) {
 		test.Errorf("with the declarations reversed the spans are %v, want them sorted as before, %v", reversed,
 			inOrder)
+	}
+}
+
+// A function is asked of as the facts' reach keys a body (#e4rd5dw): by the file a reader sees, past any `//line`
+// directive, at the offset of its `func` in the file as parsed. A function a directive places in another file is
+// asked of by that file's name, made whole against the parsed file's directory, and one before the directive by the
+// parsed file's own, each at its offset as parsed.
+func TestAFunctionIsAskedOfByItsLineDirectivesFileAtItsParsedOffset(test *testing.T) {
+	test.Parallel()
+	source := "package planted\n\nfunc placed() int {\n\treturn 1\n}\n\n//line directed.rl:10\n" +
+		"func directed() int {\n\treturn 2\n}\n"
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "/project/planted.go", source, parser.ParseComments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	standing := &everyFunctionStands{}
+	pass := &analysis.Pass{Fset: fileSet, Files: []*ast.File{file},
+		ResultOf: map[*analysis.Analyzer]any{Standing: standing}}
+	tokenFile := fileSet.File(file.FileStart)
+
+	spans := StandingSpans(pass)
+	placed, isPlaced := file.Decls[0].(*ast.FuncDecl)
+	directed, isDirected := file.Decls[1].(*ast.FuncDecl)
+	if !isPlaced || !isDirected {
+		test.Fatalf("the source's declarations are %T and %T, want two functions", file.Decls[0], file.Decls[1])
+	}
+	files := []string{"/project/planted.go", "/project/directed.rl"}
+	offsets := []int{tokenFile.Offset(placed.Pos()), tokenFile.Offset(directed.Pos())}
+	if !slices.Equal(standing.askedFiles, files) || !slices.Equal(standing.asked, offsets) {
+		test.Errorf("the standing bodies were asked of %v at %v, want %v at %v", standing.askedFiles,
+			standing.asked, files, offsets)
+	}
+	if len(spans[tokenFile]) != 2 {
+		test.Errorf("the parsed file has the spans %v, want both functions', under the file as parsed", spans)
 	}
 }
 

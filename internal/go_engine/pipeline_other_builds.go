@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -683,6 +684,12 @@ func (engine *pipeline) extraBuildRun(
 		run.lintWait = time.Since(waitStarted)
 	}
 	engine.lintStepped(extra, lintStepTaken, weight)
+	// The build's standing bodies, made once for every load of it, only where the run leaves bodies standing, and read
+	// by a load only where its passes are handed the host's sides.
+	var standing *buildStanding
+	if engine.standingConfined != nil {
+		standing = newBuildStanding(host, enabled, engine.standingConfined)
+	}
 	// A nil *check.HostInheritance would be a non-nil rule.Inheritance, which every pass would read as one.
 	var inherits rule.Inheritance
 	if inheritance != nil {
@@ -726,6 +733,14 @@ func (engine *pipeline) extraBuildRun(
 			run.factHosts = hosts
 			factHosts = func(packageId string) fact_reach.Host { return hosts[packageId] }
 		}
+		settle := engine.factReachSettle(factHosts != nil)
+		// A package whose pass is handed a host's side lints only what does not stand once standing_facts has settled
+		// it there, whose action every dispatcher's action on the package follows.
+		var standingBodies func(packageId string, after any) rule.StandingBodies
+		var standingAfter *analysis.Analyzer
+		if standing != nil && settle != nil {
+			standingBodies, standingAfter = standing.bodiesOf, settle
+		}
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
@@ -744,8 +759,10 @@ func (engine *pipeline) extraBuildRun(
 			FactHosts:   factHosts,
 			// The standing bodies each pass's side leaves are settled, for the census to count, and under the body
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
-			FactReachSettle: engine.factReachSettle(factHosts != nil),
+			FactReachSettle: settle,
 			FactReach:       engine.bodyDifferential && factHosts != nil,
+			StandingBodies:  standingBodies,
+			StandingAfter:   standingAfter,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -847,6 +864,7 @@ func (engine *pipeline) extraBuildRun(
 		engine.buildLoadTimes(extra, loadWall, shareGateWait)
 	}
 	run.inheritedFiles, run.inheritedFindings = inheritance.Counts()
+	run.standingBodies, run.standingFindings = standing.counts()
 	if engine.extraBuildEnds != nil {
 		if endError := engine.extraBuildEnds(extra, notes); endError != nil {
 			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
