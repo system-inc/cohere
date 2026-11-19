@@ -364,7 +364,8 @@ func (engine *pipeline) sealDependenceGraphs() {
 // judged first against the build's files of its packages, and that judgment answers for every object the host's units
 // read of a restored package (build_dependence.Counterparts), failing wide for one it cannot answer. The record's
 // dependencies count the standard library's units beside the host's, so its totals are those of a run whose host
-// checked every package from source.
+// checked every package from source. A run asked for the must-check census keeps the build's set in the judgment too,
+// from both graphs' differences and judgments, with what was answered wide (pipeline_must_check_census.go).
 func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDependence, *buildJudgment) {
 	if engine.dependence == nil {
 		return nil, nil
@@ -448,10 +449,11 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	}
 	standardLibrary := engine.dependence.standardLibrary
 	var standardLibraryJudged *build_dependence.Dependence
+	var standardLibraryDiffering build_dependence.Difference
 	if standardLibrary != nil && standardLibrary.graph != nil {
-		standardLibraryJudged = standardLibrary.graph.Against(
-			standardLibraryDifference(standardLibrary, engine.dependence.cgoFiles, built, fileSet, read,
-				engine.holdsLineDirective))
+		standardLibraryDiffering = standardLibraryDifference(standardLibrary, engine.dependence.cgoFiles, built,
+			fileSet, read, engine.holdsLineDirective)
+		standardLibraryJudged = standardLibrary.graph.Against(standardLibraryDiffering)
 	}
 	var standardLibraryGraph *build_dependence.Graph
 	if standardLibraryJudged != nil {
@@ -498,6 +500,26 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	}
 	record.Workspace = dependenceCounts(counts.Workspace)
 	record.Dependencies = dependenceCounts(counts.Dependencies)
+	if engine.mustCheckCensus != "" {
+		// A package the host restored with no record that the standard library's graph does not hold either is in no
+		// graph, so whatever of it a unit reads is answered wide.
+		var notHeld []string
+		for identifier := range engine.dependence.restored {
+			isHeld := false
+			// A judgment of the standard library's graph means the graph was built, so standardLibrary is not nil.
+			if standardLibraryJudged != nil {
+				_, isHeld = standardLibrary.files[identifier]
+			}
+			if !isHeld {
+				notHeld = append(notHeld, identifier)
+			}
+		}
+		judged.mustCheck = &mustCheckSet{
+			lines: mustCheckLines([]build_dependence.Difference{difference, standardLibraryDiffering},
+				[]*build_dependence.Dependence{judged.dependence, standardLibraryJudged}),
+			wide: mustCheckWide(notHeld, counterparts.Counts().WithoutCounterpart),
+		}
+	}
 	return record, judged
 }
 

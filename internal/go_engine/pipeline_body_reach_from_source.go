@@ -39,7 +39,7 @@ func fromSourceIdentifiers(loaded *load.Loaded) []string {
 
 // fromSourceRecordFile is the file of directory build's from-source packages are recorded in, named for the build.
 func fromSourceRecordFile(directory string, build project.Build) string {
-	return filepath.Join(directory, strings.NewReplacer("/", "_", " ", "_").Replace(build.String())+".txt")
+	return filepath.Join(directory, buildFileStem(build)+".txt")
 }
 
 // writeFromSourceRecord writes each extra build's from-source packages of runs into the record's directory, one ID a

@@ -157,6 +157,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	runs = append(runs, extraRuns...)
 	engine.writeBodyReachCensus(runs)
 	engine.writeFromSourceRecord(runs)
+	engine.writeMustCheckCensus(runs)
 	return runs
 }
 

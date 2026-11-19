@@ -187,6 +187,7 @@ func runOverlapping(
 	engine.bodyDifferential = os.Getenv(bodyDifferentialVariable) == "1"
 	engine.bodyReachFromSourceRecord = os.Getenv(bodyReachFromSourceRecordVariable)
 	engine.bodyReachFromSource = os.Getenv(bodyReachFromSourceVariable)
+	engine.mustCheckCensus = os.Getenv(mustCheckCensusVariable)
 	return engine.run()
 }
 
