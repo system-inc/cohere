@@ -336,14 +336,17 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.
 }
 
 // A package whose one difference is a build-only file that does not parse is seeded by the scan alone (#9paaen9): the
-// build-dependence-unparsed fixture's s has broken_windows.go, which windows alone compiles and no parser reads, and
-// which holds `//line steady.go:1`. appendParsed leaves a file it cannot parse out, so s has no build-only file to
-// count, while the scan reads its bytes and marks s, so Steady, in steady.go, which both builds compile, is dependent
-// on windows.
+// build-dependence-unparsed fixture's s is given broken_windows.go, which windows alone compiles and no parser reads,
+// and which holds `//line steady.go:1`, written into the copy, since a file of the repository's own that does not
+// parse fails the walks that parse them all. appendParsed leaves a file it cannot parse out, so s has no build-only
+// file to count, while the scan reads its bytes and marks s, so Steady, in steady.go, which both builds compile, is
+// dependent on windows.
 func TestAPackageWhoseBuildOnlyFileDoesNotParseIsSeededByItsLineDirective(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "build-dependence-unparsed"))
+	writeTestFile(test, filepath.Join(root, "s", "broken_windows.go"),
+		"package s\n\n//line steady.go:1\nfunc Broken( {\n")
 	engine, _ := runOverConfigured(test, root, exitFindings, nil, "--no-cache", "--build-dependence")
 	if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
