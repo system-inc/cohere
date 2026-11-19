@@ -15,7 +15,8 @@ import (
 const bodyReachListed = 20
 
 // writeBodyReachCensus writes each extra build's census of runs to the census file, when the run asked for one and
-// judged its builds' dependence, and notes each body differential failure on stderr, in build order, under the
+// judged its builds' dependence, after a line of what the reach does not stand for and one of the host's sides for the
+// facts' reach (factReachSides), and notes each body differential failure on stderr, in build order, under the
 // differential. An extra build with no census, judged by nothing or stopped by its type errors before its rules, is
 // written as such, and under the differential is a failure: nothing of it was compared. A file that cannot be written
 // is noted and changes nothing else.
@@ -28,6 +29,12 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		"for a package-wide rule's, stage 5's (#xeafx79): the body differential classes a package-wide rule's "+
 		"findings apart where the package holds a dependent unit, and fails a callee's fact's until the build can "+
 		"show one differs (#5vbs1np).\n")
+	// The host's sides for the facts' reach, under the census, ahead of every build that reads them.
+	if engine.factReachSides != nil {
+		fmt.Fprintf(&written, "fact reach: packages given a side %d; none, uncaptured %d, unrecorded %d, order "+
+			"unknown %d\n", len(engine.factReachSides.packages), engine.factReachSides.uncaptured,
+			engine.factReachSides.unrecorded, engine.factReachSides.orderUnknown)
+	}
 	for index, run := range runs {
 		if run.bodyReach == nil {
 			if index == 0 {

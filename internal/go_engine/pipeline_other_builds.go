@@ -64,6 +64,13 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {
 		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
+		// The host's side of each package for the facts' reach, made once here, before any build starts, and only read
+		// after. The capture goes once it is read: its no-return predicates hold the host's resolver's packages, which
+		// must not stay alive through the builds.
+		if pass.result.FactReach != nil {
+			engine.factReachSides = newFactReachSides(engine.bodyReachHost, pass.result.FactReach, loaded.Packages)
+			pass.result.FactReach = nil
+		}
 	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
 	// one again beside the pass; the walks are over, so this waits for the last sets alone.
