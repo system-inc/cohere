@@ -6,12 +6,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 )
 
-// censusFiles are every file of a census's directory, by name, with its contents.
+// censusFiles are every file of a census's directory, by name, with its contents, but each build's judgment stamp,
+// whose milliseconds differ run to run (judgmentStamp).
 func censusFiles(test *testing.T, directory string) map[string]string {
 	test.Helper()
 	entries, listError := os.ReadDir(directory)
@@ -20,6 +22,9 @@ func censusFiles(test *testing.T, directory string) map[string]string {
 	}
 	files := map[string]string{}
 	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".judgment.txt") {
+			continue
+		}
 		contents, readError := os.ReadFile(filepath.Join(directory, entry.Name()))
 		if readError != nil {
 			test.Fatal(readError)
@@ -150,14 +155,21 @@ func TestAPlainRunsDeclarationsRecordsStandInTheStore(test *testing.T) {
 	runOverConfigured(test, root, exitClean, nil, "--no-system-cache")
 	backfilledDirectory, warmDirectory := test.TempDir(), test.TempDir()
 	var steps []declarationsStep
+	var stepsLock sync.Mutex
 	_, backfilledStream := runOverConfigured(test, root, exitClean, func(engine *pipeline) {
 		engine.mustCheckCensus = backfilledDirectory
-		engine.declarationsSteps = func(step declarationsStep) { steps = append(steps, step) }
+		// The hook is called from the builds' goroutines too.
+		engine.declarationsSteps = func(step declarationsStep) {
+			stepsLock.Lock()
+			defer stepsLock.Unlock()
+			steps = append(steps, step)
+		}
 	}, "--no-system-cache")
 	_, warmStream := runOverConfigured(test, root, exitClean,
 		func(engine *pipeline) { engine.mustCheckCensus = warmDirectory }, "--no-system-cache")
 
-	if want := []declarationsStep{declarationsWalksWhole, declarationsRecordsWriting}; !slices.Equal(steps, want) {
+	if want := []declarationsStep{declarationsWalksWhole, declarationsRecordsWriting}; len(steps) < len(want) ||
+		!slices.Equal(steps[:len(want)], want) {
 		test.Errorf("want the records written once the host's walks are whole, %q, got %q", want, steps)
 	}
 	backfilled, warm := recordCounts(test, backfilledStream), recordCounts(test, warmStream)
@@ -238,5 +250,138 @@ func TestAPlainRunsStandardLibraryRecordsStandInTheSystemCache(test *testing.T) 
 				"record %t, side-loaded %q", side.name, second.plainBits.declarations.fromRecord("syscall"),
 				second.plainBits.sideLoaded)
 		}
+	}
+}
+
+// The build-dependence-embedded fixture's module, and its packages' IDs.
+const (
+	embeddedModule = "example.com/embedded"
+	embeddedLaunch = embeddedModule + "/launch"
+	embeddedSignal = embeddedModule + "/signal"
+	embeddedSteady = embeddedModule + "/steady"
+)
+
+// A plain run judges each extra build at its restore, from its listing and its build-only files' syntax alone, and its
+// must-check set is the whole graph's in every state of its stores (#anfjtr3). The build-dependence-embedded fixture's
+// launch embeds syscall's SysProcAttr, whose fields windows declares in a file of its own, so launch declares a
+// dependent object with no file of its own differing; signal embeds marker's Marker, whose method set only a file
+// windows alone compiles changes, which only that file's syntax says; steady embeds nothing a platform shapes. The
+// whole graph's census under `--build-dependence`, every package checked from source, holds launch and signal for
+// their declarations and not steady, and answers nothing wide. Each plain state writes the same: every package from
+// source beside the load; a system cache cold, then warm, under `--no-cache`; a store cold, then warm. Each build's
+// judgment stamp says it was judged at its listing. A run without the census builds no graph and finds what the
+// census runs find, line for line.
+func TestEachBuildIsJudgedAtItsRestore(test *testing.T) {
+	test.Parallel()
+
+	fixture := filepath.Join("testdata", "build-dependence-embedded")
+	reference := test.TempDir()
+	whole, _ := runOverConfigured(test, copyFixture(test, fixture), exitClean,
+		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		"--build-dependence")
+	if len(whole.buildRuns) != 2 || whole.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got %d runs", len(whole.buildRuns))
+	}
+	stem := buildFileStem(whole.buildRuns[1].build)
+	want := censusFiles(test, reference)
+	set := strings.Split(want[stem+".txt"], "\n")
+	for _, line := range []string{embeddedLaunch + "\tDeclares", embeddedSignal + "\tDeclares"} {
+		if !slices.Contains(set, line) {
+			test.Errorf("want the whole graph's set to hold %q, got %q", line, set)
+		}
+	}
+	for _, line := range set {
+		if strings.HasPrefix(line, embeddedSteady+"\t") {
+			test.Errorf("want steady in no set, got %q", line)
+		}
+	}
+	if wide := want[stem+".wide.txt"]; wide != "" {
+		test.Errorf("want nothing answered wide by the whole graph, got %q", wide)
+	}
+
+	census := func(directory string, configure func(*pipeline)) func(*pipeline) {
+		return func(engine *pipeline) {
+			if configure != nil {
+				configure(engine)
+			}
+			engine.mustCheckCensus = directory
+		}
+	}
+	systemCache, storedRoot := test.TempDir(), copyFixture(test, fixture)
+	var findings [][]string
+	for _, state := range []struct {
+		name      string
+		root      string
+		configure func(*pipeline)
+		flags     []string
+	}{
+		{"every package from source", "", nil, []string{"--no-cache", "--no-system-cache"}},
+		{"a cold system cache", "", sharingSystemCache(systemCache), []string{"--no-cache"}},
+		{"a warm system cache", "", sharingSystemCache(systemCache), []string{"--no-cache"}},
+		{"a cold store", storedRoot, nil, []string{"--no-system-cache"}},
+		{"a warm store", storedRoot, nil, []string{"--no-system-cache"}},
+	} {
+		root := state.root
+		if root == "" {
+			root = copyFixture(test, fixture)
+		}
+		directory := test.TempDir()
+		plain, stream := runOverConfigured(test, root, exitClean, census(directory, state.configure), state.flags...)
+		findings = append(findings, findingLines(normalize(stream, root)))
+		if got := censusFiles(test, directory); !maps.Equal(got, want) {
+			test.Errorf("%s: the census is\n%v\nwant the whole graph's\n%v", state.name, got, want)
+		}
+		stamp, stampError := os.ReadFile(filepath.Join(directory, stem+".judgment.txt"))
+		if stampError != nil || !strings.Contains(string(stamp), "at\tListing\n") {
+			test.Errorf("%s: want the build's judgment stamped at its listing, got %q, %v", state.name, stamp,
+				stampError)
+		}
+		if plain.plainBits == nil {
+			test.Errorf("%s: want the plain run's bits, got none", state.name)
+		}
+	}
+	offRoot := copyFixture(test, fixture)
+	off, offStream := runOverConfigured(test, offRoot, exitClean, nil, "--no-cache", "--no-system-cache")
+	if off.plainBits != nil {
+		test.Error("a run without the census built the plain run's bits")
+	}
+	for index, found := range findings {
+		if !slices.Equal(found, findingLines(normalize(offStream, offRoot))) {
+			test.Errorf("state %d: the findings with the census are\n%q\nwant those without it\n%q", index, found,
+				findingLines(normalize(offStream, offRoot)))
+		}
+	}
+}
+
+// A build's judgment at its restore waits for the plain run's graph to be whole, its side load run, before it reads it
+// (#anfjtr3). The graph's completion is held just before it lets the judgments run until the windows build has listed,
+// so a judgment that did not wait would judge first; the build's listing waits, and judges only once the graph is
+// whole. Judge without waiting, and the judgment comes before the graph is whole.
+func TestABuildsJudgmentWaitsForTheWholeGraph(test *testing.T) {
+	test.Parallel()
+
+	var steps []declarationsStep
+	var stepsLock sync.Mutex
+	listed := make(chan struct{})
+	var listedOnce sync.Once
+	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence-embedded")), exitClean,
+		func(engine *pipeline) {
+			engine.mustCheckCensus = test.TempDir()
+			engine.declarationsSteps = func(step declarationsStep) {
+				if step == declarationsReady {
+					// Held, with no lock, until the build has listed: waiting there, or judging already.
+					<-listed
+				}
+				stepsLock.Lock()
+				defer stepsLock.Unlock()
+				steps = append(steps, step)
+				if step == declarationsListedWaiting || step == declarationsJudging {
+					listedOnce.Do(func() { close(listed) })
+				}
+			}
+		}, "--no-cache", "--no-system-cache")
+	ready, judging := slices.Index(steps, declarationsReady), slices.Index(steps, declarationsJudging)
+	if ready < 0 || judging < 0 || judging < ready || slices.Index(steps, declarationsListedWaiting) > ready {
+		test.Errorf("want the build's listing to wait, then the graph whole, then the judgment, got %q", steps)
 	}
 }

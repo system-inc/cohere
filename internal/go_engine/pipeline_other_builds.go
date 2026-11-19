@@ -629,6 +629,17 @@ func (engine *pipeline) extraBuildRun(
 		shareGateWait += waited
 		return gateError
 	}
+	// A plain run's must-check census judges the build at its restore, from its first load's listing alone, once:
+	// a reload's listing names the same files (#anfjtr3). Listed runs on the load's goroutine, each load in turn, so
+	// the set is read only once the load has returned.
+	var listedMustCheck *mustCheckSet
+	if engine.plainBits != nil {
+		caching.Listed = func(reachable []*packages.Package) {
+			if listedMustCheck == nil {
+				listedMustCheck = engine.plainMustCheckOf(reachable)
+			}
+		}
+	}
 	var linting time.Duration
 	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
@@ -669,12 +680,11 @@ func (engine *pipeline) extraBuildRun(
 	}
 	// Judged on the host's graph from this first load alone, which a reload for a question never changes the files of.
 	run.dependence, run.judged = engine.dependenceOf(loaded)
-	// The build's must-check set for the census: the whole graph's under `--build-dependence`, the plain bits' on a
-	// plain run, judged from this first load's listing alone (#anfjtr3).
+	// The build's must-check set for the census: the whole graph's under `--build-dependence`, judged after this load,
+	// or the plain bits', judged at its listing (#anfjtr3).
+	run.mustCheck = listedMustCheck
 	if run.judged != nil && run.judged.mustCheck != nil {
 		run.mustCheck = run.judged.mustCheck
-	} else {
-		run.mustCheck = engine.plainMustCheckOf(loaded)
 	}
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil

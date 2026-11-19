@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"slices"
 	"sync"
+	"time"
 
 	"golang.org/x/tools/go/packages"
 
@@ -18,13 +19,28 @@ import (
 // asked for the must-check census (pipeline_must_check_census.go) has its host's lint pass build a declarations-only
 // graph of every package it checks from source, in each package's type-read walk (plainDeclarations), and judges each
 // extra build on it, writing the same census file `--build-dependence`'s whole graph writes, so the two can be held to
-// each other. It decides nothing. For now each build is judged after its first load, from its listing and its
-// build-only files alone. A package the host restored from its findings store is added from the declarations-only
-// record kept beside its entry, and a standard-library package it restored from the system cache from the one kept
-// beside its entry there (check.KeepDeclarationsRecords); one of those with no record is loaded from source once,
-// beside the builds (sideLoadStandardLibrary). Once the walks have ended, each package with no record has its record
-// written (completePlainBits). A package still in no graph, a module's the system cache restored or one a failed side
-// load left out, is named in the wide file, and each of its objects a unit reads is answered dependent on both bits.
+// each other. It decides nothing. Each build is judged at its restore (load.Caching.Listed), from its listing and its
+// build-only files' syntax alone, once the graph is whole. A package the host restored from its findings store is added
+// from the declarations-only record kept beside its entry, and a standard-library package it restored from the system
+// cache from the one kept beside its entry there (check.KeepDeclarationsRecords); one of those with no record is loaded
+// from source once, beside the builds (sideLoadStandardLibrary). Once the walks have ended, each package with no record
+// has its record written (completePlainBits). A package still in no graph, one a failed side load left out or a store
+// hit by an alias whose target has no record, is named in the wide file, and each of its objects a unit reads is
+// answered dependent on both bits.
+
+// declarationsStep is a step of a plain run's declarations graph, which a test's hook is told of as it is reached
+// (pipeline.declarationsSteps): the host's walks whole, so the graph holds every package it will; its completion
+// started; the graph whole, about to let the builds' judgments run; and, for each build, its listing waiting for the
+// graph, then its judgment. The hook is called from the pipeline's goroutine, the completion's and each build's.
+type declarationsStep string
+
+const (
+	declarationsWalksWhole     declarationsStep = "WalksWhole"
+	declarationsRecordsWriting declarationsStep = "RecordsWriting"
+	declarationsReady          declarationsStep = "Ready"
+	declarationsListedWaiting  declarationsStep = "ListedWaiting"
+	declarationsJudging        declarationsStep = "Judging"
+)
 
 // plainBits is what a plain run judges its extra builds on for the must-check census: the host's pass's declarations
 // graph, whole once the pass's walks have ended and its side load has run, and the host's listing each build's is
@@ -57,18 +73,25 @@ func newPlainBits(declarations *plainDeclarations, loaded *load.Loaded) *plainBi
 	return bits
 }
 
-// plainMustCheckOf is the must-check set of the build loaded is the first load of, judged on the plain bits from its
-// listing and its build-only files alone, once the graph is whole, nil when the run keeps no plain bits. A package the
-// graph does not hold is
-// answered wide, both bits set for every object of it a unit reads, by live object or by name.
-func (engine *pipeline) plainMustCheckOf(loaded *load.Loaded) *mustCheckSet {
+// plainMustCheckOf is the must-check set of the build whose load listed reachable, every package it reaches, judged
+// on the plain bits at the build's restore (load.Caching.Listed), from its listing and its build-only files' syntax
+// alone, once the graph is whole, nil when the run keeps no plain bits. A package the graph does not hold is answered
+// wide, both bits set for every object of it a unit reads, by live object or by name. The set is stamped with how long
+// the judgment waited for the graph and how long it took after.
+func (engine *pipeline) plainMustCheckOf(reachable []*packages.Package) *mustCheckSet {
 	bits := engine.plainBits
 	if bits == nil {
 		return nil
 	}
+	waitStarted := time.Now()
+	engine.declarationsStepped(declarationsListedWaiting)
 	<-bits.ready
-	built := map[string]*packages.Package{}
-	packages.Visit(loaded.Roots, nil, func(each *packages.Package) { built[each.ID] = each })
+	started := time.Now()
+	engine.declarationsStepped(declarationsJudging)
+	built := make(map[string]*packages.Package, len(reachable))
+	for _, each := range reachable {
+		built[each.ID] = each
+	}
 	read := engine.sourceReader(nil, nil)
 	// The judgment's shared files and packages are the facts census's, which a plain run keeps none of.
 	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
@@ -81,18 +104,12 @@ func (engine *pipeline) plainMustCheckOf(loaded *load.Loaded) *mustCheckSet {
 	return &mustCheckSet{
 		lines: mustCheckLines([]build_dependence.Difference{difference}, []*build_dependence.Dependence{dependence}),
 		wide:  mustCheckWide(bits.notHeld, 0),
+		at:    mustCheckAtListing,
+
+		judged: time.Since(started),
+		waited: started.Sub(waitStarted),
 	}
 }
-
-// declarationsStep is a step of a plain run's declarations graph at the builds' start, which a test's hook is told of
-// in order (pipeline.declarationsSteps): the host's walks whole, so the graph holds every package it will, then its
-// records' writing started.
-type declarationsStep string
-
-const (
-	declarationsWalksWhole     declarationsStep = "WalksWhole"
-	declarationsRecordsWriting declarationsStep = "RecordsWriting"
-)
 
 // declarationsStepped tells a test's declarationsSteps hook, when one is set, that the graph reached step.
 func (engine *pipeline) declarationsStepped(step declarationsStep) {
@@ -123,6 +140,7 @@ func (engine *pipeline) completePlainBits(bits *plainBits, loaded *load.Loaded) 
 				bits.notHeld = append(bits.notHeld, identifier)
 			}
 		}
+		engine.declarationsStepped(declarationsReady)
 		close(bits.ready)
 		if session != nil {
 			failed, firstFailure = session.WriteDeclarationsRecords(func(saved *packages.Package) ([]byte, bool) {

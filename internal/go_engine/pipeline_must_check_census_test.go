@@ -27,12 +27,12 @@ func censusLines(test *testing.T, path string) []string {
 }
 
 // Under `--build-dependence` with the must-check census, the build-dependence fixture's windows build writes its
-// must-check set and its wide file into the census's directory, named for the build, and the host writes none
-// (#anfjtr3). The fixture's own package, whose mode file differs and which declares Mode, dependent on windows, is in
-// the set for its files and its declarations, and so is os, whose PathSeparator windows declares in a file of its own.
-// The whole set is the one the library's own judgment of the same two loads gives, every package of its difference and
-// every package declaring a dependent object, less the host's alone, though the engine judged the standard library on
-// a graph of its own. Nothing was answered wide. A run without the census keeps no set.
+// must-check set, its wide file and its judgment's stamp into the census's directory, named for the build, and the host
+// writes none (#anfjtr3). The fixture's own package, whose mode file differs and which declares Mode, dependent on
+// windows, is in the set for its files and its declarations, and so is os, whose PathSeparator windows declares in a
+// file of its own. The whole set is the one the library's own judgment of the same two loads gives, every package of
+// its difference and every package declaring a dependent object, less the host's alone, though the engine judged the
+// standard library on a graph of its own. Nothing was answered wide. A run without the census keeps no set.
 func TestEachBuildWritesItsMustCheckSet(test *testing.T) {
 	test.Parallel()
 
@@ -55,7 +55,7 @@ func TestEachBuildWritesItsMustCheckSet(test *testing.T) {
 	for _, entry := range written {
 		names = append(names, entry.Name())
 	}
-	if want := []string{stem + ".txt", stem + ".wide.txt"}; !slices.Equal(names, want) {
+	if want := []string{stem + ".judgment.txt", stem + ".txt", stem + ".wide.txt"}; !slices.Equal(names, want) {
 		test.Fatalf("want the census to hold %q, the windows build's alone, got %q", want, names)
 	}
 	lines := censusLines(test, filepath.Join(census, stem+".txt"))

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/project"
@@ -17,7 +18,8 @@ import (
 // held to the one `--build-dependence`'s whole graph decides for the same tree. It decides nothing: nothing reads the
 // set but the census. Under `COHERE_MUST_CHECK_CENSUS=<directory>` each extra build writes two files there, named for
 // the build (buildFileStem): `<build>.txt`, its set, one package a line as `<ID>\t<reasons>`, sorted by ID, and
-// `<build>.wide.txt`, what its judgment answered wide for want of any declarations, empty when nothing was. A package
+// `<build>.wide.txt`, what its judgment answered wide for want of any declarations, empty when nothing was, beside
+// `<build>.judgment.txt`, where and how long it was judged (judgmentStamp). A package
 // is in the set for any of three reasons, written in this order, comma-separated (mustCheckReasons):
 //   - Files: both builds have it and its files differ: a file one compiles and the other does not, a line directive
 //     in one they do not share, or a cgo tool on either side (filesDiffer);
@@ -48,10 +50,31 @@ const (
 var mustCheckReasons = []mustCheckReason{mustCheckFiles, mustCheckBuildOnly, mustCheckDeclares}
 
 // mustCheckSet is one build's must-check census, each as its file writes it: lines its set's, and wide what its
-// judgment answered wide.
+// judgment answered wide. The judgment's stamp is written apart (judgmentStamp): at, where the build was judged,
+// judged how long the judgment took and waited how long it waited for its graph first.
 type mustCheckSet struct {
-	lines []string
-	wide  []string
+	lines  []string
+	wide   []string
+	at     mustCheckJudgedAt
+	judged time.Duration
+	waited time.Duration
+}
+
+// mustCheckJudgedAt is where a build's must-check set was judged: at its listing, before its restore, as a plain run
+// judges it, or after its load, as `--build-dependence` does.
+type mustCheckJudgedAt string
+
+const (
+	mustCheckAtListing mustCheckJudgedAt = "Listing"
+	mustCheckAtLoad    mustCheckJudgedAt = "Load"
+)
+
+// judgmentStamp is the third file a build writes (`<build>.judgment.txt`): where it was judged, and the judgment's
+// milliseconds and its wait for its graph's, a name and a value a line, for a pair to price the judgment by. Its
+// numbers differ run to run, so a census compared file for file leaves it out.
+func judgmentStamp(set *mustCheckSet) []string {
+	return []string{"at\t" + string(set.at), "milliseconds\t" + strconv.FormatInt(set.judged.Milliseconds(), 10),
+		"waited\t" + strconv.FormatInt(set.waited.Milliseconds(), 10)}
 }
 
 // mustCheckLines are the set's lines of the build differences describe, judged by judgments, each a graph's judgment
@@ -137,7 +160,8 @@ func (engine *pipeline) writeMustCheckCensus(runs []buildRun) {
 		for _, file := range []struct {
 			name  string
 			lines []string
-		}{{stem + ".txt", run.mustCheck.lines}, {stem + ".wide.txt", run.mustCheck.wide}} {
+		}{{stem + ".txt", run.mustCheck.lines}, {stem + ".wide.txt", run.mustCheck.wide},
+			{stem + ".judgment.txt", judgmentStamp(run.mustCheck)}} {
 			contents := ""
 			if len(file.lines) > 0 {
 				contents = strings.Join(file.lines, "\n") + "\n"

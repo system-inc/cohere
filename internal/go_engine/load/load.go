@@ -239,6 +239,13 @@ type Caching struct {
 	// is, restoring the standard library from the binary.
 	Begin func(*Overlap)
 
+	// Listed, when set, is called once the graph is built and before the Restorer restores, on the load's goroutine,
+	// with every package the load reaches, its files and imports set, as the Restorer is given them: what a caller
+	// judges of a build from its listing alone is known there, before anything is restored or checked (#anfjtr3). The
+	// load holds none of the pool's slots there, so the caller may wait in it. Every load given it calls it, a
+	// reload's included.
+	Listed func(reachable []*packages.Package)
+
 	// AtGate, when set, is called once the graph is built and the Restorer has decided, before any package is
 	// type-checked, on the load's goroutine, with how many of the graph's packages the load will check from source,
 	// every one the Restorer did not restore, and how many it holds, the packages Loaded.PackagesLoaded counts. The
@@ -546,6 +553,9 @@ func fromSource(
 		analyzedPackages = slices.DeleteFunc(slices.Clone(toAnalyze), func(root *packages.Package) bool {
 			return !caching.Analyzes(root)
 		})
+	}
+	if caching.Listed != nil {
+		caching.Listed(loadedOf(reachable))
 	}
 	if caching.Restorer != nil {
 		loaderName := LoaderSource

@@ -462,7 +462,9 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 		judged.mustCheck = &mustCheckSet{
 			lines: mustCheckLines([]build_dependence.Difference{difference, standardLibraryDiffering},
 				[]*build_dependence.Dependence{judged.dependence, standardLibraryJudged}),
-			wide: mustCheckWide(notHeld, counterparts.Counts().WithoutCounterpart),
+			wide:   mustCheckWide(notHeld, counterparts.Counts().WithoutCounterpart),
+			at:     mustCheckAtLoad,
+			judged: time.Since(started),
 		}
 	}
 	return record, judged
