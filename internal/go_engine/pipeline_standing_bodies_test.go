@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -69,19 +70,58 @@ func standingProbe(heard *heardLiterals) rule.Rule {
 	return rule.Rule{Name: standingProbeName, Origin: rule.OriginHouse, Analyzer: analyzer, Listener: listener}
 }
 
-// runStanding runs the engine over a copy of the standing-bodies fixture with the registry's rules and the standing
-// probe, declared PerUnit, under the body reach census with `--no-cache --no-fix --build-dependence`, every build
-// checked as a plain run's are, with the standing bodies' switch as switched, and returns the pipeline, its stream,
-// normalized, the literals the probe heard over every build, and the copy's root.
-func runStanding(test *testing.T, switched bool) (*pipeline, string, map[string]int, string) {
+// representationProbeName is the representation probe's rule name.
+const representationProbeName = rule.Namespace + "correctness-probe-representation"
+
+// heldRepresentations are the packages in the representation each build's walk over it handed the representation
+// probe a function of, by the base name of the file platformName is declared in, which each build declares in a file
+// of its own: standing_other.go for the host's, standing_windows.go for windows's.
+type heldRepresentations struct {
+	lock     sync.Mutex
+	packages map[string]*intermediate_representation.Package
+}
+
+// representationProbe is a house rule on a dispatcher over the representation of its own, which reports nothing and
+// keeps the package of platformName, the function each build's walk hands it (heldRepresentations). That package is the
+// one the build's own build_intermediate_representation result holds, which every dispatcher over the representation
+// on the package walks, so what of it is built once the run is over is what the build built. Declared PerUnit, it is
+// confined as the registry's rules on the representation are, so it builds no more of the package than they do.
+func representationProbe(held *heldRepresentations) rule.Rule {
+	listener := &rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+		Function: func(context *rule.Context, function *intermediate_representation.Function) {
+			if function.Name() != "platformName" {
+				return
+			}
+			held.lock.Lock()
+			defer held.lock.Unlock()
+			held.packages[filepath.Base(context.FileSet.Position(function.Pos()).Filename)] = function.Package
+		},
+	}}
+	analyzer := dispatch.NewIntermediateRepresentation().RuleAnalyzer(representationProbeName,
+		"probe_representation", "keeps the package each build's walk over the representation hands it", listener)
+	return rule.Rule{Name: representationProbeName, Origin: rule.OriginHouse, Analyzer: analyzer, Listener: listener}
+}
+
+// runStanding runs the engine over a copy of the standing-bodies fixture with the registry's rules, the standing probe
+// and the representation probe, both declared PerUnit, under the body reach census with `--no-cache --no-fix
+// --build-dependence`, every build checked as a plain run's are, with the standing bodies' switch as switched, keeping
+// each build's package in the representation in held, and returns the pipeline, its stream, normalized, the literals
+// the probe heard over every build, and the copy's root.
+func runStanding(
+	test *testing.T,
+	switched bool,
+	held *heldRepresentations,
+) (*pipeline, string, map[string]int, string) {
 	test.Helper()
 	heard := &heardLiterals{heard: map[string]int{}, inFile: map[*token.File]int{}}
 	root := copyFixture(test, standingBodiesFixture)
-	engine, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), standingProbe(heard)),
+	engine, stream, _ := runOverRegistered(test, root, exitFindings,
+		append(rules.All(), standingProbe(heard), representationProbe(held)),
 		func(engine *pipeline) {
 			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 			engine.standingBodies = switched
-			engine.plantedInputs = map[string]rules.Declared{standingProbeName: {Inputs: rules.InputsPerUnit}}
+			engine.plantedInputs = map[string]rules.Declared{standingProbeName: {Inputs: rules.InputsPerUnit},
+				representationProbeName: {Inputs: rules.InputsPerUnit}}
 		}, "--no-cache", "--no-fix", "--build-dependence")
 	heard.lock.Lock()
 	defer heard.lock.Unlock()
@@ -99,11 +139,25 @@ func rawFindings(run buildRun, root string) []string {
 	return found
 }
 
+// builtIn is whether each declared function of the package held under filename has blocks, by its name, and
+// none where no build's walk handed the probe that file's platformName.
+func builtIn(held *heldRepresentations, filename string) map[string]bool {
+	held.lock.Lock()
+	defer held.lock.Unlock()
+	built := map[string]bool{}
+	if irPackage := held.packages[filename]; irPackage != nil {
+		for _, function := range irPackage.Functions {
+			built[function.Name()] = function.Blocks != nil
+		}
+	}
+	return built
+}
+
 // windowsOutcome is windows's own outcome in engine's run over root, after its own //cohere:ignore comments
 // (outcomeOf), as sorted lines with root written /project: each finding kept, each one a directive withheld, and each
 // directive finding, an unused directive's among them. ran are every rule the run's registry holds.
 func windowsOutcome(engine *pipeline, root string) []string {
-	ran := []string{standingProbeName}
+	ran := []string{standingProbeName, representationProbeName}
 	for _, registered := range rules.All() {
 		ran = append(ran, registered.Name)
 	}
@@ -210,8 +264,10 @@ func TestARuleIsConfinedWhenDispatchedAndDeclaredPerUnitOrFileSyntax(test *testi
 func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	test.Parallel()
 
-	off, offStream, offHeard, offRoot := runStanding(test, false)
-	on, onStream, onHeard, onRoot := runStanding(test, true)
+	offHeld := &heldRepresentations{packages: map[string]*intermediate_representation.Package{}}
+	onHeld := &heldRepresentations{packages: map[string]*intermediate_representation.Package{}}
+	off, offStream, offHeard, offRoot := runStanding(test, false, offHeld)
+	on, onStream, onHeard, onRoot := runStanding(test, true, onHeld)
 
 	if len(off.buildRuns) != 2 || len(on.buildRuns) != 2 {
 		test.Fatalf("want the host's build and windows's in both runs, got %d and %d runs", len(off.buildRuns),
@@ -260,6 +316,15 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	}
 	if _, offWritten := windowsRecord(test, off, offStream); strings.Contains(offWritten, `"standing`) {
 		test.Errorf("with the switch off windows's build record writes a standing count: %s", offWritten)
+	}
+	// The saving the standing bodies buy with the registry's rules: in windows's package in the representation, as its
+	// build held it, PlantedKept, which stands, was never built with the switch on, and was with it off, while
+	// PlantedReached, which the difference reaches, was built both ways.
+	onBuilt, offBuilt := builtIn(onHeld, "standing_windows.go"), builtIn(offHeld, "standing_windows.go")
+	if onBuilt["PlantedKept"] || !offBuilt["PlantedKept"] || !onBuilt["PlantedReached"] || !offBuilt["PlantedReached"] {
+		test.Errorf("in windows's representation PlantedKept was built %t with the switch on and %t off, and "+
+			"PlantedReached %t and %t, want PlantedKept built off alone and PlantedReached both ways",
+			onBuilt["PlantedKept"], offBuilt["PlantedKept"], onBuilt["PlantedReached"], offBuilt["PlantedReached"])
 	}
 	kept, reached := `"planted kept"`, `" planted reached"`
 	if offHeard[kept] != 2 || offHeard[reached] != 2 || onHeard[kept] != 1 || onHeard[reached] != 2 {
