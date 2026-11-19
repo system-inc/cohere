@@ -37,7 +37,7 @@ const initializer = "init"
 func TestHalfAPackagesFunctionsFindWhatTheWholeRunFindsThere(test *testing.T) {
 	test.Parallel()
 	patterns := []string{"CheckEvenSliceLength", "parity", "differences", "statements", "order/forward", "order/back",
-		"standin/first", "standin/last"}
+		"standin/first", "standin/last", "instance/first", "instance/last", "around"}
 	requireHalvesFindAsTheWhole(test, analysistest.TestData(), patterns)
 }
 

@@ -108,6 +108,30 @@ func TestAStandInsMarksAreTheDefinitionsInEitherOrder(test *testing.T) {
 	})
 }
 
+// A mark that must go around a cycle more than once is the definition's (#8d9r2rh): in around every slice of swapped,
+// first and second reaches pairs's check, some only a call or two on, so the definition holds all six marked, and so
+// must the rule. The push, visiting each function once, departs on four, the three the fixture passes a slice of one
+// to and second's left, which it would mark only were second declared before first.
+func TestAMarkGoneAroundACycleIsTheDefinitions(test *testing.T) {
+	test.Parallel()
+	found := holdToDefinition(test, analysistest.TestData(), []string{"around"}, inTheOrderGiven)
+	requireDefined(test, found, map[string]bool{
+		"around.pairs values":  true,
+		"around.swapped left":  true,
+		"around.swapped right": true,
+		"around.first left":    true,
+		"around.first right":   true,
+		"around.second left":   true,
+		"around.second right":  true,
+	})
+	requireDepartures(test, found, []string{
+		"around.first right",
+		"around.second left",
+		"around.second right",
+		"around.swapped right",
+	})
+}
+
 // held is what holding packages' marks to the definition found.
 type held struct {
 	// defined is the definition's mark on each parameter of each function and method in a root's reach, by the
