@@ -108,6 +108,23 @@ func TestAStandingSpanRunsFromAFunctionsDocCommentToItsEnd(test *testing.T) {
 	}
 }
 
+// A file's spans are sorted by where each starts whatever order the file holds its declarations in, since the search
+// of a file's spans and the syntax walk's pass over them read them in order: with a parsed file's declarations
+// reversed, the spans are the same as before.
+func TestAFilesStandingSpansAreSortedByWhereEachStarts(test *testing.T) {
+	test.Parallel()
+	pass, file, _ := standingPass(test, &everyFunctionStands{})
+	tokenFile := pass.Fset.File(file.FileStart)
+	inOrder := slices.Clone(StandingSpans(pass)[tokenFile])
+	slices.Reverse(file.Decls)
+
+	reversed := StandingSpans(pass)[tokenFile]
+	if len(inOrder) != 2 || inOrder[0].Start >= inOrder[1].Start || !slices.Equal(reversed, inOrder) {
+		test.Errorf("with the declarations reversed the spans are %v, want them sorted as before, %v", reversed,
+			inOrder)
+	}
+}
+
 // A function whose body's brace is not between its start and its end stands for nothing, though the standing bodies
 // would say it stands: a span read from it would leave a confined rule deaf to what is not the body's. The brace is
 // knocked out of a parsed declaration, as a parse past an error can leave one.
