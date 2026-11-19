@@ -267,8 +267,11 @@ type pipeline struct {
 	bodyReachFromSource       string
 
 	// mustCheckCensus is the directory each extra build's must-check set is written into, from
-	// `COHERE_MUST_CHECK_CENSUS`, empty for a run that writes none (pipeline_must_check_census.go, #anfjtr3).
+	// `COHERE_MUST_CHECK_CENSUS`, empty for a run that writes none (pipeline_must_check_census.go, #anfjtr3); and
+	// plainBits what a plain run judges each extra build on for it, made from the host's lint pass as the builds start,
+	// nil in any other run (pipeline_plain_bits.go).
 	mustCheckCensus string
+	plainBits       *plainBits
 
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
 	// run found no build beside the host's to check.

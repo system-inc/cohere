@@ -123,21 +123,21 @@ func buildFileStem(build project.Build) string {
 }
 
 // writeMustCheckCensus writes each extra build's must-check set of runs, and its wide file, into the census's
-// directory, when the run was asked to and judged the build. A file that cannot be written is noted and changes
+// directory, when the run was asked to and kept the build's set. A file that cannot be written is noted and changes
 // nothing else.
 func (engine *pipeline) writeMustCheckCensus(runs []buildRun) {
 	if engine.mustCheckCensus == "" {
 		return
 	}
 	for _, run := range runs[1:] {
-		if run.judged == nil || run.judged.mustCheck == nil {
+		if run.mustCheck == nil {
 			continue
 		}
 		stem := filepath.Join(engine.mustCheckCensus, buildFileStem(run.build))
 		for _, file := range []struct {
 			name  string
 			lines []string
-		}{{stem + ".txt", run.judged.mustCheck.lines}, {stem + ".wide.txt", run.judged.mustCheck.wide}} {
+		}{{stem + ".txt", run.mustCheck.lines}, {stem + ".wide.txt", run.mustCheck.wide}} {
 			contents := ""
 			if len(file.lines) > 0 {
 				contents = strings.Join(file.lines, "\n") + "\n"

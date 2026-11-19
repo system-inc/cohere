@@ -82,6 +82,9 @@ type buildRun struct {
 	// judged is an extra build's alone, under `--build-dependence`: the judgment its record was counted from and the
 	// files it shares with the host's, which its facts are compared through once its lint has run (compareFacts).
 	judged *buildJudgment
+	// mustCheck is an extra build's alone, under the must-check census: its must-check set, its judgment's under
+	// `--build-dependence` or the plain bits' on a plain run (pipeline_plain_bits.go), nil otherwise.
+	mustCheck *mustCheckSet
 	// bodyReach is an extra build's alone, under the body reach census: which of the host's bodies its difference
 	// reaches (body_reach_host.go, #w72zxtq), nil otherwise.
 	bodyReach *buildBodyReach

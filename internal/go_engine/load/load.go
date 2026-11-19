@@ -582,6 +582,9 @@ func fromSource(
 		}
 		return false
 	})
+	// What the load withholds of each package that withholds, known once every package is checked, which a pass beside
+	// the load reads once such a package is ready, as the load ends (Overlap.Withheld).
+	var withheldDeclarations map[*packages.Package][]string
 	if caching.Begin != nil {
 		nodes := make(map[*packages.Package]*node, len(reachable))
 		for _, current := range reachable {
@@ -595,6 +598,7 @@ func fromSource(
 			Rewritten: typeChecker.rewritten,
 			nodes:     nodes,
 			ended:     ended,
+			withheld:  &withheldDeclarations,
 		})
 	}
 	if caching.AtGate != nil {
@@ -609,6 +613,7 @@ func fromSource(
 		roots = append(roots, root.loaded)
 	}
 	declarations := withholdCgoDeclarations(typeChecker.fileSet, reachable)
+	withheldDeclarations = declarations
 	// Only now is a dependency that withholds done with its syntax and type maps; one that withholds nothing was
 	// checked without maps, and its syntax goes with the rest.
 	for _, current := range reachable {

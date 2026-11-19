@@ -266,6 +266,10 @@ type lintPass struct {
 
 	checkError error
 	elapsed    time.Duration
+
+	// declarations is the pass's declarations-only graph for the must-check census on a plain run, built in its walks
+	// (plainDeclarations), nil in any other run.
+	declarations *plainDeclarations
 }
 
 // lint runs the rules the settings leave on over loaded's packages with a file in scope, through the findings cache
@@ -279,16 +283,20 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 	})
 	// The host's reads, recorded only when the run has extra builds to restore packages into, collects the standard
 	// library's table or keeps a system cache (recordsReadsOf), walked in the load's slots below its work.
-	return engine.lintPackages(analyzed, loaded.Rewritten, check.Options{Withheld: loaded.Withheld,
-		Bodiless: loaded.Bodiless, Reads: loaded.Reads, WalkSlots: loaded.WalkSlots})
+	return engine.lintPackages(analyzed, loaded.Rewritten,
+		func(each *packages.Package) []string { return loaded.Withheld[each].Declarations },
+		check.Options{Withheld: loaded.Withheld, Bodiless: loaded.Bodiless, Reads: loaded.Reads,
+			WalkSlots: loaded.WalkSlots})
 }
 
 // lintPackages is lint over the packages to analyze, with what the load gives the run in options: its Withheld once
 // it has returned, or the Ready and Abandon of a pass beside it. rewritten is the load's rewritten cgo outputs, which
-// the rules read in place of the build cache's (see sourceReader).
+// the rules read in place of the build cache's (see sourceReader), and withheldOf what the load withheld of a package
+// once it is final, which a plain run's must-check census reads (plainDeclarations).
 func (engine *pipeline) lintPackages(
 	analyzed []*packages.Package,
 	rewritten *load.Rewritten,
+	withheldOf func(*packages.Package) []string,
 	options check.Options,
 ) lintPass {
 	started := time.Now()
@@ -317,6 +325,13 @@ func (engine *pipeline) lintPackages(
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
 	}
+	// A plain run asked for the must-check census builds its declarations-only graph in the pass's walks, where every
+	// package's syntax is whole (#anfjtr3); one under `--build-dependence` has its whole graph, and any other none.
+	var declarations *plainDeclarations
+	if engine.mustCheckCensus != "" && !engine.request.judgesDependence() && options.Reads != nil {
+		declarations = newPlainDeclarations(engine.described.hasFileInScope, withheldOf)
+		options.Declarations = declarations.add
+	}
 	result, checkError := check.Run(analyzed, enabled, options)
 	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()
 	if checkError != nil {
@@ -338,7 +353,8 @@ func (engine *pipeline) lintPackages(
 			}
 			return engine.suppress(ran, engine.inScope(result.Findings), engine.described.readable())
 		}),
-		elapsed: time.Since(started),
+		elapsed:      time.Since(started),
+		declarations: declarations,
 	}
 }
 

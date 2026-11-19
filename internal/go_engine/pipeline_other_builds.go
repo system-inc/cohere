@@ -62,6 +62,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
+	// The walks are over, so a plain run's declarations graph for the must-check census holds every package it will.
+	if pass.declarations != nil {
+		engine.plainBits = newPlainBits(pass.declarations, loaded)
+	}
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {
 		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
@@ -662,6 +666,13 @@ func (engine *pipeline) extraBuildRun(
 	}
 	// Judged on the host's graph from this first load alone, which a reload for a question never changes the files of.
 	run.dependence, run.judged = engine.dependenceOf(loaded)
+	// The build's must-check set for the census: the whole graph's under `--build-dependence`, the plain bits' on a
+	// plain run, judged from this first load's listing alone (#anfjtr3).
+	if run.judged != nil && run.judged.mustCheck != nil {
+		run.mustCheck = run.judged.mustCheck
+	} else {
+		run.mustCheck = engine.plainMustCheckOf(loaded)
+	}
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil
 	}
