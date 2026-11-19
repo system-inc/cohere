@@ -36,10 +36,14 @@ import (
 // A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, its
 // package's bodies judged not the bodies the build counts in the files both compile (Miscounted), a part of it
 // unknown, its signature reaching (its body type-checks against the signature), its body reaching, by the first use
-// in the record's order that does, and a shadowed name in either part. A build whose word size or maximum alignment
-// differs from the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift
-// past a word or `math.MaxInt` type-check to other constants there with no file differing, which no bit says, as the
-// restore's own sizes gate refuses such a build every package (check's hostSizesDiffer, #61qj12v).
+// in the record's order that does, and a shadowed name in either part. A package's variable initializers are one body
+// (#bed0mnk): Go lowers them into one synthetic function, in file order, so an initializer that never returns leaves
+// every later one unreachable, and a rule reading the representation reports nothing there. Where any of them sits in
+// a file the builds do not share, or is reached, every initializer of the package is reached, Initializers, whatever
+// the files' order. A build whose word size or maximum alignment differs from the host's (buildSizesDiffer) reaches
+// every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or `math.MaxInt` type-check to other
+// constants there with no file differing, which no bit says, as the restore's own sizes gate refuses such a build
+// every package (check's hostSizesDiffer, #61qj12v).
 //
 // What the reach does not stand for, which the census says at its head: a finding that turns on a fact about a
 // function a body calls, its purity, that it never returns or that it wraps printf, is stage 4's (#h0k644s), since the
@@ -72,12 +76,13 @@ const (
 	reachedTypeArgument bodyReachReason = "TypeArgument"
 	reachedShadowed     bodyReachReason = "Shadowed"
 	reachedLoadMode     bodyReachReason = "LoadMode"
+	reachedInitializers bodyReachReason = "Initializers"
 )
 
 // bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by.
 var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reachedMiscounted, reachedUnknown,
 	reachedSignature, reachedNamed, reachedConstant, reachedLoadMode, reachedSelected, reachedValueType,
-	reachedTypeArgument, reachedShadowed}
+	reachedTypeArgument, reachedShadowed, reachedInitializers}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
@@ -115,15 +120,17 @@ func newBodyReachHost(
 // reachBuiltPackage is what the census reads of one package a build checked from source, from the build's own syntax,
 // taken before its rules let the syntax go: the files it compiles as written, the bodies in the files the host's
 // package of its ID compiles too and in those only the build compiles, every file's when the host has no such package,
-// the names its build-only files declare at package level, and the paths each shared file imports by a dot, by the
-// file as parsed.
+// the names its build-only files declare at package level, the paths each shared file imports by a dot, by the file
+// as parsed, and whether a build-only file declares a variable initializer, which reaches every one of the package's
+// (bodyReacher.reachInitializers).
 type reachBuiltPackage struct {
-	identifier      string
-	files           map[string]bool
-	sharedBodies    int
-	buildOnlyBodies int
-	buildOnlyNames  map[string]bool
-	dotImports      map[string][]string
+	identifier            string
+	files                 map[string]bool
+	sharedBodies          int
+	buildOnlyBodies       int
+	buildOnlyNames        map[string]bool
+	dotImports            map[string][]string
+	buildOnlyInitializers bool
 }
 
 // reachBuiltPackages are the packages of loaded's whole graph that it checked from source, as the census reads them
@@ -157,6 +164,7 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 				continue
 			}
 			read.buildOnlyBodies += bodies
+			read.buildOnlyInitializers = read.buildOnlyInitializers || declaresVariableInitializer(file)
 			if isHosted {
 				for _, declared := range build_dependence.PackageLevelNames(file) {
 					read.buildOnlyNames[declared] = true
@@ -202,6 +210,23 @@ func syntaxBodies(file *ast.File) int {
 		}
 	}
 	return bodies
+}
+
+// declaresVariableInitializer reports whether file declares a package-level variable with a value, which the
+// package's one synthetic initializing function runs.
+func declaresVariableInitializer(file *ast.File) bool {
+	for _, declaration := range file.Decls {
+		general, isGeneral := declaration.(*ast.GenDecl)
+		if !isGeneral || general.Tok != token.VAR {
+			continue
+		}
+		for _, spec := range general.Specs {
+			if valueSpec, isValue := spec.(*ast.ValueSpec); isValue && len(valueSpec.Values) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // buildBodyReach is one build's census: the packages it checked from source, those of them the host recorded and

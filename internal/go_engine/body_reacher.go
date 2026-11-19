@@ -47,7 +47,8 @@ type bodyReacher struct {
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
 // and counts those in files it does not, absent. Whether the build compiles a body's file is read by the file as
 // parsed, never as a //line directive renames it, which names no file the build lists (#w72zxtq, the review's must 8);
-// the renamed file is the one the census reports and the graph's units are placed in.
+// the renamed file is the one the census reports and the graph's units are placed in. The package's variable
+// initializers are then judged as one body (reachInitializers).
 func (reacher *bodyReacher) reachPackage(
 	hosted *packages.Package,
 	record *build_reads.FunctionUses,
@@ -55,13 +56,21 @@ func (reacher *bodyReacher) reachPackage(
 ) ([]reachedBody, int) {
 	var bodies []reachedBody
 	absent := 0
+	// initializers are the indexes in bodies of the package's variable initializers, and unshared whether one sits in
+	// a file the builds do not share: a host's file the build does not compile, or a build-only file.
+	var initializers []int
+	unshared := read.buildOnlyInitializers
 	for declared := range record.Declarations() {
 		if !declared.HasBody {
 			continue
 		}
 		name := declarationName(declared.Declaration)
+		isInitializer := isVariableInitializer(declared.Declaration)
 		tokenFile := hosted.Fset.File(declared.Declaration.File)
 		if tokenFile == nil {
+			if isInitializer {
+				initializers = append(initializers, len(bodies))
+			}
 			// A record always places its declarations in the host's files; one that does not is called reached, as
 			// a doubt is, and dependent, as the graph calls a place it knows no unit at.
 			bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, name: name, reason: reachedUnknown,
@@ -69,8 +78,13 @@ func (reacher *bodyReacher) reachPackage(
 			continue
 		}
 		if !read.files[tokenFile.Name()] {
+			// An absent initializer is no body of the build's, only the cause that reaches every one it shares.
+			unshared = unshared || isInitializer
 			absent++
 			continue
+		}
+		if isInitializer {
+			initializers = append(initializers, len(bodies))
 		}
 		position := tokenFile.Position(declared.Declaration.File + token.Pos(declared.Declaration.Offset))
 		if reacher.sizesDiffer {
@@ -103,7 +117,52 @@ func (reacher *bodyReacher) reachPackage(
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 				declared.Declaration.Offset)})
 	}
+	reachInitializers(bodies, initializers, unshared)
 	return bodies, absent
+}
+
+// reachInitializers judges a package's variable initializers, the bodies at initializers's indexes, as one body
+// (#bed0mnk): Go lowers them into one synthetic function, in file order, so one that never returns leaves every later
+// one unreachable, and a rule reading the representation reports nothing on them, though nothing they use differs.
+// Where any sits in a file the builds do not share, unshared, or is reached, every one is reached, Initializers,
+// whatever the files' order. The constants-only load mode rule is judged by the same rule from its own reasons, so the
+// census's count of what the general rule costs stays its own (loadModeReaches).
+//
+// Mutates: bodies gains the reason at each initializer left unreached
+func reachInitializers(bodies []reachedBody, initializers []int, unshared bool) {
+	driver := ""
+	if unshared {
+		driver = "the package's variable initializers, one in a file the builds do not share"
+	}
+	constantsOnlyReached := unshared
+	for _, index := range initializers {
+		if driver == "" && bodies[index].reason != "" {
+			driver = "the package's variable initializers, " + bodies[index].name + " reached"
+		}
+		constantsOnlyReached = constantsOnlyReached || bodies[index].constantsOnlyReason != ""
+	}
+	for _, index := range initializers {
+		if driver != "" && bodies[index].reason == "" {
+			bodies[index].reason, bodies[index].driver = reachedInitializers, driver
+		}
+		if constantsOnlyReached && bodies[index].constantsOnlyReason == "" {
+			bodies[index].constantsOnlyReason = reachedInitializers
+		}
+	}
+}
+
+// isVariableInitializer reports whether declaration is a value spec the package's synthetic initializing function
+// runs: a var's with a value. A spec of blank names alone declares no object to tell a var from a const by, so it is
+// taken as one, which costs a re-check at most and never leaves an initializer unreached.
+func isVariableInitializer(declaration build_reads.Declaration) bool {
+	if declaration.Kind != build_reads.DeclaredValue {
+		return false
+	}
+	if len(declaration.Objects) == 0 {
+		return true
+	}
+	_, isVariable := declaration.Objects[0].(*types.Var)
+	return isVariable
 }
 
 // sizesReason is Sizes when the build's sizes are not the host's, which reaches every body, and empty when they are.
