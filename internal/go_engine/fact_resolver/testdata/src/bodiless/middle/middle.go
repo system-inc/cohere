@@ -13,3 +13,23 @@ func Middle(values []int) {
 func odd() {
 	bottom.Slices([]int{1})
 }
+
+// Fresh returns a fresh pointer and reaches nothing of bottom, so the nilness of its result is judged in middle alone.
+func Fresh() *int {
+	return new(int)
+}
+
+// quiet is unexported, so objectpath names no path to it, and an answer about it has no record for the store.
+func quiet() int {
+	return 1
+}
+
+// Box is generic, so each instance of it has a Value of its own, an instance's method, which no package declares.
+type Box[Content any] struct {
+	content Content
+}
+
+// Value is what box holds.
+func (box Box[Content]) Value() Content {
+	return box.content
+}

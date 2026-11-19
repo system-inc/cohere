@@ -119,9 +119,16 @@ func (resolver *Resolver) Reads(reader *types.Package) ([]Read, bool) {
 
 // Probe is the answer of the kind named kindName about the object at path in owner, a package the run learned, as Ask
 // answers it there, encoded as a read holds it, and whether the run could have it now: not for a package the run never
-// learned, a path that names nothing, a kind not registered, or an answer that would have to reach a package the run
-// restored and no store answers, which a probe never reloads. It runs between the analysis's waves, with no pass
-// running, so the one flag it sets reaches only its own questions.
+// learned, a path that names nothing, a kind not registered, an answer that would have to reach a package the run
+// restored and no store answers, which a probe never reloads, or an answer from an unsure package, which may rest on a
+// placeholder, as Ask keeps nothing computed in one. It runs between the analysis's waves, with no pass running, so
+// the one flag it sets reaches only its own questions.
+//
+// Whether owner is unsure is read after the question, as WholeIfComplete reads it, never only before. A package once
+// unsure stays so, so reading after still finds an owner a pass's placeholder left unsure before the probe. And it
+// finds the owner the probe's own question left unsure: a probe abandons at a package the run restored, but an answer
+// it reads from a package below that the run learned and left unsure is handed back unsure, with nothing to reload,
+// and marks owner, its reader, as Ask marks any.
 func (resolver *Resolver) Probe(kindName string, owner *types.Package, path objectpath.Path) (encoded []byte,
 	answered bool) {
 	home := resolver.Package(owner)
@@ -153,7 +160,11 @@ func (resolver *Resolver) Probe(kindName string, owner *types.Package, path obje
 		}
 		encoded, answered = nil, false
 	}()
-	return probe(resolver, home, object), true
+	answer := probe(resolver, home, object)
+	if resolver.Unsure(home.Types) {
+		return nil, false
+	}
+	return answer, true
 }
 
 // ZeroAnswer is the answer of no fact of the kind named kindName, encoded as a read holds it, and whether such a kind

@@ -25,6 +25,12 @@ func PushNilness(pass *analysis.Pass, push *analysis.Analyzer, function *types.F
 	return pushed.Nilness(function, result), true
 }
 
+// Judged is heldResults, the nilness of function's results as the kind's own verdict in home holds them, nil for no
+// fact: what Ask computes, read from the kind's state and never from the resolver's memo.
+func Judged(resolver *fact_resolver.Resolver, home *fact_resolver.Package, function *types.Func) []ValueNilness {
+	return heldResults(resolver, home, function)
+}
+
 // Ask is ask, the nilness of function's results and whether a reader in reader holds them as a fact.
 func Ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, function *types.Func) ([]ValueNilness, bool) {
 	return ask(resolver, reader, function)

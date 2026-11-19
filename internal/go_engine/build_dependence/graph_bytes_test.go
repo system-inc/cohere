@@ -82,7 +82,7 @@ func TestTheGraphsHoldFewBytesOfTheirOwn(test *testing.T) {
 		if inStandardLibrary(each) {
 			standardLibraryPackages++
 		}
-		graphOfPackage(each).AddPackage(each, !inStandardLibrary(each))
+		graphOfPackage(each).AddPackage(each, !inStandardLibrary(each), nil)
 	}
 	if standardLibraryPackages < 20 {
 		test.Fatalf("the fixture's load reaches %d packages of the standard library, want its closure of os",

@@ -32,6 +32,16 @@ type collector struct {
 	// and declares and every kind edge are collected as a whole walk collects them.
 	declarationsOnly bool
 
+	// fromCgo says the file being collected hangs on the C side (fromCgo), set for each file's walk
+	// (Graph.addPackage), which every unit of the file takes as its mark (unitRecord.fromCgo).
+	fromCgo bool
+
+	// withheld are the positions of the declarations of the package the load withheld from, as AddPackage takes them,
+	// set for each package's walk (Graph.addPackage), nil where it withheld none: a unit whose declaration starts at
+	// one is marked withheld (unitRecord.withheld), and the position's value is set once a unit has, so the walk's end
+	// can tell a position no unit starts at.
+	withheld map[string]bool
+
 	// calleeSeen are the callees of the unit staticCallees is collecting, and calleeStore every unit's callees, each
 	// unit's a slice of it, which newRecord reads into the record's own.
 	calleeSeen  map[types.Object]bool
@@ -96,6 +106,15 @@ func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) 
 func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node) *unitRecord {
 	collecting.unitWalk = unitVisitor{typesInformation: collecting.typesInformation}
 	ast.Walk(&collecting.unitWalk, declaration)
+	withheld := false
+	if collecting.withheld != nil {
+		// The position as the load wrote it, past any //line directive, so the two name one declaration alike.
+		position := tokenFile.Position(declaration.Pos()).String()
+		if _, isWithheld := collecting.withheld[position]; isWithheld {
+			collecting.withheld[position] = true
+			withheld = true
+		}
+	}
 	collecting.units = append(collecting.units, unitRecord{
 		// The file a reader sees, past any //line directive, so a cgo package's unit carries its .go file as written
 		// rather than the cgo tool's output in the build cache, whose name changes from run to run.
@@ -104,6 +123,8 @@ func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node
 		end:           tokenFile.Offset(declaration.End()),
 		nodes:         collecting.unitWalk.nodes,
 		universeNames: collecting.unitWalk.universeNames,
+		fromCgo:       collecting.fromCgo,
+		withheld:      withheld,
 	})
 	collecting.declaresStart = len(collecting.declareStore)
 	return &collecting.units[len(collecting.units)-1]
