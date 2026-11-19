@@ -167,6 +167,37 @@ func (resolver *Resolver) Probe(kindName string, owner *types.Package, path obje
 	return answer, true
 }
 
+// Asked is the answer of the kind named kindName about object as reader's analysis asks it while passes run, encoded
+// as a read holds it, whether reader was handed no unsure answer while the question ran, and whether such a kind is
+// registered: with none, nothing is asked. A pass asks it of an object of its own package or of one below it, and it
+// is an ordinary question of reader, Ask's with reader as the package asking: an answer from another package is among
+// reader's reads, and a question that reaches a package the run restored and no store answers has the run reload it,
+// is answered a placeholder and leaves reader unsure. It is the answer object's package holds, as Probe's is, so
+// whether a fact on object reaches reader is the caller's to ask of Visible first.
+//
+// Probe cannot serve a pass. The flag it sets is the whole resolver's, so one raised while passes run would end, as a
+// probe's question ends, every pass's question that reached a restored package, where the run must reload it
+// instead. Asked sets no flag and recovers nothing.
+//
+// sure is false when reader's count of unsure answers rose while the question ran, as the question's own placeholder
+// raises it, or an answer computed from one. Another question of reader running at the same moment raises it too, and
+// reads here as not sure, which is the safe side: an answer taken as unsure is only never kept.
+func (resolver *Resolver) Asked(kindName string, reader *Package, object types.Object) (encoded []byte, sure bool,
+	registered bool) {
+	var probe func(resolver *Resolver, home *Package, object types.Object) []byte
+	for _, known := range registeredKinds() {
+		if known.kind.Name == kindName {
+			probe = known.probe
+		}
+	}
+	if probe == nil {
+		return nil, false, false
+	}
+	unsureBefore := resolver.unsureCount(reader.Types)
+	encoded = probe(resolver, reader, object)
+	return encoded, resolver.unsureCount(reader.Types) == unsureBefore, true
+}
+
 // ZeroAnswer is the answer of no fact of the kind named kindName, encoded as a read holds it, and whether such a kind
 // is registered.
 func ZeroAnswer(kindName string) ([]byte, bool) {
