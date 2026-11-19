@@ -20,10 +20,10 @@ const screamingRule = `"rule":"cohere-go/consistency-no-screaming-snake-case"`
 // names a module it downloaded, with no network and no real module cache (#57wgzhp); it reads strings, so its key
 // holds the standard library's. The project sits below the
 // module cache too, as a project checked out there would, so only its being a main module keeps it the project's. The
-// dependency's file and the project's own break one house rule. It returns the project's root, its one file in scope
-// and the module cache.
+// dependency's file and the project's own break one house rule. extra are more files of the project, by path below
+// its root. It returns the project's root, its one file in scope and the module cache.
 // Not parallel: it sets the go environment of the process, which every go command of the run in it reads
-func writeSystemModulesProject(test *testing.T) (string, string, string) {
+func writeSystemModulesProject(test *testing.T, extra map[string]string) (string, string, string) {
 	test.Helper()
 	// Resolved, so the module cache go env reports and the replace's directory name the files as the root's resolved
 	// path does, the engine's root being resolved (resolveRoot).
@@ -50,6 +50,7 @@ func writeSystemModulesProject(test *testing.T) (string, string, string) {
 		"helper/helper.go": "// Package helper is the project's own, outside the run's scope.\npackage helper\n\n" +
 			"// Offset is two.\nconst Offset = 2\n",
 	})
+	writeFixtureFiles(test, project, extra)
 	test.Setenv("GOMODCACHE", moduleCache)
 	test.Setenv("GOPROXY", "off")
 	test.Setenv("GOSUMDB", "off")
@@ -69,7 +70,7 @@ func writeSystemModulesProject(test *testing.T) (string, string, string) {
 // run, though it breaks the rule the project's file is reported for.
 // Not parallel: it sets the go environment of the process, which every go command of the run in it reads
 func TestTheSystemCacheKeepsAThirdPartyModuleAndNeverTheProject(test *testing.T) {
-	root, inScope, _ := writeSystemModulesProject(test)
+	root, inScope, _ := writeSystemModulesProject(test, nil)
 	source := standardLibrarySource{stamp: engineTestsStamp, systemCacheRoot: test.TempDir()}
 	filling := runEngineWith(test, root, source, rules.All(), "--no-cache", inScope)
 	if filling.counts.ModulesFromSystemCache != 0 || filling.counts.SystemCacheWritten == 0 {

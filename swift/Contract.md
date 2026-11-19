@@ -958,8 +958,10 @@ keyed on everything its entries read: the engine's own identity, the Go version,
 go flags, and the analyzers that learn facts with their options, and each entry in it on its files'
 bytes by their paths below `GOROOT`, or for a module's package below the module cache (`GOMODCACHE`),
 with the module's path, version and go version. A module's package is kept there only when its module
-is not a main module and every file of it is in the module cache, so a vendored module, or one
-replaced by a directory of the project's, stays the project's. A package whose key matches is restored
+is not a main module and every file of it is in the module cache: what decides is where the files
+sit, so a vendored module, or one replaced by a local directory, stays the project's while the
+project's tree is outside the module cache, and is kept, keyed by its files' paths and bytes, when
+the tree itself is below it. A package whose key matches is restored
 from it, in a cached run and under `--no-cache` alike, since those entries are of cohere, the Go
 installation and the module cache and nothing of the project's tree; any mismatch computes it. It is
 a dependency, analyzed for its facts alone, so no finding of it is ever reported.

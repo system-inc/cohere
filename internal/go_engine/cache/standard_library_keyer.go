@@ -81,7 +81,9 @@ func (keyer *standardLibraryKeyer) isSystem(judged *packages.Package) (bool, err
 // filesKeptApart reports whether a package's own files are the system cache's, its imports aside: a package in no
 // module, the standard library's, with every file below goroot, or a package of a module that is not a main module
 // with every file below the module cache. A main module's package is the project's wherever its files are: under
-// go.work every workspace module is a main module, and a project can sit below the module cache.
+// go.work every workspace module is a main module, and a project can sit below the module cache. Any other module's
+// package is judged by where its files sit alone, so a vendored module or a local replace stays the project's while
+// the project's tree is outside the module cache, and is kept, by its files' paths and bytes, when it is below.
 func (keyer *standardLibraryKeyer) filesKeptApart(judged *packages.Package) bool {
 	switch {
 	case judged.Module == nil:

@@ -68,9 +68,12 @@ type StandardLibraryContext struct {
 // a package when every package it imports is one it keeps too, and the package is the standard library's, in no module
 // with every file of every list it holds below the context's Goroot, or a third-party module's, in a module that is not
 // a main module (under go.work every workspace module is one) with every file of every list it holds below the
-// context's ModuleCache. A vendored module, or one replaced by a directory of the project's, has its files outside the
-// module cache, so it stays the project's. Any other package gets no key, which is no error: it is analyzed as it
-// always is. unsafe and a package with no files are keyed by their path alone, as Keys keys them.
+// context's ModuleCache. What decides is whether the module is a main module and where the files sit, never how go
+// found them: a vendored module, or one a replace points at a local directory, has its files in the project's tree,
+// outside the module cache, and stays the project's, unless that tree itself sits below the module cache, where such a
+// package is kept as any module's is, keyed by its files' paths below the module cache and their bytes, so it is never
+// another's. Any other package gets no key, which is no error: it is analyzed as it always is. unsafe and a package
+// with no files are keyed by their path alone, as Keys keys them.
 //
 // A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
 // imports, sorted by import path, as Keys' are. The own digest is a sha256 over, in this order and each part

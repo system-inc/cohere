@@ -105,9 +105,9 @@ func TestAModulesPackageBelowTheModuleCacheIsKeyedWithItsMarker(test *testing.T)
 // A package the system cache does not keep gets no key, and neither does any package that imports it, while the
 // standard library keeps every key: a main module's package below the module cache, as under go.work, where every
 // workspace module is a main module, or a project checked out below the module cache; a module's package with one
-// file outside the module cache, as a vendored module's or one a replace points at a directory of the project's;
-// a module's package that imports a project package; and every module's package when the context names no module
-// cache.
+// file outside the module cache, as a vendored module's or one a replace points at a directory of a project outside
+// the module cache; a module's package that imports a project package; and every module's package when the context
+// names no module cache.
 func TestAPackageTheSystemCacheDoesNotKeepGetsNoKey(test *testing.T) {
 	test.Parallel()
 

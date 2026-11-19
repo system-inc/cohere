@@ -3,6 +3,7 @@ package go_engine
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -32,6 +33,10 @@ type standardLibrarySource struct {
 	systemCacheRoot string
 }
 
+// errorOverlaid is why a build whose go flags name an overlay keeps no system cache (overlaidGoFlags), which the run
+// says.
+var errorOverlaid = errors.New("the go flags name an overlay (-overlay), whose files no system cache key holds")
+
 // lintCache is the per-package findings cache the lint phase reads and writes, at the root's `.cache/cohere/go`, beside
 // the front door's own cache in `.cache/cohere`, with the standard library's entries in the system cache's store,
 // system, when the run keeps one (#syscache). Under `--no-cache` it reads and writes no store: it is nil, or, when the
@@ -44,10 +49,11 @@ type standardLibrarySource struct {
 // the host's build and with an extra build's target after it for that build, and goEnvironment is go env's answer the
 // load reads there, so the build context every key shares is the one of the build the load is of, read from the go env
 // the load asked rather than from one of its own (#4rpt1jh), and so each build reads its own context's standard-library
-// entries. goEnvironment is nil only for a host whose census judged no file, which asked go env nothing; then it is
-// read here, recorded in children, the run's account of the go commands it starts (see load.Children). The project's
-// store holds stamps, the run's shard stamps, as the system cache's does, so a write by any session of the run marks
-// the shard it changes moved for every build's pack (cache.Open).
+// entries. A build whose go flags name an overlay keeps no system cache, and says why (overlaidGoFlags). goEnvironment
+// is nil only for a host whose census judged no file, which asked go env nothing; then it is read here, recorded in
+// children, the run's account of the go commands it starts (see load.Children). The project's store holds stamps, the
+// run's shard stamps, as the system cache's does, so a write by any session of the run marks the shard it changes moved
+// for every build's pack (cache.Open).
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
@@ -72,13 +78,22 @@ func lintCache(
 		}
 	}
 	values := answered.Values()
+	// A build whose go flags name an overlay keeps no system cache, as a run without one keeps none (overlaidGoFlags).
+	keepsSystem := system.store != nil
+	if keepsSystem && overlaidGoFlags(values["GOFLAGS"]) {
+		keepsSystem = false
+		system.notKeptBecause(cache.NotKeptBecause(errorOverlaid))
+	}
+	if noCache && !keepsSystem {
+		return nil, nil
+	}
 	identity, identityError := cache.ExecutableIdentity()
 	if identityError != nil {
 		return nil, fmt.Errorf("identifying the engine: %w", identityError)
 	}
 	var standardLibrary *check.StandardLibraryCaching
 	// The standard library and third-party modules are keyed apart when there is a system cache to keep them.
-	if system.store != nil {
+	if keepsSystem {
 		standardLibrary = &check.StandardLibraryCaching{
 			System: system.store,
 			Context: cache.StandardLibraryContext{
@@ -111,6 +126,23 @@ func lintCache(
 		CgoToolchain:    cgoToolchain(values),
 		AnswersInPart:   request.answersInPart,
 	}, nil
+}
+
+// overlaidGoFlags reports whether goFlags, `GOFLAGS` as go env reports it, from the environment or go's own env file,
+// names an overlay: go list then reads each file the overlay replaces from the overlay, and a key of the system cache
+// holds the bytes on disk, never the overlay's, so a build under one would keep and restore analyses of bytes it does
+// not have (#57wgzhp). go refuses an overlay of a file below `GOMODCACHE`, but not one below `GOROOT`, nor one of a
+// directory a replace names, so every build under an overlay keeps no system cache, failing closed. `GOFLAGS` is the
+// one road: go reads no other flags of the engine's go commands from outside, and the engine's own overlays, the
+// rename's proofs, load with no findings cache at all (loadRequest.withOverlay). An -overlay with no file names none.
+func overlaidGoFlags(goFlags string) bool {
+	for _, field := range strings.Fields(goFlags) {
+		name, value, _ := strings.Cut(strings.TrimLeft(field, "-"), "=")
+		if name == "overlay" && value != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // cgoToolchain is the C toolchain of values, go env's answer as cacheBuild reads it, each of load.CgoToolchainNames
@@ -176,7 +208,7 @@ func processVariable(name string) string {
 // resolve none of it: go finds every standard-library package below `GOROOT` whatever they say. A module's package
 // the system cache keeps is named in its key by its files' paths below the module cache, its version among them, and
 // by its module, so whatever version -mod or -modfile resolves keys apart, and -mod=vendor resolves it into the
-// vendor directory, outside the module cache, where the system cache keeps nothing. -trimpath
+// vendor directory, whose files' paths, below the module cache only when the project is, key it apart too. -trimpath
 // rewrites the paths go compiles into what it builds, never the paths go list names, and the source loader reads the
 // standard library's files by the paths go list names, with it or without it; the key names each file below `GOROOT`
 // besides. -buildvcs decides whether go stamps version control into a main package of the main module, which can refuse
