@@ -17,14 +17,14 @@ type Answered struct {
 	Encoded []byte
 }
 
-// Answered is every answer the run holds, by kind and object: the memo Ask reads, the store's answers, a test's
-// hand's and the computed ones, and with them the answers a kind kept of what it judged inside another judgment (see
-// Keep), which no question asked of. Recorded cannot serve a reader that needs them all (#kemy8sq). It holds an
-// answer by its objectpath, and objectpath names only what another package can reach, so an unexported function of a
-// package's scope has no path and no record. And it holds only what the run computed through Ask and its store did
-// not give it, so nothing a store answered, nothing a kind kept, and nothing at all in a run without a store. An
-// unsure answer is never among them, a placeholder or one computed in an unsure package, since nothing unsure is
-// memoized or kept.
+// Answered is every answer the run holds, by kind and object: the memo Ask reads, the store's answers, a test's hand's
+// and the computed ones, and with them the answers a kind kept of what it judged inside another judgment (see Keep),
+// which no question asked of. An answer both kept and memoized is held once, and Answered panics when the two differ.
+// Recorded cannot serve a reader that needs them all (#kemy8sq). It holds an answer by its objectpath, and objectpath
+// names only what another package can reach, so an unexported function of a package's scope has no path and no record.
+// And it holds only what the run computed through Ask and its store did not give it, so nothing a store answered,
+// nothing a kind kept, and nothing at all in a run without a store. An unsure answer is never among them, a placeholder
+// or one computed in an unsure package, since nothing unsure is memoized or kept.
 //
 // It is read once the run's passes are done, when no question is adding to what the run holds. The answers are sorted
 // by the object's package path, then by where the object is declared, its file, line and column, then by kind, then
@@ -45,26 +45,40 @@ func (resolver *Resolver) Answered() []Answered {
 	}
 	var answers []Answered
 	places := map[types.Object]token.Position{}
-	memoized := map[answerKey]bool{}
-	hold := func(key any, answer any) answerKey {
+	memoized := map[answerKey][]byte{}
+	keyOf := func(key any) answerKey {
 		answered, isKey := key.(answerKey)
 		if !isKey {
 			// Invariant: answerOf and Keep store every answer under an answerKey.
 			panic(fmt.Sprintf("fact_resolver: an answer is held under a %T", key))
 		}
-		answers = append(answers, Answered{Kind: answered.kind.Name, Object: answered.object,
-			Encoded: encodeAnswer(answered.kind, answered.object, answer)})
-		places[answered.object] = program.FileSet.Position(answered.object.Pos())
 		return answered
 	}
+	hold := func(answered answerKey, encoded []byte) {
+		answers = append(answers, Answered{Kind: answered.kind.Name, Object: answered.object, Encoded: encoded})
+		places[answered.object] = program.FileSet.Position(answered.object.Pos())
+	}
 	resolver.answers.Range(func(key any, answer any) bool {
-		memoized[hold(key, answer)] = true
+		answered := keyOf(key)
+		memoized[answered] = encodeAnswer(answered.kind, answered.object, answer)
+		hold(answered, memoized[answered])
 		return true
 	})
-	// A kept answer a question was asked of afterwards is memoized too, the same answer, and is held once.
+	// A kept answer a question was asked of afterwards is memoized too, and is held once. It is the same answer, since
+	// a kept answer is final (see Keep), and so the same bytes.
 	resolver.kept.Range(func(key any, answer any) bool {
-		if answered, isKey := key.(answerKey); !isKey || !memoized[answered] {
-			hold(key, answer)
+		answered := keyOf(key)
+		encoded := encodeAnswer(answered.kind, answered.object, answer)
+		held, isMemoized := memoized[answered]
+		if !isMemoized {
+			hold(answered, encoded)
+			return true
+		}
+		if !bytes.Equal(held, encoded) {
+			// Invariant: a kind keeps only a final answer, the one its compute answers from then on, so a question
+			// asked afterwards memoizes the same; another is a mistake in the kind, which kept a verdict it revised.
+			panic(fmt.Sprintf("fact_resolver: %s's answer about %s was kept as %s and memoized as %s",
+				answered.kind.Name, objectName(answered.object), encoded, held))
 		}
 		return true
 	})

@@ -1,6 +1,7 @@
 package fact_resolver
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/types"
@@ -187,7 +188,8 @@ func answerOf[Value any](
 // answer already memoized stands, the store's, a hand's or a computed one, since readers were given it. An answer
 // a test's hand gives is left to the hand, so a run under a hand holds only the hand's answer about object. And
 // nothing is kept in an unsure package, as answerOf keeps nothing computed in one: home was handed a placeholder
-// before the kind held this verdict, which may rest on it. The caller holds home's lock.
+// before the kind held this verdict, which may rest on it. An answer already kept stands too, heard by the hand once,
+// and one kept again that encodes otherwise panics, since a kept answer is final. The caller holds home's lock.
 func Keep[Value any](resolver *Resolver, home *Package, kind *Kind, object types.Object, answer Value) {
 	if object.Pkg() == nil || !isOrigin(object) {
 		return
@@ -204,7 +206,14 @@ func Keep[Value any](resolver *Resolver, home *Package, kind *Kind, object types
 	if resolver.Unsure(home.Types) {
 		return
 	}
-	if _, kept := resolver.kept.LoadOrStore(key, answer); kept {
+	if held, kept := resolver.kept.LoadOrStore(key, answer); kept {
+		heldEncoded, keptEncoded := encodeAnswer(kind, object, held), encodeAnswer(kind, object, answer)
+		if !bytes.Equal(heldEncoded, keptEncoded) {
+			// Invariant: a kept answer is final (see above), so a walk that hands the same object over again hands
+			// the same answer; another is a mistake in the kind, which kept a verdict it went on to revise.
+			panic(fmt.Sprintf("fact_resolver: %s's answer about %s was kept as %s and kept again as %s", kind.Name,
+				objectName(object), heldEncoded, keptEncoded))
+		}
 		return
 	}
 	if resolver.held != nil {

@@ -1,6 +1,7 @@
 package fact_resolver_test
 
 import (
+	"fmt"
 	"go/types"
 	"slices"
 	"testing"
@@ -234,6 +235,47 @@ func TestAnAnswerKeptTwiceIsHeldAndHeardOnce(test *testing.T) {
 	}
 	if heard := run.hand.heard["Middle"]; !slices.Equal(heard, []string{"true"}) {
 		test.Errorf("want the hand to hear Middle's answer once, as true, heard %q", heard)
+	}
+}
+
+// panicked is the message work panicked with, or empty when it returned.
+func panicked(work func()) (message string) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			message = fmt.Sprint(recovered)
+		}
+	}()
+	work()
+	return ""
+}
+
+// A kept answer is final, so one kept again otherwise is a mistake in the kind, never a second answer to choose from:
+// Middle kept as true and then as false panics, naming the kind, the function and both answers.
+func TestAnAnswerKeptAgainOtherwisePanics(test *testing.T) {
+	test.Parallel()
+	run := learnMiddle(test, nil, false)
+	fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, true)
+	message := panicked(func() { fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, false) })
+	if want := "fact_resolver: keep_probe's answer about bodiless/middle.Middle was kept as true and kept again as " +
+		"false"; message != want {
+		test.Errorf("want Middle kept again as false to panic with %q, got %q", want, message)
+	}
+}
+
+// An answer kept and then memoized otherwise, which a kind whose compute answers other than the verdict it kept
+// would leave, makes Answered panic, naming the kind, the function and both answers, rather than hold one of them:
+// Middle kept as true and then computed as false.
+func TestAnswersKeptAndMemoizedOtherwisePanic(test *testing.T) {
+	test.Parallel()
+	run := learnMiddle(test, nil, false)
+	fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, true)
+	if answer := run.ask(run.function, false); answer {
+		test.Fatal("want Middle asked of after Keep computed as false, got true")
+	}
+	message := panicked(func() { run.resolver.Answered() })
+	if want := "fact_resolver: keep_probe's answer about bodiless/middle.Middle was kept as true and memoized as " +
+		"false"; message != want {
+		test.Errorf("want Answered to panic with %q, got %q", want, message)
 	}
 }
 
