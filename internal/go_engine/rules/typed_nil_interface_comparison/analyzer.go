@@ -175,7 +175,7 @@ func checkComparison(
 		return
 	}
 	// Asked last, and only of a callee the nilness leaves flagged: a question never asked records no answer.
-	if calleeIsTrivial(context, trivialities, comparison, callee) {
+	if calleeIsTrivial(context, trivialities, callee) {
 		return
 	}
 	staticcheck_report.Report(context, comparison, fmt.Sprintf("this comparison is %s true", qualifier),
@@ -186,21 +186,19 @@ func checkComparison(
 			fmt.Sprintf("%s never returns a nil interface value", typeutil.FuncName(callee))))
 }
 
-// calleeIsTrivial is whether callee, the function comparison's value came from, does no real work, as
+// calleeIsTrivial is whether callee, the function a comparison's value came from, does no real work, as
 // intermediate_representation.IsTrivial judges it. A function or method the package itself declares is asked of
-// trivialities, whose answer the fact resolver records with the bodies it read, so the rule reads no other function's
-// body itself. Any other callee belongs to a package the representation holds by its types alone: it has no syntax,
-// so IsTrivial refuses it at once, as not trivial, without reading a body.
-func calleeIsTrivial(
-	context *rule.Context,
-	trivialities *function_triviality.Result,
-	comparison *intermediate_representation.BinaryOperation,
-	callee *types.Func,
-) bool {
-	if callee.Pkg() == context.Package {
-		return trivialities.IsTrivial(callee)
-	}
-	return intermediate_representation.IsTrivial(comparison.Parent().Program.FunctionValue(callee))
+// trivialities, whose answer the fact resolver records with the bodies it read, so the rule reads no function's body
+// itself, and calls IsTrivial nowhere.
+//
+// A function another package declares is never read, and is not trivial. In the program the engine hands a rule,
+// another package's function is made from its types alone and has no syntax, which IsTrivial answers not trivial, and
+// function_triviality refuses at the same boundary where other packages do have their syntax, so the rule and the
+// kind agree in every program. A method of a type from a package this one never imports has no function in that
+// program at all, since it creates a package's direct imports only, and is answered the same without being looked
+// up.
+func calleeIsTrivial(context *rule.Context, trivialities *function_triviality.Result, callee *types.Func) bool {
+	return callee.Pkg() == context.Package && trivialities.IsTrivial(callee)
 }
 
 // staticCalleeObject is the function call statically calls, or nil for a dynamic call or a callee with no function

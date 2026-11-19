@@ -72,7 +72,7 @@ func TestIsTrivialEnteringNamesEveryFunctionTheWalkRead(test *testing.T) {
 		{"alone", true, nil},
 	} {
 		function := built.Function(asked.name)
-		trivial, entered := intermediate_representation.IsTrivialEntering(function)
+		trivial, entered := intermediate_representation.IsTrivialEntering(function, nil)
 		var names []string
 		for _, read := range entered {
 			names = append(names, read.Name())
@@ -92,5 +92,32 @@ func TestIsTrivialEnteringNamesEveryFunctionTheWalkRead(test *testing.T) {
 		if asked.name == "abroad" && built.Function("third").Blocks != nil {
 			test.Error("abroad: the walk built third, which it never reached")
 		}
+	}
+}
+
+// A function the caller refuses is refused as one with no syntax is: the walk takes it as nontrivial at once, and
+// neither enters nor builds it. chained is trivial through second, so with second refused it is not, the walk names
+// only leaf, entered before it, and second and third, which only second calls, stay unbuilt.
+func TestIsTrivialEnteringNeitherEntersNorBuildsAFunctionItsCallerRefuses(test *testing.T) {
+	test.Parallel()
+	unit := differentialCheck(test, "entering", enteringSource)
+	program := intermediate_representation.NewProgram(unit.fileSet)
+	for _, imported := range unit.types.Imports() {
+		program.CreatePackage(imported, nil, nil, true)
+	}
+	built := program.CreatePackage(unit.types, unit.files, unit.typeInfo, false)
+	second := built.Function("second")
+	trivial, entered := intermediate_representation.IsTrivialEntering(built.Function("chained"),
+		func(met *intermediate_representation.Function) bool { return met == second })
+	var names []string
+	for _, read := range entered {
+		names = append(names, read.Name())
+	}
+	if trivial || !slices.Equal(names, []string{"leaf"}) {
+		test.Errorf("chained, with second refused: the walk answers %t and entered %q, want false and [\"leaf\"]",
+			trivial, names)
+	}
+	if second.Blocks != nil || built.Function("third").Blocks != nil {
+		test.Error("chained, with second refused: the walk built second, or third, which only second calls")
 	}
 }

@@ -10,8 +10,8 @@
 // the key the engine holds a unit by, so an answer is known to stand until one of them or the asked function changes.
 //
 // A reader asks only of the functions and methods its own package declares (Result.IsTrivial). Another package's
-// function has no syntax in the representation a reader walks, so IsTrivial refuses it at once, reading no body, and a
-// reader asks that of IsTrivial itself.
+// function has no syntax in the representation a reader walks, where IsTrivial refuses it at once, reading no body, so
+// a reader takes it as not trivial without asking, and the walk refuses it the same where it does have its syntax.
 package function_triviality
 
 import (

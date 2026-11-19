@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -203,6 +206,51 @@ func TestAnAnswerNamesEveryDeclarationTheWalkRead(test *testing.T) {
 	}
 }
 
+// A function literal is named by the top-level declaration that encloses it, however deep it is. Asked is trivial
+// through twice, whose function literal, called in place, calls another in place, which alone calls leaf: the answer
+// names twice once, for itself and both literals, and leaf, which shows the walk entered the inner literal. twice's
+// own answer names only leaf, both literals being its own declaration's.
+func TestAnAnswerNamesTheDeclarationEnclosingALiteralInsideALiteral(test *testing.T) {
+	test.Parallel()
+	ran := askRoots(test, "nested")
+	for _, asked := range []struct {
+		name    string
+		entered []string
+	}{
+		{"Asked", []string{"twice", "leaf"}},
+		{"twice", []string{"leaf"}},
+	} {
+		want := function_triviality.Triviality{Trivial: true, Entered: placesOf(test, ran.roots[0], asked.entered...)}
+		if answer := ran.answers["nested."+asked.name]; !reflect.DeepEqual(answer, want) {
+			test.Errorf("%s: the answer is %+v, want %+v", asked.name, answer, want)
+		}
+	}
+}
+
+// A declaration under a //line directive is named as the engine keys a unit: by the file the directive names, as
+// token.Position renders it, beside the file that holds the directive, and by the offset of the declaration's first
+// byte in the file as parsed, which no directive moves. The want is built from the fixture's own bytes, by no file
+// set.
+func TestAnAnswerNamesAFunctionUnderALineDirectiveByTheFileTheDirectiveNames(test *testing.T) {
+	test.Parallel()
+	ran := askRoots(test, "directive")
+	directory := filepath.Join(analysistest.TestData(), "src", "directive")
+	parsed, readError := os.ReadFile(filepath.Join(directory, "directive.go"))
+	if readError != nil {
+		test.Fatalf("reading the fixture: %v", readError)
+	}
+	offset := strings.Index(string(parsed), "func moved")
+	if offset < 0 || !strings.Contains(string(parsed), "\n//line other.go:10\nfunc moved") {
+		test.Fatal("the fixture no longer declares moved right under its //line directive")
+	}
+	want := function_triviality.Triviality{Trivial: true, Entered: []function_triviality.DeclarationPlace{
+		{File: filepath.Join(directory, "other.go"), Offset: offset},
+	}}
+	if answer := ran.answers["directive.Asked"]; !reflect.DeepEqual(answer, want) {
+		test.Errorf("Asked's answer is %+v, want %+v", answer, want)
+	}
+}
+
 // An answer goes to JSON and back without loss, as the resolver keeps it: every answer the run computed decodes to the
 // answer the reader was given, and encodes again to the same bytes.
 func TestAnAnswerEncodesAndDecodesWithoutLoss(test *testing.T) {
@@ -237,8 +285,10 @@ func TestAnAnswerEncodesAndDecodesWithoutLoss(test *testing.T) {
 
 // An answer is the one a reader's own walk gives, whichever program its package builds in. As a root, near is built
 // for its readers, far made from its types alone, and Crossing's walk ends at far.Nothing, which has no syntax there.
-// Below above, near builds in the resolver's own program, where far has its syntax and the walk reads on through
-// far.Nothing, which is trivial, and last: the answer is cut at far.Nothing, to the root's.
+// Below above, near builds in the resolver's own program, where far has its syntax, and the walk refuses far.Nothing
+// all the same, since another package declares it: the answer is the root's, and far.Nothing is never built. Its body
+// calls deep.Value, of a package near does not import and the resolver's program never created for near, so a build
+// of it panics.
 func TestAnAnswerIsTheSameWhereOtherPackagesHaveTheirSyntax(test *testing.T) {
 	test.Parallel()
 	root := askRoots(test, "cut/near")
@@ -259,6 +309,22 @@ func TestAnAnswerIsTheSameWhereOtherPackagesHaveTheirSyntax(test *testing.T) {
 	// The files are the same on disk, so the places are the root's.
 	if answer := function_triviality.Ask(below.resolver, home, crossing); !reflect.DeepEqual(answer, want) {
 		test.Errorf("below above, Crossing's answer is %+v, want the root's, %+v", answer, want)
+	}
+	// Refused, not survived: far.Nothing has its syntax in the program near was judged in, and no blocks.
+	far := near.Imports["cut/far"]
+	if far == nil || far.Types == nil {
+		test.Fatal("near imports no far")
+	}
+	nothing, isFunction := far.Types.Scope().Lookup("Nothing").(*types.Func)
+	if !isFunction {
+		test.Fatal("far declares no Nothing")
+	}
+	built := home.IntermediateRepresentation().Program.FunctionValue(nothing)
+	if built == nil || built.Syntax() == nil {
+		test.Fatalf("far.Nothing is %v in the program near was judged in, want a function with its syntax", built)
+	}
+	if built.Blocks != nil {
+		test.Error("the walk built far.Nothing, a function another package declares, which it must refuse unbuilt")
 	}
 }
 

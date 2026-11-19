@@ -9,9 +9,15 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
-// Kind keys triviality's answers in the resolver, and its counts. It is not registered with fact_resolver.Register, so
-// no package is computed whole in it for an entry or for the standard library's table: only a package's own reader
-// asks, of a package the run holds from source, where the answer is computed.
+// Kind keys triviality's answers in the resolver, and its counts.
+//
+// It is deliberately not registered with fact_resolver.Register (#h0k644s), so no package is computed whole in it and
+// it never enters the standard library's table. Nothing needs it whole, since only a package's own reader asks, of a
+// package the run holds from source, and its values name files by this machine's paths, which a table written for any
+// machine cannot hold. An answer a reader asked for, about a function with an objectpath, is still recorded
+// (fact_resolver.Ask), may be kept in the package's entry, and a store may give it back on a later run. What keeps an
+// answer given back right is the key that entry is under, which holds each of the package's files by its path and
+// contents, so an entry found under the same key names the same files at the same offsets.
 var Kind = &fact_resolver.Kind{Name: "function_triviality"}
 
 // bodilessTriviality is the answer about a function declared without a body, from its types alone (fact_resolver.Ask):
@@ -38,7 +44,7 @@ func (result *Result) Asking(asking string) *Result {
 
 // IsTrivial is whether function, a function or method the package itself declares, is trivial, as
 // intermediate_representation.IsTrivial answers of it. Asked of another package's function it panics: that one has no
-// syntax where a reader walks, so a reader asks IsTrivial itself, which refuses it without reading a body.
+// syntax where a reader walks, which IsTrivial answers not trivial, so a reader takes it as not trivial and never asks.
 func (result *Result) IsTrivial(function *types.Func) bool {
 	var answer triviality
 	result.resolver.Question(result.asking, func() { answer = ask(result.resolver, result.reader, function) })
@@ -65,9 +71,11 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 //
 // The answer is the one a reader's own walk gives. A reader walks the package where every other package is made from
 // its types alone, so another package's function has no syntax there and the walk refuses it at once: not trivial,
-// reading no further. Where home builds in the resolver's own program instead, other packages have their syntax and
-// the walk reads on into them, so the answer is cut at the first function another package declares, to not trivial
-// and the places before it, which is exactly where and how a reader's walk ends.
+// reading no further. Where home builds in the resolver's own program instead, other packages have their syntax, so
+// the walk is told to refuse every function whose top-level declaration another package holds, and it ends exactly
+// where and how a reader's walk ends: not trivial, with the places entered before it. No function of another package
+// is entered or built, which matters beyond the answer: its body may name a package home does not import, which the
+// resolver's program never created for home, and a build of that body panics.
 func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, function *types.Func) triviality {
 	home.Lock()
 	defer home.Unlock()
@@ -77,17 +85,16 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, func
 		// answers with no fact before it computes.
 		return triviality{}
 	}
-	trivial, entered := intermediate_representation.IsTrivialEntering(asked)
+	trivial, entered := intermediate_representation.IsTrivialEntering(asked,
+		func(met *intermediate_representation.Function) bool {
+			object := declaringFunction(met).Object()
+			return object != nil && object.Pkg() != home.Types
+		})
 	resolver.Counts(Kind).Computed.Add(1)
 	answer := triviality{Trivial: trivial}
 	own := placeOf(asked)
 	for _, read := range entered {
-		declared := declaringFunction(read)
-		if object := declared.Object(); object != nil && object.Pkg() != home.Types {
-			answer.Trivial = false
-			break
-		}
-		if place := placeOf(declared); place != own && !slices.Contains(answer.Entered, place) {
+		if place := placeOf(declaringFunction(read)); place != own && !slices.Contains(answer.Entered, place) {
 			answer.Entered = append(answer.Entered, place)
 		}
 	}
