@@ -34,3 +34,28 @@ func IsMark(fact analysis.Fact) bool {
 func Ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, parameter *types.Var) bool {
 	return ask(resolver, reader, parameter)
 }
+
+// DefinitionAnalyzer is definitionAnalyzer, the definition's oracle, for the tests outside this package.
+var DefinitionAnalyzer = definitionAnalyzer
+
+// Definition is every parameter the definition's result on pass's package holds marked, its own and its imports' that
+// the facts carried there, and whether pass holds that result at all.
+func Definition(pass *analysis.Pass) (map[types.Object]bool, bool) {
+	defined, isDefined := pass.ResultOf[definitionAnalyzer].(definitionResult)
+	return defined, isDefined
+}
+
+// OwnMarksAnalyzer is ownMarksAnalyzer, the marks the analyzer makes of the package it runs on, for the tests outside
+// this package.
+var OwnMarksAnalyzer = ownMarksAnalyzer
+
+// OwnMarks is every parameter the analyzer's own marks hold on pass's package, and whether pass holds them at all.
+func OwnMarks(pass *analysis.Pass) (map[types.Object]bool, bool) {
+	own, isOwn := pass.ResultOf[ownMarksAnalyzer].(ownMarksResult)
+	return own, isOwn
+}
+
+// Whole is whole, every parameter of home marked as the resolver computes a package whole for the store.
+func Whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object]bool {
+	return whole(resolver, home)
+}

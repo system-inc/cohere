@@ -79,17 +79,30 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	// Collected once, so the three passes walk the same functions in the same order.
 	functions := slices.Collect(built.SourceFunctions())
+	reportOddLengths(context, ownMarks(resolver, reader, functions, pass.Analyzer.Name), functions)
+	return nil, nil
+}
+
+// ownMarks is the marks of the analyzed package's own parameters, the marks run reports by: every function's own
+// checks, then each parameter a function passes on to a marked one, another package's asked of resolver as reader holds
+// it, under asking's row. It stands apart from run so the definition's oracle reads the very marks run makes, not a
+// copy of how it makes them (definition_test.go).
+func ownMarks(
+	resolver *fact_resolver.Resolver,
+	reader *fact_resolver.Package,
+	functions []*intermediate_representation.Function,
+	asking string,
+) *packageFacts {
 	marks := &packageFacts{
 		resolver: resolver,
 		home:     reader,
 		recorded: map[types.Object]bool{},
-		asking:   pass.Analyzer.Name,
+		asking:   asking,
 	}
 	walk := &pushWalk{facts: marks}
 	walk.markLengthChecks(functions)
 	walk.markIndirectLengthChecks(functions)
-	reportOddLengths(context, marks, functions)
-	return nil, nil
+	return marks
 }
 
 // dominatesEveryReturn is whether every path through function to a return passes through block.
