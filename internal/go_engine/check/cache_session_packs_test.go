@@ -503,16 +503,15 @@ func TestAPackOfAnotherEngineIsRemovedAtTheSave(test *testing.T) {
 	}
 }
 
-// The system cache's pack is named by every field of the system cache's context, so a build under another context
-// never reads a pack of entries keyed under this one: each field changed, the module cache among them (#57wgzhp), names
-// another pack, and so does another project. A new field without a case here fails, since the fields are found by
-// reflection.
+// The system cache's pack is named by every field of the standard library's context, so a build under another context
+// never reads a pack of entries keyed under this one: each field changed names another pack, and so does another
+// project. A new field without a case here fails, since the fields are found by reflection.
 func TestEveryFieldOfTheSystemContextNamesItsPackApart(test *testing.T) {
 	test.Parallel()
 
 	context := cache.StandardLibraryContext{
 		FormatVersion: "1", EngineIdentity: "engine", Build: []string{"GOOS=linux"}, Facts: []string{"nilness"},
-		Loader: load.LoaderSource, CgoToolchain: []string{"CC=clang"}, Goroot: "/go", ModuleCache: "/modules",
+		Loader: load.LoaderSource, CgoToolchain: []string{"CC=clang"}, Goroot: "/go",
 	}
 	place := systemPackPlace(context, "project")
 	changes := map[string]func(*cache.StandardLibraryContext){
@@ -523,7 +522,6 @@ func TestEveryFieldOfTheSystemContextNamesItsPackApart(test *testing.T) {
 		"Loader":         func(changed *cache.StandardLibraryContext) { changed.Loader = load.LoaderCgoTranslated },
 		"CgoToolchain":   func(changed *cache.StandardLibraryContext) { changed.CgoToolchain = []string{"CC=gcc"} },
 		"Goroot":         func(changed *cache.StandardLibraryContext) { changed.Goroot = "/other/go" },
-		"ModuleCache":    func(changed *cache.StandardLibraryContext) { changed.ModuleCache = "/other/modules" },
 	}
 	fields := reflect.TypeFor[cache.StandardLibraryContext]()
 	for index := range fields.NumField() {

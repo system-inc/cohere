@@ -557,7 +557,7 @@
                     "properties": {
                         "on": {
                             "type": "boolean",
-                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromSystemCache, modulesFromSystemCache, factsSkipped and reloads."
+                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromSystemCache, factsSkipped and reloads."
                         },
                         "hit": {
                             "type": "integer",
@@ -567,13 +567,9 @@
                             "type": "integer",
                             "description": "Go standard-library packages restored from the system cache, the engine's tables in the user's cache directory, every build's summed, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
                         },
-                        "modulesFromSystemCache": {
-                            "type": "integer",
-                            "description": "Third-party modules' packages, every file of them in the module cache, restored from the system cache, every build's summed, with nothing run on them, apart from hit and standardLibraryFromSystemCache. `--no-cache` reads them too. Absent when zero."
-                        },
                         "systemCacheWritten": {
                             "type": "integer",
-                            "description": "Entries the run's builds added to their tables of the system cache, the standard library's and modules', summed. Absent when zero."
+                            "description": "Entries the run's builds added to their tables of the system cache, summed. Absent when zero."
                         },
                         "systemCacheOff": {
                             "type": "boolean",

@@ -92,7 +92,7 @@ func lintCache(
 		return nil, fmt.Errorf("identifying the engine: %w", identityError)
 	}
 	var standardLibrary *check.StandardLibraryCaching
-	// The standard library and third-party modules are keyed apart when there is a system cache to keep them.
+	// The standard library is keyed apart when there is a system cache to keep it.
 	if keepsSystem {
 		standardLibrary = &check.StandardLibraryCaching{
 			System: system.store,
@@ -102,9 +102,6 @@ func lintCache(
 				Build:          standardLibraryBuild(values),
 				CgoToolchain:   cgoToolchain(values),
 				Goroot:         values["GOROOT"],
-				// Where go list finds every third-party module's files, which go env reports, never a variable read
-				// here (#57wgzhp).
-				ModuleCache: values["GOMODCACHE"],
 			},
 			// A standard-library dependence record is written under the toolchain that loaded it (#6a3kjvz).
 			Toolchain: cmp.Or(source.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
@@ -131,10 +128,10 @@ func lintCache(
 // overlaidGoFlags reports whether goFlags, `GOFLAGS` as go env reports it, from the environment or go's own env file,
 // names an overlay: go list then reads each file the overlay replaces from the overlay, and a key of the system cache
 // holds the bytes on disk, never the overlay's, so a build under one would keep and restore analyses of bytes it does
-// not have (#57wgzhp). go refuses an overlay of a file below `GOMODCACHE`, but not one below `GOROOT`, nor one of a
-// directory a replace names, so every build under an overlay keeps no system cache, failing closed. `GOFLAGS` is the
-// one road: go reads no other flags of the engine's go commands from outside, and the engine's own overlays, the
-// rename's proofs, load with no findings cache at all (loadRequest.withOverlay). An -overlay with no file names none.
+// not have (#57wgzhp). go takes an overlay of a file below `GOROOT`, so every build under an overlay keeps no system
+// cache, failing closed, whichever files it names. `GOFLAGS` is the one road: go reads no other flags of the engine's
+// go commands from outside, and the engine's own overlays, the rename's proofs, load with no findings cache at all
+// (loadRequest.withOverlay). An -overlay with no file names none.
 func overlaidGoFlags(goFlags string) bool {
 	for _, field := range strings.Fields(goFlags) {
 		name, value, _ := strings.Cut(strings.TrimLeft(field, "-"), "=")
@@ -202,13 +199,10 @@ func processVariable(name string) string {
 	return "process " + name + "=" + value
 }
 
-// flagsNoStandardLibraryReads are the go flags that, beyond those load.VerdictFlags leaves out, change nothing of the
-// entry of a package the system cache keeps, which standardLibraryBuild leaves out of its key. The standard library is
-// in no module, so -mod, -modfile and -modcacherw, which say how go resolves and keeps the main module's dependencies,
-// resolve none of it: go finds every standard-library package below `GOROOT` whatever they say. A module's package
-// the system cache keeps is named in its key by its files' paths below the module cache, its version among them, and
-// by its module, so whatever version -mod or -modfile resolves keys apart, and -mod=vendor resolves it into the
-// vendor directory, whose files' paths, below the module cache only when the project is, key it apart too. -trimpath
+// flagsNoStandardLibraryReads are the go flags that, beyond those load.VerdictFlags leaves out, change nothing of a
+// standard-library package's entry, which standardLibraryBuild leaves out of the standard library's key. The standard
+// library is in no module, so -mod, -modfile and -modcacherw, which say how go resolves and keeps the main module's
+// dependencies, resolve none of it: go finds every standard-library package below `GOROOT` whatever they say. -trimpath
 // rewrites the paths go compiles into what it builds, never the paths go list names, and the source loader reads the
 // standard library's files by the paths go list names, with it or without it; the key names each file below `GOROOT`
 // besides. -buildvcs decides whether go stamps version control into a main package of the main module, which can refuse

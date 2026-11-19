@@ -12,20 +12,19 @@ import (
 )
 
 // A run whose go flags name an overlay keeps nothing in the system cache and restores nothing from it (#57wgzhp): the
-// overlay's files are what go list reads in place of the disk's, and a system key holds the disk's bytes, never the
-// overlay's. go refuses an overlay of a file below `GOMODCACHE` ("Files beneath GOMODCACHE must not be replaced"), so
-// the overlay here is of strings.go, below `GOROOT`, which go takes and which the dependency the system cache keeps
-// reads: with the system cache warm, a run would otherwise write analyses keyed by the flag and the disk's bytes, which
-// the next run under the same flag restores whatever its overlay holds by then. The run says why it kept no system
-// cache, and its findings are the run's without the overlay.
+// overlay's files are what go list reads in place of the disk's, and a standard-library key holds the disk's bytes,
+// never the overlay's. The overlay here is of strings.go, below `GOROOT`, which go takes and which the fixture reaches:
+// with the system cache warm, a run would otherwise write analyses keyed by the flag and the disk's bytes, which the
+// next run under the same flag restores whatever its overlay holds by then. The run says why it kept no system cache,
+// and its findings are the run's without the overlay.
 // Not parallel: it sets the go environment of the process, which every go command of the run in it reads
 func TestARunWithAnOverlayKeepsNothingInTheSystemCache(test *testing.T) {
-	root, _, _ := writeSystemModulesProject(test, nil)
+	root := copyFixture(test, standardLibraryFixture)
 	source := standardLibrarySource{stamp: engineTestsStamp, systemCacheRoot: test.TempDir()}
 	runEngineWith(test, root, source, rules.All(), "--no-cache")
 	warm := runEngineWith(test, root, source, rules.All(), "--no-cache")
-	if warm.counts.ModulesFromSystemCache != 1 || warm.counts.FromSystemCache == 0 {
-		test.Fatalf("want the system cache warm with the dependency and the standard library, got %+v", warm.counts)
+	if warm.counts.FromSystemCache == 0 {
+		test.Fatalf("want the system cache warm with the standard library, got %+v", warm.counts)
 	}
 
 	goroot := toolchainRoot()
@@ -54,9 +53,8 @@ func TestARunWithAnOverlayKeepsNothingInTheSystemCache(test *testing.T) {
 			test.Fatal(writeError)
 		}
 		withOverlay, noted := runEngineNoting(test, root, source, rules.All(), nil, "--no-cache")
-		if withOverlay.counts.ModulesFromSystemCache != 0 || withOverlay.counts.FromSystemCache != 0 ||
-			withOverlay.counts.SystemCacheWritten != 0 || !strings.Contains(withOverlay.counts.SystemCacheNotKept,
-			"-overlay") {
+		if withOverlay.counts.FromSystemCache != 0 || withOverlay.counts.SystemCacheWritten != 0 ||
+			!strings.Contains(withOverlay.counts.SystemCacheNotKept, "-overlay") {
 			test.Errorf("want nothing restored from the system cache or written to it under -overlay, and why, got "+
 				"%+v", withOverlay.counts)
 		}

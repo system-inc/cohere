@@ -12,14 +12,9 @@ import (
 // where the file is in the installation and never where the installation is.
 const rootMarker = "$GOROOT/"
 
-// moduleCacheMarker stands for the module cache in the path a module's file is keyed by, as rootMarker stands for the
-// installation's root, apart from it, so a file below the one is never keyed as a file below the other.
-const moduleCacheMarker = "$GOMODCACHE/"
-
-// StandardLibraryContext is what every key of a package the system cache keeps shares in one run, a standard-library
-// package's or a third-party module's (#57wgzhp). It names nothing of the machine but what can change such an entry,
-// the installation's root and the module cache among them, so a key computed on one machine equals the key on any other
-// with the same engine, Go version, target, fact analyzers, `GOROOT` and, for a module's package, `GOMODCACHE`.
+// StandardLibraryContext is what every standard-library package's key shares in one run. It names nothing of the
+// machine but what can change a standard-library entry, its installation's root among them, so a key computed on one
+// machine equals the key on any other with the same engine, Go version, target, fact analyzers and `GOROOT`.
 type StandardLibraryContext struct {
 	// FormatVersion is the cache's own format version, so an entry written in another format is never read.
 	FormatVersion string
@@ -51,39 +46,23 @@ type StandardLibraryContext struct {
 	// export data's positions, so an installation moved, or another beside it, keys apart (#syscache). Each file is
 	// keyed by its path below it besides.
 	Goroot string
-
-	// ModuleCache is the module cache, `GOMODCACHE` as go env reports it, absolute, or empty, which keeps no module's
-	// package. A package of a module that is not a main module, every file of it below the module cache, is kept as a
-	// standard-library package is, each file keyed by its path below it, and the module cache is hashed into that
-	// package's own digest alone, for Goroot's reason: the store holds its entry with this machine's paths in it. It is
-	// in no standard-library package's digest, since nothing below `GOROOT` reads a module, so a standard-library key
-	// is the same whatever it says.
-	ModuleCache string
 }
 
-// StandardLibraryKeys computes the key of every package among reachable, and the packages they import, that the
-// system cache keeps (#syscache, #57wgzhp), reading each file once, and none that known, the digests Keys hashed
-// earlier in the run, already holds: a cached run hashes every file for Keys first, and a run under `--no-cache`, which
-// computes no Keys, gives none and hashes only the files of the packages the system cache keeps. The system cache keeps
-// a package when every package it imports is one it keeps too, and the package is the standard library's, in no module
-// with every file of every list it holds below the context's Goroot, or a third-party module's, in a module that is not
-// a main module (under go.work every workspace module is one) with every file of every list it holds below the
-// context's ModuleCache. What decides is whether the module is a main module and where the files sit, never how go
-// found them: a vendored module, or one a replace points at a local directory, has its files in the project's tree,
-// outside the module cache, and stays the project's, unless that tree itself sits below the module cache, where such a
-// package is kept as any module's is, keyed by its files' paths below the module cache and their bytes, so it is never
-// another's. Any other package gets no key, which is no error: it is analyzed as it always is. unsafe and a package
-// with no files are keyed by their path alone, as Keys keys them.
+// StandardLibraryKeys computes the key of every standard-library package among reachable and the packages they
+// import, reading each file once, and none that known, the digests Keys hashed earlier in the run, already holds: a
+// cached run hashes every file for Keys first, and a run under `--no-cache`, which computes no Keys, gives none and
+// hashes only the standard library's files. A package is the standard library's when it has no module, every file of
+// every list it holds is below the context's Goroot, and every package it imports is the standard library's too. Any
+// other package gets no key, which is no error: it is analyzed as it always is. unsafe and a package with no files
+// are keyed by their path alone, as Keys keys them.
 //
 // A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
 // imports, sorted by import path, as Keys' are. The own digest is a sha256 over, in this order and each part
 // length-prefixed: the context (its format version, engine identity, fact analyzers, build and Goroot, hashed once
-// for every package); for a module's package alone, the module cache and its module's path, version and go version,
-// with its replacement's; the package's ID, PkgPath and Name; each of its GoFiles, CompiledGoFiles, OtherFiles,
-// EmbedFiles and IgnoredFiles as its path below Goroot, written `$GOROOT/` and then slash-separated, or below the
-// module cache, written `$GOMODCACHE/` and then slash-separated, and the sha256 of its bytes; and, for a package with
-// cgo files alone, the loader, then the C toolchain when the loader is cgo-translated. Nothing of the process goes in:
-// only what the context names, the module and the files' bytes.
+// for every package); the package's ID, PkgPath and Name; each of its GoFiles, CompiledGoFiles, OtherFiles,
+// EmbedFiles and IgnoredFiles as its path below Goroot, written `$GOROOT/` and then slash-separated, and the sha256 of
+// its bytes; and, for a package with cgo files alone, the loader, then the C toolchain when the loader is
+// cgo-translated. Nothing of the process goes in: only what the context names and the files' bytes.
 func StandardLibraryKeys(
 	reachable []*packages.Package,
 	shared StandardLibraryContext,
@@ -95,18 +74,13 @@ func StandardLibraryKeys(
 	if !filepath.IsAbs(shared.Goroot) {
 		return nil, fmt.Errorf("keying the standard library: GOROOT %q is not absolute", shared.Goroot)
 	}
-	// Empty keeps no module's package; anything else names where every kept module's files are.
-	if shared.ModuleCache != "" && !filepath.IsAbs(shared.ModuleCache) {
-		return nil, fmt.Errorf("keying the standard library: GOMODCACHE %q is not absolute", shared.ModuleCache)
-	}
 	computing := &standardLibraryKeyer{
 		context:      standardLibraryContextDigest(shared),
 		loader:       shared.Loader,
 		cgoToolchain: shared.CgoToolchain,
 		goroot:       shared.Goroot,
-		moduleCache:  shared.ModuleCache,
 		rootRelative: map[string]string{},
-		system:       map[*packages.Package]bool{},
+		standard:     map[*packages.Package]bool{},
 		keys:         map[*packages.Package]Key{},
 		visiting:     map[*packages.Package]bool{},
 	}
@@ -114,25 +88,25 @@ func StandardLibraryKeys(
 		if candidate == nil {
 			return nil, fmt.Errorf("keying the standard library: a nil package was given")
 		}
-		if _, judgeError := computing.isSystem(candidate); judgeError != nil {
+		if _, judgeError := computing.isStandard(candidate); judgeError != nil {
 			return nil, judgeError
 		}
 	}
-	// Every package judged the system cache's, those only imported among them, since each one's imports were judged
-	// before it.
-	var system []*packages.Package
-	for judged, isSystem := range computing.system {
-		if isSystem {
-			system = append(system, judged)
+	// Every package judged the standard library's, those only imported among them, since each one's imports were
+	// judged before it.
+	var standard []*packages.Package
+	for judged, isStandard := range computing.standard {
+		if isStandard {
+			standard = append(standard, judged)
 		}
 	}
-	// No run holds a file below `GOROOT` or the module cache, so each is read from disk.
-	digests, digestsError := fileDigests(system, known, nil)
+	// No run holds a standard-library file, so each is read from disk.
+	digests, digestsError := fileDigests(standard, known, nil)
 	if digestsError != nil {
 		return nil, digestsError
 	}
 	computing.fileDigests = digests
-	for _, keyed := range system {
+	for _, keyed := range standard {
 		computing.key(keyed)
 	}
 	return computing.keys, nil
@@ -140,7 +114,7 @@ func StandardLibraryKeys(
 
 // standardLibraryContextDigest is the run's StandardLibraryContext hashed once, in the key's order: a marker that sets
 // these keys apart from Keys', the format version, the engine identity, the fact analyzers, the build and Goroot.
-// The loader, the C toolchain and the module cache are not in it, since none belongs in every package's key.
+// The loader and the C toolchain are not in it, since neither belongs in every package's key.
 func standardLibraryContextDigest(shared StandardLibraryContext) Key {
 	parts := newPartHash()
 	parts.text("standard library")
@@ -152,20 +126,19 @@ func standardLibraryContextDigest(shared StandardLibraryContext) Key {
 	return parts.sum()
 }
 
-// belowDirectory is file as a system cache's key names it, marker then its path below directory slash-separated,
-// `$GOROOT/` below goroot and `$GOMODCACHE/` below the module cache, and false for a file that is not absolute or not
-// below directory. The paths are compared as written, symbolic links unresolved, as go list names both from the same
-// go env, `GOROOT` for the one and `GOMODCACHE` for the other.
-func belowDirectory(directory string, marker string, file string) (string, bool) {
+// belowRoot is file as a standard-library key names it, `$GOROOT/` then its path below goroot slash-separated, and
+// false for a file that is not absolute or not below goroot. The paths are compared as written, symbolic links
+// unresolved, as go list names both from the same `GOROOT`.
+func belowRoot(goroot, file string) (string, bool) {
 	if !filepath.IsAbs(file) {
 		return "", false
 	}
-	relative, relativeError := filepath.Rel(directory, file)
+	relative, relativeError := filepath.Rel(goroot, file)
 	if relativeError != nil || relative == "." || relative == ".." ||
 		strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return "", false
 	}
-	return marker + filepath.ToSlash(relative), true
+	return rootMarker + filepath.ToSlash(relative), true
 }
 
 // hasCgoFiles reports whether a package has cgo files, which packages.Package holds among its GoFiles without saying

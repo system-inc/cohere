@@ -11,11 +11,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
-// keyStandardLibrary keys every package among reachable the system cache keeps, the standard library's and third-party
-// modules' (see cache.StandardLibraryKeys), reading the digest of each file hashed holds rather than hashing it again,
-// under the build's context with its fact analyzers and loader named, as the system cache's store holds such a
-// package's entry (storeFor). Keys that cannot be computed are a problem, and every such package is then keyed as any
-// other package is, or not at all in a run without the project's store.
+// keyStandardLibrary keys every standard-library package among reachable (see cache.StandardLibraryKeys), reading the
+// digest of each file hashed holds rather than hashing it again, under the build's context with its fact analyzers and
+// loader named, as the system cache's store holds a standard-library package's entry (storeFor). Keys that cannot be
+// computed are a problem, and every standard-library package is then keyed as any other package is, or not at all in a
+// run without the project's store.
 func (session *CacheSession) keyStandardLibrary(
 	loader string,
 	reachable []*packages.Package,
@@ -38,8 +38,8 @@ func (session *CacheSession) keyStandardLibrary(
 	session.standardLibraryContext = &shared
 }
 
-// StandardLibraryContext is what every key of the last Restore's packages the system cache keeps shared, its fact
-// analyzers named, and false before a Restore keyed them or when it could not.
+// StandardLibraryContext is what every standard-library key of the last Restore shared, its fact analyzers named, and
+// false before a Restore keyed the standard library or when it could not.
 func (session *CacheSession) StandardLibraryContext() (cache.StandardLibraryContext, bool) {
 	if session.standardLibraryContext == nil {
 		return cache.StandardLibraryContext{}, false
@@ -48,7 +48,7 @@ func (session *CacheSession) StandardLibraryContext() (cache.StandardLibraryCont
 }
 
 // factAnalyzerSet is each analyzer that learns facts as its slot, then its flags with their values as one JSON object,
-// sorted, which every key of the system cache holds: the system cache's entries hold only what these analyzers learned,
+// sorted, which every standard-library key holds: the system cache's entries hold only what these analyzers learned,
 // under these slots, so a run whose fact analyzers, or their options, are another run's keys every package apart. The
 // flags are read, as cacheRuleSet reads a rule's, since a flag's default is what an option left out resolves to.
 func factAnalyzerSet(known *cacheAnalyzers) []string {

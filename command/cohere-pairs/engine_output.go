@@ -23,11 +23,9 @@ type engineOutput struct {
 	FilesWalked  *int   `json:"filesWalked"`
 	// StandardLibraryRestored is the standard-library packages the run restored rather than computed, from its system
 	// cache or, for a release before it, the table its binary carried (engineLine), whichever its record names, nil
-	// when the run wrote no lint record. ModulesFromSystemCache, SystemCacheWritten, SystemCacheOff and
-	// SystemCacheNotKept are the rest of what its system cache did, which a release before it never writes, and
-	// ModulesFromSystemCache none before #57wgzhp.
+	// when the run wrote no lint record. SystemCacheWritten, SystemCacheOff and SystemCacheNotKept are the rest of
+	// what its system cache did, which a release before it never writes.
 	StandardLibraryRestored *int   `json:"standardLibraryRestored"`
-	ModulesFromSystemCache  int    `json:"modulesFromSystemCache,omitempty"`
 	SystemCacheWritten      int    `json:"systemCacheWritten"`
 	SystemCacheOff          bool   `json:"systemCacheOff,omitempty"`
 	SystemCacheNotKept      string `json:"systemCacheNotKept,omitempty"`
@@ -69,7 +67,6 @@ func readEngineOutput(stream io.Reader) (engineOutput, error) {
 						// One of the two names at most is written, by the binary that wrote the record.
 						restored := parsed.Cache.StandardLibraryFromSystemCache + parsed.Cache.StandardLibraryFromBinary
 						read.StandardLibraryRestored = &restored
-						read.ModulesFromSystemCache = parsed.Cache.ModulesFromSystemCache
 						read.SystemCacheWritten = parsed.Cache.SystemCacheWritten
 						read.SystemCacheOff = parsed.Cache.SystemCacheOff
 						read.SystemCacheNotKept = parsed.Cache.SystemCacheNotKept

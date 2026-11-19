@@ -182,33 +182,3 @@ func TestThePackageCacheLineSaysWhatTheBuildsPacksDid(test *testing.T) {
 		}
 	}
 }
-
-// The third-party modules' packages a run restored from the system cache (#57wgzhp) are read from the engine's record
-// and carried in the summary `--json` writes, apart from the standard library's, and nothing of them when there were
-// none, so a run without them encodes as it always has. The account's line is the front door's to word, and says
-// nothing of them yet: a run with them reads as one without.
-func TestThePackageCacheCarriesTheModulesFromTheSystemCache(test *testing.T) {
-	test.Parallel()
-
-	var read packageCacheUse
-	recorded := `{"on":true,"hit":4,"standardLibraryFromSystemCache":258,"modulesFromSystemCache":31}`
-	if decodeError := json.Unmarshal([]byte(recorded), &read); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	if read.ModulesFromSystemCache != 31 || read.FromSystemCache != 258 {
-		test.Errorf("read %d modules and %d standard-library packages, want 31 and 258", read.ModulesFromSystemCache,
-			read.FromSystemCache)
-	}
-	if encoded := jsonLine(summaryAsJson(runSummary{PackageCache: &read})); !strings.Contains(encoded,
-		`"modulesFromSystemCache":31`) {
-		test.Errorf("want the modules' count carried in %s", encoded)
-	}
-	if encoded := jsonLine(summaryAsJson(runSummary{PackageCache: &packageCacheUse{On: true}})); strings.Contains(
-		encoded, "modulesFromSystemCache") {
-		test.Errorf("want no modules' count when it is 0, got %s", encoded)
-	}
-	without := packageCacheUse{On: true, Hit: 4, FromSystemCache: 258}
-	if got, want := read.line(), without.line(); got != want {
-		test.Errorf("the line with the modules' count %q, want the line without it %q", got, want)
-	}
-}
