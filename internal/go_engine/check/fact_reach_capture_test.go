@@ -9,6 +9,7 @@ import (
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -303,5 +304,50 @@ func TestARestoredPackageHasNoCapture(test *testing.T) {
 		if result.FactReach == nil || len(result.FactReach.Packages) != run.want {
 			test.Errorf("the %s run captured %+v, want %d packages", run.name, result.FactReach, run.want)
 		}
+	}
+}
+
+// A package the run was handed an unsure answer in has no capture, though the resolver learned it (#5vbs1np, must 4):
+// low is restored and the store holds nothing of it, so the nilness of high's Via, which returns low.Fresh's pointer,
+// rests on a placeholder, and high is unsure. Neither is captured: low computed nothing, and what high computed may
+// rest on the placeholder.
+func TestAnUnsurePackageHasNoCapture(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeFiles(test, root, map[string]string{
+		"go.mod": "module example.com/unsure\n\ngo 1.24\n",
+		"low/low.go": "// Package low is restored.\npackage low\n\n" +
+			"// Fresh is never nil.\nfunc Fresh() *int {\n\treturn new(int)\n}\n",
+		"high/high.go": "// Package high reads low.\npackage high\n\nimport \"example.com/unsure/low\"\n\n" +
+			"// Via returns low.Fresh's pointer.\nfunc Via() *int {\n\treturn low.Fresh()\n}\n",
+	})
+	loaded, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading the unsure workspace: %v %+v", loadError, loaded)
+	}
+	byPath := map[string]*packages.Package{}
+	for _, loadedPackage := range loaded.Packages {
+		byPath[loadedPackage.PkgPath] = loadedPackage
+	}
+	low, high := byPath["example.com/unsure/low"], byPath["example.com/unsure/high"]
+	if low == nil || high == nil {
+		test.Fatalf("the load holds %v, want low and high", byPath)
+	}
+	options := DispatchOptions()
+	resolver := fact_resolver.New(answerlessStore{})
+	options.Resolver = resolver
+	options.Restored = func(restoring *packages.Package) bool { return restoring == low }
+	options.Restore = func(*checker.Action) error { return nil }
+	if _, analyzeError := checker.Analyze([]*analysis.Analyzer{reachNilnessAnalyzer}, []*packages.Package{low, high},
+		options); analyzeError != nil {
+		test.Fatalf("analyzing the unsure workspace: %v", analyzeError)
+	}
+	if !resolver.Unsure(high.Types) || resolver.Package(high.Types) == nil {
+		test.Fatalf("high is unsure %t and learned %t, want both", resolver.Unsure(high.Types),
+			resolver.Package(high.Types) != nil)
+	}
+	capture := captureFactReach(resolver, []*packages.Package{low, high})
+	if len(capture.Packages) != 0 {
+		test.Errorf("the capture holds %d packages, want none: low restored and high unsure", len(capture.Packages))
 	}
 }

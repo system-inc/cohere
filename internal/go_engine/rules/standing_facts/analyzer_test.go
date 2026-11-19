@@ -6,7 +6,13 @@ import (
 	"slices"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
@@ -403,4 +409,46 @@ func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) 
 	if !result.Stands(warm.File, warm.Offset) {
 		test.Errorf("Warm does not stand, though size holds a record of the one kind")
 	}
+}
+
+// An answer the build is not sure of reads unknown, whatever its bytes (#5vbs1np, must 4): below is restored and the
+// store holds nothing of it, so the build's question of below.Pure is answered a placeholder, which leaves the facts
+// package unsure. The placeholder is the kind's answer of no fact, not pure, the very bytes the host recorded, and
+// still Total leaves, for unknown.
+func TestAnAnswerTheBuildIsNotSureOfReadsUnknown(test *testing.T) {
+	test.Parallel()
+	found := loadFacts(test)
+	total := found.place(test, "Total")
+	question, asking := purityOf("below.Pure",
+		fact_reach.Asking{Function: imported("below", "Pure"), Parameter: -1, Encoded: notPure(test)})
+	host := &fakeHost{
+		standing: map[fact_reach.Place]bool{total: true},
+		places:   []fact_reach.Place{total},
+		imported: []fact_reach.Question{question},
+		asking:   asking,
+		users:    map[fact_reach.Object][]fact_reach.Place{"below.Pure": {total}},
+	}
+	options := check.DispatchOptions()
+	resolver := fact_resolver.New(emptyStore{})
+	options.Resolver = resolver
+	options.FactHost = rule.FactHost
+	options.FactHosts = func(packageId string) fact_reach.Host {
+		if packageId != found.root.ID {
+			return nil
+		}
+		return host
+	}
+	below := found.root.Imports["below"]
+	options.Restored = func(restoring *packages.Package) bool { return restoring == below }
+	options.Restore = func(*checker.Action) error { return nil }
+	action, _ := analyze(test, found, standing_facts.Analyzer, options)
+	result, isResult := action.Result.(*standing_facts.Result)
+	if !isResult {
+		test.Fatalf("standing_facts's result is a %T", action.Result)
+	}
+	if !resolver.Unsure(found.root.Types) {
+		test.Fatalf("the build was sure of below.Pure, though below is restored and no store answers it")
+	}
+	requireRemoved(test, result,
+		fact_reach.Removal{Place: total, Object: "below.Pure", Reason: fact_reach.UnknownReason(purity)})
 }

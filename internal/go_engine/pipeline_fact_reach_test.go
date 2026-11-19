@@ -199,3 +199,70 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 		}
 	}
 }
+
+// The second leg fails where what stands differs, shown by handing it a host's side that says otherwise of Stable
+// (#5vbs1np, must 4): the build's answer about Stable's nil-ness is its own, so a host's answer of other bytes, or none
+// at all, is a failure on a line of its own, counted under the kind, and in the census. Nothing else moves: Stable
+// stands, so the facts' reach never asks the answer, and the leg alone reads it.
+func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
+	test.Parallel()
+
+	for _, each := range []struct {
+		name string
+		// alter changes the host's side of Stable's nil-ness, the asking at key.
+		alter func(hosted *factReachPackage, key string)
+		// host is how the failure line writes the host's answer.
+		host string
+	}{
+		{"differs", func(hosted *factReachPackage, key string) {
+			asking := hosted.askings[key]
+			asking.Encoded = []byte("otherwise")
+			hosted.askings[key] = asking
+		}, "otherwise"},
+		{"host none", func(hosted *factReachPackage, key string) { delete(hosted.askings, key) }, "none"},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			censusFile := filepath.Join(test.TempDir(), "reach.txt")
+			var built string
+			on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "standing-facts")),
+				exitFindings, func(engine *pipeline) {
+					engine.bodyReachCensus = censusFile
+					engine.bodyDifferential = true
+					// Windows's is the one extra build, and its census comes before its passes read the side.
+					engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
+						hosted := engine.factReachSides.packages["example.com/standing"]
+						for key, asking := range hosted.askings {
+							if asking.Kind == "return_nil_ness" && asking.Function.Path == "Stable" &&
+								asking.Parameter < 0 {
+								built = string(asking.Encoded)
+								each.alter(hosted, key)
+							}
+						}
+						return census
+					}
+				}, "--no-cache", "--no-fix", "--build-dependence")
+			if built == "" || len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
+				test.Fatalf("want windows's body differential and the host's answer about Stable, got %d runs and "+
+					"%q", len(on.buildRuns), built)
+			}
+			differential := on.buildRuns[1].bodyDifferential
+			wantLine := " Stable return_nil_ness: host " + each.host + ", build " + built
+			if !maps.Equal(differential.standingFailed, map[string]int{"return_nil_ness": 1}) ||
+				!slices.ContainsFunc(differential.failures, func(line string) bool {
+					return strings.HasSuffix(line, wantLine)
+				}) {
+				test.Errorf("windows's second leg failed %v, with the failures\n%s\nwant one return_nil_ness, "+
+					"ending %q", differential.standingFailed, strings.Join(differential.failures, "\n"), wantLine)
+			}
+			written, readError := os.ReadFile(censusFile)
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			line := "  standing facts: compared no-return 3, return_nil_ness 1; failures return_nil_ness 1"
+			if !slices.Contains(strings.Split(string(written), "\n"), line) {
+				test.Errorf("the census file has no line %q:\n%s", line, written)
+			}
+		})
+	}
+}
