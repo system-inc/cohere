@@ -8,9 +8,10 @@
 # here is a change to the inventory, made with the reading behind it, and cohere-dev's land gate isolates every rule a
 # change here widens to PerUnit or FileSyntax.
 #
-# Three lines read otherwise than the attachment, which the unit-isolation test found compose (check's
-# unit_isolation_test.go): SA2002 reads the body of the same-package function a go statement starts, as testinggoroutine
-# does, and scannererr and sqlrowserr judge a package-level variable by its uses in every unit, at PackageExit.
+# Two lines read otherwise than the attachment, which the unit-isolation test found compose (check's
+# unit_isolation_test.go): scannererr and sqlrowserr judge a package-level variable by its uses in every unit, at
+# PackageExit. SA2002 is PerUnit because it asks the fact resolver which calls of the same-package function a go
+# statement starts stop the test (its test_stopping_calls answers), where testinggoroutine reads that function's body.
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind
@@ -80,7 +81,7 @@ cohere-go/SA1031 PerUnit
 cohere-go/SA1032 PerUnit
 cohere-go/SA2000 PerUnit FullKind
 cohere-go/SA2001 PerUnit
-cohere-go/SA2002 Composes
+cohere-go/SA2002 PerUnit
 cohere-go/SA2003 PerUnit
 cohere-go/SA3000 PerUnit
 cohere-go/SA3001 PerUnit
@@ -105,7 +106,7 @@ cohere-go/SA4019 FileSyntax
 cohere-go/SA4020 PerUnit FullKind
 cohere-go/SA4021 PerUnit
 cohere-go/SA4022 PerUnit
-cohere-go/SA4023 Composes
+cohere-go/SA4023 PerUnit
 cohere-go/SA4024 PerUnit
 cohere-go/SA4025 PerUnit
 cohere-go/SA4026 PerUnit
@@ -124,7 +125,7 @@ cohere-go/SA5005 PerUnit
 cohere-go/SA5007 PerUnit
 cohere-go/SA5008 PerUnit FullKind
 cohere-go/SA5010 PerUnit FullKind
-cohere-go/SA5012 Composes
+cohere-go/SA5012 PerUnit
 cohere-go/SA6000 PerUnit
 cohere-go/SA6001 PerUnit
 cohere-go/SA6002 PerUnit

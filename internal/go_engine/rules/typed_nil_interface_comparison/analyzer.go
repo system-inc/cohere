@@ -8,10 +8,12 @@
 // comparison's syntax, asking staticcheck_report.HasRange and Ordinal and staticcheck_code.IsInTest where the original
 // asks report.HasRange, report.Ordinal and code.IsInTest, each the port of the one the original calls, proven against
 // it beside it. It reads what each function returns from return_nil_ness, the port of staticcheck's nilness facts,
-// which cross from every dependency, through the context, its listener requiring return_nil_ness, asks Flatten and
-// IsTrivial of the engine's intermediate representation where the original asks irutil's, and asks
-// golang.org/x/exp/typeparams and honnef.co/go/tools/go/types/typeutil what the original asks them, public packages and
-// not framework.
+// which cross from every dependency, through the context, its listener requiring return_nil_ness, asks Flatten of the
+// engine's intermediate representation where the original asks irutil's, and asks golang.org/x/exp/typeparams and
+// honnef.co/go/tools/go/types/typeutil what the original asks them, public packages and not framework. Where the
+// original asks irutil.IsTrivial of the function a value came from, the port asks function_triviality, which answers
+// with the engine's IsTrivial through the fact resolver, so the answer is recorded with the bodies it read and the
+// rule itself reads the body of no function but the one it judges.
 //
 // The original walks every source function of a package in one run but keeps nothing from one comparison to the next,
 // so the port judges one function at a time and finds what the original finds. Like the original, it judges only a
@@ -39,17 +41,18 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/function_triviality"
 	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
 // Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
-// representation: every function, each judged on its own with the nilness facts of the package. It requires
-// return_nil_ness, whose result it reads.
+// representation: every function, each judged on its own with the nilness facts and the triviality of the package. It
+// requires return_nil_ness and function_triviality, whose results it reads.
 var Listener = rule.Listener{
 	FileLocal: true,
-	Requires:  []*analysis.Analyzer{return_nil_ness.Analyzer},
+	Requires:  []*analysis.Analyzer{return_nil_ness.Analyzer, function_triviality.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(context *rule.Context, function *intermediate_representation.Function) {
 			nilnesses, isNilnesses := context.ResultOf(return_nil_ness.Analyzer).(*return_nil_ness.Result)
@@ -58,7 +61,13 @@ var Listener = rule.Listener{
 				// the type it declares.
 				panic("typed_nil_interface_comparison: return_nil_ness's result is missing")
 			}
-			Check(context, nilnesses.Asking(context.RuleName()), function)
+			trivialities, isTrivialities := context.ResultOf(function_triviality.Analyzer).(*function_triviality.Result)
+			if !isTrivialities {
+				// Invariant: the listener requires function_triviality, and the dispatcher hands over its result, of
+				// the type it declares.
+				panic("typed_nil_interface_comparison: function_triviality's result is missing")
+			}
+			Check(context, nilnesses.Asking(context.RuleName()), trivialities.Asking(context.RuleName()), function)
 		},
 	},
 }
@@ -76,10 +85,11 @@ var Analyzer = dispatch.RuleAnalyzer(
 
 // Check judges one function: each comparison by == or != of an interface value with untyped nil, where the value was
 // made from a concrete value, or is a result of a function nilnesses says never returns a nil interface but may
-// return one holding a typed nil, is reported.
+// return one holding a typed nil, and that trivialities does not say is trivial, is reported.
 func Check(
 	context *rule.Context,
 	nilnesses *return_nil_ness.Result,
+	trivialities *function_triviality.Result,
 	function *intermediate_representation.Function,
 ) {
 	for _, block := range function.Blocks {
@@ -88,7 +98,7 @@ func Check(
 			if !isBinary || comparison.Operator != token.EQL && comparison.Operator != token.NEQ {
 				continue
 			}
-			checkComparison(context, nilnesses, comparison)
+			checkComparison(context, nilnesses, trivialities, comparison)
 		}
 	}
 }
@@ -97,6 +107,7 @@ func Check(
 func checkComparison(
 	context *rule.Context,
 	nilnesses *return_nil_ness.Result,
+	trivialities *function_triviality.Result,
 	comparison *intermediate_representation.BinaryOperation,
 ) {
 	// A type parameter's core may be an interface, but a value of it is no interface value.
@@ -163,7 +174,8 @@ func checkComparison(
 		returned.Inner != return_nil_ness.AlwaysNil {
 		return
 	}
-	if intermediate_representation.IsTrivial(comparison.Parent().Program.FunctionValue(callee)) {
+	// Asked last, and only of a callee the nilness leaves flagged: a question never asked records no answer.
+	if calleeIsTrivial(context, trivialities, callee) {
 		return
 	}
 	staticcheck_report.Report(context, comparison, fmt.Sprintf("this comparison is %s true", qualifier),
@@ -172,6 +184,21 @@ func checkComparison(
 			staticcheck_report.Ordinal(resultIndex+1))),
 		staticcheck_report.Related(callee,
 			fmt.Sprintf("%s never returns a nil interface value", typeutil.FuncName(callee))))
+}
+
+// calleeIsTrivial is whether callee, the function a comparison's value came from, does no real work, as
+// intermediate_representation.IsTrivial judges it. A function or method the package itself declares is asked of
+// trivialities, whose answer the fact resolver records with the bodies it read, so the rule reads no function's body
+// itself, and calls IsTrivial nowhere.
+//
+// A function another package declares is never read, and is not trivial. In the program the engine hands a rule,
+// another package's function is made from its types alone and has no syntax, which IsTrivial answers not trivial, and
+// function_triviality refuses at the same boundary where other packages do have their syntax, so the rule and the
+// kind agree in every program. A method of a type from a package this one never imports has no function in that
+// program at all, since it creates a package's direct imports only, and is answered the same without being looked
+// up.
+func calleeIsTrivial(context *rule.Context, trivialities *function_triviality.Result, callee *types.Func) bool {
+	return callee.Pkg() == context.Package && trivialities.IsTrivial(callee)
 }
 
 // staticCalleeObject is the function call statically calls, or nil for a dynamic call or a callee with no function

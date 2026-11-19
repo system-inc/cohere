@@ -48,10 +48,30 @@ func (resolver *Resolver) pathOf(object types.Object) (objectpath.Path, bool) {
 		}
 		return known.path, known.hasPath
 	}
-	path, pathError := objectpath.For(object)
+	path, pathError := resolver.objectPath(object)
 	known := objectPath{path: path, hasPath: pathError == nil}
 	resolver.paths.Store(object, known)
 	return known.path, known.hasPath
+}
+
+// objectPath is object's objectpath, or why it has none, exactly as objectpath.For gives it, by the encoder of object's
+// package, one for each package the run names an object of. objectpath.For starts a fresh search of the package's
+// whole API on every call, sorting its scope's names and walking every signature until it meets the object, which a
+// run asking the paths of thousands of parameters paid for in each; an encoder indexes its package's API once, the
+// second time an object of it is asked, and finds each path after in the index. It holds one lock over every search it
+// makes, so one encoder for the whole run would make the questions of different packages wait on each other's searches,
+// as build_dependence's objectPaths found.
+func (resolver *Resolver) objectPath(object types.Object) (objectpath.Path, error) {
+	stored, isStored := resolver.encoders.Load(object.Pkg())
+	if !isStored {
+		stored, _ = resolver.encoders.LoadOrStore(object.Pkg(), &objectpath.Encoder{})
+	}
+	encoder, isEncoder := stored.(*objectpath.Encoder)
+	if !isEncoder {
+		// Invariant: the map holds only what LoadOrStore stored above.
+		panic(fmt.Sprintf("fact_resolver: %s's objectpath encoder is a %T", objectName(object), stored))
+	}
+	return encoder.For(object)
 }
 
 // read adds the answer of kind about object, another package's, to reader's reads, encoding it only the first time.
@@ -99,9 +119,16 @@ func (resolver *Resolver) Reads(reader *types.Package) ([]Read, bool) {
 
 // Probe is the answer of the kind named kindName about the object at path in owner, a package the run learned, as Ask
 // answers it there, encoded as a read holds it, and whether the run could have it now: not for a package the run never
-// learned, a path that names nothing, a kind not registered, or an answer that would have to reach a package the run
-// restored and no store answers, which a probe never reloads. It runs between the analysis's waves, with no pass
-// running, so the one flag it sets reaches only its own questions.
+// learned, a path that names nothing, a kind not registered, an answer that would have to reach a package the run
+// restored and no store answers, which a probe never reloads, or an answer from an unsure package, which may rest on a
+// placeholder, as Ask keeps nothing computed in one. It runs between the analysis's waves, with no pass running, so
+// the one flag it sets reaches only its own questions.
+//
+// Whether owner is unsure is read after the question, as WholeIfComplete reads it, never only before. A package once
+// unsure stays so, so reading after still finds an owner a pass's placeholder left unsure before the probe. And it
+// finds the owner the probe's own question left unsure: a probe abandons at a package the run restored, but an answer
+// it reads from a package below that the run learned and left unsure is handed back unsure, with nothing to reload,
+// and marks owner, its reader, as Ask marks any.
 func (resolver *Resolver) Probe(kindName string, owner *types.Package, path objectpath.Path) (encoded []byte,
 	answered bool) {
 	home := resolver.Package(owner)
@@ -133,7 +160,11 @@ func (resolver *Resolver) Probe(kindName string, owner *types.Package, path obje
 		}
 		encoded, answered = nil, false
 	}()
-	return probe(resolver, home, object), true
+	answer := probe(resolver, home, object)
+	if resolver.Unsure(home.Types) {
+		return nil, false
+	}
+	return answer, true
 }
 
 // ZeroAnswer is the answer of no fact of the kind named kindName, encoded as a read holds it, and whether such a kind

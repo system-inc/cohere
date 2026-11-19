@@ -39,9 +39,9 @@ func recordedGraphOf(test *testing.T, live *Graph) *Graph {
 	return recorded
 }
 
-// resolvedLines are graph's resolution as lines that name no index: each unit by its place, with its size, its
-// declared objects, its receiver, its bits, its external reads and its calls, each by key; then every kind edge,
-// bit to bit, by key. Two graphs resolve alike exactly when their lines are equal.
+// resolvedLines are graph's resolution as lines that name no index: each unit by its place, with its size, its cgo
+// mark, its declared objects, its receiver, its bits, its external reads and its calls, each by key; then every kind
+// edge, bit to bit, by key. Two graphs resolve alike exactly when their lines are equal.
 func resolvedLines(graph *Graph) []string {
 	resolved := graph.resolve()
 	keys := make([]nodeKey, len(resolved.objects))
@@ -60,6 +60,12 @@ func resolvedLines(graph *Graph) []string {
 	for index := range resolved.unitCount() {
 		parts := []string{"unit " + unitName(index), fmt.Sprintf("nodes %d end %d universe %x",
 			resolved.unitNodes[index], resolved.unitEnd[index], resolved.unitUniverseNames[index])}
+		if resolved.unitFromCgo[index] {
+			parts = append(parts, "from cgo")
+		}
+		if resolved.unitWithheld[index] {
+			parts = append(parts, "withheld")
+		}
 		for _, node := range resolved.declares.row(index) {
 			parts = append(parts, "declares "+bitName(bit(node, false)))
 		}

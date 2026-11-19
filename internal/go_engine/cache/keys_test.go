@@ -330,7 +330,9 @@ func copyChain(test *testing.T) string {
 
 // A byte changed in any file a package holds, a Go file, an other file, an embedded file or an ignored file,
 // changes the key of that package and of every package that imports it, transitively, and of no other. A change
-// in the leaf of the chain leaves its dependencies' keys alone.
+// in the leaf of the chain leaves its dependencies' keys alone. A C header in the package's directory is one of its
+// other files, so a header that moves a struct's layout with no Go file changed moves the key, and with it everything
+// kept under the key, the package's dependence record among them (check.DependenceRecordKey).
 func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 	test.Parallel()
 
@@ -352,6 +354,7 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 	// when it does.
 	bottom.EmbedFiles = []string{filepath.Join(directory, "bottom", "data.txt")}
 	if !slices.Contains(bottom.OtherFiles, filepath.Join(directory, "bottom", "notes.s")) ||
+		!slices.Contains(bottom.OtherFiles, filepath.Join(directory, "bottom", "layout.h")) ||
 		!slices.Contains(bottom.IgnoredFiles, filepath.Join(directory, "bottom", "ignored.go")) {
 		test.Fatalf("bottom loaded without its other and ignored files: %q, %q", bottom.OtherFiles, bottom.IgnoredFiles)
 	}
@@ -370,6 +373,7 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 	}{
 		{"bottom/bottom.go", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
 		{"bottom/notes.s", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
+		{"bottom/layout.h", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
 		{"bottom/data.txt", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
 		{"bottom/ignored.go", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
 		{"middle/middle.go", []string{middleId, topId, topExternalId}, []string{middleId}},

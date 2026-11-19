@@ -100,9 +100,9 @@ func TestACallIntoARestoredPackageIsFollowedThroughItsGraph(test *testing.T) {
 
 	restored, dependency := layoutRestored(test)
 	hostGraph := build_dependence.NewGraph()
-	hostGraph.AddPackage(restored, true)
+	hostGraph.AddPackage(restored, true, nil)
 	dependencyGraph := build_dependence.NewGraph()
-	dependencyGraph.AddPackage(dependency, false)
+	dependencyGraph.AddPackage(dependency, false, nil)
 	nothingDiffers := build_dependence.Difference{}
 	hostJudged := hostGraph.Against(nothingDiffers)
 	dependencyJudged := dependencyGraph.Against(nothingDiffers)

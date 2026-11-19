@@ -68,7 +68,8 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 	if function.Package == walk.irPackage && !anyPointers(function.Signature) {
 		// The push answers such a function the defaults of its signature, whatever its body, and leaves it seen,
 		// which nothing reads of it: judged, imported and markSeen read seen only of a function with a result that
-		// may be nil. So it is answered unbuilt, where imported, through home.Function, and then Build built it.
+		// may be nil. So it is answered unbuilt, where imported, through home.Function, and then Build built it. Nor
+		// is it kept: its signature alone answers it, the same in every build (keepAnswer).
 		//
 		// The condition names home's functions, though dropping it changes nothing a run can see: a replay reaches
 		// another package's function only through a call its judgment transfers, and transferReturnValue asks a
@@ -85,7 +86,20 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 		return defaultNilnessForSignature(function.Signature)
 	}
 	walk.resolver.Build(function)
-	if function.Blocks == nil || walk.seen[function] {
+	if function.Blocks == nil {
+		// The push never judges a function with no blocks and answers it the defaults. A function of assembly may be
+		// one of Go in another build, with another answer, so the defaults are kept as its verdict and handed to the
+		// resolver, as the demand walk keeps them, once.
+		results := defaultNilnessForSignature(function.Signature)
+		if _, held := walk.state.results[declared]; !held {
+			walk.state.results[declared] = results
+			keepAnswer(walk.resolver, walk.home, declared, results)
+		}
+		return results
+	}
+	if walk.seen[function] {
+		// A cycle's begun read, or a function judged before to no more than the defaults, since imported answered one
+		// judged to more: the push answers the defaults, and a begun read is no verdict, so nothing is kept.
 		return defaultNilnessForSignature(function.Signature)
 	}
 	walk.seen[function] = true
@@ -102,6 +116,7 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 	delete(walk.begun, function)
 	walk.state.results[declared] = returned
 	walk.state.callees[declared] = recorder.recorded
+	keepAnswer(walk.resolver, walk.home, declared, returned)
 	walk.resolver.Counts(Kind).Computed.Add(1)
 	return returned
 }

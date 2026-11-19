@@ -335,7 +335,7 @@ func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *test
 
 	host, build := loadedOs(test, "darwin"), loadedOs(test, "windows")
 	graph := build_dependence.NewGraph()
-	graph.AddPackage(host, false)
+	graph.AddPackage(host, false, nil)
 	standardLibrary := graph.Against(build_dependence.Difference{
 		Packages:          map[string]build_dependence.PackageDifference{},
 		HostOnlyPackages:  map[string]bool{},
@@ -391,8 +391,14 @@ func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *test
 	}
 }
 
-// loadedSplit is the census-split fixture's package loaded from source for goos on arm64, cgo off.
+// loadedSplit is the census-split fixture's package loaded from source for goos (loadedFromSource).
 func loadedSplit(test *testing.T, root string, goos string) *packages.Package {
+	test.Helper()
+	return loadedFromSource(test, root, goos, "example.com/split")
+}
+
+// loadedFromSource is the package identifier of the fixture at root loaded from source for goos on arm64, cgo off.
+func loadedFromSource(test *testing.T, root string, goos string, identifier string) *packages.Package {
 	test.Helper()
 	loaded, loadError := load.PackagesCached(root, []string{"./..."},
 		[]string{"GOOS=" + goos, "GOARCH=arm64", "CGO_ENABLED=0", "GOWORK=off"}, nil, load.Caching{WithoutTests: true})
@@ -401,12 +407,12 @@ func loadedSplit(test *testing.T, root string, goos string) *packages.Package {
 	}
 	var found *packages.Package
 	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
-		if each.ID == "example.com/split" {
+		if each.ID == identifier {
 			found = each
 		}
 	})
 	if found == nil {
-		test.Fatalf("the load for %s holds no example.com/split", goos)
+		test.Fatalf("the load for %s holds no %s", goos, identifier)
 	}
 	return found
 }
@@ -414,7 +420,7 @@ func loadedSplit(test *testing.T, root string, goos string) *packages.Package {
 // splitGraph is the census-split fixture's standard-library graph as host, darwin, loads it, judged with no difference.
 func splitGraph(host *packages.Package) (*build_dependence.Graph, *build_dependence.Dependence) {
 	graph := build_dependence.NewGraph()
-	graph.AddPackage(host, false)
+	graph.AddPackage(host, false, nil)
 	return graph, graph.Against(build_dependence.Difference{
 		Packages:          map[string]build_dependence.PackageDifference{},
 		HostOnlyPackages:  map[string]bool{},

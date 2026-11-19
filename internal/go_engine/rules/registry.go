@@ -479,7 +479,7 @@ var ports = map[string]port{
 	"SA5007": {analyzer: infinite_recursion.Analyzer, listener: &infinite_recursion.Listener},
 	"SA5008": {analyzer: invalid_struct_tag.Analyzer, listener: &invalid_struct_tag.Listener},
 	"SA5010": {analyzer: impossible_type_assertion.Analyzer, listener: &impossible_type_assertion.Listener},
-	"SA5012": {analyzer: odd_slice_argument.Analyzer},
+	"SA5012": {analyzer: odd_slice_argument.Analyzer, listener: &odd_slice_argument.Listener},
 	"SA6000": {
 		analyzer: regular_expression_match_in_loop.Analyzer,
 		listener: &regular_expression_match_in_loop.Listener,

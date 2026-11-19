@@ -115,15 +115,19 @@ func graphOf(host loadedBuild, excluded func(*packages.Package) bool) *Graph {
 		if excluded != nil && excluded(loaded) {
 			continue
 		}
-		group.Go(func() { graph.AddPackage(loaded, fixtureWorkspace(loaded)) })
+		group.Go(func() { graph.AddPackage(loaded, fixtureWorkspace(loaded), nil) })
 	}
 	group.Wait()
 	return graph
 }
 
 // differenceOf is what build changes against host, from the two loads' file sets: each file matched by its path as
-// written (GoFiles), as the engine matches them, and each build-only file taken from the build's syntax, which for
-// these fixtures, with no cgo, is the file as written.
+// written (GoFiles), as the engine matches them, and each build-only file taken from the build's syntax, which is the
+// file as written but in a package the cgo tool translated: there a cgo file's syntax is its translation, matched by
+// the file a reader sees, and the file the tool generates is none of the build's files as written. A package the build
+// keeps cgo on in is said so (KeepsCgo), as the engine says it. Each file the two do not share is scanned for a line
+// directive as the disk holds it, the bytes these loads parsed, as the engine scans the bytes its run holds
+// (HoldsLineDirective): a cgo file by its name as written, as the engine scans it.
 func differenceOf(host loadedBuild, build loadedBuild) Difference {
 	difference := Difference{
 		Packages:          map[string]PackageDifference{},
@@ -145,16 +149,25 @@ func differenceOf(host loadedBuild, build loadedBuild) Difference {
 		}
 		var differing PackageDifference
 		for _, file := range hosted.GoFiles {
-			if !slices.Contains(built.GoFiles, file) {
+			if slices.Contains(built.GoFiles, file) {
+				differing.SharedFiles = append(differing.SharedFiles, file)
+			} else {
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
+				differing.EveryUnitDependent = differing.EveryUnitDependent || HoldsLineDirective(file, os.ReadFile)
 			}
 		}
 		for _, file := range built.Syntax {
-			if !slices.Contains(hosted.GoFiles, built.Fset.File(file.FileStart).Name()) {
+			name := built.Fset.File(file.FileStart).Name()
+			if !slices.Contains(built.GoFiles, name) {
+				name = built.Fset.Position(file.Package).Filename
+			}
+			if slices.Contains(built.GoFiles, name) && !slices.Contains(hosted.GoFiles, name) {
 				differing.BuildOnlyFiles = append(differing.BuildOnlyFiles, file)
+				differing.EveryUnitDependent = differing.EveryUnitDependent || HoldsLineDirective(name, os.ReadFile)
 			}
 		}
-		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
+		differing.KeepsCgo = KeepsCgo(CgoFiles(hosted), built)
+		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.KeepsCgo {
 			difference.Packages[identifier] = differing
 		}
 	}
