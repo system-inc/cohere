@@ -36,8 +36,8 @@ type definitionResult map[types.Object]bool
 //
 // The functions it reads are the package's source functions and each function of no package, an instantiation or a
 // wrapper, that they reach through such calls. A parameter of another package is marked when its fact says so, as the
-// push reads one and as the resolver answers one. It is the oracle every way the rule computes its marks is held to,
-// independent of them all: it shares only what they read of one body, directChecks, passedParameters and
+// push reads one and as the resolver answers one. It is the oracle the rule's marks are held to, independent of how
+// the rule finds them: it shares only what the rule reads of one body, directChecks, passedParameters and
 // dominatesEveryReturn.
 var definitionAnalyzer = &analysis.Analyzer{
 	Name:       "odd_slice_argument_definition",

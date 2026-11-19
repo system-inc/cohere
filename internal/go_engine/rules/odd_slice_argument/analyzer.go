@@ -1,30 +1,35 @@
 // Package odd_slice_argument is staticcheck's SA5012, a slice of odd length passed to a function that panics unless
 // its slice has an even length, as strings.NewReplacer and logging APIs taking pairs do, ported onto the engine's own
-// intermediate representation as an analyzer that asks the marks it reads of the run's fact resolver (#w7zmvat).
+// intermediate representation as an analyzer that asks every mark it reads of the run's fact resolver (#w7zmvat).
 //
-// It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5012/sa5012.go, whose logic it keeps and
-// whose message it reports word for word, at the same range, the argument. It runs in three passes over the package's
-// functions, as the original does: it marks each slice parameter a function checks for even length on every path
-// before panicking, then each slice parameter a function passes on every path to a parameter so marked, and then
-// reports each call passing a slice of known odd length to a marked parameter. The original pushes its marks as
-// object facts, judging every package, dependencies included. Here the marks of another package's parameters are asked
-// of the run's fact resolver instead (#w7zmvat unit 2), which marks a parameter only when a call asks of it, judging
-// only its function and what that reaches, and gives every answer the push gives; demand_walk.go says how. The
-// analyzed package's own marks are found the push's way, on the package's own representation, which the report walks
-// anyway, so the marks of the instantiations and wrappers built there, objects of that representation alone, are the
-// push's too. It is a plain analyzer on build_intermediate_representation.Analyzer, whose source functions it walks in
-// the order buildir's SrcFuncs lists them, and generated, whose judgment the context reads though this check filters
-// nothing. Where the original asks staticcheck's internal iterutil.All whether every return block is dominated, the
-// port loops over them itself, and where it asks irutil.IsCallTo whether a call is to len, the port asks whether the
-// callee is the builtin len, the one callee whose name irutil.CallName gives as "len". The fact differential beside
-// this file holds the port's push to the original's facts and findings over whole trees.
+// It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5012/sa5012.go, whose reading of one
+// function's body it keeps and whose message it reports word for word, at the same range, the argument. The original
+// runs in three passes over the package's functions: it marks each slice parameter a function checks for even length
+// on every path before panicking, then each slice parameter a function passes on every path to a parameter so marked,
+// and then reports each call passing a slice of known odd length to a marked parameter. It pushes its marks as object
+// facts, judging every package, dependencies included, each in one walk in the order buildir lists its functions.
 //
-// It differs in one place, adjudicated: the original reads a call's source as a call expression, and the source of a
-// go or defer statement's call is the statement, so a go or defer passing an odd slice to a marked parameter panics
-// the original's run. The port reads the statement's call and reports the argument there, which
-// TestPortReportsWhereTheOriginalPanics holds, running the original behind a recover and requiring that it panic. The
-// registry runs the port in the original's place, under its name, and the original stays only as the oracle: the parity
-// tests beside this file run both over the same packages, and the two differ nowhere else.
+// Here a mark is asked, never pushed. The port reports the same calls, one function at a time, and asks the mark of
+// each such call's parameter of the run's fact resolver, the analyzed package's own as another package's, which judges
+// only that parameter's function and what its marks rest on, in the package that declares it (#w7zmvat unit 2,
+// #8d9r2rh). The marks are defined with no order, as a least set, and demand_walk.go says how they are found. Where the
+// original asks staticcheck's internal iterutil.All whether every return block is dominated, the port loops over them
+// itself, and where it asks irutil.IsCallTo whether a call is to len, the port asks whether the callee is the builtin
+// len, the one callee whose name irutil.CallName gives as "len". It is a plain analyzer on
+// build_intermediate_representation.Analyzer, and generated, whose judgment the context reads though this check filters
+// nothing. The push walk stays in push_walk_test.go, the tests' record of what the original's walk marks, and the fact
+// differential beside this file holds that record to the original's facts over whole trees.
+//
+// It differs in two places, each adjudicated. The original reads a call's source as a call expression, and the source
+// of a go or defer statement's call is the statement, so a go or defer passing an odd slice to a marked parameter
+// panics the original's run. The port reads the statement's call and reports the argument there, which
+// TestPortReportsWhereTheOriginalPanics holds, running the original behind a recover and requiring that it panic. And
+// the original's marks turn on the order its walk meets a package's functions in, wherever a cycle of calls or a call
+// through an instantiation or a wrapper lies between a parameter and its check, where the port marks what the
+// definition marks in every order: definition_test.go is the definition's oracle, and the fixtures under
+// testdata/src/order and testdata/src/standin each hold one package in two orders. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere else.
 package odd_slice_argument
 
 import (
@@ -33,7 +38,6 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
-	"slices"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/generated"
@@ -47,8 +51,8 @@ import (
 )
 
 // Analyzer runs the port under the original's name, so the rule, its settings and every `//cohere:ignore` naming it
-// read the same once the port takes the original's place. It asks the run's fact resolver of the marks of other
-// packages' parameters, which ctrlflow, required through build_intermediate_representation, has the resolver hold.
+// read the same once the port takes the original's place. It asks the run's fact resolver of every mark it reads, of
+// packages ctrlflow, required through build_intermediate_representation, has the resolver hold.
 var Analyzer = &analysis.Analyzer{
 	Name: "SA5012",
 	Doc: "Flags a slice of odd length passed to a function that needs an even one: staticcheck's SA5012, ported onto " +
@@ -57,8 +61,8 @@ var Analyzer = &analysis.Analyzer{
 	Run:      run,
 }
 
-// run marks the package's parameters, directly and then through the calls that pass them on, asking the resolver of
-// other packages' parameters, and reports the odd slices passed to marked parameters.
+// run reports the odd slices each function of the package passes to a marked parameter, every mark, the package's own
+// among them, asked of the run's fact resolver.
 func run(pass *analysis.Pass) (any, error) {
 	context, contextError := staticcheck_report.PassContext(pass)
 	if contextError != nil {
@@ -77,32 +81,11 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("reading the marks of %s: the fact resolver never learned it, though ctrlflow, which "+
 			"it learns a package from, ran on it first", pass.Pkg.Path())
 	}
-	// Collected once, so the three passes walk the same functions in the same order.
-	functions := slices.Collect(built.SourceFunctions())
-	reportOddLengths(context, ownMarks(resolver, reader, functions, pass.Analyzer.Name), functions)
-	return nil, nil
-}
-
-// ownMarks is the marks of the analyzed package's own parameters, the marks run reports by: every function's own
-// checks, then each parameter a function passes on to a marked one, another package's asked of resolver as reader holds
-// it, under asking's row. It stands apart from run so the definition's oracle reads the very marks run makes, not a
-// copy of how it makes them (definition_test.go).
-func ownMarks(
-	resolver *fact_resolver.Resolver,
-	reader *fact_resolver.Package,
-	functions []*intermediate_representation.Function,
-	asking string,
-) *packageFacts {
-	marks := &packageFacts{
-		resolver: resolver,
-		home:     reader,
-		recorded: map[types.Object]bool{},
-		asking:   asking,
+	marks := (&Result{resolver: resolver, reader: reader}).Asking(pass.Analyzer.Name)
+	for function := range built.SourceFunctions() {
+		reportOddLengths(context, marks.Marked, function)
 	}
-	walk := &pushWalk{facts: marks}
-	walk.markLengthChecks(functions)
-	walk.markIndirectLengthChecks(functions)
-	return marks
+	return nil, nil
 }
 
 // dominatesEveryReturn is whether every path through function to a return passes through block.
@@ -183,60 +166,64 @@ func directChecks(function *intermediate_representation.Function) []*intermediat
 	return checked
 }
 
-// reportOddLengths reports each call passing a slice whose length is known and odd to a marked parameter.
-func reportOddLengths(context *rule.Context, marks facts, functions []*intermediate_representation.Function) {
-	for _, function := range functions {
-		for _, block := range function.Blocks {
-			for _, instruction := range block.Instructions {
-				call, isCall := instruction.(intermediate_representation.CallInstruction)
-				if !isCall {
+// reportOddLengths reports each call in function passing a slice whose length is known and odd to a parameter marked
+// says is marked. It reads function's own instructions and asks one mark for each such call, so it judges a function
+// on its own.
+func reportOddLengths(
+	context *rule.Context,
+	marked func(parameter *types.Var) bool,
+	function *intermediate_representation.Function,
+) {
+	for _, block := range function.Blocks {
+		for _, instruction := range block.Instructions {
+			call, isCall := instruction.(intermediate_representation.CallInstruction)
+			if !isCall {
+				continue
+			}
+			callee := call.Common().StaticCallee()
+			if callee == nil {
+				continue
+			}
+			for argumentIndex, argument := range call.Common().Arguments {
+				parameterIndex := argumentIndex
+				if callee.Signature.Recv() != nil {
+					if argumentIndex == 0 {
+						continue
+					}
+					parameterIndex--
+				}
+				if _, isSlice := argument.Type().Underlying().(*types.Slice); !isSlice {
 					continue
 				}
-				callee := call.Common().StaticCallee()
-				if callee == nil {
+				// The length is read before the mark is asked, since a finding needs both and only the mark is
+				// costly: it is a question of the resolver, which judges the parameter's function and records the
+				// answer and the read for the cache. A slice of unknown or even length is never reported, whatever
+				// the mark, so leaving its question unasked changes only what the cache holds, never a finding.
+				// A slice of an allocation of no array, which the builder makes for an array whose type is a
+				// type parameter, has no length the scan can read, and asking the mark first as the original
+				// does keeps its invariant reached exactly where the original reaches it, at a marked parameter.
+				length, unreadable := knownSliceLength(argument)
+				if unreadable == nil && (length < 0 || length%2 == 0) {
 					continue
 				}
-				for argumentIndex, argument := range call.Common().Arguments {
-					parameterIndex := argumentIndex
-					if callee.Signature.Recv() != nil {
-						if argumentIndex == 0 {
-							continue
-						}
-						parameterIndex--
-					}
-					if _, isSlice := argument.Type().Underlying().(*types.Slice); !isSlice {
-						continue
-					}
-					// The length is read before the mark is asked, since a finding needs both and only the mark is
-					// costly: of another package's parameter it is a question of the resolver, which records the
-					// answer and the read for the cache. A slice of unknown or even length is never reported, whatever
-					// the mark, so leaving its question unasked changes only what the cache holds, never a finding.
-					// A slice of an allocation of no array, which the builder makes for an array whose type is a
-					// type parameter, has no length the scan can read, and asking the mark first as the original
-					// does keeps its invariant reached exactly where the original reaches it, at a marked parameter.
-					length, unreadable := knownSliceLength(argument)
-					if unreadable == nil && (length < 0 || length%2 == 0) {
-						continue
-					}
-					parameter := callee.Signature.Params().At(parameterIndex)
-					if !marks.marked(parameter) {
-						continue
-					}
-					if unreadable != nil {
-						// Invariant: a slice expression with no high bound slices an array it allocated, a slice or
-						// a string, and only the array is an Allocation.
-						panic(fmt.Sprintf("odd_slice_argument: a slice of an allocation of %s", unreadable.Type()))
-					}
-					label := "argument"
-					signature := call.Common().Signature()
-					if parameterIndex == signature.Params().Len()-1 && signature.Variadic() {
-						label = "variadic argument"
-					}
-					// The parameter has a name, since its function could not have checked its length otherwise.
-					staticcheck_report.Report(context, callExpression(call).Args[parameterIndex],
-						fmt.Sprintf("%s %q is expected to have even number of elements, but has %d elements", label,
-							parameter.Name(), length))
+				parameter := callee.Signature.Params().At(parameterIndex)
+				if !marked(parameter) {
+					continue
 				}
+				if unreadable != nil {
+					// Invariant: a slice expression with no high bound slices an array it allocated, a slice or
+					// a string, and only the array is an Allocation.
+					panic(fmt.Sprintf("odd_slice_argument: a slice of an allocation of %s", unreadable.Type()))
+				}
+				label := "argument"
+				signature := call.Common().Signature()
+				if parameterIndex == signature.Params().Len()-1 && signature.Variadic() {
+					label = "variadic argument"
+				}
+				// The parameter has a name, since its function could not have checked its length otherwise.
+				staticcheck_report.Report(context, callExpression(call).Args[parameterIndex],
+					fmt.Sprintf("%s %q is expected to have even number of elements, but has %d elements", label,
+						parameter.Name(), length))
 			}
 		}
 	}

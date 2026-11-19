@@ -58,17 +58,17 @@ func Loose(values []string) {
 `
 
 // Over generated call graphs dense with cycles, each written as a package in several declaration orders, the marks
-// are the definition's however the rule computes them and wherever a walk enters (#8d9r2rh). Every function takes two
-// slices and passes each, the other or neither on to others, to itself, and to another package's functions, on every
-// path or only sometimes, as a declared function, a method, a method reached through a method expression's thunk, or
-// a generic function reached through its instantiation wrapper, the last two being functions of no package.
+// are the definition's wherever a judgment enters (#8d9r2rh). Every function takes two slices and passes each, the
+// other or neither on to others, to itself, and to another package's functions, on every path or only sometimes, as a
+// declared function, a method, a method reached through a method expression's thunk, or a generic function reached
+// through its instantiation wrapper, the last two being functions of no package.
 //
 // Three things are held together. The definition's oracle marks each package exactly as the graph it was generated
 // from says, computed on the graph alone, with no source and no representation, so the oracle is itself held to
-// something outside it. The analyzer's own marks, the resolver's answers, asked in a shuffled order, and the package
-// computed whole are the definition's (holdToDefinition). And a reader package, importing each one and passing every
-// function two slices of one, is reported exactly where the graph marks a parameter: there the package is a dependency
-// the resolver judges in its own program, as a run judges one, with nothing but the analyzer running.
+// something outside it. The resolver's answers, asked in a shuffled order, and the package computed whole are the
+// definition's (holdToDefinition). And a reader package, importing each one and passing every function two slices of
+// one, is reported exactly where the graph marks a parameter: there the package is a dependency the resolver judges in
+// its own program, as a run judges one, with nothing but the analyzer running.
 func TestTheMarksAreTheDefinitionsOnGeneratedGraphsInAnyOrder(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()

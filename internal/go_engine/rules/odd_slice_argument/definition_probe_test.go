@@ -21,9 +21,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
 )
 
-// Over staticcheck's fixture and the port's own, the marks are the definition's however the rule computes them
-// (#8d9r2rh): the marks the analyzer makes of the package it runs on, the resolver's answer about every parameter in
-// reach, strings' among them, and the package computed whole for the store. In none of these fixtures does the push's
+// Over staticcheck's fixture and the port's own, the marks are the definition's however they are asked (#8d9r2rh): the
+// resolver's answer about every parameter in reach, each package's own and strings' among them, and the package
+// computed whole for the store. In none of these fixtures does the push's
 // order leave out a mark the definition makes: demand/cycle's cycle is one the push enters, as the package declares
 // it, where every mark is found. So the push marks exactly what the definition does.
 func TestTheMarksAreTheDefinitionsOnTheFixtures(test *testing.T) {
@@ -66,7 +66,7 @@ func TestTheMarksAreTheDefinitionsOnTheFixtures(test *testing.T) {
 
 // One cycle of calls is marked the same in either declaration order (#8d9r2rh): in order/forward and order/back, a
 // slice passed to back, forward or pairs reaches the length check, so the definition holds all three marked in both,
-// and every way the rule computes its marks must too. The push, the tests' record of staticcheck's walk, departs in
+// and so must the rule. The push, the tests' record of staticcheck's walk, departs in
 // order/forward alone, on back's slice, which proves the two packages differ where a walk's order bites.
 func TestACyclesMarksAreTheDefinitionsInEitherOrder(test *testing.T) {
 	test.Parallel()
@@ -86,7 +86,7 @@ func TestACyclesMarksAreTheDefinitionsInEitherOrder(test *testing.T) {
 // A parameter passed through a stand-in is marked the same wherever its package declares what the stand-in stands for
 // (#8d9r2rh): in standin/first and standin/last, with no cycle of calls anywhere, each caller's slice reaches the
 // length check through an instantiation, a bound method or a thunk, so the definition holds every slice marked in
-// both, and every way the rule computes its marks must too. The push departs in standin/first alone, on all three
+// both, and so must the rule. The push departs in standin/first alone, on all three
 // callers, which proves each kind of stand-in bites its order.
 func TestAStandInsMarksAreTheDefinitionsInEitherOrder(test *testing.T) {
 	test.Parallel()
@@ -114,8 +114,8 @@ type held struct {
 	// function's full name and the parameter's name.
 	defined map[string]bool
 
-	// differences is every place a way the rule computes its marks parts from the definition, and every parameter the
-	// push marks that the definition does not.
+	// differences is every place the rule's marks part from the definition's, and every parameter the push marks that
+	// the definition does not.
 	differences []string
 
 	// departures is each parameter the definition holds marked that the push's order leaves unmarked, named as
@@ -144,24 +144,24 @@ func inTheOrderGiven(string, []*types.Var) {
 	// Nothing to do: the probe's own order is the order asked for.
 }
 
-// holdToDefinition loads the packages patterns name from directory, laid out by import path, and holds every way the
-// rule computes its marks there to the definition's oracle (odd_slice_argument.DefinitionAnalyzer), failing the test
-// wherever one parts from it:
+// holdToDefinition loads the packages patterns name from directory, laid out by import path, and holds the rule's
+// marks there to the definition's oracle (odd_slice_argument.DefinitionAnalyzer), failing the test wherever they part
+// from it:
 //
-//   - the marks the analyzer makes of each root, the marks its findings come from;
-//   - the resolver's answer about every parameter in each root's reach, asked as that root, in order's order;
+//   - the resolver's answer about every parameter in each root's reach, asked as that root, in order's order, which
+//     for the root's own parameters is the very question the rule asks for a finding there;
 //   - each root computed whole, as the run computes a package for the store, once every question is answered.
 //
-// The push runs beside them as the record of staticcheck's walk. It marks nothing the definition does not, which fails
-// the test too, and each parameter the definition marks beyond it is a departure, returned and never a failure.
+// No answer may come of replaying a package's walk, since no mark depends on an order. The push runs beside them as
+// the record of staticcheck's walk. It marks nothing the definition does not, which fails the test too, and each
+// parameter the definition marks beyond it is a departure, returned and never a failure.
 func holdToDefinition(test *testing.T, directory string, patterns []string, order askOrder) held {
 	test.Helper()
 	push := odd_slice_argument.NewPushAnalyzer(nil)
 	probe := &analysis.Analyzer{
-		Name: "definition_probe",
-		Doc:  "holds the marks of the package, however the rule computes them, to the definition's",
-		Requires: []*analysis.Analyzer{odd_slice_argument.Analyzer, push, odd_slice_argument.DefinitionAnalyzer,
-			odd_slice_argument.OwnMarksAnalyzer},
+		Name:       "definition_probe",
+		Doc:        "holds the marks of the package, however the rule computes them, to the definition's",
+		Requires:   []*analysis.Analyzer{odd_slice_argument.Analyzer, push, odd_slice_argument.DefinitionAnalyzer},
 		ResultType: reflect.TypeFor[*heldPackage](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			return holdPackage(pass, push, order)
@@ -208,14 +208,17 @@ func holdToDefinition(test *testing.T, directory string, patterns []string, orde
 	if all.compared == 0 {
 		test.Fatalf("no parameter of %v was held to the definition, so the comparison proves nothing", patterns)
 	}
+	if fallbacks := resolver.Counts(odd_slice_argument.Kind).Fallbacks.Load(); fallbacks != 0 {
+		test.Errorf("the marks fell back %d times over %v, want none", fallbacks, patterns)
+	}
 	slices.Sort(all.departures)
 	test.Logf("%d answers over %d packages held to the definition, which the push's order departs from on %d",
 		all.compared, len(graph.Roots), len(all.departures))
 	return all
 }
 
-// holdPackage holds the marks of pass's package to the definition's: the analyzer's own, and the resolver's answer
-// about every parameter in the package's reach, asked as the package in order's order.
+// holdPackage holds the marks of pass's package to the definition's: the resolver's answer about every parameter in
+// the package's reach, asked as the package in order's order.
 func holdPackage(pass *analysis.Pass, push *analysis.Analyzer, order askOrder) (*heldPackage, error) {
 	resolver, resolverError := fact_resolver.Of(pass)
 	if resolverError != nil {
@@ -228,10 +231,6 @@ func holdPackage(pass *analysis.Pass, push *analysis.Analyzer, order askOrder) (
 	defined, isDefined := odd_slice_argument.Definition(pass)
 	if !isDefined {
 		return nil, fmt.Errorf("the definition's result is a %T", pass.ResultOf[odd_slice_argument.DefinitionAnalyzer])
-	}
-	own, isOwn := odd_slice_argument.OwnMarks(pass)
-	if !isOwn {
-		return nil, fmt.Errorf("the analyzer's own marks are a %T", pass.ResultOf[odd_slice_argument.OwnMarksAnalyzer])
 	}
 	found := &heldPackage{
 		held:   held{defined: map[string]bool{}},
@@ -275,14 +274,6 @@ func holdPackage(pass *analysis.Pass, push *analysis.Analyzer, order askOrder) (
 		}
 		if defined[parameter] && !pushed {
 			found.departures = append(found.departures, name)
-		}
-	}
-	for _, parameter := range parametersOfPackage(pass.Pkg, own, found.marked) {
-		found.compared++
-		if own[parameter] != found.marked[parameter] {
-			found.differences = append(found.differences, fmt.Sprintf("in %s, %s: the analyzer's own walk marks it "+
-				"%t, the definition %t", pass.Pkg.Path(), found.name(pass.Fset, parameter), own[parameter],
-				found.marked[parameter]))
 		}
 	}
 	return found, nil

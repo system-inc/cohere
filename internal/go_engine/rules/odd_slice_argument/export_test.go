@@ -45,14 +45,10 @@ func Definition(pass *analysis.Pass) (map[types.Object]bool, bool) {
 	return defined, isDefined
 }
 
-// OwnMarksAnalyzer is ownMarksAnalyzer, the marks the analyzer makes of the package it runs on, for the tests outside
-// this package.
-var OwnMarksAnalyzer = ownMarksAnalyzer
-
-// OwnMarks is every parameter the analyzer's own marks hold on pass's package, and whether pass holds them at all.
-func OwnMarks(pass *analysis.Pass) (map[types.Object]bool, bool) {
-	own, isOwn := pass.ResultOf[ownMarksAnalyzer].(ownMarksResult)
-	return own, isOwn
+// IsDefinitionMark is whether fact is the definition's mark.
+func IsDefinitionMark(fact analysis.Fact) bool {
+	_, isMark := fact.(*evenByDefinition)
+	return isMark
 }
 
 // Whole is whole, every parameter of home marked as the resolver computes a package whole for the store.
