@@ -12,9 +12,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
-// factKindsSettled is what windows's build settled of the fact-kinds fixture's one package under the body reach census
-// and the body differential (#73k3wge): the settlement, each of the package's bodies by name, the build's run and the
-// host's, and the census file the run wrote.
+// factKindsSettled is what windows's build settled of one package of a facts' reach fixture, as fact-kinds's one
+// package, under the body reach census and the body differential (#73k3wge): the settlement, each of the package's
+// bodies by name, the build's run and the host's, and the census file the run wrote.
 type factKindsSettled struct {
 	settlement *fact_reach.Settlement
 	bodies     map[string]reachedBody
@@ -27,8 +27,15 @@ type factKindsSettled struct {
 // build settled of its package.
 func settleFactKinds(test *testing.T) *factKindsSettled {
 	test.Helper()
+	return settleFactFixture(test, "fact-kinds", "example.com/kinds")
+}
+
+// settleFactFixture runs the fixture testdata's directory fixture names under the census and the body differential,
+// and reads what windows's build settled of its package at packagePath.
+func settleFactFixture(test *testing.T, fixture string, packagePath string) *factKindsSettled {
+	test.Helper()
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
-	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "fact-kinds")), exitFindings,
+	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", fixture)), exitFindings,
 		func(engine *pipeline) {
 			engine.bodyReachCensus = censusFile
 			engine.bodyDifferential = true
@@ -39,13 +46,13 @@ func settleFactKinds(test *testing.T) *factKindsSettled {
 	settled := &factKindsSettled{bodies: map[string]reachedBody{}, run: on.buildRuns[1], host: on.buildRuns[0],
 		censusFile: censusFile}
 	for _, body := range settled.run.bodyReach.bodies {
-		if body.packageIdentifier == "example.com/kinds" {
+		if body.packageIdentifier == packagePath {
 			settled.bodies[body.name] = body
 		}
 	}
-	result, isResult := settled.run.result.FactReachSettled["example.com/kinds"].(*standing_facts.Result)
+	result, isResult := settled.run.result.FactReachSettled[packagePath].(*standing_facts.Result)
 	if !isResult || !result.Partial || result.Settlement == nil {
-		test.Fatalf("windows settled example.com/kinds as %+v, want it settled in part", result)
+		test.Fatalf("windows settled %s as %+v, want it settled in part", packagePath, result)
 	}
 	settled.settlement = result.Settlement
 	return settled

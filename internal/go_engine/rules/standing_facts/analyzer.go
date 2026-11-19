@@ -118,6 +118,12 @@ func run(pass *analysis.Pass) (any, error) {
 		result.ImportedNamed++
 	}
 
+	// The members of each cycle of calls in the build that touches a body it lints, whose answers may hang on the order
+	// the build's walk enters the cycle in, where the host's order bound saw no such cycle.
+	ordered := buildOrderNamed(pass, host, standing, functions)
+	result.BuildOrderNamed = len(ordered)
+	named = append(named, ordered...)
+
 	// The bodies the build lints already, whose recorded answers the walk asks first. The host's set is only read,
 	// here and by the walk: what still stands is the settlement's own map.
 	var reached []fact_reach.Place

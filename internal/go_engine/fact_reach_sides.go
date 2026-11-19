@@ -115,9 +115,10 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 // side, and of them settled, those whose standing bodies it settled, the build linting them in part
 // (standing_facts.Result.Partial), crashed, those it failed to settle on; and, summed over the settled ones, the
 // no-return facts compared and the objects they named, the answers the host read from other packages asked before the
-// walk and the objects they named, the order-bound objects named before anything was asked, the answers the walk asked
-// and those that read differing or unknown, by kind, the functions of a body that left with no record of a kind, by
-// kind, and the bodies the facts took out of the standing set.
+// walk and the objects they named, the order-bound objects and the members of the build's own cycles of calls named
+// before anything was asked, the answers the walk asked and those that read differing or unknown, by kind, the
+// functions of a body that left with no record of a kind, by kind, and the bodies the facts took out of the standing
+// set.
 type buildFactReach struct {
 	sides             int
 	settled           int
@@ -127,6 +128,7 @@ type buildFactReach struct {
 	importedAsked     int
 	importedNamed     int
 	orderBoundNamed   int
+	buildOrderNamed   int
 	asked             int
 	differing         map[string]int
 	unknown           map[string]int
@@ -149,6 +151,7 @@ func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *
 		census.functionsNamed += packageSettled.FunctionsNamed
 		census.importedAsked += packageSettled.ImportedAsked
 		census.importedNamed += packageSettled.ImportedNamed
+		census.buildOrderNamed += packageSettled.BuildOrderNamed
 		if hosted := hosts[identifier]; hosted != nil {
 			census.orderBoundNamed += len(hosted.OrderBound())
 		}
@@ -176,7 +179,8 @@ func writeBuildFactReach(written *strings.Builder, census *buildFactReach) {
 		census.orderBoundNamed)
 	fmt.Fprintf(written, "    answers asked %d, differing %s, unknown %s; bodies taken out %d\n", census.asked,
 		byKind(census.differing), byKind(census.unknown), census.removed)
-	fmt.Fprintf(written, "    functions with no record of a kind %s\n", byKind(census.unrecordedKinds))
+	fmt.Fprintf(written, "    functions with no record of a kind %s; build order named %d\n",
+		byKind(census.unrecordedKinds), census.buildOrderNamed)
 }
 
 // byKind is counts written by kind, the kinds in order, or none.

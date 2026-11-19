@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/system-inc/cohere/internal/go_engine/call_groups"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
@@ -35,8 +36,15 @@ func OrderBound(home *fact_resolver.Package, held []*types.Func) (bound []*types
 			return nil, false
 		}
 	}
+	// Each judged function to the declared functions of home its judgment called. One that called none is in no group.
+	callees := make(map[*types.Func][]*types.Func, len(state.callees))
+	for function, called := range state.callees {
+		for _, callee := range called {
+			callees[function] = append(callees[function], declaredFunction(callee))
+		}
+	}
 	bounded := map[*types.Func]bool{}
-	for _, group := range groupsOf(state.callees) {
+	for _, group := range call_groups.Of(callees) {
 		if slices.ContainsFunc(group, state.aboveFloor) {
 			for _, member := range group {
 				bounded[member] = true

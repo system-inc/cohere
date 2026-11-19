@@ -22,6 +22,10 @@ type Result struct {
 	// and ImportedNamed how many of them named their object: the answer differed, or could not be read.
 	ImportedAsked int
 	ImportedNamed int
+
+	// BuildOrderNamed is how many functions were named as members of a cycle of calls in the build that touches a
+	// body the build lints (buildOrderNamed).
+	BuildOrderNamed int
 }
 
 // Stands is whether the function body declared in the file parsed from filename, its `func` at offset, is left to the
