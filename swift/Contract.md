@@ -895,8 +895,9 @@ order taken, which is the order of their wall, and `[]` when there are none, nev
 
 A stamp's `label` names a moment, such as `host.load.end`, `handover.begin` or a build's `gate.taken`. `build` is the
 extra build the stamp is of, its name as the lint record's `builds` name it, and omitted for the host's run and the
-run's own steps. `round` is 1 for a load or a check that runs again after its first, as the long-line wrap's load or
-a reload for a question does, 2 for the next, and omitted for the first. No two stamps of a record share their build,
+run's own steps. `round` is a load's: 1 for a load that runs again after its first, as the long-line wrap's load or a
+reload for a question does, 2 for the next, and omitted for the first. A check carries the round of the load it runs
+over, so a run's only check can read 1. No two stamps of a record share their build,
 round and label. Begins and ends do not always pair: a run with no extra build stamps `handover.begin` and no
 `handover.end`, and a build that fails or finds type errors stamps no `end`.
 
