@@ -95,7 +95,7 @@ func loadObjects(test *testing.T, directory string, environment []string, patter
 // added from a goroutine of its own, workspace saying which belong to the checked modules, judged against the
 // difference of the two loads' files as block 1's fixture tests take it (build_dependence's differenceOf), each file
 // matched by its path as written, a build-only one taken from the build's syntax, and each file the two do not share
-// scanned for a line directive by its path (build_dependence.HoldsLineDirective).
+// scanned for a line directive as the disk holds it, the bytes the loads parsed (build_dependence.HoldsLineDirective).
 func objectDependence(
 	host objectLoad,
 	build objectLoad,
@@ -131,13 +131,15 @@ func objectDependence(
 				differing.SharedFiles = append(differing.SharedFiles, file)
 			} else {
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective || build_dependence.HoldsLineDirective(file)
+				differing.LineDirective = differing.LineDirective ||
+					build_dependence.HoldsLineDirective(file, os.ReadFile)
 			}
 		}
 		for _, file := range built.Syntax {
 			if name := built.Fset.File(file.FileStart).Name(); !slices.Contains(hosted.GoFiles, name) {
 				differing.BuildOnlyFiles = append(differing.BuildOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective || build_dependence.HoldsLineDirective(name)
+				differing.LineDirective = differing.LineDirective ||
+					build_dependence.HoldsLineDirective(name, os.ReadFile)
 			}
 		}
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {

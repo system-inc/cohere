@@ -100,7 +100,7 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 			if !isShared || !slices.Contains(hostPackage.GoFiles, file) {
 				differing.BuildOnlyFiles = appendParsed(differing.BuildOnlyFiles, fileSet, file)
 				differing.LineDirective = differing.LineDirective ||
-					isShared && build_dependence.HoldsLineDirective(file)
+					isShared && build_dependence.HoldsLineDirective(file, os.ReadFile)
 			}
 		}
 		if isShared {
@@ -109,7 +109,8 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 					differing.SharedFiles = append(differing.SharedFiles, file)
 				} else {
 					differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
-					differing.LineDirective = differing.LineDirective || build_dependence.HoldsLineDirective(file)
+					differing.LineDirective = differing.LineDirective ||
+						build_dependence.HoldsLineDirective(file, os.ReadFile)
 				}
 			}
 		}
@@ -190,22 +191,48 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 // and is the one unit left independent. With no scan the count is 0, with none of the host-only file 1, Steady alone,
 // and with none of the build-only file 4. The run's one finding is windows's own, printf's of Helper, a string there,
 // formatted with %d.
+//
+// The scan reads each file as the run holds it (pipeline.held), the bytes the load built the graph from, never the
+// disk again: with gen_other.go rewritten on disk without its directive once the run has read it, as a save in the
+// middle of a run leaves it, the graph still names Helper by shared.go, the scan still seeds p, and the count is the
+// same.
 func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.T) {
 	test.Parallel()
 
-	root := copyFixture(test, filepath.Join("testdata", "build-dependence-line-directive"))
-	engine, stream := runOver(test, root, exitFindings, "--build-dependence")
-	lint := lintRecordOf(test, stream)
-	if len(lint.Builds) != 2 || len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
-		test.Fatalf("want the host's build and windows's, got the records %+v", lint.Builds)
-	}
-	recorded := lint.Builds[1].Dependence
-	if recorded == nil {
-		test.Fatal("the windows build's record writes no dependence")
-	}
-	if recorded.Workspace.Units != 6 || recorded.Workspace.DependentUnits != 5 {
-		test.Errorf("want 5 of the workspace's 6 units dependent on windows, every one but q's Alone, got %d of %d",
-			recorded.Workspace.DependentUnits, recorded.Workspace.Units)
+	for _, each := range []struct {
+		name         string
+		rewritesDisk bool
+	}{
+		{name: "as read", rewritesDisk: false},
+		{name: "rewritten on disk once read", rewritesDisk: true},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+
+			root := copyFixture(test, filepath.Join("testdata", "build-dependence-line-directive"))
+			var configure func(*pipeline)
+			if each.rewritesDisk {
+				// Given the pipeline once describeProject has read every file, before the run's first phase.
+				configure = func(*pipeline) {
+					writeTestFile(test, filepath.Join(root, "p", "gen_other.go"),
+						"//go:build !windows\n\npackage p\n\nfunc Helper() int { return 1 }\n")
+				}
+			}
+			engine, stream := runOverConfigured(test, root, exitFindings, configure, "--no-cache", "--build-dependence")
+			lint := lintRecordOf(test, stream)
+			if len(lint.Builds) != 2 || len(engine.buildRuns) != 2 ||
+				engine.buildRuns[1].build.OperatingSystem != "windows" {
+				test.Fatalf("want the host's build and windows's, got the records %+v", lint.Builds)
+			}
+			recorded := lint.Builds[1].Dependence
+			if recorded == nil {
+				test.Fatal("the windows build's record writes no dependence")
+			}
+			if recorded.Workspace.Units != 6 || recorded.Workspace.DependentUnits != 5 {
+				test.Errorf("want 5 of the workspace's 6 units dependent on windows, every one but q's Alone, got %d "+
+					"of %d", recorded.Workspace.DependentUnits, recorded.Workspace.Units)
+			}
+		})
 	}
 }
 

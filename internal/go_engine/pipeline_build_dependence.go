@@ -63,15 +63,25 @@ func (engine *pipeline) callIndex() *build_dependence.CallIndex {
 	return engine.dependence.calls
 }
 
-// holdsLineDirective is build_dependence.HoldsLineDirective of file, scanned once a run (hostDependence.lineDirectives)
-// whichever build asks first.
+// holdsLineDirective is build_dependence.HoldsLineDirective of file as the run holds it (held), the bytes the load
+// parsed and the host's graph was built from, which every reader that would open a file again reads instead: a file
+// rewritten on disk once the run read it is scanned as the graph knows it, never as the disk has it now. A file the
+// run holds nothing for, a dependency's, the standard library's or one in scope it could not read, is read from disk,
+// where the load read it, and one that cannot be read there holds a directive, failing wide (sourceReader). It is
+// scanned once a run (hostDependence.lineDirectives) whichever build asks first, or by each of two builds that ask at
+// once, alike.
+//
+// The editor's save (#qtna8m4) is the one run whose held bytes of a file, the buffer, are not the disk's, and it never
+// reaches here: it takes `--fix` alone, refusing `--lint` (invocation.go:125), so it asks for no lint phase, which
+// alone builds the host's graph (buildDependenceGraph) and runs the extra builds this judges (runLint), and runStdin
+// (pipeline_stdin.go:53-70) calls neither.
 func (engine *pipeline) holdsLineDirective(file string) bool {
 	if scanned, isScanned := engine.dependence.lineDirectives.Load(file); isScanned {
 		if holds, isBool := scanned.(bool); isBool {
 			return holds
 		}
 	}
-	holds := build_dependence.HoldsLineDirective(file)
+	holds := build_dependence.HoldsLineDirective(file, engine.sourceReader(nil, nil))
 	engine.dependence.lineDirectives.Store(file, holds)
 	return holds
 }

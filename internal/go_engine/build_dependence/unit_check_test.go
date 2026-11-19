@@ -124,7 +124,7 @@ func graphOf(host loadedBuild, excluded func(*packages.Package) bool) *Graph {
 // differenceOf is what build changes against host, from the two loads' file sets: each file matched by its path as
 // written (GoFiles), as the engine matches them, and each build-only file taken from the build's syntax, which for
 // these fixtures, with no cgo, is the file as written. Each file the two do not share is scanned for a line directive
-// by its path, as the engine scans it (HoldsLineDirective).
+// as the disk holds it, the bytes these loads parsed, as the engine scans the bytes its run holds (HoldsLineDirective).
 func differenceOf(host loadedBuild, build loadedBuild) Difference {
 	difference := Difference{
 		Packages:          map[string]PackageDifference{},
@@ -150,13 +150,13 @@ func differenceOf(host loadedBuild, build loadedBuild) Difference {
 				differing.SharedFiles = append(differing.SharedFiles, file)
 			} else {
 				differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective || HoldsLineDirective(file)
+				differing.LineDirective = differing.LineDirective || HoldsLineDirective(file, os.ReadFile)
 			}
 		}
 		for _, file := range built.Syntax {
 			if name := built.Fset.File(file.FileStart).Name(); !slices.Contains(hosted.GoFiles, name) {
 				differing.BuildOnlyFiles = append(differing.BuildOnlyFiles, file)
-				differing.LineDirective = differing.LineDirective || HoldsLineDirective(name)
+				differing.LineDirective = differing.LineDirective || HoldsLineDirective(name, os.ReadFile)
 			}
 		}
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {

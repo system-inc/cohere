@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"go/ast"
 	"go/types"
-	"os"
 )
 
 // Difference is what one extra build changes against the host, as its file sets say: the graph's judgment of the
@@ -69,10 +68,12 @@ var (
 	blockCommentDirective = []byte("/*line ")
 )
 
-// HoldsLineDirective reports whether the file at path holds a line directive anywhere in its bytes
-// (lineCommentDirective, blockCommentDirective). A file that cannot be read is said to hold one, failing wide.
-func HoldsLineDirective(path string) bool {
-	source, readError := os.ReadFile(path)
+// HoldsLineDirective reports whether file holds a line directive anywhere in its bytes (lineCommentDirective,
+// blockCommentDirective), as read reads them: the caller's, so they are the bytes the graph was built from, which in
+// the engine are the run's held bytes rather than the disk's again (pipeline.holdsLineDirective). A file read cannot
+// read is said to hold one, failing wide.
+func HoldsLineDirective(file string, read func(file string) ([]byte, error)) bool {
+	source, readError := read(file)
 	if readError != nil {
 		return true
 	}
