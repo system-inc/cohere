@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -200,6 +203,51 @@ func TestAnAnswerNamesEveryDeclarationTheWalkRead(test *testing.T) {
 	chained := ran.answers["entering.Chained"]
 	if len(chained.Entered) == 3 && chained.Entered[0].File == chained.Entered[2].File {
 		test.Errorf("Chained names one file, %s, for declarations in two", chained.Entered[0].File)
+	}
+}
+
+// A function literal is named by the top-level declaration that encloses it, however deep it is. Asked is trivial
+// through twice, whose function literal, called in place, calls another in place, which alone calls leaf: the answer
+// names twice once, for itself and both literals, and leaf, which shows the walk entered the inner literal. twice's
+// own answer names only leaf, both literals being its own declaration's.
+func TestAnAnswerNamesTheDeclarationEnclosingALiteralInsideALiteral(test *testing.T) {
+	test.Parallel()
+	ran := askRoots(test, "nested")
+	for _, asked := range []struct {
+		name    string
+		entered []string
+	}{
+		{"Asked", []string{"twice", "leaf"}},
+		{"twice", []string{"leaf"}},
+	} {
+		want := function_triviality.Triviality{Trivial: true, Entered: placesOf(test, ran.roots[0], asked.entered...)}
+		if answer := ran.answers["nested."+asked.name]; !reflect.DeepEqual(answer, want) {
+			test.Errorf("%s: the answer is %+v, want %+v", asked.name, answer, want)
+		}
+	}
+}
+
+// A declaration under a //line directive is named as the engine keys a unit: by the file the directive names, as
+// token.Position renders it, beside the file that holds the directive, and by the offset of the declaration's first
+// byte in the file as parsed, which no directive moves. The want is built from the fixture's own bytes, by no file
+// set.
+func TestAnAnswerNamesAFunctionUnderALineDirectiveByTheFileTheDirectiveNames(test *testing.T) {
+	test.Parallel()
+	ran := askRoots(test, "directive")
+	directory := filepath.Join(analysistest.TestData(), "src", "directive")
+	parsed, readError := os.ReadFile(filepath.Join(directory, "directive.go"))
+	if readError != nil {
+		test.Fatalf("reading the fixture: %v", readError)
+	}
+	offset := strings.Index(string(parsed), "func moved")
+	if offset < 0 || !strings.Contains(string(parsed), "\n//line other.go:10\nfunc moved") {
+		test.Fatal("the fixture no longer declares moved right under its //line directive")
+	}
+	want := function_triviality.Triviality{Trivial: true, Entered: []function_triviality.DeclarationPlace{
+		{File: filepath.Join(directory, "other.go"), Offset: offset},
+	}}
+	if answer := ran.answers["directive.Asked"]; !reflect.DeepEqual(answer, want) {
+		test.Errorf("Asked's answer is %+v, want %+v", answer, want)
 	}
 }
 
