@@ -28,13 +28,13 @@ func (noAnswers) Reloaded(*types.Package) bool {
 }
 
 // The answers a run records, which are what it saves of the kind and what a build compares, hold the kind only for
-// functions the rule asked about, each a function of the package the rule was judging: of the six functions and
+// functions the rule asked about, each a function of the package the rule was judging: of the seven functions and
 // methods the fixtures start as goroutines from their own packages, and none of another package, testing and parity's
 // other among them, though both declare functions that stop a test. The kind is not registered, so nothing computes
 // it for a function no rule asked about.
 //
 // The resolver records an answer by its object's objectpath, and an unexported package-level function has none, so
-// five of the six are asked about and never recorded: only the method's answer is. The test holds that as it is, so
+// six of the seven are asked about and never recorded: only the method's answer is. The test holds that as it is, so
 // what a build can compare of the kind is plain here.
 func TestARunRecordsTheKindOnlyForTheFunctionsTheRuleAskedAbout(test *testing.T) {
 	test.Parallel()
@@ -77,7 +77,7 @@ func TestARunRecordsTheKindOnlyForTheFunctionsTheRuleAskedAbout(test *testing.T)
 	}
 	want := map[string]bool{"(*parity.suite).stops": true, "CheckConcurrentTesting.fn2": false,
 		"differences.later": false, "differences.recursive": false, "parity.fails": false,
-		"parity.stopsEitherWay": false}
+		"parity.stopsEitherWay": false, "parity.stopsInSecondFile": false}
 	if !maps.Equal(asked, want) {
 		test.Errorf("the rule asked about these functions, each with whether it has an objectpath: %v, want %v", asked,
 			want)

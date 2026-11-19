@@ -242,6 +242,12 @@ func stopsEitherWay(t *testing.T, skipped bool) {
 	}
 }
 
+// Found by both: a named function declared in another file of the package, second_file.go, where the related entry
+// is, a file other than the go statement's.
+func startsAcrossFiles(t *testing.T) {
+	go stopsInSecondFile(t)
+}
+
 // Found by neither: the goroutine closes over the test and only reads it.
 func readsOnly(t *testing.T) {
 	go func() {
