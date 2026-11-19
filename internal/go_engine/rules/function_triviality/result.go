@@ -19,7 +19,14 @@ import (
 // and a store may give it back on a later run. What keeps an answer given back right is the key that entry is under,
 // which holds each of the package's files by its path and contents, so an entry found under the same key names the
 // same files at the same offsets.
-var Kind = &fact_resolver.Kind{Name: "function_triviality"}
+var Kind = &fact_resolver.Kind{Name: "function_triviality", OrderBound: orderFree}
+
+// orderFree is triviality's order bound (fact_resolver.Kind.OrderBound): none, and known. Each answer is one walk of
+// IsTrivial from the asked function with a seen set of its own, reading no other answer (see judgeIn), so no answer
+// about any function of home hangs on the order its questions came in.
+func orderFree(*fact_resolver.Package, []*types.Func) ([]*types.Func, bool) {
+	return nil, true
+}
 
 // bodilessTriviality is the answer about a function declared without a body, from its types alone (fact_resolver.Ask):
 // trivial, having read no other body. Built from its declaration, it has its syntax and no blocks, so the walk finds
@@ -35,6 +42,9 @@ type Result struct {
 
 	// asking is the row under `--timing` whose questions these are, empty until Asking names it.
 	asking string
+
+	// asker is the body whose rule asks, which the resolver records beside each answer, nil until For names it.
+	asker *fact_resolver.Asker
 }
 
 // Asking is the package's triviality as the rule or analyzer whose `--timing` row is named asking asks it, so the
@@ -43,11 +53,23 @@ func (result *Result) Asking(asking string) *Result {
 	return &Result{resolver: result.resolver, reader: result.reader, asking: asking}
 }
 
+// For is the package's triviality as its rule asks while it checks function, so the resolver records function's body,
+// or the declaration a literal of it is in, as the asker of each answer (fact_resolver.Resolver.RecordAskers,
+// #5vbs1np). Where the resolver records no asker, the result itself is handed back, and nothing is made.
+func (result *Result) For(function *intermediate_representation.Function) *Result {
+	if !result.resolver.RecordsAskers() {
+		return result
+	}
+	asker := fact_resolver.AskerOf(function)
+	return &Result{resolver: result.resolver, reader: result.reader, asking: result.asking, asker: &asker}
+}
+
 // IsTrivial is whether function, a function or method the package itself declares, is trivial, as
 // intermediate_representation.IsTrivial answers of it. Asked of another package's function it panics: that one has no
 // syntax where a reader walks, which IsTrivial answers not trivial, so a reader takes it as not trivial and never asks.
 func (result *Result) IsTrivial(function *types.Func) bool {
 	var answer triviality
+	result.resolver.NoteAsker(Kind, function, result.asker)
 	result.resolver.Question(result.asking, func() { answer = ask(result.resolver, result.reader, function) })
 	return answer.Trivial
 }

@@ -256,6 +256,10 @@ type pipeline struct {
 	// can show it failing on bodies the reach would wrongly leave unreached.
 	bodyDifferentialCensus func(*buildBodyReach) *buildBodyReach
 
+	// factReachSides are the host's side of each package for the facts' reach, made beside bodyReachHost from what the
+	// host's lint captured of its facts, and nil whenever it is (fact_reach_sides.go, #aswfm7a).
+	factReachSides *factReachSides
+
 	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and
 	// bodyReachFromSource the one the census reads them back from, each empty unless asked
 	// (pipeline_body_reach_from_source.go).

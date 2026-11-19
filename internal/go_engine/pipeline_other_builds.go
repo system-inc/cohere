@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -62,8 +63,15 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
-	if (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil {
+	if engine.takesBodyReach() {
 		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
+		// The host's side of each package for the facts' reach, made once here, before any build starts, and only read
+		// after. The capture goes once it is read: its no-return predicates hold the host's resolver's packages, which
+		// must not stay alive through the builds.
+		if pass.result.FactReach != nil {
+			engine.factReachSides = newFactReachSides(engine.bodyReachHost, pass.result.FactReach, loaded.Packages)
+			pass.result.FactReach = nil
+		}
 	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
 	// one again beside the pass; the walks are over, so this waits for the last sets alone.
@@ -705,6 +713,14 @@ func (engine *pipeline) extraBuildRun(
 				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, census)
 			}
 		}
+		// Each pass is handed the host's side of its package for the facts' reach, with the bodies this load's census
+		// leaves unreached standing, read by the actions of the run at once and written by none.
+		var factHosts func(packageId string) fact_reach.Host
+		if engine.factReachSides != nil && run.bodyReach != nil {
+			hosts := engine.factReachSides.inBuild(run.bodyReach)
+			run.factHosts = hosts
+			factHosts = func(packageId string) fact_reach.Host { return hosts[packageId] }
+		}
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
@@ -720,6 +736,11 @@ func (engine *pipeline) extraBuildRun(
 			// Under `--build-dependence` the build's facts are compared with the host's (#0ghk7vj).
 			ExportFacts: engine.dependence != nil,
 			Inheritance: inherits,
+			FactHosts:   factHosts,
+			// The standing bodies each pass's side leaves are settled, for the census to count, and under the body
+			// differential the build's own facts are captured, for its second leg to compare those left standing by.
+			FactReachSettle: engine.factReachSettle(factHosts != nil),
+			FactReach:       engine.bodyDifferential && factHosts != nil,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -786,13 +807,35 @@ func (engine *pipeline) extraBuildRun(
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
 	}
+	// The facts' reach the last load's passes settled, whose result stands, and each package they failed to settle on,
+	// noted under the build's name.
+	if result.FactReachUnsettled != "" {
+		run.factReach = &buildFactReach{unsettled: result.FactReachUnsettled}
+	}
+	if result.FactReachSettled != nil {
+		run.factReach = newBuildFactReach(run.factHosts, result)
+		for _, crash := range result.FactReachCrashes {
+			noteTo(notes, "the facts' reach of the build %s could not settle %s: %s", extra, crash.File, crash.Error)
+		}
+	}
 	// The findings of each body the differential compared, the last load's, whose result stands, a difference classed
-	// under a later stage only where the judgment shows its cause (findingCauses). A differential is made only of a
-	// judged build (runRules).
+	// under a later stage only where the judgment shows its cause (findingCauses) and a body the facts' reach took out
+	// left to the build, and its second leg, over the facts of each body the facts' reach left standing, whose capture
+	// goes once it is read: its no-return predicates hold the build's resolver's packages. A differential is made only
+	// of a judged build (runRules).
 	if run.bodyDifferential != nil {
 		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
 			findingStagesOf(enabled), &findingCauses{dependence: run.judged.dependence,
-				filesDiffer: run.judged.filesDiffer})
+				filesDiffer: run.judged.filesDiffer}, result.FactReachSettled)
+		if result.FactReach != nil && result.FactReachSettled != nil {
+			built := make(map[string]*packages.Package, len(loaded.Packages))
+			for _, each := range loaded.Packages {
+				built[each.ID] = each
+			}
+			run.bodyDifferential.compareStanding(extra.String(), engine.factReachSides, result.FactReachSettled,
+				result.FactReach, built)
+		}
+		result.FactReach = nil
 	}
 	run.loading, run.linting, run.shareGateWait = loading, linting, shareGateWait
 	if engine.buildLoadTimes != nil {

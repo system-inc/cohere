@@ -7,6 +7,10 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
 // bodyReachListed is how many disagreements of each direction the census file lists by name per build: every one
@@ -14,8 +18,26 @@ import (
 // other direction, where stage 2 is wider, which is expected.
 const bodyReachListed = 20
 
+// takesBodyReach is whether the run makes the census's host side as its extra builds start (bodyReachHost): one that
+// judges each build's dependence and asked for the census or the body differential.
+func (engine *pipeline) takesBodyReach() bool {
+	return (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil
+}
+
+// factReachSettle is the analyzer a build settles its standing bodies by for the facts' reach, standing_facts'
+// (check.Options.FactReachSettle), when handsSides says it hands its passes the host's sides, which it does under the
+// body reach census or the body differential alone, whose census and second leg read its results (buildFactReach,
+// buildBodyDifferential.compareStanding), and nil otherwise, so nothing is settled.
+func (engine *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
+	if !handsSides {
+		return nil
+	}
+	return standing_facts.Analyzer
+}
+
 // writeBodyReachCensus writes each extra build's census of runs to the census file, when the run asked for one and
-// judged its builds' dependence, and notes each body differential failure on stderr, in build order, under the
+// judged its builds' dependence, after a line of what the reach does not stand for and one of the host's sides for the
+// facts' reach (factReachSides), and notes each body differential failure on stderr, in build order, under the
 // differential. An extra build with no census, judged by nothing or stopped by its type errors before its rules, is
 // written as such, and under the differential is a failure: nothing of it was compared. A file that cannot be written
 // is noted and changes nothing else.
@@ -28,6 +50,12 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		"for a package-wide rule's, stage 5's (#xeafx79): the body differential classes a package-wide rule's "+
 		"findings apart where the package holds a dependent unit, and fails a callee's fact's until the build can "+
 		"show one differs (#5vbs1np).\n")
+	// The host's sides for the facts' reach, under the census, ahead of every build that reads them.
+	if engine.factReachSides != nil {
+		fmt.Fprintf(&written, "fact reach: packages given a side %d; none, uncaptured %d, unrecorded %d, order "+
+			"unknown %d\n", len(engine.factReachSides.packages), engine.factReachSides.uncaptured,
+			engine.factReachSides.unrecorded, engine.factReachSides.orderUnknown)
+	}
 	for index, run := range runs {
 		if run.bodyReach == nil {
 			if index == 0 {
@@ -42,6 +70,9 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 			continue
 		}
 		writeBuildBodyReach(&written, "build "+run.build.String(), run.bodyReach)
+		if run.factReach != nil {
+			writeBuildFactReach(&written, run.factReach)
+		}
 		if run.bodyReachFromSource != nil {
 			writeBuildBodyReach(&written, "build "+run.build.String()+", within the packages a plain run checks from "+
 				"source", run.bodyReachFromSource)
@@ -51,6 +82,16 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		}
 		fmt.Fprintf(&written, "  body differential: compared %d, failures %d\n", run.bodyDifferential.compared,
 			len(run.bodyDifferential.failures))
+		if run.bodyDifferential.factsSettled {
+			fmt.Fprintf(&written, "  taken out by the facts' reach %d\n", run.bodyDifferential.takenOut)
+		}
+		if run.bodyDifferential.standingCompared != nil {
+			fmt.Fprintf(&written, "  standing facts: compared %s; failures %s\n",
+				byKind(run.bodyDifferential.standingCompared), byKind(run.bodyDifferential.standingFailed))
+			fmt.Fprintf(&written, "  standing facts only the build holds: asked only in the build, by reached bodies "+
+				"%d; held only in the build, asked by no rule %d\n", run.bodyDifferential.askedByReached,
+				run.bodyDifferential.heldUnasked)
+		}
 		for _, failure := range run.bodyDifferential.failures {
 			fmt.Fprintf(&written, "    %s\n", failure)
 			engine.note("the body differential of the build %s: %s", run.build, failure)

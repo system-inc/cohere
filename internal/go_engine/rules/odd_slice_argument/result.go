@@ -4,10 +4,18 @@ import (
 	"go/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // Kind keys SA5012's marks in each package the resolver holds, and its counts.
-var Kind = &fact_resolver.Kind{Name: "odd_slice_argument"}
+var Kind = &fact_resolver.Kind{Name: "odd_slice_argument", OrderBound: orderFree}
+
+// orderFree is the marks' order bound (fact_resolver.Kind.OrderBound): none, and known. The marks are the least set
+// closed under their rules, one set whatever order a walk finds it in (see demandWalk), so no mark of any function of
+// home hangs on the order its walks took.
+func orderFree(*fact_resolver.Package, []*types.Func) ([]*types.Func, bool) {
+	return nil, true
+}
 
 func init() {
 	fact_resolver.Register(Kind, whole,
@@ -32,6 +40,9 @@ type Result struct {
 
 	// asking is the row under `--timing` whose questions these are, empty until Asking names it.
 	asking string
+
+	// asker is the body whose rule asks, which the resolver records beside each answer, nil until For names it.
+	asker *fact_resolver.Asker
 }
 
 // Asking is the package's marks as the rule or analyzer whose `--timing` row is named asking asks them, so the
@@ -40,11 +51,23 @@ func (marks *Result) Asking(asking string) *Result {
 	return &Result{resolver: marks.resolver, reader: marks.reader, asking: asking}
 }
 
+// For is the package's marks as its rule asks while it checks function, so the resolver records function's body, or the
+// declaration a literal of it is in, as the asker of each answer (fact_resolver.Resolver.RecordAskers, #5vbs1np). Where
+// the resolver records no asker, the result itself is handed back, and nothing is made.
+func (marks *Result) For(function *intermediate_representation.Function) *Result {
+	if !marks.resolver.RecordsAskers() {
+		return marks
+	}
+	asker := fact_resolver.AskerOf(function)
+	return &Result{resolver: marks.resolver, reader: marks.reader, asking: marks.asking, asker: &asker}
+}
+
 // Marked is whether parameter is marked as this package's readers hold it: the package's own parameter, or another
 // package's whose mark the checker would have carried here (fact_resolver.Visible), that its function needs of even
 // length.
 func (marks *Result) Marked(parameter *types.Var) bool {
 	var marked bool
+	marks.resolver.NoteAsker(Kind, parameter, marks.asker)
 	marks.resolver.Question(marks.asking, func() { marked = ask(marks.resolver, marks.reader, parameter) })
 	return marked
 }

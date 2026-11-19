@@ -71,6 +71,15 @@ func (resolved *Package) Info() *types.Info {
 	return resolved.info
 }
 
+// NoReturn reports whether ctrlflow found that function never returns, as the package's analysis read it: a function
+// the package declares, or one of another package that the package calls statically, whose fact ctrlflow imported. Any
+// other function is false. The read is safe from any goroutine: ctrlflow filled the predicate's map during its own
+// pass, which ended before the checker told the resolver of the package, and the package was stored (Finished) only
+// after its predicate was set, so nothing writes it once the package can be read.
+func (resolved *Package) NoReturn(function *types.Func) bool {
+	return resolved.noReturn(function)
+}
+
 // Function is the package's declared function or method whose object is function, built, or nil when function is no
 // declared function of the package, as an instantiated method's object never is.
 func (resolved *Package) Function(function *types.Func) *intermediate_representation.Function {

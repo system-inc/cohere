@@ -310,6 +310,9 @@ func (engine *pipeline) lintPackages(
 	options.Timing = engine.timing
 	// Under `--build-dependence` the host's facts are the ones every extra build's are compared with (#0ghk7vj).
 	options.ExportFacts = engine.dependence != nil
+	// What the host's run held of its facts, read while its resolver is alive, which each package's host's side for the
+	// facts' reach is made of, only in a run whose extra builds start with the body reach's host side (#aswfm7a).
+	options.FactReach = engine.keepsForBuilds() && engine.takesBodyReach()
 	options.Counted = engine.described.countedAsWalked
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer

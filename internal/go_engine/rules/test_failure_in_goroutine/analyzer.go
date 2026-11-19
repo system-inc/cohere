@@ -113,22 +113,23 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 				// The package's synthetic initializer, which has no object and which no go statement can name.
 				continue
 			}
-			for _, stopping := range askedBy(context).StoppingCalls(declared) {
+			for _, stopping := range askedBy(context, function).StoppingCalls(declared) {
 				report(context, goStatement, stopping.Method, relatedAtPlace(context, stopping))
 			}
 		}
 	}
 }
 
-// askedBy is the package's stopping calls as context's rule asks them, StoppingCallsAnalyzer's result.
-func askedBy(context *rule.Context) *Result {
+// askedBy is the package's stopping calls as context's rule asks them while it checks function,
+// StoppingCallsAnalyzer's result.
+func askedBy(context *rule.Context, function *intermediate_representation.Function) *Result {
 	result, isResult := context.ResultOf(StoppingCallsAnalyzer).(*Result)
 	if !isResult || result == nil {
 		// Invariant: the listener requires StoppingCallsAnalyzer, and the dispatcher hands over its result, of the
 		// type it declares.
 		panic("test_failure_in_goroutine: the stopping calls' result is missing")
 	}
-	return result.Asking(context.RuleName())
+	return result.Asking(context.RuleName()).For(function)
 }
 
 // startedFunction is the function goStatement starts, when it is a function or a closure of one, and nil otherwise.

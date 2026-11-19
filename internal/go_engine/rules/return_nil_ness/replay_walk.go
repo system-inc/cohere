@@ -79,6 +79,11 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 		// library, loom and deeafbf4, and fired as soon as a judgment asked a callee of every result (#efs50c3).
 		return defaultNilnessForSignature(function.Signature)
 	}
+	if function.Package != walk.irPackage && declared.Pkg() == walk.home.Types {
+		// A stand-in for one of home's functions, read below as its fact, which the walk holds only once it has
+		// judged the declared function, so what this read answers hangs on the order (see OrderBound).
+		walk.state.standIns[declared] = true
+	}
 	if results, holds := walk.imported(declared); holds {
 		return results
 	}

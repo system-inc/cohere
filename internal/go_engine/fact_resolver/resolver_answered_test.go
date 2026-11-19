@@ -14,7 +14,7 @@ import (
 func answeredNames(answers []fact_resolver.Answered) []string {
 	var named []string
 	for _, answer := range answers {
-		named = append(named, fmt.Sprintf("%s %s %s", answer.Kind, answer.Object.Name(), answer.Encoded))
+		named = append(named, fmt.Sprintf("%s %s %s", answer.Kind.Name, answer.Object.Name(), answer.Encoded))
 	}
 	return named
 }

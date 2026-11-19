@@ -11,10 +11,10 @@ import (
 	"sync"
 )
 
-// Answered is one answer a run holds: the kind's name, the object the answer is about, and the answer, as JSON, as Ask
-// encodes one, whose zero Value is no fact.
+// Answered is one answer a run holds: the kind, whose hooks a reader may call (Kind.OrderBound), the object the answer
+// is about, and the answer, as JSON, as Ask encodes one, whose zero Value is no fact.
 type Answered struct {
-	Kind    string
+	Kind    *Kind
 	Object  types.Object
 	Encoded []byte
 }
@@ -29,10 +29,10 @@ type Answered struct {
 // or one computed in an unsure package, since nothing unsure is memoized or kept.
 //
 // It is read once the run's passes are done, when no question is adding to what the run holds. The answers are sorted
-// by the object's package path, then by where the object is declared, its file, line and column, then by kind, then
-// by the answer's bytes, so they come in the same order on every run, whatever order the questions were asked in and
-// the load parsed the files in. A place is used rather than a position, which counts from wherever the load happened
-// to add the file.
+// by the object's package path, then by where the object is declared, its file, line and column, then by kind's name,
+// then by the answer's bytes, so they come in the same order on every run, whatever order the questions were asked in
+// and the load parsed the files in. A place is used rather than a position, which counts from wherever the load
+// happened to add the file.
 func (resolver *Resolver) Answered() []Answered {
 	resolver.mutex.Lock()
 	program := resolver.program
@@ -51,7 +51,7 @@ func (resolver *Resolver) Answered() []Answered {
 			cmp.Compare(places[left.Object].Filename, places[right.Object].Filename),
 			cmp.Compare(places[left.Object].Line, places[right.Object].Line),
 			cmp.Compare(places[left.Object].Column, places[right.Object].Column),
-			cmp.Compare(left.Kind, right.Kind), bytes.Compare(left.Encoded, right.Encoded))
+			cmp.Compare(left.Kind.Name, right.Kind.Name), bytes.Compare(left.Encoded, right.Encoded))
 	})
 	return answers
 }
@@ -69,7 +69,7 @@ func heldOnce(memoized iter.Seq2[answerKey, []byte], kept iter.Seq2[answerKey, [
 	var answers []Answered
 	memoizedEncoded := map[answerKey][]byte{}
 	hold := func(answered answerKey, encoded []byte) {
-		answers = append(answers, Answered{Kind: answered.kind.Name, Object: answered.object, Encoded: encoded})
+		answers = append(answers, Answered{Kind: answered.kind, Object: answered.object, Encoded: encoded})
 	}
 	for answered, encoded := range memoized {
 		memoizedEncoded[answered] = encoded

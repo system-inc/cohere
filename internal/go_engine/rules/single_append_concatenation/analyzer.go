@@ -79,7 +79,7 @@ func judgeFunction(context *rule.Context, function *intermediate_representation.
 	}
 	// The purity pass's result is never nil, so the original's MayHaveSideEffects always asks it, and a function is
 	// pure where it answers so.
-	asking := pure.Asking(context.RuleName())
+	asking := pure.Asking(context.RuleName()).For(function)
 	ast.Inspect(syntax, func(node ast.Node) bool {
 		if statement, isRange := node.(*ast.RangeStmt); isRange {
 			Check(context, asking.IsPure, statement)

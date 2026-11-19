@@ -22,6 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -115,11 +116,33 @@ type Options struct {
 	// digesting every fact of a run is work no finding needs.
 	ExportFacts bool
 
+	// FactReach has the run hand back, in Result.FactReach, what the host's side of each analyzed package is made of
+	// for the facts' reach (#aswfm7a): the answers the run holds, the packages' no-return predicates and the objects
+	// whose answers hang on the order the run walked a package in (captureFactReach). Only a host's run with extra
+	// builds sets it; the findings are the same either way.
+	FactReach bool
+
 	// Inheritance, when not nil, is an extra build's take of the host's run for its syntax-only rules (#y6q1x2j): each
 	// such rule skips each file it inherits and reports the host's findings there as its own (rule.InheritedFiles),
 	// handed every pass under rule.Inherited (see checker.Options.Inheritance). Only an extra build restoring from the
 	// host's run sets it (HostRun.Inheritance). The findings are the same either way.
 	Inheritance rule.Inheritance
+
+	// FactHosts, when not nil, is an extra build's host's side of each package for the facts' reach (#5vbs1np), by the
+	// package's ID, nil for a package it lints whole: handed every pass on that package under rule.FactHost (see
+	// checker.Options.FactHosts), so standing_facts compares the host's facts and answers with the build's before any
+	// rule runs there. It is called from several actions at once. Only an extra build sets it.
+	FactHosts func(packageId string) fact_reach.Host
+
+	// FactReachSettle, when not nil, is the analyzer an extra build settles each package's standing bodies by for the
+	// facts' reach (#aswfm7a), standing_facts', which this package never imports: rooted beside the rules on every
+	// package the run analyzes from source, never on one it restores, its result on each is in
+	// Result.FactReachSettled. A run none of whose rules requires ctrlflow roots it nowhere, and says why in
+	// Result.FactReachUnsettled (settlingIn). It is no rule and no report: it reports nothing, an entry holds nothing
+	// of it, and no cache key and no finding count reads it (checker.Options.Beside), so the findings and the entries
+	// are the same either way. Its failure on a package is in Result.FactReachCrashes, never a finding and never a
+	// failed run.
+	FactReachSettle *analysis.Analyzer
 
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
@@ -239,6 +262,16 @@ type Result struct {
 	// ReportsRestored is how many of Reports came from the findings cache rather than from an analysis this run.
 	ReportsRestored int
 
+	// FactReachSettled is Options.FactReachSettle's result on each package the run analyzed from source that it
+	// finished on, by package ID, nil without it. FactReachCrashes are the packages it did not finish on, as Crashes
+	// says a rule's, which it never joins: it is no rule, and its crash leaves the lint phase's verdict whole.
+	FactReachSettled map[string]any
+	FactReachCrashes []Crash
+
+	// FactReachUnsettled is why the run rooted no Options.FactReachSettle though it was set, empty when it did or was
+	// not asked to: "ctrlflow not in the run", for rules none of which requires ctrlflow (settlingIn).
+	FactReachUnsettled string
+
 	// Reloads are the IDs of the packages a question of a fact computed on demand reached restored, with no answer
 	// stored, sorted (#w7zmvat wave 3). Each question was answered with a placeholder, and its pass ran on, so one run
 	// names every package its passes need; the result is not the run's, and every package handed a placeholder is a
@@ -266,6 +299,10 @@ type Result struct {
 	// as the resolver reads them, so a census can read a restored package's answers by objectpath (#ss4t5g6). Nil
 	// without it, and for a package the store holds none of.
 	RestoredAnswers map[*packages.Package]*fact_resolver.Answers
+
+	// FactReach is what the run held of its facts for the facts' reach under Options.FactReach (captureFactReach), nil
+	// without it.
+	FactReach *FactReachCapture
 
 	// Host is what the run kept for its extra builds under Options.KeepForBuilds, nil without it, and FromHost what an
 	// extra build's session restored from the host's run (CacheSession.RestoreFromHost), all zero without one.
@@ -320,7 +357,23 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		}
 		roots = append(slices.Clone(analyzers), options.Report)
 	}
-	if wrapError := wrapRuns(roots); wrapError != nil {
+	// The analyzer the facts' reach settles by, only beside rules that run ctrlflow (settlingIn), is rooted apart from
+	// roots (checker.Options.Beside), which a rule's or the report's own root on a package would be instead.
+	settler, unsettled := settlingIn(analyzers, options.FactReachSettle)
+	if settle := options.FactReachSettle; settle != nil {
+		if settling, isRule := ruleOf[settle]; isRule {
+			return nil, fmt.Errorf("settling the facts' reach by %s: it is the analyzer of rule %s, so the run could "+
+				"not tell its result from the rule's", settle.Name, settling.Name)
+		}
+		if settle == options.Report {
+			return nil, fmt.Errorf("settling the facts' reach by %s: it is the run's report", settle.Name)
+		}
+	}
+	wrapped := roots
+	if settler != nil {
+		wrapped = append(slices.Clone(roots), settler)
+	}
+	if wrapError := wrapRuns(wrapped); wrapError != nil {
 		return nil, wrapError
 	}
 	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
@@ -335,6 +388,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	checkerOptions.Reads = options.Reads
 	checkerOptions.Inheritance = options.Inheritance
+	checkerOptions.FactHosts = options.FactHosts
+	checkerOptions.Beside = settler
 	checkerOptions.ListingsRead = listingsRead
 	checkerOptions.Pool = options.Pool
 	// The walks run beside the rules, and on past Run's return, so no package's walk sits at the end of the run's
@@ -350,6 +405,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// The run's resolver, which reads and keeps answers in the session's store once the session has restored (below).
 	resolver := fact_resolver.New(nil)
 	checkerOptions.Resolver = resolver
+	// A run whose capture the body differential reads records who asked each answer (FactReachCapture.Askers), on
+	// every resolver it asks through, before any pass runs.
+	if options.FactReach {
+		resolver.RecordAskers()
+	}
 	session := options.Cache
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
@@ -369,6 +429,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		// it, and no store answers a package the run learns, which has none there.
 		resolver = fact_resolver.New(session)
 		checkerOptions.Resolver, session.resolver = resolver, resolver
+		if options.FactReach {
+			resolver.RecordAskers()
+		}
 		session.bodiless = options.Bodiless
 		if options.Ready == nil {
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
@@ -514,6 +577,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if len(result.Findings) == 0 {
 		result.Findings = nil
 	}
+	if settler != nil {
+		result.FactReachSettled, result.FactReachCrashes = settledOf(graphs)
+	}
+	result.FactReachUnsettled = unsettled
 	if options.Report != nil {
 		// The report is the last of roots.
 		result.Reports, result.ReportCrashes, result.ReportsRestored = reportsOf(options.Report, analyzed, session,
@@ -575,6 +642,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	var restoredAnswers map[*packages.Package]*fact_resolver.Answers
 	if options.ExportFacts && session != nil {
 		unnamedFacts, restoredAnswers = session.unnamedFacts(), session.restoredAnswers()
+	}
+	// Read as the rules' passes left the resolver, before the save computes packages whole for the store: that replays
+	// walks no rule asked for and keeps an answer of every function they judge, which no body's rules read.
+	if options.FactReach {
+		result.FactReach = captureFactReach(resolver, analyzed, graphs)
 	}
 	if session != nil {
 		session.save(graph, options.Withheld, files)
@@ -721,7 +793,8 @@ func abandoned(abandon <-chan struct{}) bool {
 // the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat), with no
 // store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
 // to record its lookups of other packages in, once Run sets Reads (#b2t9xmf). Inherited hands each syntax-only rule the
-// host's findings it inherits, once Run sets Inheritance (#y6q1x2j).
+// host's findings it inherits, once Run sets Inheritance (#y6q1x2j). FactHost hands each pass on a package the host's
+// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
@@ -732,6 +805,7 @@ func DispatchOptions() *checker.Options {
 		Resolved:      rule.Resolved,
 		Recorded:      rule.Recorded,
 		Inherited:     rule.Inherited,
+		FactHost:      rule.FactHost,
 	}
 }
 
