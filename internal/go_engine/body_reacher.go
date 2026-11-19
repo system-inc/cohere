@@ -49,8 +49,8 @@ type bodyReacher struct {
 // and counts those in files it does not, absent. Whether the build compiles a body's file is read by the file as
 // parsed, never as a //line directive renames it, which names no file the build lists (#w72zxtq, the review's must 8);
 // the renamed file is the one the census reports and the graph's units are placed in. A package whose imports differ
-// is then reached whole (differingImports), and the package's variable initializers are judged as one body
-// (reachInitializers).
+// is then reached whole (differingImports), and the package's variable initializers are judged as one body, by every
+// body of the package and every name one side alone declares (reachInitializers).
 func (reacher *bodyReacher) reachPackage(
 	hosted *packages.Package,
 	record *build_reads.FunctionUses,
@@ -58,12 +58,22 @@ func (reacher *bodyReacher) reachPackage(
 ) ([]reachedBody, int) {
 	var bodies []reachedBody
 	absent := 0
-	// initializers are the indexes in bodies of the package's variable initializers, and unshared whether one sits in
-	// a file the builds do not share: a host's file the build does not compile, or a build-only file.
+	// initializers are the indexes in bodies of the package's variable initializers, and unshared what one side alone
+	// holds of the package, which reaches every one of them whatever any uses (reachInitializers), the first of: an
+	// initializer in a file the builds do not share, a host's file the build does not compile or a build-only file,
+	// then a body in either, then a name either declares.
 	var initializers []int
-	unshared := read.buildOnlyInitializers
+	unshared := ""
+	absentInitializer, hostOnlyName := false, false
 	for declared := range record.Declarations() {
 		if !declared.HasBody {
+			// A type, a value with no initializer or a function declared without a body, in a file the build does
+			// not compile, is the host's side of a name one side alone declares, as buildOnlyNames is the build's. A
+			// record that places it in no file of the host's is a doubt, and taken as one.
+			if !hostOnlyName {
+				tokenFile := hosted.Fset.File(declared.Declaration.File)
+				hostOnlyName = tokenFile == nil || !read.files[tokenFile.Name()]
+			}
 			continue
 		}
 		name := declarationName(declared.Declaration)
@@ -81,7 +91,7 @@ func (reacher *bodyReacher) reachPackage(
 		}
 		if !read.files[tokenFile.Name()] {
 			// An absent initializer is no body of the build's, only the cause that reaches every one it shares.
-			unshared = unshared || isInitializer
+			absentInitializer = absentInitializer || isInitializer
 			absent++
 			continue
 		}
@@ -129,6 +139,18 @@ func (reacher *bodyReacher) reachPackage(
 			bodies[index].constantsOnlyReason = cmp.Or(bodies[index].constantsOnlyReason, reachedImports)
 		}
 	}
+	switch {
+	case read.buildOnlyInitializers || absentInitializer:
+		unshared = "one in a file the builds do not share"
+	case absent > 0:
+		unshared = "a body of the package in a file the build does not compile"
+	case read.buildOnlyBodies > 0:
+		unshared = "a body of the package in a file the build alone compiles"
+	case len(read.buildOnlyNames) > 0:
+		unshared = "a name declared by a file the build alone compiles"
+	case hostOnlyName:
+		unshared = "a name declared by a file the build does not compile"
+	}
 	reachInitializers(bodies, initializers, unshared)
 	return bodies, absent
 }
@@ -155,24 +177,34 @@ func differingImports(hosted map[string]*packages.Package, built map[string]*pac
 }
 
 // reachInitializers judges a package's variable initializers, the bodies at initializers's indexes, as one body
-// (#bed0mnk): Go lowers them into one synthetic function, in file order, so one that never returns leaves every later
-// one unreachable, and a rule reading the representation reports nothing on them, though nothing they use differs.
-// Where any sits in a file the builds do not share, unshared, or is reached, every one is reached, Initializers,
-// whatever the files' order. The constants-only load mode rule is judged by the same rule from its own reasons, so the
-// census's count of what the general rule costs stays its own (loadModeReaches).
+// (#bed0mnk): Go lowers them into one synthetic function, in the order `types.Info.InitOrder` gives, dependencies
+// first, declaration order among the independent and files in the load's order, so one that never returns leaves
+// every one after it unreachable, and a rule reading the representation reports nothing on them, though nothing they
+// use differs. Every one is reached, Initializers, where the package holds anything one side alone does, unshared
+// saying what, empty for nothing, or any body of the package is reached, an initializer's or a function's.
+//
+// Why that is enough inside one package (the Square's musts 1 and 2): the order is computed in the package alone,
+// from the order its files declare its variables in and from what its own initializers and functions refer to. So it
+// changes only where one of those bodies is other, missing or new, which is a body reached, absent or build-only, or
+// where a name one refers to resolves otherwise, which takes a declaration only one side holds. And the cut moves
+// with a function of the package that stops returning on one side, which is such a body too, itself or one it calls.
+// Across packages the order cannot change, and the cut can, by a callee's no-return fact: that is the facts' reach's.
+//
+// The constants-only load mode rule is judged by the same rule from its own reasons, so the census's count of what
+// the general rule costs stays its own (loadModeReaches).
 //
 // Mutates: bodies gains the reason at each initializer left unreached
-func reachInitializers(bodies []reachedBody, initializers []int, unshared bool) {
+func reachInitializers(bodies []reachedBody, initializers []int, unshared string) {
 	driver := ""
-	if unshared {
-		driver = "the package's variable initializers, one in a file the builds do not share"
+	if unshared != "" {
+		driver = "the package's variable initializers, " + unshared
 	}
-	constantsOnlyReached := unshared
-	for _, index := range initializers {
-		if driver == "" && bodies[index].reason != "" {
-			driver = "the package's variable initializers, " + bodies[index].name + " reached"
+	constantsOnlyReached := unshared != ""
+	for _, body := range bodies {
+		if driver == "" && body.reason != "" {
+			driver = "the package's variable initializers, " + body.name + " reached"
 		}
-		constantsOnlyReached = constantsOnlyReached || bodies[index].constantsOnlyReason != ""
+		constantsOnlyReached = constantsOnlyReached || body.constantsOnlyReason != ""
 	}
 	for _, index := range initializers {
 		if driver != "" && bodies[index].reason == "" {

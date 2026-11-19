@@ -8,18 +8,20 @@ import (
 	"testing"
 )
 
-// Go lowers a package's variable initializers into one synthetic function, in file order, so an initializer that
-// never returns leaves every later one unreachable, and a rule reading the representation reports nothing there
-// (#bed0mnk). The body-reach-initializers fixture's shared file holds three initializers staticcheck reports, SA1007,
-// SA1000 and SA1002, none of which uses anything a build changes. Each case writes a platform file whose `var first =
-// stop()` never returns on one platform and returns on the other: on windows, then on the host's platform, and sorted
-// before the shared file, then after it. Sorted before, the shared initializers' findings are the other platform's
-// alone, so the reach must not leave them unreached: it treats the package's initializers as one body, every one
-// reached where any sits in a file the builds do not share. Sorted after, the findings are alike in both builds, and
-// the initializers are reached all the same, the rule reading no order. Two cases more hold the stopping initializer on
-// one platform alone, the other's file declaring none, so each cause stands by itself: a build-only file's initializer,
-// and a host's file's the build does not compile. The last moves `var first = stop()` into a shared file of its own,
-// each platform's file declaring stop alone: first is reached by stop's name, and so every initializer with it.
+// Go lowers a package's variable initializers into one synthetic function, in the order `types.Info.InitOrder` gives,
+// which among initializers that depend on none other is the order of the files as the load lists them, so an
+// initializer that never returns leaves every one after it unreachable, and a rule reading the representation reports
+// nothing there (#bed0mnk). The body-reach-initializers fixture's shared file holds three initializers staticcheck
+// reports, SA1007, SA1000 and SA1002, none of which uses anything a build changes. Each case writes a platform file
+// whose `var first = stop()` never returns on one platform and returns on the other: on windows, then on the host's
+// platform, and sorted before the shared file, then after it. Sorted before, the shared initializers' findings are the
+// other platform's alone, so the reach must not leave them unreached: it treats the package's initializers as one body,
+// every one reached where any sits in a file the builds do not share. Sorted after, the findings are alike in both
+// builds, and the initializers are reached all the same, the rule reading no order. Two cases more hold the stopping
+// initializer on one platform alone, the other's file declaring none, so each cause stands by itself: a build-only
+// file's initializer, and a host's file's the build does not compile. The last moves `var first = stop()` into a shared
+// file of its own, each platform's file declaring stop alone: first is reached by stop's name, and so every initializer
+// with it.
 func TestTheReachTreatsAPackagesVariableInitializersAsOneBody(test *testing.T) {
 	test.Parallel()
 

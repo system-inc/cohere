@@ -1,6 +1,7 @@
-// Package initializers holds three variable initializers each build shares, every one a call staticcheck reports on
-// its constant argument, for the body reach (#bed0mnk). Go lowers every package-level variable initializer into one
-// synthetic function, in file order, so a platform file's initializer that never returns, sorted before this file,
+// Package initializers holds three variable initializers each build shares, every one a call staticcheck reports on its
+// constant argument, for the body reach (#bed0mnk). Go lowers every package-level variable initializer into one
+// synthetic function, in the order `types.Info.InitOrder` gives, the files' order as the load lists them among
+// initializers that depend on none other, so a platform file's initializer that never returns, sorted before this file,
 // leaves these unreachable on its platform alone, and their findings with them. The test writes the platform files.
 package initializers
 

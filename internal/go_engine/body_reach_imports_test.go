@@ -37,15 +37,17 @@ func TestAPackageWhoseImportsDifferIsReachedWhole(test *testing.T) {
 			if census == nil || differential == nil {
 				test.Fatal("windows's run has no census or no body differential")
 			}
-			got := map[string]string{}
+			got, constantsOnly := map[string]string{}, map[string]string{}
 			for _, body := range census.bodies {
 				if body.packageIdentifier == "example.test/gate" {
 					got[body.name] = cmp.Or(string(body.reason), "unreached")
+					constantsOnly[body.name] = cmp.Or(string(body.constantsOnlyReason), "unreached")
 				}
 			}
-			if got["Target"] != string(reachedImports) {
-				test.Errorf("windows's census judges the gate package's bodies %v, want Target reached by %s", got,
-					reachedImports)
+			// Under the constants-only load mode rule too, whose count the census reads beside the general one's.
+			if got["Target"] != string(reachedImports) || constantsOnly["Target"] != string(reachedImports) {
+				test.Errorf("windows's census judges the gate package's bodies %v, and %v under the constants-only "+
+					"rule, want Target reached by %s under both", got, constantsOnly, reachedImports)
 			}
 			var failures []string
 			for _, failure := range differential.failures {

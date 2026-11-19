@@ -37,10 +37,12 @@ import (
 // bodies judged not the bodies the build counts in the files both compile (Miscounted), a part of it unknown, its
 // signature reaching (its body type-checks against the signature), its body reaching, by the first use in the record's
 // order that does, and a shadowed name in either part. A package's variable initializers are one body (#bed0mnk): Go
-// lowers them into one synthetic function, in file order, so an initializer that never returns leaves every later one
-// unreachable, and a rule reading the representation reports nothing there. Where any of them sits in a file the builds
-// do not share, or is reached, every initializer of the package is reached, Initializers, whatever the files' order. A
-// package whose files import other paths in the build than on the host, blank imports among them, is reached whole,
+// lowers them into one synthetic function, in the order `types.Info.InitOrder` gives, dependencies first, declaration
+// order among the independent and files in the load's order, so an initializer that never returns leaves every one
+// after it unreachable, and a rule reading the representation reports nothing there. Where the package holds a body or
+// a name one side alone does, or any body of it is reached, every initializer of the package is reached, Initializers,
+// since the order and the cut hang on every body of the package an initializer may run (bodyReacher.reachInitializers).
+// A package whose files import other paths in the build than on the host, blank imports among them, is reached whole,
 // Imports (#bed0mnk): a rule may judge a body by what its package imports anywhere, as unusedwrite stands down where
 // any file imports `unsafe`, a gate no use of the body reads. A build whose word size or maximum alignment differs from
 // the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or
