@@ -108,6 +108,29 @@ func TestAStandInsMarksAreTheDefinitionsInEitherOrder(test *testing.T) {
 	})
 }
 
+// A method of a generic type is marked through an instance of the type (#8d9r2rh): in standin/generic each caller
+// passes its slice to the method of holder[string], by a call, a method value or a method expression, and the method
+// checks it, so the definition holds every slice marked, and so must the rule. The function an instance's call
+// reaches stands for the generic method by its origin, and the parameter a pass names is the origin's, of type
+// []Element: a walk that read the instance's own object would find no function of the package, and a pass that read
+// the instance's parameter, of type []string, would find no mark, and either would leave the callers unmarked. The
+// push, reading a callee's parameter off the instance's own signature as staticcheck does, departs on all three.
+func TestAGenericTypesMethodIsMarkedThroughAnInstance(test *testing.T) {
+	test.Parallel()
+	found := holdToDefinition(test, analysistest.TestData(), []string{"standin/generic"}, inTheOrderGiven)
+	requireDefined(test, found, map[string]bool{
+		"standin/generic.throughInstance values":          true,
+		"standin/generic.throughMethodValue values":       true,
+		"standin/generic.throughMethodExpression values":  true,
+		"(standin/generic.holder[Element]).method values": true,
+	})
+	requireDepartures(test, found, []string{
+		"standin/generic.throughInstance values",
+		"standin/generic.throughMethodExpression values",
+		"standin/generic.throughMethodValue values",
+	})
+}
+
 // A mark that must go around a cycle more than once is the definition's (#8d9r2rh): in around every slice of swapped,
 // first and second reaches pairs's check, some only a call or two on, so the definition holds all six marked, and so
 // must the rule. The push, visiting each function once, departs on four, the three the fixture passes a slice of one
@@ -173,7 +196,10 @@ func inTheOrderGiven(string, []*types.Var) {
 // from it:
 //
 //   - the resolver's answer about every parameter in each root's reach, asked as that root, in order's order, which
-//     for the root's own parameters is the very question the rule asks for a finding there;
+//     for the root's own parameters is the very question the rule asks for a finding there. Nothing asks before the
+//     probe, the rule's own pass included, which would have judged the package in its functions' order first, so
+//     the first question of each function not yet final enters a walk there, and a shuffled order enters the
+//     package's walks where it puts them;
 //   - each root computed whole, as the run computes a package for the store, once every question is answered.
 //
 // No answer may come of replaying a package's walk, since no mark depends on an order. The push runs beside them as
@@ -185,7 +211,7 @@ func holdToDefinition(test *testing.T, directory string, patterns []string, orde
 	probe := &analysis.Analyzer{
 		Name:       "definition_probe",
 		Doc:        "holds the marks of the package, however the rule computes them, to the definition's",
-		Requires:   []*analysis.Analyzer{odd_slice_argument.Analyzer, push, odd_slice_argument.DefinitionAnalyzer},
+		Requires:   []*analysis.Analyzer{odd_slice_argument.MarksAnalyzer, push, odd_slice_argument.DefinitionAnalyzer},
 		ResultType: reflect.TypeFor[*heldPackage](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			return holdPackage(pass, push, order)

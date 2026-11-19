@@ -128,3 +128,44 @@ func TestAWalkAsksAcrossAPackageWhereverItEntersACycle(test *testing.T) {
 		test.Errorf("entered at f, home reads %v, want %v", atF.reads["entry/home"], want)
 	}
 }
+
+// A cycle of calls entered at any of its members leaves the same marks, reads and record (#8d9r2rh). For each cycle,
+// each on a fresh resolver with nothing asked before: the first question is of one member's slice, which enters the
+// walk there, and then every member's slice is asked, so each run asks the same marks and only its entry differs.
+// The cycles are order/forward's of two, around's of one, swapped calling itself, and of two, first and second, which
+// a mark goes around twice, and entry/home's of two and of three, each passing a slice across a package to other.G.
+// Every member is marked, by the check its cycle reaches.
+func TestACycleEnteredAtAnyMemberLeavesTheSameRun(test *testing.T) {
+	test.Parallel()
+	for _, cycle := range []struct {
+		pattern string
+		members []string
+	}{
+		{pattern: "order/forward", members: []string{"back values", "forward values"}},
+		{pattern: "around", members: []string{"swapped left", "swapped right"}},
+		{pattern: "around", members: []string{"first left", "first right", "second left", "second right"}},
+		{pattern: "entry/home", members: []string{"h values", "f values"}},
+		{pattern: "entry/home", members: []string{"a values", "b values", "c values"}},
+	} {
+		test.Run(cycle.pattern+" "+strings.Join(cycle.members, ", "), func(test *testing.T) {
+			test.Parallel()
+			var first askedRun
+			for index, entry := range cycle.members {
+				ran := runAsking(test, cycle.pattern, append([]string{entry}, cycle.members...))
+				for _, member := range cycle.members {
+					if !ran.answers[member] {
+						test.Errorf("entered at %s, %s is unmarked", entry, member)
+					}
+				}
+				if index == 0 {
+					first = ran
+					continue
+				}
+				if !reflect.DeepEqual(ran, first) {
+					test.Errorf("entered at %s the run left %+v, entered at %s %+v", entry, ran, cycle.members[0],
+						first)
+				}
+			}
+		})
+	}
+}
