@@ -225,10 +225,15 @@ func (judging *judgment) answer(packed uint32, through []uint32) bool {
 
 // answerObject is whether object's bit, its underlying bit with underlying set, is set in the build, for a live object
 // of a package the graph does not hold, as answer says, asked once per object whether a unit reads it or ObjectBits
-// meets it.
+// meets it. A build with no DependentObject has nothing to answer by, and ObjectBits's caller, the stage 2 reach
+// (#w72zxtq), asks of objects a unit may never read, so the object is called dependent, failing wide, but for one of
+// the universe, which is the same in every build.
 func (judging *judgment) answerObject(object types.Object, underlying bool) bool {
-	if judging.difference.DependentObject == nil {
+	if universal(object) {
 		return false
+	}
+	if judging.difference.DependentObject == nil {
+		return true
 	}
 	if index, isExternal := judging.resolved.externalObjectIndex[object]; isExternal {
 		return judging.answer(externalObjectBit(index, underlying), nil)

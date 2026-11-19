@@ -167,6 +167,24 @@ func TestABuildAsksOfEachObjectOnce(test *testing.T) {
 	}
 }
 
+// An object of a package the graph does not hold, asked of a build judged with no DependentObject, has nothing to be
+// answered by, so ObjectBits calls it dependent on both bits, failing wide (#w72zxtq), and an object of the universe,
+// the same in every build, has neither.
+func TestAnObjectNoGraphAnswersForIsDependent(test *testing.T) {
+	test.Parallel()
+
+	elsewhere := types.NewPackage("example.com/elsewhere", "elsewhere")
+	moved := types.NewTypeName(token.NoPos, elsewhere, "Moved", nil)
+	types.NewNamed(moved, types.Typ[types.Int], nil)
+	dependence := NewGraph().Against(Difference{})
+	if bits := dependence.ObjectBits(moved); !bits.Name || !bits.Underlying {
+		test.Errorf("an object no graph answers for has the bits %+v, want both set", bits)
+	}
+	if bits := dependence.ObjectBits(types.Universe.Lookup("len")); bits.Name || bits.Underlying {
+		test.Errorf("the universe's len has the bits %+v, want none", bits)
+	}
+}
+
 // parsedPackage is the package identifier of files, each a name and its source, parsed and checked here with no loader,
 // as AddPackage takes a loaded package: what a //line directive makes of a file is the parser's, which a fixture
 // module's load would give alike.

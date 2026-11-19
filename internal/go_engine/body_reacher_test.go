@@ -23,7 +23,8 @@ import (
 // binary fraction and a check from source holds it exactly, so at cohere's root, where the host reads math from the
 // system cache and a build under `--build-dependence` checks it from source, goja's math.Sqrt2 / 2 type-checks to two
 // values. The Square ruled the rule general: every use of any object of such a package reaches, of any kind, and only
-// a package loaded alike, or one the host does not hold, reaches nothing. The census still counts the narrower rule it
+// a package loaded alike reaches nothing. One the host does not hold has no mode to compare, and reaches, failing
+// wide. The census still counts the narrower rule it
 // replaced, an untyped float or complex constant read by its value alone. The engine's fixture cannot load a package
 // two ways, since a test's host checks the standard library from source, so the rule is pinned here.
 func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
@@ -64,7 +65,7 @@ func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 		{"a typed float, export data on the host and source in the build", typed, byValue, true, true, true, false},
 		{"a function, export data on the host and source in the build", function, named, true, true, true, false},
 		{"a function, source in both", function, named, false, true, false, false},
-		{"an untyped float of a package the host does not hold", elsewhere, byValue, true, true, false, false},
+		{"an untyped float of a package the host does not hold", elsewhere, byValue, true, true, true, true},
 	}
 	for _, each := range cases {
 		reacher := &bodyReacher{
