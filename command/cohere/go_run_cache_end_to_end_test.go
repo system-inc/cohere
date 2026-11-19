@@ -669,11 +669,15 @@ func TestAGoReplayNeverCrossesTheSystemCache(test *testing.T) {
 	}
 }
 
-// packageCacheOffLine is the account's lint line of a plain run whose engine's per-package cache was off, the
-// standard library's packages from the system cache beside it or not, and then what the extra builds did with their
-// packs, which a plain run over the replay fixture always says, since it checks every build (#qqyq61s).
+// packageCacheOffLine is the account's lint line of a plain run whose engine's per-package cache was off, then what
+// the system cache did, and then what the extra builds did with their packs, which a plain run over the replay
+// fixture always says, since it checks every build (#qqyq61s). A `--no-cache` run still reads and writes the system
+// cache, and the account says the packages restored from it and the entries written to it each on its own
+// (packageCacheUse.systemCacheClause), so either clause may be there or not: which entries are left to write depends
+// on what the package's other tests wrote to the system cache they share first.
 var packageCacheOffLine = regexp.MustCompile(
-	`\n  lint: package cache off(, standard library: [0-9,]+ from the system cache)?, builds' packs: [^\n]+\n`)
+	`\n  lint: package cache off(, standard library: [0-9,]+ from the system cache)?` +
+		`(, [0-9,]+ entr(y|ies) written to the system cache)?, builds' packs: [^\n]+\n`)
 
 // TestAGoRunUnderNoCacheNeitherReplaysNorRecords: on a module whose run replays, `--no-cache` checks it fresh, says
 // its cache was off in the account and in `--json`, and leaves the cache table exactly as it found it.

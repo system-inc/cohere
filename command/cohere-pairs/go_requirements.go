@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"go/version"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,8 +22,9 @@ import (
 )
 
 // standardLibraryTableSource is the release's file that lists the Go versions its standard library tables hold, and
-// standardLibraryTableVersionsName the constant that lists them, read from each side's own source, so a side whose
-// release lists other versions is checked for its own.
+// standardLibraryTableVersionsName the constant that lists them, read from each side's own source. A side whose release
+// still generates the tables, one from before #znqfjw2, holds the file and needs each toolchain it lists; a side after
+// holds no file, since its release builds no table, and needs none.
 const (
 	standardLibraryTableSource       = "internal/release/packaging/standard_library_table.go"
 	standardLibraryTableVersionsName = "standardLibraryTableGoVersions"
@@ -50,10 +52,19 @@ func runGo(goBinary string, directory string, environment []string, arguments ..
 }
 
 // standardLibraryTableVersions are the Go versions a side's release generates its standard library tables under, read
-// from the side's source by parsing the constant that lists them, as `GOTOOLCHAIN` names each.
+// from the side's source by parsing the constant that lists them, as `GOTOOLCHAIN` names each. A side without the file,
+// one from #znqfjw2 on, whose release generates no table, has none, and that is no error; a file that does not parse,
+// or holds no such constant, is one.
 func standardLibraryTableVersions(source string) ([]string, error) {
 	path := filepath.Join(source, filepath.FromSlash(standardLibraryTableSource))
-	parsed, parseError := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+	contents, readError := os.ReadFile(path)
+	if errors.Is(readError, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if readError != nil {
+		return nil, fmt.Errorf("reading the standard library table's versions: %w", readError)
+	}
+	parsed, parseError := parser.ParseFile(token.NewFileSet(), path, contents, parser.SkipObjectResolution)
 	if parseError != nil {
 		return nil, fmt.Errorf("reading the standard library table's versions: %w", parseError)
 	}
@@ -142,9 +153,10 @@ func downloadModules(
 }
 
 // checkOffline proves the machine holds what measuring needs with the network off, and refuses naming each missing
-// piece: each side's go, as its go.mod asks for it; every toolchain each side's release generates its standard library
-// tables under, by `GOTOOLCHAIN=<version> go version`; and the module graph of each side and each corpus, by
-// downloadModules. environment is offlineGoEnvironment's, and toolchains are tried in neutral, which holds no go.mod.
+// piece: each side's go, as its go.mod asks for it; every toolchain a side's release generates its standard library
+// tables under, by `GOTOOLCHAIN=<version> go version`, for a side whose release still generates them (one from before
+// #znqfjw2; a side after needs none); and the module graph of each side and each corpus, by downloadModules.
+// environment is offlineGoEnvironment's, and toolchains are tried in neutral, which holds no go.mod.
 func checkOffline(
 	goBinary string,
 	environment []string,
@@ -213,8 +225,9 @@ func checkOffline(
 }
 
 // prepareModules fills the module cache, with the network on, with what checkOffline checks: each side's toolchain,
-// every toolchain the sides' releases generate their tables under, as modules for this platform, and every module of
-// each side's and each corpus's graph. It returns them as "path version" lines, sorted, for an image to be baked from.
+// every toolchain a side's release still generates its tables under (a side from before #znqfjw2), as modules for this
+// platform, and every module of each side's and each corpus's graph. It returns them as "path version" lines, sorted,
+// for an image to be baked from.
 func prepareModules(
 	goBinary string,
 	environment []string,

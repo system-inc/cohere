@@ -1,0 +1,20 @@
+{
+    "why": "sh30: a hyphen run with no digit and no one-letter part is words, so each is judged alone and both report, the control beside sh29 (#1z7kbtz)",
+    "expect": [
+        {
+            "covers": "WILL",
+            "occurrence": 1
+        },
+        {
+            "covers": "NOT",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

@@ -23,7 +23,7 @@ func TestAStoreOpenedAtADirectoryWritesOnlyThere(test *testing.T) {
 		test.Fatalf("opening and reading the store made its directory: %v", statError)
 	}
 
-	entry := []byte("a standard library table")
+	entry := []byte("a standard library entry")
 	if putError := store.Put(sampleKey, entry); putError != nil {
 		test.Fatal(putError)
 	}

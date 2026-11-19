@@ -9,7 +9,7 @@ import (
 
 // Counterparts answers one graph's Difference.DependentObject for the objects of packages it does not hold, read from
 // export data, by their counterparts in another graph's judgment of the same build (#ss4t5g6): the engine's host graph
-// holds what the host checked from source, and the standard library it restored from the binary's table is judged on a
+// holds what the host checked from source, and the standard library it restored from the system cache is judged on a
 // graph of its own, loaded from source beside it. An object is found by its package's path, then its objectpath in the
 // package as the other graph holds it, and answered with that object's bits (Dependence.ObjectBits). An object with
 // no counterpart answers dependent on both bits, failing wide, and is counted: one objectpath cannot name, a function's

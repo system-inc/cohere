@@ -35,8 +35,12 @@ import (
 // slot of the run's pool held, and a failed write is counted with the entries' failed writes.
 
 // DependenceRecordVersion is the format of a dependence record as the store keeps it, hashed into every record's key
-// (DependenceRecordKey), so a record of another format is never read: it changes whenever the record's encoding does.
-const DependenceRecordVersion = "dependence-record-1"
+// (DependenceRecordKey), so a record of another format is never read: it changes whenever the record's encoding does,
+// or what the collector records in it. At 2, an array's length in a spelled type reads what it uses in full, so a
+// record of 1 holds a looser bit. At 3, a var that declares no type reads every type its initializers pass through in
+// full, so a record of 2 holds a looser bit. At 4, the name bit of a type defined from another type's name reads that
+// type in full, since its fields and promoted methods are that type's, so a record of 3 holds a looser bit.
+const DependenceRecordVersion = "dependence-record-4"
 
 // DependenceRecordKey is where the store keeps the dependence record of the package whose first key is key: apart from
 // every entry, export data and alias, and derived from the entry's key alone, so a record is read only by a run that

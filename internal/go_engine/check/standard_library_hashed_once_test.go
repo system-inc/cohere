@@ -28,7 +28,7 @@ func TestARunWithAnExtraBuildHashesEachStandardLibraryFileOnceWithoutAStore(test
 		caching.Context.Build = append(caching.Context.Build, build...)
 		standardLibrary := standardLibraryContext("check tests", goRoot)
 		standardLibrary.Build = append(standardLibrary.Build, build...)
-		caching.StandardLibrary = &StandardLibraryCaching{Context: standardLibrary}
+		caching.StandardLibrary = &StandardLibraryCaching{System: systemStore(test), Context: standardLibrary}
 		return caching
 	}
 	before := cache.FilesHashed()

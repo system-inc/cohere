@@ -36,7 +36,8 @@ func benchArguments(test *testing.T, function string, arguments ...string) []str
 }
 
 // A cold run narrowed to the Go engine checks without fixing, since #pff7xhr's bar is a checking run's seconds
-// (#jp0cqkk), and reads no cache; a whole-root cold run reads no cache and fixes, as the baselines it is held to did.
+// (#jp0cqkk), and reads none of the project's caches; a whole-root cold run reads none of them and fixes, as the
+// baselines it is held to did. Either still reads and writes the standard library's system store (#syscache).
 func TestTheGoEnginesColdRunChecksWithoutFixing(test *testing.T) {
 	test.Parallel()
 	for engine, want := range map[string][]string{

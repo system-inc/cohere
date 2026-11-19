@@ -96,9 +96,7 @@ public struct ShoutingVocabulary: Sendable {
 
     /* The shape the rule's words have, `[A-Z][A-Z0-9_]*`, so a word the rule could never see is refused instead of listed. */
     static func isUppercaseWord(_ word: String) -> Bool {
-        let bytes = Array(word.utf8)
-        guard let first = bytes.first, first >= UInt8(ascii: "A"), first <= UInt8(ascii: "Z") else { return false }
-        return bytes.allSatisfy { ConsistencyNoShouting.isUppercaseWordCharacter($0) }
+        ConsistencyNoShouting.isUppercaseWord(Array(word.utf8)[...])
     }
 
     /*

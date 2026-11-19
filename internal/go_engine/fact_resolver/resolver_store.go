@@ -12,10 +12,10 @@ import (
 	"golang.org/x/tools/go/types/objectpath"
 )
 
-// Store is where a run reads the answers earlier runs computed, and the answers the binary's standard-library table
-// holds, for the packages it restored, which it holds no syntax of and cannot compute in (#w7zmvat wave 3). A package's
-// answers depend only on its cache key, a digest of its files and of every key below it, so an answer stored under a
-// package's key holds for any run in which the package has that key.
+// Store is where a run reads the answers earlier runs computed, the standard library's from the system cache, for the
+// packages it restored, which it holds no syntax of and cannot compute in (#w7zmvat wave 3). A package's answers depend
+// only on its cache key, a digest of its files and of every key below it, so an answer stored under a package's key
+// holds for any run in which the package has that key.
 type Store interface {
 	// Answers is what the store holds of the package whose types are packageTypes, or nil for none.
 	Answers(packageTypes *types.Package) *Answers
