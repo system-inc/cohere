@@ -20,7 +20,14 @@ import (
 // later run, which then reads no function for it. A StoppingCall names a file by its path and a call by its offsets
 // there, and what keeps an answer given back right is that key, which holds the path and the bytes of each of the
 // package's files (cache/keyer.go, writePortable), not the kind being unregistered.
-var Kind = &fact_resolver.Kind{Name: "test_stopping_calls"}
+var Kind = &fact_resolver.Kind{Name: "test_stopping_calls", OrderBound: orderFree}
+
+// orderFree is the stopping calls' order bound (fact_resolver.Kind.OrderBound): none, and known. A function's stopping
+// calls are read from its own instructions alone, following no call and reading no other answer (see callsIn), so no
+// answer about any function of home hangs on the order its questions came in.
+func orderFree(*fact_resolver.Package, []*types.Func) ([]*types.Func, bool) {
+	return nil, true
+}
 
 // bodilessCalls is the stopping calls of a function declared without a body, from its types alone (fact_resolver.Ask):
 // none. Built from its declaration, it has no blocks, so callsIn reads no call in it.
