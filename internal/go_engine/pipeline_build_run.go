@@ -9,6 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
@@ -84,6 +85,10 @@ type buildRun struct {
 	// bodyReach is an extra build's alone, under the body reach census: which of the host's bodies its difference
 	// reaches (body_reach_host.go, #w72zxtq), nil otherwise.
 	bodyReach *buildBodyReach
+	// factHosts are an extra build's alone, under the body reach census: the host's side of each package its census
+	// judged that has one, as its last load's passes were handed it for the facts' reach (factReachSides.inBuild,
+	// #aswfm7a), nil otherwise.
+	factHosts map[string]fact_reach.Host
 	// bodyDifferential is an extra build's alone, under the body differential: each body its reach leaves unreached
 	// compared with the host's (build_body_differential.go), nil otherwise.
 	bodyDifferential *buildBodyDifferential

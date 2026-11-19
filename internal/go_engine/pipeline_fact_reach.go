@@ -5,6 +5,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
 
 // factReachSides are the host's side of each package for the facts' reach (#aswfm7a), made once as the extra builds
@@ -69,4 +70,36 @@ func newFactReachSides(
 		})
 	}
 	return sides
+}
+
+// inBuild is, by package ID, the side the build whose body reach census is reach hands its passes on each package that
+// has one and that the census judged: the package's bodies the reach leaves unreached are its standing set, and the
+// build lints it in part when any stands, whole when none does (factReachPackage.inBuild). Only the side's own places
+// stand, its function bodies, never a value's initializer, which the census judges too and no fact's reach follows;
+// two bodies at one place, as a cgo package may hold, stand once. Any other package has no side here, and the build
+// lints it whole. It only reads the sides, on the build's own goroutine, so every build may call it at once.
+func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reach.Host {
+	unreached := map[string]map[fact_reach.Place]bool{}
+	for _, body := range reach.bodies {
+		if sides.packages[body.packageIdentifier] == nil {
+			continue
+		}
+		if unreached[body.packageIdentifier] == nil {
+			unreached[body.packageIdentifier] = map[fact_reach.Place]bool{}
+		}
+		if body.reason == "" {
+			unreached[body.packageIdentifier][fact_reach.Place{File: body.file, Offset: body.offset}] = true
+		}
+	}
+	hosts := make(map[string]fact_reach.Host, len(unreached))
+	for identifier, bodies := range unreached {
+		standing := map[fact_reach.Place]bool{}
+		for _, place := range sides.packages[identifier].Places() {
+			if bodies[place] {
+				standing[place] = true
+			}
+		}
+		hosts[identifier] = sides.packages[identifier].inBuild(standing, len(standing) > 0)
+	}
+	return hosts
 }

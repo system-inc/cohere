@@ -1,11 +1,14 @@
 package go_engine
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
 
 // Under the body reach census, with `--other-builds --build-dependence`, the host's lint hands back what its run held
@@ -53,6 +56,44 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 	if !slices.Equal(findingLines(normalize(onStream, root)), findingLines(offStream)) {
 		test.Errorf("the findings with the census are\n%q\nwant those without it\n%q",
 			findingLines(normalize(onStream, root)), findingLines(offStream))
+	}
+}
+
+// Under the body reach census windows's build hands the passes on the body-reach fixture's one package the host's side
+// of it for the facts' reach, with the two bodies its census leaves unreached, Gadget.Spin and Joined, standing, and
+// so lints the package in part (#aswfm7a). The host's run hands none, and nor does a build without the census.
+func TestEachBuildHandsItsPassesTheHostsSideWithItsUnreachedBodiesStanding(test *testing.T) {
+	test.Parallel()
+
+	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
+		func(engine *pipeline) { engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt") }, "--no-cache",
+		"--no-fix", "--other-builds", "--build-dependence")
+	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings, "--no-fix",
+		"--other-builds", "--build-dependence")
+
+	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyReach == nil {
+		test.Fatalf("want the host's build and windows's census, got %d runs", len(on.buildRuns))
+	}
+	if on.buildRuns[0].factHosts != nil {
+		test.Error("the host's run handed its passes a side of its own")
+	}
+	hosted, isHosted := on.buildRuns[1].factHosts["example.com/reach"]
+	if len(on.buildRuns[1].factHosts) != 1 || !isHosted {
+		test.Fatalf("windows's build handed the sides %v, want example.com/reach's alone", on.buildRuns[1].factHosts)
+	}
+	want := map[fact_reach.Place]bool{}
+	for _, body := range on.buildRuns[1].bodyReach.bodies {
+		if body.name == "Gadget.Spin" || body.name == "Joined" {
+			want[fact_reach.Place{File: body.file, Offset: body.offset}] = true
+		}
+	}
+	standing, partial := hosted.Standing()
+	if len(want) != 2 || !partial || !maps.Equal(standing, want) {
+		test.Errorf("windows's build handed the standing set %v, partial %t, want Gadget.Spin's and Joined's %v, "+
+			"partial", standing, partial, want)
+	}
+	if slices.ContainsFunc(off.buildRuns, func(run buildRun) bool { return run.factHosts != nil }) {
+		test.Error("a build without the census handed its passes a side")
 	}
 }
 

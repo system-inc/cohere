@@ -18,6 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -712,6 +713,14 @@ func (engine *pipeline) extraBuildRun(
 				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, census)
 			}
 		}
+		// Each pass is handed the host's side of its package for the facts' reach, with the bodies this load's census
+		// leaves unreached standing, read by the actions of the run at once and written by none.
+		var factHosts func(packageId string) fact_reach.Host
+		if engine.factReachSides != nil && run.bodyReach != nil {
+			hosts := engine.factReachSides.inBuild(run.bodyReach)
+			run.factHosts = hosts
+			factHosts = func(packageId string) fact_reach.Host { return hosts[packageId] }
+		}
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
 		return check.Run(over.Packages, enabled, check.Options{
@@ -727,6 +736,7 @@ func (engine *pipeline) extraBuildRun(
 			// Under `--build-dependence` the build's facts are compared with the host's (#0ghk7vj).
 			ExportFacts: engine.dependence != nil,
 			Inheritance: inherits,
+			FactHosts:   factHosts,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so

@@ -15,7 +15,8 @@ import (
 // body's function, and those about the functions of other packages its bodies use, from what the host's fact
 // resolver computed (check.ExportedFact). All of that is the same in every build, and is made
 // once (factReachPackage, by factReachBuilder); the standing set alone is a build's own (factReachHost). A run makes
-// each package's under the body reach census alone, once, as its extra builds start (newFactReachSides).
+// each package's under the body reach census alone, once, as its extra builds start (newFactReachSides), and each
+// build hands its passes the side with its own standing set (factReachSides.inBuild).
 
 // factReachSeparator joins the parts of a key. No part can hold it: a NUL byte is in no package's path, no file's
 // name, no objectpath, no identifier, no kind's name and no number written out. A file's digest is whatever its
