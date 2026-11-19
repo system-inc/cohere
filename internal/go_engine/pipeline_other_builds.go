@@ -565,7 +565,12 @@ func (engine *pipeline) extraBuildRun(
 		if engine.session != nil {
 			hostFiles = engine.session.Files()
 		}
-		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes, engine.extraBuildSystemCache())
+		// The build reads and writes the run's system cache in every run, one judging each build's dependence too
+		// (#wzre5eg): its standard library is then loaded as a plain run's build loads it, restored where the system
+		// cache holds it under the build's own key and checked from source and written there where it does not, so the
+		// body reach's load mode rule compares the two loads a plain run has (bodyReacher.loadModeReaches). The facts
+		// census compares no fact of a package the build restored, and counts each (compareFacts).
+		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes)
 		// Each extra build reads one pack of each store rather than open every record it hits (#b2t9xmf); the host's
 		// session keeps none.
 		if session != nil {
@@ -900,18 +905,6 @@ func (engine *pipeline) buildTimeline(extra project.Build, round int) func(label
 		return nil
 	}
 	return engine.request.timeline.Hook(extra, round, "")
-}
-
-// extraBuildSystemCache is the system cache an extra build reads its standard library from and writes it to: the
-// run's, but none in a run judging each build's dependence. There the facts census compares each build's facts and
-// answers with the host's through the build's standard library's syntax, which a package restored from the system
-// cache's store does not have, so such a build computes its standard library, as the census needs, and keeps it in
-// the project's store, as before the system cache.
-func (engine *pipeline) extraBuildSystemCache() *systemCache {
-	if engine.request.judgesDependence() {
-		return &systemCache{off: true}
-	}
-	return engine.systemCache
 }
 
 // wholeReads is result's reads once every type-read walk the run left running has ended (check.Result.ReadWalks):

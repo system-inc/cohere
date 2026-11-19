@@ -185,7 +185,9 @@ func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 // count what want's, side-loaded, counts as differing: kind for kind the facts that differ and the answers asked in one
 // build alone, and every unit those reach, firstOrderUnits among them. got may compare fewer facts than want, since it
 // leaves out what no name pairs exactly (pairByUnit), but never more, and never more fewer than its Unkeyed
-// counts, its parts summing to it; it logs how many it left out, by why, and returns those by build (#h660y7d).
+// counts, its parts summing to it; it logs how many it left out, by why, and returns those by build (#h660y7d). Both
+// censuses must be whole, neither leaving a fact out for want of the build's syntax (#wzre5eg): a build that restored
+// its standard library compares none of it, and two censuses that compare nothing agree on nothing.
 func expectSameCensus(test *testing.T, want string, got string) map[string]contract.UnkeyedFacts {
 	test.Helper()
 	parts := map[string]contract.UnkeyedFacts{}
@@ -198,6 +200,10 @@ func expectSameCensus(test *testing.T, want string, got string) map[string]contr
 		}
 		wantFacts, gotFacts := *wantDependence.Facts, *gotDependence.Facts
 		target := gotBuilds[index].Target
+		if wantFacts.WithoutSyntax != 0 || gotFacts.WithoutSyntax != 0 {
+			test.Errorf("build %s: the censuses leave out %d and %d facts for want of the build's syntax, want both "+
+				"whole", target, wantFacts.WithoutSyntax, gotFacts.WithoutSyntax)
+		}
 		if wantFacts.Workspace != gotFacts.Workspace || wantFacts.Dependencies != gotFacts.Dependencies {
 			test.Errorf("build %s: the facts census reaches\n%+v and %+v\nwant\n%+v and %+v", target,
 				gotFacts.Workspace, gotFacts.Dependencies, wantFacts.Workspace, wantFacts.Dependencies)
@@ -242,10 +248,18 @@ func expectSameCensus(test *testing.T, want string, got string) map[string]contr
 // over a table with no records side-loads the standard library and writes its records; a fresh copy of the fixture
 // whose store holds those records alone reads them, with its host checked from source as the first run's was, and
 // both runs census every build alike (expectSameCensus), judge every unit alike and report the same findings.
+//
+// Each run reads a system cache of its own holding the host's standard library and none of windows's, so its windows
+// build checks its standard library from source and the census has its facts to compare: a build reads and writes the
+// system cache as the host does (#wzre5eg), so over one system cache the first run would write windows's entries and
+// the second restore them, and its census would compare none of the standard library's facts.
 func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	test.Parallel()
 
 	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	// Copied before any run adds a build's entries to it.
+	besideStored := filled
+	besideStored.systemCacheRoot = copyFixture(test, filled.systemCacheRoot)
 	reading := readingSystemCache(filled, "")
 	sideRoot := copyFixture(test, standardLibraryRecordsFixture)
 	sideLoaded, sideStream, _ := runOverNoted(test, sideRoot, exitClean, reading, recordsSwitches...)
@@ -268,7 +282,8 @@ func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	fromStore, storeStream, _ := runOverNoted(test, storedRoot, exitClean, reading, recordsSwitches...)
+	fromStore, storeStream, _ := runOverNoted(test, storedRoot, exitClean, readingSystemCache(besideStored, ""),
+		recordsSwitches...)
 	if restored := restoredOf(test, storeStream); restored.StandardLibraryFromRecords == 0 ||
 		restored.StandardLibrarySideLoaded != 0 {
 		test.Fatalf("over the stored records the run counts %+v, want every package from them", restored)
@@ -313,31 +328,64 @@ func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	}
 }
 
-// A warm run under `--build-dependence` writes nothing to the system cache's store: a standard-library package the host
-// restores from it with no dependence record in the project's store is side-loaded for its record, which goes to the
-// project's store, and is never made a miss whose entry is written again (readDependenceRecords leaves the system
+// A warm run under `--build-dependence` writes no entry to the system cache's store: a standard-library package the
+// host restores from it with no dependence record in the project's store is side-loaded for its record, which goes to
+// the project's store, and is never made a miss whose entry is written again (readDependenceRecords leaves the system
 // cache's hits to the standard library's records), so no project's census rewrites what every project on the machine
 // shares. The project's store is fresh here, as a project new to a machine whose system cache is warm.
-func TestAWarmBuildDependenceRunWritesNothingToTheSystemCache(test *testing.T) {
+//
+// Warm is every build's standard library held: an extra build reads and writes the system cache as the host does
+// (#wzre5eg). So a first run, over a system cache holding the host's alone, adds windows's entries, its host writing
+// none and no file the store held changing, and the run after it, over another project new to the machine, restores
+// both builds' and changes no file the store held. It adds one: the windows build's pack of the store, which is the
+// project's own there, named by its root, and which a plain run's build writes too (#b2t9xmf).
+func TestAWarmBuildDependenceRunWritesNoEntryToTheSystemCache(test *testing.T) {
 	test.Parallel()
 
 	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	held := systemCacheListing(test, filled.systemCacheRoot)
+	_, fillingStream, _ := runOverNoted(test, copyFixture(test, standardLibraryRecordsFixture), exitClean,
+		readingSystemCache(filled, ""), recordsSwitches...)
+	filling := lintRecordOf(test, fillingStream).Builds
+	if len(filling) != 2 || filling[0].SystemCacheWritten != 0 || filling[1].SystemCacheWritten == 0 {
+		test.Fatalf("want the first run's host to write nothing to the system cache and its windows build its own "+
+			"standard library, got the records %+v", filling)
+	}
 	before := systemCacheListing(test, filled.systemCacheRoot)
+	for path, information := range held {
+		if strings.HasPrefix(path, systemStoreDirectory(filled.systemCacheRoot)) && before[path] != information {
+			test.Errorf("the first run changed %s, which the system cache's store held before it", path)
+		}
+	}
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	_, stream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, ""), recordsSwitches...)
 	record := lintRecordOf(test, stream)
 	if record.Cache.FromSystemCache == 0 || record.Cache.SystemCacheWritten != 0 {
-		test.Errorf("want the standard library restored from the system cache and nothing written to it, got %+v",
+		test.Errorf("want the standard library restored from the system cache and no entry written to it, got %+v",
 			record.Cache)
+	}
+	if len(record.Builds) != 2 || record.Builds[1].SystemCacheRestored != filling[1].SystemCacheWritten {
+		test.Errorf("want the windows build to restore the %d standard-library packages the first run's wrote, got "+
+			"the records %+v", filling[1].SystemCacheWritten, record.Builds)
 	}
 	if written := recordCounts(test, stream).StandardLibraryWritten; written == 0 {
 		test.Error("want the restored standard library's records written to the project's store")
 	}
 	after := systemCacheListing(test, filled.systemCacheRoot)
+	packs := filepath.Join(systemStoreDirectory(filled.systemCacheRoot), "packs") + string(filepath.Separator)
+	var added []string
 	for path, information := range after {
-		if strings.HasPrefix(path, systemStoreDirectory(filled.systemCacheRoot)) && before[path] != information {
-			test.Errorf("the run changed %s in the system cache's store", path)
+		if !strings.HasPrefix(path, systemStoreDirectory(filled.systemCacheRoot)) || before[path] == information {
+			continue
 		}
+		if _, wasHeld := before[path]; wasHeld || !strings.HasPrefix(path, packs) {
+			test.Errorf("the run changed %s in the system cache's store", path)
+			continue
+		}
+		added = append(added, path)
+	}
+	if len(added) != 1 {
+		test.Errorf("the run added the packs %v to the system cache's store, want the windows build's one", added)
 	}
 }
 

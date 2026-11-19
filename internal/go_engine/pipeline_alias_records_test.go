@@ -76,11 +76,11 @@ func TestAnAliasHitReadsItsTargetsRecord(test *testing.T) {
 	makeBodyOnly(test, root)
 	first, _ := runOverConfigured(test, root, exitClean, sharing, recordsSwitches...)
 	second, secondStream := runOverConfigured(test, root, exitClean, sharing, recordsSwitches...)
-	// The cold reference is cold in both stores, as the first run above was, so its standard library comes from where
-	// the warm runs' first came from: the host computes it and keeps it for the builds, which restore it from the host
-	// as the warm builds restore what that first run wrote through. A cold project over the warm system cache would
-	// have the host restore it and keep none, so the builds, which keep no system cache under `--build-dependence`,
-	// would compute it from source, a provenance no warm run shares (#syscache).
+	// The cold reference is cold in both stores, as the first run above was, so each of its builds finds the system
+	// cache as the first run's did, holding nothing of the standard library but what the run itself writes there. Over
+	// the warm system cache every build of a cold project would restore the standard library, the extra builds too,
+	// which read the system cache under `--build-dependence` as the host does (#wzre5eg), a provenance the first run
+	// above did not have (#syscache).
 	coldVerdicts := coldVerdictsOf(test, makeBodyOnly, sharingSystemCache(test.TempDir()))
 	expectSameVerdicts(test, "the first warm run against cold", coldVerdicts, graphVerdicts(test, first, root))
 	expectSameVerdicts(test, "the second warm run against cold", coldVerdicts, graphVerdicts(test, second, root))
