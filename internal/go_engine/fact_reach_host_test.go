@@ -626,7 +626,8 @@ func TestABuildsStandingSetIsACopyAndNoneForAPackageLintedWhole(test *testing.T)
 
 // The fixed point over the host's side in a build (fact_reach.Settle over a fact_reach.Host): size is reached, so its
 // recorded purity is asked in the build, and where that differs Warm, its one user, leaves the standing set, with size
-// named as what took it out. Warm's own purity reads equal, so nothing above it moves and every other body stands.
+// named as what took it out. Warm's own purity reads equal, so nothing above it moves and every other body stands, in
+// the settlement's own set, the one the host handed out left as it was.
 func TestADifferingAnswerAboutSizeTakesWarmOutAndNothingElse(test *testing.T) {
 	test.Parallel()
 
@@ -658,9 +659,15 @@ func TestADifferingAnswerAboutSizeTakesWarmOutAndNothingElse(test *testing.T) {
 	if !reflect.DeepEqual(settlement.Removed, wantRemoved) {
 		test.Errorf("removed %v, want Warm alone, %v", settlement.Removed, wantRemoved)
 	}
-	if standing[fixture.places["Warm"]] || len(standing) != bodies-1 {
-		test.Errorf("%d of %d bodies stand, Warm among them %t, want every one but Warm: %v", len(standing), bodies,
-			standing[fixture.places["Warm"]], slices.Collect(maps.Keys(standing)))
+	stillStanding := settlement.Standing
+	if stillStanding[fixture.places["Warm"]] || len(stillStanding) != bodies-1 {
+		test.Errorf("%d of %d bodies stand, Warm among them %t, want every one but Warm: %v", len(stillStanding),
+			bodies, stillStanding[fixture.places["Warm"]], slices.Collect(maps.Keys(stillStanding)))
+	}
+	// What still stands is the settlement's own: the set the host handed out is as it was.
+	if !standing[fixture.places["Warm"]] || len(standing) != bodies {
+		test.Errorf("the set handed to the fixed point holds %d of its %d bodies after it, want it unwritten",
+			len(standing), bodies)
 	}
 	if settlement.Asked != 2 || len(asked) != 2 || settlement.Differing["function_purity"] != 1 {
 		test.Errorf("asked %v with %v differing, want size's purity then Warm's, one differing", asked,
