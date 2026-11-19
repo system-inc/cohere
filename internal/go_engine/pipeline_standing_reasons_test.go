@@ -57,7 +57,9 @@ func runStandingReason(test *testing.T, module string, switched bool) (*pipeline
 // taggedRun is engine's build tagged audit_b, which fails the test when the run checked none.
 func taggedRun(test *testing.T, engine *pipeline) buildRun {
 	test.Helper()
-	at := slices.IndexFunc(engine.buildRuns, func(run buildRun) bool { return slices.Contains(run.build.Tags, "audit_b") })
+	at := slices.IndexFunc(engine.buildRuns, func(run buildRun) bool {
+		return slices.Contains(run.build.Tags, "audit_b")
+	})
 	if at < 0 {
 		test.Fatalf("the run checked no build tagged audit_b among its %d", len(engine.buildRuns))
 	}
@@ -100,10 +102,10 @@ func sharedFindings(run buildRun, root string) []string {
 }
 
 // Neither a callee that stops returning nor a constant whose value differs leaves a body standing with the host's
-// findings (#3rcmc3h): over each standing reason module, `target` does not stand in the tagged build, for the reason its
-// module expects, and the tagged build's own findings, and the stream's, with the standing bodies' switch on are those
-// with it off. shared.go finds otherwise in the tagged build than on the host in each, so a `target` left standing
-// with the host's findings would fail the comparison.
+// findings (#3rcmc3h): over each standing reason module, `target` does not stand in the tagged build, for the reason
+// its module expects, and the tagged build's own findings, and the stream's, with the standing bodies' switch on are
+// those with it off. shared.go finds otherwise in the tagged build than on the host in each, so a `target` left
+// standing with the host's findings would fail the comparison.
 func TestNoTargetStandsWhoseCalleeStopsReturningOrWhoseConstantDiffers(test *testing.T) {
 	test.Parallel()
 
