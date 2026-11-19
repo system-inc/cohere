@@ -178,7 +178,7 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 		test.Fatalf("want windows's body differential, got %d runs", len(on.buildRuns))
 	}
 	differential := on.buildRuns[1].bodyDifferential
-	wantCompared := map[string]int{standingNoReturn: 3, "return_nil_ness": 1}
+	wantCompared := map[string]int{"fact_deprecated": 3, standingNoReturn: 3, "printf": 3, "return_nil_ness": 1}
 	if !maps.Equal(differential.standingCompared, wantCompared) || len(differential.standingFailed) > 0 ||
 		len(differential.failures) > 0 {
 		test.Errorf("windows's second leg compared %v and failed %v, with the failures\n%s\nwant %v compared and "+
@@ -192,7 +192,7 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 	for _, line := range []string{
 		"  fact reach: sides 1, settled 1, crashed 0",
 		"    answers asked 3, differing return_nil_ness 2, unknown return_nil_ness 1; bodies taken out 2",
-		"  standing facts: compared no-return 3, return_nil_ness 1; failures none",
+		"  standing facts: compared fact_deprecated 3, no-return 3, printf 3, return_nil_ness 1; failures none",
 	} {
 		if !slices.Contains(strings.Split(string(written), "\n"), line) {
 			test.Errorf("the census file has no line %q:\n%s", line, written)
@@ -202,64 +202,81 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 
 // The second leg fails where what stands differs, shown by handing it a host's side that says otherwise of Stable
 // (#5vbs1np, must 4): the build's answer about Stable's nil-ness is its own, so a host's answer of other bytes, or none
-// at all, is a failure on a line of its own, counted under the kind, and in the census. Nothing else moves: Stable
-// stands, so the facts' reach never asks the answer, and the leg alone reads it.
+// at all, is a failure on a line of its own, counted under the kind, and in the census; and so is a deprecation of
+// Stable the host held and the build does not, which the facts' reach leaves to the reach by its argument and the
+// leg checks. Nothing else moves: Stable stands, so the facts' reach never asks the answer, and the leg alone reads it.
 func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 	test.Parallel()
 
+	// stableAsking is the key of the host's answer about Stable's nil-ness in hosted, and the answer.
+	stableAsking := func(hosted *factReachPackage) (string, fact_reach.Asking) {
+		for key, asking := range hosted.askings {
+			if asking.Kind == "return_nil_ness" && asking.Function.Path == "Stable" && asking.Parameter < 0 {
+				return key, asking
+			}
+		}
+		return "", fact_reach.Asking{}
+	}
 	for _, each := range []struct {
 		name string
-		// alter changes the host's side of Stable's nil-ness, the asking at key.
-		alter func(hosted *factReachPackage, key string)
-		// host is how the failure line writes the host's answer.
-		host string
+		kind string
+		// alter changes the host's side of Stable, and is the line's end the leg must fail with.
+		alter func(hosted *factReachPackage) string
 	}{
-		{"differs", func(hosted *factReachPackage, key string) {
-			asking := hosted.askings[key]
+		{"differs", "return_nil_ness", func(hosted *factReachPackage) string {
+			key, asking := stableAsking(hosted)
+			built := string(asking.Encoded)
 			asking.Encoded = []byte("otherwise")
 			hosted.askings[key] = asking
-		}, "otherwise"},
-		{"host none", func(hosted *factReachPackage, key string) { delete(hosted.askings, key) }, "none"},
+			return " Stable return_nil_ness: host otherwise, build " + built
+		}},
+		{"host none", "return_nil_ness", func(hosted *factReachPackage) string {
+			key, asking := stableAsking(hosted)
+			delete(hosted.askings, key)
+			return " Stable return_nil_ness: host none, build " + string(asking.Encoded)
+		}},
+		{"deprecation", "fact_deprecated", func(hosted *factReachPackage) string {
+			for index, function := range hosted.functions {
+				if function.Identity.Path == "Stable" {
+					pushed := maps.Clone(function.Pushed)
+					pushed["fact_deprecated"] = "Deprecated: otherwise"
+					hosted.functions[index].Pushed = pushed
+				}
+			}
+			return ` Stable fact_deprecated: host "Deprecated: otherwise", build ""`
+		}},
 	} {
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
 			censusFile := filepath.Join(test.TempDir(), "reach.txt")
-			var built string
+			var wantLine string
 			on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "standing-facts")),
 				exitFindings, func(engine *pipeline) {
 					engine.bodyReachCensus = censusFile
 					engine.bodyDifferential = true
 					// Windows's is the one extra build, and its census comes before its passes read the side.
 					engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
-						hosted := engine.factReachSides.packages["example.com/standing"]
-						for key, asking := range hosted.askings {
-							if asking.Kind == "return_nil_ness" && asking.Function.Path == "Stable" &&
-								asking.Parameter < 0 {
-								built = string(asking.Encoded)
-								each.alter(hosted, key)
-							}
-						}
+						wantLine = each.alter(engine.factReachSides.packages["example.com/standing"])
 						return census
 					}
 				}, "--no-cache", "--no-fix", "--build-dependence")
-			if built == "" || len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
-				test.Fatalf("want windows's body differential and the host's answer about Stable, got %d runs and "+
-					"%q", len(on.buildRuns), built)
+			if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
+				test.Fatalf("want windows's body differential, got %d runs", len(on.buildRuns))
 			}
 			differential := on.buildRuns[1].bodyDifferential
-			wantLine := " Stable return_nil_ness: host " + each.host + ", build " + built
-			if !maps.Equal(differential.standingFailed, map[string]int{"return_nil_ness": 1}) ||
+			if !maps.Equal(differential.standingFailed, map[string]int{each.kind: 1}) ||
 				!slices.ContainsFunc(differential.failures, func(line string) bool {
 					return strings.HasSuffix(line, wantLine)
 				}) {
-				test.Errorf("windows's second leg failed %v, with the failures\n%s\nwant one return_nil_ness, "+
-					"ending %q", differential.standingFailed, strings.Join(differential.failures, "\n"), wantLine)
+				test.Errorf("windows's second leg failed %v, with the failures\n%s\nwant one %s, ending %q",
+					differential.standingFailed, strings.Join(differential.failures, "\n"), each.kind, wantLine)
 			}
 			written, readError := os.ReadFile(censusFile)
 			if readError != nil {
 				test.Fatal(readError)
 			}
-			line := "  standing facts: compared no-return 3, return_nil_ness 1; failures return_nil_ness 1"
+			line := "  standing facts: compared fact_deprecated 3, no-return 3, printf 3, return_nil_ness 1; " +
+				"failures " + each.kind + " 1"
 			if !slices.Contains(strings.Split(string(written), "\n"), line) {
 				test.Errorf("the census file has no line %q:\n%s", line, written)
 			}

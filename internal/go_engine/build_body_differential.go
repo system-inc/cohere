@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -490,6 +491,19 @@ func (differential *buildBodyDifferential) compareStandingPackage(
 			case hostFunction.NoReturn != capturedPackage.NoReturn(function):
 				fail(place, name, standingNoReturn, fmt.Sprint(hostFunction.NoReturn),
 					fmt.Sprint(capturedPackage.NoReturn(function)))
+			}
+			// The function's other pushed facts, by their analyzer's name, wherever both runs held its facts of the
+			// package: a wrapper's, which the facts' reach compares, and a deprecation, which it leaves to the reach by
+			// its written argument (standing_facts' pushedFacts), proven here on every census.
+			for _, analyzer := range slices.Sorted(maps.Keys(hostFunction.Pushed)) {
+				builtFacts, isHeld := capturedPackage.Pushed[analyzer]
+				if !isHeld {
+					continue
+				}
+				differential.standingCompared[analyzer]++
+				if built := builtFacts[function]; built != hostFunction.Pushed[analyzer] {
+					fail(place, name, analyzer, strconv.Quote(hostFunction.Pushed[analyzer]), strconv.Quote(built))
+				}
 			}
 			// The answers about the function, then about each of its parameters, as fact_reach asks them.
 			objects := []types.Object{function}

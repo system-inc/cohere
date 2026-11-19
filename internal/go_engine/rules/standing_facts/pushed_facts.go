@@ -16,6 +16,16 @@ var pushedReasons = map[string]fact_reach.Reason{
 // pushedFacts are the build's own pushed facts the pass reads, beside ctrlflow's no-return: printf's wrapper facts,
 // its result on the package, which holds the facts of the package's own functions and those its imports exported
 // that its pass looked up, as the host's capture holds them (check.FactReachPackage.Pushed).
+//
+// The deprecation facts are pushed too, and are never compared here, by an argument rather than a comparison (agreed
+// in B's design, #5vbs1np). A deprecation fact is read from its object's declaration's doc comment and nothing else
+// (honnef.co/go/tools v0.8.1, analysis/facts/deprecated/deprecated.go), so it differs between two builds only where the
+// declaration's text does, or where the declaration sits in a file only one build compiles. Either way the object's
+// identity, which holds its file and is compared by the reach at body grain (#w72zxtq), differs, or its file's bytes
+// do, and the reach lints every body that uses the object before any fact is compared: no standing body reads a
+// deprecation that differs. TestADeprecationThatDiffersIsTakenOutByTheReach shows it for a function deprecated in one
+// platform's file alone, and the body differential's second leg compares each standing function's own deprecation
+// with the host's on every census, a difference failing it.
 type pushedFacts struct {
 	wrappers *printf.Wrappers
 }
