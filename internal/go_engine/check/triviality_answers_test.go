@@ -138,7 +138,9 @@ func TestTrivialityIsAnsweredOnlyWhereTheRuleAsks(test *testing.T) {
 	}
 	asked := map[string][]objectpath.Path{"example.com/asked/top": {"Local"}, "example.com/asked/bottom": nil}
 	var reachable []*packages.Package
-	packages.Visit(cold.loaded.Packages, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
+	packages.Visit(cold.loaded.Packages, nil, func(visited *packages.Package) {
+		reachable = append(reachable, visited)
+	})
 	judged := 0
 	for _, loaded := range reachable {
 		wantPaths, isOwn := asked[loaded.PkgPath]
