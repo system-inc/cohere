@@ -50,10 +50,15 @@ func TestPortExportsTheOriginalsFactsOverATree(test *testing.T) {
 }
 
 // Over the same tree, the original and the port find the same findings, every field of each, and fail to run on the
-// same packages, since the findings are what the marks are for. RequireIdenticalCorpusFacts compares marks alone, so
-// this runs the pair again through parity.Analyze, the census's comparison. A go or defer statement passing an odd
-// slice to a marked parameter would panic the original here, failing the test, the one place the two are known to
-// part (TestPortReportsWhereTheOriginalPanics).
+// same packages, since the findings are what the marks are for. RequireIdenticalCorpusFacts compares marks alone, and
+// of the push, the record of the original's walk, so this runs the rule itself beside the original through
+// parity.Analyze, the census's comparison. A difference here is to be read by hand: it is one of the places the two
+// are known to part, each held by a fixture, or a regression. A go or defer statement passing an odd slice to a marked
+// parameter panics the original (TestPortReportsWhereTheOriginalPanics). A mark the original's order leaves out, in a
+// cycle of calls or through an instantiation or a wrapper, is a finding the port alone makes (order, standin, around).
+// And an instantiation that carries another function's parameter, or one no function declares, is a finding either
+// may make alone (instance). Over cohere's own tree, at the change that made the marks a least set (#8d9r2rh), the two
+// found the same, nothing, and the push the original's two marks.
 func TestPortFindsTheOriginalsFindingsOverATree(test *testing.T) {
 	test.Parallel()
 	directory := differentialTree(test)
