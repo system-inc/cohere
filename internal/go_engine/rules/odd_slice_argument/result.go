@@ -7,7 +7,14 @@ import (
 )
 
 // Kind keys SA5012's marks in each package the resolver holds, and its counts.
-var Kind = &fact_resolver.Kind{Name: "odd_slice_argument"}
+var Kind = &fact_resolver.Kind{Name: "odd_slice_argument", OrderBound: orderFree}
+
+// orderFree is the marks' order bound (fact_resolver.Kind.OrderBound): none, and known. The marks are the least set
+// closed under their rules, one set whatever order a walk finds it in (see demandWalk), so no mark of any function of
+// home hangs on the order its walks took.
+func orderFree(*fact_resolver.Package, []*types.Func) ([]*types.Func, bool) {
+	return nil, true
+}
 
 func init() {
 	fact_resolver.Register(Kind, whole,
