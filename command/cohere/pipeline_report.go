@@ -461,6 +461,9 @@ func (report *pipelineReport) incompleteness() string {
 	if len(activeSummary.Gaps.NotWritten) > 0 {
 		return notWrittenSentence
 	}
+	if len(activeSummary.Gaps.PatternTimeouts) > 0 {
+		return patternTimeoutsSentence
+	}
 	return ""
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -654,6 +655,53 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
 	activeSummary.Gaps.Crashes = crashes
 	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
+	activeSummary.Gaps.PatternTimeouts = patternTimeoutsIn(report.Result.Notes)
+	writePatternTimeouts(account, activeSummary.Gaps.PatternTimeouts)
+}
+
+// patternTimeoutsIn gathers, from every file's notes, each pattern a rule noted as running past esregexp.MatchTimeout
+// there (rule.Context.PatternTimedOut), sorted by file, rule and pattern so the gap reads the same way every run.
+func patternTimeoutsIn(notes map[string]program.RuleNotes) []patternTimeout {
+	var timeouts []patternTimeout
+	for fileName, fileNotes := range notes {
+		for ruleName, counts := range fileNotes {
+			for key, count := range counts {
+				if pattern, timedOut := strings.CutPrefix(key, rule.PatternTimedOutNotePrefix); timedOut {
+					timeouts = append(
+						timeouts,
+						patternTimeout{Rule: ruleName, Pattern: pattern, Path: fileName, Count: count},
+					)
+				}
+			}
+		}
+	}
+	sort.Slice(timeouts, func(left, right int) bool {
+		if timeouts[left].Path != timeouts[right].Path {
+			return timeouts[left].Path < timeouts[right].Path
+		}
+		if timeouts[left].Rule != timeouts[right].Rule {
+			return timeouts[left].Rule < timeouts[right].Rule
+		}
+		return timeouts[left].Pattern < timeouts[right].Pattern
+	})
+	return timeouts
+}
+
+// writePatternTimeouts names each pattern that ran out of time, with its rule, its file and how often, so the
+// footer's count can be acted on: a pattern its user wrote that backtracks without end is the usual cause, and the
+// rule's answer there stood in for the pattern's.
+func writePatternTimeouts(out *bufio.Writer, timeouts []patternTimeout) {
+	for _, timeout := range timeouts {
+		fmt.Fprintf(
+			out,
+			"  pattern timed out: %s: %s's %s ran past %s %s, so the rule acted on a stand-in for its answer\n",
+			timeout.Path,
+			timeout.Rule,
+			timeout.Pattern,
+			esregexp.MatchTimeout,
+			counted(timeout.Count, "time", "times"),
+		)
+	}
 }
 
 // writeUnrunRuleReferences notes the rules disable comments named that cohere doesn't run, under

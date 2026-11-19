@@ -311,6 +311,12 @@ func uncheckedMarkers(summary runSummary) []string {
 			"⚠ "+counted(gaps.RulesSkippingEverything, "rule skipped every file", "rules skipped every file"),
 		)
 	}
+	if len(gaps.PatternTimeouts) > 0 {
+		markers = append(
+			markers,
+			"⚠ "+counted(len(gaps.PatternTimeouts), "pattern timed out", "patterns timed out"),
+		)
+	}
 	if gaps.Unread != "" {
 		markers = append(markers, "⚠ "+gaps.Unread)
 	}
