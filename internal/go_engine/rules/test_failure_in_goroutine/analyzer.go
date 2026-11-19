@@ -8,12 +8,15 @@
 // package in one run, but keeps nothing from one function to the next: for each go statement it reads the body of the
 // function the goroutine starts, one level deep, afresh. The port judges one function at a time and finds what the
 // original finds, reading a started function by where it is declared (#h0k644s). A function literal or a closure of
-// the function judged is part of that function's declaration and built with it, and so is a wrapper its body makes,
-// as a method value's: the port reads their blocks. A function or method the package declares is another declaration,
-// so the port asks the run's fact resolver which of its calls stop the test (StoppingCallsAnalyzer, in result.go),
-// which builds that function when first asked and keeps the answer. Judging a function so needs no other declaration
-// built before it, and what a finding rests on in another declaration's body is an answer the engine holds. A function
-// another package declares is neither read nor asked about, since the original builds no body for it.
+// the function judged is part of that function's declaration and built inside its build. A wrapper its body makes, as
+// a method value's, belongs to no declaration, and is built by whichever builder ran that body, in a later turn, or by
+// the first reader that calls Build on it. The port reads the blocks of both, and calls Build on each first, so a
+// wrapper is built by the time it is read whoever built the function judged. A function or method the package declares
+// is another declaration, so the port asks the run's fact resolver which of its calls stop the test
+// (StoppingCallsAnalyzer, in result.go), which builds that function when first asked and keeps the answer. Judging a
+// function so needs no other declaration built before it, and what a finding rests on in another declaration's body is
+// an answer the engine holds. A function another package declares is neither read nor asked about, since the original
+// builds no body for it.
 //
 // The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
 // parity tests beside this file run both over the same packages, related entries included, and they differ nowhere.
@@ -68,8 +71,9 @@ var stoppingMethods = map[string]bool{
 // instructions call a method that stops the test, reported once per such call, at the go statement, with the call as
 // its related entry. Calls in functions that body calls in turn are not followed, as in the original.
 //
-// It reads the blocks of function and of what was built with it, and no other declaration's: the stopping calls of a
-// function or method the package declares are the fact resolver's answer about it.
+// It reads the blocks of function, of the literals and closures of its declaration, and of the wrappers its body makes,
+// each of those built by its own Build before it is read, and no other declaration's: the stopping calls of a function
+// or method the package declares are the fact resolver's answer about it.
 func Check(context *rule.Context, function *intermediate_representation.Function) {
 	for _, block := range function.Blocks {
 		for _, instruction := range block.Instructions {
@@ -84,8 +88,16 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 			}
 			if started.Parent() != nil || started.Package == nil {
 				// A function literal or a closure of function's declaration, or a function of no package that
-				// function's body makes, as the wrapper of a method value is: built with function, so its blocks
-				// are here to read.
+				// function's body makes, as the wrapper of a method value is. Whoever reads a function's blocks
+				// calls Build on it first: a literal's Build finds its enclosing function built and returns, and a
+				// wrapper's builds it or waits for the builder building it, since a Build of function can return
+				// to a second caller before the first builder has built the wrappers function's body queued.
+				//
+				// It cannot deadlock. Check runs outside every build and holds no lock a build takes. Build waits
+				// for the buildOnce of the function it builds, held by a goroutine running that function's body,
+				// and a body never waits for another function's buildOnce. Then it makes the builder's closing wait
+				// for shared functions, after marking its own task done, the wait every lazy Build makes.
+				started.Build()
 				for call, name := range stoppingCalls(started) {
 					report(context, goStatement, name, relatedAtCall(call, name))
 				}
