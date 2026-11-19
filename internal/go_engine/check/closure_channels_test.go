@@ -25,12 +25,15 @@ const engineImportPath = "github.com/system-inc/cohere/internal/go_engine/"
 // resolverAskers are the packages a rule's run reaches that take the run's fact resolver from a pass, by rule.Resolved
 // or fact_resolver.Of. The resolver holds every package of the run, so a question through it could read a package
 // outside the asker's import closure; each of these asks only through fact_resolver.Visible, or shares a root's
-// representation the resolver builds the same way whoever asks first (#23b2grt).
+// representation the resolver builds the same way whoever asks first (#23b2grt), or, as test_failure_in_goroutine,
+// asks only of a function the asker's own package declares, read from that function's own instructions, and panics
+// on any other (#h0k644s).
 var resolverAskers = []string{
 	"rules/build_intermediate_representation",
 	"rules/function_purity",
 	"rules/odd_slice_argument",
 	"rules/return_nil_ness",
+	"rules/test_failure_in_goroutine",
 }
 
 // factLearners are the analyzers that declare FactTypes among every rule and everything it requires, by name. The
