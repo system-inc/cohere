@@ -519,6 +519,36 @@ func TestAUnitIsNamedByTheFileAReaderSees(test *testing.T) {
 	test.Fatal("the layout fixture has no unit Mapped")
 }
 
+// A unit after a //line directive in a file only the host compiles is a seed, though a reader sees it in a file no
+// build lists (#ss4t5g6): the directives fixture's p declares Helper an int in gen_unix.go under `//line gen.tmpl:1`
+// and a string in gen_windows.go, so on windows Helper and q's Prints, which formats it with %d, are dependent. Shared,
+// in a file both builds compile, and PrintsShared, which formats it, are not.
+func TestAUnitAfterALineDirectiveInAHostOnlyFileIsASeed(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "directives", fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")})
+	judgedUnits := map[string]bool{}
+	for _, identifier := range []string{"example.com/directives/p", "example.com/directives/q"} {
+		loaded, isLoaded := judged.host[identifier]
+		if !isLoaded {
+			test.Fatalf("the directives fixture's host has no package %s", identifier)
+		}
+		for _, file := range loaded.Syntax {
+			tokenFile := loaded.Fset.File(file.FileStart)
+			for _, unit := range unitDeclarations(file) {
+				judgedUnits[unitName(unit)] = judged.dependence.UnitDependent(loaded.ID,
+					tokenFile.Position(unit.Pos()).Filename, tokenFile.Offset(unit.Pos()))
+			}
+		}
+	}
+	expectVerdicts(test, judgedUnits, map[string]bool{
+		"func Helper":       true,
+		"func Shared":       false,
+		"func Prints":       true,
+		"func PrintsShared": false,
+	})
+}
+
 // An array's length in a spelled type is a value, so whatever it reads is read in full, as a constant's value is:
 // runtime's mPadded pads itself past `unsafe.Sizeof(m{})`, and m's layout moves by platform. In the lengths fixture
 // inner is one int64 on the host and two on windows, so Shared's field Pad, an array of `64 - unsafe.Sizeof(inner{})`
