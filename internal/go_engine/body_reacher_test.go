@@ -144,19 +144,26 @@ func (imported importerFunction) Import(path string) (*types.Package, error) {
 	return imported(path)
 }
 
-// reachRecorded is the census of a build judged against an empty graph whose every object answers unchanged, over
-// checked's packages, math among them, which the host read from export data and the build
-// checks from source, so only the load mode reaches anything.
+// unchangedDependence is a build's judgment of an empty graph whose every object answers unchanged, so no bit reaches
+// anything.
+func unchangedDependence() *build_dependence.Dependence {
+	return build_dependence.NewGraph().Against(build_dependence.Difference{
+		DependentObject: func(types.Object) (bool, bool) { return false, false }})
+}
+
+// reachRecorded is the census of a build judged against an empty graph whose every object answers unchanged
+// (unchangedDependence), over checked's packages, math among them, which the host read from export data and the build
+// checks from source, so only the load mode reaches anything, each package as the build reads it altered by alter
+// when it is not nil.
 func reachRecorded(
 	test *testing.T,
 	checked map[string]*packages.Package,
 	reads map[*packages.Package]*build_reads.Reads,
+	alter func(*reachBuiltPackage),
 ) *buildBodyReach {
 	test.Helper()
 	host := newBodyReachHost(&hostDependence{exportData: map[string]bool{"math": true},
 		decoded: map[*types.Package]bool{}}, reads, nil)
-	dependence := build_dependence.NewGraph().Against(build_dependence.Difference{
-		DependentObject: func(types.Object) (bool, bool) { return false, false }})
 	hostFiles := map[string][]string{}
 	var roots []*packages.Package
 	fromSource := map[string]bool{}
@@ -165,7 +172,13 @@ func reachRecorded(
 		fromSource[identifier] = true
 		roots = append(roots, each)
 	}
-	return host.reach(dependence, reachBuiltPackages(&load.Loaded{Roots: roots}, hostFiles), fromSource, false)
+	built := reachBuiltPackages(&load.Loaded{Roots: roots}, hostFiles)
+	if alter != nil {
+		for _, read := range built {
+			alter(read)
+		}
+	}
+	return host.reach(unchangedDependence(), built, fromSource, false)
 }
 
 // mathSource is a math package of one untyped float constant, which the reach's unit tests load two ways.
@@ -203,7 +216,7 @@ func Around(angle float64) float64 { return angle * q.TwoPi }
 
 func Still(angle float64) float64 { return -angle }
 `}}})
-	census := reachRecorded(test, checked, reads)
+	census := reachRecorded(test, checked, reads, nil)
 	got := map[string]string{}
 	for _, body := range census.bodies {
 		if body.packageIdentifier != "math" {
@@ -214,5 +227,95 @@ func Still(angle float64) float64 { return -angle }
 		"Around": "LoadMode", "Still": "unreached"}
 	if !maps.Equal(got, want) {
 		test.Errorf("the census judges\n%v\nwant\n%v", got, want)
+	}
+}
+
+// A name a file imports by a dot, which a build-only file of the package declares at package level, means that file's
+// object in the build rather than the one the host recorded (#w72zxtq): Measured calls Area, dot-imported from shapes,
+// and is reached, Shadowed, though no bit is set. Such a build does not compile, the two names clashing in the file's
+// block, so the case is a guard, and no fixture module can hold it: the build's read of q is told of the name here.
+// Other, naming nothing of shapes, stays unreached.
+func TestADotImportedNameABuildOnlyFileDeclaresReachesItsBody(test *testing.T) {
+	test.Parallel()
+
+	checked, reads := recordedPackages(test, []recordedSource{
+		{path: "example.com/shapes", files: map[string]string{"/shapes/shapes.go": `package shapes
+
+func Area() int { return 1 }
+`}},
+		{path: "example.com/q", imports: []string{"example.com/shapes"}, files: map[string]string{"/q/q.go": `package q
+
+import . "example.com/shapes"
+
+func Measured() int { return Area() }
+
+func Other() int { return 2 }
+`}}})
+	census := reachRecorded(test, checked, reads, func(read *reachBuiltPackage) {
+		if read.identifier == "example.com/q" {
+			read.buildOnlyNames["Area"] = true
+		}
+	})
+	got := map[string]string{}
+	for _, body := range census.bodies {
+		if body.packageIdentifier == "example.com/q" {
+			got[body.name] = cmp.Or(string(body.reason), "unreached") + " " + body.driver
+		}
+	}
+	want := map[string]string{"Measured": "Shadowed example.com/shapes.Area shadowed in the body",
+		"Other": "unreached "}
+	if !maps.Equal(got, want) {
+		test.Errorf("the census judges\n%v\nwant\n%v", got, want)
+	}
+}
+
+// A declaration of a record whose file the host's file set does not hold is a doubt, never a body to leave alone: each
+// is reached, Unknown, and called dependent, as the graph calls a place it knows no unit at (#w72zxtq).
+func TestADeclarationWithNoFileIsReachedAndDependent(test *testing.T) {
+	test.Parallel()
+
+	checked, reads := recordedPackages(test, []recordedSource{{path: "example.com/q",
+		files: map[string]string{"/q/q.go": `package q
+
+func Plain() int { return 1 }
+`}}})
+	hosted := checked["example.com/q"]
+	record, isRecorded := reads[hosted].FunctionUses()
+	if !isRecorded {
+		test.Fatal("q's uses are unrecorded")
+	}
+	host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil)
+	reacher := &bodyReacher{host: host, dependence: unchangedDependence(), carried: map[types.Object]bool{}}
+	elsewhere := *hosted
+	elsewhere.Fset = token.NewFileSet()
+	bodies, absent := reacher.reachPackage(&elsewhere, record,
+		reachBuiltPackages(&load.Loaded{Roots: []*packages.Package{hosted}}, map[string][]string{
+			"example.com/q": hosted.GoFiles})[0])
+	if len(bodies) != 1 || absent != 0 || bodies[0].reason != reachedUnknown || !bodies[0].unitDependent {
+		test.Errorf("want Plain reached, Unknown, and dependent, got %+v and %d absent", bodies, absent)
+	}
+}
+
+// A use read as a type argument reaches its body by either bit of its object, as a value's type does (#w72zxtq). No
+// record holds a type argument alone: an explicit one is a type expression and an inferred one some argument's type,
+// each recorded as ValueType in the same part, whose row reads the same bits first. So the row is held here, of an
+// object of a package the graph does not hold, whose underlying bit alone the build sets.
+func TestATypeArgumentReachesItsBodyByEitherBit(test *testing.T) {
+	test.Parallel()
+
+	elsewhere := types.NewPackage("example.com/elsewhere", "elsewhere")
+	number := types.NewTypeName(token.NoPos, elsewhere, "Number", nil)
+	types.NewNamed(number, types.Typ[types.Int], nil)
+	reacher := &bodyReacher{
+		host: &bodyReachHost{dependence: &hostDependence{decoded: map[*types.Package]bool{}},
+			identifiers: map[*types.Package]string{elsewhere: "example.com/elsewhere"}},
+		dependence: build_dependence.NewGraph().Against(build_dependence.Difference{
+			DependentObject: func(types.Object) (bool, bool) { return false, true }}),
+		fromSource: map[string]bool{"example.com/elsewhere": true},
+	}
+	reason, object, bits := reacher.useReason(build_reads.UsedEntry{Object: number}, build_reads.UsedTypeArgument)
+	if reason != reachedTypeArgument || object != number || bits != "underlying" {
+		test.Errorf("a type argument whose underlying bit is set reaches by %q, %v, %q, want TypeArgument by its "+
+			"underlying bit", reason, object, bits)
 	}
 }

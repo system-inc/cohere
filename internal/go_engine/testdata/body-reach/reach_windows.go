@@ -9,6 +9,12 @@ type platformPart struct{}
 // Spin spins on windows.
 func (platformPart) Spin() { /* Windows's part spins by being called, as a gadget does. */ }
 
+// platformLimit is windows's.
+const platformLimit = 16
+
+// byte is windows's own name for the universe's byte.
+type byte = uint8
+
 // platformName is windows's.
 func platformName() string {
 	return "windows"

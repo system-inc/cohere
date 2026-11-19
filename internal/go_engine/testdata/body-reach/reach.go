@@ -25,8 +25,17 @@ type inner struct{ Gadget }
 // holder is the Holder Spinner takes Spin from.
 var holder Holder
 
-// settings is of a struct type with no name, whose field no identity reaches.
-var settings struct{ A int }
+// settings is of a struct type with no name, whose fields no identity reaches.
+var settings struct {
+	A int
+	B [2]int
+}
+
+// Box holds a field of platformPart, each build's own type.
+type Box struct{ Part platformPart }
+
+// box is the Box Parted selects its Part from.
+var box Box
 
 // PlatformName calls a function only each build's own file declares.
 func PlatformName() string {
@@ -73,4 +82,34 @@ func Configured() int {
 // High shifts by half a word on a 64-bit build and by all of one on a 32-bit build, which only the sizes reach.
 func High(value uint) uint {
 	return value >> 32
+}
+
+// Paired's signature sizes an array by settings.B, whose identity is unknown.
+func Paired(values [cap(settings.B)]int) int {
+	return 0
+}
+
+// Parted selects box's Part, a field whose own type is each build's own.
+func Parted() any {
+	return box.Part
+}
+
+// Limit reads platformLimit, a constant each build's own file declares.
+func Limit() int {
+	return platformLimit
+}
+
+// Sized counts nothing of its type argument.
+func Sized[T any]() int {
+	return 0
+}
+
+// Typed instantiates Sized with Number, whose underlying type differs on windows.
+func Typed() int {
+	return Sized[Number]()
+}
+
+// Bytes takes a byte, which windows declares at package level in place of the universe's.
+func Bytes(value byte) int {
+	return 0
 }
