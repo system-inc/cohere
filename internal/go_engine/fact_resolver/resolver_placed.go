@@ -86,11 +86,22 @@ type Place struct {
 // Parameter -1, and each parameter's there too, with its index among the signature's parameters, the receiver not
 // counted. fileSet holds the files' positions and info their objects, as the load that parsed and checked them gives
 // them; a nil info places nothing. A reader of the placed answers an entry holds finds each object's answer here.
+//
+// A place two functions share is no place: neither function is placed, nor any of their parameters, so an answer is
+// never placed there and never found there, on either side, since PlacedIn and a reader both place through here.
+// cmd/cgo writes `//line <user file>:N` inside _cgo_gotypes.go, so a function it generates there can share the user
+// file's name and an offset with one the user wrote (#k7k3wwc), as build_dependence's file table knows.
 func DeclarationPlaces(fileSet *token.FileSet, files []*ast.File, info *types.Info) map[types.Object]Place {
 	places := map[types.Object]Place{}
 	if info == nil {
 		return places
 	}
+	// Each function's place, by its file and offset, with how many functions are declared there.
+	type functionAt struct {
+		file   string
+		offset int
+	}
+	declaredAt := map[functionAt]int{}
 	for _, file := range files {
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
@@ -105,11 +116,17 @@ func DeclarationPlaces(fileSet *token.FileSet, files []*ast.File, info *types.In
 			place := Place{File: tokenFile.Position(function.Pos()).Filename, Offset: tokenFile.Offset(function.Pos()),
 				Parameter: -1}
 			places[object] = place
+			declaredAt[functionAt{file: place.File, offset: place.Offset}]++
 			parameters := object.Signature().Params()
 			for index := range parameters.Len() {
 				place.Parameter = index
 				places[parameters.At(index)] = place
 			}
+		}
+	}
+	for object, place := range places {
+		if declaredAt[functionAt{file: place.File, offset: place.Offset}] > 1 {
+			delete(places, object)
 		}
 	}
 	return places

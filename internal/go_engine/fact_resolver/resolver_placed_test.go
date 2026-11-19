@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -18,6 +19,37 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
+
+// learnPlacedFixture is a resolver that learned the fixture package at path, under fact_resolver's testdata, as
+// ctrlflow finishing on it teaches one, the package as it holds it, and as the load gave it.
+func learnPlacedFixture(test *testing.T, path string) (*fact_resolver.Resolver, *fact_resolver.Package,
+	*packages.Package) {
+	test.Helper()
+	directory := analysistest.TestData()
+	loaded, loadError := load.Packages(directory, []string{path}, []string{
+		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
+	}, nil)
+	if loadError != nil || len(loaded.Roots) != 1 {
+		test.Fatalf("loading the fixture: %v", loadError)
+	}
+	resolver := fact_resolver.New(nil)
+	options := check.DispatchOptions()
+	options.Resolver = resolver
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{ctrlflow.Analyzer}, loaded.Roots, options)
+	if analyzeError != nil {
+		test.Fatalf("analyzing the fixture: %v", analyzeError)
+	}
+	for _, action := range graph.Roots {
+		if action.Err != nil {
+			test.Fatalf("running ctrlflow on %s: %v", action.Package.ID, action.Err)
+		}
+	}
+	home := resolver.Package(loaded.Roots[0].Types)
+	if home == nil {
+		test.Fatalf("the resolver never learned %s, which ctrlflow ran on", path)
+	}
+	return resolver, home, loaded.Roots[0]
+}
 
 // placedNames is placed as a test compares it, each answer as its kind, file, offset, parameter and answer on one line,
 // in the order they came.
@@ -39,28 +71,7 @@ func placedNames(placed []fact_resolver.PlacedAnswer) []string {
 func TestPlacedInPlacesEveryAnswerAtItsDeclarationsFunc(test *testing.T) {
 	test.Parallel()
 	directory := analysistest.TestData()
-	loaded, loadError := load.Packages(directory, []string{"placed"}, []string{
-		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
-	}, nil)
-	if loadError != nil {
-		test.Fatalf("loading the fixture: %v", loadError)
-	}
-	resolver := fact_resolver.New(nil)
-	options := check.DispatchOptions()
-	options.Resolver = resolver
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{ctrlflow.Analyzer}, loaded.Roots, options)
-	if analyzeError != nil {
-		test.Fatalf("analyzing the fixture: %v", analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running ctrlflow on %s: %v", action.Package.ID, action.Err)
-		}
-	}
-	home := resolver.Package(loaded.Roots[0].Types)
-	if home == nil {
-		test.Fatal("the resolver never learned placed, which ctrlflow ran on")
-	}
+	resolver, home, _ := learnPlacedFixture(test, "placed")
 	scope := home.Types.Scope()
 	function := func(name string) *types.Func {
 		declared, isFunction := scope.Lookup(name).(*types.Func)
@@ -107,5 +118,34 @@ func TestPlacedInPlacesEveryAnswerAtItsDeclarationsFunc(test *testing.T) {
 	}
 	if placed := placedNames(resolver.PlacedIn(home)); !slices.Equal(placed, want) {
 		test.Errorf("want placed\n%q\ngot\n%q", want, placed)
+	}
+}
+
+// A place two declared functions share names neither, so it is never matched (#k7k3wwc): cmd/cgo writes
+// `//line <user file>:N` inside _cgo_gotypes.go, so a generated function can share its file's name and offset with the
+// user's own in another file. one and two, in two files, sit after `//line shared.go:1` at one offset, and are left
+// out of the places, their parameters too, and so of PlacedIn, while alone, after the same directive at an offset of
+// its own, is placed with its parameter.
+func TestAPlaceTwoFunctionsShareIsNoPlace(test *testing.T) {
+	test.Parallel()
+	resolver, home, loaded := learnPlacedFixture(test, "collide")
+	scope := home.Types.Scope()
+	var named []string
+	for object, place := range fact_resolver.DeclarationPlaces(loaded.Fset, loaded.Syntax, loaded.TypesInfo) {
+		named = append(named, fmt.Sprintf("%s %s %d", object.Name(), filepath.Base(place.File), place.Parameter))
+		fact_resolver.Ask(resolver, home, keepProbe, object, func(*fact_resolver.Package) bool { return true },
+			func() bool { return false })
+	}
+	for _, name := range []string{"one", "two"} {
+		fact_resolver.Ask(resolver, home, keepProbe, scope.Lookup(name), func(*fact_resolver.Package) bool {
+			return true
+		}, func() bool { return false })
+	}
+	slices.Sort(named)
+	if want := []string{"alone shared.go -1", "count shared.go 0"}; !slices.Equal(named, want) {
+		test.Errorf("want only %q placed, got %q", want, named)
+	}
+	if placed := resolver.PlacedIn(home); len(placed) != 2 {
+		test.Errorf("want alone's two answers placed and none of one's or two's, got %+v", placed)
 	}
 }
