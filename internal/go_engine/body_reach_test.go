@@ -3,6 +3,7 @@ package go_engine
 import (
 	"cmp"
 	"fmt"
+	"go/types"
 	"maps"
 	"os"
 	"path/filepath"
@@ -11,7 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
@@ -340,6 +344,77 @@ func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T
 	if none.compared != 0 || len(none.failures) != 1 || !strings.HasPrefix(none.failures[0], "compared no body") {
 		test.Errorf("want a census that reaches every body to compare none and fail for it, got %d compared and %q",
 			none.compared, none.failures)
+	}
+}
+
+// A named type's digest holds its method set beside its layout (check.NamedTypesWritten), so a body that holds a type
+// whose method set alone differs reads apart (#w72zxtq, the review's mutant 5). Held takes and returns a Holder, whose
+// layout names inner and platformPart alike in both builds, while windows's platformPart gives Holder its Spin at a
+// shallower depth than inner's Gadget: handed to the differential as unreached, Held fails by Holder's digest.
+func TestTheBodyDifferentialFailsABodyWhoseTypeDiffersByItsMethodSetAlone(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
+	if writeError := os.WriteFile(filepath.Join(root, "held.go"), []byte(`package reach
+
+// Held hands on a Holder, whose method set alone differs on windows.
+func Held(holder Holder) Holder {
+	return holder
+}
+`), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.bodyDifferential = true
+		engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
+			altered := *census
+			altered.bodies = slices.Clone(census.bodies)
+			for index, body := range altered.bodies {
+				if body.name == "Held" {
+					altered.bodies[index].reason = ""
+				}
+			}
+			return &altered
+		}
+	}, "--no-cache", "--no-fix", "--build-dependence")
+
+	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
+		test.Fatal("want windows's body differential")
+	}
+	var failed []string
+	for _, failure := range on.buildRuns[1].bodyDifferential.failures {
+		if strings.Contains(failure, " Held: ") {
+			failed = append(failed, failure)
+		}
+	}
+	if len(failed) != 1 || !strings.Contains(failed[0], "type example.com/reach.Holder example.com/reach.Holder{") {
+		test.Errorf("want Held failed once by Holder's digest, got %q", failed)
+	}
+}
+
+// A load checked under no sizes is never read as the host's sizes, which nothing says it shares (#w72zxtq, the
+// review's mutant 6): either side with none differs, failing wide, and two loads under one measure do not.
+func TestABuildCheckedUnderNoSizesDiffersFromTheHost(test *testing.T) {
+	test.Parallel()
+
+	loaded := func(sizes types.Sizes) *load.Loaded {
+		return &load.Loaded{Roots: []*packages.Package{{ID: "example.com/sized", TypesSizes: sizes}}}
+	}
+	arm64 := types.SizesFor("gc", "arm64")
+	for _, each := range []struct {
+		name  string
+		host  types.Sizes
+		built types.Sizes
+		want  bool
+	}{
+		{"the host under no sizes", nil, arm64, true},
+		{"the build under no sizes", arm64, nil, true},
+		{"both under arm64's", arm64, types.SizesFor("gc", "arm64"), false},
+		{"the build under 386's", arm64, types.SizesFor("gc", "386"), true},
+	} {
+		if got := buildSizesDiffer(loaded(each.host), loaded(each.built)); got != each.want {
+			test.Errorf("%s: the sizes differ %t, want %t", each.name, got, each.want)
+		}
 	}
 }
 

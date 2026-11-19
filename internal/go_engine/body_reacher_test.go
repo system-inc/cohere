@@ -293,6 +293,53 @@ func Still(angle float64) float64 { return -angle }
 	}
 }
 
+// A selection reaches its body by the load mode where a member on its way is of a package loaded otherwise (#w72zxtq,
+// the review's mutant 3). a's Read selects Y, promoted into a's Wrapper through Outer, of a package the host read from
+// export data and the build checks from source, which reachRecorded names math, and through Leaf, the field Outer
+// embeds, which math declares. Y and Leaf's type are c's, and Wrapper and Outer's field a's, each loaded alike, so only
+// the embedded field math declares, which the record holds as a selection of its own and no plain use, reaches.
+// Plain selects Wrapper's own field, and stays unreached.
+func TestASelectionThroughAMemberOfAPackageLoadedOtherwiseReachesItsBody(test *testing.T) {
+	test.Parallel()
+
+	checked, reads := recordedPackages(test, []recordedSource{
+		{path: "example.com/c", files: map[string]string{"/c/c.go": `package c
+
+type Leaf struct{ Y int }
+`}},
+		{path: "math", imports: []string{"example.com/c"}, files: map[string]string{"/math/outer.go": `package math
+
+import "example.com/c"
+
+type Outer struct{ c.Leaf }
+`}},
+		{path: "example.com/a", imports: []string{"math"}, files: map[string]string{"/a/a.go": `package a
+
+import "math"
+
+type Wrapper struct {
+	math.Outer
+	Own int
+}
+
+func Read(wrapper Wrapper) int { return wrapper.Y }
+
+func Plain(wrapper Wrapper) int { return wrapper.Own }
+`}}})
+	census := reachRecorded(test, checked, reads, nil)
+	got := map[string]string{}
+	for _, body := range census.bodies {
+		if body.packageIdentifier == "example.com/a" {
+			got[body.name] = cmp.Or(string(body.reason), "unreached") + " " + body.driver
+		}
+	}
+	want := map[string]string{"Read": "LoadMode math.Outer.UF0 (/math/outer.go) LoadMode load mode in the body",
+		"Plain": "unreached "}
+	if !maps.Equal(got, want) {
+		test.Errorf("the census judges\n%v\nwant\n%v", got, want)
+	}
+}
+
 // A name a file imports by a dot, which a build-only file of the package declares at package level, means that file's
 // object in the build rather than the one the host recorded (#w72zxtq): Measured calls Area, dot-imported from shapes,
 // and is reached, Shadowed, though no bit is set. Such a build does not compile, the two names clashing in the file's
