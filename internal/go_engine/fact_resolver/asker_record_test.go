@@ -1,6 +1,7 @@
 package fact_resolver_test
 
 import (
+	"cmp"
 	"go/token"
 	"go/types"
 	"slices"
@@ -11,7 +12,7 @@ import (
 
 // A resolver records the bodies whose rules ask each answer only once told to (#5vbs1np, must 5): before, a note takes
 // no lock, since it returns before the record's, allocates nothing, and leaves no record; after, each body is held
-// once, however many times its rule asks.
+// once, however many times its rule asks, and a question with no asker is held as one no place names (round 2's N3).
 //
 // Not parallel: testing.AllocsPerRun refuses to run in a parallel test, whose neighbours' allocations it would count.
 func TestAResolverRecordsAskersOnlyOnceToldTo(test *testing.T) {
@@ -30,7 +31,11 @@ func TestAResolverRecordsAskersOnlyOnceToldTo(test *testing.T) {
 	resolver.NoteAsker(kind, object, &asker)
 	resolver.NoteAsker(kind, object, &asker)
 	resolver.NoteAsker(kind, object, nil)
-	if held := resolver.Askers()[kind.Name][object]; !slices.Equal(held, []fact_resolver.Asker{asker}) {
-		test.Errorf("the resolver holds %v as the askers of the answer, want %v alone", held, asker)
+	held := resolver.Askers()[kind.Name][object]
+	slices.SortFunc(held, func(first fact_resolver.Asker, second fact_resolver.Asker) int {
+		return cmp.Compare(first.File, second.File)
+	})
+	if want := []fact_resolver.Asker{{}, asker}; !slices.Equal(held, want) {
+		test.Errorf("the resolver holds %v as the askers of the answer, want %v", held, want)
 	}
 }

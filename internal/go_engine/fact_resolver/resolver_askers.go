@@ -15,12 +15,18 @@ func (resolver *Resolver) RecordsAskers() bool {
 	return resolver.askers != nil
 }
 
-// NoteAsker records asker as a body whose rule asked kind's answer about object, when the resolver records askers and
-// asker is a body. A run that records none takes no lock and allocates nothing here.
+// NoteAsker records asker as a body whose rule asked kind's answer about object, when the resolver records askers. A
+// question asked with no asker, by a Result never asked For a function, is recorded as one no place names, which the
+// body differential takes as standing: an asker that cannot be told fails closed (round 2's N3). A run that records
+// none takes no lock and allocates nothing here.
 func (resolver *Resolver) NoteAsker(kind *Kind, object types.Object, asker *Asker) {
 	record := resolver.askers
-	if record == nil || asker == nil {
+	if record == nil {
 		return
+	}
+	var noted Asker
+	if asker != nil {
+		noted = *asker
 	}
 	record.lock.Lock()
 	defer record.lock.Unlock()
@@ -28,7 +34,7 @@ func (resolver *Resolver) NoteAsker(kind *Kind, object types.Object, asker *Aske
 	if record.askers[key] == nil {
 		record.askers[key] = map[Asker]bool{}
 	}
-	record.askers[key][*asker] = true
+	record.askers[key][noted] = true
 }
 
 // Askers are the bodies whose rules asked each answer, by kind's name and object, each answer's in no order, read once

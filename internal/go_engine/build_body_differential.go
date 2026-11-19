@@ -418,19 +418,7 @@ func (differential *buildBodyDifferential) compareStanding(
 	built map[string]*packages.Package,
 ) {
 	differential.standingCompared, differential.standingFailed = map[string]int{}, map[string]int{}
-	identifiers := make(map[*types.Package]string, len(built))
-	for identifier, builtPackage := range built {
-		identifiers[builtPackage.Types] = identifier
-	}
-	// askerStands is whether asker, a body whose rule asked an answer, stands in this build: placed in no file, it is
-	// taken as standing; in a package the build lints whole, or that has no settlement, nothing stands.
-	askerStands := func(asker fact_resolver.Asker) bool {
-		if asker.File == "" {
-			return true
-		}
-		askerSettled, _ := settled[identifiers[asker.Package]].(*standing_facts.Result)
-		return askerSettled.Stands(asker.File, asker.Offset)
-	}
+	askerStands := standingAskers(settled, built)
 	for _, identifier := range slices.Sorted(maps.Keys(settled)) {
 		packageSettled, isResult := settled[identifier].(*standing_facts.Result)
 		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil ||
@@ -448,6 +436,24 @@ func (differential *buildBodyDifferential) compareStanding(
 		}
 		differential.compareStandingPackage(build, identifier, hosted, packageSettled.Settlement.Standing,
 			capturedPackage, builtPackage, captured.Askers, askerStands)
+	}
+}
+
+// standingAskers is whether an asker, a body whose rule asked an answer, stands in the build whose facts' reach
+// settled the packages settled holds a result of, by ID, of built, the packages its last load checked: placed in no
+// file, it is taken as standing, the side that fails; in a package the build lints whole, or that has no
+// settlement, nothing stands.
+func standingAskers(settled map[string]any, built map[string]*packages.Package) func(asker fact_resolver.Asker) bool {
+	identifiers := make(map[*types.Package]string, len(built))
+	for identifier, builtPackage := range built {
+		identifiers[builtPackage.Types] = identifier
+	}
+	return func(asker fact_resolver.Asker) bool {
+		if asker.File == "" {
+			return true
+		}
+		askerSettled, _ := settled[identifiers[asker.Package]].(*standing_facts.Result)
+		return askerSettled.Stands(asker.File, asker.Offset)
 	}
 }
 

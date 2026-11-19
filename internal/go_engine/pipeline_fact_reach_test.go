@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"go/types"
 	"maps"
 	"os"
 	"path/filepath"
@@ -8,7 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
 // Under the body reach census, with `--build-dependence`, the host's lint hands back what its run held of its facts
@@ -288,5 +293,33 @@ func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 				test.Errorf("the census file has no line %q:\n%s", line, written)
 			}
 		})
+	}
+}
+
+// An asker stands where the facts' reach left its body standing, and one no place names, as a question asked with no
+// asker is recorded (round 2's N3), stands too, the side that fails; a body of a package with no settlement, which the
+// build lints whole, never does.
+func TestAnAskerNoPlaceNamesIsTakenAsStanding(test *testing.T) {
+	test.Parallel()
+
+	settledTypes := types.NewPackage("example.com/settled", "settled")
+	wholeTypes := types.NewPackage("example.com/whole", "whole")
+	standing := fact_reach.Place{File: "settled.go", Offset: 40}
+	stands := standingAskers(map[string]any{"settled": &standing_facts.Result{Partial: true,
+		Settlement: &fact_reach.Settlement{Standing: map[fact_reach.Place]bool{standing: true}}}},
+		map[string]*packages.Package{"settled": {Types: settledTypes}, "whole": {Types: wholeTypes}})
+	for _, each := range []struct {
+		asker fact_resolver.Asker
+		want  bool
+	}{
+		{fact_resolver.Asker{}, true},
+		{fact_resolver.Asker{Package: settledTypes}, true},
+		{fact_resolver.Asker{Package: settledTypes, File: standing.File, Offset: standing.Offset}, true},
+		{fact_resolver.Asker{Package: settledTypes, File: standing.File, Offset: 90}, false},
+		{fact_resolver.Asker{Package: wholeTypes, File: "whole.go", Offset: 40}, false},
+	} {
+		if stood := stands(each.asker); stood != each.want {
+			test.Errorf("the asker %+v stands %t, want %t", each.asker, stood, each.want)
+		}
 	}
 }
