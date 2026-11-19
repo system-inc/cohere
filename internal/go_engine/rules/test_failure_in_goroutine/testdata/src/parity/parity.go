@@ -248,6 +248,26 @@ func startsAcrossFiles(t *testing.T) {
 	go stopsInSecondFile(t)
 }
 
+// Found by both: a named function declared under a //line directive in line_directive.go, its related entry placed
+// where the directive says, moved.go, though the answer names the file it was parsed from.
+func startsUnderLineDirective(t *testing.T) {
+	go stopsUnderLineDirective(t)
+}
+
+// Found by both, twice: a named function whose own instructions call the same stopping method in two branches, one
+// finding for each call, each with its own call as related entry, though the two name the same method.
+func namedWithOneMethodTwice(t *testing.T, early bool) {
+	go fatalEitherWay(t, early)
+}
+
+func fatalEitherWay(t *testing.T, early bool) {
+	if early {
+		t.Fatal("early")
+	} else {
+		t.Fatal("late")
+	}
+}
+
 // Found by neither: the goroutine closes over the test and only reads it.
 func readsOnly(t *testing.T) {
 	go func() {
