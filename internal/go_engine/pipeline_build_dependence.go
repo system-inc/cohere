@@ -46,7 +46,7 @@ type hostDependence struct {
 	decoded map[*types.Package]bool
 	// exportData are the IDs of the packages the host read from export data rather than checking from source, the
 	// system cache's or the store's, whose untyped float constants the body reach census reads as another build's
-	// check from source may not (bodyReacher.loadModeDiffers).
+	// check from source may not (bodyReacher.loadModeReaches).
 	exportData map[string]bool
 	// calls is the units of graph and of the standard library's graph and the calls between them, which every build's
 	// facts census counts by its own verdicts (#f9br7sg), built once a run by the first census to ask (callIndex,

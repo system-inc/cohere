@@ -62,6 +62,7 @@ func writeBuildBodyReach(written *strings.Builder, heading string, census *build
 		reasons = append(reasons, fmt.Sprintf("%s %d", reason, census.byReason[reason]))
 	}
 	fmt.Fprintf(written, "  reached by reason: %s\n", strings.Join(reasons, ", "))
+	writeLoadModeCost(written, census)
 	writeBodyReachDrivers(written, census)
 	fmt.Fprintf(written, "  declarations only: %d packages\n", len(census.declarationsOnly))
 	for _, identifier := range census.declarationsOnly {
@@ -106,4 +107,24 @@ func writeBodyReachDrivers(written *strings.Builder, census *buildBodyReach) {
 	for _, driver := range drivers[:min(len(drivers), bodyReachDrivers)] {
 		fmt.Fprintf(written, "    %d %s\n", counts[driver], driver)
 	}
+}
+
+// writeLoadModeCost writes to written what the general load mode rule costs beside the constants-only rule it
+// replaced (bodyReacher.loadModeReaches): the bodies each reaches first by the load mode, and the bodies the general
+// rule reaches that the constants-only one leaves unreached.
+func writeLoadModeCost(written *strings.Builder, census *buildBodyReach) {
+	general, constantsOnly, beyond := 0, 0, 0
+	for _, body := range census.bodies {
+		if body.reason == reachedLoadMode {
+			general++
+		}
+		if body.constantsOnlyReason == reachedLoadMode {
+			constantsOnly++
+		}
+		if body.reason != "" && body.constantsOnlyReason == "" {
+			beyond++
+		}
+	}
+	fmt.Fprintf(written, "  load mode: general %d, constants only %d; reached by the general rule alone %d\n", general,
+		constantsOnly, beyond)
 }

@@ -25,8 +25,10 @@ type bodyReacher struct {
 	identities *build_reads.IdentityRenderer
 	fileSet    *token.FileSet
 	// fromSource are the IDs of the packages the build checked from source, against which the load mode rule reads
-	// how the host loaded each.
-	fromSource map[string]bool
+	// how the host loaded each, and constantsOnly has it reach by an untyped float constant alone, for the census's
+	// count of what the general rule costs (loadModeReaches).
+	fromSource    map[string]bool
+	constantsOnly bool
 }
 
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
@@ -48,7 +50,7 @@ func (reacher *bodyReacher) reachPackage(
 			// A record always places its declarations in the host's files; one that does not is called reached, as
 			// a doubt is, and dependent, as the graph calls a place it knows no unit at.
 			bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, name: name, reason: reachedUnknown,
-				unitDependent: true})
+				constantsOnlyReason: reachedUnknown, unitDependent: true})
 			continue
 		}
 		position := tokenFile.Position(declared.Declaration.File + token.Pos(declared.Declaration.Offset))
@@ -61,8 +63,19 @@ func (reacher *bodyReacher) reachPackage(
 		}
 		reason, driver := reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
 			read.dotImports[position.Filename])
+		// A body the general rule reaches is judged again under the constants-only load mode rule, the census's count
+		// of what the general one costs: the load mode may have reached it through its signature as well as its body.
+		// An unreached body is unreached by both, the narrower rule reaching nothing the general one does not.
+		constantsOnlyReason := reason
+		if reason != "" {
+			reacher.constantsOnly = true
+			constantsOnlyReason, _ = reacher.reason(hosted.Types, record, declared, read.buildOnlyNames,
+				read.dotImports[position.Filename])
+			reacher.constantsOnly = false
+		}
 		bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
 			line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reason, driver: driver,
+			constantsOnlyReason: constantsOnlyReason,
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 				declared.Declaration.Offset)})
 	}
@@ -133,6 +146,12 @@ func (reacher *bodyReacher) useReason(
 		if entry.Receiver != nil && entry.Receiver.Pkg() != nil && reacher.bits(entry.Receiver).Underlying {
 			return reachedSelected, entry.Receiver, "receiver underlying"
 		}
+		if entry.Object.Pkg() != nil && reacher.loadModeReaches(entry.Object, kinds) {
+			return reachedLoadMode, entry.Object, "load mode"
+		}
+		if entry.Receiver != nil && entry.Receiver.Pkg() != nil && reacher.loadModeReaches(entry.Receiver, kinds) {
+			return reachedLoadMode, entry.Receiver, "load mode"
+		}
 		return "", nil, ""
 	}
 	if entry.Object.Pkg() == nil {
@@ -145,31 +164,40 @@ func (reacher *bodyReacher) useReason(
 	switch {
 	case kinds&build_reads.UsedNamed != 0 && bits.Name && kinds&build_reads.UsedConstant != 0:
 		return reachedConstant, entry.Object, "name"
-	case kinds&build_reads.UsedConstant != 0 && reacher.loadModeDiffers(entry.Object):
-		return reachedLoadMode, entry.Object, "load mode"
 	case kinds&build_reads.UsedNamed != 0 && bits.Name:
 		return reachedNamed, entry.Object, "name"
 	case kinds&build_reads.UsedValueType != 0 && (bits.Name || bits.Underlying):
 		return reachedValueType, entry.Object, writtenBits(bits)
 	case kinds&build_reads.UsedTypeArgument != 0 && (bits.Name || bits.Underlying):
 		return reachedTypeArgument, entry.Object, writtenBits(bits)
+	case reacher.loadModeReaches(entry.Object, kinds):
+		return reachedLoadMode, entry.Object, "load mode"
 	}
 	return "", nil, ""
 }
 
-// loadModeDiffers reports whether object is an untyped float or complex constant of a package the host and the build
-// load in different modes, one from export data and the other from source (the soundness contract's point 5, #9paaen9).
-// Export data holds such a value as a binary fraction of 512 bits, and a check from source holds it exactly, so a body
-// reading it type-checks to another value in each, though no declaration differs: goja's math.Sqrt2 / 2 does at
+// loadModeReaches reports whether a use of kinds of object reaches its body by the load mode (the soundness contract's
+// point 5, #9paaen9): object's package is one the host and the build load in different modes, one from export data
+// and the other from source, which expose the same files differently. Export data holds an untyped float as a binary
+// fraction of 512 bits, and a check from source holds it exactly, so goja's math.Sqrt2 / 2 type-checks to two values at
 // cohere's root, where the host reads math from the system cache and every build under `--build-dependence` checks it
-// from source. An integer, string or boolean constant is written exactly in both, and a typed float's value is rounded
-// to its type in both, so neither reaches. A package the host does not hold is the host's own question, never asked.
-func (reacher *bodyReacher) loadModeDiffers(object types.Object) bool {
-	constant, isConstant := object.(*types.Const)
-	if !isConstant || !isUntypedFloatingPoint(constant.Type()) {
-		return false
+// from source, though no declaration differs. The Square ruled the rule general (#w72zxtq): every use of any object
+// of such a package reaches. With constantsOnly, the census's count of the narrower rule it replaced, only an untyped
+// float or complex constant read by its value does, since an integer, string or boolean constant is written exactly in
+// both and a typed float is rounded to its type in both. A package the host does not hold is never asked.
+func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_reads.UseKinds) bool {
+	if reacher.constantsOnly {
+		constant, isConstant := object.(*types.Const)
+		if !isConstant || kinds&build_reads.UsedConstant == 0 || !isUntypedFloatingPoint(constant.Type()) {
+			return false
+		}
 	}
-	identifier, isHeld := reacher.host.identifiers[object.Pkg()]
+	return reacher.loadModeDiffers(object.Pkg())
+}
+
+// loadModeDiffers reports whether the host and the build load own in different modes.
+func (reacher *bodyReacher) loadModeDiffers(own *types.Package) bool {
+	identifier, isHeld := reacher.host.identifiers[own]
 	if !isHeld {
 		return false
 	}

@@ -5,16 +5,19 @@ import (
 	"go/token"
 	"go/types"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
-// A constant use reaches its body by the load mode (#w72zxtq) when the constant is an untyped float or complex of a
-// package the host and the build load in different modes, one from export data, which holds such a value as a 512-bit
-// binary fraction, and the other from source, which holds it exactly: at cohere's root the host reads math from the
-// system cache and a build under `--build-dependence` checks it from source, and goja's math.Sqrt2 / 2 type-checks to
-// two values. Loaded alike, the value is the same, and an integer constant or a typed float, written exactly or
-// rounded to its type in both, never reaches; nor does a package the host does not hold. The engine's fixture cannot
-// load a package two ways, since a test's host checks the standard library from source, so the rule is pinned here.
-func TestAnUntypedFloatReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
+// A use reaches its body by the load mode (#w72zxtq) when its object's package is one the host and the build load in
+// different modes, one from export data and the other from source: export data holds an untyped float as a 512-bit
+// binary fraction and a check from source holds it exactly, so at cohere's root, where the host reads math from the
+// system cache and a build under `--build-dependence` checks it from source, goja's math.Sqrt2 / 2 type-checks to two
+// values. The Square ruled the rule general: every use of any object of such a package reaches, of any kind, and only
+// a package loaded alike, or one the host does not hold, reaches nothing. The census still counts the narrower rule it
+// replaced, an untyped float or complex constant read by its value alone. The engine's fixture cannot load a package
+// two ways, since a test's host checks the standard library from source, so the rule is pinned here.
+func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 	test.Parallel()
 
 	math := types.NewPackage("math", "math")
@@ -25,35 +28,48 @@ func TestAnUntypedFloatReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 		constant.MakeImag(constant.MakeInt64(1)))
 	maximum := types.NewConst(token.NoPos, math, "MaxInt8", types.Typ[types.UntypedInt], constant.MakeInt64(127))
 	typed := types.NewConst(token.NoPos, math, "Typed", types.Typ[types.Float64], constant.MakeFloat64(0.5))
+	function := types.NewFunc(token.NoPos, math, "Abs", types.NewSignatureType(nil, nil, nil, nil, nil, false))
 	elsewhere := types.NewConst(token.NoPos, unheld, "Pi", types.Typ[types.UntypedFloat],
 		constant.MakeFloat64(3.14))
-	reacherOf := func(hostExportData bool, buildFromSource bool) *bodyReacher {
-		return &bodyReacher{
-			host: &bodyReachHost{identifiers: map[*types.Package]string{math: "math"},
-				dependence: &hostDependence{exportData: map[string]bool{"math": hostExportData}}},
-			fromSource: map[string]bool{"math": buildFromSource},
-		}
-	}
+	named := build_reads.UsedNamed
+	byValue := build_reads.UsedNamed | build_reads.UsedConstant
 	cases := []struct {
 		name            string
 		object          types.Object
+		kinds           build_reads.UseKinds
 		hostExportData  bool
 		buildFromSource bool
-		want            bool
+		general         bool
+		constantsOnly   bool
 	}{
-		{"an untyped float, export data on the host and source in the build", sqrt2, true, true, true},
-		{"an untyped float, source on the host and export data in the build", sqrt2, false, false, true},
-		{"an untyped float, source in both", sqrt2, false, true, false},
-		{"an untyped float, export data in both", sqrt2, true, false, false},
-		{"an untyped complex, export data on the host and source in the build", imaginary, true, true, true},
-		{"an untyped integer, export data on the host and source in the build", maximum, true, true, false},
-		{"a typed float, export data on the host and source in the build", typed, true, true, false},
-		{"an untyped float of a package the host does not hold", elsewhere, true, true, false},
+		{"an untyped float, export data on the host and source in the build", sqrt2, byValue, true, true, true,
+			true},
+		{"an untyped float, source on the host and export data in the build", sqrt2, byValue, false, false, true,
+			true},
+		{"an untyped float, source in both", sqrt2, byValue, false, true, false, false},
+		{"an untyped float, export data in both", sqrt2, byValue, true, false, false, false},
+		{"an untyped complex, export data on the host and source in the build", imaginary, byValue, true, true, true,
+			true},
+		{"an untyped integer, export data on the host and source in the build", maximum, byValue, true, true, true,
+			false},
+		{"a typed float, export data on the host and source in the build", typed, byValue, true, true, true, false},
+		{"a function, export data on the host and source in the build", function, named, true, true, true, false},
+		{"a function, source in both", function, named, false, true, false, false},
+		{"an untyped float of a package the host does not hold", elsewhere, byValue, true, true, false, false},
 	}
 	for _, each := range cases {
-		reacher := reacherOf(each.hostExportData, each.buildFromSource)
-		if got := reacher.loadModeDiffers(each.object); got != each.want {
-			test.Errorf("%s: the load mode reaches its body %t, want %t", each.name, got, each.want)
+		reacher := &bodyReacher{
+			host: &bodyReachHost{identifiers: map[*types.Package]string{math: "math"},
+				dependence: &hostDependence{exportData: map[string]bool{"math": each.hostExportData}}},
+			fromSource: map[string]bool{"math": each.buildFromSource},
+		}
+		if got := reacher.loadModeReaches(each.object, each.kinds); got != each.general {
+			test.Errorf("%s: the load mode reaches its body %t, want %t", each.name, got, each.general)
+		}
+		reacher.constantsOnly = true
+		if got := reacher.loadModeReaches(each.object, each.kinds); got != each.constantsOnly {
+			test.Errorf("%s: the constants-only rule reaches its body %t, want %t", each.name, got,
+				each.constantsOnly)
 		}
 	}
 }

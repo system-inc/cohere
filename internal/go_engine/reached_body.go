@@ -13,7 +13,9 @@ type reachedBody struct {
 	name              string
 	reason            bodyReachReason
 	driver            string
-	unitDependent     bool
+	// constantsOnlyReason is reason under the narrower load mode rule the general one replaced (loadModeReaches).
+	constantsOnlyReason bodyReachReason
+	unitDependent       bool
 }
 
 // String is the body as the census lists it: `package file:line name`.
