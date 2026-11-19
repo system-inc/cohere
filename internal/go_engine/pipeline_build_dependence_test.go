@@ -321,47 +321,70 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheEnginesScan(test *testing.T) {
 // dependent. u has an in-package test in every build, so the host checks u and u [u.test], and windows u [u.test]
 // alone, and kind_windows.go declares String on Kind: the host's u, compared with windows's variant as v is, is judged
 // as u [u.test], compared with its own counterpart, is, Kind and Printed dependent in each, Doubled and the test not.
+//
+// A build-only file is parsed from the bytes the run holds of it (pipeline.held), as the build's load parsed it, never
+// the disk's again: with shape_windows.go rewritten on disk without String once the run has read it, Shape's method
+// set still moves, and the counts are the same.
 func TestABuildOnlyFileOfAPackageTheBuildChecksAsItsVariantIsJudged(test *testing.T) {
 	test.Parallel()
 
-	root := copyFixture(test, filepath.Join("testdata", "build-dependence-variant"))
-	engine, _ := runOverConfigured(test, root, exitClean, nil, "--no-cache", "--build-dependence")
-	if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
-		test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
-	}
-	const shapes = "example.com/dependencevariant/v"
-	if engine.buildRuns[0].analyzed[shapes+" ["+shapes+".test]"] || !engine.buildRuns[1].analyzed[shapes+" ["+shapes+
-		".test]"] {
-		test.Fatalf("want v [v.test] analyzed on windows alone, got the host's %v and windows's %v",
-			engine.buildRuns[0].analyzed, engine.buildRuns[1].analyzed)
-	}
-	if engine.buildRuns[1].judged == nil {
-		test.Fatal("the windows build judged no dependence")
-	}
-	// Each package's workspace units, dependent and in all, as "dependent of units".
-	got := map[string]string{}
-	counts := map[string][2]int{}
-	for _, unit := range engine.buildRuns[1].judged.dependence.Units() {
-		if !unit.Workspace {
-			continue
-		}
-		counted := counts[unit.PackageId]
-		if unit.Dependent {
-			counted[0]++
-		}
-		counted[1]++
-		counts[unit.PackageId] = counted
-	}
-	for identifier, counted := range counts {
-		got[identifier] = fmt.Sprintf("%d of %d", counted[0], counted[1])
-	}
-	want := map[string]string{
-		shapes:                            "2 of 5",
-		"example.com/dependencevariant/u": "2 of 3",
-		"example.com/dependencevariant/u [example.com/dependencevariant/u.test]": "2 of 4",
-	}
-	if !maps.Equal(got, want) {
-		test.Errorf("the dependent units of each package on windows are %v, want %v", got, want)
+	for _, each := range []struct {
+		name         string
+		rewritesDisk bool
+	}{
+		{name: "as read", rewritesDisk: false},
+		{name: "rewritten on disk once read", rewritesDisk: true},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+
+			root := copyFixture(test, filepath.Join("testdata", "build-dependence-variant"))
+			var configure func(*pipeline)
+			if each.rewritesDisk {
+				// Given the pipeline once describeProject has read every file, before the run's first phase.
+				configure = func(*pipeline) {
+					writeTestFile(test, filepath.Join(root, "v", "shape_windows.go"), "package v\n")
+				}
+			}
+			engine, _ := runOverConfigured(test, root, exitClean, configure, "--no-cache", "--build-dependence")
+			if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
+				test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
+			}
+			const shapes = "example.com/dependencevariant/v"
+			if engine.buildRuns[0].analyzed[shapes+" ["+shapes+".test]"] ||
+				!engine.buildRuns[1].analyzed[shapes+" ["+shapes+".test]"] {
+				test.Fatalf("want v [v.test] analyzed on windows alone, got the host's %v and windows's %v",
+					engine.buildRuns[0].analyzed, engine.buildRuns[1].analyzed)
+			}
+			if engine.buildRuns[1].judged == nil {
+				test.Fatal("the windows build judged no dependence")
+			}
+			// Each package's workspace units, dependent and in all, as "dependent of units".
+			got := map[string]string{}
+			counts := map[string][2]int{}
+			for _, unit := range engine.buildRuns[1].judged.dependence.Units() {
+				if !unit.Workspace {
+					continue
+				}
+				counted := counts[unit.PackageId]
+				if unit.Dependent {
+					counted[0]++
+				}
+				counted[1]++
+				counts[unit.PackageId] = counted
+			}
+			for identifier, counted := range counts {
+				got[identifier] = fmt.Sprintf("%d of %d", counted[0], counted[1])
+			}
+			want := map[string]string{
+				shapes:                            "2 of 5",
+				"example.com/dependencevariant/u": "2 of 3",
+				"example.com/dependencevariant/u [example.com/dependencevariant/u.test]": "2 of 4",
+			}
+			if !maps.Equal(got, want) {
+				test.Errorf("the dependent units of each package on windows are %v, want %v", got, want)
+			}
+		})
 	}
 }
 
