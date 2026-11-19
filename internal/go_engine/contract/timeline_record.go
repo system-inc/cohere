@@ -55,7 +55,9 @@ func (record TimelineRecord) MarshalJSON() ([]byte, error) {
 type TimelineStamp struct {
 	// Build is the extra build's name (project.Build.String), such as `windows/amd64`, and omitted for the host's.
 	Build string `json:"build,omitempty"`
-	// Round is 1 for a load or a check that runs again after its first, 2 for the next, and omitted for the first.
+	// Round is a load's: 1 for a load that runs again after its first, 2 for the next, and omitted for the first. A
+	// check carries the round of the load it runs over, so a run's only check can read 1, over the long-line wrap's
+	// load.
 	Round              int    `json:"round,omitempty"`
 	Label              string `json:"label"`
 	WallMicroseconds   int64  `json:"wallMicroseconds"`

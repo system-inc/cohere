@@ -30,10 +30,13 @@ const CopiedToolchain = "go1.27.0"
 // CopiedToolchain's byte for byte, so a binary any of them links reads a directory through the copy as through its own
 // go/build: the copy calls nothing else that is go/build's own, and what it calls of go/parser, go/scanner, go/ast and
 // the rest is the linked release's either way. go1.27.1 to go1.27.3 were held to go1.27.0's sources by their sha256
-// (#tb538na), and the release workflow builds with the newest go1.27 (setup-go reads go.mod's `go 1.27`). A binary
+// (#tb538na), and go1.27.4 by the same test run under it (#afx46gf), and the release workflow builds with the newest
+// go1.27 (setup-go reads go.mod's `go 1.27`), whose `go test ./internal/...` runs that test under the same Go. A binary
 // another release links reads through go/build itself (Sharing). A test holds the toolchain's sources to the copy's
 // and its release to this list, so a release that moves the sources fails it, and one that leaves them is added.
-var sharedReleases = map[string]bool{"go1.27.0": true, "go1.27.1": true, "go1.27.2": true, "go1.27.3": true}
+var sharedReleases = map[string]bool{
+	"go1.27.0": true, "go1.27.1": true, "go1.27.2": true, "go1.27.3": true, "go1.27.4": true,
+}
 
 // Context is a go/build build context with the run's shared reads of Go files' headers. Embedding go/build's keeps
 // every field the copied code reads, `ctxt.GOOS` and `ctxt.OpenFile` among them, spelled as upstream spells it.

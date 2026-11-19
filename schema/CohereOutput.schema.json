@@ -317,7 +317,7 @@
                             "round": {
                                 "type": "integer",
                                 "minimum": 1,
-                                "description": "1 for a load or a check that runs again after its first, as the long-line wrap's load or a reload for a question does, 2 for the next. Absent for the first."
+                                "description": "A load's round: 1 for a load that runs again after its first, as the long-line wrap's load or a reload for a question does, 2 for the next. Absent for the first. A check carries the round of the load it runs over, so a run's only check can read 1."
                             },
                             "label": {
                                 "type": "string",
