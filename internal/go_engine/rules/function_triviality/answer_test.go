@@ -237,8 +237,10 @@ func TestAnAnswerEncodesAndDecodesWithoutLoss(test *testing.T) {
 
 // An answer is the one a reader's own walk gives, whichever program its package builds in. As a root, near is built
 // for its readers, far made from its types alone, and Crossing's walk ends at far.Nothing, which has no syntax there.
-// Below above, near builds in the resolver's own program, where far has its syntax and the walk reads on through
-// far.Nothing, which is trivial, and last: the answer is cut at far.Nothing, to the root's.
+// Below above, near builds in the resolver's own program, where far has its syntax, and the walk refuses far.Nothing
+// all the same, since another package declares it: the answer is the root's, and far.Nothing is never built. Its body
+// calls deep.Value, of a package near does not import and the resolver's program never created for near, so a build
+// of it panics.
 func TestAnAnswerIsTheSameWhereOtherPackagesHaveTheirSyntax(test *testing.T) {
 	test.Parallel()
 	root := askRoots(test, "cut/near")
@@ -259,6 +261,22 @@ func TestAnAnswerIsTheSameWhereOtherPackagesHaveTheirSyntax(test *testing.T) {
 	// The files are the same on disk, so the places are the root's.
 	if answer := function_triviality.Ask(below.resolver, home, crossing); !reflect.DeepEqual(answer, want) {
 		test.Errorf("below above, Crossing's answer is %+v, want the root's, %+v", answer, want)
+	}
+	// Refused, not survived: far.Nothing has its syntax in the program near was judged in, and no blocks.
+	far := near.Imports["cut/far"]
+	if far == nil || far.Types == nil {
+		test.Fatal("near imports no far")
+	}
+	nothing, isFunction := far.Types.Scope().Lookup("Nothing").(*types.Func)
+	if !isFunction {
+		test.Fatal("far declares no Nothing")
+	}
+	built := home.IntermediateRepresentation().Program.FunctionValue(nothing)
+	if built == nil || built.Syntax() == nil {
+		test.Fatalf("far.Nothing is %v in the program near was judged in, want a function with its syntax", built)
+	}
+	if built.Blocks != nil {
+		test.Error("the walk built far.Nothing, a function another package declares, which it must refuse unbuilt")
 	}
 }
 

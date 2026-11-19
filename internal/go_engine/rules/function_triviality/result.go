@@ -71,9 +71,11 @@ func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, functi
 //
 // The answer is the one a reader's own walk gives. A reader walks the package where every other package is made from
 // its types alone, so another package's function has no syntax there and the walk refuses it at once: not trivial,
-// reading no further. Where home builds in the resolver's own program instead, other packages have their syntax and
-// the walk reads on into them, so the answer is cut at the first function another package declares, to not trivial
-// and the places before it, which is exactly where and how a reader's walk ends.
+// reading no further. Where home builds in the resolver's own program instead, other packages have their syntax, so
+// the walk is told to refuse every function whose top-level declaration another package holds, and it ends exactly
+// where and how a reader's walk ends: not trivial, with the places entered before it. No function of another package
+// is entered or built, which matters beyond the answer: its body may name a package home does not import, which the
+// resolver's program never created for home, and a build of that body panics.
 func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, function *types.Func) triviality {
 	home.Lock()
 	defer home.Unlock()
@@ -83,17 +85,16 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, func
 		// answers with no fact before it computes.
 		return triviality{}
 	}
-	trivial, entered := intermediate_representation.IsTrivialEntering(asked)
+	trivial, entered := intermediate_representation.IsTrivialEntering(asked,
+		func(met *intermediate_representation.Function) bool {
+			object := declaringFunction(met).Object()
+			return object != nil && object.Pkg() != home.Types
+		})
 	resolver.Counts(Kind).Computed.Add(1)
 	answer := triviality{Trivial: trivial}
 	own := placeOf(asked)
 	for _, read := range entered {
-		declared := declaringFunction(read)
-		if object := declared.Object(); object != nil && object.Pkg() != home.Types {
-			answer.Trivial = false
-			break
-		}
-		if place := placeOf(declared); place != own && !slices.Contains(answer.Entered, place) {
+		if place := placeOf(declaringFunction(read)); place != own && !slices.Contains(answer.Entered, place) {
 			answer.Entered = append(answer.Entered, place)
 		}
 	}
