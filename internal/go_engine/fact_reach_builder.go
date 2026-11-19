@@ -242,7 +242,18 @@ func (builder *factReachBuilder) ask(
 
 // answer records answer as a question under the place of the function it is of, or of the function declaring the
 // parameter it is of. An answer about a function declared without a body is left out: nothing of a body made it, so it
-// reads the same wherever the function's types do. Any other answer that finds no place is counted unplaced.
+// reads the same wherever the function's types do.
+//
+// An answer about a variable that is no declared function's parameter is left out too, and counted nowhere. The
+// resolver's memo holds a mark for a function literal's parameter, and it needs no question of its own: a literal is
+// linted exactly when the declaration around it is; the only calls that read its parameter's mark statically are in
+// that same declaration; and the mark is made of the literal's own body, which stands or leaves with the declaration,
+// and of its callees' marks, whose difference takes the declaration out as their user. A variable that is a parameter
+// of nothing the package declares at all, an instantiation's, is answered from its types alone, the same in every
+// build. Counting either would have one closure make its whole package lint whole.
+//
+// Any other answer that finds no place is counted unplaced: one about neither a function nor a variable, about a
+// function no declaration of the record declares, or about one no identity names.
 func (builder *factReachBuilder) answer(answer check.ExportedFact) {
 	var function *types.Func
 	parameter := -1
@@ -250,12 +261,11 @@ func (builder *factReachBuilder) answer(answer check.ExportedFact) {
 	case *types.Func:
 		function = object
 	case *types.Var:
-		declared, isParameter := builder.parameters[object]
-		if !isParameter {
-			builder.hosted.unplaced++
+		declaring, isParameter := builder.parameters[object]
+		if _, isDeclared := builder.functions[declaring.function]; !isParameter || !isDeclared {
 			return
 		}
-		function, parameter = declared.function, declared.index
+		function, parameter = declaring.function, declaring.index
 	default:
 		builder.hosted.unplaced++
 		return

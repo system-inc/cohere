@@ -239,7 +239,8 @@ func TestTheFunctionsAFactIsComparedOnAreEachDeclaredOrUsedOnce(test *testing.T)
 
 	fixture, lower := checkedFactsFixture(test)
 	want := []string{"platformSize", "size", "Warm", "Pair", "Box.Open", "Box.Close", "Open", "Use", "Closer", "First",
-		"Leading", "Sized", "declared", "Labelled", "Through", "Deep", "lower.Depth", "Halved", "lower.Halve"}
+		"Leading", "Sized", "declared", "Labelled", "Through", "Deep", "lower.Depth", "Halved", "lower.Halve",
+		"Joined"}
 	objects := map[string]*types.Func{}
 	names := map[fact_reach.Object]string{}
 	for _, name := range want {
@@ -348,9 +349,11 @@ func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testi
 	}
 }
 
-// An answer no body's place can take is counted unplaced, each kind of one by itself: about the package, a result, a
-// receiver, a package-level value, and a function no declaration of the record declares. An answer about a function
-// declared without a body is neither recorded nor counted, its answer being its types' alone.
+// An answer no body's place can take is counted unplaced, each kind of one by itself: about the package, and about a
+// function no declaration of the record declares. An answer about a variable that is no declared function's parameter
+// is left out and counted nowhere, since the host hands a mark for a function literal's parameter too and one closure
+// must not make its package lint whole: a literal's parameter, a result, a receiver and a package-level value. An
+// answer about a function declared without a body is neither recorded nor counted, its answer being its types' alone.
 func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 	test.Parallel()
 
@@ -358,30 +361,30 @@ func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 	use, open := fixture.function(test, "Use"), fixture.function(test, "Box.Open")
 	elsewhere := types.NewFunc(token.NoPos, fixture.own, "elsewhere", types.NewSignatureType(nil, nil, nil, nil, nil,
 		false))
+	literal, isSignature := fixture.function(test, "Joined").Scope().Lookup("count").Type().(*types.Signature)
+	if !isSignature {
+		test.Fatal("want count, in Joined's body, of a function literal's type")
+	}
 	for _, each := range []struct {
-		name   string
-		object types.Object
+		name     string
+		object   types.Object
+		unplaced int
 	}{
-		{"the package", nil},
-		{"a result", use.Signature().Results().At(0)},
-		{"a receiver", open.Signature().Recv()},
-		{"a package-level value", fixture.own.Scope().Lookup("started")},
-		{"a function no declaration declares", elsewhere},
+		{"the package", nil, 1},
+		{"a function no declaration declares", elsewhere, 1},
+		{"a function literal's parameter", literal.Params().At(0), 0},
+		{"a result", use.Signature().Results().At(0), 0},
+		{"a receiver", open.Signature().Recv(), 0},
+		{"a package-level value", fixture.own.Scope().Lookup("started"), 0},
+		{"a function declared without a body", fixture.function(test, "declared"), 0},
 	} {
 		inputs := fixture.inputs()
 		inputs.answers = []check.ExportedFact{purity(each.object, "true")}
 		hosted := newFactReachPackage(inputs)
-		if hosted.unplaced != 1 || len(hosted.askings) != 0 {
-			test.Errorf("an answer about %s: %d unplaced and %d questions, want 1 and none", each.name,
-				hosted.unplaced, len(hosted.askings))
+		if hosted.unplaced != each.unplaced || len(hosted.askings) != 0 {
+			test.Errorf("an answer about %s: %d unplaced and %d questions, want %d and none", each.name,
+				hosted.unplaced, len(hosted.askings), each.unplaced)
 		}
-	}
-	inputs := fixture.inputs()
-	inputs.answers = []check.ExportedFact{purity(fixture.function(test, "declared"), "false")}
-	hosted := newFactReachPackage(inputs)
-	if hosted.unplaced != 0 || len(hosted.askings) != 0 {
-		test.Errorf("an answer about declared, which has no body: %d unplaced and %d questions, want neither",
-			hosted.unplaced, len(hosted.askings))
 	}
 }
 
