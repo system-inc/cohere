@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are sixteen.
+// The changes are seventeen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -225,6 +225,16 @@
 // is reached, grouped and scheduled as a root is. Unset, nothing is
 // rooted beside, and Graph.Beside is empty.
 //
+// The seventeenth is Options.StandingBodies, the seam an extra build takes
+// the host's findings of a confined rule through, inside the function
+// bodies its difference does not reach (#e4rd5dw). It answers, for a
+// package's ID, what stands there, and Options.Standing keys the answer
+// in the ResultOf of every pass on that package, as Options.Recorded keys
+// a package's reads, so a dispatcher calls a confined rule for nothing
+// inside a standing body and the rule reports the host's findings there
+// as its own. The checker never reads it. Unset, or where it answers
+// nil, ResultOf holds no standing bodies.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -298,7 +308,8 @@ import (
 	// Options.Timing measures into.
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
-	// cohere: the inheritance Options.Inheritance hands every pass.
+	// cohere: the inheritance Options.Inheritance hands every pass, and the
+	// standing bodies Options.StandingBodies hands a package's.
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	// cohere: the host's side Options.FactHosts hands a package's passes.
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
@@ -428,6 +439,17 @@ type Options struct {
 	// none of the analyzers, whose root action on a package it would
 	// otherwise share.
 	Beside *analysis.Analyzer
+
+	// cohere: StandingBodies, when set, answers for a package's ID the
+	// function bodies an extra build leaves to the host there, whose
+	// findings a confined rule takes rather than hear the body again, or
+	// nil for a package nothing stands in. Standing, when StandingBodies
+	// is set too, keys a package's answer in the ResultOf of every pass on
+	// it, a key never run, as Dependents is. It is asked once for each
+	// action, from several goroutines at once. Unset, or where it answers
+	// nil, ResultOf holds no standing bodies.
+	StandingBodies func(packageId string) rule.StandingBodies
+	Standing       *analysis.Analyzer
 
 	// cohere: Reads, when set, holds the reads of each package whose
 	// fact reads are recorded: every ObjectFact and PackageFact an action
@@ -971,6 +993,12 @@ func (act *Action) execOnce() {
 	// cohere: Options.Inherited, the inheritance under Options.Inheritance.
 	if act.opts.Inherited != nil && act.opts.Inheritance != nil {
 		inputs[act.opts.Inherited] = act.opts.Inheritance
+	}
+	// cohere: Options.Standing, the package's answer under Options.StandingBodies.
+	if act.opts.Standing != nil && act.opts.StandingBodies != nil {
+		if standing := act.opts.StandingBodies(act.Package.ID); standing != nil {
+			inputs[act.opts.Standing] = standing
+		}
 	}
 	// cohere: Options.Recorded, the package's reads under Options.Reads.
 	if act.opts.Recorded != nil && act.opts.Reads != nil {
