@@ -7,6 +7,11 @@
 // and none waits inside its own action on another's build (#zrfcwdy). It runs only where a reader requires it, and
 // every reader reads the whole package, so building before any of them asks costs nothing they would not.
 //
+// The one package it creates and leaves unbuilt is an extra build's in which a function stands (#e4rd5dw): there the
+// dispatcher over the representation hears nothing of a function that stands for every listener it starts, so it
+// builds only the others (Result.SourceFunctionsBut), and any other reader builds the package whole as it first reads
+// it (Result.SourceFunctions, Result.Package).
+//
 // It is named for what it does, as buildir and x/tools' buildssa are, rather than go_ir: every comment in this tree
 // says go/ir for staticcheck's package, which this replaces.
 package build_intermediate_representation
@@ -26,7 +31,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
-// Analyzer creates the pass's package in our intermediate representation and builds it whole.
+// Analyzer creates the pass's package in our intermediate representation and builds it whole, or leaves the building
+// to its readers where a function of the package stands (see run).
 // It requires ctrlflow, as buildir does, for the same no-return predicate, so where both run the two representations
 // end the same calls in the same `Panic`.
 var Analyzer = &analysis.Analyzer{
@@ -75,6 +81,8 @@ type Sharer interface {
 // of the map requires Analyzer on it, and a package the resolver created before this ran, for a question that reached
 // it first, was created so too: the resolver read the same set of dependents, from the graph, before any action ran.
 // A function the resolver built already is not built again: Package.Build waits on each function's own build.
+//
+// A package in which a function stands is created and not built here (see builtUnlessStanding).
 func run(pass *analysis.Pass) (any, error) {
 	graphs, isGraphs := pass.ResultOf[ctrlflow.Analyzer].(*ctrlflow.CFGs)
 	if !isGraphs {
@@ -91,13 +99,24 @@ func run(pass *analysis.Pass) (any, error) {
 				return nil, fmt.Errorf("the fact resolver shares %s recording expressions %t, where this pass's "+
 					"dependents ask %t", pass.Pkg.Path(), shared.RecordsExpressions(), readsExpressions)
 			}
-			shared.Build()
-			return &Result{irPackage: shared}, nil
+			return builtUnlessStanding(pass, shared), nil
 		}
 	}
 	created := NewPackage(pass.Fset, pass.Pkg, pass.Files, pass.TypesInfo, graphs.NoReturn, readsExpressions)
-	created.Build()
-	return &Result{irPackage: created}, nil
+	return builtUnlessStanding(pass, created), nil
+}
+
+// builtUnlessStanding is the result over irPackage, pass's package as created, which it builds whole first unless a
+// function of the package stands (rule.StandingSpans), as one does only in an extra build's pass (#e4rd5dw). A
+// standing function's findings are the host's for every confined rule, so the dispatcher, which calls no listener for
+// a function that stands for all it started, builds the package less those functions, and building it whole here
+// would build what no one reads. Any other reader of the result finds the package built whole all the same, by its
+// own first read. A pass nothing stands in, every host's, is built here as it always was.
+func builtUnlessStanding(pass *analysis.Pass, irPackage *intermediate_representation.Package) *Result {
+	if len(rule.StandingSpans(pass)) == 0 {
+		irPackage.Build()
+	}
+	return &Result{irPackage: irPackage}
 }
 
 // NewPackage creates packageTypes's package in a program of its own, as buildir does: one per package, since the
