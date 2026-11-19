@@ -8,7 +8,9 @@ import (
 // checks a package whole, hearing every answer the run computes about its objects, then checks it again with half its
 // function bodies stubbed, and answers every question about the package's objects with what the whole package
 // answered, so a kept unit reads the whole run's answers and never one recomputed from a stub: the only difference a
-// kept unit can see is another unit's syntax and types. Its methods are called from every pass at once.
+// kept unit can see is another unit's syntax and types. check's placed hand answers the same way from the placed
+// answers a host's entries hold (PlacedIn, #k7k3wwc), for a build to set once a caller names the functions those still
+// hold for. Its methods are called from every pass at once.
 type Held interface {
 	// Answer is the answer of the kind named kindName about object, encoded as Ask encodes one, to hand the question in
 	// place of computing it, and whether there is one; false has the run answer as it would without a hand on it.

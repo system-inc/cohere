@@ -43,6 +43,11 @@ type Package struct {
 
 	// states is each kind's state in the package, a pointer to the kind's own type by its *Kind (see StateOf).
 	states sync.Map
+
+	// answered is the key of every answer the run memoized or kept about the package's objects, under answeredLock,
+	// so PlacedIn reads the package's own answers without walking the whole run's (see noteAnswered).
+	answeredLock sync.Mutex
+	answered     map[answerKey]bool
 }
 
 // Lock takes the package's lock, under which a kind computes in it. A computation holding it takes another package's
