@@ -141,3 +141,11 @@ func Warm() {
 func helper() int {
 	return 1
 }
+
+// Pair holds a value of any one type.
+type Pair[T any] struct{ First T }
+
+// Firsts reads the field of an instance, which is named by its generic's: unreached, and compared.
+func Firsts(pair Pair[int]) int {
+	return pair.First
+}

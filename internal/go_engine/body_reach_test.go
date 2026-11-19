@@ -43,15 +43,16 @@ import (
 //     Unrecorded.
 //   - After, which a //line directive places in reach.rl, a file no build lists, calls platformName: reached, Named,
 //     its file decided by the file as parsed, so it is neither counted absent nor left out of the count.
-//   - Gadget.Spin, Joined, High, Before and Sized use nothing that differs: unreached, and the graph's unit verdict
-//     agrees on each. High's shift reads the word size, which windows's arm64 shares with the host.
+//   - Gadget.Spin, Joined, High, Before, Sized and Firsts use nothing that differs: unreached, and the graph's unit
+//     verdict agrees on each. High's shift reads the word size, which windows's arm64 shares with the host, and
+//     Firsts reads an instance's field, which the differential names by its generic's, as stage 1's record does.
 //   - size calls platformSize, a host-only file's: Named. Warm calls size alone, and helper calls nothing: both
 //     unreached, though their findings differ, by what the reach does not stand for. On windows platformSize is pure,
 //     so SA4017 reports Warm's discarded call, a callee's fact, stage 4's; and windows's init calls helper, so U1000,
 //     a package-wide rule, reports helper unused on the host alone, stage 5's.
 //
 // platformName's, platformLimit's and platformSize's bodies in the host-only file are absent on windows, and windows's
-// own platformName, platformLimit, platformSize, Spin, len and init are new. The body differential compares the seven
+// own platformName, platformLimit, platformSize, Spin, len and init are new. The body differential compares the eight
 // unreached bodies' types, uses and findings on windows with the host's: none fails, and Warm's and helper's findings
 // are classed apart under the stage each is owed to. The census is written to its file, saying what the reach does
 // not stand for, and the findings are the run's without it, which writes no census.
@@ -124,6 +125,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"size":         "Named",
 		"Warm":         "unreached",
 		"helper":       "unreached",
+		"Firsts":       "unreached",
 	}
 	if !maps.Equal(got, want) {
 		test.Errorf("windows's census judges the host's bodies\n%v\nwant\n%v", got, want)
@@ -152,6 +154,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"size":         "example.com/reach.platformSize (reach_other.go) Named name in the body",
 		"Warm":         "",
 		"helper":       "",
+		"Firsts":       "",
 	}
 	if !maps.Equal(drivers, wantDrivers) {
 		test.Errorf("windows's census says each body is reached first by\n%v\nwant\n%v", drivers, wantDrivers)
@@ -169,8 +172,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		test.Errorf("want the census within the plain run's from-source packages the whole but linked, got %+v",
 			within)
 	}
-	if census.total != 24 || census.reached != 17 || census.absent != 3 || census.new != 6 {
-		test.Errorf("want 24 bodies, 17 reached, 3 absent and 6 new, got %d, %d, %d and %d", census.total,
+	if census.total != 25 || census.reached != 17 || census.absent != 3 || census.new != 6 {
+		test.Errorf("want 25 bodies, 17 reached, 3 absent and 6 new, got %d, %d, %d and %d", census.total,
 			census.reached, census.absent, census.new)
 	}
 	// linked, and unsafe, which it imports and which holds no body, are unrecorded.
@@ -191,8 +194,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	if differential == nil {
 		test.Fatal("windows's run has no body differential")
 	}
-	if differential.compared != 7 || len(differential.failures) != 0 {
-		test.Errorf("want the 7 unreached bodies compared with the host's and none failing, got %d compared and "+
+	if differential.compared != 8 || len(differential.failures) != 0 {
+		test.Errorf("want the 8 unreached bodies compared with the host's and none failing, got %d compared and "+
 			"the failures\n%s", differential.compared, strings.Join(differential.failures, "\n"))
 	}
 	classed := map[findingStage]string{}
@@ -218,9 +221,9 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"build " + on.buildRuns[1].build.String(),
 		"The reach stands for no finding that turns on a callee's fact, stage 4's (#h0k644s), nor for a package-wide " +
 			"rule's, stage 5's (#xeafx79): the body differential classes their findings apart.",
-		"  bodies: 24, reached 17, unreached 7, absent 3, new 6",
+		"  bodies: 25, reached 17, unreached 8, absent 3, new 6",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
-		"  body differential: compared 7, failures 0",
+		"  body differential: compared 8, failures 0",
 		"  findings differing turning on a callee's fact, stage 4's (#h0k644s): 1",
 		"  findings differing of a package-wide rule, stage 5's (#xeafx79): 1",
 	} {
@@ -282,8 +285,8 @@ func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T
 		}
 		return &altered
 	})
-	if differential.compared != 14 {
-		test.Errorf("want 14 bodies compared, the 7 the reach leaves and the 7 it was told to, got %d",
+	if differential.compared != 15 {
+		test.Errorf("want 15 bodies compared, the 8 the reach leaves and the 7 it was told to, got %d",
 			differential.compared)
 	}
 	failed := map[string][]string{}

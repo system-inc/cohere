@@ -65,7 +65,10 @@ func (renderer *bodyRenderer) body(
 					renderer.add(tokenFile, expression, true, false,
 						"own "+used.Name()+" at "+strconv.Itoa(tokenFile.Offset(used.Pos())))
 				default:
-					identity := renderer.identities.Object(used)
+					// An instance's field or method is named by its generic's, as stage 1's record names it
+					// (genericOf): objectpath names no instance's member, and what the instance makes of it is the
+					// type facts'.
+					identity := renderer.identities.Object(genericOf(used))
 					renderer.add(tokenFile, expression, true, identity.Kind == IdentityUnknown, identity.String())
 				}
 			}
