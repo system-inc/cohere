@@ -46,6 +46,17 @@ func TestACycleReportsTheSameInEitherDeclarationOrder(test *testing.T) {
 	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "order/forward", "order/back")
 }
 
+// A finding never turns on whether a package declares a function before or after one that reaches it through a
+// stand-in (#8d9r2rh). Packages standin/first and standin/last hold the same functions, with no cycle of calls and no
+// function calling itself: three callers each pass a slice to a function of no package, an instantiation, a bound
+// method and a thunk, that stands for one of the package's own, which passes it on to a length check. first declares
+// the callers before what they reach and last after, and a slice of one passed to each caller reaches the check in
+// both, so each wants the three findings.
+func TestAStandInReportsTheSameInEitherDeclarationOrder(test *testing.T) {
+	test.Parallel()
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "standin/first", "standin/last")
+}
+
 // The differences fixture holds the calls where the two could most plausibly part, a slice whose length depends on
 // the path taken, one reaching the call through a loop's phi, arguments spread over lines and slices of slices of an
 // array. It records no difference, since the port parts from the original nowhere it can run, so the two must agree
