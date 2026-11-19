@@ -92,10 +92,13 @@ type Settlement struct {
 	Unknown   map[string]int
 }
 
-// differsReason and unknownReason are why a body left when an answer of kind, asked in the build, read otherwise than
-// the host's, or could not be read.
-func differsReason(kind string) Reason { return Reason("answer " + kind) }
-func unknownReason(kind string) Reason { return Reason("unknown " + kind) }
+// DiffersReason is why a body left when an answer of kind, asked in the build, read otherwise than the host's. It and
+// UnknownReason are exported so that whoever names an object for an answer it asked before the walk, as the build's
+// pass names one for an answer the host read from another package, gives the reason Settle gives.
+func DiffersReason(kind string) Reason { return Reason("answer " + kind) }
+
+// UnknownReason is why a body left when an answer of kind, asked in the build, could not be read.
+func UnknownReason(kind string) Reason { return Reason("unknown " + kind) }
 
 // Settle takes out of standing every body the facts reach, and reports what still stands and what it took (see the
 // package). standing is read and never written: what still stands is the settlement's own map. reached are the bodies
@@ -144,10 +147,10 @@ func Settle(
 				case Equal:
 				case Differs:
 					settlement.Differing[question.Kind]++
-					differing = append(differing, Named{Object: question.About, Reason: differsReason(question.Kind)})
+					differing = append(differing, Named{Object: question.About, Reason: DiffersReason(question.Kind)})
 				default:
 					settlement.Unknown[question.Kind]++
-					differing = append(differing, Named{Object: question.About, Reason: unknownReason(question.Kind)})
+					differing = append(differing, Named{Object: question.About, Reason: UnknownReason(question.Kind)})
 				}
 			}
 		}

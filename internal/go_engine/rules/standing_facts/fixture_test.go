@@ -1,0 +1,216 @@
+package standing_facts_test
+
+import (
+	"go/ast"
+	"go/types"
+	"testing"
+
+	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/types/objectpath"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
+	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/function_purity"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
+)
+
+// purity is the fact kind the tests' questions ask, function_purity's, whose package this import links into the test
+// binary, so the kind is registered.
+var purity = function_purity.Kind.Name
+
+// fixture is the facts package as one load made it, the build's side of a test: its file as the load names it, and
+// each of its function bodies' places by the function's name, a method's by its own.
+type fixture struct {
+	root   *packages.Package
+	file   string
+	places map[string]fact_reach.Place
+}
+
+// loadFacts loads the facts fixture and what it imports, from source, as the engine loads a package. Each run of the
+// checker takes a load of its own, since a run lets go of what it read of the packages below its roots.
+func loadFacts(test *testing.T) fixture {
+	test.Helper()
+	directory := analysistest.TestData()
+	loaded, loadError := load.Packages(directory, []string{"facts"}, []string{
+		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
+	}, nil)
+	if loadError != nil {
+		test.Fatalf("loading the facts fixture: %v", loadError)
+	}
+	if len(loaded.Roots) != 1 || loaded.Roots[0].ID != "facts" || len(loaded.Roots[0].Syntax) != 1 {
+		test.Fatalf("the load's roots are %v, want the facts package alone, of one file", loaded.Roots)
+	}
+	found := fixture{root: loaded.Roots[0], places: map[string]fact_reach.Place{}}
+	syntax := found.root.Syntax[0]
+	found.file = found.root.Fset.File(syntax.FileStart).Name()
+	for _, declaration := range syntax.Decls {
+		if function, isFunction := declaration.(*ast.FuncDecl); isFunction {
+			found.places[function.Name.Name] = fact_reach.Place{File: found.file,
+				Offset: found.root.Fset.Position(function.Pos()).Offset}
+		}
+	}
+	return found
+}
+
+// place is the place of the body of the fixture's function named name.
+func (found fixture) place(test *testing.T, name string) fact_reach.Place {
+	test.Helper()
+	place, declared := found.places[name]
+	if !declared {
+		test.Fatalf("the facts fixture declares no function named %s", name)
+	}
+	return place
+}
+
+// identity is how a host names the fixture's package-level function named name, in the file the build declares it in.
+func (found fixture) identity(name string) build_reads.Identity {
+	return build_reads.Identity{Kind: build_reads.IdentityObject, PackagePath: "facts", Path: objectpath.Path(name),
+		File: found.file}
+}
+
+// method is how a host names the method named methodName of the fixture's type named typeName, in the file the build
+// declares it in.
+func (found fixture) method(typeName string, methodName string) build_reads.Identity {
+	return build_reads.Identity{Kind: build_reads.IdentityMethod, PackagePath: "facts",
+		Path: objectpath.Path(typeName), Method: methodName, File: found.file}
+}
+
+// imported is how a host names the package-level function named name of the package at packagePath, in a file of the
+// host's own, which no build is held to for another package's function.
+func imported(packagePath string, name string) build_reads.Identity {
+	return build_reads.Identity{Kind: build_reads.IdentityObject, PackagePath: packagePath,
+		Path: objectpath.Path(name), File: "/host/" + packagePath + ".go"}
+}
+
+// settle runs standing_facts on the fixture as the engine runs a rule's analyzer, the checker handing its pass host
+// under rule.FactHost, or nothing for a nil host, and returns what the analyzer found and the run's resolver.
+func settle(test *testing.T, found fixture, host fact_reach.Host) (*standing_facts.Result, *fact_resolver.Resolver) {
+	test.Helper()
+	return settleRecording(test, found, host, nil)
+}
+
+// settleRecording is settle with the fixture's reads recorded into reads, as a run that keeps each package's reads
+// records them, or into none when reads is nil.
+func settleRecording(
+	test *testing.T,
+	found fixture,
+	host fact_reach.Host,
+	reads *build_reads.Reads,
+) (*standing_facts.Result, *fact_resolver.Resolver) {
+	test.Helper()
+	options := check.DispatchOptions()
+	if reads != nil {
+		options.Reads = map[*packages.Package]*build_reads.Reads{found.root: reads}
+	}
+	options.FactHost = rule.FactHost
+	options.FactHosts = func(packageId string) fact_reach.Host {
+		if host == nil || packageId != found.root.ID {
+			return nil
+		}
+		return host
+	}
+	action, resolver := analyze(test, found, standing_facts.Analyzer, options)
+	settled, isSettled := action.Result.(*standing_facts.Result)
+	if !isSettled {
+		test.Fatalf("standing_facts's result is a %T", action.Result)
+	}
+	return settled, resolver
+}
+
+// analyze runs analyzer on the fixture under options, and returns its action there, ended without error, and the
+// run's resolver, which holds every package of the fixture once the run has returned.
+func analyze(
+	test *testing.T,
+	found fixture,
+	analyzer *analysis.Analyzer,
+	options *checker.Options,
+) (*checker.Action, *fact_resolver.Resolver) {
+	test.Helper()
+	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
+	if !isResolver {
+		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+	}
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{analyzer}, []*packages.Package{found.root}, options)
+	if analyzeError != nil {
+		test.Fatalf("analyzing the facts fixture: %v", analyzeError)
+	}
+	if len(graph.Roots) != 1 {
+		test.Fatalf("running %s on the facts fixture left %d root actions, want one", analyzer.Name, len(graph.Roots))
+	}
+	if graph.Roots[0].Err != nil {
+		test.Fatalf("running %s on the facts fixture: %v", analyzer.Name, graph.Roots[0].Err)
+	}
+	return graph.Roots[0], resolver
+}
+
+// function is the fixture's package-level function named name, as the build's types hold it.
+func (found fixture) function(test *testing.T, name string) *types.Func {
+	test.Helper()
+	function, isFunction := found.root.Types.Scope().Lookup(name).(*types.Func)
+	if !isFunction {
+		test.Fatalf("the facts fixture declares no package-level function named %s", name)
+	}
+	return function
+}
+
+// buildsPurity is the build's own answer about the purity of object, as the fixture's readers are answered it once a
+// run has returned, encoded as the kind encodes it, so no test guesses an answer's bytes.
+func buildsPurity(
+	test *testing.T,
+	found fixture,
+	resolver *fact_resolver.Resolver,
+	object types.Object,
+) []byte {
+	test.Helper()
+	reader := resolver.Package(found.root.Types)
+	if reader == nil {
+		test.Fatalf("the resolver never learned the facts fixture")
+	}
+	encoded, sure, registered := resolver.Asked(purity, reader, object)
+	if !sure || !registered {
+		test.Fatalf("asking the purity of %s: sure %t, registered %t, want both", object.Name(), sure, registered)
+	}
+	return encoded
+}
+
+// importedFunction is the function named name of the package at packagePath, which the fixture imports, directly or
+// through an import, as the build's types hold it.
+func (found fixture) importedFunction(test *testing.T, packagePath string, name string) *types.Func {
+	test.Helper()
+	reached := []*types.Package{found.root.Types}
+	for next := 0; next < len(reached); next++ {
+		if function, isFunction := reached[next].Scope().Lookup(name).(*types.Func); isFunction &&
+			reached[next].Path() == packagePath {
+			return function
+		}
+		reached = append(reached, reached[next].Imports()...)
+	}
+	test.Fatalf("the facts fixture reaches no function %s.%s", packagePath, name)
+	return nil
+}
+
+// purityInAnotherRun is the build's answer about the purity of the function the fixture's package-level name names,
+// asked in a load and a run of its own, for a host that must hold the build's answer before the build's run starts.
+func purityInAnotherRun(test *testing.T, name string) []byte {
+	test.Helper()
+	found := loadFacts(test)
+	_, resolver := analyze(test, found, function_purity.Analyzer, check.DispatchOptions())
+	return buildsPurity(test, found, resolver, found.function(test, name))
+}
+
+// notPure is the kind's answer of no fact, encoded as the kind encodes it: a function not pure.
+func notPure(test *testing.T) []byte {
+	test.Helper()
+	zero, registered := fact_resolver.ZeroAnswer(purity)
+	if !registered {
+		test.Fatalf("%s is not a registered kind", purity)
+	}
+	return zero
+}

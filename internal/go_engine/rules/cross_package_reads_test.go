@@ -75,6 +75,11 @@ var listedCrossPackageReads = map[string]listedRead{
 		class:  readRecorded,
 		reason: "hands the judged package's imports to build_reads.ClosureInterface and records what it found",
 	},
+	"standing_facts/function_finder.go:(*functionFinder).packageAt": {
+		class: readRecorded,
+		reason: "finds the package a host's identity names, in which objectAt and methodAt look the name up through " +
+			"the package's reads",
+	},
 	"staticcheck_code/is_main_like.go:IsMainLike": {class: readDirectImports},
 	"unused_code/graph_entry.go:(*graph).entry": {
 		class:  readOwnPackage,

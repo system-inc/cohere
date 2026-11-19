@@ -29,13 +29,16 @@ const engineImportPath = "github.com/system-inc/cohere/internal/go_engine/"
 // asks only of a function the asker's own package declares, read from that function's own instructions, and panics
 // on any other (#h0k644s). function_triviality asks only of the asker's own package too, refusing any other, and cuts
 // its answer where the walk would read another package's body, so the answer reads nothing outside the package and is
-// the same in whichever program the package builds.
+// the same in whichever program the package builds. standing_facts asks what the host recorded, each question of an
+// object it found in its own package or among what that imports, and only once fact_resolver.Visible passes the
+// object: one it does not pass is answered the kind's answer of no fact, unasked (#5vbs1np).
 var resolverAskers = []string{
 	"rules/build_intermediate_representation",
 	"rules/function_purity",
 	"rules/function_triviality",
 	"rules/odd_slice_argument",
 	"rules/return_nil_ness",
+	"rules/standing_facts",
 	"rules/test_failure_in_goroutine",
 }
 
