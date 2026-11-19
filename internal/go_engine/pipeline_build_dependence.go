@@ -490,9 +490,10 @@ func standardLibraryDifference(
 
 // filesDiffer is how one package's files differ, as written: hostFiles the host compiles and builtFiles the build
 // does, each host-only file named and each shared one too, by which a unit a //line directive names apart is seeded,
-// and each build-only file parsed for its syntax alone from the bytes read gives (appendParsed). Each host-only file,
-// and each build-only one, is read by holdsLineDirective, by its path as written, whose directive could name a shared
-// file, so one that holds one marks the package (PackageDifference.LineDirective).
+// and each build-only file parsed for its syntax alone from the bytes read gives (appendParsed). The host-only files,
+// then the build-only ones, are scanned by holdsLineDirective, by path as written, until one holds a directive, which
+// could name a shared file, so it marks the package (PackageDifference.LineDirective); the files after it are not
+// scanned, since the mark is all a scan can add.
 func filesDiffer(
 	hostFiles []string,
 	builtFiles []string,

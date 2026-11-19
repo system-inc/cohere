@@ -40,9 +40,9 @@ type PackageDifference struct {
 	HostOnlyFiles []string
 
 	// SharedFiles are the files both compile, as written. A package with a host-only file has every unit
-	// build-dependent whose file, as a reader sees it, is not one of these: a //line directive in a host-only file
-	// names its units by a file the build lists nowhere, which matches no host-only file, and the record keeps no
-	// other name of a unit's file to match instead (#ss4t5g6).
+	// build-dependent whose file, as a reader sees it, is not one of these: a //line directive in a host-only file can
+	// name its units by a file no build lists, which matches no host-only file, and the record keeps no other name of a
+	// unit's file to match instead (#ss4t5g6). One naming a file both compile is LineDirective's to seed.
 	SharedFiles []string
 
 	// LineDirective says a file the two builds do not share, host-only or build-only, holds a line directive
