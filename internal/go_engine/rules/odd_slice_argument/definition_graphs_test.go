@@ -32,6 +32,9 @@ const (
 // generatedParameters names the two slices every generated function takes.
 var generatedParameters = [2]string{"left", "right"}
 
+// oddSlice is the source of a slice of one, whose length the rule knows to be odd.
+const oddSlice = `[]string{"one"}`
+
 // leafMarks is each function of the generated leaf package, by name, with whether its one slice is marked there.
 var leafMarks = map[string]bool{"Pairs": true, "Forward": true, "Loose": false}
 
@@ -325,7 +328,9 @@ func (graph generatedGraph) call(qualifier string, index int, throughExpression 
 	}
 }
 
-// source is the graph as a package named name, its functions declared in order.
+// source is the graph as a package named name, its functions declared in order, and after them a probe for each, a
+// function that passes it two slices of one, so the package holds a finding of its own wherever the graph marks a
+// parameter.
 func (graph generatedGraph) source(name string, order []int) string {
 	var source strings.Builder
 	fmt.Fprintf(&source, "package %s\n\nimport \"graphs/leaf\"\n\n", name)
@@ -366,6 +371,11 @@ func (graph generatedGraph) source(name string, order []int) string {
 		}
 		source.WriteString("}\n\n")
 	}
+	// Declared last, so no walk in declaration order enters the graph through one.
+	for index := range graph.functions {
+		fmt.Fprintf(&source, "func Probe%d() {\n\t%s\n}\n\n", index, graph.call("", index, index%2 == 0,
+			[2]string{oddSlice, oddSlice}))
+	}
 	return source.String()
 }
 
@@ -379,8 +389,7 @@ func (graph generatedGraph) readerSource(path string, order []int) (string, []in
 	for position, index := range order {
 		// The calls start on the sixth line, after the package clause, the import and the function's opening.
 		lines[index] = 6 + position
-		fmt.Fprintf(&source, "\t%s\n", graph.call("subject.", index, position%2 == 0,
-			[2]string{`[]string{"one"}`, `[]string{"one"}`}))
+		fmt.Fprintf(&source, "\t%s\n", graph.call("subject.", index, position%2 == 0, [2]string{oddSlice, oddSlice}))
 	}
 	source.WriteString("}\n")
 	return source.String(), lines

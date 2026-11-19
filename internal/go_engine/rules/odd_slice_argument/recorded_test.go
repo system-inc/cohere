@@ -78,3 +78,31 @@ func TestEveryMarkAJudgmentSettlesIsRecorded(test *testing.T) {
 			slices.Sorted(maps.Keys(want)))
 	}
 }
+
+// A package with no call passing a slice of known odd length asks no mark and judges nothing (#8d9r2rh), which is
+// nearly every package: demand/cycle and parity/pairs check lengths and pass slices on, and hold no such call, so over
+// them the resolver judges no function and tells no answer.
+func TestAPackageWithNoOddSliceJudgesNothing(test *testing.T) {
+	test.Parallel()
+	roots := loadFixtures(test, analysistest.TestData(), []string{"demand/cycle", "parity/pairs"})
+	options := check.DispatchOptions()
+	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
+	if !isResolver {
+		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+	}
+	hand := &hearingHand{heard: map[types.Object][]string{}}
+	resolver.HoldAnswers(hand)
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{odd_slice_argument.Analyzer}, roots, options)
+	if analyzeError != nil {
+		test.Fatalf("analyzing the packages: %v", analyzeError)
+	}
+	for _, action := range graph.Roots {
+		if action.Err != nil || len(action.Diagnostics) != 0 {
+			test.Fatalf("running on %s: %d findings, %v", action.Package.ID, len(action.Diagnostics), action.Err)
+		}
+	}
+	if judged := resolver.Counts(odd_slice_argument.Kind).Computed.Load(); judged != 0 || len(hand.heard) != 0 {
+		test.Errorf("with no odd slice passed anywhere the resolver judged %d functions and told %d answers, want none",
+			judged, len(hand.heard))
+	}
+}

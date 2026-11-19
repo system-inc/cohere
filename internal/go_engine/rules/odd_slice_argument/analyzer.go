@@ -1,6 +1,7 @@
 // Package odd_slice_argument is staticcheck's SA5012, a slice of odd length passed to a function that panics unless
 // its slice has an even length, as strings.NewReplacer and logging APIs taking pairs do, ported onto the engine's own
-// intermediate representation as an analyzer that asks every mark it reads of the run's fact resolver (#w7zmvat).
+// intermediate representation as a listener that judges one function at a time and asks every mark it reads of the
+// run's fact resolver (#w7zmvat, #8d9r2rh).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5012/sa5012.go, whose reading of one
 // function's body it keeps and whose message it reports word for word, at the same range, the argument. The original
@@ -9,15 +10,16 @@
 // and then reports each call passing a slice of known odd length to a marked parameter. It pushes its marks as object
 // facts, judging every package, dependencies included, each in one walk in the order buildir lists its functions.
 //
-// Here a mark is asked, never pushed. The port reports the same calls, one function at a time, and asks the mark of
-// each such call's parameter of the run's fact resolver, the analyzed package's own as another package's, which judges
-// only that parameter's function and what its marks rest on, in the package that declares it (#w7zmvat unit 2,
-// #8d9r2rh). The marks are defined with no order, as a least set, and demand_walk.go says how they are found. Where the
-// original asks staticcheck's internal iterutil.All whether every return block is dominated, the port loops over them
-// itself, and where it asks irutil.IsCallTo whether a call is to len, the port asks whether the callee is the builtin
-// len, the one callee whose name irutil.CallName gives as "len". It is a plain analyzer on
-// build_intermediate_representation.Analyzer, and generated, whose judgment the context reads though this check filters
-// nothing. The push walk stays in push_walk_test.go, the tests' record of what the original's walk marks, and the fact
+// Here a mark is asked, never pushed. The port reports the same calls, and asks the mark of each such call's parameter
+// of the run's fact resolver, the analyzed package's own as another package's, which judges only that parameter's
+// function and what its marks rest on, in the package that declares it (#w7zmvat unit 2, #8d9r2rh). The marks are
+// defined with no order, as a least set, and demand_walk.go says how they are found. So the port keeps nothing from
+// one function to the next: a function's findings are a function of its own instructions and the marks it asks, and
+// the dispatcher hands it each function on its own, in any order, some of them or all. It never needs a function
+// built that no question of its reaches. Where the original asks staticcheck's internal iterutil.All whether every
+// return block is dominated, the port loops over them itself, and where it asks irutil.IsCallTo whether a call is to
+// len, the port asks whether the callee is the builtin len, the one callee whose name irutil.CallName gives as "len".
+// The push walk stays in push_walk_test.go, the tests' record of what the original's walk marks, and the fact
 // differential beside this file holds that record to the original's facts over whole trees.
 //
 // It differs in two places, each adjudicated. The original reads a call's source as a call expression, and the source
@@ -38,40 +40,62 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
+	"reflect"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/generated"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port under the original's name, so the rule, its settings and every `//cohere:ignore` naming it
-// read the same once the port takes the original's place. It asks the run's fact resolver of every mark it reads, of
-// packages ctrlflow, required through build_intermediate_representation, has the resolver hold.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA5012",
-	Doc: "Flags a slice of odd length passed to a function that needs an even one: staticcheck's SA5012, ported onto " +
-		"the engine's own intermediate representation.",
-	Requires: []*analysis.Analyzer{build_intermediate_representation.Analyzer, generated.Analyzer},
-	Run:      run,
+// MarksAnalyzer hands the package's readers its marks, which they ask of one parameter at a time. It requires
+// ctrlflow, as the build of every package a mark is judged in does, so ctrlflow has run on the package and on every
+// package below it, and the resolver holds each of them, before a reader asks.
+var MarksAnalyzer = &analysis.Analyzer{
+	Name: "odd_slice_argument_marks",
+	Doc: "marks the slice parameters a function needs of even length when a reader asks, staticcheck's SA5012 marks " +
+		"on the engine's own representation",
+	Run:        runMarks,
+	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
+	ResultType: reflect.TypeFor[*Result](),
 }
 
-// run reports the odd slices each function of the package passes to a marked parameter, every mark, the package's own
-// among them, asked of the run's fact resolver.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	built, readError := build_intermediate_representation.ResultOf(pass)
-	if readError != nil {
-		return nil, readError
-	}
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own with
+// the package's marks. It requires MarksAnalyzer, whose result it reads.
+var Listener = rule.Listener{
+	FileLocal: true,
+	Requires:  []*analysis.Analyzer{MarksAnalyzer},
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+		Function: func(context *rule.Context, function *intermediate_representation.Function) {
+			marks, isMarks := context.ResultOf(MarksAnalyzer).(*Result)
+			if !isMarks {
+				// Invariant: the listener requires MarksAnalyzer, and the dispatcher hands over its result, of the
+				// type it declares.
+				panic("odd_slice_argument: MarksAnalyzer's result is missing")
+			}
+			Check(context, marks.Asking(context.RuleName()), function)
+		},
+	},
+}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA5012",
+	"SA5012",
+	"Flags a slice of odd length passed to a function that needs an even one: staticcheck's SA5012, ported onto "+
+		"the engine's own intermediate representation.",
+	&Listener,
+)
+
+// runMarks is the package's marks, asked of the run's resolver as the package's readers ask.
+func runMarks(pass *analysis.Pass) (any, error) {
 	resolver, resolverError := fact_resolver.Of(pass)
 	if resolverError != nil {
 		return nil, resolverError
@@ -81,11 +105,14 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("reading the marks of %s: the fact resolver never learned it, though ctrlflow, which "+
 			"it learns a package from, ran on it first", pass.Pkg.Path())
 	}
-	marks := (&Result{resolver: resolver, reader: reader}).Asking(pass.Analyzer.Name)
-	for function := range built.SourceFunctions() {
-		reportOddLengths(context, marks.Marked, function)
-	}
-	return nil, nil
+	return &Result{resolver: resolver, reader: reader}, nil
+}
+
+// Check judges one function: each call in it passing a slice of known odd length to a parameter marks holds marked is
+// reported, at the argument. It reads function's own instructions and asks one mark for each such call, and keeps
+// nothing for the next function.
+func Check(context *rule.Context, marks *Result, function *intermediate_representation.Function) {
+	reportOddLengths(context, marks.Marked, function)
 }
 
 // dominatesEveryReturn is whether every path through function to a return passes through block.
@@ -166,9 +193,7 @@ func directChecks(function *intermediate_representation.Function) []*intermediat
 	return checked
 }
 
-// reportOddLengths reports each call in function passing a slice whose length is known and odd to a parameter marked
-// says is marked. It reads function's own instructions and asks one mark for each such call, so it judges a function
-// on its own.
+// reportOddLengths is Check with the marks read through marked, which the tests' push hands its own.
 func reportOddLengths(
 	context *rule.Context,
 	marked func(parameter *types.Var) bool,
