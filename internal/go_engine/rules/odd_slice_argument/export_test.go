@@ -55,3 +55,27 @@ func IsDefinitionMark(fact analysis.Fact) bool {
 func Whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[types.Object]bool {
 	return whole(resolver, home)
 }
+
+// ParameterOwner is parameterOwner, where a parameter is declared, for the tests outside this package.
+type ParameterOwner = parameterOwner
+
+// IsLiteral is whether owner is a function literal.
+func IsLiteral(owner ParameterOwner) bool {
+	return owner.literal != nil
+}
+
+// IsAtLoad is whether owner is a function literal at package level, which runs in the package's initializer.
+func IsAtLoad(owner ParameterOwner) bool {
+	return owner.literal != nil && owner.declared == nil
+}
+
+// OwnerOf is ownerOf, where parameter is declared in home, nil for nowhere.
+func OwnerOf(home *fact_resolver.Package, parameter *types.Var) *ParameterOwner {
+	return ownerOf(home, parameter)
+}
+
+// OwnersByWalk is ownersByWalk, every named parameter of home's functions and function literals by where it is
+// declared, read from all of home's syntax, the oracle OwnerOf is held to.
+func OwnersByWalk(home *fact_resolver.Package) map[*types.Var]ParameterOwner {
+	return ownersByWalk(home)
+}
