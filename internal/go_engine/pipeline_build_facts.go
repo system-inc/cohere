@@ -189,7 +189,10 @@ func (engine *pipeline) indexHostFacts(
 // and left out, counted by why, where pairByUnit cannot pair it exactly, as is a build's answer restoredAnswer cannot
 // place. A fact of a package the build restored rather than checked from source is left out on both sides, the build
 // having no syntax of it, and counted (contract.DependenceFacts.WithoutSyntax, #wzre5eg): each one the census would
-// have compared, and each the build's entry holds by a path alone. Nil when the host's facts were never indexed.
+// have compared, and each the build's entry holds by a path alone. A fact about an object in a file the two do not
+// both compile, of a package both have by one ID, is no comparison's either, the other build having no such object,
+// and is counted on the side that holds it (contract.DependenceFacts.CompiledInOne, #w5dbvdm). Nil when the host's
+// facts were never indexed.
 func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.ExportedFact) *contract.DependenceFacts {
 	if engine.dependence.facts == nil {
 		return nil
@@ -210,6 +213,15 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 	built := make(map[factKey]check.ExportedFact, len(facts))
 	builtByPosition := map[factKey]check.ExportedFact{}
 	withoutSyntax := 0
+	// A fact about an object in a file the two builds do not both compile, of a package both have by one ID, which
+	// the build checked from source or restored: the build's is passed by here, as it is keyed, and the host's as the
+	// host's are walked, each counted where it is passed by.
+	compiledInOne := 0
+	inOnesFile := func(key factKey) bool {
+		return key.file != "" &&
+			(judged.sharedPackages[key.packageIdentifier] || judged.withoutSyntax[key.packageIdentifier]) &&
+			!judged.shared[sharedFile{packageIdentifier: key.packageIdentifier, file: key.file}]
+	}
 	for _, fact := range facts {
 		// A fact the build's own entry holds by a path alone, of a package it restored, names no object for a key to
 		// place, and every such fact of a kind would meet under its package's own key: each is counted here, apart.
@@ -225,6 +237,9 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 			}
 			// A fact in a file only the build compiles is no comparison's, as compare finds of a positioned one.
 			if !judged.shared[sharedFile{packageIdentifier: key.packageIdentifier, file: key.file}] {
+				if inOnesFile(key) {
+					compiledInOne++
+				}
 				continue
 			}
 			// As for a restored package below: an object no objectpath names has no side in the host's.
@@ -236,6 +251,10 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 			continue
 		}
 		if !isKeyed {
+			continue
+		}
+		if inOnesFile(key) {
+			compiledInOne++
 			continue
 		}
 		// A fact about an object no objectpath names, a function's local closure say, in a package the host restored
@@ -315,6 +334,10 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 			withoutSyntax++
 			continue
 		}
+		if inOnesFile(key) {
+			compiledInOne++
+			continue
+		}
 		builtFact, buildHas := built[key]
 		compare(key, hosted, true, builtFact, buildHas)
 	}
@@ -344,7 +367,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 	census.Workspace, census.Dependencies = factCallers(calls, judged.dependence, judged.standardLibrary, differing)
 	census.Milliseconds = int(time.Since(started).Milliseconds())
 	census.Unkeyed, census.UnkeyedParts = unkeyedTotal(parts), parts
-	census.WithoutSyntax = withoutSyntax
+	census.WithoutSyntax, census.CompiledInOne = withoutSyntax, compiledInOne
 	return census
 }
 
