@@ -14,11 +14,12 @@ const recordFormat = "cohere dependence record 1"
 // string table, the table itself each text's length and its bytes: the package's ID, path, whether it is the
 // workspace's; the string table; the import map, each import path and ID, by path; the type names; the object table,
 // each object its path then its local name; the units, each as its file, start, length, nodes, universe-name bits, its
-// receiver's local name plus one, 0 for none, its declares' local names, its reads and its callees; and the kind
-// edges. Reads, callees and edges name an object by its index in the table. A read is its flags (1 has a target, 2
-// touches the underlying), its target when it has one, then its expansion, each bit an object and its underlying
-// flag. An edge is its from local name, its flags (1 from underlying, 2 to underlying) and its to object. The
-// unnameable count is no part of it: a record that met one is the collecting run's to report.
+// flags (1 has a receiver, 2 hangs on the C side, unitRecord.fromCgo, 4 withheld by the host's load,
+// unitRecord.withheld), its receiver's local name when it has one, its declares' local names, its reads and its
+// callees; and the kind edges. Reads, callees and edges name an object by its index in the table. A read is its flags
+// (1 has a target, 2 touches the underlying), its target when it has one, then its expansion, each bit an object and
+// its underlying flag. An edge is its from local name, its flags (1 from underlying, 2 to underlying) and its to
+// object. The unnameable count is no part of it: a record that met one is the collecting run's to report.
 
 // recordWriter writes one record: its strings, each once, by index, and its body, after them.
 type recordWriter struct {
@@ -82,10 +83,18 @@ func encodeRecord(record *packageRecord) []byte {
 		writer.number(uint64(unit.end - unit.start))
 		writer.number(uint64(unit.nodes))
 		writer.number(unit.universeNames)
-		if unit.receiver == "" {
-			writer.number(0)
-		} else {
-			writer.number(1)
+		unitFlags := uint64(0)
+		if unit.receiver != "" {
+			unitFlags |= 1
+		}
+		if unit.fromCgo {
+			unitFlags |= 2
+		}
+		if unit.withheld {
+			unitFlags |= 4
+		}
+		writer.number(unitFlags)
+		if unit.receiver != "" {
 			writer.text(unit.receiver)
 		}
 		writer.number(uint64(len(unit.declares)))

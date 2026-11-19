@@ -7,7 +7,6 @@ import (
 	"go/token"
 	"go/types"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -169,7 +168,7 @@ func TestABuildAsksOfEachObjectOnce(test *testing.T) {
 
 // parsedPackage is the package identifier of files, each a name and its source, parsed and checked here with no loader,
 // as AddPackage takes a loaded package: what a //line directive makes of a file is the parser's, which a fixture
-// module's load would give alike.
+// module's load would give alike. A file may import package unsafe, which needs no export data, and nothing else.
 func parsedPackage(test *testing.T, identifier string, files [][2]string) *packages.Package {
 	test.Helper()
 	fileSet := token.NewFileSet()
@@ -184,7 +183,13 @@ func parsedPackage(test *testing.T, identifier string, files [][2]string) *packa
 	information := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{},
 		Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{},
 		Instances: map[*ast.Ident]types.Instance{}, Implicits: map[ast.Node]types.Object{}}
-	checked, checkError := (&types.Config{}).Check("example.com/"+identifier, fileSet, syntax, information)
+	configuration := types.Config{Importer: importerFunction(func(path string) (*types.Package, error) {
+		if path == "unsafe" {
+			return types.Unsafe, nil
+		}
+		return nil, fmt.Errorf("%s imports %s, and a package parsed here imports only unsafe", identifier, path)
+	})}
+	checked, checkError := configuration.Check("example.com/"+identifier, fileSet, syntax, information)
 	if checkError != nil {
 		test.Fatal(checkError)
 	}
@@ -195,8 +200,8 @@ func parsedPackage(test *testing.T, identifier string, files [][2]string) *packa
 // expectUnitsFoundAsByMaps fails for every place in graph's units, each one's start, the offsets just inside and
 // past its ends, and offsets before and after every unit, where unitStartingAt or unitContaining answers other than
 // the maps the resolution held before its file table: one from each unit's package, file and start to the last unit
-// written there, and one from each file to its units in the graph's order, searched for the last unit starting at or
-// before the offset.
+// written there, and one from each file to its units in the graph's order, read whole for the units whose spans hold
+// the offset, of them the one starting last, and of two starting there the later.
 func expectUnitsFoundAsByMaps(test *testing.T, label string, graph *Graph) {
 	test.Helper()
 	resolved := graph.resolve()
@@ -209,14 +214,14 @@ func expectUnitsFoundAsByMaps(test *testing.T, label string, graph *Graph) {
 		fileUnits[file] = append(fileUnits[file], index)
 	}
 	containing := func(file fileKey, offset int) (int, bool) {
-		inFile := fileUnits[file]
-		position := sort.Search(len(inFile), func(index int) bool {
-			return int(resolved.unitStart[inFile[index]]) > offset
-		}) - 1
-		if position < 0 || offset >= int(resolved.unitEnd[inFile[position]]) {
-			return 0, false
+		found, isFound := 0, false
+		for _, index := range fileUnits[file] {
+			holds := int(resolved.unitStart[index]) <= offset && offset < int(resolved.unitEnd[index])
+			if holds && (!isFound || resolved.unitStart[index] >= resolved.unitStart[found]) {
+				found, isFound = index, true
+			}
 		}
-		return inFile[position], true
+		return found, isFound
 	}
 	for file, units := range fileUnits {
 		offsets := []int{0, 1 << 20}
@@ -259,7 +264,7 @@ func TestUnitsAreFoundAsByMapsWhereverLineDirectivesPlaceThem(test *testing.T) {
 	interleaved := NewGraph()
 	interleaved.AddPackage(parsedPackage(test, "interleaved", [][2]string{{"generated.go",
 		"package interleaved\n\n//line alpha.go:1\nfunc AlphaOne() {}\n\n//line beta.go:1\nfunc BetaOne() {}\n\n" +
-			"//line alpha.go:10\nfunc AlphaTwo() {}\n\n//line beta.go:10\nfunc BetaTwo() {}\n"}}), true)
+			"//line alpha.go:10\nfunc AlphaTwo() {}\n\n//line beta.go:10\nfunc BetaTwo() {}\n"}}), true, nil)
 	if resolved := interleaved.resolve(); resolved.files.unitOrder == nil || !resolved.files.inStartOrder {
 		test.Errorf("interleaved: want an order of the file table's own, its files in start order, got order %v, "+
 			"in start order %t", resolved.files.unitOrder, resolved.files.inStartOrder)
@@ -282,7 +287,7 @@ func TestUnitsAreFoundAsByMapsWhereverLineDirectivesPlaceThem(test *testing.T) {
 		return source
 	}
 	shared.AddPackage(parsedPackage(test, "shared", [][2]string{{"first.go", sharedSource("One", "Two", "Three")},
-		{"second.go", sharedSource("Uno", "Dos")}}), true)
+		{"second.go", sharedSource("Uno", "Dos")}}), true, nil)
 	if resolved := shared.resolve(); resolved.files.unitOrder != nil || resolved.files.inStartOrder {
 		test.Errorf("shared: want no order of the file table's own, its file out of start order, got order %v, in "+
 			"start order %t", resolved.files.unitOrder, resolved.files.inStartOrder)

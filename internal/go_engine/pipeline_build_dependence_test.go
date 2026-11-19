@@ -3,7 +3,10 @@ package go_engine
 import (
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
 	"go/token"
+	"go/types"
 	"maps"
 	"os"
 	"path/filepath"
@@ -17,6 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
 // dependenceModule is the build-dependence fixture's module, whose packages are its workspace.
@@ -77,7 +81,7 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 	graph := build_dependence.NewGraph()
 	var group sync.WaitGroup
 	for _, loaded := range host {
-		group.Go(func() { graph.AddPackage(loaded, workspace(loaded)) })
+		group.Go(func() { graph.AddPackage(loaded, workspace(loaded), nil) })
 	}
 	group.Wait()
 	difference := build_dependence.Difference{
@@ -321,7 +325,7 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.
 			test.Parallel()
 
 			standardLibrary := build_dependence.NewGraph()
-			standardLibrary.AddPackage(host, false)
+			standardLibrary.AddPackage(host, false, nil)
 			// The standard library's graph has ended, as every build waits for it to.
 			done := make(chan struct{})
 			close(done)
@@ -494,5 +498,425 @@ func TestBuildDependenceOfTheHostsBuildAloneChangesNothing(test *testing.T) {
 	if switchedStream != plainStream {
 		test.Errorf("the stream with the switch under --host-build-only is\n%s\nwant the run's without it\n%s",
 			switchedStream, plainStream)
+	}
+}
+
+// filesDiffer says where a cgo tool translated a package on either side, which no file's name tells. The host's cgo
+// tool translated native.go, so a build that translates it too shares every file as written with the host, has no file
+// of its own or the host's alone, and is said to keep cgo on, by which the graph seeds the host's units of the cgo file
+// and of the tool's generated file. A build with cgo off lists no cgo file: native.go is then a file only the host
+// compiles, and cgo is still said kept on, since the file the host's tool generated is in no file list and only that
+// seeds its units. Where the host translated nothing and the build has cgo off, nothing is said of cgo.
+func TestFilesDifferSaysWhereTheBuildKeepsCgoOn(test *testing.T) {
+	test.Parallel()
+
+	plainFile, cgoFile := "/native/plain.go", "/native/native.go"
+	hostFiles := []string{plainFile, cgoFile}
+	translated := &packages.Package{GoFiles: hostFiles,
+		CompiledGoFiles: []string{plainFile, "/cache/generated", "/cache/translation"}}
+	withoutCgo := &packages.Package{GoFiles: []string{plainFile}, CompiledGoFiles: []string{plainFile}}
+	hostCgoFiles := build_dependence.CgoFiles(translated)
+	// No file here is on disk, and none is read: no build has a file of its own, and no host-only file holds a
+	// directive.
+	holdsNoDirective := func(string) bool { return false }
+
+	kept := filesDiffer(hostFiles, hostCgoFiles, translated, translated.GoFiles, token.NewFileSet(), os.ReadFile,
+		holdsNoDirective)
+	if !kept.KeepsCgo || len(kept.HostOnlyFiles) > 0 || len(kept.BuildOnlyFiles) > 0 {
+		test.Errorf("a build that translates the package: want cgo kept on and no file differing, got %+v", kept)
+	}
+	off := filesDiffer(hostFiles, hostCgoFiles, withoutCgo, withoutCgo.GoFiles, token.NewFileSet(), os.ReadFile,
+		holdsNoDirective)
+	if !off.KeepsCgo || !slices.Equal(off.HostOnlyFiles, []string{cgoFile}) || len(off.BuildOnlyFiles) > 0 {
+		test.Errorf("a build with cgo off: want %s the host's alone and cgo kept on, got %+v", cgoFile, off)
+	}
+	untranslated := filesDiffer(hostFiles, nil, withoutCgo, withoutCgo.GoFiles, token.NewFileSet(), os.ReadFile,
+		holdsNoDirective)
+	if untranslated.KeepsCgo || !slices.Equal(untranslated.HostOnlyFiles, []string{cgoFile}) {
+		test.Errorf("a build with cgo off where the host translated nothing: want %s the host's alone and nothing "+
+			"said of cgo, got %+v", cgoFile, untranslated)
+	}
+}
+
+// checkedByHand is the package at path of files, each a name and its source, parsed and type-checked here with no
+// loader and no C compiler, package "C" faked for a file that imports it, as build_dependence.Graph.AddPackage takes a
+// loaded package. Its listing, the files as written and those compiled, is the caller's to set.
+func checkedByHand(test *testing.T, path string, files [][2]string) *packages.Package {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	var syntax []*ast.File
+	for _, file := range files {
+		parsed, parseError := parser.ParseFile(fileSet, file[0], file[1], 0)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		syntax = append(syntax, parsed)
+	}
+	information := &types.Info{
+		Types:      map[ast.Expr]types.TypeAndValue{},
+		Instances:  map[*ast.Ident]types.Instance{},
+		Defs:       map[*ast.Ident]types.Object{},
+		Uses:       map[*ast.Ident]types.Object{},
+		Implicits:  map[ast.Node]types.Object{},
+		Selections: map[*ast.SelectorExpr]*types.Selection{},
+		Scopes:     map[ast.Node]*types.Scope{},
+	}
+	checked, checkError := (&types.Config{FakeImportC: true}).Check(path, fileSet, syntax, information)
+	if checkError != nil {
+		test.Fatal(checkError)
+	}
+	return &packages.Package{ID: path, PkgPath: path, Fset: fileSet, Syntax: syntax, Types: checked,
+		TypesInfo: information}
+}
+
+// dependenceOf seeds a package whose only difference is cgo, on the host's graph and on the standard library's, by
+// what the host's listing and the build's say of the cgo tool, with every file as written shared and none of either
+// side's alone. The host's graph holds native as the host's cgo tool left it, built by hand: a plain file, the file
+// the tool generates and a translation that opens with the tool's `//line` directive, Slots in the translation reading
+// `_Ciconst_SLOTS` of the generated file. The standard library's graph holds a package checked as written, as its side
+// load checks every one, which the host's listing says the host's tool translated. Where the build translates both
+// again, the cgo units of each are seeds. Where it checks them as written, only the host's cgo files say cgo is kept
+// on, and the units are seeds still. Where the host translated nothing and the build checks them as written, nothing
+// of either moves. Steady, of native's plain file, moves in none.
+func TestDependenceOfSeedsAPackageWhoseOnlyDifferenceIsCgo(test *testing.T) {
+	test.Parallel()
+
+	const nativePath = "example.com/native"
+	const standardPath = "standardcgo"
+	nativePlain, nativeCgo := "/native/plain.go", "/native/native.go"
+	generated, translation := "/cache/host/_cgo_gotypes.go", "/cache/host/native.cgo1.go"
+	native := checkedByHand(test, nativePath, [][2]string{
+		{nativePlain, "package native\n\nconst Steady = 1\n"},
+		{generated, "package native\n\nconst _Ciconst_SLOTS = 4\n"},
+		{translation, "//line " + nativeCgo + ":1:1\npackage native\n\nconst Slots = _Ciconst_SLOTS\n"},
+	})
+	native.GoFiles = []string{nativePlain, nativeCgo}
+	native.CompiledGoFiles = []string{nativePlain, generated, translation}
+	standardPlain, standardCgo := "/standard/plain.go", "/standard/native.go"
+	standard := checkedByHand(test, standardPath, [][2]string{
+		{standardPlain, "package standardcgo\n"},
+		{standardCgo, "package standardcgo\n\nimport \"C\"\n\nvar Slots = C.SLOTS\n"},
+	})
+	standard.GoFiles = []string{standardPlain, standardCgo}
+	standard.CompiledGoFiles = standard.GoFiles
+	graph, standardGraph := build_dependence.NewGraph(), build_dependence.NewGraph()
+	graph.AddPackage(native, true, nil)
+	standardGraph.AddPackage(standard, false, nil)
+	sideLoaded := make(chan struct{})
+	close(sideLoaded)
+
+	translatedCgoFiles := map[string][]string{nativePath: build_dependence.CgoFiles(native),
+		standardPath: {standardCgo}}
+	if !slices.Equal(translatedCgoFiles[nativePath], []string{nativeCgo}) {
+		test.Fatalf("want %s alone translated on the host, got %q", nativeCgo, translatedCgoFiles[nativePath])
+	}
+	// What a build compiles of a package's files as written: the cgo tool's outputs in the cgo file's place where it
+	// translates the package, and the files themselves where it checks them as written.
+	translating := func(plain string) []string {
+		return []string{plain, "/cache/build/_cgo_gotypes.go", "/cache/build/native.cgo1.go"}
+	}
+	asWritten := func(plain string, cgo string) []string { return []string{plain, cgo} }
+	for _, build := range []struct {
+		name             string
+		hostCgoFiles     map[string][]string
+		nativeCompiled   []string
+		standardCompiled []string
+		want             bool
+	}{
+		{"a build that translates what the host translated", translatedCgoFiles, translating(nativePlain),
+			translating(standardPlain), true},
+		{"a build that checks as written what the host translated", translatedCgoFiles,
+			asWritten(nativePlain, nativeCgo), asWritten(standardPlain, standardCgo), true},
+		{"a build that checks as written what the host did too", map[string][]string{},
+			asWritten(nativePlain, nativeCgo), asWritten(standardPlain, standardCgo), false},
+	} {
+		engine := &pipeline{dependence: &hostDependence{
+			graph:    graph,
+			files:    map[string][]string{nativePath: native.GoFiles, standardPath: standard.GoFiles},
+			cgoFiles: build.hostCgoFiles,
+			paths:    map[string]string{nativePath: nativePath, standardPath: standardPath},
+			restored: map[string]bool{standardPath: true},
+			standardLibrary: &standardLibraryDependence{done: sideLoaded, graph: standardGraph,
+				files: map[string][]string{standardPath: standard.GoFiles}},
+		}}
+		_, judged := engine.dependenceOf(&load.Loaded{Roots: []*packages.Package{
+			{ID: nativePath, PkgPath: nativePath, GoFiles: native.GoFiles, CompiledGoFiles: build.nativeCompiled},
+			{ID: standardPath, PkgPath: standardPath, GoFiles: standard.GoFiles,
+				CompiledGoFiles: build.standardCompiled},
+		}})
+		if judged == nil || judged.dependence == nil || judged.standardLibrary == nil {
+			test.Fatalf("%s: want a judgment of the host's graph and of the standard library's, got %+v", build.name,
+				judged)
+		}
+		for _, name := range []struct {
+			graph      string
+			dependence *build_dependence.Dependence
+			path       string
+			local      string
+			want       bool
+		}{
+			{"the host's graph", judged.dependence, nativePath, "Slots", build.want},
+			{"the host's graph", judged.dependence, nativePath, "_Ciconst_SLOTS", build.want},
+			{"the host's graph", judged.dependence, nativePath, "Steady", false},
+			{"the standard library's graph", judged.standardLibrary, standardPath, "Slots", build.want},
+		} {
+			if bits, isDeclared := name.dependence.NameBits(name.path, name.local); !isDeclared ||
+				bits.Name != name.want {
+				test.Errorf("%s: %s of %s: want its name bit %t in %s, got %+v, declared %t", build.name, name.local,
+					name.path, name.want, name.graph, bits, isDeclared)
+			}
+		}
+	}
+}
+
+// buildDependenceGraph keeps the host's cgo files of each package from its listing (build_dependence.CgoFiles), so a
+// build's judgment knows the host's cgo tool translated a package where nothing else says so: a build that checks as
+// written every file the host's tool translated, as one whose own translation failed does, shares every file as
+// written with the host and compiles none apart, and only the host's cgo files say cgo is kept on. The host's load
+// holds native as its cgo tool left it, built by hand, and the graph is built from that load as a run that judges
+// dependence builds it, with one extra build beside the host's. Slots, of the translation, and `_Ciconst_SLOTS`, of
+// the generated file, are seeds in that build; Steady, of the plain file, is not. So they are where the build checks
+// native only as its in-package test variant, "native [native.test]", which a build's load of analyzed roots keeps in
+// native's place where nothing imports native and a test file only that build compiles is native's (load's
+// reachedRoots), and the host, with no such test file, has no variant of native: the host's native is compared with
+// the build's variant, and its cgo files are those the host's graph keeps under native's own ID.
+func TestTheHostsGraphKeepsItsCgoFilesForEveryBuildsJudgment(test *testing.T) {
+	test.Parallel()
+
+	const nativePath = "example.com/native"
+	nativePlain, nativeCgo := "/native/plain.go", "/native/native.go"
+	generated, translation := "/cache/host/_cgo_gotypes.go", "/cache/host/native.cgo1.go"
+	native := checkedByHand(test, nativePath, [][2]string{
+		{nativePlain, "package native\n\nconst Steady = 1\n"},
+		{generated, "package native\n\nconst _Ciconst_SLOTS = 4\n"},
+		{translation, "//line " + nativeCgo + ":1:1\npackage native\n\nconst Slots = _Ciconst_SLOTS\n"},
+	})
+	native.GoFiles = []string{nativePlain, nativeCgo}
+	native.CompiledGoFiles = []string{nativePlain, generated, translation}
+
+	engine := &pipeline{
+		request: invocation{switches: map[string]bool{"build-dependence": true}},
+		described: &describedProject{
+			builds: []project.Build{
+				{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true},
+				{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"wide"}},
+			},
+			inScopeSet: map[string]bool{nativePlain: true, nativeCgo: true},
+		},
+	}
+	engine.buildDependenceGraph(&load.Loaded{Roots: []*packages.Package{native}}, nil)
+	if engine.dependence == nil {
+		test.Fatal("want the host's graph built from its load")
+	}
+	if cgoFiles := engine.dependence.cgoFiles[nativePath]; !slices.Equal(cgoFiles, []string{nativeCgo}) {
+		test.Errorf("want the host's graph to keep %s as native's cgo file, got %q", nativeCgo, cgoFiles)
+	}
+	variantFiles := append(slices.Clone(native.GoFiles), "/native/native_tagged_test.go")
+	for _, build := range []struct {
+		name string
+		root *packages.Package
+	}{
+		{"a build that checks the cgo file as written", &packages.Package{ID: nativePath, PkgPath: nativePath,
+			GoFiles: native.GoFiles, CompiledGoFiles: native.GoFiles}},
+		{"a build that checks the cgo file as written in native's test variant alone", &packages.Package{
+			ID: nativePath + " [" + nativePath + ".test]", PkgPath: nativePath, ForTest: nativePath,
+			GoFiles: variantFiles, CompiledGoFiles: variantFiles}},
+	} {
+		_, judged := engine.dependenceOf(&load.Loaded{Roots: []*packages.Package{build.root}})
+		if judged == nil || judged.dependence == nil {
+			test.Fatalf("%s: want a judgment of the host's graph, got %+v", build.name, judged)
+		}
+		for local, want := range map[string]bool{"Slots": true, "_Ciconst_SLOTS": true, "Steady": false} {
+			if bits, isDeclared := judged.dependence.NameBits(nativePath, local); !isDeclared || bits.Name != want {
+				test.Errorf("%s: want its name bit %t under %s, got %+v, declared %t", local, want, build.name, bits,
+					isDeclared)
+			}
+		}
+	}
+}
+
+// withheldFixture writes the withheld-through-another-package fixture under a directory of its own and returns its
+// project's root. The project's app imports d, of a dependency module beside it, outside the workspace. The
+// dependency's e declares Value in a cgo file, `C.int(4)`, which the faked package "C" leaves invalid, and, under the
+// tag `purego`, in a plain file as an int32 in its place. Its d has a cgo file of its own, so the load withholds what
+// of d holds an invalid expression, and a plain file, the same in every build, whose Doubled and Size read e.Value.
+// Neither converts it: `int(e.Value)` is a type error the host reports, which reaches nothing of d's own cgo files,
+// and a load with one builds no graph.
+func withheldFixture(test *testing.T) string {
+	test.Helper()
+	return writtenFixture(test, map[string]string{
+		"project/go.mod": "module example.com/project\n\ngo 1.21\n\nrequire example.com/dependency v0.0.0\n\n" +
+			"replace example.com/dependency => ../dependency\n",
+		"project/app/app.go": "package app\n\nimport \"example.com/dependency/d\"\n\n" +
+			"// Twice is d's doubled value.\nvar Twice = d.Doubled\n",
+		"dependency/go.mod": "module example.com/dependency\n\ngo 1.21\n",
+		"dependency/e/e_cgo.go": "//go:build !purego\n\npackage e\n\nimport \"C\"\n\n" +
+			"// Value is four, of C.\nvar Value = C.int(4)\n",
+		"dependency/e/e_purego.go": "//go:build purego\n\npackage e\n\n// Value is four.\nvar Value int32 = 4\n",
+		"dependency/d/d_cgo.go": "package d\n\n// static int one(void) { return 1; }\nimport \"C\"\n\n" +
+			"func one() int { return int(C.one()) }\n",
+		"dependency/d/d.go": "package d\n\nimport \"example.com/dependency/e\"\n\n// Doubled is twice e's value.\n" +
+			"var Doubled = e.Value * 2\n\n// Size is e's value.\nfunc Size() any { return e.Value }\n",
+	})
+}
+
+// writtenFixture writes files, each a path under a directory of its own and its contents, and returns its project's
+// root, the directory "project" under it.
+func writtenFixture(test *testing.T, files map[string]string) string {
+	test.Helper()
+	root := test.TempDir()
+	for name, contents := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if directoryError := os.MkdirAll(filepath.Dir(path), 0o755); directoryError != nil {
+			test.Fatal(directoryError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	return filepath.Join(root, "project")
+}
+
+// A withheld declaration after a `//line` directive is placed where both the load and the graph name it, past the
+// directive, so its unit alone is marked: the load writes a withheld declaration's position past any //line directive
+// (load's withholdCgoDeclarations) and the graph reads a unit's the same way (collector.newUnit). The project's app
+// imports l, of a dependency module beside it, outside the workspace, which the host fakes: l's cgo file declares raw,
+// of a C type, and its plain file declares Steady, then names generated.go by a directive, then Raw, whose initializer
+// calls raw, so the load withholds it, and nothing else of l. Under a difference that says nothing of l, Raw is a seed
+// and Steady is not: were either side to read the position as parsed, ignoring the directive, the two would disagree,
+// Raw's position would place no unit, and every unit of l would be marked (Graph.addPackage), Steady among them.
+func TestAWithheldDeclarationPastALineDirectiveIsPlaced(test *testing.T) {
+	test.Parallel()
+
+	projectRoot := writtenFixture(test, map[string]string{
+		"project/go.mod": "module example.com/project\n\ngo 1.21\n\nrequire example.com/dependency v0.0.0\n\n" +
+			"replace example.com/dependency => ../dependency\n",
+		"project/app/app.go": "package app\n\nimport \"example.com/dependency/l\"\n\n" +
+			"// Twice is l's raw value.\nvar Twice = l.Raw\n",
+		"dependency/go.mod":     "module example.com/dependency\n\ngo 1.21\n",
+		"dependency/l/l_cgo.go": "package l\n\nimport \"C\"\n\nfunc raw() C.int { return 4 }\n",
+		"dependency/l/l.go": "package l\n\n// Steady is one.\nconst Steady = 1\n\n//line generated.go:100\n" +
+			"// Raw is C's.\nvar Raw = raw()\n",
+	})
+	host, hostError := load.Packages(projectRoot, []string{"./..."}, []string{"GOWORK=off", "CGO_ENABLED=1"}, nil)
+	if hostError != nil {
+		test.Fatal(hostError)
+	}
+	if len(host.Diagnostics) > 0 {
+		test.Fatalf("want the load clean, got %v", host.Diagnostics)
+	}
+	const lPath = "example.com/dependency/l"
+	var withheld []string
+	packages.Visit(host.Roots, nil, func(each *packages.Package) {
+		if each.ID == lPath {
+			for _, position := range host.Withheld[each].Declarations {
+				withheld = append(withheld, filepath.Base(position))
+			}
+		}
+	})
+	slices.Sort(withheld)
+	// A directive with no column leaves every column after it unknown, and the position names none.
+	if !slices.Equal(withheld, []string{"generated.go:101"}) {
+		test.Errorf("want l's Raw withheld, placed past the directive, got %q", withheld)
+	}
+
+	engine := &pipeline{
+		request: invocation{switches: map[string]bool{"build-dependence": true}},
+		described: &describedProject{
+			builds: []project.Build{
+				{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true},
+				{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"other"}},
+			},
+			inScopeSet: map[string]bool{filepath.Join(projectRoot, "app", "app.go"): true},
+		},
+	}
+	engine.buildDependenceGraph(host, nil)
+	if engine.dependence == nil {
+		test.Fatal("want the host's graph built from its load")
+	}
+	dependence := engine.dependence.graph.Against(build_dependence.Difference{})
+	for local, want := range map[string]bool{"Raw": true, "Steady": false} {
+		if bits, isDeclared := dependence.NameBits(lPath, local); !isDeclared || bits.Name != want {
+			test.Errorf("l's %s: want its name bit %t under a build that says nothing of l, got %+v, declared %t",
+				local, want, bits, isDeclared)
+		}
+	}
+}
+
+// What the host's load withholds is a seed in every build, whatever the build's difference says (#9paaen9, the
+// Square's Must B). The host fakes both e and d, cgo on with no cgo of the project's own, and the load withholds d's
+// Doubled and Size, whose value and body hold e.Value, an expression the faked package "C" left invalid in e
+// (load's holdsInvalid), though they name nothing of d's own cgo file. A build under the tag `purego`, also faking,
+// compiles e's plain file in its cgo file's place, so e differs and its Value is a seed, but d's files are the same
+// in both builds and d is in no difference: Doubled and Size, with no value, no body and no edge to e.Value, are
+// checked in the build for the first time, and only what the host withheld says so. No C compiler runs: go list
+// reads cgo files with cgo on and none.
+func TestWhatTheHostWithheldIsASeedInEveryBuild(test *testing.T) {
+	test.Parallel()
+
+	projectRoot := withheldFixture(test)
+	environment := []string{"GOWORK=off", "CGO_ENABLED=1"}
+	host, hostError := load.Packages(projectRoot, []string{"./..."}, environment, nil)
+	if hostError != nil {
+		test.Fatal(hostError)
+	}
+	built, builtError := load.Packages(projectRoot, []string{"./..."}, append(slices.Clone(environment),
+		"GOFLAGS=-tags=purego"), nil)
+	if builtError != nil {
+		test.Fatal(builtError)
+	}
+	if len(host.Diagnostics)+len(built.Diagnostics) > 0 {
+		test.Fatalf("want both loads clean, got %v and %v", host.Diagnostics, built.Diagnostics)
+	}
+	const dPath = "example.com/dependency/d"
+	// What the load withheld of d's plain file, d's cgo file's one being withheld in both builds.
+	withheldOf := func(loaded *load.Loaded) []string {
+		var withheld []string
+		packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
+			if each.ID != dPath {
+				return
+			}
+			for _, position := range loaded.Withheld[each].Declarations {
+				if strings.Contains(position, string(filepath.Separator)+"d.go:") {
+					withheld = append(withheld, position[strings.LastIndex(position, "d.go:"):])
+				}
+			}
+		})
+		return withheld
+	}
+	if hostWithheld, builtWithheld := withheldOf(host), withheldOf(built); !slices.Equal(hostWithheld,
+		[]string{"d.go:6:5", "d.go:9:1"}) || len(builtWithheld) != 0 {
+		test.Fatalf("want d's Doubled and Size withheld on the host alone, got %q and %q", hostWithheld,
+			builtWithheld)
+	}
+
+	engine := &pipeline{
+		request: invocation{switches: map[string]bool{"build-dependence": true}},
+		described: &describedProject{
+			builds: []project.Build{
+				{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true},
+				{OperatingSystem: "darwin", Architecture: "arm64", CgoEnabled: true, Tags: []string{"purego"}},
+			},
+			inScopeSet: map[string]bool{filepath.Join(projectRoot, "app", "app.go"): true},
+		},
+	}
+	engine.buildDependenceGraph(host, nil)
+	if engine.dependence == nil {
+		test.Fatal("want the host's graph built from its load")
+	}
+	_, judged := engine.dependenceOf(built)
+	if judged == nil || judged.dependence == nil {
+		test.Fatalf("want a judgment of the host's graph, got %+v", judged)
+	}
+	if bits, isDeclared := judged.dependence.NameBits("example.com/dependency/e", "Value"); !isDeclared || !bits.Name {
+		test.Errorf("e's Value: want its name bit, e's files differing, got %+v, declared %t", bits, isDeclared)
+	}
+	if bits, isDeclared := judged.dependence.NameBits(dPath, "Doubled"); !isDeclared || !bits.Name {
+		test.Errorf("d's Doubled: want its name bit, its value withheld on the host, got %+v, declared %t", bits,
+			isDeclared)
+	}
+	if index, isDeclared := judged.dependence.UnitDeclaringName(dPath, "Size"); !isDeclared ||
+		!judged.dependence.Units()[index].Dependent {
+		test.Errorf("d's Size: want its unit dependent, its body withheld on the host, declared %t", isDeclared)
 	}
 }

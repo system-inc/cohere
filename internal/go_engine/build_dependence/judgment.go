@@ -70,6 +70,13 @@ func (judging *judgment) seed(index int) {
 // directive in a file the builds do not share can name that file too, and a build-only file that could not be read or
 // parsed declares what no one knows, so a package marked for either (PackageDifference.EveryUnitDependent) has every
 // unit seeded, its shared files left unread.
+//
+// So is every unit that hangs on the C side (unitRecord.fromCgo), one in a cgo tool's output or in any file of a
+// package checked as written that has a cgo file, wherever the build's package differs at all: a file only one side
+// compiles, or the host's cgo tool or the build's translated the package (PackageDifference.KeepsCgo). What the build
+// compiles in its place is its own cgo tool's, under its own tags and flags, a `!cgo` file's, or nothing of the cgo
+// tool's at all, whatever the file's name says, and a body or a value the host's load emptied the build checks for the
+// first time (cgo_files.go).
 func (judging *judgment) seedFiles() {
 	sharedFiles := map[string]map[string]bool{}
 	for identifier, differing := range judging.difference.Packages {
@@ -89,14 +96,32 @@ func (judging *judgment) seedFiles() {
 	for packageIndex, record := range resolved.packages {
 		hostOnly := judging.difference.HostOnlyPackages[record.identifier]
 		files, seedsByFile := sharedFiles[record.identifier]
-		if !hostOnly && !seedsByFile {
+		differing := judging.difference.Packages[record.identifier]
+		seedsCgo := len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.KeepsCgo
+		if !hostOnly && !seedsByFile && !seedsCgo {
 			continue
 		}
 		span := resolved.packageUnits[packageIndex]
 		for index := span[0]; index < span[1]; index++ {
-			if hostOnly || !files[resolved.files.names[resolved.unitFile[index]]] {
+			// A package seeded for its cgo alone has no shared files to read: only its marked units are seeds.
+			if hostOnly || seedsByFile && !files[resolved.files.names[resolved.unitFile[index]]] ||
+				seedsCgo && resolved.unitFromCgo[index] {
 				judging.seed(int(index))
 			}
+		}
+	}
+}
+
+// seedWithheld is rule 1's other half: every unit the host's load withheld from, its body or its initial value given
+// to the analyzers without what it held (unitRecord.withheld), is a seed in every build, whatever the build's
+// difference says. The host never checked what such a unit held, and a build may check it for the first time with no
+// file of the unit's package differing and no edge of the unit's to say so: the load withholds wherever an expression
+// is invalid, one typed from another faked package among them (load's holdsInvalid), so a build that types that
+// package's declaration another way, under a tag that moves it out of a cgo file, types the unit another way too.
+func (judging *judgment) seedWithheld() {
+	for index, withheld := range judging.resolved.unitWithheld {
+		if withheld && !judging.seedUnit[index] {
+			judging.seed(index)
 		}
 	}
 }

@@ -335,7 +335,7 @@ func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *test
 
 	host, build := loadedOs(test, "darwin"), loadedOs(test, "windows")
 	graph := build_dependence.NewGraph()
-	graph.AddPackage(host, false)
+	graph.AddPackage(host, false, nil)
 	standardLibrary := graph.Against(build_dependence.Difference{
 		Packages:          map[string]build_dependence.PackageDifference{},
 		HostOnlyPackages:  map[string]bool{},
@@ -420,7 +420,7 @@ func loadedFromSource(test *testing.T, root string, goos string, identifier stri
 // splitGraph is the census-split fixture's standard-library graph as host, darwin, loads it, judged with no difference.
 func splitGraph(host *packages.Package) (*build_dependence.Graph, *build_dependence.Dependence) {
 	graph := build_dependence.NewGraph()
-	graph.AddPackage(host, false)
+	graph.AddPackage(host, false, nil)
 	return graph, graph.Against(build_dependence.Difference{
 		Packages:          map[string]build_dependence.PackageDifference{},
 		HostOnlyPackages:  map[string]bool{},
