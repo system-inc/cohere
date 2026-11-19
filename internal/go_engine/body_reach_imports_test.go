@@ -9,15 +9,18 @@ import (
 
 // A rule may judge a body by what its package imports anywhere, a gate no use of the body's own reads (#bed0mnk,
 // Rules's audit on #zvwfe26): unusedwrite stands down in a package that imports `unsafe`, SA1015 in one that imports
-// cobra, and SA5008 accepts a repeated struct tag key in one that imports go-flags. Each module of body-reach-imports,
-// the seat's shapes, imports its path in windows's file alone, cobra and go-flags stubs by their modules' replaces,
-// beside a shared Target whose finding the gate flips, and a quiet package whose body nothing changes. The reach
-// reaches a package whole when its files import other paths in the build than on the host, Imports, so Target is never
-// compared and the body differential reads no failure.
+// cobra, and SA5008 accepts a repeated struct tag key in one that imports go-flags. Each of unsafe, cobra and goflags
+// in body-reach-imports, the seat's shapes, imports its path in windows's file alone, cobra and go-flags stubs by
+// their modules' replaces, beside a shared Target whose finding the gate flips, and a quiet package whose body nothing
+// changes. unsafe-host is unsafe turned round, importing its path in the host's file alone, so the host's build
+// stands unusedwrite down and windows's reports it: the first three hold the paths windows's build alone imports and
+// the fourth the paths the host's alone does, either half of differingImports (the Square's surviving mutant). The
+// reach reaches a package whole when its files import other paths in the build than on the host, Imports, so Target
+// is never compared and the body differential reads no failure.
 func TestAPackageWhoseImportsDifferIsReachedWhole(test *testing.T) {
 	test.Parallel()
 
-	for _, module := range []string{"unsafe", "cobra", "goflags"} {
+	for _, module := range []string{"unsafe", "cobra", "goflags", "unsafe-host"} {
 		test.Run(module, func(test *testing.T) {
 			test.Parallel()
 
