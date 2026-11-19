@@ -1,7 +1,8 @@
 // Package calls is the unit-isolation test's own fixture (#h350vqr): units that call one another, so a variant that
 // stubs a callee and keeps its caller shows whether the caller's findings rest on the callee's body or only on its
-// answers. The pin stubs halt, proceed and double and keeps their callers, whose findings each rest on one fact or
-// answer about the callee: halt never returns, proceed does, and double is pure.
+// answers. The pin stubs halt, proceed, double and typed and keeps their callers, whose findings each rest on a fact
+// or an answer about the callee: halt never returns, proceed does, double is pure, and typed does real work and never
+// returns a nil interface.
 package calls
 
 import (
@@ -102,4 +103,25 @@ func Firsts(values []*int) int {
 		println("none")
 	}
 	return *pointer
+}
+
+// absent is an error whose nil pointer, in an error, is a typed nil.
+type absent struct{}
+
+// Error says so.
+func (*absent) Error() string {
+	return "absent"
+}
+
+// typed never returns a nil interface, only one holding a nil pointer, after real work, which the resolver judges
+// from its body: its stub, a lone panic, would read as trivial.
+func typed() error {
+	var none *absent
+	println("typed")
+	return none
+}
+
+// Typed compares what typed returned with nil, which is always unequal.
+func Typed() bool {
+	return typed() != nil
 }
