@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
@@ -117,15 +118,18 @@ func newPlantedStanding(
 	return standing
 }
 
-// options is the checker's options that hand every pass the planted standing bodies, whatever its package.
+// options is the checker's options that hand each dispatcher's pass the planted standing bodies, whatever its package,
+// with a dispatcher told from any other analyzer as the engine tells one.
 func (standing *plantedStanding) options() *checker.Options {
 	return &checker.Options{
-		StandingBodies: func(string) rule.StandingBodies { return standing },
-		Standing:       rule.Standing,
+		Failed:     rule.Failed,
+		Tolerant:   IsDispatcher,
+		Standing:   rule.Standing,
+		StandingOf: func(*packages.Package, any) rule.StandingBodies { return standing },
 	}
 }
 
-// analyze runs analyzers over the standing fixture with the planted standing bodies handed to every pass.
+// analyze runs analyzers over the standing fixture with the planted standing bodies handed to each dispatcher's pass.
 func (standing *plantedStanding) analyze(test *testing.T, analyzers ...*analysis.Analyzer) *checker.Graph {
 	test.Helper()
 	graph, analyzeError := checker.Analyze(analyzers, loadFixture(test, "standing"), standing.options())

@@ -1,17 +1,20 @@
 package dispatch
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"maps"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
@@ -435,6 +438,56 @@ func TestARuleConfinedOnOneFileHearsTheNextWholeBesideARuleConfinedOnBoth(test *
 			continue
 		}
 		requireLeftToTheRule(test, whollyName, reportedBy(action), told)
+	}
+}
+
+// Where the checker has every dispatcher follow an analyzer (checker.Options.StandingAfter), the standing bodies are
+// answered from that analyzer's result on the package: with it finished, a confined rule takes the host's findings in
+// both files, and with it failed nothing stands, so the dispatcher runs as on the host, the rule hears every body and
+// keeps its own findings, none of the host's is reported and the build is told nothing.
+func TestTheStandingBodiesFollowAnAnalyzerAndNothingStandsWhereItFailed(test *testing.T) {
+	test.Parallel()
+	for _, failure := range []error{nil, errors.New("planted failure")} {
+		test.Run(fmt.Sprintf("the followed analyzer failed: %t", failure != nil), func(test *testing.T) {
+			test.Parallel()
+			dispatcher := NewSyntax()
+			ruleName := rule.Namespace + "doubted"
+			doubted := dispatcher.RuleAnalyzer(ruleName, "doubted", "reports names, ifs and closing braces",
+				doubtedListener())
+			standing := newPlantedStanding(test, everyStandingFunction, hostsFindingsOnStanding(), ruleName)
+			options := standing.options()
+			options.StandingAfter = &analysis.Analyzer{
+				Name:       "followed",
+				Doc:        "followed is what the dispatcher follows, and says so or fails",
+				ResultType: reflect.TypeFor[string](),
+				Run: func(*analysis.Pass) (any, error) {
+					if failure != nil {
+						return nil, failure
+					}
+					return "followed", nil
+				},
+			}
+			options.StandingOf = func(_ *packages.Package, after any) rule.StandingBodies {
+				if after != "followed" {
+					return nil
+				}
+				return standing
+			}
+			graph, analyzeError := checker.Analyze([]*analysis.Analyzer{doubted}, loadFixture(test, "standing"),
+				options)
+			if analyzeError != nil {
+				test.Fatalf("analyzing the fixture: %v", analyzeError)
+			}
+			action := graph.Roots[0]
+			if action.Err != nil {
+				test.Fatalf("running %s: %v", action, action.Err)
+			}
+			fallen := []string{}
+			if failure != nil {
+				fallen = []string{"first.go", "second.go"}
+			}
+			requireLeftToTheRule(test, ruleName, reportedBy(action), standing.told(), fallen...)
+		})
 	}
 }
 
