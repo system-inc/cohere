@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"iter"
 	"maps"
@@ -49,15 +50,15 @@ func (resolver *Resolver) PlacedIn(home *Package) []PlacedAnswer {
 			}
 		}
 	}
-	places := home.declarationPlaces()
+	places := DeclarationPlaces(home.fileSet, home.files, home.info)
 	var placed []PlacedAnswer
 	for _, answer := range heldOnce(within(&resolver.answers), within(&resolver.kept)) {
 		place, isPlaced := places[answer.Object]
 		if !isPlaced {
 			continue
 		}
-		placed = append(placed, PlacedAnswer{Kind: answer.Kind, File: place.file, Offset: place.offset,
-			Parameter: place.parameter, Encoded: answer.Encoded})
+		placed = append(placed, PlacedAnswer{Kind: answer.Kind, File: place.File, Offset: place.Offset,
+			Parameter: place.Parameter, Encoded: answer.Encoded})
 	}
 	slices.SortFunc(placed, ComparePlaced)
 	return placed
@@ -71,39 +72,42 @@ func ComparePlaced(left PlacedAnswer, right PlacedAnswer) int {
 		bytes.Compare(left.Encoded, right.Encoded))
 }
 
-// declarationPlace is where an answer about a declared function, or one of its parameters, is placed (see
-// PlacedAnswer).
-type declarationPlace struct {
-	file      string
-	offset    int
-	parameter int
+// Place is where an answer about a function a package declares, or one of its parameters, is placed (see
+// PlacedAnswer): File and Offset, the function's declaration's `func`, and Parameter, the parameter's index, -1 for
+// the function itself.
+type Place struct {
+	File      string
+	Offset    int
+	Parameter int
 }
 
-// declarationPlaces is the place of every function and method the package's files declare, and of each one's
-// parameters, by object: a function's own at its declaration's `func`, as newUnit places its unit, with parameter -1,
-// and each parameter's there too, with its index among the signature's parameters, the receiver not counted.
-func (resolved *Package) declarationPlaces() map[types.Object]declarationPlace {
-	places := map[types.Object]declarationPlace{}
-	if resolved.info == nil {
+// DeclarationPlaces is the place of every function and method files declare, and of each one's parameters, by object,
+// as PlacedIn places an answer: a function's own at its declaration's `func`, as newUnit places its unit, with
+// Parameter -1, and each parameter's there too, with its index among the signature's parameters, the receiver not
+// counted. fileSet holds the files' positions and info their objects, as the load that parsed and checked them gives
+// them; a nil info places nothing. A reader of the placed answers an entry holds finds each object's answer here.
+func DeclarationPlaces(fileSet *token.FileSet, files []*ast.File, info *types.Info) map[types.Object]Place {
+	places := map[types.Object]Place{}
+	if info == nil {
 		return places
 	}
-	for _, file := range resolved.files {
+	for _, file := range files {
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
 			if !isFunction {
 				continue
 			}
-			object, isDeclared := resolved.info.Defs[function.Name].(*types.Func)
-			tokenFile := resolved.fileSet.File(function.Pos())
+			object, isDeclared := info.Defs[function.Name].(*types.Func)
+			tokenFile := fileSet.File(function.Pos())
 			if !isDeclared || tokenFile == nil {
 				continue
 			}
-			place := declarationPlace{file: tokenFile.Position(function.Pos()).Filename,
-				offset: tokenFile.Offset(function.Pos()), parameter: -1}
+			place := Place{File: tokenFile.Position(function.Pos()).Filename, Offset: tokenFile.Offset(function.Pos()),
+				Parameter: -1}
 			places[object] = place
 			parameters := object.Signature().Params()
 			for index := range parameters.Len() {
-				place.parameter = index
+				place.Parameter = index
 				places[parameters.At(index)] = place
 			}
 		}
