@@ -79,6 +79,7 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 	if function.Blocks == nil || !anyPointers(function.Signature) {
 		results := defaultNilnessForSignature(function.Signature)
 		walk.state.results[declared] = results
+		keepAnswer(walk.resolver, walk.home, declared, results)
 		return results
 	}
 	walk.stack = append(walk.stack, function)
@@ -91,6 +92,7 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 	}
 	walk.state.results[declared] = returned
 	walk.state.callees[declared] = recorder.recorded
+	keepAnswer(walk.resolver, walk.home, declared, returned)
 	walk.resolver.Counts(Kind).Computed.Add(1)
 	return returned
 }

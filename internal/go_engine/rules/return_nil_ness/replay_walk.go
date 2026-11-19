@@ -102,6 +102,7 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 	delete(walk.begun, function)
 	walk.state.results[declared] = returned
 	walk.state.callees[declared] = recorder.recorded
+	keepAnswer(walk.resolver, walk.home, declared, returned)
 	walk.resolver.Counts(Kind).Computed.Add(1)
 	return returned
 }

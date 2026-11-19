@@ -26,6 +26,24 @@ func stateIn(home *fact_resolver.Package) *verdicts {
 	return state
 }
 
+// keepAnswer hands the resolver results, the verdict a walk of home just kept of function, as the answer
+// fact_resolver.Ask would keep had a reader asked of function: what heldResults answers, the results when they say
+// more than the defaults, and nil, no fact, when they do not. A walk judges a callee of home inside its caller's
+// judgment and never asks the resolver of it, so without this only the function asked of had an answer of its own
+// there, and the callees whose verdicts its answer was built from had none (#kemy8sq). The caller holds home's lock.
+func keepAnswer(
+	resolver *fact_resolver.Resolver,
+	home *fact_resolver.Package,
+	function *types.Func,
+	results []ValueNilness,
+) {
+	var answer []ValueNilness
+	if interesting(function.Signature(), results) {
+		answer = results
+	}
+	fact_resolver.Keep(resolver, home, Kind, function, answer)
+}
+
 // replayOf is the push's walk of home, replayed as far as answers have needed it, begun on the first call. The caller
 // holds home's lock.
 //

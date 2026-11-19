@@ -153,6 +153,12 @@ func answerOf[Value any](
 	if resolver.Unsure(home.Types) {
 		return answer, true
 	}
+	if _, kept := resolver.answers.Load(key); kept {
+		// compute kept the answer itself, as a kind keeps every verdict its walk judges (see Keep), the one asked of
+		// among them, so it is recorded and memoized already, and a test's hand has heard it, which hears each answer
+		// once.
+		return answer, false
+	}
 	if hasPath && resolver.store != nil {
 		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
 	}
@@ -161,6 +167,50 @@ func answerOf[Value any](
 		resolver.held.Computed(kind.Name, object, encodeAnswer(kind, object, answer))
 	}
 	return answer, false
+}
+
+// Keep keeps answer, kind's answer about object, a function of home the kind judged inside another judgment there, as
+// answerOf keeps one it computed: recorded for the store, memoized, and told to a test's hand. A kind that judges its
+// own package's callees inside its walk, as nilness does, holds each verdict in its own state and never asks of it, so
+// only the function a reader asked of had an answer here, and the callees its answer was built from had none. Kept,
+// each has an answer of its own, the one Ask would compute for it, which answer must be, and a later question about
+// it is answered from the memo.
+//
+// Nothing is kept about an object of no package or an instance's, which Ask answers no fact and never keeps. An
+// answer already memoized stands, the store's, a hand's or a computed one, since readers were given it. An answer the
+// store holds is left to the store, so Recorded stays what the run computed and the store did not give it. An answer
+// a test's hand gives is left to the hand, so a run under a hand never memoizes over the answer the hand would give
+// a reader. And nothing is kept in an unsure package, as answerOf keeps nothing computed in one: home was handed a
+// placeholder before the kind held this verdict, which may rest on it. The caller holds home's lock.
+func Keep[Value any](resolver *Resolver, home *Package, kind *Kind, object types.Object, answer Value) {
+	if object.Pkg() == nil || !isOrigin(object) {
+		return
+	}
+	key := answerKey{kind: kind, object: object}
+	if _, memoized := resolver.answers.Load(key); memoized {
+		return
+	}
+	path, hasPath := resolver.pathOf(object)
+	if hasPath && resolver.store != nil {
+		if _, held := resolver.stored(kind, object.Pkg(), path); held {
+			return
+		}
+	}
+	if resolver.held != nil {
+		if _, isHeld := resolver.held.Answer(kind.Name, object); isHeld {
+			return
+		}
+	}
+	if resolver.Unsure(home.Types) {
+		return
+	}
+	if hasPath && resolver.store != nil {
+		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
+	}
+	resolver.answers.Store(key, answer)
+	if resolver.held != nil {
+		resolver.held.Computed(kind.Name, object, encodeAnswer(kind, object, answer))
+	}
 }
 
 // decodeAnswer is encoded, the answer of kind about object as Ask encodes it, as a Value: the zero Value for no bytes,
