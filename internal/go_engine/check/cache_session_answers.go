@@ -268,7 +268,10 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 		if !stored {
 			continue
 		}
-		session.previous[reloaded] = entryDemand{answers: entry.Answers, placed: entry.Placed, reads: entry.Reads,
+		// Placed answers that do not read are left out, as answers the entry never held: the run answers from
+		// source whatever they would have.
+		placed, _ := entry.Placed.placed()
+		session.previous[reloaded] = entryDemand{answers: entry.Answers, placed: placed, reads: entry.Reads,
 			readsIncomplete: entry.ReadsIncomplete}
 	}
 }
@@ -403,7 +406,7 @@ func (session *CacheSession) rewriteEarlier() {
 			}
 			// The answers are the body's, so the record rewritten holds a body of its own; a record of another build
 			// naming the body it held reads a miss from then on, which checks that package from source once.
-			entry.Answers, entry.Placed = demanded.answers, demanded.placed
+			entry.Answers, entry.Placed = demanded.answers, storedPlacedOf(demanded.placed)
 			body, encodeError := encodeBody(entry)
 			if encodeError != nil {
 				session.problem(fmt.Sprintf("rewriting the entry of %s with its answers: %v", saved.ID, encodeError))

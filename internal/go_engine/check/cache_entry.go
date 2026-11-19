@@ -41,7 +41,8 @@ import (
 // key derived from the entry's (DependenceRecordKey, #6a3kjvz), which no entry of 12 has beside it. At 14, the store's
 // export data is shallow (export_data.Write), each package's own declarations only, which no reader of 13's deep
 // export data can read (#z4arggw). At 15, an entry holds by place every answer the run held about its package's
-// declared functions and their parameters (Placed), which an entry of 14 has none of (#k7k3wwc).
+// declared functions and their parameters (Placed), each file's and kind's name once (storedPlaced), which an entry of
+// 14 has none of (#k7k3wwc).
 const CacheFormatVersion = "go-engine-cache-15"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
@@ -84,7 +85,7 @@ type cacheEntry struct {
 	// objectpath (fact_resolver.PlacedAnswer), so an unexported function, which no objectpath names, has its answers
 	// here, and so does every kind, registered or not, in an entry whose Answers were computed whole and hold the
 	// registered kinds alone (see demandOf). They depend only on the package's key, as everything else here does.
-	Placed []fact_resolver.PlacedAnswer
+	Placed storedPlaced
 
 	// Reads are the answers of the fact kinds computed on demand that the package's analysis took from other packages,
 	// in the runs that wrote its findings and answers, each with its owner's first key then (#w7zmvat wave 3b). A run
@@ -275,7 +276,7 @@ func encodeEntry(
 		Withheld:       withheld,
 		Files:          files,
 		Answers:        demanded.answers,
-		Placed:         demanded.placed,
+		Placed:         storedPlacedOf(demanded.placed),
 		Bodiless:       demanded.bodiless,
 		BodiesRecorded: demanded.bodiesRecorded,
 	}
@@ -593,6 +594,10 @@ func restoredOf(
 		return nil, fmt.Errorf("reading the entry of %s: it is in format %q, not %q", restoring.ID, entry.Version,
 			CacheFormatVersion)
 	}
+	placed, placedError := entry.Placed.placed()
+	if placedError != nil {
+		return nil, fmt.Errorf("reading the entry of %s: %w", restoring.ID, placedError)
+	}
 	restored := &restoredPackage{
 		analyses: map[*analysis.Analyzer]restoredAnalysis{},
 		types: &load.Restored{
@@ -602,7 +607,7 @@ func restoredOf(
 		},
 		files:           entry.Files,
 		answers:         entry.Answers,
-		placed:          entry.Placed,
+		placed:          placed,
 		reads:           entry.Reads,
 		readsIncomplete: entry.ReadsIncomplete,
 		bodiless:        entry.Bodiless,

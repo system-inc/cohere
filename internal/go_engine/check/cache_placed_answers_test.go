@@ -2,10 +2,12 @@ package check
 
 import (
 	"bytes"
+	"encoding/gob"
 	"fmt"
 	"go/ast"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -89,8 +91,12 @@ func placedModule(test *testing.T, directory string, topBody string) []*packages
 // file opens, its parameter and its answer, for a test to compare.
 func placedProbeAnswers(test *testing.T, entry cacheEntry, bottomFile string) []string {
 	test.Helper()
+	placed, placedError := entry.Placed.placed()
+	if placedError != nil {
+		test.Fatal(placedError)
+	}
 	var named []string
-	for _, answer := range entry.Placed {
+	for _, answer := range placed {
 		if answer.Kind != placedKind.Name {
 			continue
 		}
@@ -223,4 +229,107 @@ func placedDisagreeing(left []fact_resolver.PlacedAnswer, right []fact_resolver.
 		}
 	}
 	return disagreeing
+}
+
+// An entry holds its placed answers by column, each file's and kind's name once, and reads back exactly what it was
+// given, in PlacedIn's order whatever order they came in: answers in two files, of two kinds, a function's own and a
+// parameter's, two at one offset. Columns of different lengths, or a kind the table does not hold, are a miss.
+func TestAnEntrysPlacedAnswersReadBackExactly(test *testing.T) {
+	test.Parallel()
+	answers := []fact_resolver.PlacedAnswer{
+		{Kind: "return_nil_ness", File: "/module/b.go", Offset: 40, Parameter: -1, Encoded: []byte("[]")},
+		{Kind: "function_purity", File: "/module/a.go", Offset: 900, Parameter: -1, Encoded: []byte("true")},
+		{Kind: "odd_slice_argument", File: "/module/a.go", Offset: 120, Parameter: 1, Encoded: []byte("true")},
+		{Kind: "function_purity", File: "/module/a.go", Offset: 120, Parameter: -1, Encoded: []byte("false")},
+	}
+	stored := storedPlacedOf(answers)
+	if len(stored.Kinds) != 3 || len(stored.Files) != 2 || len(stored.Values) != 4 {
+		test.Fatalf("want three kinds and two files, each once, and four rows, got %+v", stored)
+	}
+	placed, placedError := stored.placed()
+	want := slices.SortedFunc(slices.Values(answers), fact_resolver.ComparePlaced)
+	if placedError != nil || !reflect.DeepEqual(placed, want) {
+		test.Errorf("want %+v read back, got %+v (%v)", want, placed, placedError)
+	}
+	if empty, emptyError := storedPlacedOf(nil).placed(); emptyError != nil || len(empty) != 0 {
+		test.Errorf("want nothing read back of nothing, got %+v (%v)", empty, emptyError)
+	}
+	short := storedPlacedOf(answers)
+	short.Values = short.Values[1:]
+	unknown := storedPlacedOf(answers)
+	unknown.KindIndexes[0] = len(unknown.Kinds)
+	for name, broken := range map[string]storedPlaced{"a column short": short, "a kind past the table": unknown} {
+		if _, brokenError := broken.placed(); brokenError == nil {
+			test.Errorf("%s: want a miss, read back without an error", name)
+		}
+	}
+}
+
+// A package's placed answers by column cost fewer bytes an answer than a list naming each one's kind and file: 400
+// answers of three kinds over ten files, by the bytes each form adds to a gob that holds none, which is what an entry
+// adds, since every entry's gob describes the type once whether it holds answers or not. The test logs both.
+func TestPlacedAnswersByColumnCostFewerBytesAnAnswer(test *testing.T) {
+	test.Parallel()
+	kinds := []string{"function_purity", "return_nil_ness", "odd_slice_argument"}
+	var answers []fact_resolver.PlacedAnswer
+	for index := range 400 {
+		answers = append(answers, fact_resolver.PlacedAnswer{Kind: kinds[index%3],
+			File:   fmt.Sprintf("/Users/someone/Projects/module/internal/package/file_%d.go", index%10),
+			Offset: 120 * index, Parameter: index%4 - 1, Encoded: []byte("true")})
+	}
+	sizeOf := func(value any) int {
+		var encoded bytes.Buffer
+		if encodeError := gob.NewEncoder(&encoded).Encode(value); encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		return encoded.Len()
+	}
+	flat := sizeOf(answers) - sizeOf([]fact_resolver.PlacedAnswer{{}})
+	columns := sizeOf(storedPlacedOf(answers)) - sizeOf(storedPlaced{})
+	test.Logf("400 placed answers add %d bytes as a list naming each one's kind and file, %d by column", flat,
+		columns)
+	if columns*2 > flat {
+		test.Errorf("want the columns under half the list's bytes, got %d and %d", columns, flat)
+	}
+}
+
+// A cold run's entry reads back exactly the placed answers it was written with: read back and held again, they are the
+// same columns, and each is an answer the run held, PlacedIn's at its place (the run asks more as it saves, Double's
+// purity when top's answers are computed whole, after bottom's entry is written).
+func TestAColdEntryReadsBackThePlacedAnswersItsRunHeld(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	rules := []rule.Rule{houseRule(placedProbe)}
+	caching := testCaching(test, rules)
+	placedModule(test, directory, "func Use() int {\n\treturn bottom.Double(2)\n}\n")
+	cold := runWithSession(test, directory, caching, rules)
+	key := sessionKey(test, cold.session, "example.com/placed/bottom")
+	entry, _, stored := storedEntryAt(caching.Store, key)
+	if !stored {
+		test.Fatal("want bottom's entry written")
+	}
+	var bottom *packages.Package
+	for keyed := range cold.session.keys {
+		if keyed.PkgPath == "example.com/placed/bottom" {
+			bottom = keyed
+		}
+	}
+	home := cold.session.resolver.Package(bottom.Types)
+	if home == nil {
+		test.Fatal("the run's resolver never learned bottom")
+	}
+	placed, placedError := entry.Placed.placed()
+	if placedError != nil || len(placed) == 0 || !reflect.DeepEqual(storedPlacedOf(placed), entry.Placed) {
+		test.Fatalf("want bottom's entry to read back the columns it holds, got %+v of %+v (%v)", placed,
+			entry.Placed, placedError)
+	}
+	held := cold.session.resolver.PlacedIn(home)
+	for _, answer := range placed {
+		if !slices.ContainsFunc(held, func(each fact_resolver.PlacedAnswer) bool {
+			return reflect.DeepEqual(each, answer)
+		}) {
+			test.Errorf("want every answer read back one the run held, got %+v, which is not among %+v", answer,
+				held)
+		}
+	}
 }
