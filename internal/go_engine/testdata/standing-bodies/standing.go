@@ -9,8 +9,10 @@ func PlantedReached() string {
 	return platformName() + " planted reached"
 }
 
-// PlantedKept says the same in every build, so its body stands in windows's.
+// PlantedKept says the same in every build, so its body stands in windows's, and its literal's finding is ignored
+// with a reason inside that body.
 func PlantedKept() string {
+	//cohere:ignore cohere-go/correctness-probe-standing the planted literal a standing body's directive withholds
 	return "planted kept"
 }
 

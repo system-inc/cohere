@@ -99,6 +99,32 @@ func rawFindings(run buildRun, root string) []string {
 	return found
 }
 
+// windowsOutcome is windows's own outcome in engine's run over root, after its own //cohere:ignore comments
+// (outcomeOf), as sorted lines with root written /project: each finding kept, each one a directive withheld, and each
+// directive finding, an unused directive's among them. ran are every rule the run's registry holds.
+func windowsOutcome(engine *pipeline, root string) []string {
+	ran := []string{standingProbeName}
+	for _, registered := range rules.All() {
+		ran = append(ran, registered.Name)
+	}
+	outcome := engine.outcomeOf(engine.buildRuns[1], ran)
+	lines := []string{}
+	for _, each := range outcome.kept {
+		lines = append(lines, fmt.Sprintf("kept %+v", each))
+	}
+	for _, each := range outcome.withheld {
+		lines = append(lines, fmt.Sprintf("withheld %+v", each))
+	}
+	for _, each := range outcome.directiveFindings {
+		lines = append(lines, fmt.Sprintf("directive %+v", each))
+	}
+	for index := range lines {
+		lines[index] = strings.ReplaceAll(lines[index], root, "/project")
+	}
+	slices.Sort(lines)
+	return lines
+}
+
 // The standing bodies' switch leaves a body standing only on the census path: on, in a run judging its builds'
 // dependence that asked for the body reach census or the body differential, and in no other run, the switch's own
 // default, off, included.
@@ -177,7 +203,10 @@ func TestARuleIsConfinedWhenDispatchedAndDeclaredPerUnitOrFileSyntax(test *testi
 // one literal where the host read two, and in both declarations reports the host's findings in place of its own,
 // counted as two standing declarations with three findings, which windows's build record says. PlantedReached, which
 // the difference reaches, is heard and judged in both runs. Off, nothing is confined, every body is heard, and the
-// record writes no standing count.
+// record writes no standing count. A //cohere:ignore with a reason inside PlantedKept's standing body acts on windows's
+// build exactly as on a body it heard: the literal's finding, the host's taken, is withheld, the directive is never
+// unused, and windows's findings, withheld ones and directive findings after its own suppression are the same either
+// way.
 func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	test.Parallel()
 
@@ -196,6 +225,22 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 	if !slices.Equal(onWindows, offWindows) {
 		test.Errorf("windows's own findings with the switch on are\n%s\nwant those with it off\n%s",
 			strings.Join(onWindows, "\n"), strings.Join(offWindows, "\n"))
+	}
+	onOutcome, offOutcome := windowsOutcome(on, onRoot), windowsOutcome(off, offRoot)
+	if !slices.Equal(onOutcome, offOutcome) {
+		test.Errorf("windows's outcome after its suppression with the switch on is\n%s\nwant that with it off\n%s",
+			strings.Join(onOutcome, "\n"), strings.Join(offOutcome, "\n"))
+	}
+	withheldLiteral := slices.ContainsFunc(onOutcome, func(line string) bool {
+		return strings.HasPrefix(line, "withheld ") && strings.Contains(line, "a planted literal")
+	})
+	unusedDirective := slices.ContainsFunc(onOutcome, func(line string) bool {
+		return strings.HasPrefix(line, "directive ") && strings.Contains(line, "MessageId:unused")
+	})
+	if !withheldLiteral || unusedDirective {
+		test.Errorf("with the switch on windows withheld PlantedKept's literal: %t, and read a directive unused: %t, "+
+			"want the literal withheld and no directive unused, in\n%s", withheldLiteral, unusedDirective,
+			strings.Join(onOutcome, "\n"))
 	}
 	if on.buildRuns[1].standingDeclarations != 2 || on.buildRuns[1].standingFindings != 3 {
 		test.Errorf("windows's build took the host's findings in %d standing declarations, %d findings, want 2 and 3",
