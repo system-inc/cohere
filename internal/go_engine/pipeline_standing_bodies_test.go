@@ -402,7 +402,8 @@ var standingGates = []standingGate{
 		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Use "callerContext"`, finder: "build",
 		standing: 1},
 	{module: "abbreviated-sort-win", stood: "Items.Len", file: "shared.go",
-		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "host", standing: 3},
+		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "host",
+		standing: 3},
 	{module: "abbreviated-sort-host", stood: "Items.Len", file: "shared.go",
 		rule: "consistency-no-abbreviated-identifier", line: 5, fragment: `Identifier "Len"`, finder: "build",
 		standing: 3},
@@ -495,9 +496,9 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 			// The settled set is settled with the switch off too, so what stood in effect is the count of declarations
 			// the other build took the host's findings in: the module's own with the switch on, none with it off.
 			if on.buildRuns[1].standingDeclarations != gate.standing || off.buildRuns[1].standingDeclarations != 0 {
-				test.Errorf("the other build took the host's findings in %d declarations with the switch on and %d off, "+
-					"want %d and 0", on.buildRuns[1].standingDeclarations, off.buildRuns[1].standingDeclarations,
-					gate.standing)
+				test.Errorf("the other build took the host's findings in %d declarations with the switch on and %d "+
+					"off, want %d and 0", on.buildRuns[1].standingDeclarations,
+					off.buildRuns[1].standingDeclarations, gate.standing)
 			}
 			for _, each := range []struct {
 				switched string
