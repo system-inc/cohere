@@ -475,15 +475,20 @@ func (recorder *functionUsesRecorder) reachNamed(typed types.Type) {
 	}
 }
 
-// declaredWithin reports whether object is the declaration's own: of the package, declared within the declaration's
-// range, and in no package's or universe's scope, as a local, a parameter, a closure's variable, a label or a field
-// of a type declared in a body is.
+// declaredWithin reports whether object is the declaration's own (see declaredWithin).
 func (recorder *functionUsesRecorder) declaredWithin(object types.Object) bool {
-	if object.Pkg() != recorder.own || object.Pos() < recorder.rangeStart || object.Pos() >= recorder.rangeEnd {
+	return declaredWithin(object, recorder.own, recorder.rangeStart, recorder.rangeEnd)
+}
+
+// declaredWithin reports whether object is the own declaration's between start and end: of own, declared within that
+// range, and in no package's or universe's scope, as a local, a parameter, a closure's variable, a label or a field of
+// a type declared in a body is. Stage 1's record leaves such a use out, and the body renderer writes it by its offset.
+func declaredWithin(object types.Object, own *types.Package, start token.Pos, end token.Pos) bool {
+	if object.Pkg() != own || object.Pos() < start || object.Pos() >= end {
 		return false
 	}
 	parent := object.Parent()
-	return parent != recorder.own.Scope() && parent != types.Universe
+	return parent != own.Scope() && parent != types.Universe
 }
 
 // namedAt is the named type typed is or points to, nil for any other type.

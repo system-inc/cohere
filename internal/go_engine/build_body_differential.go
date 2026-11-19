@@ -18,9 +18,14 @@ import (
 // `--build-dependence --other-builds`: the object differential covers declarations, not bodies, so every body the reach
 // would leave unreached in a build is checked against the host's, two ways. Its types: the build checks every package
 // from source whole today, so its type information holds the body, rendered as the host's walk rendered the host's
-// (build_reads.BodyRenderings), every expression's type and every identifier's use, and the two must be the same.
-// Its findings: the build's raw findings within the body's lines must be the host's. A body that differs is a failure,
-// named by its build, package, file, declaration and first difference, written to stderr and counted in the census.
+// (build_reads.BodyRenderings), its signature's and its block's every expression's type, each named type in it by its
+// name and the digest of its whole lines as the object differential renders a type name (check.NamedTypesWritten),
+// and every identifier's use, and the two must be the same: a use of the declaration's own object by its offset, and
+// one whose identity is unknown never alike, another unknown's included. Its findings: the build's raw findings within
+// the body's lines must be the host's. A body that differs is a failure, named by its build, package, file,
+// declaration and first difference, written to stderr and counted in the census. So is a build with recorded packages
+// that compares no body, unless its sizes reached every body, and a build the census has no judgment of
+// (writeBodyReachCensus), since a machine that compares nothing passes nothing.
 
 // buildBodyDifferential is one build's body differential: how many unreached bodies it compared, each one's failure
 // line where it differed, and the bodies compared by their types, whose findings are compared once the build's rules
@@ -48,6 +53,8 @@ func newBuildBodyDifferential(
 	census *buildBodyReach,
 ) *buildBodyDifferential {
 	differential := &buildBodyDifferential{}
+	// The build's named types are digested in a memo of its own, as the host's are in the host's.
+	namedTypes := check.NewReadsBuild()
 	unreached := map[string]map[build_reads.BodyPlace]reachedBody{}
 	for _, body := range census.bodies {
 		if body.reason != "" {
@@ -77,7 +84,7 @@ func newBuildBodyDifferential(
 				builtPackage.TypesInfo, builtPackage.Syntax, func(place build_reads.BodyPlace) bool {
 					_, isUnreached := places[place]
 					return isUnreached
-				})
+				}, namedTypes.NamedTypesWritten)
 		}
 		for _, place := range slices.SortedFunc(maps.Keys(places), compareBodyPlaces) {
 			body := places[place]
@@ -103,6 +110,10 @@ func newBuildBodyDifferential(
 				comparedBody{body: body, firstLine: body.line, lastLine: builtBody.LastLine})
 		}
 	}
+	if differential.compared == 0 && census.recorded > 0 && census.byReason[reachedSizes] < census.total {
+		differential.failures = append(differential.failures, fmt.Sprintf("compared no body, though %d packages "+
+			"are recorded and their sizes reach none whole", census.recorded))
+	}
 	return differential
 }
 
@@ -112,7 +123,8 @@ func compareBodyPlaces(first build_reads.BodyPlace, second build_reads.BodyPlace
 }
 
 // firstFactDifference is the first place the host's facts and the build's differ, each sorted, as `offset N: host
-// <rendering>, build <rendering>`, `(none)` for a side that has no fact there, and empty when they are the same.
+// <rendering>, build <rendering>`, `(none)` for a side that has no fact there, and empty when they are the same. A use
+// of an unknown identity on either side differs, written alike or not, since it names no object to match.
 func firstFactDifference(
 	hostRenderings *build_reads.BodyRenderings,
 	hostFacts []build_reads.RenderedFact,
@@ -129,14 +141,21 @@ func firstFactDifference(
 	for index := range max(len(hostFacts), len(builtFacts)) {
 		hostWritten, builtWritten := "(none)", "(none)"
 		offset := int32(0)
+		unknown := false
 		if index < len(hostFacts) {
 			hostWritten, offset = written(hostRenderings, hostFacts[index]), hostFacts[index].Start
+			unknown = hostFacts[index].Unknown
 		}
 		if index < len(builtFacts) {
 			builtWritten = written(builtRenderings, builtFacts[index])
+			unknown = unknown || builtFacts[index].Unknown
 			if index >= len(hostFacts) {
 				offset = builtFacts[index].Start
 			}
+		}
+		if unknown {
+			return fmt.Sprintf("offset %d: host %s, build %s, an unknown identity matching none", offset,
+				hostWritten, builtWritten)
 		}
 		if hostWritten != builtWritten {
 			return fmt.Sprintf("offset %d: host %s, build %s", offset, hostWritten, builtWritten)

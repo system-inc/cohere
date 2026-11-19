@@ -691,7 +691,11 @@ func (engine *pipeline) extraBuildRun(
 					}), fromSource, sizesDiffer)
 			}
 			if engine.bodyDifferential {
-				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, run.bodyReach)
+				census := run.bodyReach
+				if engine.bodyDifferentialCensus != nil {
+					census = engine.bodyDifferentialCensus(census)
+				}
+				run.bodyDifferential = newBuildBodyDifferential(engine.bodyReachHost, over, census)
 			}
 		}
 		started := time.Now()

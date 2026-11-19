@@ -10,11 +10,15 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
 // Under the body reach census, with `--other-builds --build-dependence`, windows's census of the body-reach fixture
 // judges each of the host's bodies by what stage 1 recorded it using (#w72zxtq):
 //   - PlatformName calls platformName, which a host-only file declares: reached by its name bit, Named.
+//   - Accepted and Shifted take a Number, whose underlying type alone differs: reached by their signatures, through
+//     ValueType's underlying bit, though Accepted's block reads nothing of it.
 //   - Positive converts to Number, whose underlying type alone differs: reached through ValueType's underlying bit,
 //     which reading the name bit alone misses.
 //   - Spinner takes holder.Spin, Holder gaining Spin on windows through platformPart, a windows file's type it
@@ -92,6 +96,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"High":         "unreached",
 		"Before":       "unreached",
 		"After":        "Named",
+		"Accepted":     "Signature",
+		"Shifted":      "Signature",
 	}
 	if !maps.Equal(got, want) {
 		test.Errorf("windows's census judges the host's bodies\n%v\nwant\n%v", got, want)
@@ -107,6 +113,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"High":         "",
 		"Before":       "",
 		"After":        "example.com/reach.platformName (reach_other.go) Named name in the body",
+		"Accepted":     "example.com/reach.Number (reach.go) ValueType underlying in the signature",
+		"Shifted":      "example.com/reach.Number (reach.go) ValueType underlying in the signature",
 	}
 	if !maps.Equal(drivers, wantDrivers) {
 		test.Errorf("windows's census says each body is reached first by\n%v\nwant\n%v", drivers, wantDrivers)
@@ -122,8 +130,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		within.reached != census.reached {
 		test.Errorf("want the census within the plain run's from-source packages the whole, got %+v", within)
 	}
-	if census.total != 10 || census.reached != 6 || census.absent != 1 || census.new != 3 {
-		test.Errorf("want 10 bodies, 6 reached, 1 absent and 3 new, got %d, %d, %d and %d", census.total,
+	if census.total != 12 || census.reached != 8 || census.absent != 1 || census.new != 3 {
+		test.Errorf("want 12 bodies, 8 reached, 1 absent and 3 new, got %d, %d, %d and %d", census.total,
 			census.reached, census.absent, census.new)
 	}
 	if census.recorded != 1 || census.buildOnlyPackages != 0 || len(census.declarationsOnly) != 0 ||
@@ -153,7 +161,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	}
 	for _, line := range []string{
 		"build " + on.buildRuns[1].build.String(),
-		"  bodies: 10, reached 6, unreached 4, absent 1, new 3",
+		"  bodies: 12, reached 8, unreached 4, absent 1, new 3",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
 		"  body differential: compared 4, failures 0",
 	} {
@@ -176,6 +184,110 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	if !slices.Equal(findingLines(normalize(onStream, root)), findingLines(offStream)) {
 		test.Errorf("the findings with the census are\n%q\nwant those without it\n%q",
 			findingLines(normalize(onStream, root)), findingLines(offStream))
+	}
+}
+
+// The body differential is the machine every skip leans on, so it is shown failing (#w72zxtq, the review's must 9):
+// handed a census that leaves unreached six bodies the reach rightly reaches, it fails each by what it compares.
+// PlatformName's call resolves to another declaring file, and Size's len to windows's own function, of another type;
+// Positive's conversion to Number reads apart by
+// Number's whole lines, whose underlying type differs, though both builds print the type alike; Configured's
+// settings.A has no identity, which matches none, another unknown's included; Accepted differs only in its signature,
+// which is rendered with its block; and Shifted's findings differ, vet reporting its shift where Number is an int32.
+// Handed a census that reaches every body, it compares none, and fails for it.
+func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T) {
+	test.Parallel()
+
+	wronglyUnreached := []string{"PlatformName", "Size", "Positive", "Configured", "Accepted", "Shifted"}
+	run := func(census func(*buildBodyReach) *buildBodyReach) *buildBodyDifferential {
+		test.Helper()
+		on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
+			func(engine *pipeline) {
+				engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+				engine.bodyDifferential = true
+				engine.bodyDifferentialCensus = census
+			}, "--no-cache", "--no-fix", "--other-builds", "--build-dependence")
+		if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
+			test.Fatal("want windows's body differential")
+		}
+		return on.buildRuns[1].bodyDifferential
+	}
+	differential := run(func(census *buildBodyReach) *buildBodyReach {
+		altered := *census
+		altered.bodies = slices.Clone(census.bodies)
+		for index, body := range altered.bodies {
+			if slices.Contains(wronglyUnreached, body.name) {
+				altered.bodies[index].reason = ""
+			}
+		}
+		return &altered
+	})
+	if differential.compared != 10 {
+		test.Errorf("want 10 bodies compared, the 4 the reach leaves and the 6 it was told to, got %d",
+			differential.compared)
+	}
+	failed := map[string][]string{}
+	for _, failure := range differential.failures {
+		for _, name := range wronglyUnreached {
+			if strings.Contains(failure, " "+name+": ") {
+				failed[name] = append(failed[name], failure)
+			}
+		}
+	}
+	for name, wanted := range map[string]string{
+		"PlatformName": "use example.com/reach.platformName (",
+		"Size":         "type func(values []int) int",
+		"Positive":     "type example.com/reach.Number example.com/reach.Number{",
+		"Configured":   "an unknown identity matching none",
+		"Accepted":     "type example.com/reach.Number example.com/reach.Number{",
+		"Shifted":      "findings differ: host [",
+	} {
+		if !slices.ContainsFunc(failed[name], func(failure string) bool { return strings.Contains(failure, wanted) }) {
+			test.Errorf("want %s failed by %q, got %q", name, wanted, failed[name])
+		}
+	}
+	if len(differential.failures) != len(wronglyUnreached)+1 {
+		test.Errorf("want a failure for each body wrongly left unreached and a second for Shifted, got\n%s",
+			strings.Join(differential.failures, "\n"))
+	}
+
+	none := run(func(census *buildBodyReach) *buildBodyReach {
+		altered := *census
+		altered.bodies = slices.Clone(census.bodies)
+		for index := range altered.bodies {
+			altered.bodies[index].reason = reachedNamed
+		}
+		return &altered
+	})
+	if none.compared != 0 || len(none.failures) != 1 || !strings.HasPrefix(none.failures[0], "compared no body") {
+		test.Errorf("want a census that reaches every body to compare none and fail for it, got %d compared and %q",
+			none.compared, none.failures)
+	}
+}
+
+// A build the census has no judgment of compares nothing, and the body differential fails it, in the census file
+// and on stderr, rather than writing nothing for it (#w72zxtq).
+func TestABuildWithNoJudgmentFailsTheBodyDifferential(test *testing.T) {
+	test.Parallel()
+
+	censusFile := filepath.Join(test.TempDir(), "reach.txt")
+	var notes strings.Builder
+	engine := &pipeline{bodyReachHost: &bodyReachHost{}, bodyDifferential: true, bodyReachCensus: censusFile,
+		standardError: &notes}
+	engine.writeBodyReachCensus([]buildRun{{build: project.Build{OperatingSystem: "darwin"}},
+		{build: project.Build{OperatingSystem: "windows"}}})
+	written, readError := os.ReadFile(censusFile)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	for _, line := range []string{"  not judged: the build has no census",
+		"  body differential: compared 0, failures 1"} {
+		if !strings.Contains(string(written), line+"\n") {
+			test.Errorf("the census file has no line %q:\n%s", line, written)
+		}
+	}
+	if !strings.Contains(notes.String(), "the body differential of the build windows") {
+		test.Errorf("want the failure noted on stderr, got %q", notes.String())
 	}
 }
 

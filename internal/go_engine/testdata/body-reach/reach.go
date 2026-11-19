@@ -33,6 +33,18 @@ func PlatformName() string {
 	return platformName()
 }
 
+// Accepted takes a Number, whose underlying type differs on windows, and reads nothing of it: only its signature
+// reaches it.
+func Accepted(value Number) bool {
+	return true
+}
+
+// Shifted shifts a Number past an int32's width, which vet's shift check reports where Number is one, and not on
+// windows, where it is an int64.
+func Shifted(value Number) Number {
+	return value >> 40
+}
+
 // Positive converts to Number, whose underlying type alone differs on windows.
 func Positive(value int) bool {
 	return Number(value) > 0

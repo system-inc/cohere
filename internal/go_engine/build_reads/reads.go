@@ -66,8 +66,10 @@ type Reads struct {
 	functionUses *FunctionUses
 
 	// bodyFileSet is the file set the walk renders the package's bodies by, for the body differential (#w72zxtq),
-	// nil in a run that renders none (RenderBodies), and bodyRenderings what it rendered, nil until then.
+	// nil in a run that renders none (RenderBodies), bodyNamedTypes what writes the named types beside each
+	// expression's type, and bodyRenderings what it rendered, nil until then.
 	bodyFileSet    *token.FileSet
+	bodyNamedTypes func(types.Type) string
 	bodyRenderings *BodyRenderings
 }
 
@@ -327,23 +329,24 @@ func (reads *Reads) Claimed() bool {
 func (reads *Reads) Record(own *types.Package, info *types.Info, files []*ast.File) {
 	reads.publishTypes(collectTypeReads(own, info, files))
 	reads.lock.Lock()
-	fileSet := reads.bodyFileSet
+	fileSet, namedTypes := reads.bodyFileSet, reads.bodyNamedTypes
 	reads.lock.Unlock()
 	if fileSet == nil {
 		return
 	}
-	rendered := RenderBodies(fileSet, own, info, files, nil)
+	rendered := RenderBodies(fileSet, own, info, files, nil, namedTypes)
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
 	reads.bodyRenderings = rendered
 }
 
-// RenderBodiesBy has the walk render the package's bodies as well, each placed by fileSet, the load's, for the body
-// differential (BodyRenderings): asked before the walk, under the differential alone, so a plain run renders nothing.
-func (reads *Reads) RenderBodiesBy(fileSet *token.FileSet) {
+// RenderBodiesBy has the walk render the package's bodies as well, each placed by fileSet, the load's, with the named
+// types each expression's type names written by namedTypes, for the body differential (BodyRenderings): asked before
+// the walk, under the differential alone, so a plain run renders nothing.
+func (reads *Reads) RenderBodiesBy(fileSet *token.FileSet, namedTypes func(types.Type) string) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
-	reads.bodyFileSet = fileSet
+	reads.bodyFileSet, reads.bodyNamedTypes = fileSet, namedTypes
 }
 
 // BodyRenderings are the package's bodies as its walk rendered them, and whether it did.

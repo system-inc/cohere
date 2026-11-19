@@ -12,7 +12,9 @@ import (
 // and the two are compared. A body is a function's block or a var or const spec's values, placed by its declaration
 // as stage 1's record places it (Declaration.Offset), and rendered as its facts: every expression's type, and its
 // constant value when it has one, and every identifier's use, by its stable identity (IdentityRenderer), each at its
-// offsets in the file. Each text is held once, so a package's renderings cost a few words a fact.
+// offsets in the file. A function's body takes its receiver and signature with its block, and a value spec's its
+// declared type with its values, so a body reached by its signature alone has something to compare. Each text is held
+// once, so a package's renderings cost a few words a fact.
 type BodyRenderings struct {
 	texts  []string
 	bodies map[BodyPlace]RenderedBody
@@ -33,12 +35,14 @@ type BodyPlace struct {
 }
 
 // RenderedFact is one fact of a body: an expression's type, or with Use an identifier's use, between Start and End,
-// its offsets in the file, rendered as its renderings' text at Text.
+// its offsets in the file, rendered as its renderings' text at Text. Unknown marks a use of an object with no stable
+// identity, which matches no other fact, another unknown's included.
 type RenderedFact struct {
-	Start int32
-	End   int32
-	Use   bool
-	Text  uint32
+	Start   int32
+	End     int32
+	Use     bool
+	Unknown bool
+	Text    uint32
 }
 
 // Body is the body at place as it was rendered, and whether it was.
@@ -53,20 +57,22 @@ func (renderings *BodyRenderings) Text(fact RenderedFact) string {
 }
 
 // RenderBodies renders the bodies of files, own's syntax, by info, own's type information, each placed by fileSet,
-// those wanted alone, every body when wanted is nil. It is nil when info holds no types or uses to render.
+// those wanted alone, every body when wanted is nil, and with namedTypes, when not nil, the named types each
+// expression's type names written beside it. It is nil when info holds no types or uses to render.
 func RenderBodies(
 	fileSet *token.FileSet,
 	own *types.Package,
 	info *types.Info,
 	files []*ast.File,
 	wanted func(place BodyPlace) bool,
+	namedTypes func(types.Type) string,
 ) *BodyRenderings {
 	if info == nil || info.Types == nil || info.Uses == nil {
 		return nil
 	}
-	renderer := bodyRenderer{fileSet: fileSet, info: info, identities: NewIdentityRenderer(fileSet, nil),
-		qualifier: func(other *types.Package) string { return other.Path() }, textIndex: map[string]uint32{},
-		renderings: &BodyRenderings{bodies: map[BodyPlace]RenderedBody{}}}
+	renderer := bodyRenderer{fileSet: fileSet, own: own, info: info, identities: NewIdentityRenderer(fileSet, nil),
+		namedTypes: namedTypes, qualifier: func(other *types.Package) string { return other.Path() },
+		textIndex: map[string]uint32{}, renderings: &BodyRenderings{bodies: map[BodyPlace]RenderedBody{}}}
 	for _, file := range files {
 		tokenFile := fileSet.File(file.FileStart)
 		if tokenFile == nil {
@@ -76,7 +82,11 @@ func RenderBodies(
 			switch declaration := declaration.(type) {
 			case *ast.FuncDecl:
 				if declaration.Body != nil {
-					renderer.body(tokenFile, declaration.Pos(), declaration.End(), wanted, declaration.Body)
+					roots := []ast.Node{declaration.Type, declaration.Body}
+					if declaration.Recv != nil {
+						roots = append(roots, declaration.Recv)
+					}
+					renderer.body(tokenFile, declaration.Pos(), declaration.End(), wanted, roots...)
 				}
 			case *ast.GenDecl:
 				repeatsValues := false
@@ -97,7 +107,10 @@ func RenderBodies(
 					if !repeatsValues {
 						continue
 					}
-					roots := make([]ast.Node, 0, len(valueSpec.Values))
+					roots := make([]ast.Node, 0, len(valueSpec.Values)+1)
+					if valueSpec.Type != nil {
+						roots = append(roots, valueSpec.Type)
+					}
 					for _, value := range valueSpec.Values {
 						roots = append(roots, value)
 					}

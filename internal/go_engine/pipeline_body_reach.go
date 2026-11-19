@@ -16,14 +16,25 @@ const bodyReachListed = 20
 
 // writeBodyReachCensus writes each extra build's census of runs to the census file, when the run asked for one and
 // judged its builds' dependence, and notes each body differential failure on stderr, in build order, under the
-// differential. A file that cannot be written is noted and changes nothing else.
+// differential. An extra build with no census, judged by nothing or stopped by its type errors before its rules, is
+// written as such, and under the differential is a failure: nothing of it was compared. A file that cannot be written
+// is noted and changes nothing else.
 func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 	if engine.bodyReachHost == nil {
 		return
 	}
 	var written strings.Builder
-	for _, run := range runs {
+	for index, run := range runs {
 		if run.bodyReach == nil {
+			if index == 0 {
+				continue
+			}
+			fmt.Fprintf(&written, "build %s\n  not judged: the build has no census\n", run.build)
+			if engine.bodyDifferential {
+				failure := "the build was not judged, so none of its bodies was compared"
+				fmt.Fprintf(&written, "  body differential: compared 0, failures 1\n    %s\n", failure)
+				engine.note("the body differential of the build %s: %s", run.build, failure)
+			}
 			continue
 		}
 		writeBuildBodyReach(&written, "build "+run.build.String(), run.bodyReach)

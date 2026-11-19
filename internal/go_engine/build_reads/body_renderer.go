@@ -8,13 +8,17 @@ import (
 	"go/types"
 	"math/big"
 	"slices"
+	"strconv"
 )
 
-// bodyRenderer renders one package's bodies (RenderBodies), on one goroutine, each text kept once by textIndex.
+// bodyRenderer renders one package's bodies (RenderBodies), own's, on one goroutine, each text kept once by
+// textIndex, and with namedTypes the named types each expression's type names written beside it.
 type bodyRenderer struct {
 	fileSet    *token.FileSet
+	own        *types.Package
 	info       *types.Info
 	identities *IdentityRenderer
+	namedTypes func(types.Type) string
 	qualifier  types.Qualifier
 	textIndex  map[string]uint32
 	renderings *BodyRenderings
@@ -22,7 +26,9 @@ type bodyRenderer struct {
 }
 
 // body renders the body under roots of the declaration that starts at start and ends at end in tokenFile, when it is
-// wanted.
+// wanted. A use of an object the declaration declares itself, a local, a parameter or a label, is written by its
+// name and its offset in the file, which both builds share, as stage 1's record leaves it out (declaredWithin); any
+// other use whose identity is unknown is marked so, since it can match no other (Identity.Equal).
 func (renderer *bodyRenderer) body(
 	tokenFile *token.File,
 	start token.Pos,
@@ -43,14 +49,24 @@ func (renderer *bodyRenderer) body(
 			}
 			if typed, isTyped := renderer.info.Types[expression]; isTyped && typed.Type != nil {
 				text := types.TypeString(typed.Type, renderer.qualifier)
+				if renderer.namedTypes != nil {
+					text += renderer.namedTypes(typed.Type)
+				}
 				if typed.Value != nil {
 					text += " = " + exactConstant(typed.Value)
 				}
-				renderer.add(tokenFile, expression, false, text)
+				renderer.add(tokenFile, expression, false, false, text)
 			}
 			if identifier, isIdentifier := expression.(*ast.Ident); isIdentifier {
-				if used := renderer.info.Uses[identifier]; used != nil {
-					renderer.add(tokenFile, expression, true, renderer.identities.Object(used).String())
+				used := renderer.info.Uses[identifier]
+				switch {
+				case used == nil:
+				case declaredWithin(used, renderer.own, start, end):
+					renderer.add(tokenFile, expression, true, false,
+						"own "+used.Name()+" at "+strconv.Itoa(tokenFile.Offset(used.Pos())))
+				default:
+					identity := renderer.identities.Object(used)
+					renderer.add(tokenFile, expression, true, identity.Kind == IdentityUnknown, identity.String())
 				}
 			}
 			return true
@@ -59,14 +75,14 @@ func (renderer *bodyRenderer) body(
 	facts := slices.Clone(renderer.facts)
 	slices.SortFunc(facts, func(first, second RenderedFact) int {
 		return cmp.Or(cmp.Compare(first.Start, second.Start), cmp.Compare(first.End, second.End),
-			compareBool(first.Use, second.Use), cmp.Compare(renderer.renderings.texts[first.Text],
-				renderer.renderings.texts[second.Text]))
+			compareBool(first.Use, second.Use), compareBool(first.Unknown, second.Unknown),
+			cmp.Compare(renderer.renderings.texts[first.Text], renderer.renderings.texts[second.Text]))
 	})
 	renderer.renderings.bodies[place] = RenderedBody{Facts: facts, LastLine: tokenFile.Position(end).Line}
 }
 
-// add adds the fact of expression, its use when use is set, rendered as text.
-func (renderer *bodyRenderer) add(tokenFile *token.File, expression ast.Expr, use bool, text string) {
+// add adds the fact of expression, its use when use is set, of an unknown identity when unknown is, rendered as text.
+func (renderer *bodyRenderer) add(tokenFile *token.File, expression ast.Expr, use bool, unknown bool, text string) {
 	index, isKept := renderer.textIndex[text]
 	if !isKept {
 		index = uint32(len(renderer.renderings.texts))
@@ -74,7 +90,7 @@ func (renderer *bodyRenderer) add(tokenFile *token.File, expression ast.Expr, us
 		renderer.renderings.texts = append(renderer.renderings.texts, text)
 	}
 	renderer.facts = append(renderer.facts, RenderedFact{Start: int32(tokenFile.Offset(expression.Pos())),
-		End: int32(tokenFile.Offset(expression.End())), Use: use, Text: index})
+		End: int32(tokenFile.Offset(expression.End())), Use: use, Unknown: unknown, Text: index})
 }
 
 // exactConstant is value written exactly and one way only: a float or a complex part as its exact fraction, whichever

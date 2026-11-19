@@ -66,8 +66,11 @@ type ReadsBuild struct {
 	// assembly files (Restoring.Assembly), made the first time one is judged (wholeTwin).
 	whole *ReadsBuild
 
-	// uses are each object's digest as a use of each kind but the whole judges it, a cache.Key by useKey (useDigest).
-	uses sync.Map
+	// uses are each object's digest as a use of each kind but the whole judges it, a cache.Key by useKey (useDigest),
+	// and wholeTypeNames each type name's digest of its whole lines, a cache.Key by *types.TypeName
+	// (NamedTypesWritten).
+	uses           sync.Map
+	wholeTypeNames sync.Map
 
 	// candidates are each type name's candidate for a Method or Interface lookup of a query and name, a
 	// memoizedCandidate by candidateKey (candidate).
@@ -272,6 +275,41 @@ func kindOf(underlying types.Type) string {
 	default:
 		return "other"
 	}
+}
+
+// NamedTypesWritten are the named types and aliases typed names before a closure walk stops at each (directTypeNames),
+// each once, written ` path.Name{digest}`, the digest of its whole lines as a use of its name, its underlying type and
+// its method set reads them (useLines), as the object differential compares a type name (#wcwx8vf): the body
+// differential writes them beside each expression's type (#w72zxtq), so two named types of one name whose layout or
+// method set differ read apart. Empty when typed names none. Each type name's digest is computed once.
+func (build *ReadsBuild) NamedTypesWritten(typed types.Type) string {
+	var written strings.Builder
+	for _, typeName := range directTypeNames([]types.Type{typed}, nil).typeNames {
+		written.WriteString(" " + typeName.Pkg().Path() + "." + typeName.Name() + "{" +
+			build.wholeTypeNameDigest(typeName).String() + "}")
+	}
+	return written.String()
+}
+
+// wholeTypeNameDigest is the digest of typeName's whole lines (NamedTypesWritten), memoized.
+func (build *ReadsBuild) wholeTypeNameDigest(typeName *types.TypeName) cache.Key {
+	if known, isKnown := build.wholeTypeNames.Load(typeName); isKnown {
+		digest, isDigest := known.(cache.Key)
+		if !isDigest {
+			// Invariant: wholeTypeNameDigest stores only a cache.Key.
+			panic(fmt.Sprintf("check: the whole lines digest of %s is a %T", typeName.Name(), known))
+		}
+		return digest
+	}
+	lines := build.useLines(typeName, build_reads.UseUnderlying)
+	lines = append(lines, methodSetLines(typeName, build.graph.importerSees)...)
+	parts := make([][]byte, 0, len(lines))
+	for _, line := range lines {
+		parts = append(parts, []byte(line))
+	}
+	digest := cache.DigestOf(parts...)
+	build.wholeTypeNames.Store(typeName, digest)
+	return digest
 }
 
 // methodSetLines are the methods of typeName's type, and of a pointer to it unless it is an interface, that seen keeps,

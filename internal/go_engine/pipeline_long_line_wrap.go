@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/format"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -56,8 +57,11 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		caching.Begin = engine.beginSpeculativeLint
 	}
 	caching.RecordReads = engine.recordsReadsOf()
-	// The body differential compares each build's bodies with the host's as its walk rendered them.
-	caching.RendersBodies = engine.bodyDifferential && engine.request.judgesDependence()
+	// The body differential compares each build's bodies with the host's as its walk rendered them, each named type
+	// by its name and the digest of its whole lines, in a memo of the host's own.
+	if engine.bodyDifferential && engine.request.judgesDependence() {
+		caching.BodyNamedTypes = check.NewReadsBuild().NamedTypesWritten
+	}
 	started := time.Now()
 	defer func() { engine.hostLoading.Add(int64(time.Since(started))) }()
 	return engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})

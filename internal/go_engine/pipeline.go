@@ -244,6 +244,9 @@ type pipeline struct {
 	bodyReachCensus  string
 	bodyDifferential bool
 	bodyReachHost    *bodyReachHost
+	// bodyDifferentialCensus, a test's alone, hands the body differential another census than the reach's, so a test
+	// can show it failing on bodies the reach would wrongly leave unreached.
+	bodyDifferentialCensus func(*buildBodyReach) *buildBodyReach
 
 	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and
 	// bodyReachFromSource the one the census reads them back from, each empty unless asked
