@@ -16,6 +16,12 @@ allowed groups: acronyms, file names and the `ISO` 4217 currency codes, the one 
 abbreviation, or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
 tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 
+Tokens a hyphen or an ampersand joins are read whole first, as Nexus's `findUppercaseTokens` reads them (#1z7kbtz):
+a run with a digit anywhere or a part one letter long is an identifier, and nothing in it is shouting, so a fact id
+like `F-PROMISE-13` and a name like `AT&T` pass, while `WILL-NOT` has neither and each of its words is judged alone.
+Every engine reads runs the same way (`uppercaseTokens` in `internal/shouting/shouting.go`, and Swift's `words(in:)`),
+held by corpus cases `sh29` to `sh31`.
+
 A run of `//` comments on consecutive lines, with nothing but whitespace between them, is masked as
 one text, as a block comment is, so a backtick pair or a fence wrapped across its lines masks what it
 holds. A blank line, code between two comments, or a block comment ends the run. The generated-code

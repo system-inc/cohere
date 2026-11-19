@@ -53,18 +53,19 @@ func TestNextUppercaseTokenMatchesThePattern(test *testing.T) {
 
 // Every token the masked text holds is a token of the text before masking, the same bytes at the same offset, which is
 // what lets HasShoutedToken be asked before masking. A mask that blanked inside a word would leave a piece of it that
-// was never a token on its own, `NOT` out of `NOTx`, and fail here.
+// was never a token on its own, `NOT` out of `NOTx`, and fail here, as would one that blanked part of a joined run and
+// left a token the whole run held back, `RAY` out of `X-RAY`.
 func TestMaskingMakesNoNewToken(test *testing.T) {
 	test.Parallel()
-	texts := append(slices.Clone(tokenScanCases), realCommentCorpus(test)...)
-	texts = append(texts, strings.Join(tokenScanCases, "\n"))
+	texts := append(slices.Concat(tokenScanCases, runScanCases), realCommentCorpus(test)...)
+	texts = append(texts, strings.Join(tokenScanCases, "\n"), strings.Join(runScanCases, "\n"))
 	for _, text := range texts {
 		before := map[[2]int]bool{}
-		for start, end := nextUppercaseToken(text, 0); start >= 0; start, end = nextUppercaseToken(text, end) {
+		for start, end := range uppercaseTokens(text) {
 			before[[2]int{start, end}] = true
 		}
 		masked := MaskCodeAndCommands(text)
-		for start, end := nextUppercaseToken(masked, 0); start >= 0; start, end = nextUppercaseToken(masked, end) {
+		for start, end := range uppercaseTokens(masked) {
 			if !before[[2]int{start, end}] {
 				test.Fatalf("masking %q made the token %q at %d, which the text did not hold", text, masked[start:end],
 					start)
@@ -77,7 +78,7 @@ func TestMaskingMakesNoNewToken(test *testing.T) {
 // acronyms, so a gate that read only the first capital word, or the masked text's words, fails here.
 func TestHasShoutedTokenSkipsOnlyWhatReportsNothing(test *testing.T) {
 	test.Parallel()
-	texts := append(slices.Clone(tokenScanCases), realCommentCorpus(test)...)
+	texts := append(slices.Concat(tokenScanCases, runScanCases), realCommentCorpus(test)...)
 	skipped := 0
 	for _, text := range texts {
 		if HasShoutedToken(text) {
