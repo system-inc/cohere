@@ -23,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // errorRefusedAtGate is the error a build refused at the share gate ends its load with, since a build before it in
@@ -43,6 +44,7 @@ var errorRefusedAtGate = errors.New("refused at the share gate: a build before i
 func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []buildRun {
 	// The standard library's graph under `--build-dependence` ran beside the host's lint, and is over before anything
 	// of the builds is measured or started.
+	engine.request.timeline.Stamp("handover.begin")
 	engine.awaitStandardLibrary()
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
@@ -63,6 +65,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
+	engine.request.timeline.Stamp("host.readwalks.end")
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {
 		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
@@ -154,8 +157,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 			return measured
 		}
 	}
+	engine.request.timeline.Stamp("handover.end")
 	extraRuns, extraError := engine.extraBuildRuns(extras, heaviestFirst(host, extras), ours, pass.result.Host, width,
 		fromHostLive, measure)
+	engine.request.timeline.Stamp("builds.end")
 	if extraError != nil {
 		engine.otherBuildsFailed(extraError)
 		return nil
@@ -535,6 +540,11 @@ func (engine *pipeline) extraBuildRun(
 	afterLoad func(loaded bool),
 	atGate func(fromSource int, packages int) error,
 ) (buildRun, error) {
+	// Under `--timeline` the build's stamps, each under the build's name, in its first round: its own steps, and its
+	// first load's and check's. A reload's are in the reload's round, the rounds checkedFromSourceRounds counts. The
+	// name is asked only of a run that stamps (buildTimeline).
+	stamp := engine.buildTimeline(extra, 0)
+	timeline.Tell(stamp, "start")
 	environment := extraBuildEnvironment(engine.described.workspace, extra)
 	// The build's one go env, which its findings cache's key and its load, the lister and the kept listing among it,
 	// all read (#4rpt1jh), read with its lister state before the host's first load (earlyStart, startChildrenFirst),
@@ -595,6 +605,8 @@ func (engine *pipeline) extraBuildRun(
 		SharedReads:       engine.reads,
 		Fingerprints:      engine.fingerprints,
 		Walks:             engine.walks,
+		// Under `--timeline` the build's load stamps its listing's end, its restore and its first parse.
+		Timeline: stamp,
 	}
 	if session != nil {
 		caching.Restorer = session
@@ -633,6 +645,7 @@ func (engine *pipeline) extraBuildRun(
 	elapsed := time.Since(started)
 	loading += elapsed
 	loadWall += elapsed
+	timeline.Tell(stamp, "load.end")
 	// The first build's load has ended and its rules have not started: it holds none of the run's slots, and every
 	// other build waits at the share gate, before its type check, so the width is measured here, before any other
 	// build is admitted (extraBuildRuns). Their listings, graphs and restores are live as it measures, so the holding
@@ -684,6 +697,7 @@ func (engine *pipeline) extraBuildRun(
 		run.lintWait = time.Since(waitStarted)
 	}
 	engine.lintStepped(extra, lintStepTaken, weight)
+	timeline.Tell(stamp, "gate.taken")
 	// The build's standing bodies, made once for every load of it, only where the run leaves bodies standing, and read
 	// by a load only where its passes are handed the host's sides.
 	var standing *buildStanding
@@ -762,8 +776,10 @@ func (engine *pipeline) extraBuildRun(
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
 			FactReachSettle: settle,
 			FactReach:       engine.bodyDifferential && factHosts != nil,
-			StandingBodies:  standingBodies,
-			StandingAfter:   standingAfter,
+			// Under `--timeline` the check stamps in the round of the load it runs over, the last one counted.
+			Timeline:       engine.buildTimeline(extra, len(run.checkedFromSourceRounds)-1),
+			StandingBodies: standingBodies,
+			StandingAfter:  standingAfter,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -786,11 +802,15 @@ func (engine *pipeline) extraBuildRun(
 		// package restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
 		for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
 			reloads := strings.Join(result.Reloads, ", ")
+			// The reload's load, its end too, and the check over it, stamp in the round this load is of: 1 for the
+			// first reload.
+			caching.Timeline = engine.buildTimeline(extra, len(run.checkedFromSourceRounds))
 			started := time.Now()
 			loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 			elapsed := time.Since(started)
 			loading += elapsed
 			loadWall += elapsed
+			timeline.Tell(caching.Timeline, "load.end")
 			if loadError != nil {
 				return nil, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
 					loadError)
@@ -871,7 +891,18 @@ func (engine *pipeline) extraBuildRun(
 			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
 		}
 	}
+	timeline.Tell(stamp, "end")
 	return run, nil
+}
+
+// buildTimeline is extra's timeline hook in round under `--timeline` (timeline.Recorder's Hook), and nil for a run
+// that did not ask. The build reaches the recorder's interface only past the nil check, so a run without the switch
+// copies no build into an interface for it, and asks no name of it.
+func (engine *pipeline) buildTimeline(extra project.Build, round int) func(label string) {
+	if engine.request.timeline == nil {
+		return nil
+	}
+	return engine.request.timeline.Hook(extra, round, "")
 }
 
 // extraBuildSystemCache is the system cache an extra build reads its standard library from and writes it to: the

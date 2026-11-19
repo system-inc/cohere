@@ -140,6 +140,7 @@ func runOverlapping(
 	}
 	request.standardLibrary = source
 	request.answersInPart = answersInPart
+	request.timeline = newTimeline(request)
 	switch request.mode() {
 	case modeVersion:
 		return writeVersion(standardOutput, standardError)

@@ -35,6 +35,17 @@ func Process() (time.Duration, bool) {
 	return time.Duration(usage.Utime.Nano() + usage.Stime.Nano()), true
 }
 
+// ProcessUserSystem is Process apart: the CPU the whole process has spent in user mode and in the kernel, each by the
+// kernel's own count, so a reader can say where the process's time went and not only how much of it there was. False
+// when they cannot be read.
+func ProcessUserSystem() (user time.Duration, system time.Duration, known bool) {
+	var usage syscall.Rusage
+	if getrusageError := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); getrusageError != nil {
+		return 0, 0, false
+	}
+	return time.Duration(usage.Utime.Nano()), time.Duration(usage.Stime.Nano()), true
+}
+
 // Children is the CPU the process's waited-for children have used, user and system, such as a `go list` it ran.
 // False when it cannot be read.
 func Children() (time.Duration, bool) {

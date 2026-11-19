@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
@@ -267,11 +268,14 @@ func lintsWholeLocatedProject(
 // path does; reported is then true. With none, the run goes on in this process as it always did.
 //
 // flags are the run's arguments less its paths, which are the root's alone when it has any, and which the project's
-// run, named by its directory, needs no more.
+// run, named by its directory, needs no more. given is the flags the run was typed, read for a switch only a Go run
+// takes, which a project that is no Go one's refuses here rather than run without (refuseGoOnlySwitchesWithoutGo):
+// the project's run is handed none of them, and would read as one that did what was asked.
 func checkNarrowedProjectFolders(
 	location projectLocation,
 	lintConfigFileName string,
 	flags []string,
+	given map[string]bool,
 ) (int, bool, error) {
 	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(location.Root)
 	if rootIgnoreEntriesError != nil {
@@ -302,26 +306,34 @@ func checkNarrowedProjectFolders(
 		Folders:        walked.Folders,
 		FolderSeverity: severity,
 	}
+	if refuseError := refuseGoOnlySwitchesWithoutGo(found, given, flagValue); refuseError != nil {
+		return 0, false, refuseError
+	}
 	// The project's run is named by the directory and tsconfig runProject gives it, so this run's own go.
 	arguments := childArguments(withoutValuedFlags(flags, []string{"directory", "tsconfig"}), lintConfigFileName, false)
 	return runProjects(found, arguments, streams.Output), true, nil
 }
 
-// goOnlySwitches are the switches only a Go run takes (goFlags): every other engine's child is run without them, so
-// one command line at a root holding several projects narrows the Go one's check to the host's build, where Swift's
-// run would refuse the switch and TypeScript's has no other build to leave out.
-var goOnlySwitches = []string{"host-build-only"}
+// goOnlySwitches are the switches only a Go run takes (goFlags), each with what it asks of a Go run, which its refusal
+// says: every other engine's child is run without them, so one command line at a root holding several projects narrows
+// the Go one's check to the host's build, or maps the Go one's run, where Swift's run would refuse the switch and
+// TypeScript's has no other build to leave out and no engine's phases to map (#3v2zp7g).
+var goOnlySwitches = map[string]string{
+	"host-build-only": "narrows which builds of a Go project's files are checked",
+	"timeline":        "maps when each phase and each build of a Go run began and ended",
+}
 
 // refuseGoOnlySwitches refuses a run that is no Go project's and was typed one of goOnlySwitches, rather than
 // ignoring it, since a flag accepted and ignored reads as a run that did what was asked. Discovery hands them to a Go
 // project's run alone (withoutGoOnlySwitches) and refuses them at a root with no Go project
 // (refuseGoOnlySwitchesWithoutGo), so here only a TypeScript run discovery leaves alone, such as one naming
-// --directory, meets this; Swift's refuses them as its engine's arguments are built (engineArguments).
+// --directory, meets this; Swift's refuses them as its engine's arguments are built (engineArguments). Sorted, so a
+// command line naming two of them is refused for the same one every time.
 func refuseGoOnlySwitches(given map[string]bool, value func(string) string) error {
-	for _, name := range goOnlySwitches {
+	for _, name := range slices.Sorted(maps.Keys(goOnlySwitches)) {
 		if given[name] && value(name) == "true" {
-			return fmt.Errorf("--%s narrows which builds of a Go project's files are checked, and this is no Go "+
-				"project, so nothing was checked", name)
+			return fmt.Errorf("--%s %s, and this is no Go project, so nothing was checked", name,
+				goOnlySwitches[name])
 		}
 	}
 	return nil
@@ -342,7 +354,7 @@ func refuseGoOnlySwitchesWithoutGo(found discovery, given map[string]bool, value
 
 // withoutGoOnlySwitches is arguments less each of goOnlySwitches.
 func withoutGoOnlySwitches(arguments []string) []string {
-	return withoutSwitches(arguments, goOnlySwitches)
+	return withoutSwitches(arguments, slices.Collect(maps.Keys(goOnlySwitches)))
 }
 
 // swiftUntimedSwitches are the switches a Swift project's run at a discovered root is run without: `--timing`, which

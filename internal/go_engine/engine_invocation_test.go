@@ -72,6 +72,26 @@ func TestParseInvocationRefuses(test *testing.T) {
 				"/project/value.go", "/project/other.go"),
 			"--stdin-filepath answers what --fix writes for one file",
 		},
+		// Only a check run has phases and builds to map, so every other run refuses `--timeline` by name rather than
+		// accept it and write no timeline (#3v2zp7g).
+		{
+			"a timeline beside the rules", append(slices.Clone(contractArguments), "--rules", "--timeline"),
+			"--timeline maps a check run's phases and builds, and this run lists the rules, so it was refused",
+		},
+		{
+			"a timeline beside the enabled rules", append(slices.Clone(contractArguments), "--rules-enabled",
+				"--timeline"),
+			"this run lists the rules the settings turn on, so it was refused",
+		},
+		{
+			"a timeline beside the version", append(slices.Clone(contractArguments), "--version", "--timeline"),
+			"this run prints the version, so it was refused",
+		},
+		{
+			"a timeline beside a save", append(slices.Clone(contractArguments), "--fix", "--timeline",
+				"--stdin-filepath", "/project/value.go"),
+			"this run is the editor's save, which prints one file's text, so it was refused",
+		},
 	}
 	for _, refused := range cases {
 		test.Run(refused.name, func(test *testing.T) {

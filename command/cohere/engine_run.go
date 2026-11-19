@@ -329,6 +329,11 @@ type engineRun struct {
 	// ask is sent none, so a timing record there is a broken stream. timingReceived says the one record came.
 	timingRequested bool
 	timingReceived  bool
+	// timelineRequested is `--timeline` on a Go run, which the engine answers with one timeline record, the last
+	// before the summary. A run that did not ask is sent none, so a timeline record there is a broken stream.
+	// timelineReceived says the one record came.
+	timelineRequested bool
+	timelineReceived  bool
 	// memoryReceived is set by the memory record, which comes once (acceptMemory).
 	memoryReceived bool
 
@@ -436,6 +441,11 @@ func (run *engineRun) accept(line []byte) error {
 	if run.provenance == nil && envelope.Kind != "provenance" {
 		return fmt.Errorf("the first record was %q, and provenance is always first", envelope.Kind)
 	}
+	// A second timeline record is acceptTimeline's to refuse by name.
+	if run.timelineReceived && envelope.Kind != "summary" && envelope.Kind != "timeline" {
+		return fmt.Errorf("a %q record after the timeline record, which is the last before the summary",
+			envelope.Kind)
+	}
 
 	switch envelope.Kind {
 	case "provenance":
@@ -466,6 +476,8 @@ func (run *engineRun) accept(line []byte) error {
 		return decodeRecord(line, &engineInputsRecord{}, run.acceptInputs)
 	case "timing":
 		return decodeRecord(line, &contract.TimingRecord{}, run.acceptTiming)
+	case "timeline":
+		return decodeRecord(line, &contract.TimelineRecord{}, run.acceptTimeline)
 	case "memory":
 		return decodeRecord(line, &contract.MemoryRecord{}, run.acceptMemory)
 	case "summary":
@@ -1367,6 +1379,41 @@ func (run *engineRun) acceptTiming(record *contract.TimingRecord) error {
 	return nil
 }
 
+// acceptTimeline prints when each phase and each build of a Go run began and ended, once, under `--timeline`
+// (#3v2zp7g): as a table in the human views, after the lint line and the timing table when there is one, and written
+// through as a `timeline` line under `--json`. The record is the engine's own type, since only the Go engine writes
+// one.
+//
+// Refused in a run that did not ask, a second time, before every phase has its record, and with its stamps missing
+// where the contract writes `[]`, for the reason accept refuses an unknown record. That it is the last before the
+// summary is accept's to hold, since only the record after it can break it.
+func (run *engineRun) acceptTimeline(record *contract.TimelineRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a timeline record in a %s run", run.mode)
+	}
+	if !run.timelineRequested {
+		return fmt.Errorf("a timeline record in a run that did not ask for one with --timeline")
+	}
+	if run.timelineReceived {
+		return fmt.Errorf("a second timeline record")
+	}
+	if run.nextPhase < len(phaseOrder) {
+		return fmt.Errorf("a timeline record before the %s phase, and it comes after every phase",
+			phaseOrder[run.nextPhase])
+	}
+	if record.Stamps == nil {
+		return fmt.Errorf("a timeline record missing its stamps, which the contract writes [] when empty")
+	}
+	run.timelineReceived = true
+	if activeOutput.Mode == outputJson {
+		writeJsonLine(run.out, timelineAsJson(*record))
+	} else {
+		printEngineTimeline(run.out, record)
+	}
+	streams.Show(run.out)
+	return nil
+}
+
 // acceptMemory reads the memory limits a Go run raised its heap to (#5shepvt), once, after its last phase and before
 // its inputs, as the contract places it. A run that raised says so in the account `--verbose` prints, beside the
 // types phase's `memory:` line that stated the limit it began under, and under `--json` in the summary's
@@ -1424,6 +1471,10 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	// that asks.
 	if run.timingRequested && !run.timingReceived {
 		return fmt.Errorf("a summary with no timing record, in a run that asked for one with --timing")
+	}
+	// The same for `--timeline`, whose record the Go engine writes on every check run that asks (#3v2zp7g).
+	if run.timelineRequested && !run.timelineReceived {
+		return fmt.Errorf("a summary with no timeline record, in a run that asked for one with --timeline")
 	}
 	if run.duplicatesRequested && !run.duplicatesWritten {
 		return fmt.Errorf("a summary with no duplicates record, which --duplicates asked for")

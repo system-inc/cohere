@@ -31,6 +31,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -253,6 +254,12 @@ type Caching struct {
 	// and parse, each package's type check and each read of export data. Nil measures nothing (#3apgjer).
 	Timing *timing.Collector
 
+	// Timeline is told the listing's end, as `listing.end`, the restore from the findings cache's beginning and end,
+	// as `restore.begin` and `restore.end`, and the load's first parse, as `parse.first`, under `--timeline`, nil for
+	// a load that tells nothing (#3v2zp7g). The restore runs before any package is parsed, so the four come in that
+	// order. The engine hands it to the host's load and to each extra build's.
+	Timeline func(label string)
+
 	// Analyzes, when set, says which of the packages to analyze the caller's rules analyze, from each one's ID and
 	// files, before any is type-checked. One it turns down is still loaded and type-checked, for what imports it,
 	// its errors are still diagnostics and it counts in PackagesInWorkspace, and it is left out of Packages and of
@@ -406,6 +413,7 @@ func loadUnder(
 			caching.Timing,
 		)
 	})
+	timeline.Tell(caching.Timeline, "listing.end")
 	if listError != nil {
 		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)
 	}
@@ -526,6 +534,7 @@ func fromSource(
 	if caching.Pool != nil {
 		typeChecker.slots = caching.Pool
 	}
+	typeChecker.timeline = caching.Timeline
 	reachable := typeChecker.connect()
 	if caching.rootSyntaxOnly {
 		for _, current := range reachable {
@@ -552,7 +561,9 @@ func fromSource(
 		if compiled != nil {
 			loaderName = LoaderCgoTranslated
 		}
+		timeline.Tell(caching.Timeline, "restore.begin")
 		typeChecker.restored = caching.Restorer.Restore(loaderName, sizes, loadedOf(reachable), analyzedPackages)
+		timeline.Tell(caching.Timeline, "restore.end")
 	}
 	// Made after the restore, which RecordReads may read, and before any package is checked, the restored ones too,
 	// whose export data may not read, so the map a run beside the load is handed (Overlap.Reads) never changes once
