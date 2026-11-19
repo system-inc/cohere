@@ -32,11 +32,10 @@ type keepRun struct {
 	computed int
 }
 
-// learnMiddle is learnMiddleWith a store that holds stored as keepProbe's answer about middle.Middle, or nothing when
-// stored is nil.
-func learnMiddle(test *testing.T, stored []byte, handed []byte, restoresBottom bool) *keepRun {
+// learnMiddle is learnMiddleWith a store that holds nothing.
+func learnMiddle(test *testing.T, handed []byte, restoresBottom bool) *keepRun {
 	test.Helper()
-	return learnMiddleWith(test, keepStore{stored: stored}, handed, restoresBottom)
+	return learnMiddleWith(test, keepStore{}, handed, restoresBottom)
 }
 
 // learnMiddleWith runs ctrlflow on middle, loaded from source, which is how a resolver learns a package, with store,
@@ -96,57 +95,63 @@ func (run *keepRun) recorded() (string, bool) {
 	return string(encoded), isRecorded
 }
 
-// An answer kept is kept as one Ask computed: recorded for the store, told to the hand once, and memoized, so a
-// question about it afterwards is answered with it and computes nothing. That is what gives a callee a kind judged
-// inside its caller's judgment an answer of its own.
-func TestAnAnswerKeptIsRecordedHeardAndAnswersTheNextQuestion(test *testing.T) {
+// An answer kept is an answer of its own among the ones the run holds, told to the hand once, and nothing recorded
+// for the store: that is what gives a callee a kind judged inside its caller's judgment an answer. A question about
+// it afterwards goes as it would had nothing been kept, computed and recorded then, so what the run records is what
+// it would have recorded without Keep, and the hand, which heard the answer when it was kept, does not hear it again.
+func TestAnAnswerKeptIsHeldAndHeardAndRecordedOnlyOnceAskedOf(test *testing.T) {
 	test.Parallel()
-	run := learnMiddle(test, nil, nil, false)
+	run := learnMiddle(test, nil, false)
 	fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, true)
-	if recorded, isRecorded := run.recorded(); !isRecorded || recorded != "true" {
-		test.Errorf("want Middle's answer recorded as true, got %q (recorded: %t)", recorded, isRecorded)
+	if answered := answeredNames(run.resolver.Answered()); !slices.Equal(answered, []string{"keep_probe Middle true"}) {
+		test.Errorf("want Middle's answer held as true once kept, got %q", answered)
 	}
-	if answer := run.ask(run.function, false); !answer || run.computed != 0 {
-		test.Errorf("want the next question answered true and nothing computed, got %t after computing %d times",
-			answer, run.computed)
+	if recorded, isRecorded := run.recorded(); isRecorded {
+		test.Errorf("want nothing recorded for an answer kept and never asked of, got %q", recorded)
+	}
+	if answer := run.ask(run.function, true); !answer || run.computed != 1 {
+		test.Errorf("want the next question computed, as true, got %t after computing %d times", answer, run.computed)
+	}
+	if recorded, isRecorded := run.recorded(); !isRecorded || recorded != "true" {
+		test.Errorf("want Middle's answer recorded as true once asked of, got %q (recorded: %t)", recorded, isRecorded)
+	}
+	if answered := answeredNames(run.resolver.Answered()); !slices.Equal(answered, []string{"keep_probe Middle true"}) {
+		test.Errorf("want Middle's answer held once, as true, after it was asked of, got %q", answered)
 	}
 	if heard := run.hand.heard["Middle"]; !slices.Equal(heard, []string{"true"}) {
 		test.Errorf("want the hand to hear Middle's answer once, as true, heard %q", heard)
 	}
 }
 
-// An answer readers were given, or would be, stands, and Keep keeps nothing in its place: one already memoized, which
-// a question computed as false; the store's, so what the run records stays what the store did not give it; and a
-// hand's, so a run under a hand never memoizes over the answer the hand gives. Handed true in each, the next question
-// is still answered false, and neither the store's record nor the hand ever holds true.
+// An answer readers were given, or would be, stands, and Keep keeps nothing beside it: one already memoized, which a
+// question computed as false, and a hand's, so a run under a hand holds only the answer the hand gives. Handed true
+// in each, the run never holds true, the hand never hears it, and the next question is still answered false.
 func TestKeepLeavesAnAnswerAlreadyGivenStanding(test *testing.T) {
 	test.Parallel()
 	for name, standing := range map[string]struct {
-		stored       []byte
 		handed       []byte
 		asksFirst    bool
-		wantRecorded string
+		wantAnswered []string
 		wantHeard    []string
 		wantComputed int
 	}{
-		"an answer already memoized": {asksFirst: true, wantRecorded: "false", wantHeard: []string{"false"},
-			wantComputed: 1},
-		"the store's answer": {stored: []byte("false")},
-		"a hand's answer":    {handed: []byte("false")},
+		"an answer already memoized": {asksFirst: true, wantAnswered: []string{"keep_probe Middle false"},
+			wantHeard: []string{"false"}, wantComputed: 1},
+		"a hand's answer": {handed: []byte("false")},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			run := learnMiddle(test, standing.stored, standing.handed, false)
+			run := learnMiddle(test, standing.handed, false)
 			if standing.asksFirst {
 				run.ask(run.function, false)
 			}
 			fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, true)
+			if answered := answeredNames(run.resolver.Answered()); !slices.Equal(answered, standing.wantAnswered) {
+				test.Errorf("want %q held after Keep, got %q", standing.wantAnswered, answered)
+			}
 			if answer := run.ask(run.function, false); answer || run.computed != standing.wantComputed {
 				test.Errorf("want the next question answered false after computing %d times, got %t after %d",
 					standing.wantComputed, answer, run.computed)
-			}
-			if recorded, _ := run.recorded(); recorded != standing.wantRecorded {
-				test.Errorf("want %q recorded for Middle, got %q", standing.wantRecorded, recorded)
 			}
 			if heard := run.hand.heard["Middle"]; !slices.Equal(heard, standing.wantHeard) {
 				test.Errorf("want the hand to hear %q of Middle, heard %q", standing.wantHeard, heard)
@@ -157,25 +162,21 @@ func TestKeepLeavesAnAnswerAlreadyGivenStanding(test *testing.T) {
 
 // Nothing is kept in an unsure package, as nothing computed there is: middle, handed a placeholder for bottom.Bodied,
 // which the run restored and no store answers, is unsure, so an answer handed to Keep afterwards may rest on the
-// placeholder. It is neither recorded nor heard, and the next question about it computes again.
+// placeholder. The run holds nothing of it, and the hand hears nothing.
 func TestNothingIsKeptInAnUnsurePackage(test *testing.T) {
 	test.Parallel()
-	run := learnMiddle(test, nil, nil, true)
+	run := learnMiddle(test, nil, true)
 	run.ask(run.bodied, true)
 	if !run.resolver.Unsure(run.middle.Types) || run.computed != 0 {
 		test.Fatalf("want middle unsure after a question of bottom, restored, and nothing computed, got unsure %t "+
 			"after computing %d times", run.resolver.Unsure(run.middle.Types), run.computed)
 	}
 	fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, true)
-	if recorded, isRecorded := run.recorded(); isRecorded {
-		test.Errorf("want nothing recorded for Middle in an unsure package, got %q", recorded)
+	if answered := answeredNames(run.resolver.Answered()); len(answered) != 0 {
+		test.Errorf("want nothing held of Middle in an unsure package, got %q", answered)
 	}
 	if heard := run.hand.heard["Middle"]; len(heard) != 0 {
 		test.Errorf("want the hand to hear nothing of Middle, heard %q", heard)
-	}
-	if answer := run.ask(run.function, false); answer || run.computed != 1 {
-		test.Errorf("want the next question computed again, as false, got %t after computing %d times", answer,
-			run.computed)
 	}
 }
 
@@ -183,7 +184,7 @@ func TestNothingIsKeptInAnUnsurePackage(test *testing.T) {
 // computing or keeping anything: the hand hears nothing of it.
 func TestNothingIsKeptAboutAnObjectOfNoPackage(test *testing.T) {
 	test.Parallel()
-	run := learnMiddle(test, nil, nil, false)
+	run := learnMiddle(test, nil, false)
 	errorInterface, isInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
 	if !isInterface {
 		test.Fatal("the universe's error is no interface")
@@ -195,11 +196,11 @@ func TestNothingIsKeptAboutAnObjectOfNoPackage(test *testing.T) {
 }
 
 // A kind's walk keeps every verdict it judges, the one a reader asked of among them, so the compute of a question
-// keeps the very answer the question then returns. It is one answer: recorded, and heard by the hand once, never once
-// from Keep and again from Ask.
+// keeps the very answer the question then returns. It is one answer: recorded by the question, as any computed answer
+// is, held once, and heard by the hand once, never once from Keep and again from Ask.
 func TestAnAnswerItsOwnComputeKeptIsHeardOnce(test *testing.T) {
 	test.Parallel()
-	run := learnMiddle(test, nil, nil, false)
+	run := learnMiddle(test, nil, false)
 	answer := fact_resolver.Ask(run.resolver, run.middle, keepProbe, run.function,
 		func(home *fact_resolver.Package) bool {
 			fact_resolver.Keep(run.resolver, home, keepProbe, run.function, true)
@@ -208,6 +209,9 @@ func TestAnAnswerItsOwnComputeKeptIsHeardOnce(test *testing.T) {
 	if recorded, isRecorded := run.recorded(); !answer || !isRecorded || recorded != "true" {
 		test.Errorf("want the question answered true and recorded as true, got %t and %q (recorded: %t)", answer,
 			recorded, isRecorded)
+	}
+	if answered := answeredNames(run.resolver.Answered()); !slices.Equal(answered, []string{"keep_probe Middle true"}) {
+		test.Errorf("want Middle's answer held once, as true, got %q", answered)
 	}
 	if heard := run.hand.heard["Middle"]; !slices.Equal(heard, []string{"true"}) {
 		test.Errorf("want the hand to hear Middle's answer once, as true, heard %q", heard)

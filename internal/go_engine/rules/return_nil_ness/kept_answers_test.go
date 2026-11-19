@@ -24,13 +24,14 @@ import (
 // keptAnswers is what one question left in the resolver of a fixture package: the resolver, the package as it holds
 // it, every nilness answer it recorded for the package, decoded, nil for no fact, by its function's objectpath, every
 // nilness answer it holds about the package's functions (fact_resolver.Answered), decoded alike, by the function's
-// name, and the kind's counts.
+// name, with the function each is about, and the kind's counts.
 type keptAnswers struct {
-	resolver *fact_resolver.Resolver
-	home     *fact_resolver.Package
-	recorded map[string][]return_nil_ness.ValueNilness
-	answered map[string][]return_nil_ness.ValueNilness
-	counts   *fact_resolver.Counts
+	resolver  *fact_resolver.Resolver
+	home      *fact_resolver.Package
+	recorded  map[string][]return_nil_ness.ValueNilness
+	answered  map[string][]return_nil_ness.ValueNilness
+	functions map[string]*types.Func
+	counts    *fact_resolver.Counts
 }
 
 // askOnce runs a probe on the fixture package named fixture that asks the resolver the nilness of its function named
@@ -78,7 +79,7 @@ func askOnce(test *testing.T, fixture string, asked string) keptAnswers {
 	}
 	kept := keptAnswers{resolver: resolver, home: resolver.Package(loaded.Roots[0].Types),
 		recorded: map[string][]return_nil_ness.ValueNilness{}, answered: map[string][]return_nil_ness.ValueNilness{},
-		counts: resolver.Counts(return_nil_ness.Kind)}
+		functions: map[string]*types.Func{}, counts: resolver.Counts(return_nil_ness.Kind)}
 	if kept.home == nil {
 		test.Fatalf("the resolver never learned %s, which the probe ran on", fixture)
 	}
@@ -106,45 +107,49 @@ func askOnce(test *testing.T, fixture string, asked string) keptAnswers {
 			test.Fatalf("the answer held about %s, %s, does not decode: %v", answer.Object.Name(), answer.Encoded,
 				decodeError)
 		}
-		kept.answered[answer.Object.Name()] = results
+		function, isFunction := answer.Object.(*types.Func)
+		if !isFunction {
+			test.Fatalf("the answer held about %s is about no function", answer.Object.Name())
+		}
+		kept.answered[function.Name()], kept.functions[function.Name()] = results, function
 	}
 	return kept
 }
 
-// requireRecorded fails unless the resolver recorded an answer for exactly the functions of want, each with want's
-// results, nil for an answer of no fact.
-func requireRecorded(test *testing.T, kept keptAnswers, want map[string][]return_nil_ness.ValueNilness) {
+// requireKept fails unless the resolver holds an answer about exactly the functions of wantAnswered, each with its
+// results, nil for an answer of no fact, and recorded exactly wantRecorded for the store, which is the function asked
+// of and nothing a walk kept beside it, as a run records that keeps nothing.
+func requireKept(
+	test *testing.T,
+	kept keptAnswers,
+	wantAnswered map[string][]return_nil_ness.ValueNilness,
+	wantRecorded map[string][]return_nil_ness.ValueNilness,
+) {
 	test.Helper()
-	if !maps.EqualFunc(kept.recorded, want, slices.Equal[[]return_nil_ness.ValueNilness]) {
-		test.Errorf("the resolver recorded %v, want %v", kept.recorded, want)
+	if !maps.EqualFunc(kept.answered, wantAnswered, slices.Equal[[]return_nil_ness.ValueNilness]) {
+		test.Errorf("the resolver holds the answers %v, want %v", kept.answered, wantAnswered)
+	}
+	if !maps.EqualFunc(kept.recorded, wantRecorded, slices.Equal[[]return_nil_ness.ValueNilness]) {
+		test.Errorf("the resolver recorded %v, want %v", kept.recorded, wantRecorded)
 	}
 }
 
 // Asked of Caller alone, the resolver holds an answer of its own for each callee Caller's judgment judged, none of
-// which was asked of (#kemy8sq): Fresh never nil, with its results; Following, judged to no more than the defaults, as
-// no fact; and Assembled, which has no body and takes the defaults unjudged, as no fact too. Caller's own answer, no
-// fact, was built from those, and a reader of the store's entry finds each beside it. The unexported hidden, never
-// nil, is judged with them and has an answer among the ones the resolver holds, but no record: it has no objectpath
-// for the store to keep it by. No replay ran, so the answers are the ones the demand walk kept.
+// which was asked of (#kemy8sq): Fresh never nil, with its results; the unexported hidden, never nil too, which no
+// objectpath names; Following, judged to no more than the defaults, as no fact; and Assembled, which has no body and
+// takes the defaults unjudged, as no fact too. Caller's own answer, no fact, was built from those. What the run
+// recorded for the store is Caller's answer alone, as a run that kept nothing records. No replay ran, so the answers
+// are the ones the demand walk kept.
 func TestEveryCalleeADemandWalkJudgesHasAnAnswerOfItsOwn(test *testing.T) {
 	test.Parallel()
 	kept := askOnce(test, "kept", "Caller")
-	requireRecorded(test, kept, map[string][]return_nil_ness.ValueNilness{
-		"Caller":    nil,
-		"Fresh":     {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
-		"Following": nil,
-		"Assembled": nil,
-	})
-	wantAnswered := map[string][]return_nil_ness.ValueNilness{
+	requireKept(test, kept, map[string][]return_nil_ness.ValueNilness{
 		"Caller":    nil,
 		"Fresh":     {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
 		"hidden":    {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
 		"Following": nil,
 		"Assembled": nil,
-	}
-	if !maps.EqualFunc(kept.answered, wantAnswered, slices.Equal[[]return_nil_ness.ValueNilness]) {
-		test.Errorf("the resolver holds the answers %v, want %v", kept.answered, wantAnswered)
-	}
+	}, map[string][]return_nil_ness.ValueNilness{"Caller": nil})
 	if fallbacks := kept.counts.Fallbacks.Load(); fallbacks != 0 {
 		test.Errorf("asking of Caller replayed %d times, want 0, so the demand walk's answers went untested", fallbacks)
 	}
@@ -152,26 +157,28 @@ func TestEveryCalleeADemandWalkJudgesHasAnAnswerOfItsOwn(test *testing.T) {
 
 // Asked of Inner alone, over the unbuilt fixture, the resolver replays the push's walk, which judges Outer on the way
 // to Inner, and holds Outer's answer, never nil, beside Inner's, no fact, though no reader asked of Outer (#kemy8sq).
-// Size and Count, which the replay answers the defaults and keeps no verdict of, have none.
+// Size and Count, which the replay answers the defaults and keeps no verdict of, have none. What the run recorded for
+// the store is Inner's answer alone.
 func TestEveryFunctionAReplayJudgesHasAnAnswerOfItsOwn(test *testing.T) {
 	test.Parallel()
 	kept := askOnce(test, "unbuilt", "Inner")
-	requireRecorded(test, kept, map[string][]return_nil_ness.ValueNilness{
+	requireKept(test, kept, map[string][]return_nil_ness.ValueNilness{
 		"Inner": nil,
 		"Outer": {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
-	})
+	}, map[string][]return_nil_ness.ValueNilness{"Inner": nil})
 	if fallbacks := kept.counts.Fallbacks.Load(); fallbacks != 1 {
 		test.Errorf("asking of Inner replayed %d times, want 1, so the replay's answers went untested", fallbacks)
 	}
 }
 
-// What a replay keeps of a cycle is what a later question reads (#kemy8sq). CycleOuter and CycleInner call each other,
-// and asked of CycleInner alone the resolver replays the push, which begins at CycleOuter: CycleInner, reading its
-// begun partner as the defaults, may return nil, where judged first it would return what CycleOuter does, never nil.
-// Each verdict was handed to the resolver as the walk kept it, CycleInner's while CycleOuter was still being judged,
-// and each is final: of every function the resolver holds a record for, a question asked directly afterwards answers
-// the record, and so does the kind's own verdict, which the record was made from and which no later judgment revised.
-func TestWhatAReplayKeepsOfACycleIsWhatALaterQuestionReads(test *testing.T) {
+// What a replay keeps of a cycle is what a later question answers (#kemy8sq). CycleOuter and CycleInner call each
+// other, and asked of CycleInner alone the resolver replays the push, which begins at CycleOuter: CycleInner, reading
+// its begun partner as the defaults, may return nil, where judged first it would return what CycleOuter does, never
+// nil. Each verdict was handed to the resolver as the walk kept it, CycleInner's while CycleOuter was still being
+// judged, and each is final: of every function the resolver holds an answer about, a question asked directly
+// afterwards answers the same, and so does the kind's own verdict, which the answer was made from and which no later
+// judgment revised.
+func TestWhatAReplayKeepsOfACycleIsWhatALaterQuestionAnswers(test *testing.T) {
 	test.Parallel()
 	kept := askOnce(test, "differences", "CycleInner")
 	if fallbacks := kept.counts.Fallbacks.Load(); fallbacks != 1 {
@@ -181,21 +188,17 @@ func TestWhatAReplayKeepsOfACycleIsWhatALaterQuestionReads(test *testing.T) {
 		"CycleInner": nil,
 		"CycleOuter": {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
 	} {
-		if record, isRecorded := kept.recorded[name]; !isRecorded || !slices.Equal(record, want) {
-			test.Errorf("%s: the resolver recorded %v (recorded: %t), want %v", name, record, isRecorded, want)
+		if held, isHeld := kept.answered[name]; !isHeld || !slices.Equal(held, want) {
+			test.Errorf("%s: the resolver holds %v (held: %t), want %v", name, held, isHeld, want)
 		}
 	}
-	for path, record := range kept.recorded {
-		object, objectError := objectpath.Object(kept.home.Types, objectpath.Path(path))
-		function, isFunction := object.(*types.Func)
-		if objectError != nil || !isFunction {
-			test.Fatalf("the record at %s names %v, no function of the package: %v", path, object, objectError)
+	for name, held := range kept.answered {
+		function := kept.functions[name]
+		if asked, _ := return_nil_ness.Ask(kept.resolver, kept.home, function); !slices.Equal(asked, held) {
+			test.Errorf("%s: asked directly the resolver answers %v, and the answer it held is %v", name, asked, held)
 		}
-		if asked, _ := return_nil_ness.Ask(kept.resolver, kept.home, function); !slices.Equal(asked, record) {
-			test.Errorf("%s: asked directly the resolver answers %v, and its record is %v", path, asked, record)
-		}
-		if judged := return_nil_ness.Judged(kept.resolver, kept.home, function); !slices.Equal(judged, record) {
-			test.Errorf("%s: the kind's own verdict is %v, and the resolver's record is %v", path, judged, record)
+		if judged := return_nil_ness.Judged(kept.resolver, kept.home, function); !slices.Equal(judged, held) {
+			test.Errorf("%s: the kind's own verdict is %v, and the answer the resolver held is %v", name, judged, held)
 		}
 	}
 }

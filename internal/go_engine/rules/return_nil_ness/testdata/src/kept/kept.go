@@ -1,8 +1,8 @@
 // Package kept holds a caller whose judgment judges four callees of its own package, none of which a reader asks of:
 // the resolver must hold an answer of its own for each all the same, as it does for the caller (#kemy8sq). Assembled is
 // declared without a body, as a function of assembly is, whose stub.s makes the package one go build takes; cohere
-// never assembles it. hidden is unexported, so it has no objectpath, and the resolver holds its answer with no record
-// of it for the store.
+// never assembles it. hidden is unexported, so it has no objectpath, and the resolver holds its answer by its object
+// all the same.
 package kept
 
 // Node is a value results point at.

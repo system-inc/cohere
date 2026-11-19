@@ -27,21 +27,24 @@ func stateIn(home *fact_resolver.Package) *verdicts {
 }
 
 // keepAnswer hands the resolver results, the verdict a walk of home just kept of function, as the answer
-// fact_resolver.Ask would keep had a reader asked of function: what heldResults answers, the results when they say
+// fact_resolver.Ask would give a reader who asked of function: what heldResults answers, the results when they say
 // more than the defaults, and nil, no fact, when they do not. A walk judges a callee of home inside its caller's
 // judgment and never asks the resolver of it, so without this only the function asked of had an answer of its own
-// there, and the callees whose verdicts its answer was built from had none (#kemy8sq). The caller holds home's lock.
+// among the ones the resolver holds, and the callees whose verdicts its answer was built from had none (#kemy8sq).
+// The resolver records nothing for the store of it: a callee is recorded when a reader asks of it, as before. The
+// caller holds home's lock.
 //
 // A verdict handed over is final, the one judgeIn answers of function from then on, which the resolver needs of it,
-// since it memoizes the answer for every later question (fact_resolver.Keep). Neither walk judges a function twice:
-// each returns a verdict held before it would judge, so one kept is never revised, and judgeIn reads the verdicts held
-// before it walks at all. And a verdict is kept only once it is the push's. The demand walk keeps one only while it has
-// met no call whose answer hangs on the push's order (demandWalk.orderDependent): every function it judged below the
-// one kept was judged whole, none read while begun but by itself, and whatever else it read was a verdict held already,
-// final by this same reasoning, another package's answer, which Keep keeps nothing built from when it was a
-// placeholder, or the defaults of a function never judged. Once it meets such a call it keeps nothing more, and the
-// replay answers. The replay keeps the push's one judgment of each function, in the push's order: a member of a cycle
-// that read its begun partner as the defaults is final at that, since the push never judges it again.
+// since it holds the answer as function's for the rest of the run (fact_resolver.Keep). Neither walk judges a function
+// twice: each returns a verdict held before it would judge, so one kept is never revised, and judgeIn reads the
+// verdicts held before it walks at all. And a verdict is kept only once it is the push's. The demand walk keeps one
+// only while it has met no call whose answer hangs on the push's order (demandWalk.orderDependent): every function it
+// judged below the one kept was judged whole, none read while begun but by itself, and whatever else it read was a
+// verdict held already, final by this same reasoning, another package's answer, which Keep keeps nothing built from
+// when it was a placeholder, or the defaults of a function never judged. Once it meets such a call it keeps nothing
+// more, and the replay answers. The replay keeps the push's one judgment of each function, in the push's order: a
+// member of a cycle that read its begun partner as the defaults is final at that, since the push never judges it
+// again.
 func keepAnswer(
 	resolver *fact_resolver.Resolver,
 	home *fact_resolver.Package,

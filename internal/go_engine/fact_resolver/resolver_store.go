@@ -153,36 +153,41 @@ func answerOf[Value any](
 	if resolver.Unsure(home.Types) {
 		return answer, true
 	}
-	if _, kept := resolver.answers.Load(key); kept {
-		// compute kept the answer itself, as a kind keeps every verdict its walk judges (see Keep), the one asked of
-		// among them, so it is recorded and memoized already, and a test's hand has heard it, which hears each answer
-		// once.
-		return answer, false
-	}
 	if hasPath && resolver.store != nil {
 		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
 	}
 	resolver.answers.Store(key, answer)
 	if resolver.held != nil {
-		resolver.held.Computed(kind.Name, object, encodeAnswer(kind, object, answer))
+		// A test's hand hears each answer once, and it heard this one already when the kind kept it, in this compute
+		// or in an earlier judgment that judged object with its caller (see Keep).
+		if _, kept := resolver.kept.Load(key); !kept {
+			resolver.held.Computed(kind.Name, object, encodeAnswer(kind, object, answer))
+		}
 	}
 	return answer, false
 }
 
 // Keep keeps answer, kind's answer about object, a function of home the kind judged inside another judgment there, as
-// answerOf keeps one it computed: recorded for the store, memoized, and told to a test's hand. A kind that judges its
-// own package's callees inside its walk, as nilness does, holds each verdict in its own state and never asks of it, so
-// only the function a reader asked of had an answer here, and the callees its answer was built from had none. Kept,
-// each has an answer of its own, and a later question about it is answered from the memo. So answer must be final,
-// the one Ask's compute would answer about object from then on, never a verdict the kind may still revise, which the
-// kind owes: only it knows when a verdict it holds is one.
+// an answer of its own among the ones the run holds (see Answered), and tells a test's hand of it as of one computed.
+// A kind that judges its own package's callees inside its walk, as nilness does, holds each verdict in its own state
+// and never asks of it, so only the function a reader asked of had an answer here, and the callees its answer was
+// built from had none. answer must be final, the one Ask's compute would answer about object from then on, never a
+// verdict the kind may still revise, which the kind owes: only it knows when a verdict it holds is one.
+//
+// A kept answer is held apart from the memo Ask reads, and nothing is recorded for the store. So a question about
+// object afterwards goes as it would had nothing been kept: the store's answer when the store holds one, else
+// compute's, which the kind answers from the verdict it holds, and which is recorded then, as any computed answer is.
+// Recorded is untouched by Keep, and stays exactly what the run computed through Ask and the store did not give it.
+// Nor does Keep read the store: an answer the store holds for object was computed for the package's own key, so it
+// is this same answer, and reading it would cost each kept verdict an objectpath and a lookup. When Keep read the
+// store and recorded, the resolver's judging at cohere's root cost about 8% more CPU, 3.20 to 3.45 CPU-s, for a
+// record an entry holding its package's answers whole never reads (#kemy8sq).
 //
 // Nothing is kept about an object of no package or an instance's, which Ask answers no fact and never keeps. An
-// answer already memoized stands, the store's, a hand's or a computed one, since readers were given it. An answer the
-// store holds is left to the store, so Recorded stays what the run computed and the store did not give it. An answer
-// a test's hand gives is left to the hand, so a run under a hand never memoizes over the answer the hand would give
-// a reader. And nothing is kept in an unsure package, as answerOf keeps nothing computed in one: home was handed a
-// placeholder before the kind held this verdict, which may rest on it. The caller holds home's lock.
+// answer already memoized stands, the store's, a hand's or a computed one, since readers were given it. An answer
+// a test's hand gives is left to the hand, so a run under a hand holds only the hand's answer about object. And
+// nothing is kept in an unsure package, as answerOf keeps nothing computed in one: home was handed a placeholder
+// before the kind held this verdict, which may rest on it. The caller holds home's lock.
 func Keep[Value any](resolver *Resolver, home *Package, kind *Kind, object types.Object, answer Value) {
 	if object.Pkg() == nil || !isOrigin(object) {
 		return
@@ -190,12 +195,6 @@ func Keep[Value any](resolver *Resolver, home *Package, kind *Kind, object types
 	key := answerKey{kind: kind, object: object}
 	if _, memoized := resolver.answers.Load(key); memoized {
 		return
-	}
-	path, hasPath := resolver.pathOf(object)
-	if hasPath && resolver.store != nil {
-		if _, held := resolver.stored(kind, object.Pkg(), path); held {
-			return
-		}
 	}
 	if resolver.held != nil {
 		if _, isHeld := resolver.held.Answer(kind.Name, object); isHeld {
@@ -205,10 +204,9 @@ func Keep[Value any](resolver *Resolver, home *Package, kind *Kind, object types
 	if resolver.Unsure(home.Types) {
 		return
 	}
-	if hasPath && resolver.store != nil {
-		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
+	if _, kept := resolver.kept.LoadOrStore(key, answer); kept {
+		return
 	}
-	resolver.answers.Store(key, answer)
 	if resolver.held != nil {
 		resolver.held.Computed(kind.Name, object, encodeAnswer(kind, object, answer))
 	}

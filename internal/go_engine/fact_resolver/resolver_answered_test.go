@@ -71,7 +71,7 @@ func TestAnsweredHoldsEveryAnswerWhereRecordedHoldsOnlyThoseWithAPathAndAStore(t
 // is computed in a package left unsure. Neither is answered.
 func TestAnUnsureAnswerIsNeverAmongTheAnswered(test *testing.T) {
 	test.Parallel()
-	run := learnMiddle(test, nil, nil, true)
+	run := learnMiddle(test, nil, true)
 	run.ask(run.bodied, true)
 	run.ask(run.function, true)
 	if !run.resolver.Unsure(run.middle.Types) || run.computed != 1 {
