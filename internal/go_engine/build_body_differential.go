@@ -31,8 +31,9 @@ import (
 // that compares no body, unless its sizes reached every body, and a build the census has no judgment of
 // (writeBodyReachCensus), since a machine that compares nothing passes nothing. A body whose findings differ only by
 // rules a later stage owns, those that read a callee's facts (stage 4's, #h0k644s) or judge the package whole (stage
-// 5's, #xeafx79), all of one stage, is classed apart under that stage, counted and listed, and no failure: the reach
-// does not stand for them.
+// 5's, #xeafx79), all owed to one stage, is classed apart under that stage, counted and listed, and no failure, but
+// only where the build shows that stage's cause for the body (findingCauses): the reach does not stand for them, and
+// the later stage redoes the body only where its cause holds.
 
 // buildBodyDifferential is one build's body differential: how many unreached bodies it compared, each one's failure
 // line where it differed, each findings difference a later stage owns by that stage (findingStage), and the bodies
@@ -64,20 +65,21 @@ var findingStages = []struct {
 	{stagePackageWide, "of a package-wide rule, stage 5's (#xeafx79)"},
 }
 
-// findingStagesOf are the stages enabled's rules' findings are owed to, by rule name, those of neither left out: a
-// rule that reads facts of its own (readsFacts) is stage 4's, and one the inputs table declares Composes, stage 5's.
-// Facts are asked first, so printf, which is both, is stage 4's.
-func findingStagesOf(enabled []rule.Rule) map[string]findingStage {
+// findingStagesOf are the stages enabled's rules' findings may be owed to, by rule name, each rule's in findingStages's
+// order, those of neither left out: a rule that reads facts of its own (readsFacts) may be stage 4's, and one the
+// inputs table declares Composes stage 5's. printf, which is both, may be either, whichever's cause the build shows
+// for the body (findingCauses).
+func findingStagesOf(enabled []rule.Rule) map[string][]findingStage {
 	// Ignored: a table that does not parse is TestTheInputsTableParses's to fail, and leaves every rule unclassed,
 	// so its differences stay failures.
 	declared, _ := rules.DeclaredInputs()
-	stages := map[string]findingStage{}
+	stages := map[string][]findingStage{}
 	for _, each := range enabled {
-		switch {
-		case readsFacts(each.Analyzer):
-			stages[each.Name] = stageCalleeFacts
-		case declared[each.Name].Inputs == rules.InputsComposes:
-			stages[each.Name] = stagePackageWide
+		if readsFacts(each.Analyzer) {
+			stages[each.Name] = append(stages[each.Name], stageCalleeFacts)
+		}
+		if declared[each.Name].Inputs == rules.InputsComposes {
+			stages[each.Name] = append(stages[each.Name], stagePackageWide)
 		}
 	}
 	return stages
@@ -238,11 +240,14 @@ func firstFactDifference(
 
 // compareFindings compares, for each body compared by its types, the build's findings within its lines with the
 // host's, hostFindings and builtFindings each by file, adding a failure for each body where they differ, but where
-// every finding one side has and the other lacks is of rules stages owes to one later stage, which classes it there.
+// every finding one side has and the other lacks is of rules stages owes to one later stage whose cause causes shows
+// for the body, which classes it there. A difference its rules owe to a stage whose cause is not shown stays a
+// failure, saying so.
 func (differential *buildBodyDifferential) compareFindings(
 	hostFindings map[string][]check.Finding,
 	builtFindings map[string][]check.Finding,
-	stages map[string]findingStage,
+	stages map[string][]findingStage,
+	causes *findingCauses,
 ) {
 	for _, compared := range differential.bodies {
 		hostWritten := findingsWithin(hostFindings[compared.body.file], compared.firstLine, compared.lastLine)
@@ -252,21 +257,46 @@ func (differential *buildBodyDifferential) compareFindings(
 		}
 		line := fmt.Sprintf("%s: findings differ: host [%s], build [%s]", compared.body,
 			strings.Join(hostWritten, "; "), strings.Join(builtWritten, "; "))
-		if stage := differingStage(hostWritten, builtWritten, stages); stage != "" {
+		owed := differingStages(hostWritten, builtWritten, stages)
+		if stage := classingStage(owed, compared.body, causes); stage != "" {
 			if differential.classed == nil {
 				differential.classed = map[findingStage][]string{}
 			}
 			differential.classed[stage] = append(differential.classed[stage], line)
 			continue
 		}
+		if len(owed) > 0 {
+			written := make([]string, 0, len(owed))
+			for _, stage := range owed {
+				written = append(written, string(stage))
+			}
+			line += ", owed by its rules to " + strings.Join(written, " or ") + ", whose cause the build does not show"
+		}
 		differential.failures = append(differential.failures, line)
 	}
 }
 
-// differingStage is the one stage every finding hostWritten or builtWritten holds and the other lacks is owed to, by
-// its rule, the written finding's first word (findingsWithin), empty when one is owed to none or they are owed to two.
-func differingStage(hostWritten []string, builtWritten []string, stages map[string]findingStage) findingStage {
-	var stage findingStage
+// classingStage is the first of owed whose cause causes shows for body, empty when none is.
+func classingStage(owed []findingStage, body reachedBody, causes *findingCauses) findingStage {
+	for _, stage := range owed {
+		if causes.shown(stage, body) {
+			return stage
+		}
+	}
+	return ""
+}
+
+// differingStages are the stages, in findingStages's order, that every finding hostWritten or builtWritten holds and
+// the other lacks may be owed to, by its rule, the written finding's first word (findingsWithin): none when one of
+// them is owed to no stage, so a body mixing a classed difference with an unclassed one is never classed, nor one
+// whose differences no one stage owns all of.
+func differingStages(
+	hostWritten []string,
+	builtWritten []string,
+	stages map[string][]findingStage,
+) []findingStage {
+	var shared []findingStage
+	isFirst := true
 	for _, sides := range [][2][]string{{hostWritten, builtWritten}, {builtWritten, hostWritten}} {
 		for _, written := range sides[0] {
 			if slices.Contains(sides[1], written) {
@@ -274,13 +304,14 @@ func differingStage(hostWritten []string, builtWritten []string, stages map[stri
 			}
 			ruleName, _, _ := strings.Cut(written, " ")
 			owed := stages[ruleName]
-			if owed == "" || stage != "" && owed != stage {
-				return ""
+			if isFirst {
+				shared, isFirst = slices.Clone(owed), false
+				continue
 			}
-			stage = owed
+			shared = slices.DeleteFunc(shared, func(stage findingStage) bool { return !slices.Contains(owed, stage) })
 		}
 	}
-	return stage
+	return shared
 }
 
 // findingsWithin are findings that start between firstLine and lastLine, each written as `rule line:column message`,

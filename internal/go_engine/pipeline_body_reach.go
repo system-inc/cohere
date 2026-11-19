@@ -25,7 +25,9 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 	}
 	var written strings.Builder
 	fmt.Fprintf(&written, "The reach stands for no finding that turns on a callee's fact, stage 4's (#h0k644s), nor "+
-		"for a package-wide rule's, stage 5's (#xeafx79): the body differential classes their findings apart.\n")
+		"for a package-wide rule's, stage 5's (#xeafx79): the body differential classes a package-wide rule's "+
+		"findings apart where the package holds a dependent unit, and fails a callee's fact's until the build can "+
+		"show one differs (#5vbs1np).\n")
 	for index, run := range runs {
 		if run.bodyReach == nil {
 			if index == 0 {

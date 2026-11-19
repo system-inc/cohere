@@ -46,7 +46,9 @@ import (
 // callee's fact moves with the callee's own body while the callee's bit, its signature, stays unset; and a
 // package-wide rule's finding, U1000's or vet's tests', which turns on what the rest of the package holds rather than
 // on what the body uses, is stage 5's (#xeafx79). The body differential classes a findings failure that only such
-// rules make apart, with its own count and lines (findingStage), rather than passing or failing on it.
+// rules make apart, with its own count and lines (findingStage), rather than failing on it, where the build shows the
+// stage's cause for the body (findingCauses): a dependent unit in its package for stage 5's, and for stage 4's nothing
+// yet, so each such difference is a failure until the build can show a callee's facts differ (#5vbs1np).
 
 // bodyReachCensusVariable names the file the census is written to, unset for a run that writes none.
 const bodyReachCensusVariable = "COHERE_BODY_REACH_CENSUS"

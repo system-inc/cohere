@@ -786,10 +786,13 @@ func (engine *pipeline) extraBuildRun(
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
 	}
-	// The findings of each body the differential compared, the last load's, whose result stands.
+	// The findings of each body the differential compared, the last load's, whose result stands, a difference classed
+	// under a later stage only where the judgment shows its cause (findingCauses). A differential is made only of a
+	// judged build (runRules).
 	if run.bodyDifferential != nil {
 		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
-			findingStagesOf(enabled))
+			findingStagesOf(enabled), &findingCauses{dependence: run.judged.dependence,
+				filesDiffer: run.judged.filesDiffer})
 	}
 	run.loading, run.linting, run.shareGateWait = loading, linting, shareGateWait
 	if engine.buildLoadTimes != nil {

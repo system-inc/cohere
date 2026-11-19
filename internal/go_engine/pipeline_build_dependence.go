@@ -339,7 +339,8 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 		BuildOnlyPackages: map[string]bool{},
 	}
 	fileSet := token.NewFileSet()
-	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{}}
+	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
+		filesDiffer: map[string]bool{}}
 	for identifier, hostFiles := range engine.dependence.files {
 		counterpart, isShared := built[identifier]
 		asVariant := false
@@ -368,6 +369,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 		}
 		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 {
 			difference.Packages[identifier] = differing
+			judged.filesDiffer[identifier] = true
 		}
 	}
 	for identifier, each := range built {
