@@ -12,9 +12,9 @@ import (
 // (#anfjtr3), built by its lint pass as each package's type-read walk runs, while its syntax and type information are
 // whole (check.Options.Declarations), and so tied to that pass: a pass dropped, beside the load or for a reload, drops
 // its graph with it. inScope says which packages are the workspace's, and withheldOf what the load withheld of a
-// package (load.PackageWithheld.Declarations), read once the package is final. Each package is added once, by the
-// first walk that hands it on, every other caller waiting for that add (added), and held records the IDs of the
-// packages added.
+// package (load.PackageWithheld.Declarations), read once the package is final. Each package is added once, from the
+// findings store's declarations-only record of it before any walk starts (addRecord), or else by the first walk that
+// hands it on, every other caller waiting for that add (added), and held records the IDs of the packages added.
 type plainDeclarations struct {
 	graph      *build_dependence.Graph
 	inScope    func(*packages.Package) bool
@@ -45,12 +45,21 @@ func (declarations *plainDeclarations) add(loaded *packages.Package) {
 		panic("go_engine: the plain declarations' adds hold something other than a *sync.Once")
 	}
 	once.Do(func() {
-		if loaded.TypesInfo == nil {
+		// A package added from its record needs no walk of its syntax.
+		if loaded.TypesInfo == nil || declarations.holds(loaded.ID) {
 			return
 		}
 		declarations.graph.AddPackage(loaded, declarations.inScope(loaded), declarations.withheldOf(loaded))
 		declarations.held.Store(loaded.ID, true)
 	})
+}
+
+// addRecord adds the package of identifier from record, the findings store's declarations-only record of it, which
+// stands for its syntax whether the host restored it or checks it, the record being keyed by every input it reads
+// (check.DeclarationsRecordKey). It is called before the pass's walks start, so no walk adds the package again.
+func (declarations *plainDeclarations) addRecord(identifier string, record *build_dependence.Record) {
+	declarations.graph.AddDecoded(record)
+	declarations.held.Store(identifier, true)
 }
 
 // holds reports whether the package of identifier was added to the graph.

@@ -62,9 +62,12 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
-	// The walks are over, so a plain run's declarations graph for the must-check census holds every package it will.
+	// The walks are over, so a plain run's declarations graph for the must-check census holds every package it will,
+	// and its records are written beside the builds, joined before the run's record.
 	if pass.declarations != nil {
+		engine.declarationsStepped(declarationsWalksWhole)
 		engine.plainBits = newPlainBits(pass.declarations, loaded)
+		defer engine.writeDeclarationsRecords(pass.declarations)()
 	}
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {

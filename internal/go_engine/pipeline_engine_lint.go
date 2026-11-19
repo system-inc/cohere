@@ -331,6 +331,14 @@ func (engine *pipeline) lintPackages(
 	if engine.mustCheckCensus != "" && !engine.request.judgesDependence() && options.Reads != nil {
 		declarations = newPlainDeclarations(engine.described.hasFileInScope, withheldOf)
 		options.Declarations = declarations.add
+		// The session has restored by now, beside the load or within it, so every record it read is final here.
+		if session != nil {
+			for each := range options.Reads {
+				if record, isRecorded := session.DependenceRecord(each); isRecorded {
+					declarations.addRecord(each.ID, record)
+				}
+			}
+		}
 	}
 	result, checkError := check.Run(analyzed, enabled, options)
 	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()

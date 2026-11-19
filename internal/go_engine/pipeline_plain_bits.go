@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"errors"
 	"go/token"
 	"go/types"
 	"sync"
@@ -17,7 +18,9 @@ import (
 // extra build on it, writing the same census file `--build-dependence`'s whole graph writes, so the two can be held to
 // each other. It decides nothing. For now each build is judged after its first load, from its listing and its
 // build-only files alone; a package the host restored has no record yet, so it is in no graph, named in the wide file,
-// and each of its objects a unit reads is answered dependent on both bits.
+// and each of its objects a unit reads is answered dependent on both bits. A package the host restored from its
+// findings store is added from the declarations-only record kept beside its entry (check.KeepDeclarationsRecords), and
+// each package the host's save wrote has its record written once the walks have ended (writeDeclarationsRecords).
 
 // plainBits is what a plain run judges its extra builds on for the must-check census: the host's pass's declarations
 // graph, whole once the pass's walks have ended, and the host's listing each build's is compared with. notHeld are the
@@ -71,4 +74,63 @@ func (engine *pipeline) plainMustCheckOf(loaded *load.Loaded) *mustCheckSet {
 		lines: mustCheckLines([]build_dependence.Difference{difference}, []*build_dependence.Dependence{dependence}),
 		wide:  mustCheckWide(bits.notHeld, 0),
 	}
+}
+
+// declarationsStep is a step of a plain run's declarations graph at the builds' start, which a test's hook is told of
+// in order (pipeline.declarationsSteps): the host's walks whole, so the graph holds every package it will, then its
+// records' writing started.
+type declarationsStep string
+
+const (
+	declarationsWalksWhole     declarationsStep = "WalksWhole"
+	declarationsRecordsWriting declarationsStep = "RecordsWriting"
+)
+
+// declarationsStepped tells a test's declarationsSteps hook, when one is set, that the graph reached step.
+func (engine *pipeline) declarationsStepped(step declarationsStep) {
+	if engine.declarationsSteps != nil {
+		engine.declarationsSteps(step)
+	}
+}
+
+// writeDeclarationsRecords starts writing, on a goroutine of its own beside the builds, the declarations-only record of
+// each package the host's save wrote with none (check.CacheSession.WriteDeclarationsRecords), from declarations, whose
+// walks have ended, and returns the join, which waits for the writes and says on stderr when any failed. A run with no
+// session writes none.
+func (engine *pipeline) writeDeclarationsRecords(declarations *plainDeclarations) func() {
+	session := engine.session
+	if session == nil {
+		return func() {
+			// A run with no session wrote no entry, so there is no record to wait for.
+		}
+	}
+	engine.declarationsStepped(declarationsRecordsWriting)
+	var failed int
+	var firstFailure error
+	written := make(chan struct{})
+	go func() {
+		defer close(written)
+		failed, firstFailure = session.WriteDeclarationsRecords(func(saved *packages.Package) ([]byte, bool) {
+			return declarations.graph.EncodedRecord(saved.ID)
+		})
+	}()
+	return func() {
+		<-written
+		if failed > 0 {
+			engine.note("the findings cache: %d declarations records not written, the first: %v", failed, firstFailure)
+		}
+	}
+}
+
+// decodeDeclarationsRecord is the declarations-only record encoded holds (build_dependence.DecodeRecord), or why it
+// holds none: bytes that do not decode, or a whole graph's record, which no declarations record's key holds.
+func decodeDeclarationsRecord(encoded []byte) (*build_dependence.Record, error) {
+	record, decodeError := build_dependence.DecodeRecord(encoded)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	if !record.DeclarationsOnly() {
+		return nil, errors.New("decoding a declarations record: it is a whole graph's record")
+	}
+	return record, nil
 }

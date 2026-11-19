@@ -272,6 +272,9 @@ type pipeline struct {
 	// nil in any other run (pipeline_plain_bits.go).
 	mustCheckCensus string
 	plainBits       *plainBits
+	// declarationsSteps, a test's alone, is told of each step of a plain run's declarations graph at the builds'
+	// start, in order (declarationsStepped).
+	declarationsSteps func(declarationsStep)
 
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
 	// run found no build beside the host's to check.
@@ -415,6 +418,12 @@ func (engine *pipeline) run() int {
 			// restores, and the records of those it checks are written beside their entries (#6a3kjvz).
 			if engine.request.judgesDependence() && engine.request.requests(contract.PhaseLint) {
 				engine.session.KeepDependenceRecords(build_dependence.DecodeRecord)
+			}
+			// A plain run asked for the must-check census reads its declarations-only graph's records of the packages
+			// it restores instead, and writes those it builds once its walks end (#anfjtr3).
+			if engine.mustCheckCensus != "" && !engine.request.judgesDependence() &&
+				engine.request.requests(contract.PhaseLint) {
+				engine.session.KeepDeclarationsRecords(decodeDeclarationsRecord)
 			}
 		}
 	}

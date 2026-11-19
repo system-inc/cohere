@@ -3,6 +3,7 @@ package check
 import (
 	"crypto/sha256"
 	"fmt"
+	"sync"
 
 	"golang.org/x/tools/go/packages"
 
@@ -53,6 +54,26 @@ func DependenceRecordKey(key cache.Key) cache.Key {
 	return sha256.Sum256(append([]byte("dependence record "+DependenceRecordVersion+" "), key[:]...))
 }
 
+// The declarations-only records of a plain run asked for the must-check census (#anfjtr3). A run with no
+// `--build-dependence` builds a declarations-only graph instead (build_dependence.NewDeclarationsGraph), and keeps each
+// package's declarations-only record beside its entry, as the switch keeps a whole one, under a key of its own derived
+// from the entry's first key (DeclarationsRecordKey), so neither kind of run ever reads the other's. They are read,
+// backfilled and counted as the whole records are (readDependenceRecords), but written apart: the graph is built in
+// the host's type-read walks, which run past the save, so each record is written once the walks have ended, beside
+// the builds (WriteDeclarationsRecords), never beside its entry in the save.
+
+// DeclarationsRecordVersion is the format of a declarations-only record as the store keeps it, hashed into its key
+// (DeclarationsRecordKey) apart from the whole records' version: it changes whenever the record's encoding does, or
+// what a declarations-only graph collects into it.
+const DeclarationsRecordVersion = "declarations-record-1"
+
+// DeclarationsRecordKey is where the store keeps the declarations-only record of the package whose first key is key:
+// apart from every entry, export data, alias and whole record, and derived from the entry's key alone, as
+// DependenceRecordKey is.
+func DeclarationsRecordKey(key cache.Key) cache.Key {
+	return sha256.Sum256(append([]byte("declarations record "+DeclarationsRecordVersion+" "), key[:]...))
+}
+
 // DependenceRecordCounts are what the session did with dependence records over its last load: the records read, each
 // found under its package's key; written, after their entries; backfilled, the first-key hits with no record made a
 // miss so their records are written; alias read, the hits by an alias that hold, once holdAliasHits has dropped those
@@ -85,8 +106,12 @@ type DependenceRecordCounts struct {
 // dependenceRecords is a session's dependence records over its last load: decode, the host graph's decoding of a
 // record's bytes; found, each record the store holds of a package the load keyed that decodes, by package, decoded;
 // throughAlias, the packages of found whose record is their alias target's; recordOf, the host graph's record of a
-// package its syntax built, for the write, nil until the graph is built; and the counts.
+// package its syntax built, for the write, nil until the graph is built; and the counts. declarationsOnly says the
+// records are a plain run's declarations-only ones (KeepDeclarationsRecords), kept under their own key and written
+// apart from the save, with recordOf nil.
 type dependenceRecords struct {
+	declarationsOnly bool
+
 	decode       func(encoded []byte) (*build_dependence.Record, error)
 	found        map[*packages.Package]*build_dependence.Record
 	throughAlias map[*packages.Package]bool
@@ -105,6 +130,16 @@ type dependenceRecords struct {
 func (session *CacheSession) KeepDependenceRecords(decode func(encoded []byte) (*build_dependence.Record, error)) {
 	if session.caching.Store != nil {
 		session.dependence = &dependenceRecords{decode: decode}
+	}
+}
+
+// KeepDeclarationsRecords has the session read the declarations-only records of its host's load, and backfill a hit
+// with none, as KeepDependenceRecords has it read whole ones: on a plain run asked for the must-check census, on a
+// session with a store (#anfjtr3). decode is the declarations-only graph's decoding of a record's bytes, refusing a
+// whole record. Their writes are WriteDeclarationsRecords', once the graph is whole.
+func (session *CacheSession) KeepDeclarationsRecords(decode func(encoded []byte) (*build_dependence.Record, error)) {
+	if session.caching.Store != nil {
+		session.dependence = &dependenceRecords{declarationsOnly: true, decode: decode}
 	}
 }
 
@@ -158,7 +193,11 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	unreadable := make([]error, len(keyed))
 	session.fanOut(len(keyed), func(index int) {
 		recordKey, _ := session.recordKeyOf(keyed[index])
-		if record, isStored := session.caching.Store.Get(DependenceRecordKey(recordKey)); isStored {
+		storedKey := DependenceRecordKey(recordKey)
+		if records.declarationsOnly {
+			storedKey = DeclarationsRecordKey(recordKey)
+		}
+		if record, isStored := session.caching.Store.Get(storedKey); isStored {
 			read[index], unreadable[index] = records.decode(record)
 		}
 	})
@@ -191,7 +230,10 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 		delete(session.stored, each)
 		records.counts.Backfilled++
 	}
-	session.readStandardLibraryRecords(reachable)
+	// The standard library's declarations-only records are the system cache's, which a plain run does not read yet.
+	if !records.declarationsOnly {
+		session.readStandardLibraryRecords(reachable)
+	}
 }
 
 // recordKeyOf is the key keyed's record is kept beside, and whether it is an alias's target: a hit by an alias that
@@ -218,4 +260,63 @@ func (session *CacheSession) dependenceRecordToWrite(saved *packages.Package) ([
 		return nil, false
 	}
 	return records.recordOf(saved)
+}
+
+// WriteDeclarationsRecords writes, beside the entry of each package the project's store holds under the package's first
+// key, its declarations-only record as recordOf gives it, unless the store already holds that record beside the entry
+// (#anfjtr3): a package whose record was read under its own first key has it, and one whose record was its alias
+// target's is written its own, as dependenceRecordToWrite does for whole records. An entry is under the first key when
+// the last save wrote it, or when the package hit by that key: a hit backfilled for want of a record is checked from
+// source by the load, but a later wave can restore it by the same key again, its entry never written, and recordOf
+// holds it all the same. recordOf answers false for a package its graph holds no live record of, one restored with no
+// type information, which is then written none. recordOf is the plain run's
+// declarations-only graph's, and the caller calls this once the host's type-read walks have ended, so the graph holds
+// every package it will: a record asked before its package's walk ended would be missing, and its package restored
+// with no record by the next run. Each record is encoded on the run's pool and written with no slot held
+// (fanOutWriting), and counted written; it returns how many writes failed and the first one's reason, since the
+// session's counts were handed on with the host's result before it runs. A package the system cache keeps has its
+// entry in that store, and no record written here.
+func (session *CacheSession) WriteDeclarationsRecords(recordOf func(*packages.Package) ([]byte, bool)) (int, error) {
+	records := session.dependence
+	if records == nil || !records.declarationsOnly {
+		return 0, nil
+	}
+	var writing []*packages.Package
+	for saved, key := range session.keys {
+		_, hit := session.hits[saved]
+		if !session.written[saved] && !(hit && session.stored[saved] == key) ||
+			session.storeFor(saved) != session.caching.Store {
+			continue
+		}
+		if _, isFound := records.found[saved]; isFound && !records.throughAlias[saved] {
+			continue
+		}
+		writing = append(writing, saved)
+	}
+	failed := 0
+	var firstFailure error
+	var countsLock sync.Mutex
+	session.fanOutWriting(len(writing), func(index int) func() {
+		saved := writing[index]
+		record, isHeld := recordOf(saved)
+		if !isHeld {
+			return nil
+		}
+		key := DeclarationsRecordKey(session.keys[saved])
+		// The write and its counting run with no slot held: the counting is a counter's, under a lock.
+		return func() {
+			putError := session.caching.Store.Put(key, record)
+			countsLock.Lock()
+			defer countsLock.Unlock()
+			if putError != nil {
+				if failed == 0 {
+					firstFailure = fmt.Errorf("writing the declarations record of %s: %w", saved.ID, putError)
+				}
+				failed++
+				return
+			}
+			records.counts.Written++
+		}
+	})
+	return failed, firstFailure
 }

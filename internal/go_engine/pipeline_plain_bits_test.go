@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 )
 
 // censusFiles are every file of a census's directory, by name, with its contents.
@@ -126,5 +128,52 @@ func TestAPlainRunsBitsJudgeEachBuildAsTheWholeGraph(test *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A plain run's declarations-only records stand in its store for the packages the host restores (#anfjtr3). Over one
+// copy of the build-dependence fixture, every package keyed into the project's store (`--no-system-cache`): a run
+// without the census warms the store with no record; a census run then backfills every hit, checks it from source and
+// writes each record once the host's walks have ended, never before; and a third reads every record back, backfilling
+// nothing and writing nothing. Both census runs write the whole graph's census, and neither answers any package wide.
+// Read no record, and the third run's wide file fills with every package its host restored.
+func TestAPlainRunsDeclarationsRecordsStandInTheStore(test *testing.T) {
+	test.Parallel()
+
+	reference := test.TempDir()
+	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
+		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		"--build-dependence")
+	want := censusFiles(test, reference)
+
+	root := copyFixture(test, filepath.Join("testdata", "build-dependence"))
+	runOverConfigured(test, root, exitClean, nil, "--no-system-cache")
+	backfilledDirectory, warmDirectory := test.TempDir(), test.TempDir()
+	var steps []declarationsStep
+	_, backfilledStream := runOverConfigured(test, root, exitClean, func(engine *pipeline) {
+		engine.mustCheckCensus = backfilledDirectory
+		engine.declarationsSteps = func(step declarationsStep) { steps = append(steps, step) }
+	}, "--no-system-cache")
+	_, warmStream := runOverConfigured(test, root, exitClean,
+		func(engine *pipeline) { engine.mustCheckCensus = warmDirectory }, "--no-system-cache")
+
+	if want := []declarationsStep{declarationsWalksWhole, declarationsRecordsWriting}; !slices.Equal(steps, want) {
+		test.Errorf("want the records written once the host's walks are whole, %q, got %q", want, steps)
+	}
+	backfilled, warm := recordCounts(test, backfilledStream), recordCounts(test, warmStream)
+	if backfilled.Backfilled == 0 || backfilled.Written != backfilled.Backfilled {
+		test.Errorf("want every hit backfilled and its record written, got %+v", backfilled)
+	}
+	if warm != (contract.DependenceRecords{Read: backfilled.Written}) {
+		test.Errorf("want every record read back, %d, and nothing backfilled or written, got %+v", backfilled.Written,
+			warm)
+	}
+	for _, census := range []struct {
+		name      string
+		directory string
+	}{{"the backfilling run", backfilledDirectory}, {"the warm run", warmDirectory}} {
+		if got := censusFiles(test, census.directory); !maps.Equal(got, want) {
+			test.Errorf("%s: the census is\n%v\nwant the whole graph's\n%v", census.name, got, want)
+		}
 	}
 }
