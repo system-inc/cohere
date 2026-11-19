@@ -76,19 +76,22 @@ func leaveMiddleUnsure(test *testing.T, run probeRun) {
 
 // A probe never answers from an unsure package, as Ask keeps nothing computed in one: its verdicts may rest on a
 // placeholder. Probed of middle.Fresh after a question left middle unsure, the resolver could not answer, where a
-// run with no placeholder answers never nil. And probed of top.Top, whose answer is read from middle's, it could not
-// either, though top was sure when the probe began: the probe's own question, answered from an unsure package, left
-// top unsure, which no reload abandons, since middle was learned. So Probe asks whether the package is unsure after
-// its question, never only before.
+// run with no placeholder answers never nil. Nor of middle.Middle, whose answer is no fact, null, the very bytes of
+// the placeholder's zero Value, so only the package's being unsure tells the two apart. And probed of top.Top, whose
+// answer is read from middle's, it could not either, though top was sure when the probe began: the probe's own
+// question, answered from an unsure package, left top unsure, which no reload abandons, since middle was learned. So
+// Probe asks whether the package is unsure after its question, never only before.
 func TestAProbeNeverAnswersFromAnUnsurePackage(test *testing.T) {
 	test.Parallel()
 	const neverNil = `[{"Inner":4,"Outer":1}]`
 	for name, probed := range map[string]struct {
 		ofTop bool
 		path  objectpath.Path
+		want  string
 	}{
-		"the package probed was left unsure":                       {ofTop: false, path: "Fresh"},
-		"a package below it was, whose answer the probe then read": {ofTop: true, path: "Top"},
+		"the package probed was left unsure":                       {ofTop: false, path: "Fresh", want: neverNil},
+		"the package probed was, and the answer is no fact":        {ofTop: false, path: "Middle", want: "null"},
+		"a package below it was, whose answer the probe then read": {ofTop: true, path: "Top", want: neverNil},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -100,9 +103,9 @@ func TestAProbeNeverAnswersFromAnUnsurePackage(test *testing.T) {
 			}
 			sure := learnTop(test)
 			encoded, answered := sure.resolver.Probe(return_nil_ness.Kind.Name, owner(sure), probed.path)
-			if !answered || string(encoded) != neverNil {
-				test.Fatalf("with no placeholder, want %s probed as %s, got %q (answered: %t)", probed.path, neverNil,
-					encoded, answered)
+			if !answered || string(encoded) != probed.want {
+				test.Fatalf("with no placeholder, want %s probed as %s, got %q (answered: %t)", probed.path,
+					probed.want, encoded, answered)
 			}
 			unsure := learnTop(test)
 			leaveMiddleUnsure(test, unsure)
