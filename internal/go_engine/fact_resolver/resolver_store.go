@@ -173,8 +173,9 @@ func answerOf[Value any](
 // answerOf keeps one it computed: recorded for the store, memoized, and told to a test's hand. A kind that judges its
 // own package's callees inside its walk, as nilness does, holds each verdict in its own state and never asks of it, so
 // only the function a reader asked of had an answer here, and the callees its answer was built from had none. Kept,
-// each has an answer of its own, the one Ask would compute for it, which answer must be, and a later question about
-// it is answered from the memo.
+// each has an answer of its own, and a later question about it is answered from the memo. So answer must be final,
+// the one Ask's compute would answer about object from then on, never a verdict the kind may still revise, which the
+// kind owes: only it knows when a verdict it holds is one.
 //
 // Nothing is kept about an object of no package or an instance's, which Ask answers no fact and never keeps. An
 // answer already memoized stands, the store's, a hand's or a computed one, since readers were given it. An answer the

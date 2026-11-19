@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -19,9 +20,12 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
 )
 
-// keptAnswers is what one question left in the resolver of a fixture package: every nilness answer the resolver
-// recorded for the package, decoded, nil for no fact, by its function's objectpath, and the kind's counts.
+// keptAnswers is what one question left in the resolver of a fixture package: the resolver, the package as it holds
+// it, every nilness answer it recorded for the package, decoded, nil for no fact, by its function's objectpath, and the
+// kind's counts.
 type keptAnswers struct {
+	resolver *fact_resolver.Resolver
+	home     *fact_resolver.Package
 	recorded map[string][]return_nil_ness.ValueNilness
 	counts   *fact_resolver.Counts
 }
@@ -69,8 +73,11 @@ func askOnce(test *testing.T, fixture string, asked string) keptAnswers {
 			test.Fatalf("probing %s: %v", action.Package.ID, action.Err)
 		}
 	}
-	kept := keptAnswers{recorded: map[string][]return_nil_ness.ValueNilness{},
-		counts: resolver.Counts(return_nil_ness.Kind)}
+	kept := keptAnswers{resolver: resolver, home: resolver.Package(loaded.Roots[0].Types),
+		recorded: map[string][]return_nil_ness.ValueNilness{}, counts: resolver.Counts(return_nil_ness.Kind)}
+	if kept.home == nil {
+		test.Fatalf("the resolver never learned %s, which the probe ran on", fixture)
+	}
 	for path, encoded := range resolver.Recorded(loaded.Roots[0].Types)[return_nil_ness.Kind.Name] {
 		var results []return_nil_ness.ValueNilness
 		if decodeError := json.Unmarshal(encoded, &results); decodeError != nil {
@@ -121,5 +128,40 @@ func TestEveryFunctionAReplayJudgesHasAnAnswerOfItsOwn(test *testing.T) {
 	})
 	if fallbacks := kept.counts.Fallbacks.Load(); fallbacks != 1 {
 		test.Errorf("asking of Inner replayed %d times, want 1, so the replay's answers went untested", fallbacks)
+	}
+}
+
+// What a replay keeps of a cycle is what a later question reads (#kemy8sq). CycleOuter and CycleInner call each other,
+// and asked of CycleInner alone the resolver replays the push, which begins at CycleOuter: CycleInner, reading its
+// begun partner as the defaults, may return nil, where judged first it would return what CycleOuter does, never nil.
+// Each verdict was handed to the resolver as the walk kept it, CycleInner's while CycleOuter was still being judged,
+// and each is final: of every function the resolver holds a record for, a question asked directly afterwards answers
+// the record, and so does the kind's own verdict, which the record was made from and which no later judgment revised.
+func TestWhatAReplayKeepsOfACycleIsWhatALaterQuestionReads(test *testing.T) {
+	test.Parallel()
+	kept := askOnce(test, "differences", "CycleInner")
+	if fallbacks := kept.counts.Fallbacks.Load(); fallbacks != 1 {
+		test.Fatalf("asking of CycleInner replayed %d times, want 1, so the replay's answers went untested", fallbacks)
+	}
+	for name, want := range map[string][]return_nil_ness.ValueNilness{
+		"CycleInner": nil,
+		"CycleOuter": {{Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil}},
+	} {
+		if record, isRecorded := kept.recorded[name]; !isRecorded || !slices.Equal(record, want) {
+			test.Errorf("%s: the resolver recorded %v (recorded: %t), want %v", name, record, isRecorded, want)
+		}
+	}
+	for path, record := range kept.recorded {
+		object, objectError := objectpath.Object(kept.home.Types, objectpath.Path(path))
+		function, isFunction := object.(*types.Func)
+		if objectError != nil || !isFunction {
+			test.Fatalf("the record at %s names %v, no function of the package: %v", path, object, objectError)
+		}
+		if asked, _ := return_nil_ness.Ask(kept.resolver, kept.home, function); !slices.Equal(asked, record) {
+			test.Errorf("%s: asked directly the resolver answers %v, and its record is %v", path, asked, record)
+		}
+		if judged := return_nil_ness.Judged(kept.resolver, kept.home, function); !slices.Equal(judged, record) {
+			test.Errorf("%s: the kind's own verdict is %v, and the resolver's record is %v", path, judged, record)
+		}
 	}
 }
