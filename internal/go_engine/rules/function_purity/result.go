@@ -7,7 +7,14 @@ import (
 )
 
 // Kind keys purity's verdicts in each package the resolver holds, and its counts.
-var Kind = &fact_resolver.Kind{Name: "function_purity"}
+var Kind = &fact_resolver.Kind{Name: "function_purity", OrderBound: orderFree}
+
+// orderFree is purity's order bound (fact_resolver.Kind.OrderBound): none, and known. Purity is the least set closed
+// under its rules, a cycle of calls never pure, which is one set whatever order a walk finds it in (see demandWalk), so
+// no answer about any function of home hangs on the order its walks took.
+func orderFree(*fact_resolver.Package, []*types.Func) ([]*types.Func, bool) {
+	return nil, true
+}
 
 func init() {
 	fact_resolver.Register(Kind, whole,
