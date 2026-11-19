@@ -2,7 +2,9 @@ package go_engine
 
 import (
 	"encoding/json"
+	"fmt"
 	"go/token"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -306,6 +308,59 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheEnginesScan(test *testing.T) {
 	if record.Restored.StandardLibraryUnits != 3 || record.Restored.StandardLibraryDependentUnits != 3 {
 		test.Errorf("want all 3 of the standard library's units dependent on windows, p's Helper, Plain and Shared, "+
 			"got %d of %d", record.Restored.StandardLibraryDependentUnits, record.Restored.StandardLibraryUnits)
+	}
+}
+
+// A package the build checks only as its in-package test variant is judged with the variant's build-only files that
+// are the package's own, those not named as test files (#9paaen9). In the build-dependence-variant fixture windows
+// alone compiles v's in-package test, so the host checks v and windows checks v [v.test] in its place, and nothing
+// imports v, so windows's load leaves v out (load.Caching's AnalyzedRootsOnly). v's shape_windows.go, which windows
+// alone compiles, declares String on Shape, a type both builds have, so Shape's method set moves: Shape and Printed,
+// which formats it, are dependent, and Doubled, which reads nothing of it, is not. u has an in-package test in every
+// build, so the host checks u and u [u.test], and windows u [u.test] alone, and kind_windows.go declares String on
+// Kind: the host's u, compared with windows's variant as v is, is judged as u [u.test], compared with its own
+// counterpart, is, Kind and Printed dependent in each, Doubled and the test not.
+func TestABuildOnlyFileOfAPackageTheBuildChecksAsItsVariantIsJudged(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "build-dependence-variant"))
+	engine, _ := runOverConfigured(test, root, exitClean, nil, "--no-cache", "--build-dependence")
+	if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
+	}
+	const shapes = "example.com/dependencevariant/v"
+	if engine.buildRuns[0].analyzed[shapes+" ["+shapes+".test]"] || !engine.buildRuns[1].analyzed[shapes+" ["+shapes+
+		".test]"] {
+		test.Fatalf("want v [v.test] analyzed on windows alone, got the host's %v and windows's %v",
+			engine.buildRuns[0].analyzed, engine.buildRuns[1].analyzed)
+	}
+	if engine.buildRuns[1].judged == nil {
+		test.Fatal("the windows build judged no dependence")
+	}
+	// Each package's workspace units, dependent and in all, as "dependent of units".
+	got := map[string]string{}
+	counts := map[string][2]int{}
+	for _, unit := range engine.buildRuns[1].judged.dependence.Units() {
+		if !unit.Workspace {
+			continue
+		}
+		counted := counts[unit.PackageId]
+		if unit.Dependent {
+			counted[0]++
+		}
+		counted[1]++
+		counts[unit.PackageId] = counted
+	}
+	for identifier, counted := range counts {
+		got[identifier] = fmt.Sprintf("%d of %d", counted[0], counted[1])
+	}
+	want := map[string]string{
+		shapes:                            "2 of 3",
+		"example.com/dependencevariant/u": "2 of 3",
+		"example.com/dependencevariant/u [example.com/dependencevariant/u.test]": "2 of 4",
+	}
+	if !maps.Equal(got, want) {
+		test.Errorf("the dependent units of each package on windows are %v, want %v", got, want)
 	}
 }
 
