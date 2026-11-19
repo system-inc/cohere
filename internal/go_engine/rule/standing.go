@@ -10,20 +10,19 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Standing keys, in a dispatcher's pass's ResultOf, the package's StandingBodies, which the engine's checker hands
-// each dispatcher's pass on a package when its checker.Options.Standing is this key and its Options.StandingOf answers
-// for the package (#e4rd5dw): the function declarations an extra build leaves to the host there, whose bodies a
-// confined rule never hears and whose findings it reports from the host's as its own. A rule's own pass holds none,
-// so its dispatcher's outcome carries the package's to it. It lives beside Inherited, the same seam one level up, a
-// whole file, and like it is a key and never runs: no analyzer requires it, so it is in no graph. One that required it
-// would fail on every package, naming it.
+// Standing keys, in a pass's ResultOf, the package's StandingBodies, which the engine's checker hands every pass on a
+// package when its checker.Options.Standing is this key and its Options.StandingBodies answers for the package
+// (#e4rd5dw): the function declarations an extra build leaves to the host there, whose bodies a confined rule never
+// hears and whose findings it reports from the host's as its own. It lives beside Inherited, the same seam one level
+// up, a whole file, and like it is a key and never runs: no analyzer requires it, so it is in no graph. One that
+// required it would fail on every package, naming it.
 var Standing = &analysis.Analyzer{
 	Name: "standing",
-	Doc: "keys the function bodies an extra build leaves to the host, which the checker hands a dispatcher's pass, " +
-		"and never runs",
+	Doc: "keys the function bodies an extra build leaves to the host, which the checker hands every pass, and never " +
+		"runs",
 	Run: func(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("an analyzer on %s requires %s, which is the key of the standing bodies the checker "+
-			"hands a dispatcher's pass, never an analyzer to run", pass.Pkg.Path(), pass.Analyzer.Name)
+			"hands every pass, never an analyzer to run", pass.Pkg.Path(), pass.Analyzer.Name)
 	},
 }
 
@@ -34,8 +33,8 @@ var Standing = &analysis.Analyzer{
 // findings there rather than hear the body again. Only a function declaration's body stands. A type, variable or
 // constant declaration, a value's initializer and the function literals inside them are always the build's own.
 //
-// Both dispatchers read it, and every rule's own action tells it what it took, so every method may be called from
-// several goroutines at once.
+// Both dispatchers and every rule's own action read it, so every method may be called from several goroutines at
+// once.
 type StandingBodies interface {
 	// Stands is whether the function declared at offset, the offset of its `func` in the file parsed from filename,
 	// stands.
@@ -65,11 +64,12 @@ type StandingSpan struct {
 }
 
 // StandingSpans is each standing function declaration of pass's package, by its token file and sorted by where it
-// starts, from standing, the package's StandingBodies, which the checker hands a dispatcher's pass under Standing. A
-// dispatcher reads them once as it starts, for every listener. A pass handed none, the host's and any driver's but
-// the engine's, has none, and neither has a package nothing stands in.
-func StandingSpans(pass *analysis.Pass, standing StandingBodies) map[*token.File][]StandingSpan {
-	if standing == nil {
+// starts, from the package's StandingBodies, which the checker hands pass under Standing. A dispatcher reads them
+// once as it starts, for every listener. A pass without a StandingBodies, the host's and any driver's but the
+// engine's, has none, and neither has a package nothing stands in.
+func StandingSpans(pass *analysis.Pass) map[*token.File][]StandingSpan {
+	standing, stands := pass.ResultOf[Standing].(StandingBodies)
+	if !stands {
 		return nil
 	}
 	var spans map[*token.File][]StandingSpan
@@ -113,12 +113,12 @@ func StandingSpans(pass *analysis.Pass, standing StandingBodies) map[*token.File
 	return spans
 }
 
-// StandingFiles is what the rule named ruleName takes of the host, through standing, the package's StandingBodies,
-// over pass's standing declarations, spans (StandingSpans): the files it is confined on, each with its spans, and the
-// host's findings inside those spans as diagnostics in pass's own file set, in the order of pass's files. On a file it
-// is confined on, the rule hears no standing body and its own findings inside a standing span are dropped for the
-// host's (OutsideStanding, ReportStanding). It is the sibling of InheritedFiles one level down, a declaration where
-// that is a file, and a file among inherited, which the rule takes whole, stands in no part.
+// StandingFiles is what the rule named ruleName takes of the host over pass's standing declarations, spans
+// (StandingSpans): the files it is confined on, each with its spans, and the host's findings inside those spans as
+// diagnostics in pass's own file set, in the order of pass's files. On a file it is confined on, the rule hears no
+// standing body and its own findings inside a standing span are dropped for the host's (OutsideStanding,
+// ReportStanding). It is the sibling of InheritedFiles one level down, a declaration where that is a file, and a file
+// among inherited, which the rule takes whole, stands in no part.
 //
 // A file is confined for the rule only when the package's StandingBodies confines the rule, the file has a standing
 // span, the host holds the rule's findings on it, and every one of them places in the file. Otherwise the rule hears
@@ -129,12 +129,14 @@ func StandingSpans(pass *analysis.Pass, standing StandingBodies) map[*token.File
 func StandingFiles(
 	pass *analysis.Pass,
 	ruleName string,
-	standing StandingBodies,
 	spans map[*token.File][]StandingSpan,
 	inherited map[*token.File]bool,
 ) (map[*token.File][]StandingSpan, []analysis.Diagnostic) {
-	// With spans there is a standing, since the spans were read from it.
-	if len(spans) == 0 || !standing.Confines(ruleName) {
+	if len(spans) == 0 {
+		return nil, nil
+	}
+	standing, stands := pass.ResultOf[Standing].(StandingBodies)
+	if !stands || !standing.Confines(ruleName) {
 		return nil, nil
 	}
 	var confined map[*token.File][]StandingSpan
@@ -194,14 +196,12 @@ func OutsideStanding(
 }
 
 // ReportStanding reports diagnostics, the host's findings inside the standing declarations of the files the rule
-// named ruleName is confined on (StandingFiles), on pass as the rule's own, and tells standing, the package's
-// StandingBodies, for each of those files, how many declarations stood there and how many findings it reported in
-// them (StandingBodies.Took), so the build counts what it showed. standing is the one the rule's dispatcher read the
-// take from, which the rule's own pass does not hold. Only a rule whose run finished without a crash calls it.
+// named ruleName is confined on (StandingFiles), on pass as the rule's own, and tells the package's StandingBodies,
+// for each of those files, how many declarations stood there and how many findings it reported in them
+// (StandingBodies.Took), so the build counts what it showed. Only a rule whose run finished without a crash calls it.
 func ReportStanding(
 	pass *analysis.Pass,
 	ruleName string,
-	standing StandingBodies,
 	confined map[*token.File][]StandingSpan,
 	diagnostics []analysis.Diagnostic,
 ) {
@@ -213,7 +213,8 @@ func ReportStanding(
 		pass.Report(diagnostic)
 		reported[pass.Fset.File(diagnostic.Pos)]++
 	}
-	if standing == nil {
+	standing, stands := pass.ResultOf[Standing].(StandingBodies)
+	if !stands {
 		return
 	}
 	for tokenFile, fileSpans := range confined {

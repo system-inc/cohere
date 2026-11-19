@@ -20,17 +20,27 @@ type standingPass struct {
 	followed bool
 }
 
-// standingPasses records, by analyzer name and package path, what each pass of the analyzers it builds found, and the
-// packages the followed analyzer has finished on.
+// standingPasses records, by analyzer name and package path, what each pass of the analyzers it builds found, the
+// packages the followed analyzer has finished on, and, by package ID, what a test's Options.StandingBodies was asked
+// with each time it was asked, a string or, for anything else, nothing.
 type standingPasses struct {
 	mutex    sync.Mutex
 	passes   map[string]standingPass
 	finished map[string]bool
+	asked    map[string][]string
 }
 
 // newStandingPasses is a standingPasses that has recorded nothing.
 func newStandingPasses() *standingPasses {
-	return &standingPasses{passes: map[string]standingPass{}, finished: map[string]bool{}}
+	return &standingPasses{passes: map[string]standingPass{}, finished: map[string]bool{}, asked: map[string][]string{}}
+}
+
+// ask records that a test's Options.StandingBodies was asked for packageId with after.
+func (passes *standingPasses) ask(packageId string, after any) {
+	afterText, _ := after.(string)
+	passes.mutex.Lock()
+	defer passes.mutex.Unlock()
+	passes.asked[packageId] = append(passes.asked[packageId], afterText)
 }
 
 // analyzer is one named name that requires required and records what each of its passes found.

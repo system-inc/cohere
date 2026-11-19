@@ -54,9 +54,9 @@ func (*everyFunctionStands) Took(string, string, int, int) {
 	// No rule is confined, so none takes anything.
 }
 
-// standingPass is a pass over standingSource, parsed as planted.go, with its file and the file's function declarations
-// in source order.
-func standingPass(test *testing.T) (*analysis.Pass, *ast.File, []*ast.FuncDecl) {
+// standingPass is a pass over standingSource, parsed as planted.go, holding standing under the Standing key, with its
+// file and the file's function declarations in source order.
+func standingPass(test *testing.T, standing StandingBodies) (*analysis.Pass, *ast.File, []*ast.FuncDecl) {
 	test.Helper()
 	fileSet := token.NewFileSet()
 	file, parseError := parser.ParseFile(fileSet, "planted.go", standingSource, parser.ParseComments)
@@ -69,21 +69,25 @@ func standingPass(test *testing.T) (*analysis.Pass, *ast.File, []*ast.FuncDecl) 
 			functions = append(functions, function)
 		}
 	}
-	return &analysis.Pass{Fset: fileSet, Files: []*ast.File{file}}, file, functions
+	pass := &analysis.Pass{Fset: fileSet, Files: []*ast.File{file}}
+	if standing != nil {
+		pass.ResultOf = map[*analysis.Analyzer]any{Standing: standing}
+	}
+	return pass, file, functions
 }
 
 // A standing function's span runs from its doc comment, or its `func` when it has none, to its end, with its body's
 // opening brace between, and each function is asked of by the offset of its `func`. Only a function declaration with
 // a body is asked of: a function literal in a variable's initializer and a declaration with no body never stand. A
-// pass handed no standing bodies has no spans.
+// pass that holds no standing bodies has no spans.
 func TestAStandingSpanRunsFromAFunctionsDocCommentToItsEnd(test *testing.T) {
 	test.Parallel()
 	standing := &everyFunctionStands{}
-	pass, file, functions := standingPass(test)
+	pass, file, functions := standingPass(test, standing)
 	documented, method := functions[0], functions[1]
 	tokenFile := pass.Fset.File(file.FileStart)
 
-	spans := StandingSpans(pass, standing)
+	spans := StandingSpans(pass)
 	expected := []StandingSpan{
 		{Start: documented.Doc.Pos(), Body: documented.Body.Lbrace, End: documented.End()},
 		{Start: method.Pos(), Body: method.Body.Lbrace, End: method.End()},
@@ -98,8 +102,9 @@ func TestAStandingSpanRunsFromAFunctionsDocCommentToItsEnd(test *testing.T) {
 			standing.asked, asked)
 	}
 
-	if spans := StandingSpans(pass, nil); spans != nil {
-		test.Errorf("a pass handed no standing bodies has the spans %v, want none", spans)
+	bare, _, _ := standingPass(test, nil)
+	if spans := StandingSpans(bare); spans != nil {
+		test.Errorf("a pass with no standing bodies has the spans %v, want none", spans)
 	}
 }
 
@@ -108,12 +113,12 @@ func TestAStandingSpanRunsFromAFunctionsDocCommentToItsEnd(test *testing.T) {
 // reversed, the spans are the same as before.
 func TestAFilesStandingSpansAreSortedByWhereEachStarts(test *testing.T) {
 	test.Parallel()
-	pass, file, _ := standingPass(test)
+	pass, file, _ := standingPass(test, &everyFunctionStands{})
 	tokenFile := pass.Fset.File(file.FileStart)
-	inOrder := slices.Clone(StandingSpans(pass, &everyFunctionStands{})[tokenFile])
+	inOrder := slices.Clone(StandingSpans(pass)[tokenFile])
 	slices.Reverse(file.Decls)
 
-	reversed := StandingSpans(pass, &everyFunctionStands{})[tokenFile]
+	reversed := StandingSpans(pass)[tokenFile]
 	if len(inOrder) != 2 || inOrder[0].Start >= inOrder[1].Start || !slices.Equal(reversed, inOrder) {
 		test.Errorf("with the declarations reversed the spans are %v, want them sorted as before, %v", reversed,
 			inOrder)
@@ -126,13 +131,12 @@ func TestAFilesStandingSpansAreSortedByWhereEachStarts(test *testing.T) {
 func TestAFunctionWhoseBraceIsOutOfPlaceNeverStands(test *testing.T) {
 	test.Parallel()
 	standing := &everyFunctionStands{}
-	pass, file, functions := standingPass(test)
+	pass, file, functions := standingPass(test, standing)
 	documented, method := functions[0], functions[1]
 	documented.Body.Lbrace = token.NoPos
 	method.Body.Lbrace = method.End()
 
-	spans := StandingSpans(pass, standing)
-	if len(spans[pass.Fset.File(file.FileStart)]) != 0 || len(standing.asked) != 0 {
+	if spans := StandingSpans(pass); len(spans[pass.Fset.File(file.FileStart)]) != 0 || len(standing.asked) != 0 {
 		test.Errorf("with each brace out of place the spans are %v and the standing bodies were asked of %v, want no "+
 			"span and nothing asked", spans, standing.asked)
 	}
@@ -144,9 +148,9 @@ func TestAFunctionWhoseBraceIsOutOfPlaceNeverStands(test *testing.T) {
 // very findings it was handed.
 func TestARulesOwnFindingIsDroppedFromASpansStartThroughItsEnd(test *testing.T) {
 	test.Parallel()
-	pass, file, _ := standingPass(test)
+	pass, file, _ := standingPass(test, &everyFunctionStands{})
 	tokenFile := pass.Fset.File(file.FileStart)
-	spans := StandingSpans(pass, &everyFunctionStands{})
+	spans := StandingSpans(pass)
 	documented, method := spans[tokenFile][0], spans[tokenFile][1]
 	other := pass.Fset.AddFile("other.go", -1, 100)
 

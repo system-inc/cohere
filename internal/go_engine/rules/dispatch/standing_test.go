@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
@@ -467,7 +466,7 @@ func TestTheStandingBodiesFollowAnAnalyzerAndNothingStandsWhereItFailed(test *te
 					return "followed", nil
 				},
 			}
-			options.StandingOf = func(_ *packages.Package, after any) rule.StandingBodies {
+			options.StandingBodies = func(_ string, after any) rule.StandingBodies {
 				if after != "followed" {
 					return nil
 				}

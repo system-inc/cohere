@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -23,33 +22,24 @@ var standingKey = &analysis.Analyzer{
 }
 
 // standingOf is the standing bodies answered for one package: the ID it was answered for, and what it was asked with.
+// Each answer is one of its own, so two passes hold the same answer only when they hold the same one.
 type standingOf struct {
 	packageId string
-	after     string
+	after     any
 }
 
 // Stands answers that nothing stands.
-func (standingOf) Stands(string, int) bool { return false }
+func (*standingOf) Stands(string, int) bool { return false }
 
 // Confines answers that no rule is confined.
-func (standingOf) Confines(string) bool { return false }
+func (*standingOf) Confines(string) bool { return false }
 
 // Findings answers that the host holds no findings.
-func (standingOf) Findings(string, string) ([]rule.InheritedFinding, bool) { return nil, false }
+func (*standingOf) Findings(string, string) ([]rule.InheritedFinding, bool) { return nil, false }
 
 // Took records nothing.
-func (standingOf) Took(string, string, int, int) {
+func (*standingOf) Took(string, string, int, int) {
 	// The checker's test reads what a pass holds, never a take.
-}
-
-// standingOfPackage is an Options.StandingOf that answers each package with its own ID and what it was asked with,
-// which must be nothing or a string, and counts its calls into asked.
-func standingOfPackage(asked *sync.Map) func(*packages.Package, any) rule.StandingBodies {
-	return func(analyzed *packages.Package, after any) rule.StandingBodies {
-		asked.Store(analyzed.ID, true)
-		afterText, _ := after.(string)
-		return standingOf{packageId: analyzed.ID, after: afterText}
-	}
 }
 
 // analyzeStanding runs analyzers over roots under options and fails test on any action's error but the followed
@@ -75,70 +65,77 @@ func analyzeStanding(
 	return actions
 }
 
-// Under Options.StandingOf a dispatcher's pass on a package, one of an analyzer Options.Tolerant names, holds under
-// Options.Standing what the option answers for that very package, asked with nothing while Options.StandingAfter is
-// unset. A pass of any other analyzer holds nothing there, and neither does a dispatcher's on a package the option
-// answers nil for, no nil under the key either. Without the option no pass holds anything under the key, and the
-// graph holds the same actions either way.
-func TestADispatchersPassHoldsItsOwnPackagesStandingBodies(test *testing.T) {
+// Under Options.StandingBodies, with Options.StandingAfter unset, every pass on a package holds under Options.Standing
+// the one answer the option gave for that package's ID, asked once for the package and with nothing: a dispatcher's
+// pass, the pass of a rule that requires the dispatcher and the pass of an analyzer beside them all hold the same one.
+// On a package the option answers nil for, no pass holds anything there, no nil under the key either. Without the
+// option no pass holds anything under the key, and the graph holds the same actions either way.
+func TestEveryPassOnAPackageHoldsItsOneStandingBodies(test *testing.T) {
 	test.Parallel()
 	roots := timedModule(test)
 	// The first package is the one nothing stands in.
 	bare := roots[0].ID
 	passes := newStandingPasses()
-	dispatcher, plain := passes.analyzer("dispatcher"), passes.analyzer("plain")
-	isDispatcher := func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher }
-	actions := analyzeStanding(test, []*analysis.Analyzer{dispatcher, plain}, roots, &Options{
-		Tolerant: isDispatcher,
+	dispatcher := passes.analyzer("dispatcher")
+	analyzers := []*analysis.Analyzer{dispatcher, passes.analyzer("ruled", dispatcher), passes.analyzer("plain")}
+	options := &Options{
+		Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
 		Standing: standingKey,
-		StandingOf: func(analyzed *packages.Package, after any) rule.StandingBodies {
-			if analyzed.ID == bare || after != nil {
+		StandingBodies: func(packageId string, after any) rule.StandingBodies {
+			if passes.ask(packageId, after); packageId == bare {
 				return nil
 			}
-			return standingOf{packageId: analyzed.ID}
+			return &standingOf{packageId: packageId, after: after}
 		},
-	})
+	}
+	actions := analyzeStanding(test, analyzers, roots, options)
 	for _, root := range roots {
-		held := passes.passes["dispatcher "+root.PkgPath].standing
-		if root.ID == bare {
-			if passes.passes["dispatcher "+root.PkgPath].keyed {
-				test.Errorf("the dispatcher's pass on %s, which the option answers nil for, holds %v under Standing, "+
-					"want nothing there, no nil either", root.ID, held)
+		dispatched := passes.passes["dispatcher "+root.PkgPath]
+		for _, name := range []string{"dispatcher", "ruled", "plain"} {
+			found := passes.passes[name+" "+root.PkgPath]
+			if root.ID == bare {
+				if found.keyed {
+					test.Errorf("the pass of %s on %s, which the option answers nil for, holds %v under Standing, "+
+						"want nothing there, no nil either", name, root.ID, found.standing)
+				}
+				continue
 			}
-		} else if held != (standingOf{packageId: root.ID}) {
-			test.Errorf("the dispatcher's pass on %s holds %v under Standing, want what the option answers for its "+
-				"own package, asked with nothing", root.ID, held)
+			held, isHeld := found.standing.(*standingOf)
+			if !isHeld || held.packageId != root.ID || held.after != nil || found.standing != dispatched.standing {
+				test.Errorf("the pass of %s on %s holds %v under Standing, want the answer for its own package, "+
+					"asked with nothing, and the very one the dispatcher's pass holds, %v", name, root.ID,
+					found.standing, dispatched.standing)
+			}
 		}
-		if plain := passes.passes["plain "+root.PkgPath]; plain.keyed {
-			test.Errorf("the pass of an analyzer that is no dispatcher holds %v under Standing on %s", plain.standing,
-				root.ID)
+		if asked := passes.asked[root.ID]; len(asked) != 1 {
+			test.Errorf("the option was asked %d times for %s, want once for the package", len(asked), root.ID)
 		}
 	}
 
 	unset := newStandingPasses()
 	unsetDispatcher := unset.analyzer("dispatcher")
-	unsetActions := analyzeStanding(test, []*analysis.Analyzer{unsetDispatcher, unset.analyzer("plain")}, roots,
-		&Options{Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == unsetDispatcher },
-			Standing: standingKey})
+	unsetActions := analyzeStanding(test, []*analysis.Analyzer{unsetDispatcher, unset.analyzer("ruled",
+		unsetDispatcher), unset.analyzer("plain")}, roots, &Options{Standing: standingKey})
 	for key, found := range unset.passes {
 		if found.keyed {
 			test.Errorf("without the option the pass %s holds %v under Standing", key, found.standing)
 		}
 	}
-	if actions != 2*len(roots) || unsetActions != actions {
-		test.Errorf("the graph holds %d actions with the option and %d without, want one for each of two analyzers on "+
-			"each of %d packages both ways", actions, unsetActions, len(roots))
+	if actions != 3*len(roots) || unsetActions != actions {
+		test.Errorf("the graph holds %d actions with the option and %d without, want one for each of three analyzers "+
+			"on each of %d packages both ways", actions, unsetActions, len(roots))
 	}
 }
 
 // Under Options.StandingAfter each dispatcher's action on a package follows that analyzer's action there, though the
 // dispatcher does not require it: the followed analyzer has finished on the package before the dispatcher's pass
-// runs, Options.StandingOf is asked with its result there, and the result is no input of the dispatcher's pass. An
-// analyzer that is no dispatcher follows nothing. A dispatcher that requires the analyzer itself follows it by its own
-// edge, holds its result as any input, and the option is asked with it all the same. One that requires it only for a
-// listener no rule of the run has, an edge Options.ForDependents drops, follows it by the edge Analyze adds once that
-// one is dropped, so it still follows, and holds no result of it.
-func TestADispatcherFollowsTheStandingAnalyzerAndTheOptionIsAskedWithItsResult(test *testing.T) {
+// runs, Options.StandingBodies is asked once for the package, with its result there, and the result is no input of the
+// dispatcher's pass. The pass of a rule that requires the dispatcher holds the very answer the dispatcher's pass
+// holds. The pass of an analyzer that follows neither may run before the answer, so it holds none. A dispatcher that
+// requires the analyzer itself follows it by its own edge and holds its result as any input. One that requires it
+// only for a listener no rule of the run has, an edge Options.ForDependents drops, follows it by the edge Analyze adds
+// once that one is dropped, and holds no result of it.
+func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test *testing.T) {
 	test.Parallel()
 	for _, requirement := range []struct {
 		name     string
@@ -159,12 +156,13 @@ func TestADispatcherFollowsTheStandingAnalyzerAndTheOptionIsAskedWithItsResult(t
 			if requirement.requires {
 				dispatcher = passes.analyzer("dispatcher", followed)
 			}
-			results := requirement.results
-			asked := &sync.Map{}
 			options := &Options{
-				Tolerant:      func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
-				Standing:      standingKey,
-				StandingOf:    standingOfPackage(asked),
+				Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+				Standing: standingKey,
+				StandingBodies: func(packageId string, after any) rule.StandingBodies {
+					passes.ask(packageId, after)
+					return &standingOf{packageId: packageId, after: after}
+				},
 				StandingAfter: followed,
 			}
 			if requirement.dropped {
@@ -172,33 +170,45 @@ func TestADispatcherFollowsTheStandingAnalyzerAndTheOptionIsAskedWithItsResult(t
 					return analyzer == dispatcher && required == followed
 				}
 			}
-			actions := analyzeStanding(test, []*analysis.Analyzer{dispatcher, passes.analyzer("plain")}, roots,
-				options)
+			actions := analyzeStanding(test, []*analysis.Analyzer{dispatcher, passes.analyzer("ruled", dispatcher),
+				passes.analyzer("plain")}, roots, options)
 			for _, root := range roots {
 				found := passes.passes["dispatcher "+root.PkgPath]
-				expected := standingOf{packageId: root.ID, after: "followed on " + root.PkgPath}
-				if !found.followed || found.standing != expected || !slices.Equal(found.results, results) {
+				held, isHeld := found.standing.(*standingOf)
+				after := "followed on " + root.PkgPath
+				if !found.followed || !isHeld || held.packageId != root.ID || held.after != after ||
+					!slices.Equal(found.results, requirement.results) {
 					test.Errorf("the dispatcher's pass on %s ran after the followed analyzer: %t, holds %v under "+
-						"Standing and the results %v, want it after, holding %v and the results %v", root.ID,
-						found.followed, found.standing, found.results, expected, results)
+						"Standing and the results %v, want it after, holding the answer for its package asked with "+
+						"%q, and the results %v", root.ID, found.followed, found.standing, found.results, after,
+						requirement.results)
 				}
-				if plain := passes.passes["plain "+root.PkgPath]; plain.standing != nil || len(plain.results) != 0 {
-					test.Errorf("the pass of an analyzer that is no dispatcher holds %v under Standing and the "+
+				if ruled := passes.passes["ruled "+root.PkgPath]; !isHeld || ruled.standing != found.standing {
+					test.Errorf("the pass of the rule that requires the dispatcher holds %v under Standing on %s, "+
+						"want the very answer the dispatcher's pass holds, %v", ruled.standing, root.ID,
+						found.standing)
+				}
+				if plain := passes.passes["plain "+root.PkgPath]; plain.keyed || len(plain.results) != 0 {
+					test.Errorf("the pass of an analyzer that follows nothing holds %v under Standing and the "+
 						"results %v on %s, want neither", plain.standing, plain.results, root.ID)
 				}
+				if asked := passes.asked[root.ID]; len(asked) != 1 {
+					test.Errorf("the option was asked %d times for %s, want once for the package", len(asked),
+						root.ID)
+				}
 			}
-			if actions != 3*len(roots) {
-				test.Errorf("the graph holds %d actions, want the dispatcher's, the other analyzer's and the "+
-					"followed one's on each of %d packages", actions, len(roots))
+			if actions != 4*len(roots) {
+				test.Errorf("the graph holds %d actions, want the dispatcher's, its rule's, the other analyzer's and "+
+					"the followed one's on each of %d packages", actions, len(roots))
 			}
 		})
 	}
 }
 
-// Where the analyzer Options.StandingAfter names failed on a package, the dispatcher there runs all the same and
-// holds nothing under Options.Standing, the option never asked: every doubt lints. The failure of the edge Analyze
-// added is no part of what the dispatcher reads under Options.Failed, and it fails no dispatcher even where
-// Options.Failed is unset, when an action runs past nothing else.
+// Where the analyzer Options.StandingAfter names failed on a package, the dispatcher there runs all the same, and
+// neither its pass nor its rule's holds anything under Options.Standing, the option never asked: every doubt lints.
+// The failure of the edge Analyze added is no part of what the dispatcher reads under Options.Failed, and it fails no
+// dispatcher even where Options.Failed is unset, when an action runs past nothing else.
 func TestAFailedStandingAnalyzerLeavesNothingStandingAndFailsNoDispatcher(test *testing.T) {
 	test.Parallel()
 	for _, failed := range []*analysis.Analyzer{failedKey, nil} {
@@ -206,54 +216,68 @@ func TestAFailedStandingAnalyzerLeavesNothingStandingAndFailsNoDispatcher(test *
 			test.Parallel()
 			roots := timedModule(test)
 			passes := newStandingPasses()
-			followed := passes.followedAnalyzer(errors.New("planted failure"))
 			dispatcher := passes.analyzer("dispatcher")
-			asked := &sync.Map{}
-			analyzeStanding(test, []*analysis.Analyzer{dispatcher}, roots, &Options{
-				Failed:        failed,
-				Tolerant:      func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
-				Standing:      standingKey,
-				StandingOf:    standingOfPackage(asked),
-				StandingAfter: followed,
-			})
+			analyzeStanding(test, []*analysis.Analyzer{dispatcher, passes.analyzer("ruled", dispatcher)}, roots,
+				&Options{
+					Failed:   failed,
+					Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+					Standing: standingKey,
+					StandingBodies: func(packageId string, after any) rule.StandingBodies {
+						passes.ask(packageId, after)
+						return &standingOf{packageId: packageId, after: after}
+					},
+					StandingAfter: passes.followedAnalyzer(errors.New("planted failure")),
+				})
 			for _, root := range roots {
 				found, ran := passes.passes["dispatcher "+root.PkgPath]
-				_, wasAsked := asked.Load(root.ID)
-				if !ran || !found.followed || found.standing != nil || len(found.failed) != 0 || wasAsked {
+				ruled, ruledRan := passes.passes["ruled "+root.PkgPath]
+				asked := len(passes.asked[root.ID])
+				if !ran || !found.followed || found.keyed || len(found.failed) != 0 || !ruledRan || ruled.keyed ||
+					asked != 0 {
 					test.Errorf("on %s, where the followed analyzer failed, the dispatcher ran: %t, after it: %t, "+
-						"holding %v under Standing and %v under Failed, the option asked: %t, want it run after, "+
-						"holding nothing under either, and the option never asked", root.ID, ran, found.followed,
-						found.standing, found.failed, wasAsked)
+						"holding something under Standing: %t, and %v under Failed, its rule ran: %t, holding "+
+						"something under Standing: %t, and the option was asked %d times, want both run, the "+
+						"dispatcher after, nothing held under either key, and the option never asked", root.ID, ran,
+						found.followed, found.keyed, found.failed, ruledRan, ruled.keyed, asked)
 				}
 			}
 		})
 	}
 }
 
-// A restored package runs nothing, so a dispatcher's action on one follows nothing: with every package restored, the
-// graph holds only the dispatcher's actions and the followed analyzer never runs.
+// A restored package runs nothing, so a dispatcher's action on one follows nothing and nothing is asked of it: with
+// every package restored, the graph holds only the dispatcher's actions, the followed analyzer never runs, and the
+// option is never asked, with Options.StandingAfter or without.
 func TestADispatcherOnARestoredPackageFollowsNothing(test *testing.T) {
 	test.Parallel()
-	roots := timedModule(test)
-	passes := newStandingPasses()
-	dispatcher := passes.analyzer("dispatcher")
-	asked := &sync.Map{}
-	actions := analyzeStanding(test, []*analysis.Analyzer{dispatcher}, roots, &Options{
-		Tolerant:      func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
-		Standing:      standingKey,
-		StandingOf:    standingOfPackage(asked),
-		StandingAfter: passes.followedAnalyzer(nil),
-		Restored:      func(*packages.Package) bool { return true },
-		Restore:       func(*Action) error { return nil },
-	})
-	if actions != len(roots) || len(passes.finished) != 0 || len(passes.passes) != 0 {
-		test.Errorf("with every package restored the graph holds %d actions, the followed analyzer ran on %v and %d "+
-			"passes ran, want only the dispatcher's action on each of %d packages and nothing run", actions,
-			passes.finished, len(passes.passes), len(roots))
+	for _, follows := range []bool{true, false} {
+		roots := timedModule(test)
+		passes := newStandingPasses()
+		dispatcher := passes.analyzer("dispatcher")
+		options := &Options{
+			Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+			Standing: standingKey,
+			StandingBodies: func(packageId string, after any) rule.StandingBodies {
+				passes.ask(packageId, after)
+				return &standingOf{packageId: packageId, after: after}
+			},
+			Restored: func(*packages.Package) bool { return true },
+			Restore:  func(*Action) error { return nil },
+		}
+		if follows {
+			options.StandingAfter = passes.followedAnalyzer(nil)
+		}
+		actions := analyzeStanding(test, []*analysis.Analyzer{dispatcher}, roots, options)
+		if actions != len(roots) || len(passes.finished) != 0 || len(passes.passes) != 0 || len(passes.asked) != 0 {
+			test.Errorf("with every package restored and a followed analyzer: %t, the graph holds %d actions, the "+
+				"followed analyzer ran on %v, %d passes ran and the option was asked of %v, want only the "+
+				"dispatcher's action on each of %d packages, nothing run and nothing asked", follows, actions,
+				passes.finished, len(passes.passes), passes.asked, len(roots))
+		}
 	}
 }
 
-// With Options.StandingOf unset, Options.StandingAfter adds no action: the analyzer it names never runs, and the
+// With Options.StandingBodies unset, Options.StandingAfter adds no action: the analyzer it names never runs, and the
 // graph holds only the actions of the analyzers asked for.
 func TestWithoutTheStandingOptionNothingIsFollowed(test *testing.T) {
 	test.Parallel()
