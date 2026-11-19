@@ -178,9 +178,10 @@ func (collecting *collector) collectType(tokenFile *token.File, spec *ast.TypeSp
 }
 
 // collectTypeKinds is a type spec's edges. The name bit reads its type parameters' constraints in full, its declared
-// methods, the name bits of its embedded fields, whose methods it promotes, and for an interface its own underlying,
-// since an interface's methods are its underlying. The underlying bit reads everything the underlying type reaches in
-// full, as a value.
+// methods, the name bits of its embedded fields, whose methods it promotes, for an interface its own underlying,
+// since an interface's methods are its underlying, and for a type defined from another type's name, `type T S`, S in
+// full, since T's fields and promoted methods are S's. The underlying bit reads everything the underlying type reaches
+// in full, as a value.
 func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *ast.TypeSpec) {
 	switch declared := typeName.Type().(type) {
 	case *types.Named:
@@ -189,6 +190,14 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 			// `type T S` keeps S in its expression's type, where the resolved underlying has lost it, so S is read in
 			// full into T's underlying.
 			collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(typeAndValue.Type, true))
+			switch typeAndValue.Type.(type) {
+			case *types.Named, *types.Alias:
+				// T's shape is S's too: its fields, and the methods its embedded fields promote, are S's, and a struct
+				// that embeds T reads them through T's name bit, so S is read in full into that as well (#9paaen9). A
+				// type that spells its struct reads alike in every build, and its embedded fields' edges below cover
+				// it.
+				collecting.addEdges(typeName, false, collecting.walker.borrowedReferences(typeAndValue.Type, true))
+			}
 		}
 		collecting.addUses(typeName, true, false, spec.Type)
 		if spec.TypeParams != nil {

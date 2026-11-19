@@ -760,3 +760,91 @@ func TestUnitsCarryTheirStaticCallsAndHoldTheirObjects(test *testing.T) {
 		}
 	}
 }
+
+// A type defined from another type's name, `type Extra platformExtra`, has that type's shape: its fields and the
+// methods its embedded fields promote are the named type's, so they move with it though the declaration reads alike
+// in every build. In the definedfrom fixture platformExtra has no field on the host and a Name, a string, on linux,
+// and platformPart embeds nothing on the host and Gadget, with its Spin, on linux. Inner embeds Wrap and a pointer to
+// Extra, so its Name is Wrap's Base's, an int two levels down, on the host and Extra's own string on linux; Holder
+// embeds a pointer to Part, so it has Spin, and implements Spinner, on linux alone.
+//
+// The bit that must be set on Extra, Part, Inner and Holder is the name bit: it carries a type's method set and what
+// its embedded fields promote, a pointer or a conversion to an interface reads a type by that bit alone, as Boxed
+// reads Holder, and a field selection reads every type on its path by it, as Label reads Inner. So Label and Boxed are
+// dependent, and Label's records really differ between the builds (checkUnits). Steady, defined from Base, which no
+// build changes, keeps both bits unset, and so do Kept, which embeds a pointer to it, and Named, which reads its Name.
+// The graph read back from its records resolves and judges alike.
+func TestATypeDefinedFromAPlatformTypeReadsItsShape(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "definedfrom", linuxBuild)
+	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
+		"type platformExtra": true,
+		"type platformPart":  true,
+		"type Base":          false,
+		"type Wrap":          false,
+		"type Extra":         true,
+		"type Inner":         true,
+		"func Label":         true,
+		"type Gadget":        false,
+		"method Gadget.Spin": false,
+		"type Part":          true,
+		"type Holder":        true,
+		"type Spinner":       false,
+		"func Boxed":         true,
+		"type Steady":        false,
+		"type Kept":          false,
+		"func Named":         false,
+	})
+
+	checked := checkUnits(judged.host, judged.build, judged.dependence)
+	for _, miss := range checked.misses {
+		test.Errorf("independent and records differently: %s", miss)
+	}
+	if len(checked.unexportedUntouched) > 0 {
+		test.Errorf("want no unit differing only in unexported fields it never selects, got %q",
+			checked.unexportedUntouched)
+	}
+	if checked.dependentDiffer == 0 {
+		test.Error("no dependent unit records differently, so the comparison does not see Label's Name move")
+	}
+
+	live := graphOf(judged.host, nil)
+	expectNoUnnameable(test, "definedfrom", live)
+	recorded := recordedGraphOf(test, live)
+	expectAlike(test, "definedfrom resolved", resolvedLines(live), resolvedLines(recorded))
+	recordedDependence := recorded.Against(judged.difference)
+	expectAlike(test, "definedfrom under linux", unitVerdicts(judged.dependence), unitVerdicts(recordedDependence))
+	for _, graph := range []struct {
+		name       string
+		dependence *Dependence
+	}{
+		{"the live graph", judged.dependence},
+		{"the graph read back from its records", recordedDependence},
+	} {
+		for _, name := range []struct {
+			local string
+			named bool
+		}{
+			{"Extra", true},
+			{"Part", true},
+			{"Inner", true},
+			{"Holder", true},
+			{"Steady", false},
+			{"Kept", false},
+		} {
+			bits, isDeclared := graph.dependence.NameBits("example.com/definedfrom", name.local)
+			if !isDeclared {
+				test.Errorf("%s: no unit of the definedfrom fixture declares it in %s", name.local, graph.name)
+				continue
+			}
+			switch {
+			case name.named && !bits.Name:
+				test.Errorf("%s: want its name bit set on linux in %s, got %+v", name.local, graph.name, bits)
+			case !name.named && bits != (Bits{}):
+				test.Errorf("%s: want neither bit set on linux in %s, as no build changes it, got %+v", name.local,
+					graph.name, bits)
+			}
+		}
+	}
+}
