@@ -195,6 +195,48 @@ func TestNothingIsKeptAboutAnObjectOfNoPackage(test *testing.T) {
 	}
 }
 
+// Nothing is kept about an instance's object, which Ask answers no fact without computing or keeping anything: the
+// Value of middle.Box[int], a method of middle's package that is not its own origin. The run holds nothing of it, and
+// the hand hears nothing.
+func TestNothingIsKeptAboutAnInstancesObject(test *testing.T) {
+	test.Parallel()
+	run := learnMiddle(test, nil, false)
+	box, isNamed := run.middle.Types.Scope().Lookup("Box").Type().(*types.Named)
+	if !isNamed {
+		test.Fatal("middle declares no named type Box")
+	}
+	instance, instantiateError := types.Instantiate(nil, box, []types.Type{types.Typ[types.Int]}, true)
+	if instantiateError != nil {
+		test.Fatalf("instantiating middle.Box with int: %v", instantiateError)
+	}
+	boxOfInt, isInstance := instance.(*types.Named)
+	if !isInstance || boxOfInt.NumMethods() != 1 || boxOfInt.Method(0).Origin() == boxOfInt.Method(0) {
+		test.Fatalf("want middle.Box[int] a named type whose one method is an instance's, got %v", instance)
+	}
+	fact_resolver.Keep(run.resolver, run.middle, keepProbe, boxOfInt.Method(0), true)
+	if answered := answeredNames(run.resolver.Answered()); len(answered) != 0 {
+		test.Errorf("want nothing held of an instance's method, got %q", answered)
+	}
+	if heard := run.hand.heard["Value"]; len(heard) != 0 {
+		test.Errorf("want the hand to hear nothing of middle.Box[int]'s Value, heard %q", heard)
+	}
+}
+
+// An answer kept twice is kept once: held once, and heard by the hand once, never again when a walk hands the same
+// verdict over a second time.
+func TestAnAnswerKeptTwiceIsHeldAndHeardOnce(test *testing.T) {
+	test.Parallel()
+	run := learnMiddle(test, nil, false)
+	fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, true)
+	fact_resolver.Keep(run.resolver, run.middle, keepProbe, run.function, true)
+	if answered := answeredNames(run.resolver.Answered()); !slices.Equal(answered, []string{"keep_probe Middle true"}) {
+		test.Errorf("want Middle's answer held once, as true, got %q", answered)
+	}
+	if heard := run.hand.heard["Middle"]; !slices.Equal(heard, []string{"true"}) {
+		test.Errorf("want the hand to hear Middle's answer once, as true, heard %q", heard)
+	}
+}
+
 // A kind's walk keeps every verdict it judges, the one a reader asked of among them, so the compute of a question
 // keeps the very answer the question then returns. It is one answer: recorded by the question, as any computed answer
 // is, held once, and heard by the hand once, never once from Keep and again from Ask.

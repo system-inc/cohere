@@ -17,3 +17,13 @@ func Fresh() *int {
 func quiet() int {
 	return 1
 }
+
+// Box is generic, so each instance of it has a Value of its own, an instance's method, which no package declares.
+type Box[Content any] struct {
+	content Content
+}
+
+// Value is what box holds.
+func (box Box[Content]) Value() Content {
+	return box.content
+}
