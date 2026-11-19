@@ -221,6 +221,7 @@ func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) 
 	if len(through.Cache.Problems) > 0 {
 		test.Errorf("windows reported problems writing through: %q", through.Cache.Problems)
 	}
+	placedCompared := 0
 	for _, path := range append([]string{throughBasePath, throughUserPath}, through.FromHost.Untouched...) {
 		written, writtenKey := throughEntry(test, throughSession, path)
 		checked, checkedKey := throughEntry(test, sourceSession, path)
@@ -238,7 +239,9 @@ func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) 
 		}
 		// Placed answers are what each run held about the package, which follows the questions each asked
 		// (demandOf), so the two agree at every place both hold an answer of one kind at, and differ only in which.
-		if disagreeing := placedDisagreeing(written.placed, checked.placed); len(disagreeing) > 0 {
+		disagreeing, compared := placedDisagreeing(written.placed, checked.placed)
+		placedCompared += compared
+		if len(disagreeing) > 0 {
 			test.Errorf("%s: written through and checked from source, the placed answers disagree at %q", path,
 				disagreeing)
 		}
@@ -247,6 +250,11 @@ func TestAnEntryWrittenThroughIsTheOneTheBuildWritesFromSource(test *testing.T) 
 			test.Errorf("%s: the entry written through\n%+v\nthe entry checked from source\n%+v", path, written,
 				checked)
 		}
+	}
+	// Agreement where both hold an answer says nothing when they hold none at one place.
+	if placedCompared == 0 {
+		test.Error("the entries written through and checked from source hold no placed answer at one place, so " +
+			"none was compared")
 	}
 }
 

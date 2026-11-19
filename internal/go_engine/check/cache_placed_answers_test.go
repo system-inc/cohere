@@ -214,28 +214,35 @@ func TestAnEntryWhosePlacedAnswersGrewAfterTheFirstWaveIsWrittenAgain(test *test
 }
 
 // placedDisagreeing is every place, its kind, file, offset and parameter, at which left and right both hold an answer
-// and the two answers differ.
-func placedDisagreeing(left []fact_resolver.PlacedAnswer, right []fact_resolver.PlacedAnswer) []string {
+// and the two answers differ, and how many places both hold an answer at, which a caller holds above zero, so two sets
+// with no place in common never pass as agreeing.
+func placedDisagreeing(left []fact_resolver.PlacedAnswer, right []fact_resolver.PlacedAnswer) ([]string, int) {
 	held := make(map[placedAt][]byte, len(left))
 	for _, answer := range left {
 		held[placedAt{kind: answer.Kind, file: answer.File, digest: string(answer.FileDigest), offset: answer.Offset,
 			parameter: answer.Parameter}] = answer.Encoded
 	}
 	var disagreeing []string
+	compared := 0
 	for _, answer := range right {
 		at := placedAt{kind: answer.Kind, file: answer.File, digest: string(answer.FileDigest), offset: answer.Offset,
 			parameter: answer.Parameter}
-		if encoded, isHeld := held[at]; isHeld && !bytes.Equal(encoded, answer.Encoded) {
+		encoded, isHeld := held[at]
+		if !isHeld {
+			continue
+		}
+		compared++
+		if !bytes.Equal(encoded, answer.Encoded) {
 			disagreeing = append(disagreeing, fmt.Sprintf("%s %s:%d %d", at.kind, at.file, at.offset, at.parameter))
 		}
 	}
-	return disagreeing
+	return disagreeing, compared
 }
 
 // An entry holds its placed answers by column, each file's and kind's name once, and reads back exactly what it was
 // given, in PlacedIn's order whatever order they came in: answers in three files, two of one name parsed from other
 // bytes and one with no digest, of three kinds, a function's own and a parameter's, two at one offset. Columns of
-// different lengths, or a kind the table does not hold, are a miss.
+// different lengths, a kind the table does not hold, or an empty answer, are a miss.
 func TestAnEntrysPlacedAnswersReadBackExactly(test *testing.T) {
 	test.Parallel()
 	answers := []fact_resolver.PlacedAnswer{
@@ -265,7 +272,11 @@ func TestAnEntrysPlacedAnswersReadBackExactly(test *testing.T) {
 	short.Values = short.Values[1:]
 	unknown := storedPlacedOf(answers)
 	unknown.KindIndexes[0] = len(unknown.Kinds)
-	for name, broken := range map[string]storedPlaced{"a column short": short, "a kind past the table": unknown} {
+	// An empty answer is no answer: decoded, it would read as the zero value, no fact, never what the run held.
+	empty := storedPlacedOf(answers)
+	empty.Values[0] = nil
+	for name, broken := range map[string]storedPlaced{"a column short": short, "a kind past the table": unknown,
+		"an empty answer": empty} {
 		if _, brokenError := broken.placed(); brokenError == nil {
 			test.Errorf("%s: want a miss, read back without an error", name)
 		}

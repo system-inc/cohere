@@ -79,7 +79,9 @@ func storedPlacedOf(answers []fact_resolver.PlacedAnswer) storedPlaced {
 }
 
 // placed is the answers stored holds, in PlacedIn's order, an empty digest read as none, or an error, which is a miss,
-// for columns of different lengths or an index past its table, which only bytes no storedPlacedOf wrote have.
+// for columns of different lengths, an index past its table, or an empty answer, which only bytes no storedPlacedOf
+// wrote have: Ask encodes every answer, no fact too, as JSON of some bytes, and empty bytes would decode as the zero
+// value, an answer the run never held.
 func (stored storedPlaced) placed() ([]fact_resolver.PlacedAnswer, error) {
 	rows := len(stored.KindIndexes)
 	if len(stored.FileIndexes) != rows || len(stored.OffsetSteps) != rows || len(stored.Parameters) != rows ||
@@ -96,6 +98,9 @@ func (stored storedPlaced) placed() ([]fact_resolver.PlacedAnswer, error) {
 		if kind < 0 || kind >= len(stored.Kinds) || file < 0 || file >= len(stored.Files) {
 			return nil, fmt.Errorf("reading the placed answers: row %d names kind %d of %d and file %d of %d", row,
 				kind, len(stored.Kinds), file, len(stored.Files))
+		}
+		if len(stored.Values[row]) == 0 {
+			return nil, fmt.Errorf("reading the placed answers: row %d holds an empty answer", row)
 		}
 		answer := fact_resolver.PlacedAnswer{Kind: stored.Kinds[kind], File: stored.Files[file],
 			Offset: stored.OffsetSteps[row], Parameter: stored.Parameters[row], Encoded: stored.Values[row]}

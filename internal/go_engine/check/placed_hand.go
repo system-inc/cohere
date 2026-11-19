@@ -41,10 +41,15 @@ func newPlacedHand() *placedHand {
 
 // hold has the hand answer of held, a package the build loaded from source, its syntax and types its own, with the
 // answers of placed, the host's entry's of it, about each function standing names by its place, Parameter -1, and its
-// parameters. standing is the caller's word on which of held's functions the host's answers still hold for; until a
-// build hands one, only a test does. digests is the sha256 of each file's bytes as the build parsed it, by the name it
-// parsed it under, as digestsOf reads them from the build's keys; an answer whose file the host held no digest of is
-// never taken.
+// parameters. standing is the caller's word on which of held's functions the host's answers still hold for, and a
+// sound caller names a function only when all three hold: nothing its answers rest on was reached, so no function in
+// its callee closure differs and a caller of a reached unit is never standing; the build parsed the same bytes the
+// host did, which the digests check here too; and its place is its own, which DeclarationPlaces holds by placing no
+// place two functions share. Unit B's comparison of the host's and the build's units is what makes the first true;
+// until a build hands a predicate built on it, only a test does, and TestOnlyATestHoldsTheAnswers keeps every hand,
+// this one included, out of an engine run. digests is the sha256 of each file's bytes as the build parsed it, by the
+// name it parsed it under, as digestsOf reads them from the build's keys; an answer whose file the host held no digest
+// of is never taken.
 func (hand *placedHand) hold(
 	held *packages.Package,
 	placed []fact_resolver.PlacedAnswer,
