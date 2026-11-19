@@ -12,8 +12,8 @@ import (
 // The host's side of the facts' fixed point, stage 4 of #9paaen9 (#5vbs1np): for one package the host checked from
 // source, everything a build's pass is handed of the host's run (fact_reach.Host). The bodies that use each object
 // come from stage 1's record of what each declaration uses (build_reads.FunctionUses), the answers that rest on each
-// body's function from what the host's fact resolver computed (check.ExportedFact), and the answers it took from
-// other packages from the resolver's reads (fact_resolver.Read). All of that is the same in every build, and is made
+// body's function, and those about the functions of other packages its bodies use, from what the host's fact
+// resolver computed (check.ExportedFact). All of that is the same in every build, and is made
 // once (factReachPackage, by factReachBuilder); the standing set alone is a build's own (factReachHost). Nothing but
 // a test reads this yet: the unit that asks a build each question comes after.
 
@@ -70,10 +70,9 @@ type factReachPackage struct {
 	functions []fact_reach.Function
 
 	// recorded are, by a body's place, the questions the host's answers about its function and its parameters make,
-	// in the order of their keys, since the answers come in a map's order and the fixed point asks, and takes bodies
-	// out, in the order it reads them. imported are the questions the answers the host's analysis took from other
-	// packages make, in the order the reads came. askings are what a build is asked of each question of either, by the
-	// question's key.
+	// and imported the questions its answers about the functions of other packages the bodies use make. Both are in
+	// the order of their keys, since the answers come in a map's order and the fixed point asks, and takes bodies out,
+	// in the order it reads them. askings are what a build is asked of each question of either, by the question's key.
 	recorded map[fact_reach.Place][]fact_reach.Question
 	imported []fact_reach.Question
 	askings  map[string]fact_reach.Asking
@@ -84,9 +83,8 @@ type factReachPackage struct {
 	// unplaced counts what the package's side could not name, each a comparison a build would never make. An answer
 	// no body could take: one about the package, a result, a receiver, a function no declaration of the record
 	// declares or one no identity names. A body the file set places in no file, whose answers and uses have nowhere
-	// to rest. A read whose path names nothing, or names neither a function nor a function's parameter, or a function
-	// no identity names. An order-bound object no identity names. A package that has any is linted whole in every
-	// build (factReachHost.Standing), since what cannot be placed cannot be compared.
+	// to rest. An order-bound object no identity names. A package that has any is linted whole in every build
+	// (factReachHost.Standing), since what cannot be placed cannot be compared.
 	unplaced int
 }
 
@@ -116,7 +114,8 @@ func (hosted *factReachPackage) Functions() []fact_reach.Function {
 	return hosted.functions
 }
 
-// Imported are the questions the answers the host's analysis of the package took from other packages make.
+// Imported are the questions the host's answers about the functions of other packages the package's bodies use,
+// and about their parameters, make.
 func (hosted *factReachPackage) Imported() []fact_reach.Question {
 	return hosted.imported
 }

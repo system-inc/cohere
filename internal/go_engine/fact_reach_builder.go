@@ -5,15 +5,10 @@ import (
 	"go/token"
 	"go/types"
 	"slices"
-	"strconv"
-	"strings"
-
-	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
-	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
 // factReachInputs are what one package's side is made from (newFactReachPackage), each the host's own:
@@ -21,7 +16,7 @@ import (
 //   - record is stage 1's record of what each of the package's declarations uses.
 //   - renderer renders the identities, on the caller's goroutine.
 //   - answers are the host's answers about the package's objects, each with Answer set.
-//   - reads are the answers the host's analysis of the package took from other packages.
+//   - imported are the host's answers about other packages' objects, every one it holds, each with Answer set.
 //   - noReturn reports whether the host holds the no-return fact of a function.
 //   - orderBound are the objects whose answers hang on the order the host walked the package in.
 type factReachInputs struct {
@@ -29,7 +24,7 @@ type factReachInputs struct {
 	record     *build_reads.FunctionUses
 	renderer   *build_reads.IdentityRenderer
 	answers    []check.ExportedFact
-	reads      []fact_resolver.Read
+	imported   []check.ExportedFact
 	noReturn   func(function *types.Func) bool
 	orderBound []types.Object
 }
@@ -49,22 +44,24 @@ type factReachFunction struct {
 	placed bool
 }
 
-// factReachParameter is a parameter of a declared function: the function, and the parameter's index among its
-// parameters.
+// factReachParameter is a parameter of a function the package declares or uses: the function, and the parameter's
+// index among its parameters.
 type factReachParameter struct {
 	function *types.Func
 	index    int
 }
 
 // factReachBuilder makes one package's side from inputs, and is let go once it has. rendered keeps each object's
-// identity and key, rendered once however many bodies use it. functions and parameters are what the record's function
-// declarations declare, which the answers are placed by, and met the functions a no-return fact is compared on
-// already, by key.
+// identity and key, rendered once however many bodies use it. functions are the functions the record's declarations
+// declare, which the package's own answers are placed by, used the functions its bodies use, which another package's
+// answers are kept by, and parameters each parameter of either. met are the functions a no-return fact is compared
+// on already, by key.
 type factReachBuilder struct {
 	inputs     factReachInputs
 	hosted     *factReachPackage
 	rendered   map[types.Object]factReachRendered
 	functions  map[*types.Func]factReachFunction
+	used       map[*types.Func]bool
 	parameters map[*types.Var]factReachParameter
 	met        map[fact_reach.Object]bool
 }
@@ -76,7 +73,8 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		hosted: &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{},
 			recorded: map[fact_reach.Place][]fact_reach.Question{}, askings: map[string]fact_reach.Asking{}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
-		parameters: map[*types.Var]factReachParameter{}, met: map[fact_reach.Object]bool{},
+		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
+		met: map[fact_reach.Object]bool{},
 	}
 	for declared := range inputs.record.Declarations() {
 		// A type has no body, and a value's initializer is no function's: neither is a place.
@@ -103,14 +101,17 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 	for _, answer := range inputs.answers {
 		builder.answer(answer)
 	}
+	for _, answer := range inputs.imported {
+		builder.importedAnswer(answer)
+	}
+	// The answers come in a map's order, and the fixed point asks, and takes bodies out, in the order it reads them.
+	byKey := func(first fact_reach.Question, second fact_reach.Question) int {
+		return cmp.Compare(first.Key, second.Key)
+	}
 	for _, questions := range builder.hosted.recorded {
-		slices.SortFunc(questions, func(first fact_reach.Question, second fact_reach.Question) int {
-			return cmp.Compare(first.Key, second.Key)
-		})
+		slices.SortFunc(questions, byKey)
 	}
-	for _, read := range inputs.reads {
-		builder.read(read)
-	}
+	slices.SortFunc(builder.hosted.imported, byKey)
 	for _, object := range inputs.orderBound {
 		rendered := builder.render(object)
 		if !rendered.known {
@@ -150,9 +151,9 @@ func (builder *factReachBuilder) meet(function *types.Func) {
 		Identity: rendered.identity, NoReturn: builder.inputs.noReturn(function)})
 }
 
-// declare keeps each function declared declares, by its object, with the place of its body, and each of its
-// parameters by the parameter's object, and meets each declared with a body. An init function and one named `_`
-// declare no object, and no answer or fact is about either.
+// declare keeps each function declared declares, by its object, with the place of its body, and its parameters, and
+// meets each declared with a body. An init function and one named `_` declare no object, and no answer or fact is
+// about either.
 func (builder *factReachBuilder) declare(
 	declared build_reads.DeclarationUses,
 	place fact_reach.Place,
@@ -164,27 +165,36 @@ func (builder *factReachBuilder) declare(
 			continue
 		}
 		builder.functions[function] = factReachFunction{place: place, placed: isPlaced}
-		parameters := function.Signature().Params()
-		for index := range parameters.Len() {
-			builder.parameters[parameters.At(index)] = factReachParameter{function: function, index: index}
-		}
+		builder.keepParameters(function)
 		if declared.HasBody {
 			builder.meet(function)
 		}
 	}
 }
 
+// keepParameters keeps each of function's parameters by the parameter's object, so an answer about one finds the
+// function and the parameter's index among its parameters.
+func (builder *factReachBuilder) keepParameters(function *types.Func) {
+	parameters := function.Signature().Params()
+	for index := range parameters.Len() {
+		builder.parameters[parameters.At(index)] = factReachParameter{function: function, index: index}
+	}
+}
+
 // use makes the body at place, declared's, a user of each object its body uses, the object selected for a selection,
-// and meets each function among them. Its signature's uses are not its body's: a rule reads a fact where a body names
-// or selects its object. A body with a use no identity names is a user of every object instead, as one the record
-// marks unknown is. The recorder marks a body unknown wherever a use of it renders unknown, by the renderer's own rule
-// (build_reads.unplacedIdentity), so the second check finds nothing today, and stands for a record made any other way.
+// and meets each function among them, kept as used with its parameters. Its signature's uses are not its body's: a
+// rule reads a fact where a body names or selects its object. A body with a use no identity names is a user of every
+// object instead, as one the record marks unknown is. The recorder marks a body unknown wherever a use of it renders
+// unknown, by the renderer's own rule (build_reads.unplacedIdentity), so the second check finds nothing today, and
+// stands for a record made any other way.
 func (builder *factReachBuilder) use(place fact_reach.Place, declared build_reads.DeclarationUses) {
 	isFollowed := !declared.BodyUnknown
 	keys := make([]fact_reach.Object, 0, len(declared.Body))
 	for _, use := range declared.Body {
 		object := builder.inputs.record.Used(use).Object
-		if function, isFunction := object.(*types.Func); isFunction {
+		if function, isFunction := object.(*types.Func); isFunction && !builder.used[function] {
+			builder.used[function] = true
+			builder.keepParameters(function)
 			builder.meet(function)
 		}
 		rendered := builder.render(object)
@@ -263,68 +273,30 @@ func (builder *factReachBuilder) answer(answer check.ExportedFact) {
 	}
 }
 
-// read records read, an answer the host's analysis took from another package, as a question asked before any body
-// leaves: about the function its path names, or the function declaring the parameter its path names. A read with no
-// owner, or whose path names nothing in its owner, or anything else, is counted unplaced.
-func (builder *factReachBuilder) read(read fact_resolver.Read) {
-	if read.Owner == nil {
-		builder.hosted.unplaced++
-		return
-	}
-	object, objectError := objectpath.Object(read.Owner, read.Path)
-	if objectError != nil {
-		builder.hosted.unplaced++
-		return
-	}
+// importedAnswer records answer, one the host holds about another package's object, as a question asked before any
+// body leaves, when it is about a function a body of the package uses or about a parameter of one. The host hands
+// every answer it holds, most of them about functions the package never touches, so any other is left out and counted
+// nowhere: no body's findings turn on it. So is one about a function the record declares, which is the package's own
+// and is asked as its body leaves.
+func (builder *factReachBuilder) importedAnswer(answer check.ExportedFact) {
 	var function *types.Func
 	parameter := -1
-	switch object := object.(type) {
+	switch object := answer.Object.(type) {
 	case *types.Func:
 		function = object
 	case *types.Var:
-		declaring, index, isParameter := factReachParameterOf(read.Owner, read.Path, object)
+		declaring, isParameter := builder.parameters[object]
 		if !isParameter {
-			builder.hosted.unplaced++
 			return
 		}
-		function, parameter = declaring, index
+		function, parameter = declaring.function, declaring.index
 	default:
-		builder.hosted.unplaced++
 		return
 	}
-	if question, isNew := builder.ask(read.Kind, function, parameter, read.Value); isNew {
+	if _, isDeclared := builder.functions[function]; isDeclared || !builder.used[function] {
+		return
+	}
+	if question, isNew := builder.ask(answer.Analyzer, function, parameter, answer.Encoded); isNew {
 		builder.hosted.imported = append(builder.hosted.imported, question)
 	}
-}
-
-// factReachParameterSuffix is how an objectpath goes from a function to one of its parameters, before the parameter's
-// index: `.` for the function's type, `P` for the signature's parameters and `A` for the one at an index.
-const factReachParameterSuffix = ".PA"
-
-// factReachParameterOf is the function of owner that declares variable, the object path names there, as a parameter,
-// and the parameter's index, false when variable is no function's parameter. An objectpath writes a parameter as its
-// function's path, then factReachParameterSuffix and the index, so the function is looked up by what comes before.
-// The path is only where to look: what it leads to must be a function, and hold variable itself at that index.
-func factReachParameterOf(owner *types.Package, path objectpath.Path, variable *types.Var) (*types.Func, int, bool) {
-	cut := strings.LastIndex(string(path), factReachParameterSuffix)
-	if cut < 0 {
-		return nil, 0, false
-	}
-	index, indexError := strconv.Atoi(string(path)[cut+len(factReachParameterSuffix):])
-	if indexError != nil || index < 0 {
-		return nil, 0, false
-	}
-	declaring, declaringError := objectpath.Object(owner, path[:cut])
-	if declaringError != nil {
-		return nil, 0, false
-	}
-	function, isFunction := declaring.(*types.Func)
-	if !isFunction {
-		return nil, 0, false
-	}
-	parameters := function.Signature().Params()
-	if index >= parameters.Len() || parameters.At(index) != variable {
-		return nil, 0, false
-	}
-	return function, index, true
 }

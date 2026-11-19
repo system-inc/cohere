@@ -14,12 +14,9 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/types/objectpath"
-
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
-	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
 // factReachFixture is one package of the fact-reach fixture, checked from its source by the test itself, with no
@@ -144,8 +141,8 @@ func (fixture *factReachFixture) key(test *testing.T, object types.Object) fact_
 	return key
 }
 
-// inputs are what the fixture's host side is made from with no answer, no read, no object bound to the order and no
-// function holding the no-return fact, for a test to add its own to.
+// inputs are what the fixture's host side is made from with no answer of its own or imported, no object bound to the
+// order and no function holding the no-return fact, for a test to add its own to.
 func (fixture *factReachFixture) inputs() factReachInputs {
 	return factReachInputs{fileSet: fixture.fileSet, record: fixture.record,
 		renderer: build_reads.NewIdentityRenderer(fixture.fileSet, nil),
@@ -181,18 +178,6 @@ func (fixture *factReachFixture) standing(names ...string) map[fact_reach.Place]
 // purity is a hand-made answer of function_purity about object, encoded as written.
 func purity(object types.Object, encoded string) check.ExportedFact {
 	return check.ExportedFact{Analyzer: "function_purity", Object: object, Answer: true, Encoded: []byte(encoded)}
-}
-
-// readOf is a hand-made read of the answer of kind about object, another package's, by the objectpath that names it
-// there.
-func readOf(test *testing.T, kind string, object types.Object, value string) fact_resolver.Read {
-	test.Helper()
-
-	path, pathError := objectpath.For(object)
-	if pathError != nil {
-		test.Fatalf("%s has no objectpath: %v", object, pathError)
-	}
-	return fact_resolver.Read{Kind: kind, Owner: object.Pkg(), Path: path, Value: []byte(value)}
 }
 
 // An object's users are the bodies that name or select it, each once, in the order they are declared: a function
@@ -359,7 +344,7 @@ func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testi
 		test.Errorf("Warm's place, which no answer is about, holds %+v", got)
 	}
 	if got := hosted.Imported(); len(got) != 0 {
-		test.Errorf("with no read, the imported questions are %+v", got)
+		test.Errorf("with no imported answer, the imported questions are %+v", got)
 	}
 }
 
@@ -400,27 +385,40 @@ func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 	}
 }
 
-// An answer the host's analysis took from another package is a question asked before any body leaves, in the order
-// the reads came: a read of a function is about it, and a read of a function's parameter, a method's too, is about
-// the function with the parameter's index, found by the path and held to the function's own parameter. A read handed
-// twice is one question, and what a build is asked of each is kept by its key beside the recorded ones.
-func TestAReadOfAnotherPackageIsAQuestionAboutItsFunction(test *testing.T) {
+// An answer the host holds about another package's function is a question asked before any body leaves, when a body
+// of the package uses the function: one of the function itself, and one of its parameter with the parameter's index,
+// still about the function. The questions come in the order of their keys whatever order the answers came in, an
+// answer handed twice is one question, and what a build is asked of each is kept by its key beside the recorded ones.
+// The host hands every answer it holds, so one about a function no body uses, about that function's parameter, about
+// a value, about the package, or about one of the package's own functions, answered among its own or not, is left
+// out and counted nowhere.
+func TestAnImportedAnswerAboutAUsedFunctionIsAQuestionAboutIt(test *testing.T) {
 	test.Parallel()
 
 	fixture, lower := checkedFactsFixture(test)
+	size := fixture.function(test, "size")
 	depth, halve := lower.function(test, "Depth"), lower.function(test, "Halve")
 	apply := lower.function(test, "Scale.Apply")
+	oddSlice := func(parameter *types.Var, encoded string) check.ExportedFact {
+		return check.ExportedFact{Analyzer: "odd_slice_argument", Object: parameter, Answer: true,
+			Encoded: []byte(encoded)}
+	}
 	inputs := fixture.inputs()
-	inputs.answers = []check.ExportedFact{purity(fixture.function(test, "size"), "true")}
-	inputs.reads = []fact_resolver.Read{
-		readOf(test, "function_purity", depth, "true"),
-		readOf(test, "odd_slice_argument", halve.Signature().Params().At(1), `{"odd":true}`),
-		readOf(test, "odd_slice_argument", apply.Signature().Params().At(0), `{"odd":false}`),
-		readOf(test, "function_purity", depth, "true"),
+	inputs.answers = []check.ExportedFact{purity(size, "true")}
+	inputs.imported = []check.ExportedFact{
+		oddSlice(halve.Signature().Params().At(1), `{"odd":true}`),
+		purity(apply, "true"),
+		oddSlice(apply.Signature().Params().At(0), `{"odd":false}`),
+		purity(lower.own.Scope().Lookup("Limit"), "true"),
+		purity(nil, "true"),
+		purity(size, "false"),
+		purity(fixture.function(test, "platformSize"), "true"),
+		purity(depth, "true"),
+		purity(depth, "true"),
 	}
 	hosted := newFactReachPackage(inputs)
 	if hosted.unplaced != 0 {
-		test.Errorf("want every read placed, got %d unplaced", hosted.unplaced)
+		test.Errorf("want nothing unplaced, an imported answer left out being counted nowhere, got %d", hosted.unplaced)
 	}
 	imported := hosted.Imported()
 	renderer := build_reads.NewIdentityRenderer(fixture.fileSet, nil)
@@ -432,10 +430,14 @@ func TestAReadOfAnotherPackageIsAQuestionAboutItsFunction(test *testing.T) {
 	}{
 		{"function_purity", depth, -1, "true"},
 		{"odd_slice_argument", halve, 1, `{"odd":true}`},
-		{"odd_slice_argument", apply, 0, `{"odd":false}`},
 	}
 	if len(imported) != len(want) {
-		test.Fatalf("the imported questions are %+v, want %d, a read handed twice being one", imported, len(want))
+		var asked []string
+		for _, question := range imported {
+			asking, _ := hosted.Asking(question.Key)
+			asked = append(asked, fmt.Sprintf("%s of %s, parameter %d", asking.Kind, asking.Function, asking.Parameter))
+		}
+		test.Fatalf("the imported questions are %q, want Depth's purity and Halve's parameter 1 alone", asked)
 	}
 	for index, each := range want {
 		question := imported[index]
@@ -450,7 +452,8 @@ func TestAReadOfAnotherPackageIsAQuestionAboutItsFunction(test *testing.T) {
 				isAsked, each.kind, each.function.Name(), each.parameter, each.encoded)
 		}
 	}
-	// The recorded question answers by its key beside the imported ones, and neither list holds the other's.
+	// The recorded question answers by its key beside the imported ones, with the answer the package's own answers
+	// gave, and neither list holds the other's.
 	recorded := hosted.Recorded(fixture.places["size"])
 	if len(recorded) != 1 {
 		test.Fatalf("size's place holds %+v, want its one question", recorded)
@@ -462,37 +465,9 @@ func TestAReadOfAnotherPackageIsAQuestionAboutItsFunction(test *testing.T) {
 	if slices.Contains(imported, recorded[0]) {
 		test.Error("size's recorded question is among the imported ones")
 	}
-}
-
-// A read no function can take is counted unplaced, each kind of one by itself: a path that names nothing, a result, a
-// value, a type, a parameter whose path leads to a value of a function type and no function, and a read with no owner.
-func TestAReadNoFunctionCanTakeIsCountedUnplaced(test *testing.T) {
-	test.Parallel()
-
-	fixture, lower := checkedFactsFixture(test)
-	halve := lower.function(test, "Halve")
-	hook, isSignature := lower.own.Scope().Lookup("Hook").Type().(*types.Signature)
-	if !isSignature {
-		test.Fatal("want Hook of a function type")
-	}
-	for _, each := range []struct {
-		name string
-		read fact_resolver.Read
-	}{
-		{"a path that names nothing", fact_resolver.Read{Kind: "function_purity", Owner: lower.own, Path: "Missing"}},
-		{"a result", readOf(test, "function_purity", halve.Signature().Results().At(0), "true")},
-		{"a value", readOf(test, "function_purity", lower.own.Scope().Lookup("Limit"), "true")},
-		{"a type", readOf(test, "function_purity", lower.own.Scope().Lookup("Scale"), "true")},
-		{"a parameter of a value of a function type", readOf(test, "odd_slice_argument", hook.Params().At(0), "{}")},
-		{"no owner", fact_resolver.Read{Kind: "function_purity", Path: "Depth"}},
-	} {
-		inputs := fixture.inputs()
-		inputs.reads = []fact_resolver.Read{each.read}
-		hosted := newFactReachPackage(inputs)
-		if hosted.unplaced != 1 || len(hosted.Imported()) != 0 || len(hosted.askings) != 0 {
-			test.Errorf("a read of %s: %d unplaced, %d imported and %d askings, want 1 and none", each.name,
-				hosted.unplaced, len(hosted.Imported()), len(hosted.askings))
-		}
+	if len(hosted.askings) != len(want)+1 {
+		test.Errorf("%d questions have something to ask, want the %d imported and size's", len(hosted.askings),
+			len(want))
 	}
 }
 
