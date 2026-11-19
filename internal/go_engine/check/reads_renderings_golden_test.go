@@ -18,8 +18,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
-// updateRenderings has the golden test write the renderings it computes over the golden, after a change that moved
-// them and ReadsRendererVersion with them.
+// updateRenderings has the golden test write the renderings it computes over the golden, after a change meant to move
+// them.
 var updateRenderings = flag.Bool("update", false, "write the reads renderings golden")
 
 // renderingsGolden is where the golden of the fixture's renderings lives.
@@ -43,7 +43,7 @@ const renderingsSource = "package rendered\n\n" +
 	"const Rotation = 1.5 + 2i\n\n" +
 	"const Greeting = \"hello\"\n"
 
-// readsRenderingLines are what a persisted digest is taken of, for a fixed fixture: the version line, then each
+// readsRenderingLines are what a verdict compares of the host's side and the build's, for a fixed fixture: each
 // object of the verdict fixture's darwin platform and of renderingsSource, its closure digest measured by the amd64
 // sizes and whole, each beside the closure it stands for written out (closureRendering), the digest of what each kind
 // of use reads of it, measured, beside the lines it reads (useLines), and the value digests of fixed facts.
@@ -51,7 +51,7 @@ func readsRenderingLines(test *testing.T) []string {
 	test.Helper()
 
 	sizes := types.SizesFor("gc", "amd64")
-	lines := []string{"renderer " + ReadsRendererVersion}
+	lines := []string{}
 	for _, declaring := range []*types.Package{
 		checkedWorld(test, "darwin", "").platform,
 		checkedInMemory(test, renderingPath, renderingsSource, nil),
@@ -117,8 +117,7 @@ func methodCandidateLines(typeName *types.TypeName) []string {
 	}
 	var lines []string
 	for _, method := range methods {
-		candidate, isCandidate := methodCandidateOf(typeName, build_reads.QueryMethod, method.Name(), nil,
-			ReadsRendererVersion)
+		candidate, isCandidate := methodCandidateOf(typeName, build_reads.QueryMethod, method.Name(), nil)
 		if !isCandidate {
 			continue
 		}
@@ -132,11 +131,10 @@ func methodCandidateLines(typeName *types.TypeName) []string {
 	return lines
 }
 
-// The renderings a persisted digest is taken of stay as the golden holds them while ReadsRendererVersion does, so a
-// change to a closure digest, a rendering or a fact's value digest that does not move the version fails here: a record
-// another binary persisted would otherwise be matched against renderings made another way. A change that moves the
-// version too writes the golden again with -update.
-func TestTheReadsRenderingsMoveOnlyWithTheirVersion(test *testing.T) {
+// The renderings a verdict compares stay as the golden holds them, so a change to a closure digest, a rendering or a
+// fact's value digest, which moves what every verdict holds or declines, is seen here and written again on purpose with
+// -update.
+func TestTheReadsRenderingsStayAsTheGoldenHoldsThem(test *testing.T) {
 	test.Parallel()
 
 	computed := strings.Join(readsRenderingLines(test), "\n") + "\n"
@@ -150,17 +148,10 @@ func TestTheReadsRenderingsMoveOnlyWithTheirVersion(test *testing.T) {
 	if readError != nil {
 		test.Fatalf("reading the golden: %v (write it with -update)", readError)
 	}
-	if string(golden) == computed {
-		return
+	if string(golden) != computed {
+		test.Fatalf("the reads renderings moved: write the golden again with -update if the move is meant. The first "+
+			"line that moved:\n%s", firstMovedLine(string(golden), computed))
 	}
-	goldenVersion, _, _ := strings.Cut(string(golden), "\n")
-	if goldenVersion == "renderer "+ReadsRendererVersion {
-		test.Fatalf("the reads renderings moved while ReadsRendererVersion stayed %s: move it, then write the "+
-			"golden again with -update. The first line that moved:\n%s", ReadsRendererVersion,
-			firstMovedLine(string(golden), computed))
-	}
-	test.Fatalf("the golden is of %s, while ReadsRendererVersion is %s: write it again with -update",
-		strings.TrimPrefix(goldenVersion, "renderer "), ReadsRendererVersion)
 }
 
 // firstMovedLine is the first line golden and computed write differently, each side's.
