@@ -37,8 +37,8 @@ import (
 // restored, by ID, sorted, how many
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
-// package never a candidate by the first word of why: inputs, noEntry, sizes, never, unknown, unpersisted, unreadable,
-// export, T, L, F, D or A.
+// package never a candidate by the first word of why: inputs, noEntry, sizes, never, unknown, noReads, export, T, L, F,
+// D or A.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
 // wall time it ran within.
@@ -191,12 +191,6 @@ var declineKeys = map[string]string{
 
 	// A package the host kept, in a build whose sizes are not the host's, which restores nothing from it (#61qj12v).
 	"sizes": "buildSizes",
-
-	// A package whose entry persisted no reads, counted apart from reads never recorded.
-	"unpersisted": "readsNotPersisted",
-
-	// A package whose persisted reads name something the record does not hold.
-	"unreadable": "readsUnreadable",
 }
 
 // reasonWord is why a package was not restored from the host, as the record counts it: the reason's first word,
@@ -414,15 +408,11 @@ func loadedSizes(loaded []*packages.Package) types.Sizes {
 }
 
 // unrestorableReads is why a visited package's reads can never hold, as a reason the record counts by its first word,
-// empty for reads a verdict judges: a package kept with persisted reads has its record judged by
-// the verdict, which declines a record it cannot read or match before any read; one kept with none, or whose reads
-// are marked never or were never recorded, is declined here.
+// empty for reads a verdict judges: one kept with none, or whose reads are marked never or were never recorded, is
+// declined here.
 func unrestorableReads(restoring Restoring) string {
 	if restoring.Reads == nil {
-		if restoring.persisted == nil {
-			return unpersistedReads
-		}
-		return ""
+		return noReads
 	}
 	if restorable, why := restoring.Reads.Restorable(); !restorable {
 		if restoring.Reads.Never() != "" {
