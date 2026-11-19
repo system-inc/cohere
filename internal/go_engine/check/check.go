@@ -26,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -822,20 +823,31 @@ func abandoned(abandon <-chan struct{}) bool {
 // to record its lookups of other packages in, once Run sets Reads (#b2t9xmf). Inherited hands each syntax-only rule the
 // host's findings it inherits, once Run sets Inheritance (#y6q1x2j). FactHost hands each pass on a package the host's
 // side of it for the facts' reach, once Run sets FactHosts (#5vbs1np). Standing hands each pass on a package what
-// stands there, once Run sets StandingBodies (#e4rd5dw).
+// stands there, once Run sets StandingBodies (#e4rd5dw), and FollowsStanding names the actions that follow
+// StandingAfter's there: each dispatcher's, and the representation's build, which then leaves unbuilt what stands for
+// every rule its dispatcher starts (followsStanding).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
-		Dependents:    rule.Dependents,
-		Failed:        rule.Failed,
-		Tolerant:      dispatch.IsDispatcher,
-		ForDependents: dispatch.ListenerRequirement,
-		Resolver:      fact_resolver.New(nil),
-		Resolved:      rule.Resolved,
-		Recorded:      rule.Recorded,
-		Inherited:     rule.Inherited,
-		FactHost:      rule.FactHost,
-		Standing:      rule.Standing,
+		Dependents:      rule.Dependents,
+		Failed:          rule.Failed,
+		Tolerant:        dispatch.IsDispatcher,
+		ForDependents:   dispatch.ListenerRequirement,
+		Resolver:        fact_resolver.New(nil),
+		Resolved:        rule.Resolved,
+		Recorded:        rule.Recorded,
+		Inherited:       rule.Inherited,
+		FactHost:        rule.FactHost,
+		Standing:        rule.Standing,
+		FollowsStanding: followsStanding,
 	}
+}
+
+// followsStanding is whether analyzer's action on a package follows checker.Options.StandingAfter's there (#e4rd5dw):
+// a dispatcher's, whose confined rules hear no standing body, and build_intermediate_representation's, so the
+// representation is built less what stands for every rule its dispatcher starts rather than whole. Neither is required
+// by standing_facts, the analyzer the census path follows, so no follower waits on itself.
+func followsStanding(analyzer *analysis.Analyzer) bool {
+	return dispatch.IsDispatcher(analyzer) || analyzer == build_intermediate_representation.Analyzer
 }
 
 // actionFindings is what action found, as newFinding makes it.

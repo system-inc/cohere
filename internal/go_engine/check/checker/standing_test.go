@@ -79,8 +79,9 @@ func TestEveryPassOnAPackageHoldsItsOneStandingBodies(test *testing.T) {
 	dispatcher := passes.analyzer("dispatcher")
 	analyzers := []*analysis.Analyzer{dispatcher, passes.analyzer("ruled", dispatcher), passes.analyzer("plain")}
 	options := &Options{
-		Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
-		Standing: standingKey,
+		Tolerant:        func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+		FollowsStanding: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+		Standing:        standingKey,
 		StandingBodies: func(packageId string, after any) rule.StandingBodies {
 			if passes.ask(packageId, after); packageId == bare {
 				return nil
@@ -162,6 +163,9 @@ func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test 
 				Tolerant: func(analyzer *analysis.Analyzer) bool {
 					return analyzer == dispatcher || analyzer == second
 				},
+				FollowsStanding: func(analyzer *analysis.Analyzer) bool {
+					return analyzer == dispatcher || analyzer == second
+				},
 				Standing: standingKey,
 				StandingBodies: func(packageId string, after any) rule.StandingBodies {
 					passes.ask(packageId, after)
@@ -224,9 +228,10 @@ func TestAFailedStandingAnalyzerLeavesNothingStandingAndFailsNoDispatcher(test *
 			dispatcher := passes.analyzer("dispatcher")
 			analyzeStanding(test, []*analysis.Analyzer{dispatcher, passes.analyzer("ruled", dispatcher)}, roots,
 				&Options{
-					Failed:   failed,
-					Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
-					Standing: standingKey,
+					Failed:          failed,
+					Tolerant:        func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+					FollowsStanding: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+					Standing:        standingKey,
 					StandingBodies: func(packageId string, after any) rule.StandingBodies {
 						passes.ask(packageId, after)
 						return &standingOf{packageId: packageId, after: after}
@@ -260,8 +265,9 @@ func TestADispatcherOnARestoredPackageFollowsNothing(test *testing.T) {
 		passes := newStandingPasses()
 		dispatcher := passes.analyzer("dispatcher")
 		options := &Options{
-			Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
-			Standing: standingKey,
+			Tolerant:        func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+			FollowsStanding: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+			Standing:        standingKey,
 			StandingBodies: func(packageId string, after any) rule.StandingBodies {
 				passes.ask(packageId, after)
 				return &standingOf{packageId: packageId, after: after}
@@ -290,9 +296,10 @@ func TestWithoutTheStandingOptionNothingIsFollowed(test *testing.T) {
 	passes := newStandingPasses()
 	dispatcher := passes.analyzer("dispatcher")
 	actions := analyzeStanding(test, []*analysis.Analyzer{dispatcher}, roots, &Options{
-		Tolerant:      func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
-		Standing:      standingKey,
-		StandingAfter: passes.followedAnalyzer(nil),
+		Tolerant:        func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+		FollowsStanding: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+		Standing:        standingKey,
+		StandingAfter:   passes.followedAnalyzer(nil),
 	})
 	if actions != len(roots) || len(passes.finished) != 0 {
 		test.Errorf("the graph holds %d actions and the followed analyzer ran on %v, want only the dispatcher's on "+

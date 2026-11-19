@@ -118,13 +118,15 @@ func newPlantedStanding(
 }
 
 // options is the checker's options that hand every pass the planted standing bodies, whatever its package, with a
-// dispatcher told from any other analyzer as the engine tells one.
+// dispatcher told from any other analyzer as the engine tells one, and each dispatcher a follower of
+// checker.Options.StandingAfter where a test sets it.
 func (standing *plantedStanding) options() *checker.Options {
 	return &checker.Options{
-		Failed:         rule.Failed,
-		Tolerant:       IsDispatcher,
-		Standing:       rule.Standing,
-		StandingBodies: func(string, any) rule.StandingBodies { return standing },
+		Failed:          rule.Failed,
+		Tolerant:        IsDispatcher,
+		FollowsStanding: IsDispatcher,
+		Standing:        rule.Standing,
+		StandingBodies:  func(string, any) rule.StandingBodies { return standing },
 	}
 }
 

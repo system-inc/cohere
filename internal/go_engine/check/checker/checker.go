@@ -234,18 +234,20 @@
 // dispatcher calls a confined rule for nothing inside a standing body and
 // the rule reports the host's findings there as its own.
 // Options.StandingAfter names an analyzer whose action on a package
-// every dispatcher's action there follows, a dispatcher's being one
-// Options.Tolerant names: Analyze adds the edge, no analyzer's Requires
-// changes, and StandingBodies is asked with that action's result. Then
-// only a pass that runs after that action holds the answer, a
-// dispatcher's and a rule's own after its dispatcher. Where that action
-// failed, the dispatcher runs all the same with nothing standing, and a
-// failure of the added edge is no part of its own nor of what it reads
-// under Options.Failed. The checker never reads the answer. Analyze
-// refuses a StandingAfter that is a dispatcher, or requires one through
-// what it requires, since every dispatcher's action would then wait on
-// one that waits on it. With StandingBodies unset, the graph and every
-// pass are as they were.
+// every follower's action there follows, a follower being an analyzer
+// Options.FollowsStanding names, the engine's dispatchers and the build
+// of its representation, which then leaves unbuilt what stands for
+// every rule its dispatcher starts: Analyze adds the edge, no analyzer's
+// Requires changes, and StandingBodies is asked with that action's
+// result. Then only a pass that runs after that action holds the
+// answer, a follower's and one that follows a follower, as a rule's own
+// follows its dispatcher. Where that action failed, the follower runs
+// all the same with nothing standing, and a failure of the added edge is
+// no part of its own nor of what it reads under Options.Failed. The
+// checker never reads the answer. Analyze refuses a StandingAfter that
+// is a follower, or requires one through what it requires, since every
+// such follower's action would then wait on one that waits on it. With
+// StandingBodies unset, the graph and every pass are as they were.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -459,24 +461,25 @@ type Options struct {
 	// package, by whichever action on it reads the answer first, and
 	// Standing, when StandingBodies is set too, keys that one answer in
 	// the ResultOf of every pass on the package, a key never run, as
-	// Dependents is. StandingAfter, when StandingBodies is set too, is an
-	// analyzer whose action on a package each action there that Tolerant
-	// names, a dispatcher's, follows, by an edge Analyze adds where the
-	// analyzer does not require it already, and whose result there
-	// StandingBodies is asked with as after, nil without StandingAfter.
-	// With StandingAfter only a pass that runs after its action holds
-	// the answer: one that follows that action, and one that follows
-	// such a one, as a rule's own follows its dispatcher. Where that
-	// action failed, no pass holds one, and a failure of the edge Analyze
-	// added fails no action and is not under Failed. StandingAfter must
-	// not require a dispatcher, itself or through what it requires, since
-	// the dispatcher would then wait on itself, and Analyze refuses one
-	// that does, naming it. With StandingBodies
+	// Dependents is. StandingAfter, when StandingBodies and
+	// FollowsStanding are set too, is an analyzer whose action on a
+	// package each action there that FollowsStanding names follows, by an
+	// edge Analyze adds where the analyzer does not require it already,
+	// and whose result there StandingBodies is asked with as after, nil
+	// without StandingAfter. With StandingAfter only a pass that runs
+	// after its action holds the answer: one that follows that action,
+	// and one that follows such a one, as a rule's own follows its
+	// dispatcher. Where that action failed, no pass holds one, and a
+	// failure of the edge Analyze added fails no action and is not under
+	// Failed. StandingAfter must not be or require an analyzer
+	// FollowsStanding names, since that one would then wait on itself,
+	// and Analyze refuses one that does, naming it. With StandingBodies
 	// unset, no action is added, and unset or where it answers nil,
 	// ResultOf holds no standing bodies.
-	Standing       *analysis.Analyzer
-	StandingBodies func(packageId string, after any) rule.StandingBodies
-	StandingAfter  *analysis.Analyzer
+	Standing        *analysis.Analyzer
+	StandingBodies  func(packageId string, after any) rule.StandingBodies
+	StandingAfter   *analysis.Analyzer
+	FollowsStanding func(*analysis.Analyzer) bool
 
 	// cohere: Reads, when set, holds the reads of each package whose
 	// fact reads are recorded: every ObjectFact and PackageFact an action
@@ -748,13 +751,13 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		return nil, err
 	}
 
-	// cohere: refuse an Options.StandingAfter that is a dispatcher or
-	// requires one, whose edge would have each dispatcher wait on itself.
-	if opts.StandingBodies != nil && opts.StandingAfter != nil && opts.Tolerant != nil {
-		if dispatcher := requiredDispatcher(opts.StandingAfter, opts.Tolerant); dispatcher != nil {
-			return nil, fmt.Errorf("the analyzer every dispatcher follows for its standing bodies, %s, "+
-				"requires the dispatcher %s, itself or through what it requires, so each dispatcher's action "+
-				"would wait on itself", opts.StandingAfter.Name, dispatcher.Name)
+	// cohere: refuse an Options.StandingAfter that is a follower or
+	// requires one, whose edge would have that follower wait on itself.
+	if opts.StandingBodies != nil && opts.StandingAfter != nil && opts.FollowsStanding != nil {
+		if follower := requiredFollower(opts.StandingAfter, opts.FollowsStanding); follower != nil {
+			return nil, fmt.Errorf("the analyzer every follower follows for its standing bodies, %s, "+
+				"requires the follower %s, itself or through what it requires, so that follower's action "+
+				"would wait on itself", opts.StandingAfter.Name, follower.Name)
 		}
 	}
 
@@ -859,19 +862,20 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 	}
 
-	// cohere: Options.StandingAfter, the action each dispatcher's action on
-	// a package follows. The edge is added here, once ForDependents has
-	// dropped what it drops, so this one stays, and before the readers are
-	// counted, so the Result is kept until the dispatcher has read it. A
-	// restored package runs nothing, so nothing there follows anything.
-	if opts.StandingBodies != nil && opts.StandingAfter != nil && opts.Tolerant != nil {
-		var dispatchers []*Action
+	// cohere: Options.StandingAfter, the action each follower's action on
+	// a package follows (Options.FollowsStanding). The edge is added here,
+	// once ForDependents has dropped what it drops, so this one stays, and
+	// before the readers are counted, so the Result is kept until the
+	// follower has read it. A restored package runs nothing, so nothing
+	// there follows anything.
+	if opts.StandingBodies != nil && opts.StandingAfter != nil && opts.FollowsStanding != nil {
+		var followers []*Action
 		for _, act := range actions {
-			if opts.Tolerant(act.Analyzer) && (opts.Restored == nil || !opts.Restored(act.Package)) {
-				dispatchers = append(dispatchers, act)
+			if opts.FollowsStanding(act.Analyzer) && (opts.Restored == nil || !opts.Restored(act.Package)) {
+				followers = append(followers, act)
 			}
 		}
-		for _, act := range dispatchers {
+		for _, act := range followers {
 			after := mkAction(opts.StandingAfter, act.Package)
 			if !requiredByAny([]*Action{act}, after) {
 				act.Deps = append(act.Deps, after)
@@ -1330,10 +1334,10 @@ func requiredByAny(acts []*Action, dep *Action) bool {
 	return false
 }
 
-// cohere: requiredDispatcher is the first analyzer tolerant names that
-// after is or requires, depth first through what each requires, and nil
-// when there is none.
-func requiredDispatcher(after *analysis.Analyzer, tolerant func(*analysis.Analyzer) bool) *analysis.Analyzer {
+// cohere: requiredFollower is the first analyzer follows names that after
+// is or requires, depth first through what each requires, and nil when
+// there is none.
+func requiredFollower(after *analysis.Analyzer, follows func(*analysis.Analyzer) bool) *analysis.Analyzer {
 	seen := map[*analysis.Analyzer]bool{}
 	var find func(current *analysis.Analyzer) *analysis.Analyzer
 	find = func(current *analysis.Analyzer) *analysis.Analyzer {
@@ -1341,7 +1345,7 @@ func requiredDispatcher(after *analysis.Analyzer, tolerant func(*analysis.Analyz
 			return nil
 		}
 		seen[current] = true
-		if tolerant(current) {
+		if follows(current) {
 			return current
 		}
 		for _, required := range current.Requires {
