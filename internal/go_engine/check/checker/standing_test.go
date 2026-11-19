@@ -131,10 +131,11 @@ func TestEveryPassOnAPackageHoldsItsOneStandingBodies(test *testing.T) {
 // dispatcher does not require it: the followed analyzer has finished on the package before the dispatcher's pass
 // runs, Options.StandingBodies is asked once for the package, with its result there, and the result is no input of the
 // dispatcher's pass. The pass of a rule that requires the dispatcher holds the very answer the dispatcher's pass
-// holds. The pass of an analyzer that follows neither may run before the answer, so it holds none. A dispatcher that
-// requires the analyzer itself follows it by its own edge and holds its result as any input. One that requires it
-// only for a listener no rule of the run has, an edge Options.ForDependents drops, follows it by the edge Analyze adds
-// once that one is dropped, and holds no result of it.
+// holds, and so do a second dispatcher's pass and its rule's, as the syntax dispatcher and the one over the
+// representation both run on a package. The pass of an analyzer that follows neither may run before the answer, so it
+// holds none. A dispatcher that requires the analyzer itself follows it by its own edge and holds its result as any
+// input. One that requires it only for a listener no rule of the run has, an edge Options.ForDependents drops, follows
+// it by the edge Analyze adds once that one is dropped, and holds no result of it.
 func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test *testing.T) {
 	test.Parallel()
 	for _, requirement := range []struct {
@@ -156,8 +157,11 @@ func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test 
 			if requirement.requires {
 				dispatcher = passes.analyzer("dispatcher", followed)
 			}
+			second := passes.analyzer("second")
 			options := &Options{
-				Tolerant: func(analyzer *analysis.Analyzer) bool { return analyzer == dispatcher },
+				Tolerant: func(analyzer *analysis.Analyzer) bool {
+					return analyzer == dispatcher || analyzer == second
+				},
 				Standing: standingKey,
 				StandingBodies: func(packageId string, after any) rule.StandingBodies {
 					passes.ask(packageId, after)
@@ -171,7 +175,7 @@ func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test 
 				}
 			}
 			actions := analyzeStanding(test, []*analysis.Analyzer{dispatcher, passes.analyzer("ruled", dispatcher),
-				passes.analyzer("plain")}, roots, options)
+				second, passes.analyzer("second_ruled", second), passes.analyzer("plain")}, roots, options)
 			for _, root := range roots {
 				found := passes.passes["dispatcher "+root.PkgPath]
 				held, isHeld := found.standing.(*standingOf)
@@ -183,10 +187,11 @@ func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test 
 						"%q, and the results %v", root.ID, found.followed, found.standing, found.results, after,
 						requirement.results)
 				}
-				if ruled := passes.passes["ruled "+root.PkgPath]; !isHeld || ruled.standing != found.standing {
-					test.Errorf("the pass of the rule that requires the dispatcher holds %v under Standing on %s, "+
-						"want the very answer the dispatcher's pass holds, %v", ruled.standing, root.ID,
-						found.standing)
+				for _, name := range []string{"ruled", "second", "second_ruled"} {
+					if after := passes.passes[name+" "+root.PkgPath]; !isHeld || after.standing != found.standing {
+						test.Errorf("the pass of %s holds %v under Standing on %s, want the very answer the "+
+							"dispatcher's pass holds, %v", name, after.standing, root.ID, found.standing)
+					}
 				}
 				if plain := passes.passes["plain "+root.PkgPath]; plain.keyed || len(plain.results) != 0 {
 					test.Errorf("the pass of an analyzer that follows nothing holds %v under Standing and the "+
@@ -197,9 +202,9 @@ func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test 
 						root.ID)
 				}
 			}
-			if actions != 4*len(roots) {
-				test.Errorf("the graph holds %d actions, want the dispatcher's, its rule's, the other analyzer's and "+
-					"the followed one's on each of %d packages", actions, len(roots))
+			if actions != 6*len(roots) {
+				test.Errorf("the graph holds %d actions, want two dispatchers', their two rules', the other "+
+					"analyzer's and the followed one's on each of %d packages", actions, len(roots))
 			}
 		})
 	}
