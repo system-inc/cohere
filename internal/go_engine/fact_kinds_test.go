@@ -121,8 +121,8 @@ func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 		test.Fatal("windows's build ran no body differential")
 	}
 	if len(differential.standingFailed) > 0 {
-		test.Errorf("windows's second leg failed %v, among the differential's failures\n%s\nwant nothing standing that "+
-			"differs", differential.standingFailed, strings.Join(differential.failures, "\n"))
+		test.Errorf("windows's second leg failed %v, among the differential's failures\n%s\nwant nothing standing "+
+			"that differs", differential.standingFailed, strings.Join(differential.failures, "\n"))
 	}
 }
 
@@ -151,6 +151,8 @@ func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndLeavesAnEqualOnesStandi
 		{"stopping calls", "StoppingUser", "stopVia", fact_reach.UnknownReason("test_stopping_calls"), ""},
 	} {
 		test.Run(kind.name, func(test *testing.T) {
+			// The settlement is only read, by every kind at once.
+			test.Parallel()
 			if settled.bodies[kind.user].reason != "" {
 				test.Fatalf("the reach reached %s for %q, want it unreached", kind.user,
 					settled.bodies[kind.user].reason)
