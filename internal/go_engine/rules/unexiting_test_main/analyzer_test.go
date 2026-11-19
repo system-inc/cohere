@@ -36,8 +36,11 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 // package level and calls inside a call's arguments. The two agree on every one but a TestMain after a call to os.Exit
 // at package level, in its file or in the file before, which the port alone finds, as each record says (#zvwfe26).
 // shapes.go holds the exits they agree on: direct, in a function literal, deferred, and through a local alias, which
-// neither counts.
+// neither counts. Every TestMain there is a method in a file go test never runs, which both judge by its name and
+// parameter alone, so test_main_file holds the same difference on a TestMain as go test runs one, a function in a
+// test file, after a call to os.Exit at package level in the package's other file.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	parity.RequireOnlyAdjudicated(test, sa3000.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	parity.RequireOnlyAdjudicated(test, sa3000.Analyzer, Analyzer, analysistest.TestData(), "test_main_file")
 }

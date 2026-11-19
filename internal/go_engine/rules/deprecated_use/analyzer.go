@@ -17,8 +17,9 @@
 // own deprecation lets it use deprecated objects, is cleared only at a file's start and replaced only at the next
 // declaration, so a package-level variable after a deprecated function in its file is judged as if inside it, and its
 // use of a deprecated object is missed. The port keeps no state: it reads the function declaration a node is in off
-// the node's ancestors, so each declaration is judged by its own (#zvwfe26), and departs from the original there alone
-// (the differences fixture's after_deprecated.go). Like the original, it misses dot-imported objects, and leaves alone
+// the node's ancestors, so each declaration is judged by its own (#zvwfe26), and departs from the original there alone:
+// a package-level declaration after a deprecated function or method, which the differences fixture's records hold in
+// after_deprecated.go and shapes.go. Like the original, it misses dot-imported objects, and leaves alone
 // a deprecated object of the standard library its knowledge does not date. The registry runs the port in the
 // original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
 // both over the same modules, and the two differ nowhere else they hold.

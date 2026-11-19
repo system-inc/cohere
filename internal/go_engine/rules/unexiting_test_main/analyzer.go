@@ -13,7 +13,8 @@
 // alone: whether a call to os.Exit was seen is cleared only when a TestMain's walk ends, so a call to os.Exit at
 // package level, in a variable's initializer, counts for the TestMain after it, which is then not reported. The port
 // keeps the same walk but counts only the calls inside a TestMain, so each is judged by its own body (#zvwfe26), and
-// departs from the original there alone (differences' exitAtPackageLevel). It keeps the original's false positive, a
+// departs from the original there alone: a TestMain after a call to os.Exit at package level, in its file or another,
+// which the differences fixture's records and test_main_file's hold. It keeps the original's false positive, a
 // TestMain whose os.Exit is in a function it calls (upstream's CheckTestMainExit-4). The registry runs the port in the
 // original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
 // both over the same modules, and the two differ nowhere else they hold.
