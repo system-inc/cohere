@@ -6,11 +6,16 @@ import (
 	"slices"
 )
 
-// recordFormat opens every encoded record and names its format, so bytes of another format are refused rather than
-// read wrong.
-const recordFormat = "cohere dependence record 1"
+// The two formats a record is encoded in, each opening its bytes, so bytes of another format are refused rather than
+// read wrong: recordFormat a whole graph's record, and declarationsRecordFormat a declarations-only graph's
+// (NewDeclarationsGraph, #anfjtr3), which holds no unit's reads or callees. A reader tells the two apart by these
+// words alone, so a declarations-only record is never read as a whole one whose units read nothing (Graph.add).
+const (
+	recordFormat             = "cohere dependence record 1"
+	declarationsRecordFormat = "cohere declarations record 1"
+)
 
-// The encoded record (#6a3kjvz), after recordFormat, every number an unsigned varint and every text an index into the
+// The encoded record (#6a3kjvz), after its format, every number an unsigned varint and every text an index into the
 // string table, the table itself each text's length and its bytes: the package's ID, path, whether it is the
 // workspace's; the string table; the import map, each import path and ID, by path; the type names; the object table,
 // each object its path then its local name; the units, each as its file, start, length, nodes, universe-name bits, its
@@ -19,7 +24,8 @@ const recordFormat = "cohere dependence record 1"
 // callees; and the kind edges. Reads, callees and edges name an object by its index in the table. A read is its flags
 // (1 has a target, 2 touches the underlying), its target when it has one, then its expansion, each bit an object and
 // its underlying flag. An edge is its from local name, its flags (1 from underlying, 2 to underlying) and its to
-// object. The unnameable count is no part of it: a record that met one is the collecting run's to report.
+// object. The unnameable count is no part of it: a record that met one is the collecting run's to report. A
+// declarations-only record is the same with no unit's reads or callees, not even their counts.
 
 // recordWriter writes one record: its strings, each once, by index, and its body, after them.
 type recordWriter struct {
@@ -59,7 +65,8 @@ func (writer *recordWriter) object(object recordedObject) {
 	writer.text(object.local)
 }
 
-// encodeRecord is record's bytes (see recordFormat).
+// encodeRecord is record's bytes, in the format of what it holds: a declarations-only record's
+// (declarationsRecordFormat), or a whole one's (recordFormat).
 func encodeRecord(record *packageRecord) []byte {
 	writer := &recordWriter{strings: map[string]int{}}
 	writer.number(uint64(len(record.imports)))
@@ -101,6 +108,10 @@ func encodeRecord(record *packageRecord) []byte {
 		for _, declared := range unit.declares {
 			writer.text(declared.local)
 		}
+		// A declarations-only record's units hold no reads or callees (collector.declarationsOnly), so it writes none.
+		if record.declarationsOnly {
+			continue
+		}
 		writer.number(uint64(len(unit.reads)))
 		for _, read := range unit.reads {
 			flags := uint64(0)
@@ -138,7 +149,11 @@ func encodeRecord(record *packageRecord) []byte {
 		writer.number(flags)
 		writer.number(uint64(edge.to))
 	}
-	encoded := append([]byte(recordFormat), 0)
+	format := recordFormat
+	if record.declarationsOnly {
+		format = declarationsRecordFormat
+	}
+	encoded := append([]byte(format), 0)
 	head := &recordWriter{}
 	for _, value := range []string{record.identifier, record.path} {
 		head.number(uint64(len(value)))

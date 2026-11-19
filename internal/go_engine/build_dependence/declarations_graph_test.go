@@ -307,7 +307,7 @@ func TestADeclarationsGraphCollectsNoBody(test *testing.T) {
 }
 
 // What only a unit's body gives, a declarations-only graph refuses with a panic that says what the caller tried:
-// encoding a record, a unit's verdict, every unit, the counts, a call index over it, as the host's graph or as the
+// a unit's verdict, every unit, the counts, a call index over it, as the host's graph or as the
 // standard library's, and a unit's verdict through a call index of whole graphs handed its judgment, as the host's or
 // as the standard library's. A whole graph answers each. A refusal is told from any other panic by its opening words,
 // since without one Units and UnitDependent would panic all the same, on a verdict that was never made. The refusals
@@ -340,7 +340,6 @@ func TestADeclarationsGraphRefusesWhatOnlyABodyGives(test *testing.T) {
 			tried string
 			call  func()
 		}{
-			{"EncodedRecord", "encode a record of", func() { _, _ = asked.graph.EncodedRecord(packageId) }},
 			{"UnitDependent", "read a unit's verdict from",
 				func() { dependence.UnitDependent(packageId, file, start) }},
 			{"Units", "read every unit's verdict and calls from", func() { dependence.Units() }},
