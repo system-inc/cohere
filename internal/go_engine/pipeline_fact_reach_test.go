@@ -97,6 +97,47 @@ func TestEachBuildHandsItsPassesTheHostsSideWithItsUnreachedBodiesStanding(test 
 	}
 }
 
+// Under the body reach census windows's build settles the standing bodies of the body-reach fixture's one package by
+// standing_facts, which reads the side its passes were handed, and the census writes what that took (#aswfm7a): the
+// side used, its 8 functions' no-return facts compared, platformName's named, since windows declares its own in a file
+// of its own, and nothing taken out, since PlatformName, platformName's one user, is reached already. No fact kind
+// answered about the package, so nothing is asked. A build without the census settles nothing.
+func TestEachBuildSettlesItsStandingBodiesAndTheCensusCountsThem(test *testing.T) {
+	test.Parallel()
+
+	censusFile := filepath.Join(test.TempDir(), "reach.txt")
+	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
+		func(engine *pipeline) { engine.bodyReachCensus = censusFile }, "--no-cache", "--no-fix", "--other-builds",
+		"--build-dependence")
+	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings, "--no-fix",
+		"--other-builds", "--build-dependence")
+
+	if len(on.buildRuns) != 2 || on.buildRuns[1].factReach == nil {
+		test.Fatalf("want windows's census of the facts' reach, got %d runs", len(on.buildRuns))
+	}
+	census := on.buildRuns[1].factReach
+	if census.sides != 1 || census.settled != 1 || census.crashed != 0 || census.functionsCompared == 0 {
+		test.Errorf("windows's build settled %+v, want its one side used, settled in part, and no-return facts "+
+			"compared", census)
+	}
+	written, readError := os.ReadFile(censusFile)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	for _, line := range []string{
+		"  fact reach: sides 1, settled 1, crashed 0",
+		"    functions compared 8, named 1; imported asked 0, named 0; order bound named 0",
+		"    answers asked 0, differing none, unknown none; bodies taken out 0",
+	} {
+		if !slices.Contains(strings.Split(string(written), "\n"), line) {
+			test.Errorf("the census file has no line %q:\n%s", line, written)
+		}
+	}
+	if slices.ContainsFunc(off.buildRuns, func(run buildRun) bool { return run.factReach != nil }) {
+		test.Error("a build without the census settled its standing bodies")
+	}
+}
+
 // On a warm run the host restores the body-reach fixture's one package from the findings store, so its run computed
 // nothing there and holds no side of it: the census counts it uncaptured, and every build lints it whole (#aswfm7a).
 func TestAWarmRunGivesARestoredPackageNoSideForTheFactsReach(test *testing.T) {

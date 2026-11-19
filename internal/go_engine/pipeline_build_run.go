@@ -89,6 +89,9 @@ type buildRun struct {
 	// judged that has one, as its last load's passes were handed it for the facts' reach (factReachSides.inBuild,
 	// #aswfm7a), nil otherwise.
 	factHosts map[string]fact_reach.Host
+	// factReach is an extra build's alone, under the body reach census when it handed its passes the host's sides: its
+	// last load's census of the facts' reach (buildFactReach), nil otherwise.
+	factReach *buildFactReach
 	// bodyDifferential is an extra build's alone, under the body differential: each body its reach leaves unreached
 	// compared with the host's (build_body_differential.go), nil otherwise.
 	bodyDifferential *buildBodyDifferential

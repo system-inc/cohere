@@ -1,11 +1,19 @@
 package go_engine
 
 import (
+	"cmp"
+	"fmt"
+	"maps"
+	"slices"
+	"strings"
+
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
 // factReachSides are the host's side of each package for the facts' reach (#aswfm7a), made once as the extra builds
@@ -102,4 +110,89 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 		hosts[identifier] = sides.packages[identifier].inBuild(standing, len(standing) > 0)
 	}
 	return hosts
+}
+
+// factReachSettle is the analyzer a build settles its standing bodies by for the facts' reach, standing_facts'
+// (check.Options.FactReachSettle), when handsSides says it hands its passes the host's sides, under the census alone,
+// whose counts are what read its results (buildFactReach), and nil otherwise, so nothing is settled.
+func (engine *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
+	if !handsSides || engine.bodyReachCensus == "" {
+		return nil
+	}
+	return standing_facts.Analyzer
+}
+
+// buildFactReach is one build's census of the facts' reach, of its last load: sides, the packages it handed a host's
+// side, and of them settled, those whose standing bodies it settled, the build linting them in part
+// (standing_facts.Result.Partial), crashed, those it failed to settle on; and, summed over the settled ones, the
+// no-return facts compared and the objects they named, the answers the host read from other packages asked before the
+// walk and the objects they named, the order-bound objects named before anything was asked, the answers the walk asked
+// and those that read differing or unknown, by kind, and the bodies the facts took out of the standing set.
+type buildFactReach struct {
+	sides             int
+	settled           int
+	crashed           int
+	functionsCompared int
+	functionsNamed    int
+	importedAsked     int
+	importedNamed     int
+	orderBoundNamed   int
+	asked             int
+	differing         map[string]int
+	unknown           map[string]int
+	removed           int
+}
+
+// newBuildFactReach is the census of the build whose passes were handed hosts, by package ID, and whose check.Run gave
+// result, the last load's.
+func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *buildFactReach {
+	census := &buildFactReach{sides: len(hosts), crashed: len(result.FactReachCrashes), differing: map[string]int{},
+		unknown: map[string]int{}}
+	for identifier, settled := range result.FactReachSettled {
+		packageSettled, isResult := settled.(*standing_facts.Result)
+		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil {
+			continue
+		}
+		census.settled++
+		census.functionsCompared += packageSettled.FunctionsCompared
+		census.functionsNamed += packageSettled.FunctionsNamed
+		census.importedAsked += packageSettled.ImportedAsked
+		census.importedNamed += packageSettled.ImportedNamed
+		if hosted := hosts[identifier]; hosted != nil {
+			census.orderBoundNamed += len(hosted.OrderBound())
+		}
+		census.asked += packageSettled.Settlement.Asked
+		for kind, count := range packageSettled.Settlement.Differing {
+			census.differing[kind] += count
+		}
+		for kind, count := range packageSettled.Settlement.Unknown {
+			census.unknown[kind] += count
+		}
+		census.removed += len(packageSettled.Settlement.Removed)
+	}
+	return census
+}
+
+// writeBuildFactReach writes one build's census of the facts' reach to written.
+func writeBuildFactReach(written *strings.Builder, census *buildFactReach) {
+	fmt.Fprintf(written, "  fact reach: sides %d, settled %d, crashed %d\n", census.sides, census.settled,
+		census.crashed)
+	fmt.Fprintf(written, "    functions compared %d, named %d; imported asked %d, named %d; order bound named %d\n",
+		census.functionsCompared, census.functionsNamed, census.importedAsked, census.importedNamed,
+		census.orderBoundNamed)
+	fmt.Fprintf(written, "    answers asked %d, differing %s, unknown %s; bodies taken out %d\n", census.asked,
+		byKind(census.differing), byKind(census.unknown), census.removed)
+}
+
+// byKind is counts written by kind, the kinds in order, or none.
+func byKind(counts map[string]int) string {
+	if len(counts) == 0 {
+		return "none"
+	}
+	kinds := slices.SortedFunc(maps.Keys(counts), cmp.Compare[string])
+	written := make([]string, 0, len(kinds))
+	for _, kind := range kinds {
+		written = append(written, fmt.Sprintf("%s %d", kind, counts[kind]))
+	}
+	return strings.Join(written, ", ")
 }

@@ -49,6 +49,9 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 			continue
 		}
 		writeBuildBodyReach(&written, "build "+run.build.String(), run.bodyReach)
+		if run.factReach != nil {
+			writeBuildFactReach(&written, run.factReach)
+		}
 		if run.bodyReachFromSource != nil {
 			writeBuildBodyReach(&written, "build "+run.build.String()+", within the packages a plain run checks from "+
 				"source", run.bodyReachFromSource)

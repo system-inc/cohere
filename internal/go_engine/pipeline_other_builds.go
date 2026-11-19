@@ -737,6 +737,8 @@ func (engine *pipeline) extraBuildRun(
 			ExportFacts: engine.dependence != nil,
 			Inheritance: inherits,
 			FactHosts:   factHosts,
+			// Under the census, the standing bodies each pass's side leaves are settled, for the census to count.
+			FactReachSettle: engine.factReachSettle(factHosts != nil),
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -802,6 +804,14 @@ func (engine *pipeline) extraBuildRun(
 	// The facts census reads the last load's facts, whose result stands, beside the host's (#0ghk7vj).
 	if run.judged != nil && run.dependence != nil {
 		run.dependence.Facts = engine.compareFacts(run.judged, result.Facts)
+	}
+	// The facts' reach the last load's passes settled, whose result stands, and each package they failed to settle on,
+	// noted under the build's name.
+	if result.FactReachSettled != nil {
+		run.factReach = newBuildFactReach(run.factHosts, result)
+		for _, crash := range result.FactReachCrashes {
+			noteTo(notes, "the facts' reach of the build %s could not settle %s: %s", extra, crash.File, crash.Error)
+		}
 	}
 	// The findings of each body the differential compared, the last load's, whose result stands, a difference classed
 	// under a later stage only where the judgment shows its cause (findingCauses). A differential is made only of a
