@@ -53,7 +53,9 @@ func runPush(pass *analysis.Pass, judged *atomic.Int64) (pushResult, error) {
 	walk := &pushWalk{facts: marks}
 	walk.markLengthChecks(functions)
 	walk.markIndirectLengthChecks(functions)
-	reportOddLengths(context, marks, functions)
+	for _, function := range functions {
+		reportOddLengths(context, marks.marked, function)
+	}
 	if judged != nil {
 		judged.Add(int64(len(functions)))
 	}

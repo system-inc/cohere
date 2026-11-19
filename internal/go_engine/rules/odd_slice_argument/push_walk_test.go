@@ -9,15 +9,16 @@ import (
 )
 
 // facts is where the push walk reads whether a parameter is marked and marks one: the pass's evenElements facts, as
-// the original reads and exports them, or a map of the package's own marks with every other package's asked of the
-// resolver.
+// the original reads and exports them.
 type facts interface {
 	marked(parameter *types.Var) bool
 	mark(parameter types.Object)
 }
 
 // pushWalk marks one package's parameters the original's way: every source function's own checks first, then, in
-// buildir's order with one seen set, each parameter a function passes on to a marked one.
+// buildir's order with one seen set, each parameter a function passes on to a marked one. The rule no longer walks
+// so (#8d9r2rh, see demandWalk): this is the tests' record of what staticcheck's walk marks, order and all, which the
+// definition's marks are counted against.
 type pushWalk struct {
 	facts facts
 }
@@ -58,7 +59,7 @@ func (walk *pushWalk) markIndirectLengthChecks(functions []*intermediate_represe
 				if callee.Package == function.Package || callee.Package == nil {
 					visit(callee)
 				}
-				for _, passed := range passedParameters(call, callee) {
+				for _, passed := range signatureParameters(call, callee) {
 					if walk.facts.marked(passed.calleeParameter) {
 						walk.facts.mark(passed.parameter.Object())
 					}
@@ -71,16 +72,10 @@ func (walk *pushWalk) markIndirectLengthChecks(functions []*intermediate_represe
 	}
 }
 
-// passedParameter is a slice parameter of the calling function passed as it is to a parameter of the callee.
-type passedParameter struct {
-	parameter       *intermediate_representation.Parameter
-	calleeParameter *types.Var
-}
-
-// passedParameters is each slice parameter call passes as it is to callee, with the callee's parameter it is passed
-// to: the signature's parameter, not the callee's Parameters, which a function of another package, built from export
-// data, does not hold. A method's receiver is passed to no parameter.
-func passedParameters(
+// signatureParameters is each slice parameter call passes as it is to callee, with the parameter it is passed to as
+// the original names it: the one callee's own signature holds at that place, whatever function declared it. The rule
+// names the declared function's instead (declaredParameter), so this reading is the record's alone.
+func signatureParameters(
 	call *intermediate_representation.Call,
 	callee *intermediate_representation.Function,
 ) []passedParameter {

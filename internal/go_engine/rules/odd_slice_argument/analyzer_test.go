@@ -38,6 +38,55 @@ func TestPortExportsTheOriginalsFacts(test *testing.T) {
 		"parity", "parity/pairs")
 }
 
+// A finding never turns on the order a package declares its functions in (#8d9r2rh). Packages order/forward and
+// order/back hold one cycle of calls in two orders, a walk in declaration order entering it at another function in
+// each, and a slice of one passed into the cycle reaches its length check in both, so the port reports it in both.
+// The original reports it in order/back, where the two are held identical and to the fixture's own note, and misses
+// it in order/forward, which records the finding the port alone makes there.
+func TestACycleReportsTheSameInEitherDeclarationOrder(test *testing.T) {
+	test.Parallel()
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "order/back")
+	parity.RequireIdentical(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "order/back")
+	parity.RequireOnlyAdjudicated(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "order/forward")
+}
+
+// A finding never turns on whether a package declares a function before or after one that reaches it through a
+// stand-in (#8d9r2rh). Packages standin/first and standin/last hold the same functions, with no cycle of calls and no
+// function calling itself: three callers each pass a slice to a function of no package, an instantiation, a bound
+// method and a thunk, that stands for one of the package's own, which passes it on to a length check. first declares
+// the callers before what they reach and last after, and a slice of one passed to each caller reaches the check in
+// both, so the port reports the three in both. The original reports them in standin/last, where the two are held
+// identical and to the fixture's own notes, and misses them in standin/first, which records the three findings the
+// port alone makes there.
+func TestAStandInReportsTheSameInEitherDeclarationOrder(test *testing.T) {
+	test.Parallel()
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "standin/last")
+	parity.RequireIdentical(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "standin/last")
+	parity.RequireOnlyAdjudicated(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "standin/first")
+}
+
+// A mark goes around a cycle of calls as often as the passes carry it (#8d9r2rh). Package around holds a function
+// calling itself with its slices swapped, and two functions passing theirs back and forth, where a slice reaches the
+// length check only a call or two on. The original's walk visits each function once and misses those in every order a
+// package can declare them in, so the fixture records each finding the port alone makes, beside one both make.
+func TestAMarkGoesAroundACycleAsOftenAsItsPassesCarryIt(test *testing.T) {
+	test.Parallel()
+	parity.RequireOnlyAdjudicated(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "around")
+}
+
+// A finding never turns on which generic function was instantiated first (#8d9r2rh). Packages instance/first and
+// instance/last hold three generic functions and a slice of one passed to each, with the one that checks its slice
+// and the one that checks nothing declared and instantiated in either order. The port asks the mark of the declared
+// function's own parameter, and finds in both the slices passed to the two functions that check theirs. The original
+// reads the mark off the instantiation's signature, which two instantiations of identical signatures share, and each
+// package records where that parts the two: a slice it reports by another function's check, dropped, a finding it
+// makes under another function's parameter name, renamed, and the slice it misses, found.
+func TestAnInstantiationReportsByItsDeclaredFunctionInEitherOrder(test *testing.T) {
+	test.Parallel()
+	parity.RequireOnlyAdjudicated(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "instance/first")
+	parity.RequireOnlyAdjudicated(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "instance/last")
+}
+
 // The differences fixture holds the calls where the two could most plausibly part, a slice whose length depends on
 // the path taken, one reaching the call through a loop's phi, arguments spread over lines and slices of slices of an
 // array. It records no difference, since the port parts from the original nowhere it can run, so the two must agree

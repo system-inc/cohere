@@ -396,7 +396,7 @@ func (resolver *Resolver) Whole(home *Package) map[string]map[objectpath.Path][]
 			if object.Pkg() != home.Types || !isOrigin(object) {
 				continue
 			}
-			if path, pathError := objectpath.For(object); pathError == nil {
+			if path, pathError := resolver.objectPath(object); pathError == nil {
 				answers[path] = encoded
 			}
 		}

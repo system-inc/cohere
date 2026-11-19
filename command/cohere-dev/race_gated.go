@@ -35,6 +35,8 @@ var raceGated = []raceEntry{
 	{"internal/go_engine/check", "dependence sets and type graph digests are computed at once over one host " +
 		"(dependence_concurrency_test.go, type_graph_concurrency_test.go)"},
 	{"internal/go_engine/check/checker", "the scheduler runs groups and actions at once, up to its slots and workers"},
+	{"internal/go_engine/fact_resolver", "TestObjectsAskedAtOnceAreNamedAsObjectpathNamesThem asks the resolver's " +
+		"objectpath encoders from several goroutines while each indexes its package (object_path_test.go, #8d9r2rh)"},
 	{"internal/go_engine/intermediate_representation", "the intermediate representation is built in parallel " +
 		"(parallel_build_test.go)"},
 	{"internal/go_engine/load", "the loader lists and type-checks packages side by side"},
