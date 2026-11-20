@@ -158,7 +158,8 @@ func TestAStandingBodyNamingASystemConstantLeavesForPresence(test *testing.T) {
 
 // emptyfunction's row (#xeafx79): shape is a marker, so Check, which selects its isShape, leaves, and so does Odd,
 // which selects Other's isShape, a method of the marker's name on a receiver that does not implement shape. Firsts
-// selects wide's first, and wide is no marker, so it stands, as Count, which selects nothing, does.
+// selects wide's first, and wide is no marker, so it stands, as Count, which selects nothing, does. Each method
+// declared under the marker's name, isShape, leaves too: the rule's verdict on an empty one hangs on every selection.
 func TestAStandingBodySelectingAMarkersMethodLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "marking")
@@ -168,7 +169,8 @@ func TestAStandingBodySelectingAMarkersMethodLeavesForPresence(test *testing.T) 
 		presenceUse{key: "marking.Pair.first", identity: found.method("Pair", "first"), users: []string{"Firsts"}})
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
-		"Check": standing_presence.EmptyFunction, "Odd": standing_presence.EmptyFunction}, nil)
+		"Check": standing_presence.EmptyFunction, "Odd": standing_presence.EmptyFunction,
+		"isShape": standing_presence.EmptyFunction}, nil)
 }
 
 // noany's bound (#xeafx79), one body taken out under each kind of key: Handle's parameter is a key, so Handle's own
@@ -232,8 +234,8 @@ func TestABodyAPresentCallerStartsLeavesForPresence(test *testing.T) {
 // A body that writes a candidate of consistency-no-any's of its own, or declares a marker interface, leaves for the
 // host's record of it (#xeafx79): Loose writes interface{} in a local variable's type, which no use records, and
 // Literal writes any in a function literal's parameter, so both leave for noany; Sealed declares a marker of its own,
-// so it leaves for emptyfunction, and so does Seals, which selects Box's method of the marker's name. Plain writes no
-// candidate, and Opens selects a method of another name, so both stand.
+// so it leaves for emptyfunction, and so do Seals, which selects Box's method of the marker's name, and that method,
+// seal, itself. Plain writes no candidate, and Opens selects a method of another name, so both stand.
 func TestABodyHoldingAnyOrAMarkerOfItsOwnLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "owning")
@@ -245,5 +247,6 @@ func TestABodyHoldingAnyOrAMarkerOfItsOwnLeavesForPresence(test *testing.T) {
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"Loose": standing_presence.NoAny, "Literal": standing_presence.NoAny,
 		"Sealed": standing_presence.EmptyFunction, "Seals": standing_presence.EmptyFunction,
+		"seal": standing_presence.EmptyFunction,
 	}, nil)
 }

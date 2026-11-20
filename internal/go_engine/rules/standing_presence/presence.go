@@ -47,16 +47,18 @@ func Present(
 	for _, record := range records {
 		recordedMarkers = append(recordedMarkers, record.LocalMarkers...)
 	}
+	markers := presentMarkers(pass, recordedMarkers)
 	named := slices.Concat(
 		hostPortNamed(pass, used, find),
 		scannerErrorNamed(pass, used, find),
 		sqlRowsErrorNamed(pass, used, find),
 		screamingNamed(pass, used, find),
-		emptyFunctionNamed(pass, used, find, recordedMarkers),
+		emptyFunctionNamed(used, find, markers),
 	)
 	noAnyNamed, leaving := noAnyBound(pass, host, used, find)
 	named = append(named, noAnyNamed...)
 	leaving = append(leaving, recordedLeaving(records, standing)...)
+	leaving = append(leaving, markerMethodsLeaving(syntaxOf(pass), markers, standing)...)
 	leaving = append(leaving, edgesLeaving(syntaxOf(pass), host, records, standing, named, leaving)...)
 	return named, leaving
 }

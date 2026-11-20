@@ -19,24 +19,58 @@ import (
 // receiver, of any package, since a selection the rule reads is judged by whether its receiver implements the
 // interface, which the build cannot judge of a body it never holds.
 //
-// A marker is as the rule reads one: an interface type the package defines, at any level, with exactly one explicit
-// method, the method unexported, and nothing embedded (analyzer.go:107-126). The build reads every one its own syntax
-// declares, and recorded are the names of those the host's record says a body declares, which the build's syntax
-// holds no longer once the body is stripped.
+// markers are the method names of every marker interface the package declares (presentMarkers).
 func emptyFunctionNamed(
-	pass *analysis.Pass,
 	used []fact_reach.UsedObject,
 	find func(identity build_reads.Identity) (types.Object, bool),
-	recorded []string,
+	markers map[string]bool,
 ) []fact_reach.Named {
-	markers := markerNames(pass)
-	for _, name := range recorded {
-		markers[name] = true
-	}
 	if len(markers) == 0 {
 		return nil
 	}
 	return methodsNamed(used, markers, find, EmptyFunction.Reason())
+}
+
+// presentMarkers are the method names of every marker interface the package declares, as the rule reads one: an
+// interface type the package defines, at any level, with exactly one explicit method, the method unexported, and
+// nothing embedded (analyzer.go:107-126). The build reads every one its own syntax declares, and recorded are the
+// names of those the host's record says a body declares, which the build's syntax holds no longer once the body is
+// stripped.
+func presentMarkers(pass *analysis.Pass, recorded []string) map[string]bool {
+	markers := markerNames(pass)
+	for _, name := range recorded {
+		markers[name] = true
+	}
+	return markers
+}
+
+// markerMethodsLeaving are the standing method declarations of the package whose names are markers', in the order of
+// syntax's files, whatever their bodies: the rule reports an empty one at its own body unless no selection in the
+// package names a method of its name on a receiver implementing the marker (isUnusedMarker,
+// rules/consistency_no_empty_function/analyzer.go:159-204), so its verdict hangs on every body that selects one, in
+// either build. A method declaration is package-level syntax, which the build keeps when a body is stripped, so the
+// build finds every one itself.
+func markerMethodsLeaving(
+	syntax packageSyntax,
+	markers map[string]bool,
+	standing map[fact_reach.Place]bool,
+) []Leaving {
+	if len(markers) == 0 {
+		return nil
+	}
+	var leaving []Leaving
+	for _, file := range syntax.files {
+		for _, declaration := range file.Decls {
+			method, isFunction := declaration.(*ast.FuncDecl)
+			if !isFunction || method.Recv == nil || !markers[method.Name.Name] {
+				continue
+			}
+			if place := placeOf(syntax, method); standing[place] {
+				leaving = append(leaving, Leaving{Place: place, Reason: EmptyFunction.Reason()})
+			}
+		}
+	}
+	return leaving
 }
 
 // markerNames are the names of the one method of each marker interface the pass's files declare, at any level.

@@ -14,7 +14,9 @@ import (
 // standingPresence is a module of the standing gates' shape for one presence row (#xeafx79): a file only the host
 // compiles, one only the other build does, and file, which both compile and which holds leaves, a body the other
 // build's difference never reaches that the row takes out, and stands, one it leaves standing. named is how many
-// objects the row names in the other build: none for an edge row, whose bodies leave by themselves. The other build is
+// objects the row names in the other build: none for an edge row, whose bodies leave by themselves; and removed how
+// many bodies it takes out, one where it says none, two in presence-emptyfunction, whose Circle.isShape, a method of
+// the marker's name, leaves beside the body that selects one. The other build is
 // windows's in every module but presence-requireparallel's and presence-caller's, whose is the tag presence_b's: a
 // subtest's signature, and a caller's that testinggoroutine hears, holds *testing.T, whose type each platform declares
 // otherwise, so in windows's build the reach lints every such body already. Every module reads no type a platform
@@ -26,9 +28,10 @@ type standingPresence struct {
 	module string
 	row    standing_presence.Row
 	file   string
-	leaves string
-	stands string
-	named  int
+	leaves  string
+	stands  string
+	named   int
+	removed int
 }
 
 // standingPresences are the presence rows' modules, one a row.
@@ -42,7 +45,7 @@ var standingPresences = []standingPresence{
 	{module: "presence-screaming", row: standing_presence.Screaming, file: "shared.go", leaves: "Reads",
 		stands: "Port", named: 1},
 	{module: "presence-emptyfunction", row: standing_presence.EmptyFunction, file: "shared.go", leaves: "Check",
-		stands: "Port", named: 1},
+		stands: "Port", named: 1, removed: 2},
 	{module: "presence-noany", row: standing_presence.NoAny, file: "shared.go", leaves: "Build", stands: "Port",
 		named: 1},
 	{module: "presence-testinggoroutine", row: standing_presence.TestingGoroutine, file: "shared.go",
@@ -118,10 +121,12 @@ func TestAStandingBodyThatNamesARowsCandidateLeavesTheStandingSet(test *testing.
 				test.Errorf("%s does not stand in the other build, so the module holds nothing that stays",
 					presence.stands)
 			}
+			// One body taken out for the row where the module says nothing else.
+			removed := max(presence.removed, 1)
 			if other.factReach == nil || other.factReach.presenceNamed[string(presence.row)] != presence.named ||
-				other.factReach.presenceRemoved[string(presence.row)] != 1 {
-				test.Errorf("the other build's census of the facts' reach is %+v, want %d objects named and one body "+
-					"taken out for %s", other.factReach, presence.named, presence.row)
+				other.factReach.presenceRemoved[string(presence.row)] != removed {
+				test.Errorf("the other build's census of the facts' reach is %+v, want %d objects named and %d bodies "+
+					"taken out for %s", other.factReach, presence.named, removed, presence.row)
 			}
 			if !slices.Equal(findingLines(onStream), findingLines(offStream)) {
 				test.Errorf("the findings with the switch on are\n%s\nwant those with it off\n%s",
