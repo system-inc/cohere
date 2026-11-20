@@ -5,6 +5,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
@@ -36,6 +37,13 @@ type describedProject struct {
 	// earlyStart), which the pipeline joins before its first load (awaitStarted). Nil, as a test's hand-made project
 	// has it, started none.
 	started *earlyStart
+
+	// systemCache is the run's system cache, opened before the go commands describeProject starts, which keep each
+	// build's build context in it, and handed to the pipeline (newPipeline), with shardStamps, the run's stamps of its
+	// stores' shard directories, which its store holds. Nil, as a test's hand-made project has it, for the pipeline to
+	// open its own.
+	systemCache *systemCache
+	shardStamps *cache.ShardStamps
 
 	// builds are what a run of every build checks, the host's first, read from the census before the first record
 	// (readBuilds), so the project record names a file only another build compiles as checked by it, and the lint
@@ -81,6 +89,16 @@ func (described *describedProject) awaitStarted() {
 	if described.started != nil {
 		described.started.wait()
 	}
+}
+
+// openedSystemCache is the run's system cache and the shard stamps its store holds: the ones describeProject opened,
+// or new ones for a test's project, nil or made by hand, which opened none.
+func (described *describedProject) openedSystemCache(request invocation) (*systemCache, *cache.ShardStamps) {
+	if described != nil && described.systemCache != nil {
+		return described.systemCache, described.shardStamps
+	}
+	shardStamps := cache.NewShardStamps(nil)
+	return openSystemCache(request, shardStamps), shardStamps
 }
 
 // readable are the in-scope files that could be read, in order: the files a phase that reads source is given.

@@ -135,6 +135,9 @@ func runOverRequest(
 	// The settings' targets are builds the census checks, handed to the description as the engine hands them, so
 	// a tree whose settings name a target is checked under it here too (runOverlapping).
 	request.targets = ruleSettings.Targets
+	// The system cache of the run's own, unless the request names one, given before the description opens it, so its
+	// early start keeps each build context where the run's own builds read it (isolatedSource).
+	request.standardLibrary = isolatedSource(test, request.standardLibrary)
 	described, describeError := describeProject(request)
 	if describeError != nil {
 		test.Fatal(describeError)

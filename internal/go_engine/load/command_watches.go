@@ -23,14 +23,25 @@ func WatchGoEnvironmentAsks(workspace string) (asks *atomic.Int64, stop func()) 
 	return goEnvironmentWatches.watch(workspace)
 }
 
-// buildListWatches count the build lists a listerState runs (WatchBuildLists).
-var buildListWatches = commandWatches{byWorkspace: map[string]*atomic.Int64{}}
+// listerCommandWatches count the runs of each of listerCommands a listerState starts, by its index (WatchBuildLists,
+// WatchBuildContexts).
+var listerCommandWatches = [len(listerCommands)]commandWatches{
+	{byWorkspace: map[string]*atomic.Int64{}},
+	{byWorkspace: map[string]*atomic.Int64{}},
+}
 
 // WatchBuildLists counts every `go list -m -json all` the lister's state runs in workspace, absolute, until stop is
 // called, for a test holding a run to one build list for every build that shares the host's (ShareModulesOf). Only a
 // test calls it; it is exported for the engine's tests, as WatchGoEnvironmentAsks is.
 func WatchBuildLists(workspace string) (lists *atomic.Int64, stop func()) {
-	return buildListWatches.watch(workspace)
+	return listerCommandWatches[buildList].watch(workspace)
+}
+
+// WatchBuildContexts counts every go list of the build context (contextTemplate) the lister's state runs in
+// workspace, absolute, until stop is called, for a test holding a run to none where the system cache keeps every
+// build's (KeepContextIn). Only a test calls it, as WatchBuildLists.
+func WatchBuildContexts(workspace string) (contexts *atomic.Int64, stop func()) {
+	return listerCommandWatches[buildContext].watch(workspace)
 }
 
 // watch counts each run in workspace, absolute, until stop is called.

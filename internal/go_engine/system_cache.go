@@ -1,18 +1,22 @@
 package go_engine
 
 import (
+	"crypto/sha256"
+	"errors"
 	"path/filepath"
 	"sync"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // systemCache is the run's system cache (#syscache): a second store beside the project's, in the user's cache
 // directory rather than any project's, which holds every standard-library package's entry under its key in its
 // build's context, read and written as the project's store is, by every run of the same engine on the machine,
 // whatever project it checks. It is found once a run, before any build reads it, and handed to every build's
-// lintCache.
+// lintCache, and, opened before the project is described, to the early start, which keeps each build's context go list
+// answers there (contexts).
 type systemCache struct {
 	// root is the system cache's root, empty when the run keeps none.
 	root string
@@ -52,6 +56,45 @@ func openSystemCache(request invocation, stamps *cache.ShardStamps) *systemCache
 // systemStoreDirectory is where the system cache at root keeps its store of the standard library's entries.
 func systemStoreDirectory(root string) string {
 	return filepath.Join(root, "go", "store")
+}
+
+// errorNoSystemStore is why a run with no system cache's store keeps nothing in it.
+var errorNoSystemStore = errors.New("the run keeps no system cache")
+
+// contexts is where the run keeps each build's build context go list answers, the system cache's store
+// (load.GoEnvironment.KeepContextIn, #sfjj2rh), nil when the run keeps no system cache: under `--no-system-cache`, or
+// with no root.
+func (system *systemCache) contexts() load.ListingStore {
+	if system == nil || system.store == nil {
+		return nil
+	}
+	return system
+}
+
+// Kept is what the system cache's store holds under key, marked used on a hit, so its trim keeps what runs read
+// (cache.TrimSystemCache).
+func (system *systemCache) Kept(key [sha256.Size]byte) ([]byte, bool) {
+	if system.store == nil {
+		return nil, false
+	}
+	contents, stored := system.store.Get(cache.Key(key))
+	if stored {
+		system.store.MarkUsed(cache.Key(key))
+	}
+	return contents, stored
+}
+
+// Keep writes contents whole under key in the system cache's store. A write that fails is why the system cache is
+// not kept as it should be, which the run says, never an error of the run's.
+func (system *systemCache) Keep(key [sha256.Size]byte, contents []byte) error {
+	if system.store == nil {
+		return errorNoSystemStore
+	}
+	putError := system.store.Put(cache.Key(key), contents)
+	if putError != nil {
+		system.notKeptBecause(cache.NotKeptBecause(putError))
+	}
+	return putError
 }
 
 // failedAt records why the system cache is not kept as it should be when session, a build's, failed to write to it

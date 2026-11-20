@@ -1,13 +1,16 @@
 package go_engine
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
 // A run of every build over a module whose census needs two extra builds starts every go command it needs
@@ -54,6 +57,62 @@ func TestARunsExtraBuildsReadTheHostsBuildList(test *testing.T) {
 	}
 	if found, want := findingLines(stream), findingLines(string(expected)); !slices.Equal(found, want) {
 		test.Errorf("the run found\n%s\nwant\n%s", strings.Join(found, ""), strings.Join(want, ""))
+	}
+}
+
+// A run of every build keeps each build's build context in the system cache (#sfjj2rh): a first run over an empty one
+// runs the three, the host's and the two extra builds', and keeps them, and a second over the same system cache runs
+// none, forks no go list for an extra build at all, finds what the first found, and starts no go command after its
+// first load began. A run under `--no-system-cache` runs all three again.
+func TestAWarmSystemCacheRunsNoBuildContext(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	systemCacheRoot := test.TempDir()
+	contexts, stopContexts := load.WatchBuildContexts(root)
+	defer stopContexts()
+	lists, stopLists := load.WatchBuildLists(root)
+	defer stopLists()
+	run := func(extra ...string) string {
+		test.Helper()
+		arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
+			extra...)
+		request, parseError := parseInvocation(arguments)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		request.standardLibrary.systemCacheRoot = systemCacheRoot
+		contexts.Store(0)
+		lists.Store(0)
+		engine, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), nil)
+		if exitCode != exitFindings {
+			test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, exitFindings, standardOutput, standardError)
+		}
+		if len(engine.buildRuns) != 3 {
+			test.Fatalf("the run checked %d builds, want the host's and two extra", len(engine.buildRuns))
+		}
+		return normalize(standardOutput, root)
+	}
+	cold := run()
+	if ran := contexts.Load(); ran != 3 {
+		test.Errorf("the run over an empty system cache ran %d build contexts, want the three builds'", ran)
+	}
+	warm := run()
+	if ran := contexts.Load(); ran != 0 {
+		test.Errorf("the run over a warm system cache ran %d build contexts, want none", ran)
+	}
+	if ran := lists.Load(); ran != 1 {
+		test.Errorf("the run over a warm system cache ran %d build lists, want the host's alone", ran)
+	}
+	if found, want := findingLines(warm), findingLines(cold); !slices.Equal(found, want) {
+		test.Errorf("the warm run found\n%s\nwant the cold run's\n%s", strings.Join(found, ""), strings.Join(want, ""))
+	}
+	if lint := lintRecordOf(test, warm); lint.ChildProcessesAfterLoad != 0 {
+		test.Errorf("the warm run started %d go commands after its first load began, want 0: %s",
+			lint.ChildProcessesAfterLoad, strings.Join(lint.ChildProcessesAfterLoadNamed, "; "))
+	}
+	run("--no-system-cache")
+	if ran := contexts.Load(); ran != 3 {
+		test.Errorf("the run under --no-system-cache ran %d build contexts, want the three builds'", ran)
 	}
 }
 

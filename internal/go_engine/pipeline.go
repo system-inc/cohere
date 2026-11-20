@@ -76,7 +76,8 @@ type pipeline struct {
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
 
-	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache).
+	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache): the
+	// description's, which its early start kept each build's build context in.
 	systemCache *systemCache
 
 	// shardStamps are the run's stamps of its stores' shard directories, which every extra build's packs read, each
@@ -323,8 +324,9 @@ func newPipeline(
 	standardError io.Writer,
 	memory *engineMemory,
 ) *pipeline {
-	// Made before the system cache's store, which holds them, as every store the run opens does (cache.Open).
-	shardStamps := cache.NewShardStamps(nil)
+	// The description's, opened before the go commands it started, with the shard stamps its store holds, as every
+	// store the run opens holds them (cache.Open).
+	systemCache, shardStamps := described.openedSystemCache(request)
 	return &pipeline{
 		request:       request,
 		described:     described,
@@ -338,7 +340,7 @@ func newPipeline(
 		// The facts census reads each build's own facts, which a restore from the host's run would replace.
 		censusKeepsHostRestoreOff: request.judgesDependence(),
 		timing:                    newTiming(request),
-		systemCache:               openSystemCache(request, shardStamps),
+		systemCache:               systemCache,
 		shardStamps:               shardStamps,
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),

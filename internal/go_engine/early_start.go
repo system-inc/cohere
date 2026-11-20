@@ -35,6 +35,10 @@ type earlyStart struct {
 	unbuiltReasons map[string]string
 	buildsError    error
 
+	// contexts is where each build's build context is kept across runs, the system cache's store, nil when the run
+	// keeps none (load.GoEnvironment.KeepContextIn).
+	contexts load.ListingStore
+
 	// buildGoEnvironments are each extra build's go env, by the build's index among the extras, read with its lister
 	// state, nil where go env failed, and nil whole when no batch was started (startBuilds). Written by the batch and
 	// read only once started has ended.
@@ -45,16 +49,18 @@ type earlyStart struct {
 }
 
 // startEarly starts the host's go env in workspace under its environment, with held as what its build context opens a
-// file through (load.ReadGoEnvironment), then, when fetchesListerState, the host's lister state, and, when readsPorts,
-// the toolchain's ports beside it, each on a goroutine of its own, every go command recorded in children.
+// file through (load.ReadGoEnvironment), then, when fetchesListerState, the host's lister state, its build context read
+// from contexts when a run kept it there, and, when readsPorts, the toolchain's ports beside it, each on a goroutine of
+// its own, every go command recorded in children.
 func startEarly(
 	workspace project.Workspace,
 	held load.Held,
 	children *load.Children,
+	contexts load.ListingStore,
 	fetchesListerState bool,
 	readsPorts bool,
 ) *earlyStart {
-	early := &earlyStart{}
+	early := &earlyStart{contexts: contexts}
 	early.hostAnswered.Add(1)
 	early.started.Go(func() {
 		early.goEnvironment, early.goEnvironmentError = load.ReadGoEnvironment(workspace.Root,
@@ -63,6 +69,7 @@ func startEarly(
 		if fetchesListerState && early.goEnvironment != nil {
 			// Not timed: a run under `--timing` fetches its lister state where it always has, so each measurement of
 			// its children's CPU is of its own commands alone (startChildrenFirst).
+			early.goEnvironment.KeepContextIn(contexts, early.goEnvironment, false)
 			early.goEnvironment.FetchListerState(nil)
 		}
 	})
@@ -135,8 +142,9 @@ func (early *earlyStart) awaitBuilds() ([]project.Build, map[string]string, erro
 // startBuilds starts each of extras' go env in workspace under the build's environment, then its lister state, each
 // build on a goroutine of its own, as startChildrenNow does in a run whose description started none, every go command
 // recorded in children: a build whose build list prints what host's does, host the host's go env, reads host's and
-// runs only its build context (load.GoEnvironment.ShareModulesOf, #sfjj2rh). Called once, from a goroutine started
-// counts, so its wait never ends before these are counted.
+// runs only its build context (load.GoEnvironment.ShareModulesOf, #sfjj2rh), and reads that from the system cache when
+// a run kept it there (load.GoEnvironment.KeepContextIn). Called once, from a goroutine started counts, so its wait
+// never ends before these are counted.
 func (early *earlyStart) startBuilds(
 	workspace project.Workspace,
 	host *load.GoEnvironment,
@@ -152,6 +160,7 @@ func (early *earlyStart) startBuilds(
 			if goEnvironment != nil {
 				// Not timed: the batch starts only in a run not under `--timing` (startReadingBuilds's startsBuilds).
 				goEnvironment.ShareModulesOf(host, false)
+				goEnvironment.KeepContextIn(early.contexts, host, false)
 				goEnvironment.FetchListerState(nil)
 			}
 			early.buildGoEnvironments[index] = goEnvironment

@@ -1,6 +1,7 @@
 package load
 
 import (
+	"crypto/sha256"
 	"slices"
 	"strings"
 	"sync"
@@ -16,8 +17,12 @@ var listerCommands = [...][]string{
 }
 
 // buildList is listerCommands' index of the build list, the one command an answer may read of another's
-// (modulesSharedWith).
-const buildList = 0
+// (modulesSharedWith), and buildContext its index of the build context, the one a run may read from the system cache
+// (KeepContextIn).
+const (
+	buildList    = 0
+	buildContext = 1
+)
 
 // listerState is what listerCommands printed under one GoEnvironment, each command's output and failure by its index,
 // fetched once for every load under it (#sktb2y8).
@@ -34,6 +39,13 @@ type listerState struct {
 	// environment and its guard, and never here, so this one's guard records nothing for it; its failure is read too.
 	// Nil for an answer that lists its own. Set only before the state is first fetched (ShareModulesOf).
 	modulesFrom *GoEnvironment
+
+	// contextStore is where the build context is kept across runs, the system cache's store, under contextKey, the key
+	// predicted for it from the host's go env before this answer's own (predictedContextKey), read in place of running
+	// the command when this answer's own key is the predicted one and the store holds it, and written when the command
+	// runs and succeeds. Nil to keep none. Set only before the state is first fetched (KeepContextIn).
+	contextStore ListingStore
+	contextKey   [sha256.Size]byte
 }
 
 // listerCommand is one of listerCommands as it ran, what it printed and how it failed.
@@ -75,15 +87,37 @@ func (state *listerState) ran(index int, goEnvironment *GoEnvironment, collector
 	}
 	command := &state.commands[index]
 	command.once.Do(func() {
-		if index == buildList {
-			buildListWatches.counted(goEnvironment.workspace)
+		key, keeps := state.keptContextKey(index, goEnvironment)
+		if keeps {
+			if kept, stored := state.contextStore.Kept(key); stored {
+				command.output = kept
+				return
+			}
 		}
+		listerCommandWatches[index].counted(goEnvironment.workspace)
 		measureListing(collector, func() {
 			command.output, command.failure = goOutput(goEnvironment.guard, goEnvironment.workspace,
 				goEnvironment.fullEnvironment, listerCommands[index])
 		})
+		if keeps && command.failure == nil {
+			// Ignored: a build context the store could not keep is asked of go list again next run, which is all its
+			// keeping saves, and the store says why it kept none (the engine's systemCache).
+			_ = state.contextStore.Keep(key, command.output)
+		}
 	})
 	return command.output, command.failure
+}
+
+// keptContextKey is where listerCommands[index] is kept in contextStore, and whether it is: only the build context,
+// only with a store, and only when the key of goEnvironment's own answer is the one predicted from the host's before
+// it, so a prediction the answer contradicts, as a toolchain the build's go env names and the host's did not, runs
+// the command and keeps nothing.
+func (state *listerState) keptContextKey(index int, goEnvironment *GoEnvironment) ([sha256.Size]byte, bool) {
+	if index != buildContext || state.contextStore == nil {
+		return [sha256.Size]byte{}, false
+	}
+	key, keeps := ownContextKey(goEnvironment)
+	return key, keeps && key == state.contextKey
 }
 
 // buildListUnread are the names of goEnvironmentNames whose answer the build list never reads, which an extra build's

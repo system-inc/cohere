@@ -15,7 +15,8 @@ import (
 // environments and guards, so every answer is the one the load would have read: each build's go env is kept for its
 // run (extraBuildRun), and each answer's lister state is fetched once for every load under it
 // (load.GoEnvironment.FetchListerState). A build whose `go list -m -json all` prints what the host's does reads the
-// host's, its failure too, in place of running its own, outside `--timing` (load.GoEnvironment.ShareModulesOf,
+// host's, its failure too, in place of running its own, and a build context the system cache keeps from an earlier run
+// is read from there, outside `--timing` (load.GoEnvironment.ShareModulesOf, load.GoEnvironment.KeepContextIn,
 // #sfjj2rh).
 //
 // describeProject starts them beside its census and its reads, once it has read the builds, and the host's lister
@@ -75,6 +76,8 @@ func (engine *pipeline) startChildrenNow(extras []project.Build) []*load.GoEnvir
 				if goEnvironment != nil {
 					// Under `--timing` each build lists its own, so each step's children's CPU is of its own commands.
 					goEnvironment.ShareModulesOf(engine.described.goEnvironment, engine.timing != nil)
+					goEnvironment.KeepContextIn(engine.systemCache.contexts(), engine.described.goEnvironment,
+						engine.timing != nil)
 					goEnvironment.FetchListerState(engine.timing)
 				}
 				goEnvironments[index] = goEnvironment

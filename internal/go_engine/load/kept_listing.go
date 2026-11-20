@@ -24,7 +24,8 @@ import (
 // listingFormatVersion is hashed into every listing's key, so a listing kept in another shape is never read.
 const listingFormatVersion = "go-engine-listing-1"
 
-// ListingStore is where the load keeps go list's answer between runs, the findings cache's store, by a sha256 key.
+// ListingStore is where the load keeps go list's answer between runs, by a sha256 key: the findings cache's store for
+// a listing, and the system cache's for a build context (KeepContextIn).
 type ListingStore interface {
 	Kept(key [sha256.Size]byte) ([]byte, bool)
 	Keep(key [sha256.Size]byte, listing []byte) error
