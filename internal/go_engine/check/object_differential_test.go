@@ -519,11 +519,9 @@ func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	var (
-		counting    sync.Mutex
-		ran         int
-		judgedUnder = map[string]int{}
-	)
+	var counting sync.Mutex
+	ran := 0
+	judgedUnder := map[string]int{}
 	// Cleanup runs once every parallel subtest below is done, so the counts are whole when it reads them.
 	test.Cleanup(func() {
 		for _, build := range objectFixtureBuilds {
