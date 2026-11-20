@@ -10,9 +10,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
-// functionFinder finds the build's own function for an identity the host names one by, for one pass, on one
-// goroutine. The host's objects are another run's, of another type-check, so nothing of them but the identity crosses,
-// and the build looks its own object up by it.
+// functionFinder finds the build's own function, or package-level variable or constant, for an identity the host names
+// one by, for one pass, on one goroutine. The host's objects are another run's, of another type-check, so nothing of
+// them but the identity crosses, and the build looks its own object up by it.
 //
 // It reads only the build's own types, those of the pass's package and of what that imports, in the pass that asks,
 // and keeps nothing past the pass: the finder and its map of the imports go when run returns, so no later pass, build
@@ -27,50 +27,70 @@ type functionFinder struct {
 	imported map[string]*types.Package
 }
 
-// function is the build's function for identity, and false when the build has none: a package the pass's package does
-// not import, a name or a path that reaches nothing, an object that is no function, or an identity of a kind that
-// names no function, as an import's or an unknown one.
+// function is the build's function for identity, and false when the build has none (find), or when what it has is no
+// function.
+func (finder *functionFinder) function(identity build_reads.Identity) (*types.Func, bool) {
+	object, found := finder.find(identity)
+	function, isFunction := object.(*types.Func)
+	return function, found && isFunction
+}
+
+// value is the build's package-level variable or constant for identity, and false when the build has none (find), or
+// when what it has is another kind of object, or one declared below package level, as a field an objectpath reaches.
+// It finds the objects a presence row judges (standing_presence), each of which only the build's own declaration of
+// it can make a candidate.
+func (finder *functionFinder) value(identity build_reads.Identity) (types.Object, bool) {
+	object, found := finder.find(identity)
+	if !found || object.Pkg() == nil || object.Parent() != object.Pkg().Scope() {
+		return nil, false
+	}
+	switch object.(type) {
+	case *types.Var, *types.Const:
+		return object, true
+	}
+	return nil, false
+}
+
+// find is the build's object for identity, and false when the build has none: a package the pass's package does not
+// import, a name or a path that reaches nothing, or an identity of a kind that names no object here, as an import's or
+// an unknown one.
 //
-// A function of the pass's own package must be declared in the file the identity names, since a platform's file that
-// declares the same name is another declaration, with another body and so other facts. Another package's function is
-// not held to its file: its positions come from wherever the build loaded the package from, source or export data,
-// which are not the host's to compare, and where its declaring file differs by build the reach already lints its
+// An object of the pass's own package must be declared in the file the identity names, since a platform's file that
+// declares the same name is another declaration, with another body or value and so other facts. Another package's
+// object is not held to its file: its positions come from wherever the build loaded the package from, source or export
+// data, which are not the host's to compare, and where its declaring file differs by build the reach already lints its
 // users. Digest and Ordinal are not compared at all: a run reads every file once, so the file of one name is the same
 // bytes in each of its builds, and an ordinal counts only the declarations no objectpath reaches, an init function or
 // `_`, which no body uses.
-func (finder *functionFinder) function(identity build_reads.Identity) (*types.Func, bool) {
+func (finder *functionFinder) find(identity build_reads.Identity) (types.Object, bool) {
 	home := finder.packageAt(identity.PackagePath)
 	if home == nil {
 		return nil, false
 	}
-	var function *types.Func
+	var object types.Object
 	switch identity.Kind {
 	case build_reads.IdentityObject:
-		object, found := objectAt(home, identity.Path)
+		declared, found := objectAt(home, identity.Path)
 		if !found {
 			return nil, false
 		}
-		declared, isFunction := object.(*types.Func)
-		if !isFunction {
-			return nil, false
-		}
-		function = declared
+		object = declared
 	case build_reads.IdentityMethod:
 		method, found := methodAt(home, string(identity.Path), identity.Method)
 		if !found {
 			return nil, false
 		}
-		function = method
+		object = method
 	default:
 		return nil, false
 	}
 	if home == finder.pass.Pkg {
-		file := finder.pass.Fset.File(function.Pos())
+		file := finder.pass.Fset.File(object.Pos())
 		if file == nil || file.Name() != identity.File {
 			return nil, false
 		}
 	}
-	return function, true
+	return object, true
 }
 
 // packageAt is the package at path as the pass's package sees it: itself, or the one package of that path among
