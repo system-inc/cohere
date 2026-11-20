@@ -2,6 +2,7 @@ package check
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -103,5 +104,30 @@ func TestAReportCountsEveryPackageLeftOutAndNamesTheFirstFew(test *testing.T) {
 		"compared is the tree in part; the first 5: " + strings.Join(seven[:5], "; ")
 	if !slices.Equal(report.failed, []string{wantFailure}) {
 		test.Errorf("want the report to fail once, saying %q, got %q", wantFailure, report.failed)
+	}
+}
+
+// A load that finds nothing compares nothing, and a report of nothing compared is no judgment: go list's ./... over a
+// module of no package returns no package and no error, so the two loads are empty, the tally is all zeros, nothing
+// is left out and nothing fails a leg, and the report fails once, naming the build, as it does under every caller.
+func TestALoadThatFindsNothingFailsTheObjectDifferential(test *testing.T) {
+	test.Parallel()
+
+	module := test.TempDir()
+	if writeError := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module scratch\n\ngo 1.24\n"),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	host := loadObjects(test, module, objectEnvironment("darwin", ""), "./...", true)
+	built := loadObjects(test, module, objectEnvironment("linux", ""), "./...", true)
+	if len(host.packages) > 0 || len(built.packages) > 0 {
+		test.Fatalf("want both loads empty, got %d packages on darwin and %d on linux", len(host.packages),
+			len(built.packages))
+	}
+	tally := objectDifferences(host, built, objectDependence(host, built, objectFixtureWorkspace).ObjectBits)
+	var report recordedReport
+	reportObjectDifferences(&report, "linux", tally, time.Now())
+	if want := []string{"linux: compared no object, so the load found nothing"}; !slices.Equal(report.failed, want) {
+		test.Errorf("want the report to fail once, saying %q, got %q", want, report.failed)
 	}
 }
