@@ -64,6 +64,10 @@ type FactReachPackage struct {
 	// it: the functions a body starts, whether it writes a candidate of consistency-no-any's of its own, and the
 	// marker interfaces it declares. A body that holds none of them has no entry.
 	Presence map[fact_reach.Place]standing_presence.BodyRecord
+
+	// PresenceRead is whether the run read the package's bodies for Presence at all. One it never read holds nothing
+	// in Presence that says its bodies hold nothing, so its side counts it unplaced, and a build lints it whole.
+	PresenceRead bool
 }
 
 // factReachKinds is what one captured package's answers are, by kind: each kind that answered about its objects, in the
@@ -100,8 +104,8 @@ func captureFactReach(
 			// Restored: ctrlflow never ran on it, so the resolver never learned it, and nothing was computed there.
 			continue
 		}
-		hosted := &FactReachPackage{NoReturn: home.NoReturn, OrderKnown: true,
-			Presence: presence.of(analyzedPackage.ID)}
+		hosted := &FactReachPackage{NoReturn: home.NoReturn, OrderKnown: true}
+		hosted.Presence, hosted.PresenceRead = presence.of(analyzedPackage.ID)
 		capture.Packages[analyzedPackage.ID], captured[analyzedPackage.Types] = hosted, hosted
 		kinds[analyzedPackage.Types] = &factReachKinds{functions: map[*fact_resolver.Kind][]*types.Func{}}
 	}

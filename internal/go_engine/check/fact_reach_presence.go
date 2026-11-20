@@ -16,7 +16,8 @@ type factReachPresence struct {
 	read map[string]map[fact_reach.Place]standing_presence.BodyRecord
 }
 
-// readBodies reads read's bodies while its syntax and type information are whole.
+// readBodies reads read's bodies while its syntax and type information are whole, and keeps an entry even where none
+// holds anything, so a package read apart from one never read.
 func (presence *factReachPresence) readBodies(read *packages.Package) {
 	bodies := standing_presence.ReadBodies(read.Fset, read.Syntax, read.TypesInfo, read.Types)
 	presence.lock.Lock()
@@ -24,12 +25,15 @@ func (presence *factReachPresence) readBodies(read *packages.Package) {
 	presence.read[read.ID] = bodies
 }
 
-// of is what was read of the bodies of the package of ID packageId, nil for none, and nil from no presence at all.
-func (presence *factReachPresence) of(packageId string) map[fact_reach.Place]standing_presence.BodyRecord {
+// of is what was read of the bodies of the package of ID packageId, and whether they were read at all: a package
+// whose bodies hold nothing presence reads was read, with no entry, and one never handed over, as one whose type
+// information was gone by its last action, or a run with no presence at all, was not.
+func (presence *factReachPresence) of(packageId string) (map[fact_reach.Place]standing_presence.BodyRecord, bool) {
 	if presence == nil {
-		return nil
+		return nil, false
 	}
 	presence.lock.Lock()
 	defer presence.lock.Unlock()
-	return presence.read[packageId]
+	bodies, isRead := presence.read[packageId]
+	return bodies, isRead
 }

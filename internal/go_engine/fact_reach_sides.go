@@ -67,15 +67,16 @@ func newFactReachSides(
 			}
 		}
 		sides.packages[analyzedPackage.ID] = newFactReachPackage(factReachInputs{
-			fileSet:    hosted.Fset,
-			record:     record,
-			renderer:   build_reads.NewIdentityRenderer(hosted.Fset, nil),
-			answers:    captured.Answers,
-			imported:   imported,
-			noReturn:   captured.NoReturn,
-			pushed:     captured.Pushed,
-			orderBound: captured.OrderBound,
-			presence:   captured.Presence,
+			fileSet:      hosted.Fset,
+			record:       record,
+			renderer:     build_reads.NewIdentityRenderer(hosted.Fset, nil),
+			answers:      captured.Answers,
+			imported:     imported,
+			noReturn:     captured.NoReturn,
+			pushed:       captured.Pushed,
+			orderBound:   captured.OrderBound,
+			presence:     captured.Presence,
+			presenceRead: captured.PresenceRead,
 		})
 	}
 	return sides

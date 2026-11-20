@@ -24,17 +24,18 @@ import (
 //     (check.FactReachPackage.Pushed).
 //   - orderBound are the objects whose answers hang on the order the host walked the package in.
 //   - presence is what each body holds that the presence rows read, by its place, read off the package's syntax while
-//     the host's run held it (check.FactReachPackage.Presence).
+//     the host's run held it (check.FactReachPackage.Presence), and presenceRead whether it was read at all.
 type factReachInputs struct {
-	fileSet    *token.FileSet
-	record     *build_reads.FunctionUses
-	renderer   *build_reads.IdentityRenderer
-	answers    []check.ExportedFact
-	imported   []check.ExportedFact
-	noReturn   func(function *types.Func) bool
-	pushed     map[string]map[types.Object]string
-	orderBound []types.Object
-	presence   map[fact_reach.Place]standing_presence.BodyRecord
+	fileSet      *token.FileSet
+	record       *build_reads.FunctionUses
+	renderer     *build_reads.IdentityRenderer
+	answers      []check.ExportedFact
+	imported     []check.ExportedFact
+	noReturn     func(function *types.Func) bool
+	pushed       map[string]map[types.Object]string
+	orderBound   []types.Object
+	presence     map[fact_reach.Place]standing_presence.BodyRecord
+	presenceRead bool
 }
 
 // factReachRendered is an object as a package's side names it: its identity, and its key, known false for an object
@@ -170,8 +171,14 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 
 // readPresence keeps, by its place, what each body holds that the presence rows read, read off the host's own syntax
 // (fact_reach.Host.Presence), each function a body starts by its key. A function no identity names is counted
-// unplaced, as a body's use of one is, since no build could find which body it is.
+// unplaced, as a body's use of one is, since no build could find which body it is. A package whose bodies were never
+// read is counted unplaced too, and so linted whole: no record would read as no body holding anything, and a standing
+// body that starts a goroutine or writes its own any would stand unproven.
 func (builder *factReachBuilder) readPresence() {
+	if !builder.inputs.presenceRead {
+		builder.hosted.unplaced++
+		return
+	}
 	for place, body := range builder.inputs.presence {
 		record := fact_reach.PresenceRecord{OwnAny: body.OwnAny, LocalMarkers: body.LocalMarkers}
 		record.GoStarts = builder.startedKeys(body.GoStarts)

@@ -150,11 +150,12 @@ func (fixture *factReachFixture) key(test *testing.T, object types.Object) fact_
 }
 
 // inputs are what the fixture's host side is made from with no answer of its own or imported, no object bound to the
-// order and no function holding the no-return fact, for a test to add its own to.
+// order, no function holding the no-return fact and no body holding anything presence reads, its bodies read, for a
+// test to add its own to.
 func (fixture *factReachFixture) inputs() factReachInputs {
 	return factReachInputs{fileSet: fixture.fileSet, record: fixture.record,
 		renderer: build_reads.NewIdentityRenderer(fixture.fileSet, nil),
-		noReturn: func(*types.Func) bool { return false }}
+		noReturn: func(*types.Func) bool { return false }, presenceRead: true}
 }
 
 // placesOf are the places of names, in their order.
@@ -247,6 +248,28 @@ func TestAPackagesUsedObjectsAreEveryObjectItsBodiesUseByKey(test *testing.T) {
 	}
 	if slices.Contains(keys, fixture.key(test, fixture.own.Scope().Lookup("Label"))) {
 		test.Errorf("Label, which only a signature names, is a used object")
+	}
+}
+
+// A package whose bodies' presence the host never read fails closed (#xeafx79): no record would read as no body
+// holding anything, so a standing body that starts a goroutine or writes its own any would stand unproven. Its side
+// counts it unplaced, and every build lints it whole, while the same package read, with nothing in its bodies,
+// stands as the reach leaves it.
+func TestAPackageWhosePresenceWasNeverReadIsLintedWhole(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	read := newFactReachPackage(fixture.inputs())
+	if _, partial := read.inBuild(fixture.standing("size"), true).Standing(); !partial || read.unplaced != 0 {
+		test.Fatalf("read, the package is partial %t with %d unplaced, want partial and none", partial, read.unplaced)
+	}
+	inputs := fixture.inputs()
+	inputs.presenceRead = false
+	unread := newFactReachPackage(inputs)
+	standing, partial := unread.inBuild(fixture.standing("size"), true).Standing()
+	if partial || standing != nil || unread.unplaced != 1 {
+		test.Errorf("never read, the package is partial %t, standing %v, with %d unplaced, want linted whole and one "+
+			"unplaced", partial, standing, unread.unplaced)
 	}
 }
 

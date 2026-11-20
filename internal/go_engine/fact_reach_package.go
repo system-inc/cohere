@@ -109,10 +109,11 @@ type factReachPackage struct {
 	// unplaced counts what the package's side could not name, each a comparison a build would never make. An answer
 	// no body could take: one about the package, a function no declaration of the record declares or one no identity
 	// names. A body the file set places in no file, whose answers and uses have nowhere to rest. An order-bound
-	// object no identity names. A package that has any is linted whole in every build (factReachHost.Standing),
-	// since what cannot be placed cannot be compared. An answer about a variable that is no declared function's
-	// parameter is none of these, nor is one its kind marks as its types' alone about a function no declaration
-	// declares, and each is left out uncounted (factReachBuilder.answer).
+	// object no identity names. A function a body starts that no identity names, and a package whose bodies' presence
+	// the host never read (factReachBuilder.readPresence). A package that has any is linted whole in every build
+	// (factReachHost.Standing), since what cannot be placed cannot be compared. An answer about a variable that is no
+	// declared function's parameter is none of these, nor is one its kind marks as its types' alone about a function
+	// no declaration declares, and each is left out uncounted (factReachBuilder.answer).
 	unplaced int
 }
 
