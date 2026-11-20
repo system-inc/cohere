@@ -540,6 +540,10 @@ func (engine *pipeline) extraBuildRun(
 	afterLoad func(loaded bool),
 	atGate func(fromSource int, packages int) error,
 ) (buildRun, error) {
+	// A test's hold on the build before it reads anything (extraBuildStarts), nil in every run but a test's.
+	if engine.extraBuildStarts != nil {
+		engine.extraBuildStarts(extra)
+	}
 	// Under `--timeline` the build's stamps, each under the build's name, in its first round: its own steps, and its
 	// first load's and check's. A reload's are in the reload's round, the rounds checkedFromSourceRounds counts. The
 	// name is asked only of a run that stamps (buildTimeline).
@@ -645,6 +649,9 @@ func (engine *pipeline) extraBuildRun(
 		return gateError
 	}
 	var linting time.Duration
+	if engine.extraBuildLoads != nil {
+		engine.extraBuildLoads(extra)
+	}
 	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 	elapsed := time.Since(started)
@@ -807,6 +814,9 @@ func (engine *pipeline) extraBuildRun(
 			// The reload's load, its end too, and the check over it, stamp in the round this load is of: 1 for the
 			// first reload.
 			caching.Timeline = engine.buildTimeline(extra, len(run.checkedFromSourceRounds))
+			if engine.extraBuildLoads != nil {
+				engine.extraBuildLoads(extra)
+			}
 			started := time.Now()
 			loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 			elapsed := time.Since(started)
