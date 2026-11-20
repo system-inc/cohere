@@ -24,9 +24,10 @@ import (
 // StandardLibraryDependenceRecordVersion is the format of a standard-library dependence record as the store keeps it,
 // hashed into its key apart from the host's records' version, so either changes alone. It moves with
 // DependenceRecordVersion when what the collector records changes, as it did at 2, at 3, at 4, where the name bit of a
-// type defined from another type's name reads that type in full, and at 5, where each unit carries whether it hangs
-// on the C side, one in a cgo tool's output or in any file of a package checked as written that has a cgo file.
-const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-5"
+// type defined from another type's name reads that type in full, at 5, where each unit carries whether it hangs on
+// the C side, one in a cgo tool's output or in any file of a package checked as written that has a cgo file, and at
+// 6, where a const spec that repeats the spec before it carries that spec's universe names.
+const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-6"
 
 // StandardLibraryDependenceRecordKey is where the store keeps the dependence record of the standard-library package
 // whose standard-library key is standardLibraryKey (cache.StandardLibraryKeys), written by the engine whose identity is
@@ -149,4 +150,79 @@ func (session *CacheSession) WriteStandardLibraryRecords(
 		}
 	})
 	return failed, firstFailure
+}
+
+// StandardLibraryDeclarationsRecordKey is where the system cache's store keeps the declarations-only record of the
+// standard-library package whose standard-library key is standardLibraryKey (#anfjtr3), written by the engine whose
+// identity is engineIdentity under toolchain, as StandardLibraryDependenceRecordKey keys a whole one in the project's
+// store, apart from it by its own words and version (DeclarationsRecordVersion). It is kept in the system cache's
+// store beside the package's entry, since the record, as the entry, holds nothing of any project's, so every project,
+// and a run under `--no-cache`, which has no store of its own, reads the one record. The whole records' version,
+// DependenceRecordVersion, is hashed in beside its own, as DeclarationsRecordKey hashes it, since the engine's identity
+// a stamp sets can stay one across binaries whose collectors record otherwise.
+func StandardLibraryDeclarationsRecordKey(
+	standardLibraryKey cache.Key, engineIdentity string, toolchain string,
+) cache.Key {
+	return standardLibraryDeclarationsRecordKeyAt(DependenceRecordVersion, standardLibraryKey, engineIdentity,
+		toolchain)
+}
+
+// standardLibraryDeclarationsRecordKeyAt is StandardLibraryDeclarationsRecordKey with dependenceVersion as the whole
+// records' version, which a test names apart from DependenceRecordVersion to see the key move with it.
+func standardLibraryDeclarationsRecordKeyAt(
+	dependenceVersion string, standardLibraryKey cache.Key, engineIdentity string, toolchain string,
+) cache.Key {
+	return cache.DigestOf([]byte("standard library declarations record "+DeclarationsRecordVersion),
+		[]byte(dependenceVersion), []byte(engineIdentity), []byte(toolchain), standardLibraryKey[:])
+}
+
+// standardLibraryDeclarationsKey is keyed's declarations-only record key in the system cache's store, and whether it
+// has one: a package of the standard library, in no module, that the session keys apart for the system cache
+// (KeptBySystemCache), restored from it or written to it, in a session that keeps one.
+func (session *CacheSession) standardLibraryDeclarationsKey(keyed *packages.Package) (cache.Key, bool) {
+	standardLibrary := session.caching.StandardLibrary
+	key, isKeyed := session.standardLibraryKeys[keyed]
+	if !isKeyed || standardLibrary == nil || keyed.Module != nil || !session.KeptBySystemCache(keyed) {
+		return cache.Key{}, false
+	}
+	return StandardLibraryDeclarationsRecordKey(key, standardLibrary.Context.EngineIdentity, standardLibrary.Toolchain),
+		true
+}
+
+// readStandardLibraryDeclarations looks up, in the system cache's store, the declarations-only record of every
+// standard-library package the session restored from there, and decodes each, as readStandardLibraryRecords does the
+// whole ones in the project's store: one that does not decode is a problem, said, and its package has none, so the
+// plain run's side load loads it and its record is written again.
+func (session *CacheSession) readStandardLibraryDeclarations(reachable []*packages.Package) {
+	records := session.dependence
+	records.standardLibrary = map[*packages.Package]*build_dependence.Record{}
+	if session.caching.StandardLibrary == nil {
+		return
+	}
+	var restored []*packages.Package
+	var keys []cache.Key
+	for _, each := range reachable {
+		key, isKeyed := session.standardLibraryDeclarationsKey(each)
+		if isKeyed && session.restoredFromSystemCache(each) {
+			restored = append(restored, each)
+			keys = append(keys, key)
+		}
+	}
+	read := make([]*build_dependence.Record, len(restored))
+	unreadable := make([]error, len(restored))
+	session.fanOut(len(restored), func(index int) {
+		if record, isStored := session.caching.StandardLibrary.System.Get(keys[index]); isStored {
+			read[index], unreadable[index] = records.decode(record)
+		}
+	})
+	for index, each := range restored {
+		switch {
+		case unreadable[index] != nil:
+			records.counts.StandardLibraryUnreadable++
+			session.problem(fmt.Sprintf("reading the declarations record of %s: %v", each.ID, unreadable[index]))
+		case read[index] != nil:
+			records.standardLibrary[each] = read[index]
+			records.counts.StandardLibraryRead++
+		}
+	}
 }

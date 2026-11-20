@@ -17,7 +17,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
-	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -309,6 +308,24 @@ type pipeline struct {
 	bodyReachFromSourceRecord string
 	bodyReachFromSource       string
 
+	// mustCheckCensus is the directory each extra build's must-check set is written into, from
+	// `COHERE_MUST_CHECK_CENSUS`, empty for a run that writes none (pipeline_must_check_census.go, #anfjtr3); and
+	// plainBits what a plain run judges each extra build on for it, made from the host's lint pass as the builds start,
+	// nil in any other run (pipeline_plain_bits.go).
+	mustCheckCensus string
+	plainBits       *plainBits
+	// mustCheckSets are each extra build's must-check set, by its build's name, its judgment's under
+	// `--build-dependence` or the plain bits' on a plain run, written only under the census and under
+	// mustCheckSetsLock, since extra builds run at once. They live here and not on buildRun, which every run with extra
+	// builds makes one of per build, so the census leaves buildRun's size as it was (pipeline_build_run_size_test.go).
+	mustCheckSetsLock sync.Mutex
+	mustCheckSets     map[string]*mustCheckSet
+	// declarationsSteps, a test's alone, is told of each step of a plain run's declarations graph at the builds'
+	// start, in order (declarationsStepped). sideLoadRefused, a test's alone too, fails a plain run's standard-library
+	// side load with itself in place of the load, as a load that failed would (sideLoadStandardLibrary).
+	declarationsSteps func(declarationsStep)
+	sideLoadRefused   error
+
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
 	// run found no build beside the host's to check.
 	buildRuns []buildRun
@@ -455,7 +472,13 @@ func (engine *pipeline) run() int {
 			// Under `--build-dependence` the host's graph is read from the records the store keeps of the packages it
 			// restores, and the records of those it checks are written beside their entries (#6a3kjvz).
 			if engine.request.judgesDependence() && engine.request.requests(contract.PhaseLint) {
-				engine.session.KeepDependenceRecords(build_dependence.DecodeRecord)
+				engine.session.KeepDependenceRecords(decodeWholeRecord)
+			}
+			// A plain run asked for the must-check census reads its declarations-only graph's records of the packages
+			// it restores instead, and writes those it builds once its walks end (#anfjtr3).
+			if engine.mustCheckCensus != "" && !engine.request.judgesDependence() &&
+				engine.request.requests(contract.PhaseLint) {
+				engine.session.KeepDeclarationsRecords(decodeDeclarationsRecord)
 			}
 		}
 	}

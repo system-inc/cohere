@@ -94,6 +94,18 @@ func (walks *Walks) Ended(owner *packages.Package) <-chan struct{} {
 	return endedAlready
 }
 
+// Started reports whether Go started a walk of owner, false for nil walks, so a caller walking whatever no walk reached
+// starts none twice (check's recordUnreachedTypes).
+func (walks *Walks) Started(owner *packages.Package) bool {
+	if walks == nil {
+		return false
+	}
+	walks.endedLock.Lock()
+	defer walks.endedLock.Unlock()
+	_, started := walks.ended[owner]
+	return started
+}
+
 // Wait returns once every walk Go started has ended, at once for nil walks, a run that started none.
 func (walks *Walks) Wait() {
 	if walks == nil {

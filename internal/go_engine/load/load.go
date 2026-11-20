@@ -240,6 +240,13 @@ type Caching struct {
 	// is, restoring the standard library from the binary.
 	Begin func(*Overlap)
 
+	// Listed, when set, is called once the graph is built and before the Restorer restores, on the load's goroutine,
+	// with every package the load reaches, its files and imports set, as the Restorer is given them: what a caller
+	// judges of a build from its listing alone is known there, before anything is restored or checked (#anfjtr3). The
+	// load holds none of the pool's slots there, so the caller may wait in it. Every load given it calls it, a
+	// reload's included.
+	Listed func(reachable []*packages.Package)
+
 	// AtGate, when set, is called once the graph is built and the Restorer has decided, before any package is
 	// type-checked, on the load's goroutine, with how many of the graph's packages the load will check from source,
 	// every one the Restorer did not restore, and how many it holds, the packages Loaded.PackagesLoaded counts. The
@@ -558,6 +565,9 @@ func fromSource(
 			return !caching.Analyzes(root)
 		})
 	}
+	if caching.Listed != nil {
+		caching.Listed(loadedOf(reachable))
+	}
 	if caching.Restorer != nil {
 		loaderName := LoaderSource
 		if compiled != nil {
@@ -595,6 +605,9 @@ func fromSource(
 		}
 		return false
 	})
+	// What the load withholds of each package that withholds, known once every package is checked, which a pass beside
+	// the load reads once such a package is ready, as the load ends (Overlap.Withheld).
+	var withheldDeclarations map[*packages.Package][]string
 	if caching.Begin != nil {
 		nodes := make(map[*packages.Package]*node, len(reachable))
 		for _, current := range reachable {
@@ -608,6 +621,7 @@ func fromSource(
 			Rewritten: typeChecker.rewritten,
 			nodes:     nodes,
 			ended:     ended,
+			withheld:  &withheldDeclarations,
 		})
 	}
 	if caching.AtGate != nil {
@@ -622,6 +636,7 @@ func fromSource(
 		roots = append(roots, root.loaded)
 	}
 	declarations := withholdCgoDeclarations(typeChecker.fileSet, reachable)
+	withheldDeclarations = declarations
 	// Only now is a dependency that withholds done with its syntax and type maps; one that withholds nothing was
 	// checked without maps, and its syntax goes with the rest.
 	for _, current := range reachable {

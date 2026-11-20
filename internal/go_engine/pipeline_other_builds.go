@@ -66,6 +66,13 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
 	engine.request.timeline.Stamp("host.readwalks.end")
+	// The walks are over, so a plain run's declarations graph for the must-check census holds every package it will,
+	// and its records are written beside the builds, joined before the run's record.
+	if pass.declarations != nil {
+		engine.declarationsStepped(declarationsWalksWhole)
+		engine.plainBits = newPlainBits(pass.declarations, loaded)
+		defer engine.completePlainBits(engine.plainBits, loaded)()
+	}
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {
 		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
@@ -168,6 +175,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	runs = append(runs, extraRuns...)
 	engine.writeBodyReachCensus(runs)
 	engine.writeFromSourceRecord(runs)
+	engine.writeMustCheckCensus(runs)
 	return runs
 }
 
@@ -650,6 +658,17 @@ func (engine *pipeline) extraBuildRun(
 		shareGateWait += waited
 		return gateError
 	}
+	// A plain run's must-check census judges the build at its restore, from its first load's listing alone, once:
+	// a reload's listing names the same files (#anfjtr3). Listed runs on the load's goroutine, each load in turn, so
+	// the set is read only once the load has returned.
+	var listedMustCheck *mustCheckSet
+	if engine.plainBits != nil {
+		caching.Listed = func(reachable []*packages.Package) {
+			if listedMustCheck == nil {
+				listedMustCheck = engine.plainMustCheckOf(reachable)
+			}
+		}
+	}
 	var linting time.Duration
 	if engine.extraBuildLoads != nil {
 		engine.extraBuildLoads(extra)
@@ -694,6 +713,16 @@ func (engine *pipeline) extraBuildRun(
 	}
 	// Judged on the host's graph from this first load alone, which a reload for a question never changes the files of.
 	run.dependence, run.judged = engine.dependenceOf(loaded)
+	// The build's must-check set for the census: the whole graph's under `--build-dependence`, judged after this load,
+	// or the plain bits', judged at its listing (#anfjtr3). Either is nil without the census, so a plain run never
+	// takes the lock.
+	mustCheck := listedMustCheck
+	if run.judged != nil && run.judged.mustCheck != nil {
+		mustCheck = run.judged.mustCheck
+	}
+	if mustCheck != nil {
+		engine.keepMustCheckSet(extra, mustCheck)
+	}
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil
 	}
