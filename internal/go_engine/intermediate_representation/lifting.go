@@ -295,16 +295,30 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 	// Marked before the round writes a block, so release clears what a round wrote however far it got.
 	scratch.blockValuesUsed = max(scratch.blockValuesUsed, len(scratch.blockValues))
 	instructions := 0
+	predecessors := 0
 	for _, block := range function.Blocks {
 		instructions += len(block.Instructions)
+		predecessors += len(block.Predecessors)
 	}
 	scratch.slots = liftingCleared(scratch.slots, instructions)
+	// Grown to the round's whole count first, so the appends below allocate at most once a round. It isn't what keeps
+	// the views right: a view carved before an append moved the array still reads its own ids, since nothing
+	// writes the old array again.
+	scratch.predecessors = slices.Grow(scratch.predecessors[:0], predecessors)
 	// Each instruction's id is its index in its block for the round, so a lifted cell, Load or debug reference is
 	// found by its block and id rather than through a map (#beapx0q). finishBody numbers them again after lifting.
 	start := 0
 	for blockIndex, block := range function.Blocks {
 		end := start + len(block.Instructions)
-		scratch.blockValues[blockIndex] = liftingBlock{block: block, vacantSlots: scratch.slots[start:end:end]}
+		first := len(scratch.predecessors)
+		for _, predecessor := range block.Predecessors {
+			scratch.predecessors = append(scratch.predecessors, static_single_assignment.BlockId(predecessor.Index))
+		}
+		// Capped at its own end, so an append to one block's view makes a new array rather than writing the next
+		// block's predecessors.
+		last := len(scratch.predecessors)
+		scratch.blockValues[blockIndex] = liftingBlock{block: block, vacantSlots: scratch.slots[start:end:end],
+			predecessors: scratch.predecessors[first:last:last]}
 		lifting.blocks[blockIndex] = &scratch.blockValues[blockIndex]
 		start = end
 		for index, instruction := range block.Instructions {
@@ -762,14 +776,21 @@ func liftingReplaceAll(from Value, to Value) {
 	fromReferrers := from.Referrers()
 	toReferrers := to.Referrers()
 	for _, referrer := range *fromReferrers {
-		if composite, isComposite := referrer.(*CompositeValue); isComposite {
+		switch referrer := referrer.(type) {
+		case *CompositeValue:
 			// Walked directly, since a composite value may hold very many operands.
-			for index, value := range composite.Values {
+			for index, value := range referrer.Values {
 				if value == from {
-					composite.Values[index] = to
+					referrer.Values[index] = to
 				}
 			}
-		} else {
+		case *debugReference:
+			// Its one operand is X, read directly: in a package with the expression map a lifted Load is often
+			// read by debug references alone, and the walk made an operand slice for them all the same (#z844663).
+			if referrer.X == from {
+				referrer.X = to
+			}
+		default:
 			operands = referrer.Operands(operands[:0])
 			for _, operand := range operands {
 				if *operand != nil && *operand == from {
@@ -787,10 +808,19 @@ func liftingReplaceAll(from Value, to Value) {
 // liftingReplace moves instruction's uses of from to to, as go/ir's replace does.
 func liftingReplace(instruction Instruction, from Value, to Value) {
 	matched := false
-	for _, operand := range instruction.Operands(nil) {
-		if *operand == from {
-			*operand = to
-			matched = true
+	if reference, isReference := instruction.(*debugReference); isReference {
+		// Its one operand is X, read directly, as liftingReplaceAll reads it, rather than through the operand slice
+		// Operands makes for each instruction a rename walks.
+		matched = reference.X == from
+		if matched {
+			reference.X = to
+		}
+	} else {
+		for _, operand := range instruction.Operands(nil) {
+			if *operand == from {
+				*operand = to
+				matched = true
+			}
 		}
 	}
 	if !matched {

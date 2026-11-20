@@ -305,6 +305,115 @@ func closureWholeReads(memo *ReadsBuild, object types.Object) map[types.Object]b
 	return wholeReads
 }
 
+// selectedField is what a name selects on a type (fieldSet): the selection, the index path through embedded fields and
+// whether it goes through a pointer, or that the name is ambiguous or a method's, and the field it selects and that
+// field's own line (ownRendering), none where it selects no field.
+type selectedField struct {
+	selection string
+	field     types.Object
+	own       string
+}
+
+// line is the selected field as the leg writes it, its selection and then its own line.
+func (selected selectedField) line() string {
+	return strings.TrimSuffix(selected.selection+" "+selected.own, " ")
+}
+
+// fieldSet is every field selectable on typeName's type, promoted ones at every depth, each by its key, its name, or
+// for an unexported one its package's path and name, since two packages' unexported names never select each other:
+// the field the type checker's lookup selects of the name (types.LookupFieldOrMethod, on an addressable value), with
+// its index path through embedded fields and whether the path goes through a pointer, and its own line, as the method
+// set's lines are written (methodSetLines). A name ambiguous at its shallowest depth selects nothing, and one a
+// promoted method takes at a shallower depth selects the method, each said so. The names are every field's of the
+// struct under the type, or under the pointer it is, and of each struct an embedded field reaches, walked
+// breadth-first, each struct once; a type with no struct under it has none.
+func fieldSet(typeName *types.TypeName) map[string]selectedField {
+	written := writtenType(typeName.Type())
+	selected := map[string]selectedField{}
+	walked := map[types.Type]bool{}
+	pending := []types.Type{typeName.Type()}
+	for len(pending) > 0 {
+		current := types.Unalias(pending[0])
+		pending = pending[1:]
+		if pointer, isPointer := current.Underlying().(*types.Pointer); isPointer {
+			current = types.Unalias(pointer.Elem())
+		}
+		structure, isStruct := current.Underlying().(*types.Struct)
+		if !isStruct || walked[current] {
+			continue
+		}
+		walked[current] = true
+		for field := range structure.Fields() {
+			if field.Embedded() {
+				pending = append(pending, field.Type())
+			}
+			key := field.Name()
+			if !field.Exported() {
+				key = field.Pkg().Path() + "." + key
+			}
+			if _, isKnown := selected[key]; isKnown {
+				continue
+			}
+			found, index, indirect := types.LookupFieldOrMethod(typeName.Type(), true, field.Pkg(), field.Name())
+			switch found.(type) {
+			case nil:
+				selected[key] = selectedField{selection: fmt.Sprintf("field of %s %s ambiguous at depth %d", written,
+					field.Name(), len(index))}
+			case *types.Func:
+				selected[key] = selectedField{selection: fmt.Sprintf("field of %s %s is a method at %v indirect %t",
+					written, field.Name(), index, indirect), own: ownRendering(found)}
+			default:
+				selected[key] = selectedField{selection: fmt.Sprintf("field of %s %s at %v indirect %t", written,
+					field.Name(), index, indirect), field: found, own: ownRendering(found)}
+			}
+		}
+	}
+	return selected
+}
+
+// fieldDifference is one field whose line differs between two builds' field sets (fieldSetDifferences): what a
+// failure says of it, whether its selection differs, which the type's name bit carries, and the host's field where the
+// two select a field alike and only its own line differs, which that field's own bit carries too.
+type fieldDifference struct {
+	said            string
+	selectionDiffer bool
+	hostField       types.Object
+}
+
+// fieldSetDifferences are the fields whose lines differ between two field sets (fieldSet), each by its key and both
+// sides' lines, absent where one side selects no field of the key, sorted by key.
+func fieldSetDifferences(host map[string]selectedField, build map[string]selectedField) []fieldDifference {
+	keys := map[string]bool{}
+	for key := range host {
+		keys[key] = true
+	}
+	for key := range build {
+		keys[key] = true
+	}
+	var differences []fieldDifference
+	for _, key := range slices.Sorted(maps.Keys(keys)) {
+		hosted, isHosted := host[key]
+		built, isBuilt := build[key]
+		hostLine, buildLine := "absent", "absent"
+		if isHosted {
+			hostLine = hosted.line()
+		}
+		if isBuilt {
+			buildLine = built.line()
+		}
+		if hostLine == buildLine {
+			continue
+		}
+		difference := fieldDifference{said: fmt.Sprintf("its field %s differs, the host's %q, the build's %q", key,
+			hostLine, buildLine), selectionDiffer: !isHosted || !isBuilt || hosted.selection != built.selection}
+		if !difference.selectionDiffer && hosted.field != nil {
+			difference.hostField = hosted.field
+		}
+		differences = append(differences, difference)
+	}
+	return differences
+}
+
 // objectDifferences holds block 1's bits to the lines TypesHold writes: every object block 1 calls unchanged must
 // render alike in both builds. For every object of every package both loads hold without errors, each the host's read
 // in the host's memo and its counterpart in the build's, the object the build's package of the same ID declares
@@ -317,6 +426,10 @@ func closureWholeReads(memo *ReadsBuild, object types.Object) map[types.Object]b
 //   - a member, any object but a type name, has its own line differ and its bit unset (a UseMember read, judged by
 //     its own line, and gated by its own bit alone);
 //   - a type name has its name line (UseName) or its method set lines (UseMethodSet) differ and its name bit unset;
+//   - a type name has a field selectable on it, promoted ones at every depth, differ (fieldSet) and its name bit
+//     unset, which carries what its embedded fields promote (#dj5csr5): where the selection itself differs, its depth,
+//     its path or whether the name selects a field at all, or where it is alike and the selected field's own line
+//     differs with the field's own bit unset too, since a selection reads its field's own bit beside the path's;
 //   - a type name has its closure digest differ and no type name its closure reaches has either bit set, the objects
 //     a whole read of it reads (closureWholeReads), itself among them.
 //
@@ -397,6 +510,24 @@ func objectDifferences(
 						", and its name bit is unset")
 				default:
 					tally.differedCovered++
+				}
+			}
+			counterpartTypeName, isCounterpartTypeName := counterpart.(*types.TypeName)
+			if !isCounterpartTypeName {
+				// Invariant: the kinds compared alike above, so the counterpart of a type name is one.
+				panic(fmt.Sprintf("check: the counterpart of the type name %s is a %T", named, counterpart))
+			}
+			for _, differs := range fieldSetDifferences(fieldSet(typeName), fieldSet(counterpartTypeName)) {
+				switch {
+				case bits.Name:
+					tally.differedCovered++
+				case differs.hostField != nil && bitsOf(differs.hostField).Name:
+					tally.differedCovered++
+				case differs.selectionDiffer:
+					tally.failures = append(tally.failures, named+": "+differs.said+", and its name bit is unset")
+				default:
+					tally.failures = append(tally.failures, named+": "+differs.said+", and neither its name bit nor "+
+						"the field's own bit is set")
 				}
 			}
 			if hostMemo.closureDigest(typeName) == buildMemo.closureDigest(counterpart) {
@@ -599,6 +730,61 @@ func TestTheClosureDigestLegFailsWhereNoNameItReachesHasABit(test *testing.T) {
 	if blanked.differedCovered != asSet.differedCovered-len(want) {
 		test.Errorf("with Inner's bits blanked, want %d differing lines covered, %d fewer than block 1's bits cover, "+
 			"got %d", asSet.differedCovered-len(want), len(want), blanked.differedCovered)
+	}
+}
+
+// The field-set leg of objectDifferences fails a type name a field selectable on which moves while its name bit is
+// unset (fieldSet), which no fixture reaches while block 1 holds. In the promoted fixture Inner embeds Wrap, which
+// embeds Base and its Name, and a pointer to Extra, which has a Name on linux alone, so Inner's Name is Base's int at
+// depth 2 on the host and Extra's string at depth 1 on linux; and Both embeds First and Second, each with a Count on
+// linux and only First with one elsewhere, so Both's Count is First's on the host and ambiguous on linux. Nothing else
+// the differential renders of either moves but their closure digests, which Extra's and Second's bits cover. With
+// block 1's bits as they are, the two name bits are set and nothing fails; with them blanked, the two fields fail and
+// nothing else does.
+func TestTheFieldSetLegFailsWhereAPromotedFieldMovesUnderAnUnsetNameBit(test *testing.T) {
+	test.Parallel()
+
+	directory := filepath.Join("..", "build_dependence", "testdata", "promoted")
+	host := loadObjects(test, directory, objectEnvironment("darwin", ""), "./...", true)
+	built := loadObjects(test, directory, objectEnvironment("linux", ""), "./...", true)
+	if len(host.broken) > 0 || len(built.broken) > 0 {
+		test.Fatalf("the promoted fixture does not type-check: %q on the host, %q on linux", host.broken, built.broken)
+	}
+	hosted := host.packages["example.com/promoted"]
+	if hosted == nil {
+		test.Fatal("the promoted fixture's host holds no example.com/promoted")
+	}
+	blankedObjects := map[types.Object]bool{hosted.Types.Scope().Lookup("Inner"): true,
+		hosted.Types.Scope().Lookup("Both"): true}
+	dependence := objectDependence(host, built, objectFixtureWorkspace)
+
+	// Both tallies on this goroutine, one after the other: ObjectBits is asked from one goroutine at a time.
+	for object := range blankedObjects {
+		if bits := dependence.ObjectBits(object); !bits.Name {
+			test.Errorf("want %s's name bit set on linux, got %+v", object.Name(), bits)
+		}
+	}
+	asSet := objectDifferences(host, built, dependence.ObjectBits)
+	if len(asSet.failures) > 0 {
+		test.Errorf("want nothing failing with block 1's bits, got %q", asSet.failures)
+	}
+	blanked := objectDifferences(host, built, func(object types.Object) build_dependence.Bits {
+		if blankedObjects[object] {
+			return build_dependence.Bits{}
+		}
+		return dependence.ObjectBits(object)
+	})
+	want := []string{
+		"example.com/promoted.Both: its field Count differs, the host's \"field of example.com/promoted.Both Count " +
+			"at [0 0] indirect false field of example.com/promoted Count int\", the build's \"field of " +
+			"example.com/promoted.Both Count ambiguous at depth 2\", and its name bit is unset",
+		"example.com/promoted.Inner: its field Name differs, the host's \"field of example.com/promoted.Inner Name " +
+			"at [0 0 0] indirect false field of example.com/promoted Name int\", the build's \"field of " +
+			"example.com/promoted.Inner Name at [1 0] indirect true field of example.com/promoted Name string\", and " +
+			"its name bit is unset",
+	}
+	if !slices.Equal(blanked.failures, want) {
+		test.Errorf("with Inner's and Both's bits blanked, want the failures %q, got %q", want, blanked.failures)
 	}
 }
 

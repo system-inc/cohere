@@ -67,6 +67,19 @@ func Counts() {
 	_ = value << typed // clean, a count beyond an int64
 }
 
+// Expressions and assignments that are not shifts, each with a constant operand on the right that a shift by it would
+// be reported for, so a port gathering more than the shifts would report them.
+func NotShifts(values []uint8) {
+	var narrow uint8
+	_ = narrow + 200           // clean, a sum
+	_ = narrow * 64            // clean, a product
+	_ = narrow&8 == 8          // clean, a mask compared
+	narrow = 8                 // clean, an assignment
+	narrow += 100              // clean, an arithmetic assignment
+	narrow |= 64               // clean, a bitwise assignment
+	narrow, values[0] = 9, 255 // clean, an assignment of two
+}
+
 // Constants shifted are left alone, however far.
 func Constants() {
 	const oneIf64Bit = ^uint(0) >> 63 // clean

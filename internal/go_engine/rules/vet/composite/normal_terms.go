@@ -20,29 +20,36 @@ type termSet struct {
 	terms    termList
 }
 
-// normalTerms is the terms of candidate's type set: a type parameter's normalized structural terms, an interface's or
-// a union's normalized terms, and any other type as its one term. It is nil with no error for a set of every type, and
-// an error for a set that is invalid, too complex, or empty. x/tools' typeparams NormalTerms.
-func normalTerms(candidate types.Type) ([]*types.Term, error) {
+// firstNormalTerm is the type of the first term of candidate's type set, the one a literal of candidate is judged by,
+// or nil when the set is invalid, too complex, empty, or of every type. The set is a type parameter's normalized
+// structural terms, an interface's or a union's normalized terms, and any other type as its one term: x/tools'
+// typeparams NormalTerms, read for its first term alone, so a literal of an ordinary type, nearly every literal,
+// builds no list of terms at all.
+func firstNormalTerm(candidate types.Type) types.Type {
 	// The type set of an alias is its target's.
 	described := types.Unalias(candidate)
 	if named, isNamed := described.(*types.Named); isNamed {
 		described = named.Underlying()
 	}
+	var terms termList
+	var termsError error
 	switch constrained := described.(type) {
 	case *types.TypeParam:
-		return structuralTerms(constrained)
-	case *types.Union:
-		return computeTermSet(constrained)
-	case *types.Interface:
-		return computeTermSet(constrained)
+		terms, termsError = structuralTerms(constrained)
+	case *types.Union, *types.Interface:
+		terms, termsError = computeTermSet(constrained)
+	default:
+		// Any other type is its own one term, as written, so an alias stays an alias.
+		return candidate
 	}
-	// Any other type is its own one term, as written, so an alias stays an alias.
-	return []*types.Term{types.NewTerm(false, candidate)}, nil
+	if termsError != nil || len(terms) == 0 {
+		return nil
+	}
+	return terms[0].denoted
 }
 
 // structuralTerms is the normalized terms of parameter's constraint. x/tools' typeparams StructuralTerms.
-func structuralTerms(parameter *types.TypeParam) ([]*types.Term, error) {
+func structuralTerms(parameter *types.TypeParam) (termList, error) {
 	constraint := parameter.Constraint()
 	if constraint == nil {
 		return nil, fmt.Errorf("%s has nil constraint", parameter)
@@ -55,8 +62,10 @@ func structuralTerms(parameter *types.TypeParam) ([]*types.Term, error) {
 }
 
 // computeTermSet is the normalized terms of an interface or a union, nil for every type, and errorEmptyTypeSet for
-// none. x/tools' typeparams computeTermSet.
-func computeTermSet(constrained types.Type) ([]*types.Term, error) {
+// none. x/tools' typeparams computeTermSet, which copies the list into go/types terms where this hands back the
+// computation's own: the memo it was computed in is this call's alone and goes with it, and no term or list is
+// written once built, so its callers, which only read it, share it with nothing that changes.
+func computeTermSet(constrained types.Type) (termList, error) {
 	computed, computeError := computeTermSetOf(constrained, map[types.Type]*termSet{})
 	if computeError != nil {
 		return nil, computeError
@@ -67,11 +76,7 @@ func computeTermSet(constrained types.Type) ([]*types.Term, error) {
 	if computed.terms.isAll() {
 		return nil, nil
 	}
-	terms := []*types.Term{}
-	for _, member := range computed.terms {
-		terms = append(terms, types.NewTerm(member.tilde, member.denoted))
-	}
-	return terms, nil
+	return computed.terms, nil
 }
 
 // computeTermSetOf is the term set of candidate, remembered in seen, which finds a cycle in a constraint's
@@ -173,14 +178,15 @@ func pointerCoreType(candidate types.Type) (*types.Pointer, bool) {
 		return pointer, isPointer
 	}
 	// Kept for fidelity, and run never reaches it: the type it dereferences is the first of a normalized term set,
-	// which expands every interface into its terms, so its underlying type is never an interface.
-	terms, termsError := normalTerms(underlying)
+	// which expands every interface into its terms, so its underlying type is never an interface. An interface's
+	// normal terms are its term set's, so the set is computed directly.
+	terms, termsError := computeTermSet(underlying)
 	if len(terms) == 0 || termsError != nil {
 		return nil, false
 	}
-	shared := terms[0].Type().Underlying()
+	shared := terms[0].denoted.Underlying()
 	for _, other := range terms[1:] {
-		if !types.Identical(shared, other.Type().Underlying()) {
+		if !types.Identical(shared, other.denoted.Underlying()) {
 			return nil, false
 		}
 	}
