@@ -62,12 +62,12 @@ func (reacher *bodyReacher) reachPackage(
 	var bodies []reachedBody
 	absent := 0
 	// initializers are the indexes in bodies of the package's variable initializers, and unshared what one side alone
-	// holds of the package, which reaches every one of them whatever any uses (reachInitializers), the first of: an
-	// initializer in a file the builds do not share, a host's file the build does not compile or a build-only file,
-	// then a body in either, then a name either declares.
+	// holds of the package, which reaches every one of them whatever any uses (reachInitializers), the first of: a body
+	// in a host's file the build does not compile, then one in a build-only file, an initializer counted as a body in
+	// either, then a name either declares.
 	var initializers []int
 	unshared := ""
-	absentInitializer, hostOnlyName := false, false
+	hostOnlyName := false
 	for declared := range record.Declarations() {
 		if !declared.HasBody {
 			// A type, a value with no initializer or a function declared without a body, in a file the build does
@@ -93,8 +93,8 @@ func (reacher *bodyReacher) reachPackage(
 			continue
 		}
 		if !read.files[tokenFile.Name()] {
-			// An absent initializer is no body of the build's, only the cause that reaches every one it shares.
-			absentInitializer = absentInitializer || isInitializer
+			// An absent initializer is no body of the build's, only a cause, as any absent body is, that reaches every
+			// one it shares.
 			absent++
 			continue
 		}
@@ -156,8 +156,6 @@ func (reacher *bodyReacher) reachPackage(
 		}
 	}
 	switch {
-	case read.buildOnlyInitializers || absentInitializer:
-		unshared = "one in a file the builds do not share"
 	case absent > 0:
 		unshared = "a body of the package in a file the build does not compile"
 	case read.buildOnlyBodies > 0:

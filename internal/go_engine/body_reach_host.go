@@ -137,23 +137,21 @@ func newBodyReachHost(
 // reachBuiltPackage is what the census reads of one package a build checked from source, from the build's own syntax,
 // taken before its rules let the syntax go: the files it compiles as written, the bodies in the files the host's
 // package of its ID compiles too and in those only the build compiles, every file's when the host has no such package,
-// the names its build-only files declare at package level, the paths each shared file imports by a dot, by the file
-// as parsed, whether a build-only file declares a variable initializer, which reaches every one of the package's
-// (bodyReacher.reachInitializers), the paths its files import, each with the package it resolves to, by its load's
-// import graph (differingImports), its types, of which the host's Closure lookups are asked again
-// (differingClosureLookups), and in each shared file, by the file as parsed, the declarations a //line directive moves
-// onto a file the builds do not share, each by its offset with the file claimed (unsharedLineClaims).
+// the names its build-only files declare at package level, the paths each shared file imports by a dot, by the file as
+// parsed, the paths its files import, each with the package it resolves to, by its load's import graph
+// (differingImports), its types, of which the host's Closure lookups are asked again (differingClosureLookups), and in
+// each shared file, by the file as parsed, the declarations a //line directive moves onto a file the builds do not
+// share, each by its offset with the file claimed (unsharedLineClaims).
 type reachBuiltPackage struct {
-	identifier            string
-	types                 *types.Package
-	files                 map[string]bool
-	sharedBodies          int
-	buildOnlyBodies       int
-	buildOnlyNames        map[string]bool
-	dotImports            map[string][]string
-	buildOnlyInitializers bool
-	imports               map[string]*packages.Package
-	lineClaims            map[string]map[int]string
+	identifier      string
+	types           *types.Package
+	files           map[string]bool
+	sharedBodies    int
+	buildOnlyBodies int
+	buildOnlyNames  map[string]bool
+	dotImports      map[string][]string
+	imports         map[string]*packages.Package
+	lineClaims      map[string]map[int]string
 }
 
 // reachBuiltPackages are the packages of loaded's whole graph that it checked from source, as the census reads them
@@ -196,8 +194,9 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 				}
 				continue
 			}
+			// A build-only variable initializer is among them, a value spec's, which reaches every one of the
+			// package's as any build-only body does (bodyReacher.reachInitializers).
 			read.buildOnlyBodies += bodies
-			read.buildOnlyInitializers = read.buildOnlyInitializers || declaresVariableInitializer(file)
 			if isHosted {
 				for _, declared := range build_dependence.PackageLevelNames(file) {
 					read.buildOnlyNames[declared] = true
@@ -378,23 +377,6 @@ func documentedStart(declaration ast.Decl) token.Pos {
 		return documentation.Pos()
 	}
 	return declaration.Pos()
-}
-
-// declaresVariableInitializer reports whether file declares a package-level variable with a value, which the
-// package's one synthetic initializing function runs.
-func declaresVariableInitializer(file *ast.File) bool {
-	for _, declaration := range file.Decls {
-		general, isGeneral := declaration.(*ast.GenDecl)
-		if !isGeneral || general.Tok != token.VAR {
-			continue
-		}
-		for _, spec := range general.Specs {
-			if valueSpec, isValue := spec.(*ast.ValueSpec); isValue && len(valueSpec.Values) > 0 {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // buildBodyReach is one build's census: the packages it checked from source, those of them the host recorded and
