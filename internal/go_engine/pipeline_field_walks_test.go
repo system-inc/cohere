@@ -33,11 +33,15 @@ type fieldWalkRow struct {
 
 // fieldWalkRows are every rule that walks another package's type, each judged by the read its walk starts from: a
 // value handed to an empty interface, copied, compared, a parameter held by value, a struct literal and the value it
-// copies fields from, an embedding, and a selection by name through embedded fields.
+// copies fields from, an embedding, and a selection by name through embedded fields. SA1003 has a second row, a
+// channel whose element is the type (#407y2q8): the channel's type names Streamed and reads no more of it, so only the
+// look through the value handed to binary.Write, entering the channel's element, reads it whole.
 var fieldWalkRows = []fieldWalkRow{
 	{name: "printf", user: "printed", rule: "printf", reads: []string{"Printed Whole"}, foundOn: "host"},
 	{name: "copylocks", user: "locked", rule: "copylocks", reads: []string{"Locked Whole"}, foundOn: "windows"},
 	{name: "SA1003", user: "encoded", rule: "SA1003", reads: []string{"Encoded Whole"}, foundOn: "windows"},
+	{name: "SA1003 through a channel", user: "streamed", rule: "SA1003", reads: []string{"Streamed Whole"},
+		foundOn: "windows"},
 	{name: "SA4000", user: "measured", rule: "SA4000", reads: []string{"Measured Whole"}, foundOn: "host"},
 	{name: "SA4017", user: "basic", rule: "SA4017", reads: []string{"Basic Whole"}, foundOn: "host"},
 	{name: "SA9005", user: "hidden", rule: "SA9005", reads: []string{"Hidden Whole"}, foundOn: "host"},

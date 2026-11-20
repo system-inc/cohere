@@ -505,6 +505,19 @@ type Options struct {
 	// inline, as the last action on the package finishes.
 	Walks *build_reads.Walks
 
+	// cohere: Declarations, when set, is called with each package Analyze
+	// runs on that has type information, while its syntax and type
+	// information are whole, in the package's walk on Walks and before
+	// they are let go of, whether or not its type reads are walked: a
+	// package whose reads are marked never, one with cgo files say, is
+	// walked for it alone (see declareThenWalk). It may be called for one
+	// package more than once, and from two walks at once (check's
+	// recordUnreachedTypes), so it adds each package once and returns only
+	// once that package is added, the syntax whole until then. Unset, as
+	// in every run but the must-check census's (#anfjtr3), releaseSyntax
+	// is as it was.
+	Declarations func(*packages.Package)
+
 	// cohere: Pool, when set, is the run's one set of slots, which every
 	// load and check of the run shares (#ckm0hsp): a worker holds one of
 	// them while it runs an action, taken at the action's group's priority
@@ -1263,6 +1276,10 @@ func (act *Action) releaseSyntax() {
 		}
 	}
 	reads := act.opts.Reads[act.Package]
+	if act.opts.Declarations != nil && act.Package.TypesInfo != nil {
+		act.declareThenWalk(reads, letGo)
+		return
+	}
 	if reads == nil || act.Package.TypesInfo == nil || !reads.Claim() {
 		letGo()
 		return
@@ -1276,6 +1293,29 @@ func (act *Action) releaseSyntax() {
 		reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
 		letGo()
 	})
+}
+
+// cohere: declareThenWalk is releaseSyntax under Options.Declarations,
+// for a package with type information: in one walk on Walks, or inline
+// without them, the package is handed to Declarations, then its type
+// reads are walked when reads, nil for a package whose reads are not
+// recorded, can claim them, then letGo lets its syntax go. A package
+// whose reads are marked never fails the claim, and is walked for its
+// declarations alone.
+func (act *Action) declareThenWalk(reads *build_reads.Reads, letGo func()) {
+	walksReads := reads != nil && reads.Claim()
+	walk := func() {
+		act.opts.Declarations(act.Package)
+		if walksReads {
+			reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
+		}
+		letGo()
+	}
+	if act.opts.Walks == nil {
+		walk()
+		return
+	}
+	act.opts.Walks.Go(act.Package, nil, walk)
 }
 
 // cohere: letGoOfSyntax clears act's package's syntax and type

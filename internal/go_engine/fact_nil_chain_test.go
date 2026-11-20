@@ -24,6 +24,11 @@ func TestNilnessKeptAnswersTakeEachChainsUserOutThroughBothWalks(test *testing.T
 	test.Parallel()
 
 	settled := settleFactFixture(test, "fact-nil-chain", "example.com/nilchain")
+	// The host's run replayed the push's walk, so the second chain's records are the replay's and not the demand
+	// walk's alone: purity and odd slice never replay, so every replay of the run is nil-ness's (check.Result.Replays).
+	if replays := settled.host.result.Replays; replays == 0 {
+		test.Fatal("the host's run replayed no walk, want the second chain's cycle to have made nil-ness replay one")
+	}
 	for _, name := range []string{"leafShared", "leafReplayed"} {
 		if settled.bodies[name].reason == "" {
 			test.Fatalf("the reach left %s unreached, want it reached, so that the build compares its record", name)

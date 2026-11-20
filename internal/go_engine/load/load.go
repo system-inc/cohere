@@ -209,9 +209,9 @@ type Caching struct {
 	// change to the bytes it holds, so a load after a write reads them again (#t7h2sm4).
 	Fingerprints *Fingerprints
 
-	// Walks is the package directories the loads after every write of the run share, nil for none (see PackageWalks):
-	// set on each extra build's load and never on the host's, since the long-line wrap writes between the host's first
-	// load and the builds.
+	// Walks is the package directories the run's loads share, nil for none (see PackageWalks): set on the host's load
+	// and each extra build's, and started over by the run at every change to the bytes it holds, so the builds take the
+	// walks read since the last one (#vnb7btx).
 	Walks *PackageWalks
 
 	// Pool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
@@ -239,6 +239,13 @@ type Caching struct {
 	// Restorer whose decisions are all made before the first type check may be given with it, as one without a store
 	// is, restoring the standard library from the binary.
 	Begin func(*Overlap)
+
+	// Listed, when set, is called once the graph is built and before the Restorer restores, on the load's goroutine,
+	// with every package the load reaches, its files and imports set, as the Restorer is given them: what a caller
+	// judges of a build from its listing alone is known there, before anything is restored or checked (#anfjtr3). The
+	// load holds none of the pool's slots there, so the caller may wait in it. Every load given it calls it, a
+	// reload's included.
+	Listed func(reachable []*packages.Package)
 
 	// AtGate, when set, is called once the graph is built and the Restorer has decided, before any package is
 	// type-checked, on the load's goroutine, with how many of the graph's packages the load will check from source,
@@ -361,6 +368,8 @@ func loadWorkspace(
 	}
 	goEnvironment := caching.GoEnvironment
 	if !goEnvironment.answers(workspace, environment) {
+		// An answer read here runs its own build list, never the host's (ShareModulesOf): only the run's early reads
+		// of each build's go env share it, and a load lands here only when it was handed none of those.
 		var environmentError error
 		measureListingCommand(caching.Timing, func() {
 			goEnvironment, environmentError = ReadGoEnvironment(workspace, environment, caching.Held, caching.Children)
@@ -556,6 +565,9 @@ func fromSource(
 			return !caching.Analyzes(root)
 		})
 	}
+	if caching.Listed != nil {
+		caching.Listed(loadedOf(reachable))
+	}
 	if caching.Restorer != nil {
 		loaderName := LoaderSource
 		if compiled != nil {
@@ -593,6 +605,9 @@ func fromSource(
 		}
 		return false
 	})
+	// What the load withholds of each package that withholds, known once every package is checked, which a pass beside
+	// the load reads once such a package is ready, as the load ends (Overlap.Withheld).
+	var withheldDeclarations map[*packages.Package][]string
 	if caching.Begin != nil {
 		nodes := make(map[*packages.Package]*node, len(reachable))
 		for _, current := range reachable {
@@ -606,6 +621,7 @@ func fromSource(
 			Rewritten: typeChecker.rewritten,
 			nodes:     nodes,
 			ended:     ended,
+			withheld:  &withheldDeclarations,
 		})
 	}
 	if caching.AtGate != nil {
@@ -620,6 +636,7 @@ func fromSource(
 		roots = append(roots, root.loaded)
 	}
 	declarations := withholdCgoDeclarations(typeChecker.fileSet, reachable)
+	withheldDeclarations = declarations
 	// Only now is a dependency that withholds done with its syntax and type maps; one that withholds nothing was
 	// checked without maps, and its syntax goes with the rest.
 	for _, current := range reachable {
