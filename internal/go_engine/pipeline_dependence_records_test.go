@@ -396,3 +396,64 @@ func TestAPlainRunReadsNoRecord(test *testing.T) {
 			"library's %d", hostReads, len(host), standardLibraryReads, len(standardLibrary))
 	}
 }
+
+// storedDeclarationsRecords are the first keys of the packages whose declarations-only record root's store holds, each
+// a key the store holds whose check.DeclarationsRecordKey it holds too.
+func storedDeclarationsRecords(test *testing.T, root string) []cache.Key {
+	test.Helper()
+	stored := map[cache.Key]bool{}
+	walkError := filepath.WalkDir(storeDirectory(root), func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() {
+			return pathError
+		}
+		// A file named for no key, as the store's packs are, is not an entry.
+		decoded, decodeError := hex.DecodeString(entry.Name())
+		if decodeError == nil && len(decoded) == len(cache.Key{}) {
+			stored[cache.Key(decoded)] = true
+		}
+		return nil
+	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
+	var keys []cache.Key
+	for key := range stored {
+		if stored[check.DeclarationsRecordKey(key)] {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
+// A run under `--build-dependence` refuses a declarations-only record found under a whole record's key as a record that
+// does not decode, a miss (#anfjtr3). Over one copy of the build-dependence-embedded fixture, every package keyed into
+// the project's store, a plain census run writes each package's declarations-only record, and each is then planted
+// under its package's whole record key, as a collision of the two keys or a damaged store would leave it. The run
+// under the switch counts every planted record unreadable, rather than hand it to the whole graph, which panics on a
+// declarations-only record.
+func TestABuildDependenceRunRefusesADeclarationsRecord(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "build-dependence-embedded"))
+	runOverConfigured(test, root, exitClean, func(engine *pipeline) { engine.mustCheckCensus = test.TempDir() },
+		"--no-system-cache")
+	planted := storedDeclarationsRecords(test, root)
+	if len(planted) == 0 {
+		test.Fatal("the census run wrote no declarations record")
+	}
+	store := cache.Open(root, nil)
+	for _, key := range planted {
+		record, isStored := store.Get(check.DeclarationsRecordKey(key))
+		if !isStored {
+			test.Fatalf("the declarations record beside %x does not read", key)
+		}
+		if putError := store.Put(check.DependenceRecordKey(key), record); putError != nil {
+			test.Fatal(putError)
+		}
+	}
+	_, stream := runOverRaw(test, root, exitClean, "--no-system-cache", "--build-dependence")
+	if counted := recordCounts(test, stream); counted.Unreadable != len(planted) || counted.Read != 0 {
+		test.Errorf("the run counts %+v, want each of the %d planted records unreadable and none read", counted,
+			len(planted))
+	}
+}

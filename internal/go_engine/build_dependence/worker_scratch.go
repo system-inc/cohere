@@ -83,6 +83,8 @@ func (scratch *workerScratch) release() {
 	scratch.collecting.fromCgo = false
 	scratch.collecting.withheld = nil
 	scratch.collecting.units = emptied(scratch.collecting.units)
+	scratch.collecting.spans = emptied(scratch.collecting.spans)
+	scratch.collecting.repeats = emptied(scratch.collecting.repeats)
 	scratch.collecting.edges = emptied(scratch.collecting.edges)
 	clear(scratch.collecting.edgeSeen)
 	clear(scratch.collecting.calleeSeen)

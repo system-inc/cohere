@@ -62,6 +62,18 @@ func findingLines(stream string) []string {
 // in a file the two do not share (build_dependence.HoldsLineDirective).
 func libraryDependence(test *testing.T, root string, hostEnvironment []string, buildEnvironment []string) Counts {
 	test.Helper()
+	counts := libraryJudgment(test, root, hostEnvironment, buildEnvironment).judged.Counts()
+	return Counts{Workspace: dependenceCounts(counts.Workspace), Dependencies: dependenceCounts(counts.Dependencies)}
+}
+
+// libraryJudgment is libraryDependence's judgment of the fixture at root, before it is counted.
+func libraryJudgment(
+	test *testing.T,
+	root string,
+	hostEnvironment []string,
+	buildEnvironment []string,
+) libraryJudged {
+	test.Helper()
 	load := func(environment []string) map[string]*packages.Package {
 		roots, loadError := packages.Load(&packages.Config{
 			Mode:  packages.LoadAllSyntax | packages.NeedTypesInfo,
@@ -128,8 +140,7 @@ func libraryDependence(test *testing.T, root string, hostEnvironment []string, b
 			difference.Packages[identifier] = differing
 		}
 	}
-	counts := graph.Against(difference).Counts()
-	return Counts{Workspace: dependenceCounts(counts.Workspace), Dependencies: dependenceCounts(counts.Dependencies)}
+	return libraryJudged{judged: graph.Against(difference), difference: difference}
 }
 
 // Counts are a build's dependence counts by scope, as the record writes them, without its milliseconds.

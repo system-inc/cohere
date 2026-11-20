@@ -55,6 +55,19 @@ func (walk *demandWalk) isPure(function *intermediate_representation.Function) b
 
 // verdict is whether function, a declared function of home, is pure: its verdict kept, not pure while it is still
 // being judged, or judged now and kept.
+//
+// Each verdict judged is handed to the resolver too (fact_resolver.Keep), as the answer fact_resolver.Ask would give a
+// reader who asked of function, which is the verdict itself: judgeIn answers the verdict kept. A walk judges a callee
+// of home inside its caller's judgment and never asks the resolver of it, so without this only the function asked of
+// had an answer of its own among the ones the resolver holds, and the callees its answer was built from had none
+// (#z9fze0t). The resolver records nothing for the store of it: a callee is recorded when a reader asks of it, as
+// before.
+//
+// A verdict handed over is final, which the resolver needs of it, since it holds the answer as function's for the
+// rest of the run. It is the definition's, whatever order found it (see demandWalk), and no walk judges a function
+// twice: each returns a verdict kept before it would judge. One kept while a caller further up the stack is still
+// being judged is final too, since it is kept only after its own judgment returned: a callee that read a function
+// still being judged as not pure is on a cycle of calls through it, and never pure in any order.
 func (walk *demandWalk) verdict(function *intermediate_representation.Function) bool {
 	declared := declaredFunction(function)
 	if pure, judged := walk.state.pure[declared]; judged {
@@ -68,6 +81,7 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 	pure := judge(walk, function, declared)
 	delete(walk.stack, function)
 	walk.state.pure[declared] = pure
+	fact_resolver.Keep(walk.resolver, walk.home, Kind, declared, pure)
 	walk.resolver.Counts(Kind).Computed.Add(1)
 	return pure
 }

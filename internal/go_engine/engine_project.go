@@ -14,6 +14,7 @@ import (
 	"golang.org/x/mod/modfile"
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
@@ -77,7 +78,11 @@ func describeProject(request invocation) (described *describedProject, describeE
 	// read.
 	timed := request.switches["timing"]
 	loads := request.requests(contract.PhaseTypes) || request.requests(contract.PhaseLint)
-	early := startEarly(workspace, held, children, !timed && loads, readsBuilds)
+	// Opened before the go commands start, since the early start reads and writes each build's build context there,
+	// and handed to the pipeline, so the run has one system cache, one store and one set of shard stamps (newPipeline).
+	shardStamps := cache.NewShardStamps(nil)
+	system := openSystemCache(request, shardStamps)
+	early := startEarly(workspace, held, children, system.contexts(), !timed && loads, readsBuilds)
 	defer func() {
 		// A refusal leaves no go command running.
 		if describeError != nil {
@@ -111,6 +116,8 @@ func describeProject(request invocation) (described *describedProject, describeE
 		contents:           map[string][]byte{},
 		children:           children,
 		started:            early,
+		systemCache:        system,
+		shardStamps:        shardStamps,
 	}
 	described.record = contract.ProjectRecord{
 		Root:             root,

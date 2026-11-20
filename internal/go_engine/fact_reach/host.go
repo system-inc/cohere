@@ -52,8 +52,7 @@ type Host interface {
 
 	// Kinds are the fact kinds the host answered about the package's objects, sorted by name, each answering about
 	// parameters where the host's answers of it are: each a kind a body that leaves reads unknown for where it holds no
-	// record of it, beside every kind the build registers. A kind the host never answered about the package served no
-	// body of it, whatever its judgments read.
+	// record of it. A kind the host never answered about the package served no body of it, whatever its judgments read.
 	Kinds() []Kind
 }
 

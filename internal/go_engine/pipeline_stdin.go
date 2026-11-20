@@ -36,6 +36,8 @@ import (
 //   - Nothing on output, exit 1, for a formatter that broke, with why on stderr. The hook shows it and saves the buffer
 //     as typed.
 func (engine *pipeline) runStdin(output io.Writer) int {
+	// The go commands the description started end before the save returns, so none outlives it.
+	defer engine.joinChildren()
 	path := engine.request.stdinPath
 	if _, held := engine.described.contents[path]; !held || !engine.described.inScopeSet[path] {
 		engine.note("%s was left as typed: %s", path, engine.stdinDeclined(path))

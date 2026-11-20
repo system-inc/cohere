@@ -21,10 +21,11 @@
 // lets go of what only resolution and encoding read, the records' units, edges and object tables among them, so the
 // graph every build is judged on holds only what a judgment reads.
 //
-// A graph made by NewDeclarationsGraph collects declarations only: every unit's place, size and declared objects and
-// every kind edge, and no unit's reads or calls, the larger half of an add's work. Its objects' bits are a whole
-// graph's, since they come from the seeds and the kind edges alone, and whatever a unit's body gives, a verdict, the
-// counts, a call or a record, it refuses with a panic rather than answer wrong (#w72zxtq).
+// A graph made by NewDeclarationsGraph collects declarations only: every unit's place, universe names and declared
+// objects and every kind edge, and no unit's reads, calls or size, the larger part of an add's work. Its objects' bits
+// are a whole graph's, since they come from the seeds and the kind edges alone, and whatever a unit's body gives, a
+// verdict, the counts or a call, it refuses with a panic rather than answer wrong (#w72zxtq). Its records are
+// declarations-only records, in a format of their own, which only a declarations-only graph takes (#anfjtr3).
 package build_dependence
 
 import (
@@ -92,6 +93,11 @@ type packageRecord struct {
 	// released says a sealed graph let go of the record's imports, objects, units and edges (Graph.Seal), so another
 	// graph it was added to would hold its package with no unit and drop every read of its objects: add refuses it.
 	released bool
+
+	// declarationsOnly says the record holds no unit's reads or callees: a declarations-only graph collected it from a
+	// live package (Graph.addPackage), or it was decoded from a declarations-only record's bytes. It is encoded in
+	// that format (declarationsRecordFormat), and a whole graph refuses it (Graph.add).
+	declarationsOnly bool
 }
 
 // unitRecord is one unit as the collector finds it in a live package, before newRecord names its objects: the file a
@@ -142,12 +148,14 @@ func NewGraph() *Graph {
 }
 
 // NewDeclarationsGraph is an empty graph that collects declarations only (#w72zxtq): a package added from its live load
-// (AddPackage) gives every unit's place, size, universe names, cgo mark and declared objects and every kind edge, as a
-// whole graph's does, and no unit's reads or calls. An object's bits come from the seeds and the fixed point over the
-// kind edges alone (Against), so ObjectBits, NameBits and DependentObjects answer as a whole graph's do, and so do
-// UnitDeclaringName and UnitContaining, which read a unit's place. What only a unit's body gives is refused with a
-// panic (refuseDeclarationsOnly), never answered wrong: a unit's verdict (Dependence.UnitDependent, Units,
-// CallIndex.Dependent), the counts (Dependence.Counts), a call index (NewCallIndex) and a record (EncodedRecord).
+// (AddPackage) gives every unit's place, universe names, cgo mark and declared objects and every kind edge, as a whole
+// graph's does, and no unit's reads or calls, nor its size, which only the counts read (a unit's nodes are 0). An
+// object's bits come from the seeds and the fixed point over the kind edges alone (Against), so ObjectBits, NameBits
+// and DependentObjects answer as a whole graph's do, and so do UnitDeclaringName and UnitContaining, which read a
+// unit's place. What only a unit's body gives is refused with a panic (refuseDeclarationsOnly), never answered wrong: a
+// unit's verdict (Dependence.UnitDependent, Units, CallIndex.Dependent), the counts (Dependence.Counts) and a call
+// index (NewCallIndex). A record of a package it collected (EncodedRecord) is a declarations-only record, which holds
+// everything it collected and says it holds no unit's reads or calls (declarationsRecordFormat).
 //
 // A whole record added to it (AddRecord, AddDecoded) is sound: the record only holds more than the graph reads, its
 // units' reads and calls, which no answer the graph gives rests on.
@@ -215,6 +223,10 @@ func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, withhel
 				break
 			}
 		}
+		if collecting.declarationsOnly {
+			collecting.universeNamesFromUses(loaded.Fset)
+		}
+		collecting.repeatUniverseNames()
 		units, edges = collecting.units, collecting.edges
 	}
 	var typesPackage *types.Package
@@ -223,6 +235,7 @@ func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, withhel
 	}
 	record := newRecord(loaded.ID, workspace, typesPackage, imports, encoders, units, edges, scratch)
 	record.typesPackage = loaded.Types
+	record.declarationsOnly = graph.declarationsOnly
 	if record.path == "" {
 		record.path = loaded.PkgPath
 	}
@@ -256,11 +269,20 @@ func (graph *Graph) encoders() *objectPaths {
 
 // add publishes record under one hold of the lock, and lets the last resolution go. A sealed graph panics
 // (refuseSealed), one sealed while the package's walk ran included, and so does a record another graph's Seal let go
-// of (packageRecord.released).
+// of (packageRecord.released), and a whole graph handed a declarations-only record (packageRecord.declarationsOnly).
 func (graph *Graph) add(record *packageRecord) {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
 	graph.refuseSealed("add a package")
+	if record.declarationsOnly && !graph.declarationsOnly {
+		// Invariant: a declarations-only record is kept under keys of its own, apart from a whole record's, and read
+		// only into a declarations-only graph, so a whole graph handed one is the caller's bug, and taking it would
+		// call independent every unit of the package that is dependent by its body alone.
+		panic("build_dependence: a caller tried to add the declarations-only record of " + record.identifier +
+			" to a whole graph (NewGraph), which would read none of its units' reads or calls and call a unit " +
+			"that is dependent by its body alone independent: only a declarations-only graph " +
+			"(NewDeclarationsGraph) takes it")
+	}
 	if record.released {
 		// Invariant: each decoded Record is added to one graph, the host's or the standard library's
 		// (pipeline_build_dependence.go), and the findings cache decodes its records afresh for every load, so no
@@ -275,13 +297,12 @@ func (graph *Graph) add(record *packageRecord) {
 }
 
 // EncodedRecord is the record of the package of identifier as AddRecord reads it, and false when the graph holds no
-// such package. A sealed graph panics (refuseSealed), since it let go of most of what a record holds, and so does a
-// declarations-only one (refuseDeclarationsOnly), whose record would hold no unit's reads or calls.
+// such package: a declarations-only record of a package a declarations-only graph collected, which only such a graph
+// takes, and a whole record of any other, one a declarations-only graph took from a whole record's bytes included. A
+// sealed graph panics (refuseSealed), since it let go of most of what a record holds.
 func (graph *Graph) EncodedRecord(identifier string) ([]byte, bool) {
 	graph.lock.Lock()
 	defer graph.lock.Unlock()
-	refuseDeclarationsOnly(graph.declarationsOnly, "encode a record of", "the record would hold no unit's reads, "+
-		"and a whole graph reading it back would call a unit that is dependent by its body alone independent")
 	graph.refuseSealed("encode a record")
 	record, isHeld := graph.packages[identifier]
 	if !isHeld {
@@ -351,9 +372,9 @@ func (graph *Graph) refuseSealed(tried string) {
 func refuseDeclarationsOnly(declarationsOnly bool, tried string, wrong string) {
 	if declarationsOnly {
 		// Invariant: a declarations-only graph is made for its objects' bits alone, which stage 2 of the
-		// declaration-grain checker joins with its typed uses (#w72zxtq), and the engine's verdicts, counts, call index
-		// and records all come from the whole graphs it makes (pipeline_build_dependence.go), so a caller that asks
-		// one for any of them is the caller's bug, and a quiet answer would be a wrong one.
+		// declaration-grain checker joins with its typed uses (#w72zxtq), and the engine's verdicts, counts and call
+		// index all come from the whole graphs it makes (pipeline_build_dependence.go), so a caller that asks one for
+		// any of them is the caller's bug, and a quiet answer would be a wrong one.
 		panic("build_dependence: a caller tried to " + tried + " a declarations-only graph " +
 			"(NewDeclarationsGraph), which collected no unit's reads or calls, so " + wrong + ": only a whole graph " +
 			"(NewGraph) answers that")

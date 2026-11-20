@@ -7,3 +7,8 @@ func platformPairs(values []anything) {
 		panic("odd")
 	}
 }
+
+// platformCount is windows's, which says how many values it has and needs nothing of them.
+func platformCount(values []anything) {
+	println("count on windows", len(values))
+}

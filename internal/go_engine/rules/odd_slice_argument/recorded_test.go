@@ -40,10 +40,13 @@ func (hand *hearingHand) Computed(kindName string, object types.Object, encoded 
 	hand.heard[object] = append(hand.heard[object], string(encoded))
 }
 
-// Only a mark a question asks is told, never one its judgment settles beside it (#8d9r2rh). Over order/forward the
-// rule asks one mark, of back's slice, for odd's call. Judging it settles forward's and pairs' too, which back's answer
-// rests on and nobody asks: they are kept in the package's state, and the resolver tells back's alone, once and marked.
-func TestOnlyTheAskedMarkIsTold(test *testing.T) {
+// Every mark a judgment settles is told, once, the asked one and those it rests on alike (#z9fze0t). Over
+// order/forward the rule asks one mark, of back's slice, for odd's call. Judging it settles forward's and pairs' too,
+// which back's answer rests on and nobody asks: each is handed to the resolver as an answer of its own
+// (fact_resolver.Keep), so a hand hears all three, each once and marked, back's among them only once though it was
+// both kept and asked. What the run records for the store is another matter, the asked marks alone
+// (TestTheRecordIsTheAskedMarksInEitherOrder, #8d9r2rh).
+func TestEveryMarkAJudgmentSettlesIsToldOnce(test *testing.T) {
 	test.Parallel()
 	roots := loadFixtures(test, analysistest.TestData(), []string{"order/forward"})
 	options := check.DispatchOptions()
@@ -67,7 +70,7 @@ func TestOnlyTheAskedMarkIsTold(test *testing.T) {
 		heard[object.Name()+" at "+roots[0].Fset.Position(object.Pos()).String()] = answers
 	}
 	want := map[string][]string{}
-	for _, name := range []string{"back"} {
+	for _, name := range []string{"back", "forward", "pairs"} {
 		function, isFunction := roots[0].Types.Scope().Lookup(name).(*types.Func)
 		if !isFunction {
 			test.Fatalf("order/forward declares no function %s", name)
@@ -76,7 +79,7 @@ func TestOnlyTheAskedMarkIsTold(test *testing.T) {
 		want[parameter.Name()+" at "+roots[0].Fset.Position(parameter.Pos()).String()] = []string{"true"}
 	}
 	if !maps.EqualFunc(heard, want, slices.Equal) {
-		test.Errorf("the run told the marks %v, want only %v told, once, marked", heard,
+		test.Errorf("the run told the marks %v, want %v told, each once, marked", heard,
 			slices.Sorted(maps.Keys(want)))
 	}
 }

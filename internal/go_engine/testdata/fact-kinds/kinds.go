@@ -34,8 +34,9 @@ func size() int {
 }
 
 // helper returns platformSize's double, which counts its calls on every platform but windows, so helper is pure on
-// windows alone. No body asks helper's purity: size's judgment reads it from the kind's own state, so the host holds
-// no record of it, and only that a body the build lints holds no record takes size out (#5vbs1np, must 1).
+// windows alone. No body asks helper's purity: size's judgment judges it inside its own walk, which hands the resolver
+// helper's verdict all the same (#z9fze0t), so the host holds a record of it, and its differing on windows takes size
+// out.
 func helper(base int) int {
 	return platformSize(base)
 }

@@ -8,7 +8,19 @@ import (
 )
 
 // Kind keys purity's verdicts in each package the resolver holds, and its counts.
-var Kind = &fact_resolver.Kind{Name: "function_purity", OrderBound: orderFree, TypesAlone: typesAlone}
+//
+// It records every judgment (fact_resolver.Kind.RecordsEveryJudgment). A verdict is made in one place, demandWalk's
+// verdict, which hands it to the resolver as it stores it, and another package's function is asked through
+// fact_resolver.Ask, which holds the answer. And judge reads only the instructions of the function it judges: of a
+// function that one calls it asks its callees, whose answer is a verdict, the resolver's answer, or not pure for a
+// function with no object, an anonymous one, read no further. TestEveryVerdictPurityHoldsIsAnAnswerTheResolverHolds
+// pins the first, and check's TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer the second.
+var Kind = &fact_resolver.Kind{
+	Name:                 "function_purity",
+	OrderBound:           orderFree,
+	TypesAlone:           typesAlone,
+	RecordsEveryJudgment: true,
+}
 
 // orderFree is purity's order bound (fact_resolver.Kind.OrderBound): none, and known. Purity is the least set closed
 // under its rules, a cycle of calls never pure, which is one set whatever order a walk finds it in (see demandWalk), so

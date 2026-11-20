@@ -19,14 +19,16 @@ import (
 // start, on the pipeline's goroutine, and only read after, by every build at once (factReachPackage). packages are the
 // sides by package ID: one for each package the host analyzed whose side could be made. Every other package gets
 // none, and a build lints it whole; the census counts why: uncaptured, a package the host's run holds no side of,
-// restored or handed an unsure answer (check.FactReachCapture.Packages); unrecorded, one with no record of what each
-// of its declarations uses; and orderUnknown, one whose answers hang on the host's order in a way no kind could say
-// (check.FactReachPackage.OrderKnown).
+// restored or handed an unsure answer (check.FactReachCapture.Packages); storeAnswered, one the run learned and the
+// store answered a question about, whose record no kind can call complete (check.FactReachCapture.StoreAnswered);
+// unrecorded, one with no record of what each of its declarations uses; and orderUnknown, one whose answers hang on the
+// host's order in a way no kind could say (check.FactReachPackage.OrderKnown).
 type factReachSides struct {
-	packages     map[string]*factReachPackage
-	uncaptured   int
-	unrecorded   int
-	orderUnknown int
+	packages      map[string]*factReachPackage
+	uncaptured    int
+	storeAnswered int
+	unrecorded    int
+	orderUnknown  int
 }
 
 // newFactReachSides is the host's side of each of analyzed, the packages the host's lint ran over, from host, the body
@@ -42,7 +44,11 @@ func newFactReachSides(
 	for _, analyzedPackage := range analyzed {
 		captured := capture.Packages[analyzedPackage.ID]
 		if captured == nil {
-			sides.uncaptured++
+			if capture.StoreAnswered[analyzedPackage.ID] {
+				sides.storeAnswered++
+			} else {
+				sides.uncaptured++
+			}
 			continue
 		}
 		hosted := host.packages[analyzedPackage.ID]

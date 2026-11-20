@@ -129,6 +129,26 @@ func TestAnUnknownAnswerJoinsAndADifferenceCarriesUp(test *testing.T) {
 	}
 }
 
+// Every comparison but Equal and Differs reads unknown (#e3q4cds): Unknown itself, and a value of the type none of the
+// three names, which no compare gives today and one that did would mean nothing the build could trust. Each names size
+// as an unknown answer of its kind, and takes Warm, its user, out, so nothing the build cannot read stands; Warm's own
+// purity, asked as it leaves, reads equal.
+func TestEveryComparisonButEqualAndDiffersNamesItsObjectUnknown(test *testing.T) {
+	test.Parallel()
+	for _, comparison := range []fact_reach.Comparison{fact_reach.Unknown, fact_reach.Comparison(3),
+		fact_reach.Comparison(-1)} {
+		compare, _ := answering(
+			map[string]fact_reach.Comparison{purityOfSize.Key: comparison, purityOfWarm.Key: fact_reach.Equal})
+		settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true}, []fact_reach.Place{size}, nil, nil,
+			warmFixture(), compare)
+		wantRemoved := []fact_reach.Removal{{Place: warm, Object: "size", Reason: "unknown function_purity"}}
+		if !reflect.DeepEqual(settlement.Removed, wantRemoved) || settlement.Unknown["function_purity"] != 1 {
+			test.Errorf("comparing %d, removed %v with unknown answers %v, want %v and one function_purity unknown",
+				comparison, settlement.Removed, settlement.Unknown, wantRemoved)
+		}
+	}
+}
+
 // An object named before any answer is asked takes its users out with its own reason, and their recorded answers are
 // asked as any body's that left.
 func TestANamedObjectTakesItsUsersOut(test *testing.T) {
@@ -163,6 +183,34 @@ func TestAQuestionIsAskedOnceAndAReachedUserIsNotRemoved(test *testing.T) {
 	if len(settlement.Removed) != 0 || !settlement.Standing[outer] {
 		test.Errorf("removed %v leaving %v, want none: Warm, size's one user, was reached before", settlement.Removed,
 			settlement.Standing)
+	}
+}
+
+// A question recorded under two bodies is asked once and is a record at both (#e3q4cds): Warm's purity names size as
+// a function its judgment entered, so the host recorded it under size too, and both bodies are linted. size reaches
+// Warm's record first and asks it; Warm, reached after, holds it all the same, so Warm is named for no missing record
+// and Outer, its user, stands. With Warm's record gone from both, Warm holds none, and Outer leaves.
+func TestAQuestionRecordedUnderTwoBodiesIsARecordAtEach(test *testing.T) {
+	test.Parallel()
+	kinds := []fact_reach.Kind{{Name: "function_purity"}}
+	compare, asked := answering(
+		map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Equal, purityOfWarm.Key: fact_reach.Equal})
+	source := warmFixture()
+	source.recorded[size] = append(source.recorded[size], purityOfWarm)
+	settlement := fact_reach.Settle(map[fact_reach.Place]bool{outer: true}, []fact_reach.Place{size, warm}, nil,
+		kinds, source, compare)
+	if !settlement.Standing[outer] || len(settlement.Unrecorded) != 0 || asked[purityOfWarm.Key] != 1 {
+		test.Errorf("removed %v with %v unrecorded, Warm's purity asked %d times, want Outer standing, nothing "+
+			"unrecorded and Warm's purity asked once", settlement.Removed, settlement.Unrecorded,
+			asked[purityOfWarm.Key])
+	}
+	source = warmFixture()
+	delete(source.recorded, warm)
+	settlement = fact_reach.Settle(map[fact_reach.Place]bool{outer: true}, []fact_reach.Place{size, warm}, nil, kinds,
+		source, compare)
+	wantRemoved := []fact_reach.Removal{{Place: outer, Object: "Warm", Reason: "unrecorded function_purity"}}
+	if !reflect.DeepEqual(settlement.Removed, wantRemoved) {
+		test.Errorf("with no record of Warm's purity, removed %v, want %v", settlement.Removed, wantRemoved)
 	}
 }
 
