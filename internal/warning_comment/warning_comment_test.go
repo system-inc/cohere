@@ -64,16 +64,25 @@ func TestWordsInFindsEachWordWhereverItStands(test *testing.T) {
 			"/* in the " + word + " middle */",
 			"/* at the end\n   " + word + " */",
 		} {
-			for _, texts := range [][]string{{text}, {"// nothing here", text}} {
-				words := WordsIn(texts)
+			// The word alone, after a comment without one, and before one, so a gate that reads any one comment of
+			// the group, the first or the last, turns away a group it should keep.
+			for _, group := range []struct {
+				texts []string
+				at    int
+			}{
+				{texts: []string{text}, at: 0},
+				{texts: []string{"// nothing here", text}, at: 1},
+				{texts: []string{text, "//", "// nothing here"}, at: 0},
+			} {
+				words := WordsIn(group.texts)
 				if len(words) != 1 {
-					test.Errorf("WordsIn(%q) = %v, want one word", texts, words)
+					test.Errorf("WordsIn(%q) = %v, want one word", group.texts, words)
 					continue
 				}
-				got := texts[words[0].Comment][words[0].Start:words[0].End]
-				if words[0].Comment != len(texts)-1 || got != word {
+				got := group.texts[words[0].Comment][words[0].Start:words[0].End]
+				if words[0].Comment != group.at || got != word {
 					test.Errorf("WordsIn(%q) found %q in comment %d, want %q in comment %d",
-						texts, got, words[0].Comment, word, len(texts)-1)
+						group.texts, got, words[0].Comment, word, group.at)
 				}
 			}
 		}

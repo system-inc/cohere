@@ -8,13 +8,13 @@ import (
 
 // lowerFirst hands back a name that opens with an ASCII byte outside A to Z as it is, without lowering it, so it must
 // give what lowering the first rune gives for every opening: the letters at both ends of A to Z and the bytes just
-// outside them, lowercase letters, digits and the underscore, the last ASCII byte, a multibyte letter in either case,
-// a byte that is no rune, a single letter and the empty name.
+// outside them, lowercase letters, digits and the underscore, the last ASCII byte and the first byte past it, a
+// multibyte letter in either case, a byte that is no rune, a single letter and the empty name.
 func TestLowerFirstAgreesWithLoweringTheFirstRune(test *testing.T) {
 	test.Parallel()
 	for _, name := range []string{
 		"Result", "Ahead", "Zone", "@result", "[result", "`result", "{result",
-		"result", "aside", "zone", "_result", "0result", "\x7fresult",
+		"result", "aside", "zone", "_result", "0result", "\x7fresult", "\x80result",
 		"Ölçü", "ölçü", "Σigma", "\xffresult", "R", "r", "",
 	} {
 		first, size := utf8.DecodeRuneInString(name)
