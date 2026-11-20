@@ -438,9 +438,10 @@ type Options struct {
 
 	// cohere: FactHosts, when set, answers the host's side of the package
 	// whose ID is packageId for the facts' reach in an extra build, nil
-	// for a package with none. It is called for every action as the
-	// action starts, on the action's goroutine, so it must be safe to
-	// call from several at once. FactHost, when FactHosts is set too,
+	// for a package with none. It is called for every action that runs a
+	// pass, as the action starts, on the action's goroutine, so it must be
+	// safe to call from several at once; an action on a restored package
+	// runs none, so it never asks. FactHost, when FactHosts is set too,
 	// keys what it answers in the ResultOf of every pass on that package,
 	// a key never run, as Dependents is. Unset, ResultOf holds no host's
 	// side.
@@ -1067,7 +1068,14 @@ func (act *Action) execOnce() {
 
 	// Plumb the output values of the dependencies
 	// into the inputs of this action.  Also facts.
-	inputs := make(map[*analysis.Analyzer]any)
+	// cohere: an action on a restored package runs no pass, so it makes no
+	// inputs, which only a pass reads, nil here and never written; it still
+	// inherits its prerequisites' facts below (see Options.Restored).
+	restored := act.opts.Restored != nil && act.opts.Restored(act.Package)
+	var inputs map[*analysis.Analyzer]any
+	if !restored {
+		inputs = make(map[*analysis.Analyzer]any)
+	}
 	act.objectFacts = make(map[objectFactKey]analysis.Fact)
 	act.packageFacts = make(map[packageFactKey]analysis.Fact)
 	for _, dep := range act.Deps {
@@ -1078,7 +1086,8 @@ func (act *Action) execOnce() {
 			// cohere: one that failed, which only a tolerant action reaches, is
 			// absent, its error under Options.Failed instead, and so is the
 			// edge Options.StandingAfter added, which the analyzer never asked for.
-			if dep.Err != nil || dep == act.standingEdge {
+			// A restored action holds no inputs, so every one is absent there.
+			if restored || dep.Err != nil || dep == act.standingEdge {
 				continue
 			}
 			inputs[dep.Analyzer] = dep.Result
@@ -1088,6 +1097,14 @@ func (act *Action) execOnce() {
 			// become available to this analysis pass.
 			inheritFacts(act, dep)
 		}
+	}
+	// cohere: a restored package's own facts come from the cache, in
+	// place of a pass, on top of those it inherited (see Options.Restored).
+	// It returns before the keys below, every one of them an input of the
+	// pass it never makes.
+	if restored {
+		act.Err = act.opts.Restore(act)
+		return
 	}
 	// cohere: Options.Dependents, the set Analyze gathered for this action.
 	// An action nothing on its package requires holds a nil map, an empty
@@ -1126,13 +1143,6 @@ func (act *Action) execOnce() {
 		if host := act.opts.FactHosts(act.Package.ID); host != nil {
 			inputs[act.opts.FactHost] = host
 		}
-	}
-
-	// cohere: a restored package's own facts come from the cache, in
-	// place of a pass, on top of those it inherited (see Options.Restored).
-	if act.opts.Restored != nil && act.opts.Restored(act.Package) {
-		act.Err = act.opts.Restore(act)
-		return
 	}
 
 	// Quick (nonexhaustive) check that the correct go/packages mode bits were used.
