@@ -13,6 +13,12 @@ import (
 	"testing"
 )
 
+// anything is any by another name, so the odd slice callees' values are no candidate of consistency-no-any, whose
+// presence bound would take their users out before any fact could (#xeafx79), and so are any to every fact here.
+// platformPairs writes it too in each platform's file, since a candidate there would make every parameter that
+// feeds it a key, the bound being closed under the rule's flow.
+type anything = any
+
 // failure is an error whose nil pointer is never a nil error.
 type failure struct{}
 
@@ -103,7 +109,7 @@ func NilnessStable() bool {
 }
 
 // Odd slice. pairs passes its values to platformPairs, which needs them even on every platform but windows.
-func pairs(values ...any) {
+func pairs(values ...anything) {
 	platformPairs(values)
 }
 
@@ -113,7 +119,7 @@ func OddUser() {
 }
 
 // pairsAlways needs its values even in every build, after naming the platform.
-func pairsAlways(values ...any) {
+func pairsAlways(values ...anything) {
 	println(platformName())
 	if len(values)%2 != 0 {
 		panic("odd")

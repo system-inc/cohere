@@ -28,6 +28,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -445,8 +446,14 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Resolver = resolver
 	// A run whose capture the body differential reads records who asked each answer (FactReachCapture.Askers), on
 	// every resolver it asks through, before any pass runs.
+	// And reads what each body holds that the presence rows read, while each package's syntax is whole: no later point
+	// holds it (checker.Options.BodiesRead).
+	var presence *factReachPresence
 	if options.FactReach {
 		resolver.RecordAskers()
+		presence = &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{},
+			markers: map[string][]string{}}
+		checkerOptions.BodiesRead = presence.readBodies
 	}
 	session := options.Cache
 	// A package anything stands in is never written to the store, whose entry would carry the host's findings there.
@@ -701,7 +708,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Read as the rules' passes left the resolver, before the save computes packages whole for the store: that replays
 	// walks no rule asked for and keeps an answer of every function they judge, which no body's rules read.
 	if options.FactReach {
-		result.FactReach = captureFactReach(resolver, analyzed, graphs)
+		result.FactReach = captureFactReach(resolver, analyzed, graphs, presence)
 	}
 	if session != nil {
 		timeline.Tell(options.Timeline, "check.save.begin")

@@ -26,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
@@ -174,14 +175,31 @@ func run(pass *analysis.Pass) (any, error) {
 		result.ImportedNamed++
 	}
 
+	// The bodies a package-wide rule reads along a row's edge, which must be present in the build: the objects whose
+	// users leave, and each body that leaves by itself, taken out of the pass's own copy here, before the cycles are
+	// read, so a cycle that touches it is one the build lints, and among the bodies reached below, whose recorded
+	// answers the walk asks.
+	presenceNamed, leaving := standing_presence.Present(pass, host, standing, functions.find)
+	named = append(named, presenceNamed...)
+	result.PresenceNamed = map[standing_presence.Row]int{}
+	result.PresenceRemoved = map[standing_presence.Row]int{}
+	for _, object := range presenceNamed {
+		if row, isRow := standing_presence.RowOf(object.Reason); isRow {
+			result.PresenceNamed[row]++
+		}
+	}
+	for _, left := range result.keepLeaving(standing, leaving) {
+		delete(standing, left)
+	}
+
 	// The members of each cycle of calls in the build that touches a body it lints, whose answers may hang on the order
 	// the build's walk enters the cycle in, where the host's order bound saw no such cycle.
 	ordered := buildOrderNamed(pass, host, standing, functions)
 	result.BuildOrderNamed = len(ordered)
 	named = append(named, ordered...)
 
-	// The bodies the build lints already, whose recorded answers the walk asks first. The host's set is only read,
-	// here and by the walk: what still stands is the settlement's own map.
+	// The bodies the build lints already, a body presence took out among them, whose recorded answers the walk asks
+	// first. The host's set is only read, here and by the walk: what still stands is the settlement's own map.
 	var reached []fact_reach.Place
 	for _, place := range host.Places() {
 		if !standing[place] {
@@ -218,5 +236,49 @@ func run(pass *analysis.Pass) (any, error) {
 		kinds = append(kinds, fact_reach.Kind{Name: name, Parameters: units[name]})
 	}
 	result.Settlement = fact_reach.Settle(standing, reached, named, kinds, source, asked.compare)
+	for _, removal := range result.Settlement.Removed {
+		if row, isRow := standing_presence.RowOf(removal.Reason); isRow {
+			result.PresenceRemoved[row]++
+		}
+	}
+
+	// noany's bound and the edge rows again, to a fixed point with the facts: a body that left only for a differing
+	// fact is present now, so its flows may route to a key, and it may start a function that still stands, or be
+	// started by one. What still stands is read again, and what that names and takes out is settled, the bodies as
+	// reached, until a round takes nothing out. Each round takes a body out of the standing set or ends, so there are
+	// at most as many rounds as bodies stood. A question asked in an earlier round is answered from the same verdicts
+	// again, and counted again where a later round's body records it.
+	for {
+		namedAgain, leavingAgain := standing_presence.Reread(pass, host, result.Settlement.Standing, functions.find)
+		again := maps.Clone(result.Settlement.Standing)
+		reachedAgain := result.keepLeaving(again, leavingAgain)
+		for _, left := range reachedAgain {
+			delete(again, left)
+		}
+		settled := fact_reach.Settle(again, reachedAgain, namedAgain, kinds, source, asked.compare)
+		if len(reachedAgain) == 0 && len(settled.Removed) == 0 {
+			break
+		}
+		for _, removal := range settled.Removed {
+			if row, isRow := standing_presence.RowOf(removal.Reason); isRow {
+				result.PresenceRemoved[row]++
+			}
+		}
+		result.Settlement.Standing = settled.Standing
+		result.Settlement.Removed = append(result.Settlement.Removed, settled.Removed...)
+		result.Settlement.Asked += settled.Asked
+		result.Settlement.Differing = summedCounts(result.Settlement.Differing, settled.Differing)
+		result.Settlement.Unknown = summedCounts(result.Settlement.Unknown, settled.Unknown)
+		result.Settlement.Unrecorded = summedCounts(result.Settlement.Unrecorded, settled.Unrecorded)
+	}
 	return result, nil
+}
+
+// summedCounts are each kind's count of first and second, summed, in a map of their own.
+func summedCounts(first map[string]int, second map[string]int) map[string]int {
+	summed := maps.Clone(first)
+	for kind, count := range second {
+		summed[kind] += count
+	}
+	return summed
 }

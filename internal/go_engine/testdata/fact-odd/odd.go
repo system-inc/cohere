@@ -7,8 +7,14 @@
 // the same on windows, both on record, so E, which hands its slice on as H's second, stands.
 package odd
 
+// anything is any by another name, so a parameter of it is no candidate of consistency-no-any, whose presence bound
+// would take G and F out before any fact could (#xeafx79), and so is any to every fact this fixture holds.
+// platformPairs writes it too in each platform's file, since a candidate there would make every parameter that
+// feeds it a key, the bound being closed under the rule's flow.
+type anything = any
+
 // G checks its first slice even, hands its second to platformPairs, and returns no error.
-func G(first []any, second []any) error {
+func G(first []anything, second []anything) error {
 	if len(first)%2 != 0 {
 		panic("odd")
 	}
@@ -30,7 +36,7 @@ func GFailed() bool {
 
 // F hands its slice on as G's second, so F's mark is G's second parameter's: needed even on windows alone. It names
 // only G, whose signature is the same in every build, so the reach leaves it standing.
-func F(values []any) {
+func F(values []anything) {
 	G(nil, values)
 }
 
@@ -41,7 +47,7 @@ func FUser() {
 
 // H checks its first slice even, as G does, hands its second to platformCount, which needs no slice even in any build,
 // and returns no error.
-func H(first []any, second []any) error {
+func H(first []anything, second []anything) error {
 	if len(first)%2 != 0 {
 		panic("odd")
 	}
@@ -63,7 +69,7 @@ func HFailed() bool {
 
 // E hands its slice on as H's second, so E's mark is H's second parameter's: needed even in no build. It names only
 // H, whose signature is the same in every build, so the reach leaves it standing.
-func E(values []any) {
+func E(values []anything) {
 	H(nil, values)
 }
 

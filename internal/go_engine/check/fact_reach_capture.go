@@ -9,7 +9,9 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
 
 // FactReachCapture is what a host's run held of its facts for the facts' reach (#aswfm7a), read from the run's resolver
@@ -38,6 +40,10 @@ type FactReachCapture struct {
 	// Askers are the bodies whose rules asked each answer, by kind's name and object (fact_resolver.Resolver.Askers):
 	// an answer no rule asked, one a kind kept or computed inside another's judgment, has none.
 	Askers map[string]map[types.Object][]fact_resolver.Asker
+
+	// BodiesRead are the IDs of the packages whose bodies the run read for presence (FactReachPackage.Presence),
+	// sorted: the packages it was given, never a dependency, whose side no build is handed.
+	BodiesRead []string
 }
 
 // FactReachPackage is one analyzed package as the run held its facts.
@@ -65,6 +71,20 @@ type FactReachPackage struct {
 	// (fmt.Sprint), which the build reads alike. An analyzer the run never ran on the package, as where no enabled
 	// rule requires it, has no map, and no build compares its facts there: no finding of the package read them.
 	Pushed map[string]map[types.Object]string
+
+	// Presence is, by its place, what each function body of the package holds that the presence rows read and no use
+	// of stage 1's record says (standing_presence.ReadBodies), read off the package's syntax while the run still holds
+	// it: the functions a body starts, whether it writes a candidate of consistency-no-any's of its own, and the
+	// marker interfaces it declares. A body that holds none of them has no entry.
+	Presence map[fact_reach.Place]standing_presence.BodyRecord
+
+	// PresenceRead is whether the run read the package's bodies for Presence at all. One it never read holds nothing
+	// in Presence that says its bodies hold nothing, so its side counts it unplaced, and a build lints it whole.
+	PresenceRead bool
+
+	// Markers are the method names of every marker interface the package's syntax declares, read with its bodies
+	// (standing_presence.ReadMarkers), sorted.
+	Markers []string
 }
 
 // factReachKinds is what one captured package's answers are, by kind: each kind that answered about its objects, in the
@@ -75,19 +95,21 @@ type factReachKinds struct {
 }
 
 // captureFactReach is what resolver, the run's, holds of its facts for the facts' reach of analyzed, read once the
-// run's passes are done, and the pushed facts each action of graphs held, a later wave's on a package counting, as
-// the findings read it. It reads every answer once (fact_resolver.Answered), then calls each kind's bound once per
-// package. A kind that answered nothing about a package's objects is not called there: its state holds no judgment of
-// the package, so its bound is empty, and known. An answer about a parameter is no function the kind answered about,
-// and the one kind with a bound, nil-ness, answers only about functions. It asks each answer's kind once whether the
-// object's types alone decide the answer, and marks the answer where they do.
+// run's passes are done, the pushed facts each action of graphs held, a later wave's on a package counting, as the
+// findings read it, and what presence read of each package's bodies. It reads every answer once
+// (fact_resolver.Answered), then calls each kind's bound once per package. A kind that answered nothing about a
+// package's objects is not called there: its state holds no judgment of the package, so its bound is empty, and known.
+// An answer about a parameter is no function the kind answered about, and the one kind with a bound, nil-ness, answers
+// only about functions. It asks each answer's kind once whether the object's types alone decide the answer, and marks
+// the answer where they do.
 func captureFactReach(
 	resolver *fact_resolver.Resolver,
 	analyzed []*packages.Package,
 	graphs []*checker.Graph,
+	presence *factReachPresence,
 ) *FactReachCapture {
 	capture := &FactReachCapture{Packages: make(map[string]*FactReachPackage, len(analyzed)),
-		StoreAnswered: map[string]bool{}, Askers: resolver.Askers()}
+		StoreAnswered: map[string]bool{}, Askers: resolver.Askers(), BodiesRead: presence.packages()}
 	captured := make(map[*types.Package]*FactReachPackage, len(analyzed))
 	kinds := make(map[*types.Package]*factReachKinds, len(analyzed))
 	for _, analyzedPackage := range analyzed {
@@ -104,6 +126,8 @@ func captureFactReach(
 			continue
 		}
 		hosted := &FactReachPackage{NoReturn: home.NoReturn, OrderKnown: true}
+		hosted.Presence, hosted.PresenceRead = presence.of(analyzedPackage.ID)
+		hosted.Markers = presence.markersOf(analyzedPackage.ID)
 		capture.Packages[analyzedPackage.ID], captured[analyzedPackage.Types] = hosted, hosted
 		kinds[analyzedPackage.Types] = &factReachKinds{functions: map[*fact_resolver.Kind][]*types.Func{}}
 	}

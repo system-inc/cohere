@@ -447,6 +447,14 @@ type Options struct {
 	FactHosts func(packageId string) fact_reach.Host
 	FactHost  *analysis.Analyzer
 
+	// cohere: BodiesRead, when set, is handed each package Analyze was
+	// given once, as the last action on it finishes, while its syntax and
+	// type information are still whole: the one point every analyzed
+	// package passes before they are let go (releaseSyntax). It is called
+	// on that action's goroutine, so it must be safe to call from several
+	// at once.
+	BodiesRead func(read *packages.Package)
+
 	// cohere: Beside, when set, is rooted on each package Analyze is
 	// given that Restored does not name, beside the analyzers, and its
 	// actions are Graph.Beside's rather than Graph.Roots'. It must be
@@ -1263,6 +1271,11 @@ func (act *Action) releaseSyntax() {
 		return
 	}
 	keeps := act.syntax.given && act.syntax.finished == nil
+	// Only a given package's bodies are read: a dependency is analyzed for its facts alone, and no build is handed its
+	// side.
+	if act.opts.BodiesRead != nil && act.syntax.given && act.Package.TypesInfo != nil {
+		act.opts.BodiesRead(act.Package)
+	}
 	if act.syntax.given && !keeps {
 		act.syntax.finished(act.Package)
 	}
