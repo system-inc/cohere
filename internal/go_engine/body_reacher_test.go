@@ -188,7 +188,7 @@ func reachRecorded(
 ) *buildBodyReach {
 	test.Helper()
 	host := newBodyReachHost(&hostDependence{exportData: map[string]bool{"math": true},
-		decoded: map[*types.Package]bool{}}, reads, nil)
+		decoded: map[*types.Package]bool{}}, reads, nil, nil)
 	hostFiles := map[string][]string{}
 	for identifier, each := range checked {
 		hostFiles[identifier] = each.GoFiles
@@ -300,7 +300,7 @@ func Still(angle float64) float64 { return -angle }
 	graph := newReachBuiltGraph(&load.Loaded{Roots: slices.Collect(maps.Values(checked))})
 	for _, mathExportData := range []bool{false, true} {
 		reacher := &bodyReacher{host: newBodyReachHost(&hostDependence{
-			exportData: map[string]bool{"math": mathExportData}, decoded: map[*types.Package]bool{}}, reads, nil),
+			exportData: map[string]bool{"math": mathExportData}, decoded: map[*types.Package]bool{}}, reads, nil, nil),
 			graph: graph, carried: map[types.Object]bool{}}
 		reacher.carryUnrecorded(checked["example.com/q"].Types)
 		// TwoPi, q's one value, carried only where math loads otherwise.
@@ -442,7 +442,7 @@ func Around(angle int) int { return angle * q.Scale }
 			delete(checked["example.com/a"].Imports, "example.com/gone")
 		}
 		// The host holds gone either way, the build only as a's imports reach it.
-		host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil)
+		host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil, nil)
 		hostFiles := map[string][]string{}
 		for identifier, hosted := range checked {
 			hostFiles[identifier] = hosted.GoFiles
@@ -572,7 +572,7 @@ func Plain() int { return 1 }
 	if !isRecorded {
 		test.Fatal("q's uses are unrecorded")
 	}
-	host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil)
+	host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil, nil)
 	reacher := &bodyReacher{host: host, dependence: unchangedDependence(), carried: map[types.Object]bool{}}
 	elsewhere := *hosted
 	elsewhere.Fset = token.NewFileSet()

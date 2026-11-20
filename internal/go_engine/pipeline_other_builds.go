@@ -68,7 +68,8 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	engine.request.timeline.Stamp("host.readwalks.end")
 	// The body reach census reads the host's records of what each declaration uses beside each build's judgment.
 	if engine.takesBodyReach() {
-		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings)
+		engine.bodyReachHost = newBodyReachHost(engine.dependence, hostReads, pass.result.Findings,
+			loaded.Packages)
 		// The host's side of each package for the facts' reach, made once here, before any build starts, and only read
 		// after. The capture goes once it is read: its no-return predicates hold the host's resolver's packages, which
 		// must not stay alive through the builds.
@@ -869,7 +870,8 @@ func (engine *pipeline) extraBuildRun(
 	// goes once it is read: its no-return predicates hold the build's resolver's packages. A differential is made only
 	// of a judged build (runRules).
 	if run.bodyDifferential != nil {
-		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
+		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings,
+			findingsByPackage(result.Findings, loaded.Packages),
 			findingStagesOf(enabled), &findingCauses{dependence: run.judged.dependence,
 				filesDiffer: run.judged.filesDiffer}, engine.factReachSides, result.FactReachSettled)
 		if result.FactReach != nil && result.FactReachSettled != nil {

@@ -102,26 +102,28 @@ var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reache
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
 // walk rendered them; the host's graph, with the types of the packages it took from the findings store's records
-// rather than from their syntax (hostDependence.decoded); and the host's findings by file, before the merge, which the
-// differential compares each skipped body's with.
+// rather than from their syntax (hostDependence.decoded); and the host's findings by the package that lints each file
+// and then by the file (findingsByPackage), which the differential compares each skipped body's with.
 type bodyReachHost struct {
 	packages   map[string]*packages.Package
 	reads      map[*packages.Package]*build_reads.Reads
 	dependence *hostDependence
-	findings   map[string][]check.Finding
+	findings   map[string]map[string][]check.Finding
 	// identifiers are the IDs of the host's packages by their types, by which the reach finds how a build loaded the
 	// package of an object the host's record names.
 	identifiers map[*types.Package]string
 }
 
-// newBodyReachHost is the census's host side from the host's whole reads (wholeReads), its graph and its findings.
+// newBodyReachHost is the census's host side from the host's whole reads (wholeReads), its graph and its findings over
+// analyzed, the packages it linted.
 func newBodyReachHost(
 	dependence *hostDependence,
 	reads map[*packages.Package]*build_reads.Reads,
 	findings []check.Finding,
+	analyzed []*packages.Package,
 ) *bodyReachHost {
 	host := &bodyReachHost{packages: make(map[string]*packages.Package, len(reads)), reads: reads,
-		dependence: dependence, findings: findingsByFile(findings),
+		dependence: dependence, findings: findingsByPackage(findings, analyzed),
 		identifiers: make(map[*types.Package]string, len(reads))}
 	for each := range reads {
 		host.packages[each.ID] = each

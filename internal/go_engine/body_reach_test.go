@@ -698,8 +698,9 @@ func TestABodyIsClassedOnlyWhereOneStageOwnsEveryDifference(test *testing.T) {
 			stagePackageWide},
 	}
 	differential := &buildBodyDifferential{}
-	hostFindings := map[string][]check.Finding{}
-	builtFindings := map[string][]check.Finding{}
+	// Each side lints every body's file in the body's own package.
+	hostFindings := map[string]map[string][]check.Finding{"example.com/mixed": {}}
+	builtFindings := map[string]map[string][]check.Finding{"example.com/mixed": {}}
 	for index, each := range cases {
 		file := fmt.Sprintf("/mixed/body%d.go", index)
 		differential.bodies = append(differential.bodies, comparedBody{body: reachedBody{
@@ -707,12 +708,12 @@ func TestABodyIsClassedOnlyWhereOneStageOwnsEveryDifference(test *testing.T) {
 			host: placedLines{file: file, firstLine: 1, lastLine: 9}, built: placedLines{file: file, firstLine: 1,
 				lastLine: 9}})
 		for line, rule := range each.host {
-			hostFindings[file] = append(hostFindings[file], check.Finding{File: file, Rule: rule, Line: line + 2,
-				Column: 1, Message: "m"})
+			hostFindings["example.com/mixed"][file] = append(hostFindings["example.com/mixed"][file],
+				check.Finding{File: file, Rule: rule, Line: line + 2, Column: 1, Message: "m"})
 		}
 		for line, rule := range each.built {
-			builtFindings[file] = append(builtFindings[file], check.Finding{File: file, Rule: rule, Line: line + 5,
-				Column: 1, Message: "m"})
+			builtFindings["example.com/mixed"][file] = append(builtFindings["example.com/mixed"][file],
+				check.Finding{File: file, Rule: rule, Line: line + 5, Column: 1, Message: "m"})
 		}
 	}
 	differential.compareFindings(hostFindings, builtFindings, stages,

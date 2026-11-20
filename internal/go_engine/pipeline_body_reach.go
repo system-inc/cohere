@@ -92,6 +92,8 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		if run.bodyDifferential.factsSettled {
 			fmt.Fprintf(&written, "  taken out by the facts' reach %d\n", run.bodyDifferential.takenOut)
 		}
+		fmt.Fprintf(&written, "  findings not compared, linted in another package on one side %d\n",
+			run.bodyDifferential.lintedApart)
 		if run.bodyDifferential.standingCompared != nil {
 			fmt.Fprintf(&written, "  standing facts: compared %s; failures %s\n",
 				byKind(run.bodyDifferential.standingCompared), byKind(run.bodyDifferential.standingFailed))

@@ -126,7 +126,7 @@ func stop() int {
 			// always sorted after. The shared file's other findings, U1000's and the dropped errors', read alike.
 			sharedFile := filepath.Join(root, "shared.go")
 			var hostRules []string
-			for _, finding := range on.bodyReachHost.findings[sharedFile] {
+			for _, finding := range on.bodyReachHost.findings["example.com/initializers"][sharedFile] {
 				if rule := strings.TrimPrefix(finding.Rule, "cohere-go/"); strings.HasPrefix(rule, "SA") {
 					hostRules = append(hostRules, rule)
 				}
