@@ -25,21 +25,24 @@ import (
 
 // recordingKind is one kind the stub differential holds to its flag (fact_resolver.Kind.RecordsEveryJudgment): the
 // kind, the directory of its package, whose testdata is the `GOPATH` root of its fixtures, whether its answers are
-// about a function's parameters, where a question of a function is one of each parameter, and the directory of its two
-// packages in the recording_across fixture, lower and upper, which imports it.
+// about a function's parameters, where a question of a function is one of each parameter, the directory of its two
+// packages in the recording_across fixture, lower and upper, which imports it, and the function of lower that upper's
+// answers rest on.
 type recordingKind struct {
-	kind        *fact_resolver.Kind
-	directory   string
-	byParameter bool
-	across      string
+	kind         *fact_resolver.Kind
+	directory    string
+	byParameter  bool
+	across       string
+	acrossCallee string
 }
 
 // recordingKinds are the kinds the differential runs over, which TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer
 // holds to be every registered kind that sets the flag.
 var recordingKinds = []recordingKind{
-	{kind: function_purity.Kind, directory: "function_purity", across: "purity"},
-	{kind: odd_slice_argument.Kind, directory: "odd_slice_argument", byParameter: true, across: "odd"},
-	{kind: return_nil_ness.Kind, directory: "return_nil_ness", across: "nilness"},
+	{kind: function_purity.Kind, directory: "function_purity", across: "purity", acrossCallee: "Middle"},
+	{kind: odd_slice_argument.Kind, directory: "odd_slice_argument", byParameter: true, across: "odd",
+		acrossCallee: "Pairs"},
+	{kind: return_nil_ness.Kind, directory: "return_nil_ness", across: "nilness", acrossCallee: "Middle"},
 }
 
 // recordingQuestions is one copy of a fixture package and the questions asked of it: the package it copies, what the
@@ -366,6 +369,14 @@ func stubAcross(test *testing.T, kind recordingKind) (recordingCoverage, []strin
 			stubbed = append(stubbed, unit)
 			stubbedNames = append(stubbedNames, unit.name)
 		}
+	}
+	// The callee is among the answers compared, so the differential reads something across the boundary.
+	isDeclared := slices.ContainsFunc(functionUnits(lower), func(unit functionUnit) bool {
+		return unit.name == kind.acrossCallee
+	})
+	if !isDeclared || slices.Contains(stubbedNames, kind.acrossCallee) {
+		test.Errorf("%s: the run holds no answer about lower.%s, which upper's answers rest on, want one among those "+
+			"compared", kind.kind.Name, kind.acrossCallee)
 	}
 	freshLower, freshUpper := acrossPair(test, kind)
 	lowerVariant, lowerError := variantOf(freshLower, 1, stubbed, noReturn)
