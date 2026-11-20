@@ -20,11 +20,13 @@ import (
 	"go/ast"
 	goformat "go/format"
 	"go/parser"
+	"go/printer"
 	"go/scanner"
 	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
@@ -226,6 +228,15 @@ func collect(files []string, outcomes []outcome) Result {
 	return result
 }
 
+// gofmtBuffers are the buffers formatFile has gofmt print into, each one file's from its print until formatFile
+// returns, so a run grows one buffer a worker to the size of the files it formats rather than one for every file.
+// Each waits in the pool empty.
+var gofmtBuffers = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+
+// gofmtBufferKeptBytes is the largest buffer gofmtBuffers takes back: one an unusually large file grew is let go, so
+// the pool never holds that much for every worker while the run formats ordinary files.
+const gofmtBufferKeptBytes = 256 << 10
+
 // formatFile formats one file, writing the result under options.Write and keeping it under options.KeepOutput, unless
 // options.Known says what the run made of the same bytes before. A run that does not write reads the file from
 // options.Held when that holds it. A write options.Root refuses leaves the file changed and not written, as a check
@@ -245,8 +256,9 @@ func formatFile(file string, options Options) outcome {
 
 	// The package clause and the comments above it are all the generated rule reads. A parse that stops there
 	// also refuses what gofmt refuses and format.Source does not: a file with no package clause, which
-	// format.Source would format as a fragment of declarations.
-	headerMode := parser.PackageClauseOnly | parser.ParseComments
+	// format.Source would format as a fragment of declarations. Its one reader is ast.IsGenerated, which reads the
+	// comments and the clause's place and never the objects or scope a resolution would build.
+	headerMode := parser.PackageClauseOnly | parser.ParseComments | parser.SkipObjectResolution
 	header, headerError := parser.ParseFile(token.NewFileSet(), "", original, headerMode)
 	if headerError != nil {
 		return notFormatted(file, fmt.Sprintf("it does not parse: %v", headerError))
@@ -258,7 +270,20 @@ func formatFile(file string, options Options) outcome {
 		return outcome{generated: true}
 	}
 
-	formatted, formatError := goformat.Source(original)
+	buffer, isBuffer := gofmtBuffers.Get().(*bytes.Buffer)
+	if !isBuffer {
+		// Only formatFile puts into gofmtBuffers, and only buffers; its New makes one when it holds none.
+		buffer = new(bytes.Buffer)
+	}
+	// formatted is buffer's bytes, so every reader of it below is done by the time this runs: the comparisons, the
+	// write, which copies it into the file, and Output, which is a copy of its own.
+	defer func() {
+		if buffer.Cap() <= gofmtBufferKeptBytes {
+			buffer.Reset()
+			gofmtBuffers.Put(buffer)
+		}
+	}()
+	formatted, formatError := gofmtSource(original, buffer)
 	if formatError != nil {
 		return notFormatted(file, formatFailureReason(formatError))
 	}
@@ -270,7 +295,8 @@ func formatFile(file string, options Options) outcome {
 	}
 	changed := &ChangedFile{File: file, Formatted: true, FirstDifferingLine: firstDifferingLine(original, formatted)}
 	if options.KeepOutput && !options.Write {
-		changed.Output = formatted
+		// A copy, since formatted is the pooled buffer's and the next file formatted prints over it.
+		changed.Output = bytes.Clone(formatted)
 	}
 	if options.Write {
 		writeError := WriteAtomically(options.Root, file, formatted)
@@ -284,6 +310,37 @@ func formatFile(file string, options Options) outcome {
 		changed.Written = true
 	}
 	return outcome{changed: changed}
+}
+
+// gofmtPrinterMode and gofmtTabWidth are go/format's printer settings, which are cmd/gofmt's, copied since go/format
+// keeps them to itself. gofmtNormalizeNumbers is go/format's printerNormalizeNumbers, a mode go/printer reserves for
+// go/format and cmd/gofmt and exports no name for: it prints number literals' prefixes and exponents in their one
+// canonical spelling. TestGofmtSourceIsGoFormatsOutputForEveryGoFile holds these to go/format's output.
+const (
+	gofmtNormalizeNumbers = 1 << 30
+	gofmtPrinterMode      = printer.UseSpaces | printer.TabIndent | gofmtNormalizeNumbers
+	gofmtTabWidth         = 8
+)
+
+// gofmtSource is go/format.Source's output for original, a file whose package clause parses, printed into output,
+// which must be empty, and returned as output's bytes, good until output is written again. It is Source's path for a
+// whole file, the same parse, import sort and print, with the print into a buffer the caller keeps rather than one of
+// its own. A file that does not parse fails with the parse's error, which is Source's too: Source tries a file as a
+// fragment only when the error is that it lacks a package clause, and this one has one.
+func gofmtSource(original []byte, output *bytes.Buffer) ([]byte, error) {
+	fileSet := token.NewFileSet()
+	syntax, parseError := parser.ParseFile(fileSet, "", original, parser.ParseComments|parser.SkipObjectResolution)
+	if parseError != nil {
+		return nil, parseError
+	}
+	ast.SortImports(fileSet, syntax)
+	// gofmt's output is about as long as its input, so one growth up front spares the print growing as it goes.
+	output.Grow(len(original) + 1024)
+	configuration := printer.Config{Mode: gofmtPrinterMode, Tabwidth: gofmtTabWidth}
+	if printError := configuration.Fprint(output, fileSet, syntax); printError != nil {
+		return nil, printError
+	}
+	return output.Bytes(), nil
 }
 
 // readOriginal is the bytes formatFile formats: the run's held bytes of file under a check, when it holds them, and
