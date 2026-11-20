@@ -337,9 +337,9 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 }
 
 // standingGate is one module of testdata/standing-gates (#zvwfe26), each a rule's package-wide gate: the other build's
-// own file, windows's in every module but abbreviated-closure, whose other build is the tag audit_b's, or the host's
-// own file opens or closes the gate that judges a body in shared.go, or in example_test.go, which both builds compile
-// and whose declaration, stood, is one the other build's difference never reaches. stood names that declaration as
+// own file, windows's in every module but the two of abbreviated-closure, whose other build is the tag audit_b's, or
+// the host's own file opens or closes the gate that judges a body in shared.go, or in example_test.go, which both
+// builds compile and whose declaration, stood, is one the other build's difference never reaches. stood names it as
 // the census does. The finding the gate decides there is named by its rule, its line in file, a fragment of its
 // message, and fix, where not empty, a fragment one of its suggestions holds in its message or an edit's text; finder
 // is the build that finds it, "host" or "build" for the other, the second finding nothing of the rule on that line
@@ -365,12 +365,15 @@ type standingGate struct {
 //   - SA5008 by an import of go-flags (import-goflags-*), a stub by the module's replace, after which a repeated
 //     `default` key in a struct tag is accepted anywhere in the package.
 //   - tests by the package's scope, `ExampleFoo` referring to an unknown identifier unless some file declares Foo
-//     (example-*), and by its imports, `ExampleBuffer` unless some file imports bytes (example-import-*).
+//     (example-*), by its imports, `ExampleBuffer` unless some file imports bytes (example-import-*), and by the
+//     members of the type an example names, `ExampleFoo_Bar` referring to an unknown field or method unless some file
+//     declares a method Bar of Foo, a type both builds declare (example-member-*).
 //   - consistency-no-abbreviated-identifier by the package's scope, `callerContext` being the name it suggests for a
 //     context parameter only while no file declares it (abbreviated-scope-*), by a use of sort, after which it leaves
 //     a method named Len alone (abbreviated-sort-*), and by the package's whole import closure, whose packages' names
-//     it keeps free (abbreviated-closure): the package imports dep alone in both builds, and dep imports context
-//     under the tag alone, so `context` is the name it suggests for a local ctx on the host only.
+//     it keeps free: the package imports dep alone in both builds, and dep imports context under the tag alone
+//     (abbreviated-closure) or in every build but the tag's (abbreviated-closure-host), so `context` is the name it
+//     suggests for a local ctx only in the build whose dep does not import it.
 //   - S1018, S1025 and stringintconv by a universe name the package may declare in any file: S1018 offers copy() for a
 //     sliding loop only while copy is the builtin (copy-scope-*), S1025 a conversion only while string is
 //     (sprintf-scope-*), and stringintconv imports fmt under its own name only while no file declares fmt
@@ -396,6 +399,10 @@ var standingGates = []standingGate{
 		fragment: "ExampleBuffer refers to unknown identifier: Buffer", finder: "host", standing: 2},
 	{module: "example-import-host", stood: "ExampleBuffer", file: "example_test.go", rule: "tests", line: 3,
 		fragment: "ExampleBuffer refers to unknown identifier: Buffer", finder: "build", standing: 2},
+	{module: "example-member-win", stood: "ExampleFoo_Bar", file: "example_test.go", rule: "tests", line: 3,
+		fragment: "ExampleFoo_Bar refers to unknown field or method: Foo.Bar", finder: "host", standing: 2},
+	{module: "example-member-host", stood: "ExampleFoo_Bar", file: "example_test.go", rule: "tests", line: 3,
+		fragment: "ExampleFoo_Bar refers to unknown field or method: Foo.Bar", finder: "build", standing: 2},
 	{module: "abbreviated-scope-win", stood: "target", file: "shared.go", rule: "consistency-no-abbreviated-identifier",
 		line: 5, fragment: `Use "callerContext"`, finder: "host", standing: 1},
 	{module: "abbreviated-scope-host", stood: "target", file: "shared.go",
@@ -409,6 +416,9 @@ var standingGates = []standingGate{
 		standing: 3},
 	{module: "abbreviated-closure", stood: "Target", file: "shared.go",
 		rule: "consistency-no-abbreviated-identifier", line: 9, fragment: `Use "context"`, finder: "host", standing: 2},
+	{module: "abbreviated-closure-host", stood: "Target", file: "shared.go",
+		rule: "consistency-no-abbreviated-identifier", line: 9, fragment: `Use "context"`, finder: "build",
+		standing: 2},
 	{module: "copy-scope-win", stood: "target", file: "shared.go", rule: "S1018", line: 4,
 		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "host", standing: 1},
 	{module: "copy-scope-host", stood: "target", file: "shared.go", rule: "S1018", line: 4,
