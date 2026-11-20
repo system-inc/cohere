@@ -34,6 +34,12 @@ import (
 // bits wherever a unit reads them, and then, as `WithoutCounterpart\t<count>`, the objects of a package a graph does
 // hold that it answered wide for want of a counterpart there, when any was. A run without the variable judges and
 // writes nothing more than it did.
+//
+// A build with no `<build>.txt` had no set written, as a run whose lint load recorded no reads writes none, and its
+// reader takes that to mean every package of the build must be checked. A package whose bodies alone read a dependent
+// object, `func G() int { return p.F() }` where `F`'s result type differs in the build, is in no set: the check that
+// catches it is the restore from the host's run by its reads (#b2t9xmf), whose load half, check.TypesHold, declines a
+// package whose type check reached an object that reads otherwise in the build, so it is checked from source there.
 
 // mustCheckCensusVariable names the directory each extra build's must-check set is written into.
 const mustCheckCensusVariable = "COHERE_MUST_CHECK_CENSUS"

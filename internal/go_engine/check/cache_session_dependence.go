@@ -64,16 +64,24 @@ func DependenceRecordKey(key cache.Key) cache.Key {
 // the builds (WriteDeclarationsRecords), never beside its entry in the save.
 
 // DeclarationsRecordVersion is the format of a declarations-only record as the store keeps it, hashed into its key
-// (DeclarationsRecordKey) apart from the whole records' version: it changes whenever the record's encoding does, or
-// what a declarations-only graph collects into it. At 2, a const spec that repeats the spec before it carries that
-// spec's universe names, as a whole record does at its 6.
+// (DeclarationsRecordKey) beside the whole records' version, DependenceRecordVersion: it changes whenever the record's
+// encoding does, or what a declarations-only graph alone collects into it, and a change to what the collector records,
+// which moves the whole records' version, moves the key too, so neither leaves a stale record readable. At 2, a const
+// spec that repeats the spec before it carries that spec's universe names, as a whole record does at its 6.
 const DeclarationsRecordVersion = "declarations-record-2"
 
 // DeclarationsRecordKey is where the store keeps the declarations-only record of the package whose first key is key:
 // apart from every entry, export data, alias and whole record, and derived from the entry's key alone, as
 // DependenceRecordKey is.
 func DeclarationsRecordKey(key cache.Key) cache.Key {
-	return sha256.Sum256(append([]byte("declarations record "+DeclarationsRecordVersion+" "), key[:]...))
+	return declarationsRecordKeyAt(DependenceRecordVersion, key)
+}
+
+// declarationsRecordKeyAt is DeclarationsRecordKey with dependenceVersion as the whole records' version, which a test
+// names apart from DependenceRecordVersion to see the key move with it.
+func declarationsRecordKeyAt(dependenceVersion string, key cache.Key) cache.Key {
+	return sha256.Sum256(append([]byte("declarations record "+DeclarationsRecordVersion+" "+dependenceVersion+" "),
+		key[:]...))
 }
 
 // DependenceRecordCounts are what the session did with dependence records over its last load: the records read, each
@@ -127,8 +135,8 @@ type dependenceRecords struct {
 
 // KeepDependenceRecords has the session read and write the dependence records of its host's load: under
 // `--build-dependence` alone, on a session with a store. decode is the host graph's decoding of a record's bytes
-// (build_dependence.DecodeRecord), which the session runs as it reads each record, so a record that does not decode is
-// its own to say and to write again.
+// (build_dependence.DecodeRecord), refusing a declarations-only record, which the session runs as it reads each
+// record, so a record that does not decode is its own to say and to write again.
 func (session *CacheSession) KeepDependenceRecords(decode func(encoded []byte) (*build_dependence.Record, error)) {
 	if session.caching.Store != nil {
 		session.dependence = &dependenceRecords{decode: decode}

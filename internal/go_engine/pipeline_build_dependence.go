@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -677,4 +678,20 @@ func dependenceCounts(counts build_dependence.ScopeCounts) contract.DependenceCo
 		BuildOnlyUnits:        counts.BuildOnlyUnits,
 		BuildOnlyNodes:        counts.BuildOnlyNodes,
 	}
+}
+
+// decodeWholeRecord is the whole record encoded holds (build_dependence.DecodeRecord), or why it holds none: bytes that
+// do not decode, or a declarations-only record, which no whole record's key holds and a whole graph refuses with a
+// panic (#anfjtr3). A run under `--build-dependence` reads one, from a collision of the two keys or a damaged store, as
+// a record that does not decode, and writes its package's whole record over it, as decodeDeclarationsRecord refuses a
+// whole record on a plain run.
+func decodeWholeRecord(encoded []byte) (*build_dependence.Record, error) {
+	record, decodeError := build_dependence.DecodeRecord(encoded)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	if record.DeclarationsOnly() {
+		return nil, errors.New("decoding a whole record: it is a declarations-only graph's record")
+	}
+	return record, nil
 }

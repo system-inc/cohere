@@ -157,12 +157,23 @@ func (session *CacheSession) WriteStandardLibraryRecords(
 // identity is engineIdentity under toolchain, as StandardLibraryDependenceRecordKey keys a whole one in the project's
 // store, apart from it by its own words and version (DeclarationsRecordVersion). It is kept in the system cache's
 // store beside the package's entry, since the record, as the entry, holds nothing of any project's, so every project,
-// and a run under `--no-cache`, which has no store of its own, reads the one record.
+// and a run under `--no-cache`, which has no store of its own, reads the one record. The whole records' version,
+// DependenceRecordVersion, is hashed in beside its own, as DeclarationsRecordKey hashes it, since the engine's identity
+// a stamp sets can stay one across binaries whose collectors record otherwise.
 func StandardLibraryDeclarationsRecordKey(
 	standardLibraryKey cache.Key, engineIdentity string, toolchain string,
 ) cache.Key {
+	return standardLibraryDeclarationsRecordKeyAt(DependenceRecordVersion, standardLibraryKey, engineIdentity,
+		toolchain)
+}
+
+// standardLibraryDeclarationsRecordKeyAt is StandardLibraryDeclarationsRecordKey with dependenceVersion as the whole
+// records' version, which a test names apart from DependenceRecordVersion to see the key move with it.
+func standardLibraryDeclarationsRecordKeyAt(
+	dependenceVersion string, standardLibraryKey cache.Key, engineIdentity string, toolchain string,
+) cache.Key {
 	return cache.DigestOf([]byte("standard library declarations record "+DeclarationsRecordVersion),
-		[]byte(engineIdentity), []byte(toolchain), standardLibraryKey[:])
+		[]byte(dependenceVersion), []byte(engineIdentity), []byte(toolchain), standardLibraryKey[:])
 }
 
 // standardLibraryDeclarationsKey is keyed's declarations-only record key in the system cache's store, and whether it

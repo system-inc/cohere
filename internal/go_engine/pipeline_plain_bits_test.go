@@ -455,3 +455,30 @@ func TestAPackageInNoGraphIsInTheSet(test *testing.T) {
 		}
 	}
 }
+
+// A plain run without the census keeps no declarations record (#anfjtr3). Over one copy of the
+// build-dependence-embedded fixture, whose windows build runs beside the host's, every package keyed into the
+// project's store, a run fills the store and a warm run after it restores every package the host checks from there:
+// the warm run counts no dependence record of any kind, reading, backfilling and writing none, and the store holds no
+// declarations record beside any entry. Keep declarations records on a plain run without the census, and the warm run
+// backfills every hit.
+func TestAPlainRunWithoutTheCensusKeepsNoDeclarationsRecord(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "build-dependence-embedded"))
+	runOverConfigured(test, root, exitClean, nil, "--no-system-cache")
+	warm, warmStream := runOverConfigured(test, root, exitClean, nil, "--no-system-cache")
+	if len(warm.buildRuns) != 2 || warm.plainBits != nil {
+		test.Fatalf("want the host's build and windows's and no plain bits, got %d runs", len(warm.buildRuns))
+	}
+	cached := lintRecordOf(test, warmStream).Cache
+	if cached.Missed != 0 {
+		test.Fatalf("want the warm run to restore every package, got %d missed", cached.Missed)
+	}
+	if cached.DependenceRecords != nil {
+		test.Errorf("want no dependence record counted, got %+v", *cached.DependenceRecords)
+	}
+	if stored := storedDeclarationsRecords(test, root); len(stored) != 0 {
+		test.Errorf("want no declarations record in the store, got %d", len(stored))
+	}
+}

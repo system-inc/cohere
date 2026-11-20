@@ -17,7 +17,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
-	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -447,7 +446,7 @@ func (engine *pipeline) run() int {
 			// Under `--build-dependence` the host's graph is read from the records the store keeps of the packages it
 			// restores, and the records of those it checks are written beside their entries (#6a3kjvz).
 			if engine.request.judgesDependence() && engine.request.requests(contract.PhaseLint) {
-				engine.session.KeepDependenceRecords(build_dependence.DecodeRecord)
+				engine.session.KeepDependenceRecords(decodeWholeRecord)
 			}
 			// A plain run asked for the must-check census reads its declarations-only graph's records of the packages
 			// it restores instead, and writes those it builds once its walks end (#anfjtr3).
