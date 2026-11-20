@@ -156,6 +156,11 @@ type Kind struct {
 	// such a package as complete, and the facts' reach gives it no side (check.FactReachCapture.StoreAnswered). Nor is
 	// the claim about ctrlflow's no-return of a callee, which cuts the blocks a judgment reads after a call: that is a
 	// fact the checker pushes, which a reader compares on its own.
+	//
+	// The flag is read only of a kind registered with the resolver (Register, RecordingNames). Set on a kind that never
+	// registers, as triviality and the stopping calls do not, it is inert: the kind keeps the unrecorded rule whole.
+	// A kind that registers with it set joins the stub differential's kinds too (check's recordingKinds), whose guard
+	// fails while the two lists differ.
 	RecordsEveryJudgment bool
 }
 
