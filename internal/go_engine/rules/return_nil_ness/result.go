@@ -27,6 +27,12 @@ import (
 //
 // TestEveryVerdictNilnessHoldsIsAnAnswerTheResolverHolds pins the first claim, and check's
 // TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer the second.
+//
+// An answer the store gave about a function of a package the run learned was judged in another run, and nothing it
+// rests on was judged in this one. Where no judgment of this run reached the function, it has no verdict in the kind's
+// state, and the kind's own order bound reads not known for the package (OrderBound), so it gets no side for the facts'
+// reach and is linted whole. The resolver now keeps that bound for every kind, whatever the state holds
+// (fact_resolver.Package.AnsweredFromStore), and the capture reads it first.
 var Kind = &fact_resolver.Kind{Name: "return_nil_ness"}
 
 func init() {

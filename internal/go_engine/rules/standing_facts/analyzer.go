@@ -177,7 +177,9 @@ func run(pass *analysis.Pass) (any, error) {
 	// about is one the kind never judged there, no answer of the host's rests on its body, and there is nothing to
 	// compare. Where it did judge the function the host holds the answer, recorded at its body, which the walk asks
 	// as the body leaves. A package handed an unsure answer keeps nothing, and has no side here at all, so the build
-	// lints it whole (check.FactReachCapture.Packages).
+	// lints it whole (check.FactReachCapture.Packages). Nor has a package the store answered a question about, loaded
+	// from source and answered from its entry: that answer was judged in another run, on bodies this one never judged,
+	// so no kind's record of the package is complete (check.FactReachCapture.StoreAnswered).
 	units := map[string]bool{}
 	for _, kind := range host.Kinds() {
 		units[kind.Name] = kind.Parameters

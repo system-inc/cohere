@@ -149,9 +149,13 @@ type Kind struct {
 	// and left no record of (fact_reach.Settle's unrecorded rule, which that kind keeps whole). The first claim alone
 	// would not do: a judgment that looked into a callee's body and made no verdict of it would leave a record as
 	// complete, and rest on a body with none. A package handed an unsure answer keeps nothing (Keep, answerOf), and
-	// the claim is not about it: a reader holds no answers of such a package at all. Nor is it about ctrlflow's
-	// no-return of a callee, which cuts the blocks a judgment reads after a call: that is a fact the checker pushes,
-	// which a reader compares on its own.
+	// the claim is not about it: a reader holds no answers of such a package at all. Nor is it about a package the run
+	// learned that the store answered a question about, as one loaded from source to answer a question is answered from
+	// its entry (Package.AnsweredFromStore): that answer was judged in another run, and nothing of what it rests on was
+	// judged in this one, so a function there with no answer may be one it rests on. A reader takes no kind's record of
+	// such a package as complete, and the facts' reach gives it no side (check.FactReachCapture.StoreAnswered). Nor is
+	// the claim about ctrlflow's no-return of a callee, which cuts the blocks a judgment reads after a call: that is a
+	// fact the checker pushes, which a reader compares on its own.
 	RecordsEveryJudgment bool
 }
 

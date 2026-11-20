@@ -18,7 +18,15 @@ import (
 type FactReachCapture struct {
 	// Packages are, by package ID, each analyzed package the run computed in. A package the run restored, or whose
 	// analysis was handed an unsure answer, is absent, which says the run has no side of it, so a build lints it whole.
+	// So is one the store answered a question about (StoreAnswered).
 	Packages map[string]*FactReachPackage
+
+	// StoreAnswered are, by package ID, each analyzed package the run learned that Packages leaves out because the
+	// store gave an answer about one of its objects (fact_resolver.Package.AnsweredFromStore), as a package loaded from
+	// source to answer a question is answered from its entry. The answer was judged in another run, and nothing of what
+	// it rests on in this one, so a function the run holds no answer of a kind about may be one it rests on: no kind's
+	// record of the package is complete (fact_resolver.Kind.RecordsEveryJudgment), and the package is one to lint whole.
+	StoreAnswered map[string]bool
 
 	// Answers are every answer the run holds, about every package's objects, as fact_resolver.Answered orders them, the
 	// answers a build is asked of another package's objects before any body leaves. Each is an answer as
@@ -78,7 +86,7 @@ func captureFactReach(
 	graphs []*checker.Graph,
 ) *FactReachCapture {
 	capture := &FactReachCapture{Packages: make(map[string]*FactReachPackage, len(analyzed)),
-		Askers: resolver.Askers()}
+		StoreAnswered: map[string]bool{}, Askers: resolver.Askers()}
 	captured := make(map[*types.Package]*FactReachPackage, len(analyzed))
 	kinds := make(map[*types.Package]*factReachKinds, len(analyzed))
 	for _, analyzedPackage := range analyzed {
@@ -88,6 +96,10 @@ func captureFactReach(
 		home := resolver.Package(analyzedPackage.Types)
 		if home == nil {
 			// Restored: ctrlflow never ran on it, so the resolver never learned it, and nothing was computed there.
+			continue
+		}
+		if home.AnsweredFromStore() {
+			capture.StoreAnswered[analyzedPackage.ID] = true
 			continue
 		}
 		hosted := &FactReachPackage{NoReturn: home.NoReturn, OrderKnown: true}
