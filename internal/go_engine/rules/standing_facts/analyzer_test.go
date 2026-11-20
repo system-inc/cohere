@@ -506,3 +506,25 @@ func TestAWrapperFactTheBuildNeverLookedUpReadsUnknown(test *testing.T) {
 			result.PushedNamed)
 	}
 }
+
+// A wrapper fact that reads the same in the build is compared and names nothing, and is not counted among the named
+// (#e3q4cds): Caller calls stop, so the build's printf looked stop up, and neither side holds a wrapper fact of it.
+// Caller stands, and the census's "pushed facts compared, named" counts one compared and none named.
+func TestAnEqualWrapperFactIsComparedAndNotNamed(test *testing.T) {
+	test.Parallel()
+	found := loadFacts(test)
+	caller := found.place(test, "Caller")
+	host := &fakeHost{
+		standing: map[fact_reach.Place]bool{caller: true},
+		places:   []fact_reach.Place{caller},
+		functions: []fact_reach.Function{{Object: "facts.stop", Identity: found.identity("stop"), NoReturn: true,
+			Pushed: map[string]string{"printf": ""}}},
+		users: map[fact_reach.Object][]fact_reach.Place{"facts.stop": {caller}},
+	}
+	result, _ := settle(test, found, host)
+	requireRemoved(test, result)
+	if result.PushedCompared != 1 || result.PushedNamed != 0 {
+		test.Errorf("compared %d pushed facts and named %d, want one compared and none named", result.PushedCompared,
+			result.PushedNamed)
+	}
+}
