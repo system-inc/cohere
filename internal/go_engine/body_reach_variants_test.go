@@ -12,7 +12,9 @@ import (
 
 // bodyReachVariantsFixtures holds the reader's two modules of #wzre5eg's review (#bed0mnk), each a package audit whose
 // in-package test file windows alone compiles, so windows checks audit's test variant, `audit [audit.test]`, which the
-// host never builds, and that file declares a package-level true, so audit's Enabled is false there.
+// host never builds, and that file declares a package-level true, so audit's Enabled is false there. Beside them is
+// the hunter's module, variant-method-set, whose test file gives a type of the variant a method the plain package's
+// lacks.
 var bodyReachVariantsFixtures = filepath.Join("testdata", "body-reach-variants")
 
 // An import may resolve, in a build, to a package of another ID than on the host, with every file alike (#bed0mnk, the
@@ -76,6 +78,74 @@ func TestAPackageWhoseImportResolvesToAnotherPackageIsReachedWhole(test *testing
 	if len(failures) > 0 || windows.bodyDifferential.compared != 2 {
 		test.Errorf("want the body differential to compare the two constants and read no failure, got %d compared "+
 			"and\n%s", windows.bodyDifferential.compared, strings.Join(failures, "\n"))
+	}
+}
+
+// A test variant may differ from its plain package by a type's method set, with no constant read anywhere (#bed0mnk,
+// the hunter's promote-win). In variant-method-set p's W embeds T, and an in-package test file windows alone compiles
+// declares a method on T, so W's method set holds the promoted M in `p [p.test]` and nothing in plain p. q imports p,
+// so windows holds plain p by its ID beside the variant, and builds q again for p's tests, against the variant. The
+// external test's F takes a p.W: its p is plain p on the host and the variant on windows, so the parameter's type is
+// another type under the same name, though no file of the external test differs, every ID the host holds the build
+// holds, and no bit of plain p's W is set. Both of the external test's imports resolve to other packages on windows
+// (differingImports), so its package is reached whole, Imports, and F is never compared. Plain q's F, whose p is
+// plain p in both builds, stays unreached and compares equal.
+func TestABodyNamingATypeOfAPackageBuiltAgainForItsTestsIsReached(test *testing.T) {
+	test.Parallel()
+
+	const plain = "example.com/audit/p"
+	const variant = "example.com/audit/p [example.com/audit/p.test]"
+	const through = "example.com/audit/q"
+	const rebuilt = "example.com/audit/q [example.com/audit/p.test]"
+	const external = "example.com/audit/p_test [example.com/audit/p.test]"
+	root := copyFixture(test, filepath.Join(bodyReachVariantsFixtures, "variant-method-set"))
+	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		engine.bodyReachFromSourceRecord = test.TempDir()
+		engine.bodyDifferential = true
+	}, "--no-cache", "--no-fix", "--build-dependence")
+
+	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
+	}
+	windows := on.buildRuns[1]
+	if windows.bodyReach == nil || windows.bodyDifferential == nil {
+		test.Fatal("windows's run has no census or no body differential")
+	}
+	// The fixture's premise: the host holds p plain alone, and windows checks it plain and as its test variant.
+	if _, isHosted := on.dependence.paths[variant]; isHosted || on.dependence.paths[plain] == "" ||
+		!slices.Contains(windows.fromSourceIdentifiers, plain) ||
+		!slices.Contains(windows.fromSourceIdentifiers, variant) {
+		test.Fatalf("want the host to hold p plain alone and windows to check it plain and as its test variant, got "+
+			"the host's %v and windows's %v", slices.Sorted(maps.Keys(on.dependence.paths)),
+			windows.fromSourceIdentifiers)
+	}
+	got, constantsOnly, drivers := map[string]string{}, map[string]string{}, map[string]string{}
+	for _, body := range windows.bodyReach.bodies {
+		name := body.packageIdentifier + " " + body.name
+		got[name] = cmp.Or(string(body.reason), "unreached")
+		constantsOnly[name] = cmp.Or(string(body.constantsOnlyReason), "unreached")
+		drivers[name] = body.driver
+	}
+	// Under the constants-only load mode rule too, whose count the census reads beside the general one's.
+	want := map[string]string{through + " F": "unreached", external + " F": string(reachedImports)}
+	if !maps.Equal(got, want) || !maps.Equal(constantsOnly, want) {
+		test.Errorf("windows's census judges\n%v\nand under the constants-only rule\n%v\nwant by both\n%v", got,
+			constantsOnly, want)
+	}
+	wantDriver := "the package's imports differing, by " + plain + " resolving to " + plain + " on the host and to " +
+		variant + " in the build, " + through + " resolving to " + through + " on the host and to " + rebuilt +
+		" in the build"
+	if drivers[external+" F"] != wantDriver {
+		test.Errorf("F is reached first by %q, want %q", drivers[external+" F"], wantDriver)
+	}
+	var failures []string
+	for _, failure := range windows.bodyDifferential.failures {
+		failures = append(failures, strings.ReplaceAll(failure, root+string(filepath.Separator), ""))
+	}
+	if len(failures) > 0 || windows.bodyDifferential.compared != 1 {
+		test.Errorf("want the body differential to compare q's F alone and read no failure, got %d compared and\n%s",
+			windows.bodyDifferential.compared, strings.Join(failures, "\n"))
 	}
 }
 
