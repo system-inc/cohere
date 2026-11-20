@@ -187,7 +187,9 @@ func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 // leaves out what no name pairs exactly (pairByUnit), but never more, and never more fewer than its Unkeyed
 // counts, its parts summing to it; it logs how many it left out, by why, and returns those by build (#h660y7d). Both
 // censuses must be whole, neither leaving a fact out for want of the build's syntax (#wzre5eg): a build that restored
-// its standard library compares none of it, and two censuses that compare nothing agree on nothing.
+// its standard library compares none of it, and two censuses that compare nothing agree on nothing. got counts as
+// many facts in a file one build alone compiles as want does, never more, and fewer only within what its Unkeyed
+// leaves beside the facts compared fewer (#w5dbvdm).
 func expectSameCensus(test *testing.T, want string, got string) map[string]contract.UnkeyedFacts {
 	test.Helper()
 	parts := map[string]contract.UnkeyedFacts{}
@@ -226,6 +228,13 @@ func expectSameCensus(test *testing.T, want string, got string) map[string]contr
 			test.Errorf("build %s: the census compares %d facts fewer than the side load and counts %d unkeyed",
 				target, fewer, gotFacts.Unkeyed)
 		}
+		// A fact in a file one build alone compiles is counted either way (#w5dbvdm), but for a host's fact no name
+		// pairs exactly, which the records leave unkeyed where the side load places it by its counterpart.
+		if inOne := wantFacts.CompiledInOne - gotFacts.CompiledInOne; inOne < 0 || fewer+inOne > gotFacts.Unkeyed {
+			test.Errorf("build %s: the census counts %d facts in a file one build alone compiles and the side load "+
+				"%d, want as many, or fewer by no more than its %d unkeyed less the %d compared fewer", target,
+				gotFacts.CompiledInOne, wantFacts.CompiledInOne, gotFacts.Unkeyed, fewer)
+		}
 		unkeyed := gotFacts.UnkeyedParts
 		if total := unkeyed.Unnamed + unkeyed.Closures + unkeyed.Unplaced + unkeyed.PathOnly + unkeyed.Collisions +
 			unkeyed.Answers; total != gotFacts.Unkeyed {
@@ -233,8 +242,8 @@ func expectSameCensus(test *testing.T, want string, got string) map[string]contr
 				gotFacts.Unkeyed, unkeyed, total)
 		}
 		parts[target] = unkeyed
-		test.Logf("build %s: %d facts compared fewer, %d unkeyed, %+v", target, fewer, gotFacts.Unkeyed,
-			gotFacts.UnkeyedParts)
+		test.Logf("build %s: %d facts compared fewer, %d unkeyed, %+v, %d and %d in a file one build alone compiles",
+			target, fewer, gotFacts.Unkeyed, gotFacts.UnkeyedParts, wantFacts.CompiledInOne, gotFacts.CompiledInOne)
 		compared++
 	}
 	if compared == 0 {
@@ -367,6 +376,11 @@ func TestAWarmBuildDependenceRunWritesNoEntryToTheSystemCache(test *testing.T) {
 	if len(record.Builds) != 2 || record.Builds[1].SystemCacheRestored != filling[1].SystemCacheWritten {
 		test.Errorf("want the windows build to restore the %d standard-library packages the first run's wrote, got "+
 			"the records %+v", filling[1].SystemCacheWritten, record.Builds)
+	}
+	// The windows build's own count, which the listing below would otherwise be left to tell.
+	if len(record.Builds) == 2 && record.Builds[1].SystemCacheWritten != 0 {
+		test.Errorf("the windows build wrote %d entries to the system cache, want none, the first run's build having "+
+			"written its standard library whole", record.Builds[1].SystemCacheWritten)
 	}
 	if written := recordCounts(test, stream).StandardLibraryWritten; written == 0 {
 		test.Error("want the restored standard library's records written to the project's store")

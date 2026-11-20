@@ -2,6 +2,7 @@ package check
 
 import (
 	"errors"
+	"go/ast"
 	"go/types"
 	"slices"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
 )
 
@@ -287,6 +289,131 @@ func TestTheRunCapturesTheFactsReachUnderItsSwitch(test *testing.T) {
 	}
 }
 
+// aloneFiles are the workspace the capture's marks are read over: one package with an `init` function beside double,
+// which is pure, and Twice, which discards double's result.
+var aloneFiles = map[string]string{
+	"go.mod": "module example.com/alone\n\ngo 1.24\n",
+	"alone.go": "// Package alone declares an init beside a call whose result nothing reads.\npackage alone\n\n" +
+		"// started counts the package's starts.\nvar started int\n\n" +
+		"func init() {\n\tstarted++\n}\n\n" +
+		"// double is pure.\nfunc double(value int) int {\n\treturn value * 2\n}\n\n" +
+		"// Twice discards double's result.\nfunc Twice() int {\n\tdouble(2)\n\treturn started\n}\n",
+}
+
+// initProbe is a kind that declares no hook for the answers types alone decide, registered nowhere, answering true of
+// every `init` function.
+var initProbe = &fact_resolver.Kind{Name: "init_probe"}
+
+// initProbeAnalyzer asks initProbe of every `init` function its package's files declare, the function purity's hook
+// marks purity's own answer about.
+var initProbeAnalyzer = &analysis.Analyzer{
+	Name:     "init_probe",
+	Doc:      "asks a kind with no types-alone hook of every init function",
+	Requires: []*analysis.Analyzer{ctrlflow.Analyzer},
+	Run: func(pass *analysis.Pass) (any, error) {
+		resolver, resolverError := fact_resolver.Of(pass)
+		if resolverError != nil {
+			return nil, resolverError
+		}
+		reader := resolver.Package(pass.Pkg)
+		for _, file := range pass.Files {
+			for _, declaration := range file.Decls {
+				function, isFunction := declaration.(*ast.FuncDecl)
+				if !isFunction || function.Recv != nil || function.Name.Name != "init" {
+					continue
+				}
+				if declared, isDeclared := pass.TypesInfo.Defs[function.Name].(*types.Func); isDeclared {
+					fact_resolver.Ask(resolver, reader, initProbe, types.Object(declared),
+						func(*fact_resolver.Package) bool { return true }, func() bool { return false })
+				}
+			}
+		}
+		return nil, nil
+	},
+}
+
+// captureAlone runs the registry's SA4017, which asks the purity of each call's callee whose results nothing reads,
+// and the rules of beside over the alone workspace, with the facts' reach captured, and returns the run's capture and
+// the package's.
+func captureAlone(test *testing.T, beside ...rule.Rule) (*FactReachCapture, *FactReachPackage) {
+	test.Helper()
+	root := test.TempDir()
+	writeFiles(test, root, aloneFiles)
+	loaded, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading the workspace: %v %+v", loadError, loaded)
+	}
+	var asking []rule.Rule
+	for _, registered := range rules.All() {
+		if registered.Name == rule.Namespace+"SA4017" {
+			asking = append(asking, registered)
+		}
+	}
+	if len(asking) != 1 {
+		test.Fatalf("the registry holds %d rules named SA4017, want 1", len(asking))
+	}
+	on, runError := Run(loaded.Packages, append(asking, beside...), Options{FactReach: true})
+	if runError != nil {
+		test.Fatalf("running with the switch: %v", runError)
+	}
+	if on.FactReach == nil {
+		test.Fatal("with the switch the run captured nothing")
+	}
+	return on.FactReach, capturedOf(test, on.FactReach, loaded.Packages, "example.com/alone")
+}
+
+// markedNames are the names of the objects answers are about, by kind, each as "kind name", in order, with "marked"
+// after one marked as its types' alone.
+func markedNames(answers []ExportedFact) []string {
+	var names []string
+	for _, answer := range answers {
+		if answer.TypesAlone {
+			names = append(names, answer.Analyzer+" "+answer.Object.Name()+" marked")
+		} else {
+			names = append(names, answer.Analyzer+" "+answer.Object.Name())
+		}
+	}
+	return names
+}
+
+// The capture marks each answer its kind says its object's types alone decide (fact_resolver.Kind.TypesAlone), among a
+// package's answers and among the run's alike, and no other. Under SA4017, which asks the purity of each call's callee
+// whose results nothing reads, the package's initializer calls its `init`, so the run holds purity's answer about a
+// function no identity names: marked, since purity answers not pure for every function with no results. Its answer
+// about double, whose result Twice discards, turns on double's body and is not marked.
+func TestTheCaptureMarksTheAnswersTheirKindSaysTypesAloneDecide(test *testing.T) {
+	test.Parallel()
+	capture, alone := captureAlone(test)
+	want := []string{"function_purity init marked", "function_purity double"}
+	if got := markedNames(alone.Answers); !slices.Equal(got, want) {
+		test.Errorf("the package's answers are %q, want %q", got, want)
+	}
+	if got := markedNames(capture.Answers); !slices.Equal(got, want) {
+		test.Errorf("the run's answers are %q, want %q", got, want)
+	}
+}
+
+// A kind that declares no hook has no answer marked, whatever the answer is about (fact_resolver.Kind.TypesAlone: nil
+// says no answer of the kind is its types' alone). initProbe's answer about the package's `init` function is handed
+// unmarked, among the package's answers and the run's alike, beside purity's about the same function, which purity's
+// hook marks. An unmarked answer about an `init` is one the host's side counts unplaced, so the package lints whole
+// in every build (go_engine's TestAnAnswerAboutAnInitIsLeftOutByItsMarkAlone): nobody has argued the kind's answer is
+// the same in every build, and the capture never takes a missing hook for that argument.
+func TestTheCaptureMarksNoAnswerOfAKindThatDeclaresNoHook(test *testing.T) {
+	test.Parallel()
+	if initProbe.TypesAlone != nil {
+		test.Fatal("initProbe declares a hook, so the test holds nothing of a kind without one")
+	}
+	capture, alone := captureAlone(test, houseRule(initProbeAnalyzer))
+	want := []string{"function_purity init marked", "init_probe init", "function_purity double"}
+	if got := markedNames(alone.Answers); !slices.Equal(got, want) {
+		test.Errorf("the package's answers are %q, want %q", got, want)
+	}
+	if got := markedNames(capture.Answers); !slices.Equal(got, want) {
+		test.Errorf("the run's answers are %q, want %q", got, want)
+	}
+}
+
 // A package the run restored from the findings cache computed nothing, so the capture holds no side of it, and the
 // engine lints it whole: a cold run with the cache captures every package, and the warm run after it, which restores
 // them all, none.
@@ -340,7 +467,15 @@ func TestAnUnsurePackageHasNoCapture(test *testing.T) {
 	options.Resolver = resolver
 	options.Restored = func(restoring *packages.Package) bool { return restoring == low }
 	options.Restore = func(*checker.Action) error { return nil }
-	if _, analyzeError := checker.Analyze([]*analysis.Analyzer{reachNilnessAnalyzer}, []*packages.Package{low, high},
+	// Wrapped first, as Run wraps every analyzer before it analyzes: wrapRuns sets an analyzer's Run in place, under
+	// its mutex, the first time any run meets it, and this package's tests share reachNilnessAnalyzer and everything
+	// it requires. Analyze reads each of those Runs with no lock, so a bare call beside another test's first wrap is
+	// a race (#msx89hq). Once wrapped here, none of them is written again.
+	asking := []*analysis.Analyzer{reachNilnessAnalyzer}
+	if wrapError := wrapRuns(asking); wrapError != nil {
+		test.Fatal(wrapError)
+	}
+	if _, analyzeError := checker.Analyze(asking, []*packages.Package{low, high},
 		options); analyzeError != nil {
 		test.Fatalf("analyzing the unsure workspace: %v", analyzeError)
 	}

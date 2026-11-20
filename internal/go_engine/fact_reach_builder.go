@@ -299,6 +299,14 @@ func (builder *factReachBuilder) ask(
 // of nothing the package declares at all, an instantiation's, is answered from its types alone, the same in every
 // build. Counting either would have one closure make its whole package lint whole.
 //
+// An answer about a function no declaration of the record declares is left out, uncounted, when its kind marks it as
+// its types' alone (check.ExportedFact.TypesAlone), as purity's about an `init` function is, which the package's
+// initializer calls and no identity names. It reads the same in every build that declares the function, whatever the
+// build makes of its body, so no build's answer differs from the host's, nothing compares it, and no finding turns on
+// it. Counting it would have one `init` make its whole package lint whole. A marked answer about a function a
+// declaration does declare is recorded and asked as any other, so its body, where a build lints it, holds its record
+// of the kind.
+//
 // Any other answer that finds no place is counted unplaced: one about neither a function nor a variable, about a
 // function no declaration of the record declares, or about one no identity names.
 func (builder *factReachBuilder) answer(answer check.ExportedFact) {
@@ -319,7 +327,9 @@ func (builder *factReachBuilder) answer(answer check.ExportedFact) {
 	}
 	declared, isDeclared := builder.functions[function]
 	if !isDeclared {
-		builder.hosted.unplaced++
+		if !answer.TypesAlone {
+			builder.hosted.unplaced++
+		}
 		return
 	}
 	if !declared.placed {

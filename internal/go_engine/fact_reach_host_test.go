@@ -19,12 +19,14 @@ import (
 )
 
 // factReachFixture is one package of the fact-reach fixture, checked from its source by the test itself, with no
-// engine run: its file set, its types, stage 1's record of it, and the place of each function declared with a body, by
-// its name, a method's as `Type.Method`, and in the order declared, file by file in the order of their names, read from
-// the syntax and never from the record under test.
+// engine run: its file set, its types, its type information, which alone names an `init` function's object, stage 1's
+// record of it, and the place of each function declared with a body, by its name, a method's as `Type.Method`, and in
+// the order declared, file by file in the order of their names, read from the syntax and never from the record under
+// test.
 type factReachFixture struct {
 	fileSet  *token.FileSet
 	own      *types.Package
+	info     *types.Info
 	record   *build_reads.FunctionUses
 	places   map[string]fact_reach.Place
 	declared []fact_reach.Place
@@ -99,7 +101,7 @@ func checkedFactReachFixture(
 	if checkError != nil {
 		test.Fatalf("type-checking %s: %v", path, checkError)
 	}
-	fixture.own = own
+	fixture.own, fixture.info = own, info
 	reads := &build_reads.Reads{}
 	reads.RecordFunctionUses()
 	reads.RecordTypes(own, info, files)
@@ -377,6 +379,8 @@ func TestAnAnswerIsRecordedUnderItsFunctionsPlaceAndAboutItsFunction(test *testi
 // is left out and counted nowhere, since the host hands a mark for a function literal's parameter too and one closure
 // must not make its package lint whole: a literal's parameter, a result, a receiver and a package-level value. An
 // answer about a function declared without a body is neither recorded nor counted, its answer being its types' alone.
+// So is one about a function no declaration declares that its kind marks as its types' alone, as purity's about an
+// `init` function is, while the same answer unmarked is counted, and a mark never excuses an answer about the package.
 func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 	test.Parallel()
 
@@ -389,24 +393,83 @@ func TestAnAnswerNoPlaceCanTakeIsCountedUnplaced(test *testing.T) {
 		test.Fatal("want count, in Joined's body, of a function literal's type")
 	}
 	for _, each := range []struct {
-		name     string
-		object   types.Object
-		unplaced int
+		name       string
+		object     types.Object
+		typesAlone bool
+		unplaced   int
 	}{
-		{"the package", nil, 1},
-		{"a function no declaration declares", elsewhere, 1},
-		{"a function literal's parameter", literal.Params().At(0), 0},
-		{"a result", use.Signature().Results().At(0), 0},
-		{"a receiver", open.Signature().Recv(), 0},
-		{"a package-level value", fixture.own.Scope().Lookup("started"), 0},
-		{"a function declared without a body", fixture.function(test, "declared"), 0},
+		{"the package", nil, false, 1},
+		{"the package, marked as its types' alone", nil, true, 1},
+		{"a function no declaration declares", elsewhere, false, 1},
+		{"a function no declaration declares, marked as its types' alone", elsewhere, true, 0},
+		{"a function literal's parameter", literal.Params().At(0), false, 0},
+		{"a result", use.Signature().Results().At(0), false, 0},
+		{"a receiver", open.Signature().Recv(), false, 0},
+		{"a package-level value", fixture.own.Scope().Lookup("started"), false, 0},
+		{"a function declared without a body", fixture.function(test, "declared"), false, 0},
 	} {
 		inputs := fixture.inputs()
-		inputs.answers = []check.ExportedFact{purity(each.object, "true")}
+		answer := purity(each.object, "true")
+		answer.TypesAlone = each.typesAlone
+		inputs.answers = []check.ExportedFact{answer}
 		hosted := newFactReachPackage(inputs)
 		if hosted.unplaced != each.unplaced || len(hosted.askings) != 0 {
 			test.Errorf("an answer about %s: %d unplaced and %d questions, want %d and none", each.name,
 				hosted.unplaced, len(hosted.askings), each.unplaced)
+		}
+	}
+	// A mark leaves out only what no place takes: a marked answer about Use, whose body is placed, is recorded and
+	// asked as any other, so a body the build lints still holds its record of the kind.
+	inputs := fixture.inputs()
+	placed := purity(use, "false")
+	placed.TypesAlone = true
+	inputs.answers = []check.ExportedFact{placed}
+	hosted := newFactReachPackage(inputs)
+	if recorded := hosted.Recorded(fixture.places["Use"]); hosted.unplaced != 0 || len(recorded) != 1 {
+		test.Errorf("a marked answer about Use: %d unplaced and %+v recorded, want none and its one question",
+			hosted.unplaced, recorded)
+	}
+}
+
+// An answer about an `init` function is left out by its mark alone (#30dtg3p). The record declares no object for an
+// `init`, so no answer about one finds a declaration, and one the capture did not mark, as every answer of a kind that
+// declares no hook is (fact_resolver.Kind.TypesAlone, check's TestTheCaptureMarksNoAnswerOfAKindThatDeclaresNoHook), is
+// counted unplaced, which has every build lint the package whole. The same answer marked is left out, uncounted.
+// Neither is recorded at the body's place or asked, and either way the body is a place, the user of what it names.
+func TestAnAnswerAboutAnInitIsLeftOutByItsMarkAlone(test *testing.T) {
+	test.Parallel()
+
+	fixture := checkedFactReachFixture(test, "initialized", "example.com/facts/initialized")
+	var initializer *types.Func
+	for identifier, object := range fixture.info.Defs {
+		if function, isFunction := object.(*types.Func); isFunction && identifier.Name == "init" {
+			initializer = function
+		}
+	}
+	if initializer == nil {
+		test.Fatal("the fixture declares no init function")
+	}
+	for _, each := range []struct {
+		name       string
+		typesAlone bool
+		unplaced   int
+	}{
+		{"unmarked, as every answer of a kind with no hook is", false, 1},
+		{"marked as its types' alone", true, 0},
+	} {
+		inputs := fixture.inputs()
+		inputs.answers = []check.ExportedFact{{Analyzer: "init_probe", Object: initializer, Answer: true,
+			Encoded: []byte("true"), TypesAlone: each.typesAlone}}
+		hosted := newFactReachPackage(inputs)
+		recorded := hosted.Recorded(fixture.places["init"])
+		if hosted.unplaced != each.unplaced || len(hosted.askings) != 0 || len(recorded) != 0 {
+			test.Errorf("an answer about an init function, %s: %d unplaced, %d questions and %+v recorded, want %d "+
+				"and none", each.name, hosted.unplaced, len(hosted.askings), recorded, each.unplaced)
+		}
+		users := hosted.Users(fixture.key(test, fixture.function(test, "count")))
+		if want := fixture.placesOf(test, "init"); !slices.Equal(users, want) {
+			test.Errorf("an answer about an init function, %s: the users of count are %v, want %v, init's body",
+				each.name, users, want)
 		}
 	}
 }

@@ -56,6 +56,11 @@ func NoResult(value int) {
 	_ = value + 1
 }
 
+// Not pure: an init function has no result, though all its body does is call a pure function.
+func init() {
+	_ = Add(1, 2)
+}
+
 // Pure: calls itself.
 func Factorial(value int) int { // want Factorial:"is pure"
 	if value <= 1 {
