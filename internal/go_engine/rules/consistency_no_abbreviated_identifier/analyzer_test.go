@@ -214,6 +214,16 @@ func TestOnlyDeclaredMethodsFixAName(test *testing.T) {
 		"promotedmethods")
 }
 
+// What the package reaches is read only when a name the vocabulary finds abbreviated first asks. lazyreach's first
+// file declares none, and its first is a type switch's ctx in the second, whose advice is the descriptive one only
+// because the package reaches a package named context, so a type switch that judged with what the package reaches
+// left unread would advise the bare "context" and offer it as a rename, failing the want.
+func TestWhatThePackageReachesIsReadForItsFirstFinding(test *testing.T) {
+	test.Parallel()
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), consistency_no_abbreviated_identifier.Analyzer,
+		"lazyreach")
+}
+
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
 // command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
 // Loading the fixtures needs only go list.
