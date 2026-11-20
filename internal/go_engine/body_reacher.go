@@ -284,6 +284,11 @@ func closureIdentifier(imports map[string]*packages.Package, path string) string
 // The constants-only load mode rule is judged by the same rule from its own reasons, so the census's count of what
 // the general rule costs stays its own (loadModeReaches).
 //
+// No initializer stands in a real run today (the Square's should 3 on the three-piece head): rule.StandingSpans passes
+// over every declaration but a function declaration with a body before it asks whether one stands, so a value spec's
+// initializer is never spanned and always the build's own to lint, as rule.StandingBodies says, and reaching one
+// changes what the differential compares and the census counts, never what a build lints.
+//
 // Mutates: bodies gains the reason at each initializer left unreached
 func reachInitializers(bodies []reachedBody, initializers []int, unshared string) {
 	driver := ""
