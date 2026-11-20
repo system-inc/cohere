@@ -119,6 +119,20 @@ says so and runs main's from the main checkout, against the worktree (#8wpk5tp),
 code can't land the old way. On a loaded morning a branch gated green eight times without landing, and
 every one of those gates compiled a merge that never existed again.
 
+Two to four accepted units land under one gate as a train:
+`go run ./command/cohere-dev land --train <head> <head> --task <id>`, each head a branch or a commit, from a
+clean worktree, with `--message` for the subject, `a train of N units` unless it says. The Go org's accepted units came faster than one 40-minute gate on Sun2 could land
+them, nine deep on 2026-11-20, and each queued head merged and gated again as main moved; 0d6e96146, a train built by
+hand, saved two gates. Before the line it refuses fewer than two heads or more than four, no `--task` of the train's
+own, a head given twice or one main holds, a unit whose subjects break the house's or that names no one task of its
+own, and a merge subject over 72 characters. It composes the train without touching a worktree, a chain of merges
+from main, `Merge <sha> (#<task>) into the train`, and a unit that clashes with the units before it is refused,
+naming them and the paths. Then, before the lock, it checks the worktree out at the train, runs `go build ./...`
+and the fast tier, and refuses a red. Then it lands exactly as one head lands, the train's last merge the head, and
+its body names each unit with its task. Once it lands, each unit's task is closed through `ahra tasks done` with
+the landing's sha; a close that fails is said, with the command to run by hand. A red gate lands nothing and names
+the directories each unit's diff touches, since land doesn't read which packages the gate failed.
+
 The gate's `go test` runs on a house Mac through Loom's gap, on the exact commit being landed, and never on
 Kirk's Mac (#rr818c8). Land puts the commit in Loom's feed with `ahra loom push --feed`, Operations' bridge
 carries it to each Mac's `/opt/loom-mirrors`, and the first free Mac of `COHERE_DEV_GATE_BOXES`, `Sun2,Marin`

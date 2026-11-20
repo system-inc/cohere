@@ -91,6 +91,9 @@ func land(arguments []string) int {
 	if isMains, differs := runsMainsLand(worktree); !isMains {
 		return runMainsLand(worktree, mainCheckout, differs, arguments)
 	}
+	if options.Train {
+		return landTrain(worktree, mainCheckout, options)
+	}
 
 	head, gitOutputError := gitOutput(worktree, "rev-parse", "HEAD")
 	if gitOutputError != nil {
@@ -144,13 +147,51 @@ func land(arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", landingSubjectError)
 		return 2
 	}
+	code, _ := landOntoMain(landingRun{
+		Worktree:     worktree,
+		MainCheckout: mainCheckout,
+		Head:         head,
+		Branch:       branch,
+		At:           head,
+		Task:         task,
+		Subject:      subject,
+		Message: func(mainCommit string, gated string, resolution string) string {
+			return landingMessage(subject, branch, head, mainCommit, commits, gated, resolution)
+		},
+	})
+	return code
+}
 
+// landingRun is one landing as the land lock carries it, a single head's or a train's (land_train.go).
+type landingRun struct {
+	Worktree     string
+	MainCheckout string
+	// Head is the commit merged onto main: the worktree's head, or a train's last merge.
+	Head string
+	// Branch and At are where the worktree stood before land moved it, its branch, empty when it was detached, and
+	// its commit, where a landing that lands nothing puts it back.
+	Branch string
+	At     string
+	Task   string
+	// Subject is the landing commit's subject, `Land #<task>: <what landed>`.
+	Subject string
+	// Message is the landing commit's whole message, given main as the landing joins it, the gate's account, and the
+	// sentence a resolved conflict carries, empty for none.
+	Message func(mainCommit string, gated string, resolution string) string
+	// RedGate says more of a red gate once land has said it failed, or nil to say nothing more.
+	RedGate func()
+}
+
+// landOntoMain takes the land lock and lands run's head onto main: merged onto main as it stands, asked again whether
+// main already holds it, gated once, and main fast-forwarded to the landing. It returns the exit code and the landing
+// commit, empty when nothing landed.
+func landOntoMain(run landingRun) (int, string) {
 	directory, landDirectoryError := landDirectory()
 	if landDirectoryError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", landDirectoryError)
-		return 1
+		return 1, ""
 	}
-	what := "landing " + shortCommit(head) + " from " + worktree
+	what := "landing " + shortCommit(run.Head) + " from " + run.Worktree
 	held, waitInLineError := waitInLine(directory, 1, what, "land lock", func() {
 		fmt.Fprintln(
 			streams.Errors,
@@ -159,86 +200,77 @@ func land(arguments []string) int {
 	})
 	if waitInLineError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", waitInLineError)
-		return 1
+		return 1, ""
 	}
 	defer held.release()
 
 	// The worktree is checked out at each landing commit for its gate, and goes back to where it was if nothing
 	// lands, so a refused landing leaves it as land found it.
-	// Never with --discard-changes: a worktree the gate left changed says so, and is left for its owner.
-	restore := func() {
-		back := []string{"switch", "--quiet", "--detach", head}
-		if branch != "" {
-			back = []string{"switch", "--quiet", branch}
-		}
-		if output, gitCombinedError := gitCombined(worktree, back...); gitCombinedError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: putting %s back where it was (git %s): %v\n%s\n",
-				worktree, strings.Join(back, " "), gitCombinedError, output)
-		}
-	}
+	restore := func() { putWorktreeBack(run.Worktree, run.Branch, run.At) }
 	for attempt := 1; attempt <= landAttempts; attempt++ {
-		mainCommit, gitOutputError := gitOutput(worktree, "rev-parse", "main")
+		mainCommit, gitOutputError := gitOutput(run.Worktree, "rev-parse", "main")
 		if gitOutputError != nil {
 			fmt.Fprintf(streams.Errors, "cohere-dev: reading main: %v\n", gitOutputError)
-			return 1
+			return 1, ""
 		}
-		tree, mergeOntoMainError := mergeOntoMain(worktree, mainCommit, head)
+		tree, mergeOntoMainError := mergeOntoMain(run.Worktree, mainCommit, run.Head)
 		resolution := ""
 		var conflict *mergeConflict
 		switch {
 		case errors.As(mergeOntoMainError, &conflict):
 			// A conflict confined to generated files is regenerated rather than refused (land_regenerate.go).
-			resolved, said, code := resolveGeneratedConflict(worktree, head, conflict)
+			resolved, said, code := resolveGeneratedConflict(run.Worktree, run.Head, conflict)
 			if code != 0 {
-				return code
+				return code, ""
 			}
 			tree, resolution = resolved, said
 		case mergeOntoMainError != nil:
 			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", mergeOntoMainError)
-			return 1
+			return 1, ""
 		}
 		// What landed while this one waited may be this very work, so main is asked again, as it stands now.
-		held, heldError := heldByMain(worktree, mainCommit, head, tree)
+		held, heldError := heldByMain(run.Worktree, mainCommit, run.Head, tree)
 		if heldError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: reading whether main holds %s: %v\n", shortCommit(head), heldError)
-			return 1
+			fmt.Fprintf(streams.Errors, "cohere-dev: reading whether main holds %s: %v\n", shortCommit(run.Head),
+				heldError)
+			return 1, ""
 		}
 		if held != "" {
 			fmt.Fprintf(streams.Errors, "cohere-dev: nothing to land, and no gate runs: %s\n", held)
-			return 2
+			return 2, ""
 		}
 		// The commit the gate runs on. The one that lands is made after it, of the same tree and parents, with
 		// the gate's account in its message.
 		gating, commitTreeError := commitTree(
-			worktree,
+			run.Worktree,
 			tree,
-			subject+"\n\nBeing gated by cohere-dev land.",
+			run.Subject+"\n\nBeing gated by cohere-dev land.",
 			mainCommit,
-			head,
+			run.Head,
 		)
 		if commitTreeError != nil {
 			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", commitTreeError)
-			return 1
+			return 1, ""
 		}
 		// Main may be what records a submodule as a symlink, and what lands is the merge.
-		if checkGitlinksError := checkGitlinks(worktree, gating); checkGitlinksError != nil {
+		if checkGitlinksError := checkGitlinks(run.Worktree, gating); checkGitlinksError != nil {
 			fmt.Fprintf(
 				streams.Errors,
 				"cohere-dev: after merging main at %s: %v\n",
 				shortCommit(mainCommit),
 				checkGitlinksError,
 			)
-			return 2
+			return 2, ""
 		}
-		output, gitCombinedError := gitCombined(worktree, "switch", "--quiet", "--detach", gating)
+		output, gitCombinedError := gitCombined(run.Worktree, "switch", "--quiet", "--detach", gating)
 		if gitCombinedError != nil {
 			fmt.Fprintf(streams.Errors, "cohere-dev: checking %s out at the landing to gate it: %v\n%s\n",
-				worktree, gitCombinedError, output)
+				run.Worktree, gitCombinedError, output)
 			restore()
-			return 1
+			return 1, ""
 		}
 		// The merge may have moved a pin, and the gate must build against what it lands.
-		if checkSubmodulesError := checkSubmodules(worktree); checkSubmodulesError != nil {
+		if checkSubmodulesError := checkSubmodules(run.Worktree); checkSubmodulesError != nil {
 			fmt.Fprintf(
 				streams.Errors,
 				"cohere-dev: after merging main at %s: %v\n",
@@ -246,46 +278,49 @@ func land(arguments []string) int {
 				checkSubmodulesError,
 			)
 			restore()
-			return 2
+			return 2, ""
 		}
-		code, gated := gate(worktree, gating, task)
+		code, gated := gate(run.Worktree, gating, run.Task)
 		if code == quietRefusedExitCode {
 			// Only the wall exits 75 here (quiet.go): go vet and go test never do. A held landing is not a red one, so
 			// it does not say failed, and it keeps 75, try again later, so a script can tell the two apart (#vq5b7fs).
 			restore()
 			fmt.Fprintf(streams.Errors, "cohere-dev: held by the quiet window, so nothing landed; %s is back where it "+
-				"was. Land again once it closes: go run ./command/cohere-dev quiet wait\n", worktree)
-			return code
+				"was. Land again once it closes: go run ./command/cohere-dev quiet wait\n", run.Worktree)
+			return code, ""
 		}
 		if code != 0 {
 			restore()
 			fmt.Fprintf(streams.Errors, "cohere-dev: the gate failed, so nothing landed; %s is back where it was\n",
-				worktree)
-			return code
+				run.Worktree)
+			if run.RedGate != nil {
+				run.RedGate()
+			}
+			return code, ""
 		}
 		landing, commitTreeError := commitTree(
-			worktree,
+			run.Worktree,
 			tree,
-			landingMessage(subject, branch, head, mainCommit, commits, gated, resolution),
+			run.Message(mainCommit, gated, resolution),
 			mainCommit,
-			head,
+			run.Head,
 		)
 		if commitTreeError != nil {
 			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", commitTreeError)
 			restore()
-			return 1
+			return 1, ""
 		}
 		// git refuses a fast-forward when main has moved since the merge, which is the test that nothing
 		// landed outside this lock during the gate.
 		if output, gitCombinedError := gitCombined(
-			mainCheckout,
+			run.MainCheckout,
 			"merge",
 			"--ff-only",
 			landing,
 		); gitCombinedError != nil {
 			// Ignored: a main that can't be read reads as moved, and the next attempt reads it again and stops
 			// there with git's error.
-			moved, _ := gitOutput(worktree, "rev-parse", "main")
+			moved, _ := gitOutput(run.Worktree, "rev-parse", "main")
 			if moved != mainCommit {
 				fmt.Fprintf(
 					streams.Errors,
@@ -298,23 +333,23 @@ func land(arguments []string) int {
 			fmt.Fprintf(
 				streams.Errors,
 				"cohere-dev: fast-forwarding main in %s: %v\n%s\n",
-				mainCheckout,
+				run.MainCheckout,
 				gitCombinedError,
 				output,
 			)
 			restore()
-			return 1
+			return 1, ""
 		}
 		// The same tree as the commit it was gated at, so nothing on disk moves.
 		// Ignored: main holds the landing either way, and a worktree left at the gated commit says the same.
-		_, _ = gitCombined(worktree, "switch", "--quiet", "--detach", landing)
-		fmt.Fprintf(streams.Errors, "cohere-dev: landed %s on main: %s\n", shortCommit(landing), subject)
-		left := shortCommit(head)
-		if branch != "" {
-			left = branch + " stays at " + left
+		_, _ = gitCombined(run.Worktree, "switch", "--quiet", "--detach", landing)
+		fmt.Fprintf(streams.Errors, "cohere-dev: landed %s on main: %s\n", shortCommit(landing), run.Subject)
+		left := shortCommit(run.At)
+		if run.Branch != "" {
+			left = run.Branch + " stays at " + left
 		}
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s is at it, detached; %s\n", worktree, left)
-		return 0
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s is at it, detached; %s\n", run.Worktree, left)
+		return 0, landing
 	}
 	restore()
 	fmt.Fprintf(
@@ -322,7 +357,21 @@ func land(arguments []string) int {
 		"cohere-dev: main moved outside land during each of %d gates, so nothing landed\n",
 		landAttempts,
 	)
-	return 1
+	return 1, ""
+}
+
+// putWorktreeBack switches the worktree back to branch, or to the commit at, detached, when branch is empty, and
+// says so when git can't. Never with --discard-changes: a worktree the gate left changed says so, and is left for its
+// owner.
+func putWorktreeBack(worktree string, branch string, at string) {
+	back := []string{"switch", "--quiet", "--detach", at}
+	if branch != "" {
+		back = []string{"switch", "--quiet", branch}
+	}
+	if output, gitCombinedError := gitCombined(worktree, back...); gitCombinedError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: putting %s back where it was (git %s): %v\n%s\n",
+			worktree, strings.Join(back, " "), gitCombinedError, output)
+	}
 }
 
 // checkSubmodules requires every submodule of the worktree to be checked out at the commit its tree
