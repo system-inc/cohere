@@ -228,6 +228,15 @@ func collect(files []string, outcomes []outcome) Result {
 	return result
 }
 
+// gofmtBuffers are the buffers formatFile has gofmt print into, each one file's from its print until formatFile
+// returns, so a run grows one buffer a worker to the size of the files it formats rather than one for every file.
+// Each waits in the pool empty.
+var gofmtBuffers = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+
+// gofmtBufferKeptBytes is the largest buffer gofmtBuffers takes back: one an unusually large file grew is let go, so
+// the pool never holds that much for every worker while the run formats ordinary files.
+const gofmtBufferKeptBytes = 256 << 10
+
 // formatFile formats one file, writing the result under options.Write and keeping it under options.KeepOutput, unless
 // options.Known says what the run made of the same bytes before. A run that does not write reads the file from
 // options.Held when that holds it. A write options.Root refuses leaves the file changed and not written, as a check
@@ -302,15 +311,6 @@ func formatFile(file string, options Options) outcome {
 	}
 	return outcome{changed: changed}
 }
-
-// gofmtBuffers are the buffers formatFile has gofmt print into, each one file's from its print until formatFile
-// returns, so a run grows one buffer a worker to the size of the files it formats rather than one for every file.
-// Each waits in the pool empty.
-var gofmtBuffers = sync.Pool{New: func() any { return new(bytes.Buffer) }}
-
-// gofmtBufferKeptBytes is the largest buffer gofmtBuffers takes back: one an unusually large file grew is let go, so
-// the pool never holds that much for every worker while the run formats ordinary files.
-const gofmtBufferKeptBytes = 256 << 10
 
 // gofmtPrinterMode and gofmtTabWidth are go/format's printer settings, which are cmd/gofmt's, copied since go/format
 // keeps them to itself. gofmtNormalizeNumbers is go/format's printerNormalizeNumbers, a mode go/printer reserves for

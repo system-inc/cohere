@@ -69,7 +69,8 @@ func TestGofmtSourceIsGoFormatsOutputForEveryGoFile(test *testing.T) {
 	}
 
 	differences := make([]string, len(files))
-	var compared, failedAlike atomic.Int64
+	var compared atomic.Int64
+	var failedAlike atomic.Int64
 	bounded.ForEach(len(files), false, func(index int) {
 		original, readError := os.ReadFile(files[index])
 		if readError != nil {
