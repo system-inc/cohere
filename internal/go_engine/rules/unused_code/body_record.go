@@ -9,15 +9,19 @@ import "encoding/json"
 // declaring identifier is written or by its index among the body's locals: no types.Object, no token.Pos and no
 // index into the graph, none of which another build's graph shares.
 type bodyRecord struct {
-	// Body is the function declaration the body is of, placed at its `func`, as a standing body is keyed
-	// (rule.StandingBodies.Stands).
+	// Body is the function declaration the body is of, as a standing body is keyed (rule.StandingBodies.Stands): the
+	// file a reader sees its `func` in, past any `//line` directive, and the offset of that `func` in the file as
+	// parsed. It is the one place of a record that takes a directive's name. Two bodies of a package can share a key,
+	// in two files whose directives name one file, and then neither has a record (bodyRecords).
 	Body recordedPlace `json:"body"`
 	// Locals is every node the body's walk makes, in the order the walk met them. A local is its index here and never
 	// a position: a type switch makes one variable a clause, all at one offset, and an unnamed parameter of a function
 	// literal has no declaring identifier.
 	Locals []recordedLocal `json:"locals"`
 	// Uses is every use edge the walk adds while the body is open, each once, in the order the walk added them. An
-	// edge another body adds too is in both records, though the graph holds it once.
+	// edge another body adds too is in both records, though the graph holds it once. Either end may be an object
+	// declared outside the body: a struct to struct conversion makes the fields of the two structs use each other,
+	// a package-level struct's or those of an anonymous struct in a signature.
 	Uses []recordedUse `json:"uses"`
 	// Rooted is each local the root uses by a step after the walk, a generated file's nodes and the objects a
 	// directive ignores, in the order those steps met them. Both steps read one file's bytes, which a standing body's
@@ -32,8 +36,9 @@ type bodyRecord struct {
 	Present recordedPresence `json:"present"`
 }
 
-// recordedPlace is a place in the package's source: the file a reader sees, past any `//line` directive, and the
-// offset in the file as parsed, the pair a standing body is keyed by.
+// recordedPlace is a place in the package's source: a file and an offset in that file as parsed. But for a record's
+// own key the file is named as it was parsed, never as a `//line` directive names it, so a place is found in a
+// build's own files by name and offset alone.
 type recordedPlace struct {
 	File   string `json:"file"`
 	Offset int    `json:"offset"`
@@ -79,15 +84,15 @@ const (
 	// endLocal is a local of the body.
 	endLocal endKind = "local"
 	// endDeclared is an object declared outside the body: at package level, a field or a method of a package-level
-	// type, or a name of the function's own signature.
+	// type, a name of the function's own signature, or a field of an anonymous struct any signature writes.
 	endDeclared endKind = "declared"
 	// endRoot is the graph's root.
 	endRoot endKind = "root"
 )
 
-// recordedPresence is the four reasons a body cannot be summarized by its record. Each feeds a step after the walk
-// that compares or reads the build's own types, which no record of positions can replay, so a build keeps such a body
-// present and walks it itself.
+// recordedPresence is the five reasons a body cannot be summarized by its record. Each reads the build's own types
+// past what a record of positions can replay, in a step after the walk or in the walk itself, so a build keeps such
+// a body present and walks it itself.
 type recordedPresence struct {
 	// UnexportedInterfaceMethod is whether the body holds an interface type literal whose method set, with what it
 	// embeds, holds an unexported method. Any named type of the package may come to implement it, and use the methods
@@ -100,10 +105,15 @@ type recordedPresence struct {
 	// InterfaceInstance is whether the body writes an instantiation of a generic interface type of the package,
 	// which entry reads from the package's instances whole.
 	InterfaceInstance bool `json:"interfaceInstance"`
-	// IgnoredType is whether a directive ignores a type name the body declares. useIgnored then uses that type's
-	// methods and fields from go/types, which for a local alias of a package-level type are declared outside the
-	// body.
+	// IgnoredType is whether a directive ignores a type name the body declares, one on its line or one on its whole
+	// file. useIgnored then uses that type's methods and fields from go/types, which for a local alias of a
+	// package-level type are declared outside the body.
 	IgnoredType bool `json:"ignoredType"`
+	// AllFieldsUsed is whether the body's walk used every field of a type, and of the structs and arrays it holds
+	// (useAllFieldsRecursively), as it does for a conversion to or from unsafe.Pointer and for a local struct with a
+	// structs.HostLayout field. Through a named pointer type, `type P *T` and `unsafe.Pointer(p)`, that reads fields
+	// of a type nothing in the body names.
+	AllFieldsUsed bool `json:"allFieldsUsed"`
 }
 
 // encoded is record in its canonical form: JSON, every field in its declared order and no map among them, so one

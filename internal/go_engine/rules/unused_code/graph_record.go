@@ -15,7 +15,8 @@ import (
 // It listens where the graph is made, in use and in see, above the graph's own dedupe: the graph keeps an edge from
 // the first walk that adds it alone, so its lists cannot say which bodies added an edge two of them share.
 type bodyRecorder struct {
-	// records is each body's record, in the order the walk read the bodies.
+	// records is each body's record, in the order the walk read the bodies, those that share a key among them
+	// (bodyRecords).
 	records []bodyRecord
 	// cursor is the body the walk is in, which isOpen says it is in.
 	cursor bodyCursor
@@ -63,7 +64,7 @@ type localOfRecord struct {
 }
 
 // recordBodies makes the graph record each function declaration's body as entry walks it. It is asked before entry,
-// and the records are the recorder's once entry has returned.
+// and bodyRecords gives the records once entry has returned.
 func (graph *graph) recordBodies() {
 	recorder := &bodyRecorder{
 		locals:   map[nodeIndex]localOfRecord{},
@@ -85,6 +86,27 @@ func (graph *graph) recordBodies() {
 	graph.recorder = recorder
 }
 
+// bodyRecords is the record of each function declaration's body entry walked, in the order it walked them, and none
+// for a graph that was not asked to record. Two bodies whose keys are one, in two files whose `//line` directives
+// name one file, have no record, neither of them: a build asking by that key could be handed the other body's, so
+// both are left for it to walk.
+func (graph *graph) bodyRecords() []bodyRecord {
+	if graph.recorder == nil {
+		return nil
+	}
+	keyed := make(map[recordedPlace]int, len(graph.recorder.records))
+	for _, record := range graph.recorder.records {
+		keyed[record.Body]++
+	}
+	kept := make([]bodyRecord, 0, len(graph.recorder.records))
+	for _, record := range graph.recorder.records {
+		if keyed[record.Body] == 1 {
+			kept = append(kept, record)
+		}
+	}
+	return kept
+}
+
 // openBody opens the cursor on declaration's body, function being the node of the function it declares. It is opened
 // before the function's type is read, where the walk sees the body's immediate locals.
 func (graph *graph) openBody(declaration *ast.FuncDecl, function nodeIndex) {
@@ -99,7 +121,7 @@ func (graph *graph) openBody(declaration *ast.FuncDecl, function nodeIndex) {
 	recorder.isOpen = true
 	// Each list is made empty and never nil, so a record with none of something encodes as it does on any run.
 	recorder.records = append(recorder.records, bodyRecord{
-		Body:   graph.placeOf(declaration.Pos()),
+		Body:   graph.keyOf(declaration),
 		Locals: []recordedLocal{},
 		Uses:   []recordedUse{},
 		Rooted: []int{},
@@ -127,16 +149,32 @@ func (graph *graph) closeBody() {
 	clear(recorder.files)
 }
 
-// placeOf is position as a record places it: by the file a `//line` directive names there, or else the file's own
-// name, and by the offset in the file as parsed.
+// keyOf is the key of declaration's body, as a standing body is keyed: the file a `//line` directive names at its
+// `func`, or else the file's own name, and the offset of that `func` in the file as parsed.
+func (graph *graph) keyOf(declaration *ast.FuncDecl) recordedPlace {
+	tokenFile := graph.tokenFileOf(declaration.Pos())
+	return recordedPlace{
+		File:   tokenFile.Position(declaration.Pos()).Filename,
+		Offset: tokenFile.Offset(declaration.Pos()),
+	}
+}
+
+// placeOf is position as a record places an object: by its file's name as parsed, which no `//line` directive
+// changes, and by the offset in that file.
 func (graph *graph) placeOf(position token.Pos) recordedPlace {
+	tokenFile := graph.tokenFileOf(position)
+	return recordedPlace{File: tokenFile.Name(), Offset: tokenFile.Offset(position)}
+}
+
+// tokenFileOf is the file of the file set that position is in.
+func (graph *graph) tokenFileOf(position token.Pos) *token.File {
 	tokenFile := graph.fileSet.File(position)
 	if tokenFile == nil {
-		// Invariant: a record places only a function declaration of the package's syntax and an object of the package
-		// that syntax declares, each in a file of the package's file set.
+		// Invariant: a record places only a function declaration of the package's syntax and an object the walk made
+		// a node, each declared in a file of the file set.
 		panic(fmt.Sprintf("a recorded position, %d, is in no file of the file set", position))
 	}
-	return recordedPlace{File: tokenFile.Position(position).Filename, Offset: tokenFile.Offset(position)}
+	return tokenFile
 }
 
 // isLocalOfOpenBody is whether index's node is an object declared inside the open body's braces.
@@ -149,7 +187,8 @@ func (graph *graph) isLocalOfOpenBody(index nodeIndex) bool {
 }
 
 // endOf is index's node as an end of an edge in the open body's record. A local is numbered, and worded as a finding
-// would word it, the first time the body meets it.
+// would word it, the first time the body meets it. A node is the generic origin of every instance of it (node), so
+// a local generic type's field and each instantiated field a selection resolves to are one local.
 func (graph *graph) endOf(index nodeIndex) recordedEnd {
 	recorder := graph.recorder
 	if index == 0 {
@@ -289,10 +328,18 @@ func (graph *graph) recordNamedType(typeName *types.TypeName) {
 	}
 }
 
-// recordIgnoredType records that a directive ignores the type name at index, which keeps its body present when it is
-// a body's local.
+// recordIgnoredType records that useIgnored reached its type branch for the type name at index, whichever directive
+// matched it, one on its line or one on its whole file, which keeps its body present when it is a body's local.
 func (graph *graph) recordIgnoredType(index nodeIndex) {
 	if placed, isLocal := graph.recorder.locals[index]; isLocal {
 		graph.recorder.records[placed.record].Present.IgnoredType = true
+	}
+}
+
+// recordAllFieldsUsed records that the walk used every field of a type, through the structs and arrays it holds,
+// which keeps the open body present.
+func (graph *graph) recordAllFieldsUsed() {
+	if graph.recorder.isOpen {
+		graph.recorder.records[graph.recorder.cursor.record].Present.AllFieldsUsed = true
 	}
 }

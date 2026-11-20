@@ -99,7 +99,7 @@ func (recorded recordedPackage) bodies(test *testing.T) map[string]recordedPlace
 func (recorded recordedPackage) recordAt(test *testing.T, place recordedPlace) bodyRecord {
 	test.Helper()
 	var found []bodyRecord
-	for _, record := range recorded.graph.recorder.records {
+	for _, record := range recorded.graph.bodyRecords() {
 		if record.Body == place {
 			found = append(found, record)
 		}
@@ -149,6 +149,9 @@ func (recorded recordedPackage) described(record bodyRecord) string {
 	}
 	if record.Present.IgnoredType {
 		flags = append(flags, "ignoredType")
+	}
+	if record.Present.AllFieldsUsed {
+		flags = append(flags, "allFieldsUsed")
 	}
 	fmt.Fprintf(&text, "present: %s\n", joinedOrNone(flags))
 	return text.String()
@@ -337,7 +340,8 @@ present: none
 	{
 		// The fields of the two structs use each other, edges whose ends are both outside the body and neither the
 		// function. The graph keeps them from the first body alone, and each body's record holds them. So it does the
-		// function's use of its own parameter, which the signature added before the body read it.
+		// function's use of its own parameter, which the signature added before the body read it. The source's
+		// fields may be those of an anonymous struct a signature writes, as declared outside the body as any.
 		name: "a struct to struct conversion, the same one in two bodies",
 		sources: []recordedSource{{"shape.go", `package shape
 
@@ -348,6 +352,8 @@ type target struct{ a, b int }
 func First(value source) target { return target(value) }
 
 func Second(value source) target { return target(value) }
+
+func Signed(value struct{ a, b int }) target { return target(value) }
 `}},
 		bodies: map[string]string{
 			"First": `use: function -> target at shape.go:5:6
@@ -370,11 +376,21 @@ rooted: none
 files: shape.go
 present: none
 `,
+			"Signed": `use: function -> target at shape.go:5:6
+use: function -> value at shape.go:11:13
+use: a at shape.go:11:27 -> a at shape.go:5:21
+use: a at shape.go:5:21 -> a at shape.go:11:27
+use: b at shape.go:11:30 -> b at shape.go:5:24
+use: b at shape.go:5:24 -> b at shape.go:11:30
+rooted: none
+files: shape.go
+present: none
+`,
 		},
 	},
 	{
 		// Every field of the struct is used, and every field of a struct or an array of structs it holds by value,
-		// but none behind a pointer.
+		// but none behind a pointer. A walk that uses fields so keeps its body present.
 		name: "an unsafe.Pointer conversion over nested struct and array fields",
 		sources: []recordedSource{{"shape.go", `package shape
 
@@ -402,7 +418,7 @@ use: function -> rest at shape.go:11:2
 use: function -> far at shape.go:12:2
 rooted: none
 files: shape.go
-present: none
+present: allFieldsUsed
 `,
 		},
 	},
@@ -772,6 +788,97 @@ present: none
 `,
 		},
 	},
+	{
+		// The pointer's type is named, so nothing in the body names the struct whose fields the conversion uses, nor
+		// the struct that one holds. The body is kept present for it, and one that only returns the pointer is not.
+		name: "a conversion to unsafe.Pointer through a named pointer type",
+		sources: []recordedSource{{"shape.go", `package shape
+
+import "unsafe"
+
+type inner struct{ x int }
+
+type outer struct{ held inner }
+
+type named *outer
+
+func address(pointer named) unsafe.Pointer { return unsafe.Pointer(pointer) }
+
+func plain(pointer named) *outer { return pointer }
+`}},
+		bodies: map[string]string{
+			"address": `use: function -> pointer at shape.go:11:14
+use: function -> held at shape.go:7:20
+use: function -> x at shape.go:5:20
+rooted: none
+files: shape.go
+present: allFieldsUsed
+`,
+			"plain": `use: function -> pointer at shape.go:13:12
+rooted: none
+files: shape.go
+present: none
+`,
+		},
+	},
+	{
+		// A directive on the whole file ignores the local alias as one on its line would, and roots the methods and
+		// fields of the package-level type it names all the same.
+		name: "a file ignore directive over a local alias of a package-level type",
+		sources: []recordedSource{{"shape.go", `//lint:file-ignore U1000 kept for the test
+
+package shape
+
+type target struct{ field int }
+
+func (target) method() {}
+
+func Aliasing() {
+	type kept = target
+	var _ kept
+}
+`}},
+		bodies: map[string]string{
+			"method": noRecord,
+			"Aliasing": `local 0: type "kept" at shape.go:10:7, owned by function
+local 1: var "_" at shape.go:11:6, owned by function
+use: local 0 -> target at shape.go:5:6
+use: local 1 -> local 0
+use: function -> local 1
+rooted: local 0 local 1
+files: shape.go
+present: ignoredType
+`,
+		},
+	},
+	{
+		// A selection through an instance resolves to an instantiated field, which is the generic field's node, so
+		// the record has one local for both.
+		name: "a local generic type's field, used through an instance",
+		sources: []recordedSource{{"shape.go", `package shape
+
+func Generic() int {
+	type box[T any] struct{ item T }
+	var kept box[int]
+	return kept.item
+}
+`}},
+		bodies: map[string]string{
+			"Generic": `local 0: type "box" at shape.go:4:7, owned by function
+local 1: var "kept" at shape.go:5:6, owned by function
+local 2: type param "T" at shape.go:4:11, owned by local 0
+local 3: field "item" at shape.go:4:26, owned by local 0
+use: function -> local 1
+use: local 0 -> local 2
+use: local 3 -> local 2
+use: local 1 -> local 0
+use: function -> local 3
+rooted: none
+files: none
+present: none
+`,
+		},
+	},
 }
 
 // TestRecorderRecordsEachShapeOfBody holds the recorder to the whole record of a body of each shape (#xeafx79): its
@@ -785,9 +892,8 @@ func TestRecorderRecordsEachShapeOfBody(test *testing.T) {
 			test.Parallel()
 			recorded := recordPackage(test, each.sources, each.generated)
 			places := recorded.bodies(test)
-			if len(recorded.graph.recorder.records) != len(places) {
-				test.Errorf("the package has %d records for its %d bodies", len(recorded.graph.recorder.records),
-					len(places))
+			if records := recorded.graph.bodyRecords(); len(records) != len(places) {
+				test.Errorf("the package has %d records for its %d bodies", len(records), len(places))
 			}
 			if recorded.graph.recorder.isOpen {
 				test.Error("the cursor is still open once the walk is over")
@@ -839,37 +945,89 @@ func TestRecorderGivesOneBodyTheSameBytesTwice(test *testing.T) {
 	}
 }
 
-// lineDirectiveSource is a file whose second function a `//line` directive places in another file.
+// lineDirectiveSource is a file a `//line` directive renames from its first function on.
 const lineDirectiveSource = `package shape
 
-func before() {}
-
 //line named.go:40
-func After() { before() }
+func After() {
+	const kept = 1
+	below()
+}
+
+func below() {}
 `
 
-// TestRecorderPlacesByTheLineDirectivesFileAndTheParsedOffset holds a record's places to the pair a standing body is
-// keyed by (rule.StandingBodies.Stands): the file a `//line` directive names, and the offset in the file as parsed,
-// which the directive does not move. An object declared above the directive keeps the parsed file's name.
-func TestRecorderPlacesByTheLineDirectivesFileAndTheParsedOffset(test *testing.T) {
+// TestRecorderKeysByTheLineDirectivesFileAndPlacesByTheParsedOne holds a record's two kinds of place apart
+// (#xeafx79). Its key is a standing body's (rule.StandingBodies.Stands): the file a `//line` directive names, and the
+// offset in the file as parsed, which the directive does not move. Every other place in it, a local's, an end's and
+// each of its files, names the file as it was parsed, though the directive renames those positions too, since a
+// build finds an object in its own parsed files.
+func TestRecorderKeysByTheLineDirectivesFileAndPlacesByTheParsedOne(test *testing.T) {
 	test.Parallel()
 	recorded := recordPackage(test, []recordedSource{{"parsed.go", lineDirectiveSource}}, nil)
 	record := recorded.recordAt(test, recordedPlace{
 		File:   "named.go",
 		Offset: strings.Index(lineDirectiveSource, "func After"),
 	})
-	expected := []recordedUse{{
+	expectedLocals := []recordedLocal{{
+		Place:  recordedPlace{File: "parsed.go", Offset: strings.Index(lineDirectiveSource, "kept")},
+		Kind:   "const",
+		Name:   "kept",
+		Owners: []recordedEnd{{Kind: endFunction}},
+	}}
+	if !reflect.DeepEqual(record.Locals, expectedLocals) {
+		test.Errorf("the body's locals are %+v, not %+v", record.Locals, expectedLocals)
+	}
+	expectedUses := []recordedUse{{
 		By: recordedEnd{Kind: endFunction},
 		Used: recordedEnd{Kind: endDeclared, Place: recordedPlace{
 			File:   "parsed.go",
-			Offset: strings.Index(lineDirectiveSource, "before"),
+			Offset: strings.Index(lineDirectiveSource, "func below") + len("func "),
 		}},
 	}}
-	if !reflect.DeepEqual(record.Uses, expected) {
-		test.Errorf("the body's uses are %+v, not %+v", record.Uses, expected)
+	if !reflect.DeepEqual(record.Uses, expectedUses) {
+		test.Errorf("the body's uses are %+v, not %+v", record.Uses, expectedUses)
 	}
 	if !reflect.DeepEqual(record.Files, []string{"parsed.go"}) {
 		test.Errorf("the body's files are %v, not the one parsed file", record.Files)
+	}
+}
+
+// sharedKeySources are two files whose `//line` directives name one file, each with a function whose `func` is at
+// the same offset of its own file, so the two bodies have one key. The second file's later function is under the
+// directive's name too, at an offset of its own.
+var sharedKeySources = []recordedSource{
+	{"one.go", `package shape
+
+//line shared.go:10
+func First() {}
+`},
+	{"two.go", `package shape
+
+//line shared.go:20
+func Second() {}
+
+func Third() {}
+`},
+}
+
+// TestRecorderKeepsNoRecordOfBodiesThatShareAKey holds the records to one body a key (#xeafx79): of two bodies whose
+// keys are the same, the package has a record of neither, not of the first and not of the last, since a build asking
+// by that key could be handed either. A body keyed alone under the same directive's name keeps its record.
+func TestRecorderKeepsNoRecordOfBodiesThatShareAKey(test *testing.T) {
+	test.Parallel()
+	recorded := recordPackage(test, sharedKeySources, nil)
+	places := recorded.bodies(test)
+	if places["First"] != places["Second"] {
+		test.Fatalf("First is keyed %+v and Second %+v, two keys, so dropping neither proves nothing", places["First"],
+			places["Second"])
+	}
+	if walked := len(recorded.graph.recorder.records); walked != 3 {
+		test.Fatalf("the walk recorded %d bodies, not the package's three", walked)
+	}
+	kept := recorded.graph.bodyRecords()
+	if len(kept) != 1 || kept[0].Body != places["Third"] {
+		test.Errorf("the package keeps %+v, not the one record of Third at %+v", kept, places["Third"])
 	}
 }
 
@@ -928,17 +1086,16 @@ func TestRecorderChangesNothingTheRuleFinds(test *testing.T) {
 				}
 			}
 		}
-		if len(recording.recorder.records) != declared {
-			test.Errorf("%s: %d records for %d function declarations with a body", loaded,
-				len(recording.recorder.records), declared)
+		records, recordsAgain := recording.bodyRecords(), again.bodyRecords()
+		if len(records) != declared {
+			test.Errorf("%s: %d records for %d function declarations with a body", loaded, len(records), declared)
 		}
-		if len(again.recorder.records) != len(recording.recorder.records) {
-			test.Fatalf("%s: recorded twice, %d records and then %d", loaded, len(recording.recorder.records),
-				len(again.recorder.records))
+		if len(recordsAgain) != len(records) {
+			test.Fatalf("%s: recorded twice, %d records and then %d", loaded, len(records), len(recordsAgain))
 		}
-		for index, record := range recording.recorder.records {
+		for index, record := range records {
 			firstBytes, firstError := record.encoded()
-			secondBytes, secondError := again.recorder.records[index].encoded()
+			secondBytes, secondError := recordsAgain[index].encoded()
 			if firstError != nil || secondError != nil {
 				test.Fatalf("%s: encoding the records at %+v: %v, %v", loaded, record.Body, firstError, secondError)
 			}
