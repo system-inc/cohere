@@ -28,6 +28,15 @@ import (
 // and folds it in after the steady fingerprint, so a build asking after another build's go list rewrote one reads the
 // bytes it left, and keeps its listing against them.
 //
+// It remembers the listings themselves too, each one a load made or read kept, by listingKey, so a later load asking
+// with the same key is answered without listing again (#32594zm): an extra build lists for its first load and again
+// for a load after its first check, and under `--no-cache`, with no store to keep the first, the second was a listing
+// as whole as the first. A listing is of the bytes held as it was made, as every fingerprint here is, and remembered
+// here alone, so the run's start over at a change to those bytes drops it with them, and no listing made before a write
+// is ever answered after it. As listingFingerprint does, each module file a go command of the run can rewrite is read
+// again at every ask, and one that moved or cannot be read is listed again; a listing with an error in it is never
+// remembered, as none is kept (listingInputs).
+//
 // It is shared by the loads that read the same bytes: a run's are the host's and every extra build's, and the run
 // starts its Fingerprints over at every change to the bytes it holds (the pipeline's heldChanged), so a header the
 // fix, the wrap or a rename rewrote is read again by the load after it and never keeps the fingerprint of the bytes
@@ -47,11 +56,17 @@ type Fingerprints struct {
 	rootsWalked      atomic.Int64
 	moduleFilesRead  atomic.Int64
 
-	mutex       sync.Mutex
-	directories map[string]*fingerprintedDirectory
-	listings    map[[sha256.Size]byte]*fingerprintedListing
-	roots       map[string]*walkedRoot
-	moduleFiles map[string]*readModuleFile
+	// listingsRemembered and listingsAnswered count the listings remembered and the asks answered from one, which a
+	// test reads (ListingsRemembered).
+	listingsRemembered atomic.Int64
+	listingsAnswered   atomic.Int64
+
+	mutex              sync.Mutex
+	directories        map[string]*fingerprintedDirectory
+	listings           map[[sha256.Size]byte]*fingerprintedListing
+	roots              map[string]*walkedRoot
+	moduleFiles        map[string]*readModuleFile
+	rememberedListings map[[sha256.Size]byte]*rememberedListing
 }
 
 // fingerprintedDirectory is one directory's fingerprint, read once.
@@ -87,10 +102,11 @@ type readModuleFile struct {
 // NewFingerprints is fingerprints no build has read yet.
 func NewFingerprints() *Fingerprints {
 	return &Fingerprints{
-		directories: map[string]*fingerprintedDirectory{},
-		listings:    map[[sha256.Size]byte]*fingerprintedListing{},
-		roots:       map[string]*walkedRoot{},
-		moduleFiles: map[string]*readModuleFile{},
+		directories:        map[string]*fingerprintedDirectory{},
+		listings:           map[[sha256.Size]byte]*fingerprintedListing{},
+		roots:              map[string]*walkedRoot{},
+		moduleFiles:        map[string]*readModuleFile{},
+		rememberedListings: map[[sha256.Size]byte]*rememberedListing{},
 	}
 }
 
