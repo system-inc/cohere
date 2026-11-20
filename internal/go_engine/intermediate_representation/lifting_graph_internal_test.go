@@ -2,6 +2,7 @@ package intermediate_representation
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/system-inc/cohere/static_single_assignment"
@@ -221,5 +222,51 @@ func TestReleaseClearsAScratchWhosePrepareStoppedBeforeItsWalk(test *testing.T) 
 	}
 	if !reflect.ValueOf(scratch.blockValues[0]).IsZero() {
 		test.Error("after release, blockValues still holds the block the panicking prepare wrote")
+	}
+}
+
+// liftingEdgesFunction is a function of count empty blocks joined by edges, each a pair of block indices, added in
+// order.
+func liftingEdgesFunction(count int, edges [][2]int) *Function {
+	function := &Function{}
+	for index := range count {
+		function.Blocks = append(function.Blocks, &BasicBlock{Index: index, parent: function})
+	}
+	for _, edge := range edges {
+		addEdge(function.Blocks[edge[0]], function.Blocks[edge[1]])
+	}
+	return function
+}
+
+// TestPredecessorViewsAreEachBlocksOwn prepares a function with a loop, 6 predecessors in all, then a line of 3
+// blocks, 2 in all, in one scratch released between them, as the pool hands one function's scratch to the next
+// (#z844663). Each block of the second sees its own predecessors and no more, the shared array holds the second's 2
+// rather than growing past the first's, and an append to one block's view, as the core's graph maintenance makes,
+// leaves the next block's predecessors as they were.
+func TestPredecessorViewsAreEachBlocksOwn(test *testing.T) {
+	test.Parallel()
+	var scratch liftingScratch
+	looped := liftingEdgesFunction(5, [][2]int{{0, 1}, {0, 2}, {1, 3}, {2, 3}, {3, 4}, {4, 1}})
+	liftingPrepare(looped, nil, liftingOptions{}, &scratch)
+	scratch.release()
+	line := liftingEdgesFunction(3, [][2]int{{0, 1}, {1, 2}})
+	lifting := liftingPrepare(line, nil, liftingOptions{}, &scratch)
+	for _, block := range lifting.blocks {
+		var want []static_single_assignment.BlockId
+		for _, predecessor := range block.block.Predecessors {
+			want = append(want, static_single_assignment.BlockId(predecessor.Index))
+		}
+		if got := (liftingGraph{}).Predecessors(block); !slices.Equal(got, want) {
+			test.Errorf("block %d's predecessors are %v, want %v", block.block.Index, got, want)
+		}
+	}
+	if len(scratch.predecessors) != 2 {
+		test.Errorf("the shared array holds %d predecessors after the line's prepare, want its 2",
+			len(scratch.predecessors))
+	}
+	_ = append((liftingGraph{}).Predecessors(lifting.blocks[1]), 99)
+	if got := (liftingGraph{}).Predecessors(lifting.blocks[2]); !slices.Equal(got,
+		[]static_single_assignment.BlockId{1}) {
+		test.Errorf("after an append to block 1's view, block 2's predecessors are %v, want [1]", got)
 	}
 }

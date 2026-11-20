@@ -13,7 +13,6 @@ import (
 	"go/token"
 	"go/types"
 	"iter"
-	"math/big"
 	"reflect"
 	"slices"
 	"strings"
@@ -321,7 +320,6 @@ type Scc struct {
 	Index                    int
 	Blocks                   []*BasicBlock
 	Predecessors, Successors []*Scc
-	reachable                big.Int
 }
 
 // Pure values ----------------------------------------

@@ -39,12 +39,14 @@ type liftingSlot struct {
 	isCell bool
 }
 
-// liftingBlock is one block as the core sees it: the block, the phis the core places in it until lifting turns
-// them into *Phi instructions, and its instructions' places by index, nil when none of them has one.
+// liftingBlock is one block as the core sees it: the block, its predecessors by id, the phis the core places in it
+// until lifting turns them into *Phi instructions, and its instructions' places by index, nil when none of them has
+// one.
 type liftingBlock struct {
-	block *BasicBlock
-	phis  []*static_single_assignment.Phi[liftingPlace]
-	slots []liftingSlot
+	block        *BasicBlock
+	predecessors []static_single_assignment.BlockId
+	phis         []*static_single_assignment.Phi[liftingPlace]
+	slots        []liftingSlot
 
 	// newPhis are the *Phi instructions the resolve made of the core's phis here, to prepend.
 	newPhis []*Phi
@@ -116,12 +118,10 @@ func (liftingGraph) Id(block *liftingBlock) static_single_assignment.BlockId {
 	return static_single_assignment.BlockId(block.block.Index)
 }
 
+// Predecessors is the view liftingPrepare carved for block, which the core only reads, as it reads the slice the
+// other IR's adapter keeps on its block, rather than a new slice for each of the core's calls (#z844663).
 func (liftingGraph) Predecessors(block *liftingBlock) []static_single_assignment.BlockId {
-	predecessors := make([]static_single_assignment.BlockId, len(block.block.Predecessors))
-	for index, predecessor := range block.block.Predecessors {
-		predecessors[index] = static_single_assignment.BlockId(predecessor.Index)
-	}
-	return predecessors
+	return block.predecessors
 }
 
 // SetPredecessors is asked only by the core's graph maintenance, which lifting doesn't run; the builder keeps

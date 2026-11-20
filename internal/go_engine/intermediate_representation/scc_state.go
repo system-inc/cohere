@@ -100,13 +100,4 @@ func buildSccs(function *Function) {
 	}
 
 	function.Sccs = state.sccs
-
-	// This iterates over the SCCs in reverse topological order, i.e., "bottom
-	// up". This allows us to build up reachability sets.
-	for _, scc := range function.Sccs {
-		scc.reachable.SetBit(&scc.reachable, scc.Index, 1)
-		for _, successor := range scc.Successors {
-			scc.reachable.Or(&scc.reachable, &successor.reachable)
-		}
-	}
 }
