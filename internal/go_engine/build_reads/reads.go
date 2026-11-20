@@ -34,6 +34,20 @@ const RestoredFromCache = "restored from the findings cache; its reads are not s
 // Its state is explicit, since empty reads promise something: recorded, its type reads walked, empty when it read
 // nothing; never, with the first reason; or unknown, its type reads never walked, which is no promise at all. Only
 // recorded reads with no never mark can restore their package (see Restorable).
+//
+// Each sorted list, Uses, Selections, Facts and Lookups, is kept the first time it is asked and handed to every later
+// caller, the same slice, until a read of its kind is added. The verdicts of every extra build ask the host's reads
+// for the same lists (check.TypesHold, check.FactsHold and check.ReadFactTypes), and copying and sorting them anew for
+// each build cost a run at cohere's root, with every build and no findings cache, 0.06 s of wall, 0.93 s of user
+// time, 0.36 GB and 2.6 million objects allocated, and about 160 MiB of its peak, measured as the pair of release
+// binaries with and without the kept lists (#f7qsmdf). A host alone asks each list once and reads level.
+//
+// So a list is shared, and a caller ranges over it and never sorts it, appends to it or writes an element: ranging is
+// all those three do. That is safe for builds running side by side, since the lock is held for the read of a kept
+// list and for the build of one, and a kept list is never written again. A read added drops the list, the next ask
+// builds another slice, and a caller still ranging over the one it was handed reads it as it was. A kept list holds
+// alive the objects the map beside it already holds, for as long as the Reads lives, which for the host's is until
+// check.HostRun.Release lets its entries go: nothing new is kept alive, only the slices themselves.
 type Reads struct {
 	lock sync.Mutex
 
@@ -47,6 +61,12 @@ type Reads struct {
 	uses       map[ObjectUse]bool
 	selections map[selectionIdentity]Selection
 
+	// sortedUses and sortedSelections are uses and selections as Uses and Selections sort them, each kept from its
+	// first ask until its map gains an entry, and nil while not kept, which an empty list kept is not. A kept list is
+	// handed out, so it is dropped and never written.
+	sortedUses       []ObjectUse
+	sortedSelections []Selection
+
 	// closureOnly is why every read of the package is judged by its closure, empty while each is judged by its kind.
 	closureOnly string
 
@@ -54,9 +74,15 @@ type Reads struct {
 	// another package is inherited before any pass runs, so a second read of it reads the same.
 	facts map[factKey]Fact
 
+	// sortedFacts is facts as Facts sorts them, kept and dropped as sortedUses is, nil while not kept.
+	sortedFacts []Fact
+
 	// lookups are the rules' questions of other packages, each once, the first answer kept: what a package declares
 	// does not change during a run, so a second ask answers the same.
 	lookups map[lookupKey]Lookup
+
+	// sortedLookups is lookups as Lookups sorts them, kept and dropped as sortedUses is, nil while not kept.
+	sortedLookups []Lookup
 
 	// never is the first reason the package can never be restored, empty while it can.
 	never string
@@ -223,14 +249,19 @@ type factKey struct {
 	packageFact bool
 }
 
-// AddUse records that the package's type check made a use of kind of object, another package's.
+// AddUse records that the package's type check made a use of kind of object, another package's. A use the reads lacked
+// drops the kept list of them (Uses), and one they hold leaves it.
 func (reads *Reads) AddUse(object types.Object, kind UseKind) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
 	if reads.uses == nil {
 		reads.uses = map[ObjectUse]bool{}
 	}
-	reads.uses[ObjectUse{Object: object, Kind: kind}] = true
+	use := ObjectUse{Object: object, Kind: kind}
+	if _, recorded := reads.uses[use]; !recorded {
+		reads.uses[use] = true
+		reads.sortedUses = nil
+	}
 }
 
 // AddFact records one fact read, keeping the first of reads alike.
@@ -239,7 +270,7 @@ func (reads *Reads) AddFact(fact Fact) {
 }
 
 // AddFacts records fact reads, under one hold of the lock, as an action publishes the reads it gathered, keeping the
-// first of reads alike.
+// first of reads alike. A read the reads lacked drops the kept list of them (Facts), and reads they all hold leave it.
 func (reads *Reads) AddFacts(facts []Fact) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
@@ -251,12 +282,14 @@ func (reads *Reads) AddFacts(facts []Fact) {
 			packageFact: fact.Object == nil}
 		if _, recorded := reads.facts[key]; !recorded {
 			reads.facts[key] = fact
+			reads.sortedFacts = nil
 		}
 	}
 }
 
-// AddLookup records one question a rule asked of other packages, keeping the first of questions alike. Nil reads, as
-// a run that records nothing hands a rule, record nothing.
+// AddLookup records one question a rule asked of other packages, keeping the first of questions alike. A question
+// the reads lacked drops the kept list of them (Lookups), and one they hold leaves it. Nil reads, as a run that
+// records nothing hands a rule, record nothing.
 func (reads *Reads) AddLookup(lookup Lookup) {
 	if reads == nil {
 		return
@@ -280,6 +313,7 @@ func (reads *Reads) AddLookup(lookup Lookup) {
 		rule: lookup.Rule}
 	if _, recorded := reads.lookups[key]; !recorded {
 		reads.lookups[key] = lookup
+		reads.sortedLookups = nil
 	}
 }
 
@@ -377,10 +411,12 @@ func (reads *Reads) FunctionUses() (*FunctionUses, bool) {
 }
 
 // publishTypes adds collected to the reads under one hold of the lock, marks them recorded, and keeps what each
-// declaration uses, when it was recorded.
+// declaration uses, when it was recorded. It drops the kept lists of uses and of selections (Uses, Selections), both
+// and whatever it added: a walk publishes once, so nothing is saved by telling whether a map gained an entry.
 func (reads *Reads) publishTypes(collected typeReads) {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
+	reads.sortedUses, reads.sortedSelections = nil, nil
 	if reads.uses == nil {
 		reads.uses = collected.uses
 	} else {
@@ -446,9 +482,18 @@ func (reads *Reads) Never() string {
 
 // Uses are the uses the package's type check made of other packages' objects, sorted by object (see compareObjects),
 // then kind.
+//
+// The list is kept and shared (see Reads): every caller gets the same slice until a use is added, so a caller ranges
+// over it and never sorts it, appends to it or writes an element. It is built under the lock and never written after,
+// which makes it safe for builds asking side by side, and it is as long as its capacity, every use appended to a
+// slice made for as many, so a caller's append copies it and cannot write into the kept array. Reads with no uses
+// keep an empty list that is not nil, since a nil list is one not kept.
 func (reads *Reads) Uses() []ObjectUse {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
+	if reads.sortedUses != nil {
+		return reads.sortedUses
+	}
 	uses := make([]ObjectUse, 0, len(reads.uses))
 	for use := range reads.uses {
 		uses = append(uses, use)
@@ -456,14 +501,22 @@ func (reads *Reads) Uses() []ObjectUse {
 	slices.SortFunc(uses, func(left, right ObjectUse) int {
 		return cmp.Or(compareObjects(left.Object, right.Object), cmp.Compare(left.Kind, right.Kind))
 	})
+	reads.sortedUses = uses
 	return uses
 }
 
 // Selections are the selections the package made through other packages' named types, sorted by receiver, name and
 // index.
+//
+// The list is kept and shared as Uses' is (see Reads): the same slice for every caller until the walk publishes, to
+// range over and never to sort, append to or write, a selection's Index included. It is built under the lock, never
+// written after, and as long as its capacity, and reads with no selections keep an empty list, never nil.
 func (reads *Reads) Selections() []Selection {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
+	if reads.sortedSelections != nil {
+		return reads.sortedSelections
+	}
 	selections := make([]Selection, 0, len(reads.selections))
 	for _, selection := range reads.selections {
 		selections = append(selections, selection)
@@ -472,13 +525,21 @@ func (reads *Reads) Selections() []Selection {
 		return cmp.Or(compareObjects(left.Receiver, right.Receiver), cmp.Compare(left.Name, right.Name),
 			slices.Compare(left.Index, right.Index))
 	})
+	reads.sortedSelections = selections
 	return selections
 }
 
 // Facts are the fact reads, sorted by owner, then object (a package fact first), fact type and outcome.
+//
+// The list is kept and shared as Uses' is (see Reads): the same slice for every caller until a fact read is added, to
+// range over and never to sort, append to or write. It is built under the lock, never written after, and as long as
+// its capacity, and reads with no fact reads keep an empty list, never nil.
 func (reads *Reads) Facts() []Fact {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
+	if reads.sortedFacts != nil {
+		return reads.sortedFacts
+	}
 	facts := make([]Fact, 0, len(reads.facts))
 	for _, fact := range reads.facts {
 		facts = append(facts, fact)
@@ -509,13 +570,21 @@ func (reads *Reads) Facts() []Fact {
 			return -1
 		}
 	})
+	reads.sortedFacts = facts
 	return facts
 }
 
 // Lookups are the rules' questions of other packages, sorted by question, package, name, subject and rule.
+//
+// The list is kept and shared as Uses' is (see Reads): the same slice for every caller until a question is added, to
+// range over and never to sort, append to or write. It is built under the lock, never written after, and as long as
+// its capacity, and reads with no lookups keep an empty list, never nil.
 func (reads *Reads) Lookups() []Lookup {
 	reads.lock.Lock()
 	defer reads.lock.Unlock()
+	if reads.sortedLookups != nil {
+		return reads.sortedLookups
+	}
 	lookups := make([]Lookup, 0, len(reads.lookups))
 	for _, lookup := range reads.lookups {
 		lookups = append(lookups, lookup)
@@ -535,6 +604,7 @@ func (reads *Reads) Lookups() []Lookup {
 		}
 		return cmp.Or(compareObjects(left.Subject, right.Subject), cmp.Compare(left.Rule, right.Rule))
 	})
+	reads.sortedLookups = lookups
 	return lookups
 }
 
