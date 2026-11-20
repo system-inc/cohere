@@ -639,6 +639,25 @@ func TestApplyKeepsOneIndexPerFile(test *testing.T) {
 	}
 }
 
+// TestApplyKeepsTheFirstIndexOfAFileEvenWithNoDirective hands Apply a file's index with no directive and then
+// another copy of the same file with one. The first copy is the file's, so the second's directive withholds nothing
+// and is reported nowhere: an Apply that kept the first copy holding a directive would let it withhold the finding.
+func TestApplyKeepsTheFirstIndexOfAFileEvenWithNoDirective(test *testing.T) {
+	test.Parallel()
+	directed := "package fixture\n//cohere:ignore printf the format is built at run time\nvar first = risky()\n"
+	indexes := []*Index{Build("a.go", []byte("package fixture\n\nvar first = risky()\n")), Build("a.go", []byte(directed))}
+	findings := []Finding{{Rule: "cohere-go/printf", File: "a.go", Line: 3}}
+
+	outcome := Apply(knownRules, knownRules, indexes, findings)
+
+	if !slices.Equal(outcome.Kept, findings) || len(outcome.WithheldByRule) != 0 {
+		test.Fatalf("kept %v and withheld %v, want the one finding kept", outcome.Kept, outcome.WithheldByRule)
+	}
+	if len(outcome.DirectiveFindings) != 0 {
+		test.Fatalf("directive findings %s, want none", renderDirectiveFindings(outcome.DirectiveFindings))
+	}
+}
+
 // TestBuildConcurrently builds and applies from many goroutines at once, as the engine does per package.
 func TestBuildConcurrently(test *testing.T) {
 	test.Parallel()

@@ -108,20 +108,23 @@ func Apply(knownRules []string, rulesRan []string, indexes []*Index, findings []
 	}
 
 	// One index per file, the first: a second copy's directives would be built as states of their own, and a
-	// finding credits only one of them, so the other would be reported unused for withholding what its twin did.
-	var unique []*Index
-	seenFiles := map[string]bool{}
-	for _, index := range indexes {
-		if !seenFiles[index.File] {
-			seenFiles[index.File] = true
-			unique = append(unique, index)
+	// finding credits only one of them, so the other would be reported unused for withholding what its twin did. Most
+	// files hold no directive, so only a file whose first index has one is kept: walking the indexes from the last, each
+	// index replaces what a later copy of its file left, so the first copy decides, and one with no directive takes
+	// its file out, a later copy's directives with it.
+	firstIndexes := map[string]*Index{}
+	for _, index := range slices.Backward(indexes) {
+		if len(index.directives) == 0 {
+			delete(firstIndexes, index.File)
+			continue
 		}
+		firstIndexes[index.File] = index
 	}
 
-	statesByFile := map[string][]*directiveState{}
-	for _, index := range unique {
+	statesByFile := make(map[string][]*directiveState, len(firstIndexes))
+	for file, index := range firstIndexes {
 		for _, indexed := range index.directives {
-			statesByFile[index.File] = append(statesByFile[index.File], resolveDirective(index.File, indexed, known))
+			statesByFile[file] = append(statesByFile[file], resolveDirective(file, indexed, known))
 		}
 	}
 
@@ -136,8 +139,11 @@ func Apply(knownRules []string, rulesRan []string, indexes []*Index, findings []
 		outcome.WithheldByRule[finding.Rule]++
 	}
 
-	for _, index := range unique {
-		for _, state := range statesByFile[index.File] {
+	// The files come in the map's order, which the sort below sets right: a file's states are in its index's order,
+	// and the findings of one directive, all at its comment's start, stay in the order it reported them, since no two
+	// directives of a file start at one place.
+	for _, states := range statesByFile {
+		for _, state := range states {
 			outcome.DirectiveFindings = append(outcome.DirectiveFindings, directiveFindings(state, ran)...)
 		}
 	}
