@@ -23,11 +23,13 @@
 package unused_code
 
 import (
+	"cmp"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
 	"math"
+	"slices"
 	"unsafe"
 
 	"honnef.co/go/tools/analysis/facts/generated"
@@ -222,7 +224,8 @@ type object struct {
 }
 
 // result is the graph's verdict on each object it holds: used, unused and reported, or quiet, unused but not reported
-// because what owns it is unused too. Each is in the order of the graph's nodes.
+// because what owns it is unused too. The used and the quiet are in the order of the graph's nodes, and the unused,
+// which are the rule's findings, in the order of their positions.
 type result struct {
 	used   []object
 	unused []object
@@ -507,8 +510,10 @@ func (graph *graph) colorAndQuieten() []nodeState {
 	return states
 }
 
-// results is the graph's verdict on every node but the root, in the order of the nodes, each node's object worded
-// here from the object the node stands for, as the original words it when it makes the node.
+// results is the graph's verdict on every node but the root, each node's object worded here from the object the node
+// stands for, as the original words it when it makes the node. The used and the quiet are in the order of the nodes.
+// The unused are sorted by position (#xeafx79): the order of the nodes is the order the walk met them, which a build
+// that takes a body's nodes from the host's record does not share, and the findings must not depend on it.
 func (graph *graph) results() result {
 	states := graph.colorAndQuieten()
 
@@ -536,5 +541,9 @@ func (graph *graph) results() result {
 			verdict.unused = append(verdict.unused, graph.objectOf(each.typesObject))
 		}
 	}
+	// Stable, so objects sharing a position, the variables a type switch makes one a clause, stay in node order.
+	slices.SortStableFunc(verdict.unused, func(one object, other object) int {
+		return cmp.Compare(one.position, other.position)
+	})
 	return verdict
 }
