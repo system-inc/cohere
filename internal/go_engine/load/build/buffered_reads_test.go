@@ -15,8 +15,8 @@ import (
 
 // A read through a pooled buffered reader is every byte of its own file (bufferedReaders): reads of many files run at
 // once, each taking a reader from the pool as the others hand theirs back, and every header, import and embed read is
-// the one readGoInfo reads from the file's bytes alone. Headers run past the buffer's 4 KiB, and an embedding file reads
-// on to its end, so a reader handed back while its read still fills it is refilled from another file under it.
+// the one readGoInfo reads from the file's bytes alone. Headers run past the buffer's 4 KiB, and an embedding file
+// reads on to its end, so a reader handed back while its read still fills it is refilled from another file under it.
 func TestEveryReadThroughAPooledReaderIsItsOwnFile(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -27,8 +27,8 @@ func TestEveryReadThroughAPooledReaderIsItsOwnFile(test *testing.T) {
 		var source strings.Builder
 		// A header comment of the file's own letter and length, up to past two buffers' worth, so a byte from another
 		// file shows wherever it lands.
-		fmt.Fprintf(&source, "// %s\n\npackage file%d\n\nimport (\n", strings.Repeat(string(rune('a'+index)), index*600),
-			index)
+		fmt.Fprintf(&source, "// %s\n\npackage file%d\n\nimport (\n",
+			strings.Repeat(string(rune('a'+index)), index*600), index)
 		for imported := range index%4 + 1 {
 			fmt.Fprintf(&source, "\t\"example.com/file%d/import%d\"\n", index, imported)
 		}
@@ -49,7 +49,8 @@ func TestEveryReadThroughAPooledReaderIsItsOwnFile(test *testing.T) {
 		}
 	}
 	context := &Context{Context: build.Default}
-	const readers, rounds = 8, 20
+	const readers = 8
+	const rounds = 20
 	var group sync.WaitGroup
 	failures := make(chan string, readers*rounds*fileCount)
 	for reader := range readers {

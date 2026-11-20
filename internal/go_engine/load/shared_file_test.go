@@ -17,7 +17,8 @@ import (
 func TestASharedHeadIsNeverWrittenOverByALaterRead(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
-	const readers, shortPerReader = 8, 64
+	const readers = 8
+	const shortPerReader = 64
 	contents := map[string]string{}
 	for reader := range readers {
 		long := filepath.Join(directory, fmt.Sprintf("long%d.s", reader))

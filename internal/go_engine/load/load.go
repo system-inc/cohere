@@ -750,5 +750,6 @@ func exists(file string) bool {
 // inside reports whether path is in workspace or below it: workspace, then a separator, at path's start. The separator
 // is read at its place rather than appended to workspace, which made a string for every ask.
 func inside(workspace, path string) bool {
-	return len(path) > len(workspace) && path[len(workspace)] == filepath.Separator && strings.HasPrefix(path, workspace)
+	return len(path) > len(workspace) && path[len(workspace)] == filepath.Separator &&
+		strings.HasPrefix(path, workspace)
 }
