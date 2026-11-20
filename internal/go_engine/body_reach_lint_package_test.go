@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/check"
 )
 
 // Each side lints a file in one package of those that compile it, the in-package test variant where the package has
@@ -107,5 +109,31 @@ func TestACensusRunLeavesNoPackageUntouched(test *testing.T) {
 	}
 	if !slices.Equal(noisy(windows), []string{"cohere-go/unusedwrite"}) {
 		test.Errorf("windows's own findings in noisy.go are %v, want unusedwrite's", noisy(windows))
+	}
+}
+
+// A body of a package neither side lints, a dependency's or the standard library's a build checks from source, is
+// counted apart from one whose file a side lints in another package, so the census's count of bodies linted apart says
+// only what its name says (#bed0mnk, census's reading at bcb8b9861, where the two were one count and a tree's
+// dependencies made up nearly all of it). compareFindings is handed three bodies: one in a package neither side holds
+// an entry for, one in a package the build alone lints, and one both lint, alike.
+func TestABodyOfAPackageNeitherSideLintsIsCountedApartFromOneLintedElsewhere(test *testing.T) {
+	test.Parallel()
+
+	body := func(identifier string) comparedBody {
+		file := "/" + identifier + "/target.go"
+		return comparedBody{body: reachedBody{packageIdentifier: identifier, file: file, line: 3, name: "Target"},
+			host: placedLines{file: file, firstLine: 3, lastLine: 5}, built: placedLines{file: file, firstLine: 3,
+				lastLine: 5}}
+	}
+	differential := &buildBodyDifferential{bodies: []comparedBody{body("example.test/dependency"),
+		body("example.test/apart"), body("example.test/linted")}}
+	hostFindings := map[string]map[string][]check.Finding{"example.test/linted": {}}
+	builtFindings := map[string]map[string][]check.Finding{"example.test/apart": {}, "example.test/linted": {}}
+	differential.compareFindings(hostFindings, builtFindings, nil, &findingCauses{}, nil, nil)
+
+	if differential.lintedByNeither != 1 || differential.lintedApart != 1 || len(differential.failures) > 0 {
+		test.Errorf("want 1 body linted by neither, 1 apart and no failure, got %d, %d and %v",
+			differential.lintedByNeither, differential.lintedApart, differential.failures)
 	}
 }

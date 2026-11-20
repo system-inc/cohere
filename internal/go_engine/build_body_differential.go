@@ -79,8 +79,10 @@ type buildBodyDifferential struct {
 	takenOut     int
 
 	// lintedApart is how many bodies compared by their types one side lints in another package than the body's own,
-	// whose findings were then left alone (compareFindings).
-	lintedApart int
+	// and lintedByNeither how many in a package neither side lints, a dependency's or the standard library's checked
+	// from source, whose findings were in either case left alone (compareFindings).
+	lintedApart     int
+	lintedByNeither int
 
 	// standingCompared and standingFailed are the second leg's comparisons and failures by kind, an answer's kind or
 	// standingNoReturn; each failure's line is among failures too.
@@ -312,7 +314,8 @@ func firstFactDifference(
 // compared with the variant's on the host, which may import what p does not. A body one side lints in another package
 // than its own is counted apart, lintedApart, and its findings are not compared: on the host, standing finds no
 // findings of the body's package there, so the build lints the body itself; in the build, the body's package lints
-// nothing there, so nothing of it stands.
+// nothing there, so nothing of it stands. A body of a package neither side lints has no findings on either, and is
+// counted apart from those, lintedByNeither, so the count of bodies linted apart says only what its name says.
 func (differential *buildBodyDifferential) compareFindings(
 	hostFindings map[string]map[string][]check.Finding,
 	builtFindings map[string]map[string][]check.Finding,
@@ -330,9 +333,14 @@ func (differential *buildBodyDifferential) compareFindings(
 			continue
 		}
 		// A package a side lints holds an entry, empty where it found nothing, and the body is in a file of its
-		// package, so a side whose findings hold no entry of the package lints the file in another.
+		// package, so a side whose findings hold no entry of the package lints the file in another, or, where
+		// neither side holds one, the package is linted by neither.
 		hostFiles, hostLints := hostFindings[compared.body.packageIdentifier]
 		builtFiles, builtLints := builtFindings[compared.body.packageIdentifier]
+		if !hostLints && !builtLints {
+			differential.lintedByNeither++
+			continue
+		}
 		if !hostLints || !builtLints {
 			differential.lintedApart++
 			continue
