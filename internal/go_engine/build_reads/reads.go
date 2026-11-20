@@ -480,8 +480,8 @@ func (reads *Reads) Never() string {
 	return reads.never
 }
 
-// Uses are the uses the package's type check made of other packages' objects, sorted by object (see compareObjects),
-// then kind.
+// Uses are the uses the package's type check made of other packages' objects, sorted by object (see
+// objectOrdering.compare), then kind.
 //
 // The list is kept and shared (see Reads): every caller gets the same slice until a use is added, so a caller ranges
 // over it and never sorts it, appends to it or writes an element. It is built under the lock and never written after,
@@ -498,8 +498,9 @@ func (reads *Reads) Uses() []ObjectUse {
 	for use := range reads.uses {
 		uses = append(uses, use)
 	}
+	var ordering objectOrdering
 	slices.SortFunc(uses, func(left, right ObjectUse) int {
-		return cmp.Or(compareObjects(left.Object, right.Object), cmp.Compare(left.Kind, right.Kind))
+		return cmp.Or(ordering.compare(left.Object, right.Object), cmp.Compare(left.Kind, right.Kind))
 	})
 	reads.sortedUses = uses
 	return uses
@@ -521,8 +522,9 @@ func (reads *Reads) Selections() []Selection {
 	for _, selection := range reads.selections {
 		selections = append(selections, selection)
 	}
+	var ordering objectOrdering
 	slices.SortFunc(selections, func(left, right Selection) int {
-		return cmp.Or(compareObjects(left.Receiver, right.Receiver), cmp.Compare(left.Name, right.Name),
+		return cmp.Or(ordering.compare(left.Receiver, right.Receiver), cmp.Compare(left.Name, right.Name),
 			slices.Compare(left.Index, right.Index))
 	})
 	reads.sortedSelections = selections
@@ -544,6 +546,7 @@ func (reads *Reads) Facts() []Fact {
 	for _, fact := range reads.facts {
 		facts = append(facts, fact)
 	}
+	var ordering objectOrdering
 	slices.SortFunc(facts, func(left, right Fact) int {
 		if order := cmp.Compare(left.Package.Path(), right.Package.Path()); order != 0 {
 			return order
@@ -554,7 +557,7 @@ func (reads *Reads) Facts() []Fact {
 		case left.Object != nil && right.Object == nil:
 			return 1
 		case left.Object != nil:
-			if order := compareObjects(left.Object, right.Object); order != 0 {
+			if order := ordering.compare(left.Object, right.Object); order != 0 {
 				return order
 			}
 		}
@@ -589,6 +592,7 @@ func (reads *Reads) Lookups() []Lookup {
 	for _, lookup := range reads.lookups {
 		lookups = append(lookups, lookup)
 	}
+	var ordering objectOrdering
 	slices.SortFunc(lookups, func(left, right Lookup) int {
 		if order := cmp.Or(cmp.Compare(left.Query, right.Query), cmp.Compare(left.Path, right.Path),
 			cmp.Compare(left.Name, right.Name)); order != 0 {
@@ -602,7 +606,7 @@ func (reads *Reads) Lookups() []Lookup {
 		case right.Subject == nil:
 			return 1
 		}
-		return cmp.Or(compareObjects(left.Subject, right.Subject), cmp.Compare(left.Rule, right.Rule))
+		return cmp.Or(ordering.compare(left.Subject, right.Subject), cmp.Compare(left.Rule, right.Rule))
 	})
 	reads.sortedLookups = lookups
 	return lookups
@@ -619,12 +623,23 @@ func (reads *Reads) Unordered() ([]ObjectUse, []Selection, []Fact, []Lookup) {
 		slices.Collect(maps.Values(reads.facts)), slices.Collect(maps.Values(reads.lookups))
 }
 
-// compareObjects orders two objects by their package's path, then their name, then how go/types writes them, which
-// tells apart two fields or methods of one name on different types, and last by position, for two written alike. One
+// objectOrdering orders the objects of one sort (see compare), remembering how go/types wrote each object it had to
+// write, so an object tied with others on package and name is written once in the sort and not again in each of its
+// comparisons. Ties are common: this package's own uses hold 36 names tied so, twelve fields of go/ast named X among
+// them, and a sort compares each tied object with its rivals several times. It is made for one sort and dropped when
+// the sort returns: its key is the object, by identity, and its value a string, which nothing writes and nothing past
+// the sort holds, so it shares nothing with the sorted list it helped build or with any later sort. The zero value is
+// ready, and makes no map until a tie needs one.
+type objectOrdering struct {
+	written map[types.Object]string
+}
+
+// compare orders two objects by their package's path, then their name, then how go/types writes them, which tells
+// apart two fields or methods of one name on different types, and last by position, for two written alike. One
 // object compared with itself is equal before anything is written: the selections a package makes through one
 // receiver all compare that receiver with itself, as do the uses of one object in several kinds, and writing a large
 // struct twice for each of those comparisons doubled every build's decide on deeafbf4 (#p1s9gdk).
-func compareObjects(left types.Object, right types.Object) int {
+func (ordering *objectOrdering) compare(left types.Object, right types.Object) int {
 	if left == right {
 		return 0
 	}
@@ -633,9 +648,23 @@ func compareObjects(left types.Object, right types.Object) int {
 		return order
 	}
 	// Written only for two distinct objects of one package and name, two fields or methods of one name on different
-	// types, which is rare, so a sort writes almost nothing.
+	// types.
 	return cmp.Or(
-		cmp.Compare(types.ObjectString(left, nil), types.ObjectString(right, nil)),
+		cmp.Compare(ordering.writing(left), ordering.writing(right)),
 		cmp.Compare(left.Pos(), right.Pos()),
 	)
+}
+
+// writing is how go/types writes object, types.ObjectString with no qualifier, written the first time the sort asks
+// and remembered for the rest of it.
+func (ordering *objectOrdering) writing(object types.Object) string {
+	if written, remembered := ordering.written[object]; remembered {
+		return written
+	}
+	written := types.ObjectString(object, nil)
+	if ordering.written == nil {
+		ordering.written = map[types.Object]string{}
+	}
+	ordering.written[object] = written
+	return written
 }
