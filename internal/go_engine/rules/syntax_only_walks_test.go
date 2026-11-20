@@ -36,6 +36,38 @@ func TestTheRegistrysSyntaxOnlyWalksHold(test *testing.T) {
 	}
 }
 
+// The registry never hands a type-aware rule a pass with no type information (#f5g7ym6). It makes one two ways, both
+// for a rule whose findings on a file are the file's bytes' alone: a listener marked SyntaxOnly hears every build
+// through a syntax-only context (rule.NewSyntaxOnlyContext), and a syntax-only walk runs through rule.SyntaxOnlyRun,
+// each holding no TypesInfo. Every other pass holds its package's, which the load sets on every package it checks, an
+// empty one on a package checked for its types only. A type-aware rule marked a syntax-only walk is refused as the
+// package initializes (rule.ValidateSyntaxOnlyWalk), and this holds the listeners to the same: a rule that guards a
+// missing TypesInfo, as consistency-no-any does for a binary's typeless parity walk, would judge nothing there and say
+// nothing, and a real typeless pass would read as a clean one. A registry with no listener marked SyntaxOnly, or no
+// type-aware rule, proves nothing and fails.
+func TestTheRegistryHandsNoTypeAwareRuleATypelessPass(test *testing.T) {
+	test.Parallel()
+	syntaxOnlyListeners, typeAware := 0, 0
+	for _, registered := range All() {
+		listensSyntaxOnly := registered.Listener != nil && registered.Listener.SyntaxOnly
+		if listensSyntaxOnly {
+			syntaxOnlyListeners++
+		}
+		if !registered.TypeAware {
+			continue
+		}
+		typeAware++
+		if listensSyntaxOnly {
+			test.Errorf("%s is type aware and its listener is marked SyntaxOnly, so every build hands it a context "+
+				"with no type information", registered.Name)
+		}
+	}
+	if syntaxOnlyListeners == 0 || typeAware == 0 {
+		test.Fatalf("the registry holds %d listeners marked SyntaxOnly and %d type-aware rules, too few to prove "+
+			"anything", syntaxOnlyListeners, typeAware)
+	}
+}
+
 // A rule marked a syntax-only walk runs through rule.SyntaxOnlyRun (#y6q1x2j): handed a pass whose inheritance says
 // second.go is inherited, its own analyzer walks first.go alone, and the pass reports its finding there and then the
 // host's on second.go, placed at second.go's package clause. A mark naming no registered rule, or a dispatched one, is
