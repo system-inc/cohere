@@ -24,6 +24,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
@@ -148,14 +149,37 @@ func run(pass *analysis.Pass) (any, error) {
 		result.ImportedNamed++
 	}
 
+	// The bodies a package-wide rule reads along a row's edge, which must be present in the build: the objects whose
+	// users leave, and each body that leaves by itself, taken out of the pass's own copy here, before the cycles are
+	// read, so a cycle that touches it is one the build lints, and among the bodies reached below, whose recorded
+	// answers the walk asks.
+	presenceNamed, leaving := standing_presence.Present(pass, host, functions.value)
+	named = append(named, presenceNamed...)
+	result.PresenceNamed = map[standing_presence.Row]int{}
+	result.PresenceRemoved = map[standing_presence.Row]int{}
+	for _, object := range presenceNamed {
+		if row, isRow := standing_presence.RowOf(object.Reason); isRow {
+			result.PresenceNamed[row]++
+		}
+	}
+	for _, left := range leaving {
+		if !standing[left.Place] {
+			continue
+		}
+		delete(standing, left.Place)
+		if row, isRow := standing_presence.RowOf(left.Reason); isRow {
+			result.PresenceRemoved[row]++
+		}
+	}
+
 	// The members of each cycle of calls in the build that touches a body it lints, whose answers may hang on the order
 	// the build's walk enters the cycle in, where the host's order bound saw no such cycle.
 	ordered := buildOrderNamed(pass, host, standing, functions)
 	result.BuildOrderNamed = len(ordered)
 	named = append(named, ordered...)
 
-	// The bodies the build lints already, whose recorded answers the walk asks first. The host's set is only read,
-	// here and by the walk: what still stands is the settlement's own map.
+	// The bodies the build lints already, a body presence took out among them, whose recorded answers the walk asks
+	// first. The host's set is only read, here and by the walk: what still stands is the settlement's own map.
 	var reached []fact_reach.Place
 	for _, place := range host.Places() {
 		if !standing[place] {
@@ -179,5 +203,10 @@ func run(pass *analysis.Pass) (any, error) {
 		kinds = append(kinds, fact_reach.Kind{Name: name, Parameters: units[name]})
 	}
 	result.Settlement = fact_reach.Settle(standing, reached, named, kinds, host, asked.compare)
+	for _, removal := range result.Settlement.Removed {
+		if row, isRow := standing_presence.RowOf(removal.Reason); isRow {
+			result.PresenceRemoved[row]++
+		}
+	}
 	return result, nil
 }

@@ -37,15 +37,23 @@ type fixture struct {
 // checker takes a load of its own, since a run lets go of what it read of the packages below its roots.
 func loadFacts(test *testing.T) fixture {
 	test.Helper()
+	return loadFixture(test, "facts")
+}
+
+// loadFixture loads the fixture package at path, of one file, and what it imports, as loadFacts loads facts. The
+// presence fixture is a package of its own, since it imports fmt, whose closure every other test would load for
+// nothing.
+func loadFixture(test *testing.T, path string) fixture {
+	test.Helper()
 	directory := analysistest.TestData()
-	loaded, loadError := load.Packages(directory, []string{"facts"}, []string{
+	loaded, loadError := load.Packages(directory, []string{path}, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
 	}, nil)
 	if loadError != nil {
-		test.Fatalf("loading the facts fixture: %v", loadError)
+		test.Fatalf("loading the %s fixture: %v", path, loadError)
 	}
-	if len(loaded.Roots) != 1 || loaded.Roots[0].ID != "facts" || len(loaded.Roots[0].Syntax) != 1 {
-		test.Fatalf("the load's roots are %v, want the facts package alone, of one file", loaded.Roots)
+	if len(loaded.Roots) != 1 || loaded.Roots[0].ID != path || len(loaded.Roots[0].Syntax) != 1 {
+		test.Fatalf("the load's roots are %v, want the %s package alone, of one file", loaded.Roots, path)
 	}
 	found := fixture{root: loaded.Roots[0], places: map[string]fact_reach.Place{}}
 	syntax := found.root.Syntax[0]
@@ -64,21 +72,21 @@ func (found fixture) place(test *testing.T, name string) fact_reach.Place {
 	test.Helper()
 	place, declared := found.places[name]
 	if !declared {
-		test.Fatalf("the facts fixture declares no function named %s", name)
+		test.Fatalf("the %s fixture declares no function named %s", found.root.ID, name)
 	}
 	return place
 }
 
-// identity is how a host names the fixture's package-level function named name, in the file the build declares it in.
+// identity is how a host names the fixture's package-level object named name, in the file the build declares it in.
 func (found fixture) identity(name string) build_reads.Identity {
-	return build_reads.Identity{Kind: build_reads.IdentityObject, PackagePath: "facts", Path: objectpath.Path(name),
-		File: found.file}
+	return build_reads.Identity{Kind: build_reads.IdentityObject, PackagePath: found.root.PkgPath,
+		Path: objectpath.Path(name), File: found.file}
 }
 
 // method is how a host names the method named methodName of the fixture's type named typeName, in the file the build
 // declares it in.
 func (found fixture) method(typeName string, methodName string) build_reads.Identity {
-	return build_reads.Identity{Kind: build_reads.IdentityMethod, PackagePath: "facts",
+	return build_reads.Identity{Kind: build_reads.IdentityMethod, PackagePath: found.root.PkgPath,
 		Path: objectpath.Path(typeName), Method: methodName, File: found.file}
 }
 
@@ -124,13 +132,14 @@ func analyze(
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{analyzer}, []*packages.Package{found.root}, options)
 	if analyzeError != nil {
-		test.Fatalf("analyzing the facts fixture: %v", analyzeError)
+		test.Fatalf("analyzing the %s fixture: %v", found.root.ID, analyzeError)
 	}
 	if len(graph.Roots) != 1 {
-		test.Fatalf("running %s on the facts fixture left %d root actions, want one", analyzer.Name, len(graph.Roots))
+		test.Fatalf("running %s on the %s fixture left %d root actions, want one", analyzer.Name, found.root.ID,
+			len(graph.Roots))
 	}
 	if graph.Roots[0].Err != nil {
-		test.Fatalf("running %s on the facts fixture: %v", analyzer.Name, graph.Roots[0].Err)
+		test.Fatalf("running %s on the %s fixture: %v", analyzer.Name, found.root.ID, graph.Roots[0].Err)
 	}
 	return graph.Roots[0], resolver
 }

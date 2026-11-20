@@ -1,6 +1,9 @@
 package standing_facts
 
-import "github.com/system-inc/cohere/internal/go_engine/fact_reach"
+import (
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+)
 
 // Result is one package's standing bodies in one build, settled, and what settling them took, for the build's census.
 // A nil Result, and the empty one a package with no host's side or one linted whole has, hold nothing standing.
@@ -31,6 +34,13 @@ type Result struct {
 	// BuildOrderNamed is how many functions were named as members of a cycle of calls in the build that touches a
 	// body the build lints (buildOrderNamed).
 	BuildOrderNamed int
+
+	// PresenceNamed is how many objects each presence row named, whose users leave so the row's rule reads them in
+	// the build (standing_presence), and PresenceRemoved how many bodies left the standing set for each row: the users
+	// the settlement took out with the row's reason, and each body that left by itself. Both are empty, never nil, in
+	// a partial result.
+	PresenceNamed   map[standing_presence.Row]int
+	PresenceRemoved map[standing_presence.Row]int
 }
 
 // Stands is whether the function body declared in the file parsed from filename, its `func` at offset, is left to the
