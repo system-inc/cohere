@@ -207,14 +207,18 @@ func (walk *demandWalk) settle() {
 // handed over is final, which the resolver needs of it: settle hands marks over only after its last pass, and a
 // function settled is never reached again.
 func (walk *demandWalk) keepMarks(settled *reachedFunction) {
-	parameters := settled.function.Signature.Params()
-	if declared, isDeclared := settled.function.Object().(*types.Func); isDeclared {
-		// The function's parameters as it declares them, which a pass names (declaredParameter).
-		parameters = declared.Signature().Params()
-	}
-	for parameter := range parameters.Variables() {
+	for parameter := range ownParameters(settled.function).Variables() {
 		fact_resolver.Keep(walk.resolver, walk.home, Kind, parameter, settled.marked[parameter])
 	}
+}
+
+// ownParameters are the parameters function, a source function of home, declares: a declared function's as its object
+// declares them, which a pass names (declaredParameter), and a function literal's own.
+func ownParameters(function *intermediate_representation.Function) *types.Tuple {
+	if declared, isDeclared := function.Object().(*types.Func); isDeclared {
+		return declared.Signature().Params()
+	}
+	return function.Signature.Params()
 }
 
 // marked is whether the parameter pass passes to is marked, as far as settle has come: by its holder's marks, final

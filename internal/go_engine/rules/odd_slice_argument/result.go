@@ -8,7 +8,16 @@ import (
 )
 
 // Kind keys SA5012's marks in each package the resolver holds, and its counts.
-var Kind = &fact_resolver.Kind{Name: "odd_slice_argument", OrderBound: orderFree}
+//
+// It records every judgment (fact_resolver.Kind.RecordsEveryJudgment). Marks are made in one place, demandWalk's
+// settle, which hands the resolver the mark of every parameter of each function it settles (keepMarks), and another
+// package's parameter is asked through fact_resolver.Ask, which holds the answer. And a walk reads a function's body
+// only where it reaches the function (reach), and settles every function it reaches: a pass to a stand-in is a pass
+// to the declared function, reached as any other, and no mark is read of a function before it is settled. A function
+// with no parameter has no mark to hold and no answer, and none rests on it: only a slice parameter of its own is
+// ever passed on, and it has none. TestEveryMarkOddSliceSettlesIsAnAnswerTheResolverHolds pins the first, and check's
+// TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer the second.
+var Kind = &fact_resolver.Kind{Name: "odd_slice_argument", OrderBound: orderFree, RecordsEveryJudgment: true}
 
 // orderFree is the marks' order bound (fact_resolver.Kind.OrderBound): none, and known. The marks are the least set
 // closed under their rules, one set whatever order a walk finds it in (see demandWalk), so no mark of any function of

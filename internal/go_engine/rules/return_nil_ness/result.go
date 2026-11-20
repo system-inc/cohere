@@ -10,12 +10,30 @@ import (
 )
 
 // Kind keys nilness's verdicts in each package the resolver holds, and its counts.
+//
+// It records every judgment (fact_resolver.Kind.RecordsEveryJudgment), set as the package initializes, beside its
+// order bound. Both walks hand the resolver each verdict they keep as they keep it (keepAnswer), and another package's
+// function is asked through fact_resolver.Ask, which holds the answer. A judgment reads only the instructions of the
+// function it judges: of a function that one calls it asks its walk, whose answer is a verdict, the resolver's
+// answer, or the defaults of the callee's signature, read from no body, for a function begun, one with no object, and
+// one the push holds no fact of yet. Two verdicts are handed to no resolver, and neither is a body read with no
+// record:
+//
+//   - a function none of whose results may be nil is answered the defaults of its signature before a block of its
+//     body is read, by both walks, so no answer rests on its body;
+//   - a verdict the demand walk judged after it met a call whose answer hangs on the push's order is thrown away with
+//     the answers built on it, never stored, and the replay judges what the question needs again and hands over each
+//     verdict it keeps (judgeIn).
+//
+// TestEveryVerdictNilnessHoldsIsAnAnswerTheResolverHolds pins the first claim, and check's
+// TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer the second.
 var Kind = &fact_resolver.Kind{Name: "return_nil_ness"}
 
 func init() {
 	// Set here rather than in Kind's literal: OrderBound reads the kind's state under Kind, and a literal naming it
 	// would make Kind's initializer depend on itself, which Go refuses as an initialization cycle.
 	Kind.OrderBound = OrderBound
+	Kind.RecordsEveryJudgment = true
 	fact_resolver.Register(Kind, whole,
 		func(resolver *fact_resolver.Resolver, home *fact_resolver.Package, object types.Object) []ValueNilness {
 			function, isFunction := object.(*types.Func)

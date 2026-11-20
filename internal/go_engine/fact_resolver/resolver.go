@@ -126,6 +126,26 @@ type Kind struct {
 	// answering false says of one object, which is what a reader takes wherever nobody has argued otherwise: saying
 	// an answer is its types' alone takes an argument of its own, as an order bound does.
 	TypesAlone func(object types.Object) bool
+
+	// RecordsEveryJudgment is the kind's word that the answers the resolver holds are a complete record of what its
+	// judgments read, in every package the run computed in. It claims two things, and a kind sets it only where both
+	// are argued, as an order bound is:
+	//
+	//   - the kind hands every verdict its judgments reach to the resolver once it is final, through Ask or Keep, a
+	//     callee's it judged inside its caller's judgment among them;
+	//   - a judgment of the kind reads another function's body only by way of a verdict about that function, never by
+	//     looking into the body itself with no verdict made of it.
+	//
+	// Together they say that a function the resolver holds no answer of the kind about is one the kind never judged
+	// in the run, so no answer the run holds rests on its body. A reader comparing two builds' answers has nothing to
+	// compare there, where for a kind without the flag it must take such a function as one a judgment may have read
+	// and left no record of (fact_reach.Settle's unrecorded rule, which that kind keeps whole). The first claim alone
+	// would not do: a judgment that looked into a callee's body and made no verdict of it would leave a record as
+	// complete, and rest on a body with none. A package handed an unsure answer keeps nothing (Keep, answerOf), and
+	// the claim is not about it: a reader holds no answers of such a package at all. Nor is it about ctrlflow's
+	// no-return of a callee, which cuts the blocks a judgment reads after a call: that is a fact the checker pushes,
+	// which a reader compares on its own.
+	RecordsEveryJudgment bool
 }
 
 // Counts is what a resolver computed of one kind over its run.
