@@ -14,6 +14,7 @@
 package build
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 )
 
 // CopiedToolchain is the Go release whose go/build the copied files are, the version each copy's header names.
@@ -163,6 +165,11 @@ func (ctxt *Context) readGoInfoOnce(name string, fileSet *token.FileSet) (fileIn
 	return kept.info, kept.openError, kept.readError
 }
 
+// bufferedReaders are the buffered readers openAndReadGoInfo reads a file through, each at bufio's default size, which
+// readGoInfo's bufio.NewReader takes as it is rather than wrapping in a buffer of its own: one read's buffer is the
+// next read's, where readGoInfo made one for every file.
+var bufferedReaders = sync.Pool{New: func() any { return bufio.NewReader(nil) }}
+
 // openAndReadGoInfo opens the file at name and reads it as readGoInfo reads it, into fileSet, then closes it, as
 // upstream's matchFile does, with the open's error and the read's apart.
 func (ctxt *Context) openAndReadGoInfo(name string, fileSet *token.FileSet) (fileInfo, error, error) {
@@ -171,7 +178,18 @@ func (ctxt *Context) openAndReadGoInfo(name string, fileSet *token.FileSet) (fil
 	if openError != nil {
 		return read, openError, nil
 	}
-	readError := readGoInfo(reader, &read)
+	buffered, pooled := bufferedReaders.Get().(*bufio.Reader)
+	if !pooled {
+		// Only openAndReadGoInfo puts into bufferedReaders, and only what its New makes, so this is never met.
+		buffered = bufio.NewReader(nil)
+	}
+	buffered.Reset(reader)
+	readError := readGoInfo(buffered, &read)
+	// readGoInfo is the buffer's last reader: its importReader copies each byte it keeps into a slice of its own, the
+	// header and the rest of an embedding file alike, and goes with the call, so nothing read holds the buffer. The
+	// reset lets go of the file, so the pool holds no reader of a file the run closed.
+	buffered.Reset(nil)
+	bufferedReaders.Put(buffered)
 	// Ignored: the file was only read, and upstream's matchFile ignores it too.
 	_ = reader.Close()
 	return read, nil, readError
@@ -182,16 +200,18 @@ func (ctxt *Context) openAndReadGoInfo(name string, fileSet *token.FileSet) (fil
 // comment, all Import reads of it; and each import without its doc comment, which only saveCgo reads, and a file that
 // imports "C" is go/build's to read (errorCgoFile). Of cohere's root, a header kept whole held 3.9 KB, and compacted
 // 2.4 KB.
+//
+// The syntax tree's root and the imports are cut in place: both are the read's own, made by this read's readGoInfo
+// and held by nothing else until the read is shared (readGoInfoOnce), and readGoInfo made the imports at the length
+// the parse counted, so cutting them in place keeps no more of them than a copy would.
 func compacted(read fileInfo) fileInfo {
 	read.header = bytes.Clone(read.header)
 	if read.parsed != nil {
-		read.parsed = &ast.File{Package: read.parsed.Package, Name: read.parsed.Name, Doc: read.parsed.Doc}
+		*read.parsed = ast.File{Package: read.parsed.Package, Name: read.parsed.Name, Doc: read.parsed.Doc}
 	}
-	imports := make([]fileImport, len(read.imports))
-	for index, each := range read.imports {
-		imports[index] = fileImport{path: each.path, pos: each.pos, position: each.position}
+	for index := range read.imports {
+		read.imports[index].doc = nil
 	}
-	read.imports = imports
 	// Import reads no position through the file set once each is resolved, so the set and its file go with the read.
 	read.fset = nil
 	return read
@@ -200,12 +220,10 @@ func compacted(read fileInfo) fileInfo {
 // resolved is read with each import's position resolved in the file set read was read into, the one position the
 // copied Import reads through a file set (fileImport's position): the embeds' and the directives' readGoInfo resolves
 // itself. Resolved once by the read, no build reads a position through another's file set, whose file locks to answer.
+// Each is resolved in place, since the imports are the read's own, as compacted's are.
 func resolved(read fileInfo) fileInfo {
-	imports := make([]fileImport, len(read.imports))
-	for index, each := range read.imports {
-		each.position = read.fset.Position(each.pos)
-		imports[index] = each
+	for index := range read.imports {
+		read.imports[index].position = read.fset.Position(read.imports[index].pos)
 	}
-	read.imports = imports
 	return read
 }
