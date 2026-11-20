@@ -44,10 +44,13 @@ import (
 // since the order and the cut hang on every body of the package an initializer may run (bodyReacher.reachInitializers).
 // A package whose files import other paths in the build than on the host, blank imports among them, is reached whole,
 // Imports (#bed0mnk): a rule may judge a body by what its package imports anywhere, as unusedwrite stands down where
-// any file imports `unsafe`, a gate no use of the body reads. A build whose word size or maximum alignment differs from
-// the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or
-// `math.MaxInt` type-check to other constants there with no file differing, which no bit says, as the restore's own
-// sizes gate refuses such a build every package (check's hostSizesDiffer, #61qj12v).
+// any file imports `unsafe`, a gate no use of the body reads. So is a package one of whose imports resolves, in the
+// build, to a package of another ID than on the host, another package under the same path, as go test builds a package
+// again against a test variant: the objects its bodies read there are not the ones the host's record names
+// (differingImports). A build whose word size or maximum alignment differs from the host's (buildSizesDiffer) reaches
+// every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or `math.MaxInt` type-check to other
+// constants there with no file differing, which no bit says, as the restore's own sizes gate refuses such a build
+// every package (check's hostSizesDiffer, #61qj12v).
 //
 // What the reach does not stand for, which the census says at its head: a finding that turns on a fact about a
 // function a body calls, its purity, that it never returns or that it wraps printf, is stage 4's (#h0k644s), since the
@@ -127,7 +130,8 @@ func newBodyReachHost(
 // package of its ID compiles too and in those only the build compiles, every file's when the host has no such package,
 // the names its build-only files declare at package level, the paths each shared file imports by a dot, by the file
 // as parsed, whether a build-only file declares a variable initializer, which reaches every one of the package's
-// (bodyReacher.reachInitializers), and the paths its files import, by its load's import graph (differingImports).
+// (bodyReacher.reachInitializers), and the paths its files import, each with the package it resolves to, by its load's
+// import graph (differingImports).
 type reachBuiltPackage struct {
 	identifier            string
 	files                 map[string]bool

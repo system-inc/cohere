@@ -25,11 +25,13 @@ import (
 // system cache and a build misses its own there and checks it from source, goja's math.Sqrt2 / 2 type-checks to two
 // values. The Square ruled the rule general: every use of any object of such a package reaches, of any kind, and only
 // a package loaded alike reaches nothing. One the host does not hold has no mode to compare, and reaches, failing
-// wide, and so does one the host checked from source that the build's graph lacks, or holds without its types: the
-// direct rule reads a package by its ID alone, whatever the carry makes of one the build lacks (#wzre5eg). The census
-// still counts the narrower rule it replaced, an untyped float or complex constant read by its value alone. A fixture
-// loads a package two ways only over a filled system cache, the whole standard library at once
-// (TestAPackageLoadedOtherwiseStillStartsTheCarryBesideALackedOne), so the rule's cases are pinned here.
+// wide, and so does one the build's graph lacks, whatever the host's mode (#bed0mnk), or holds without its types
+// where the host checked it from source: the direct rule reads a package by its ID alone, whatever the carry makes of
+// one the build lacks (#wzre5eg), since the package the build holds of its path in its place, a test variant, may
+// declare the object otherwise. The census still counts the narrower rule it replaced, an untyped float or complex
+// constant read by its value alone. A fixture loads a package two ways only over a filled system cache, the whole
+// standard library at once (TestAPackageLoadedOtherwiseStillStartsTheCarryBesideALackedOne), so the rule's cases are
+// pinned here.
 func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 	test.Parallel()
 
@@ -78,6 +80,10 @@ func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 			true, true},
 		{"a function, source on the host and no package of its ID in the build", function, named, false, lacked, true,
 			false},
+		{"an untyped float, export data on the host and no package of its ID in the build", sqrt2, byValue, true,
+			lacked, true, true},
+		{"a function, export data on the host and no package of its ID in the build", function, named, true, lacked,
+			true, false},
 		{"a function, source on the host and held without its types in the build", function, named, false,
 			builtWithoutTypes, true, false},
 	}

@@ -158,16 +158,32 @@ func (reacher *bodyReacher) reachPackage(
 	return bodies, absent
 }
 
-// differingImports are the paths, sorted, that a package's files import in one build and not the other, hosted the
-// host's import graph of it and built the build's, blank imports among them, `unsafe` too, which the graph holds as
-// any other import. A rule may judge every body by them, whatever the body uses (#bed0mnk): unusedwrite stands down
-// in a package that imports `unsafe`, SA1015 in one that imports cobra, a command's, and SA5008 accepts a repeated
-// struct tag key in one that imports go-flags.
+// differingImports are the imports of a package that differ between the builds, sorted by path, hosted the host's
+// import graph of it and built the build's, blank imports among them, `unsafe` too, which the graph holds as any other
+// import: the paths its files import in one build and not the other, and the paths both import that resolve in the
+// build to a package of another ID than on the host, each of those written with both IDs.
+//
+// A rule may judge every body by the paths, whatever the body uses (#bed0mnk): unusedwrite stands down in a package
+// that imports `unsafe`, SA1015 in one that imports cobra, a command's, and SA5008 accepts a repeated struct tag key
+// in one that imports go-flags.
+//
+// A path that resolves to another ID is another package under the same name (#bed0mnk, the reader's must 2 on
+// #wzre5eg). go test builds a package again against a test variant, `via [audit.test]` against `audit [audit.test]`,
+// and a test file may declare a universe name the package's own files use, so the variant's constants are not the
+// package's, nor are those of a package built against it. A body that reads one type-checks to other values where
+// only the build holds the variant, though no file of its package differs and every ID the host holds the build
+// holds, loaded alike: the reach reads an object by the host's ID of its package, and here the build's body reads
+// another package's.
 func differingImports(hosted map[string]*packages.Package, built map[string]*packages.Package) []string {
 	var differing []string
-	for path := range hosted {
-		if _, isBuilt := built[path]; !isBuilt {
+	for path, hostImported := range hosted {
+		builtImported, isBuilt := built[path]
+		switch {
+		case !isBuilt:
 			differing = append(differing, path)
+		case builtImported.ID != hostImported.ID:
+			differing = append(differing, path+" resolving to "+hostImported.ID+" on the host and to "+
+				builtImported.ID+" in the build")
 		}
 	}
 	for path := range built {
@@ -486,9 +502,9 @@ func (reacher *bodyReacher) startsCarry(identifier string, path string) (starts 
 // every use of any object of such a package reaches. With constantsOnly, the census's count of the narrower rule it
 // replaced, only an untyped float or complex constant read by its value does, since an integer, string or boolean
 // constant is written exactly in both and a typed float is rounded to its type in both. A package the host does not
-// hold differs. An object a value spec declared from what the load mode reaches reaches it as well, under either rule
-// (carryLoadMode): the constants-only rule reads the general rule's carried objects, of them the untyped float and
-// complex constants alone.
+// hold differs, and so does one the build holds nothing of by its ID (loadModeDiffers). An object a value spec
+// declared from what the load mode reaches reaches it as well, under either rule (carryLoadMode): the constants-only
+// rule reads the general rule's carried objects, of them the untyped float and complex constants alone.
 func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_reads.UseKinds) bool {
 	if reacher.constantsOnly {
 		constant, isConstant := object.(*types.Const)
@@ -501,14 +517,21 @@ func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_rea
 
 // loadModeDiffers reports whether the host and the build load own in different modes. A package the host does not
 // hold has no mode to compare, and so differs, failing wide (#w72zxtq). This is the direct rule, of a body that names
-// an object of own, and it reads a package by its ID alone: one the host checked from source and the build's graph
-// lacks differs here, though it starts no carry (startsCarry).
+// an object of own, and it reads a package by its ID alone: one the build's graph lacks by that ID differs here
+// whatever the host's mode (#bed0mnk, the reader's must 1 on #wzre5eg), though it starts no carry (startsCarry).
+//
+// The two differ on purpose. The carry asks whether a value may have been computed from a package loaded in two
+// modes, so it reads the path and lets the package of another ID the build holds of it stand in, a command's test
+// variant holding every file of the command. The direct rule asks whether the object the body names is the one the
+// host recorded, and a stand-in's need not be: a test variant's own files may declare a universe name the package's
+// files use, so the variant's constant is another value where nothing was loaded otherwise. Read by the mode alone, a
+// package the host restored and the build lacks agreed, export data on one side and no check from source on the other.
 func (reacher *bodyReacher) loadModeDiffers(own *types.Package) bool {
 	identifier, isHeld := reacher.host.identifiers[own]
 	if !isHeld {
 		return true
 	}
-	return reacher.identifiedLoadModeDiffers(identifier)
+	return !reacher.graph.holds(identifier) || reacher.identifiedLoadModeDiffers(identifier)
 }
 
 // identifiedLoadModeDiffers reports whether the host and the build load the package the host holds by identifier in
