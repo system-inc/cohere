@@ -22,7 +22,8 @@ type FactReachCapture struct {
 
 	// Answers are every answer the run holds, about every package's objects, as fact_resolver.Answered orders them, the
 	// answers a build is asked of another package's objects before any body leaves. Each is an answer as
-	// computedAnswers makes one, with Package nil for an object of a package the load holds none of.
+	// computedAnswers makes one, with Package nil for an object of a package the load holds none of, and with
+	// TypesAlone set where its kind says the object's types alone decide it (fact_resolver.Kind.TypesAlone).
 	Answers []ExportedFact
 
 	// Askers are the bodies whose rules asked each answer, by kind's name and object (fact_resolver.Resolver.Askers):
@@ -69,7 +70,8 @@ type factReachKinds struct {
 // the findings read it. It reads every answer once (fact_resolver.Answered), then calls each kind's bound once per
 // package. A kind that answered nothing about a package's objects is not called there: its state holds no judgment of
 // the package, so its bound is empty, and known. An answer about a parameter is no function the kind answered about,
-// and the one kind with a bound, nil-ness, answers only about functions.
+// and the one kind with a bound, nil-ness, answers only about functions. It asks each answer's kind once whether the
+// object's types alone decide the answer, and marks the answer where they do.
 func captureFactReach(
 	resolver *fact_resolver.Resolver,
 	analyzed []*packages.Package,
@@ -107,7 +109,7 @@ func captureFactReach(
 	for _, answer := range answered {
 		fact := ExportedFact{Package: owners[answer.Object.Pkg()], Analyzer: answer.Kind.Name,
 			FactType: answerFactType, Object: answer.Object, Digest: cache.DigestOf(answer.Encoded), Answer: true,
-			Encoded: answer.Encoded}
+			Encoded: answer.Encoded, TypesAlone: answer.Kind.TypesAlone != nil && answer.Kind.TypesAlone(answer.Object)}
 		capture.Answers = append(capture.Answers, fact)
 		hosted := captured[answer.Object.Pkg()]
 		if hosted == nil {

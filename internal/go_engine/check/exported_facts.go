@@ -23,6 +23,10 @@ import (
 // Analyzer is its kind, FactType is "answer", Answer is set, and Encoded is its JSON, which Digest is of. A question
 // the run never asked has no answer, so an answer only one build holds says nothing of the fact.
 //
+// TypesAlone says of an answer the facts' reach captured (captureFactReach) that its kind holds it the same in every
+// build that declares its object with those types, whatever the object's body (fact_resolver.Kind.TypesAlone). No
+// other fact or answer sets it.
+//
 // ObjectPath names the object of a fact a restored package's entry holds about an object its export data does not
 // hold, which has no Object (CacheSession.unnamedFacts): an importer never sees it, but the package's own run exported
 // it, and a census comparing with a run that checked the package from source finds it by its path (#ss4t5g6).
@@ -37,6 +41,7 @@ type ExportedFact struct {
 	Undigestable bool
 	Answer       bool
 	Encoded      []byte
+	TypesAlone   bool
 }
 
 // answerFactType is every answer's FactType.
