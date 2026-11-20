@@ -4,6 +4,11 @@ package load
 // whole graph. Every root's test variants ask what its tests reach and what depends on it, and answering from the Deps
 // themselves gathered a few thousand import paths and read the whole listing for each root, which at a few hundred
 // roots was most of what a graph cost to build. Here each answer is a few words of bits.
+//
+// The sets together are the listing's packages squared, a bit each: 160 KB at cohere's root, 1,125 packages, about
+// 12 MB at ten thousand packages and about 300 MB at fifty thousand, held while newGraph runs and no longer. A listing
+// of some tens of thousands of packages wants another shape: sets for the packages the roots' tests reach alone, or
+// sparse ones.
 type listedDependencies struct {
 	// place is each listed package's place in the listing, by import path. A listing holds one package a path
 	// (listing.add, the in-process lister), so a path's place is its package's, as the listing's byPath is.
