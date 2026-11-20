@@ -146,3 +146,16 @@ func (server *server) stop() {
 	defer server.log.Close()
 	os.Exit(0) // want `os\.Exit`
 }
+
+// The first exit has its defer ahead of it in its own block, and the second is reached only by the defer of the
+// block before it, so the walk back the second needs must run though the first never needed it.
+func exitTwice(failed bool, late bool) {
+	if failed {
+		defer use("first")
+		os.Exit(1) // want `os\.Exit`
+	}
+	defer use("second")
+	if late {
+		os.Exit(2) // want `os\.Exit`
+	}
+}
