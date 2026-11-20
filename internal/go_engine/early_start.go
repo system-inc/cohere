@@ -11,7 +11,8 @@ import (
 // earlyStart is the go commands describeProject starts beside its census and its file reads, which wait on neither
 // (#q9ezwvw): the host's go env, which needs only the root and the workspace's environment, then its lister state,
 // which needs only go env's answer, and, in a run that reads builds, the toolchain's ports (project.ReadPorts), which
-// need only the root and the environment, then, once the builds are read, each extra build's go env and lister state.
+// need only the root and the environment, then, once the builds are read, each extra build's go env and lister state,
+// the host's build list read in place of its own where it prints the same (#sfjj2rh).
 // Every one is joined before the host's first load (describedProject.awaitStarted), or before describeProject returns
 // an error, so no go command outlives a refused run, and none of the builds starts after the first load begins.
 type earlyStart struct {
@@ -120,7 +121,7 @@ func (early *earlyStart) startReadingBuilds(
 		early.builds, early.unbuiltReasons, early.buildsError = readBuilds(census, goEnvironment, ports, targets,
 			reader)
 		if startsBuilds && early.buildsError == nil && len(early.builds) > 1 {
-			early.startBuilds(workspace, early.builds[1:], children)
+			early.startBuilds(workspace, goEnvironment, early.builds[1:], children)
 		}
 	})
 }
@@ -133,8 +134,15 @@ func (early *earlyStart) awaitBuilds() ([]project.Build, map[string]string, erro
 
 // startBuilds starts each of extras' go env in workspace under the build's environment, then its lister state, each
 // build on a goroutine of its own, as startChildrenNow does in a run whose description started none, every go command
-// recorded in children. Called once, from a goroutine started counts, so its wait never ends before these are counted.
-func (early *earlyStart) startBuilds(workspace project.Workspace, extras []project.Build, children *load.Children) {
+// recorded in children: a build whose build list prints what host's does, host the host's go env, reads host's and
+// runs only its build context (load.GoEnvironment.ShareModulesOf, #sfjj2rh). Called once, from a goroutine started
+// counts, so its wait never ends before these are counted.
+func (early *earlyStart) startBuilds(
+	workspace project.Workspace,
+	host *load.GoEnvironment,
+	extras []project.Build,
+	children *load.Children,
+) {
 	early.buildGoEnvironments = make([]*load.GoEnvironment, len(extras))
 	for index, extra := range extras {
 		early.started.Go(func() {
@@ -142,6 +150,8 @@ func (early *earlyStart) startBuilds(workspace project.Workspace, extras []proje
 			goEnvironment, _ := load.ReadGoEnvironment(workspace.Root, extraBuildEnvironment(workspace, extra), nil,
 				children)
 			if goEnvironment != nil {
+				// Not timed: the batch starts only in a run not under `--timing` (startReadingBuilds's startsBuilds).
+				goEnvironment.ShareModulesOf(host, false)
 				goEnvironment.FetchListerState(nil)
 			}
 			early.buildGoEnvironments[index] = goEnvironment

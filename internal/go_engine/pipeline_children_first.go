@@ -14,7 +14,9 @@ import (
 // build loads, started with the engine at gigabytes resident. Started early they are the same commands under the same
 // environments and guards, so every answer is the one the load would have read: each build's go env is kept for its
 // run (extraBuildRun), and each answer's lister state is fetched once for every load under it
-// (load.GoEnvironment.FetchListerState). Each build keeps its own `go list -m -json all`, never another's.
+// (load.GoEnvironment.FetchListerState). A build whose `go list -m -json all` prints what the host's does reads the
+// host's, its failure too, in place of running its own, outside `--timing` (load.GoEnvironment.ShareModulesOf,
+// #sfjj2rh).
 //
 // describeProject starts them beside its census and its reads, once it has read the builds, and the host's lister
 // state in any run that loads (earlyStart, #q9ezwvw), so here the run waits for whatever of them is left. Under
@@ -49,7 +51,8 @@ func (engine *pipeline) startChildrenFirst() {
 
 // startChildrenNow starts the host's lister state, and each of extras' go env and lister state, at once, or one at a
 // time under `--timing`, and returns each extra build's go env by its index, nil where go env failed: the path of a run
-// whose description started none of them (startChildrenFirst).
+// whose description started none of them (startChildrenFirst). A build that reads the host's build list waits for it,
+// or runs it, under the host's environment and guard, whichever step comes first.
 func (engine *pipeline) startChildrenNow(extras []project.Build) []*load.GoEnvironment {
 	goEnvironments := make([]*load.GoEnvironment, len(extras))
 	var oneAtATime sync.Mutex
@@ -70,6 +73,8 @@ func (engine *pipeline) startChildrenNow(extras []project.Build) []*load.GoEnvir
 				goEnvironment, _ := load.ReadGoEnvironment(engine.described.workspace.Root,
 					extraBuildEnvironment(engine.described.workspace, extra), nil, engine.described.children)
 				if goEnvironment != nil {
+					// Under `--timing` each build lists its own, so each step's children's CPU is of its own commands.
+					goEnvironment.ShareModulesOf(engine.described.goEnvironment, engine.timing != nil)
 					goEnvironment.FetchListerState(engine.timing)
 				}
 				goEnvironments[index] = goEnvironment

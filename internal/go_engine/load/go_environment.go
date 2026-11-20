@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
@@ -43,8 +41,8 @@ type GoEnvironment struct {
 	guard *workspaceSumGuard
 
 	// listerState is the two go commands the in-process lister reads under the answer, run once for every load under
-	// it, and early when the run asks (FetchListerState). A pointer, so a copy of the answer, as a test makes, shares
-	// it.
+	// it, and early when the run asks (FetchListerState), the build list the host's when an extra build's reads it
+	// (ShareModulesOf). A pointer, so a copy of the answer, as a test makes, shares it.
 	listerState *listerState
 }
 
@@ -113,7 +111,7 @@ func ReadGoEnvironment(directory string, environment []string, held Held, childr
 // workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh): a run
 // through a linked root then names its inputs as a run at the real root does. The command is recorded in children.
 func askGoEnvironment(workspace string, environment []string, children *Children) (map[string]string, error) {
-	goEnvironmentAsked(workspace)
+	goEnvironmentWatches.counted(workspace)
 	arguments := append([]string{"env", "-json"}, goEnvironmentNames...)
 	children.started(arguments)
 	command := exec.Command("go", arguments...)
@@ -189,42 +187,24 @@ func (goEnvironment *GoEnvironment) FetchListerState(collector *timing.Collector
 	goEnvironment.listerState.fetch(goEnvironment, collector)
 }
 
+// ShareModulesOf has every lister under the answer read host's `go list -m -json all`, its output and its failure,
+// in place of running its own, when modulesSharedWith says it prints the same, and reports whether it does: an extra
+// build's go env, read beside the host's before the first load, then forks one go list where it forked two
+// (#sfjj2rh). host is the host's answer, nil for none, and timed whether the run is under `--timing`. Called once the
+// answer is read and before anything fetches its lister state, as the early start does. A load that reads an answer
+// of its own (PackagesCached, when the one it is handed does not answer its environment) shares nothing.
+func (goEnvironment *GoEnvironment) ShareModulesOf(host *GoEnvironment, timed bool) bool {
+	if host == nil || host == goEnvironment || !modulesSharedWith(goEnvironment, host, timed) {
+		return false
+	}
+	goEnvironment.listerState.modulesFrom = host
+	return true
+}
+
 // contextFor is the build target as a build context that opens a file held holds from its held bytes, and any other
 // on disk, whichever bytes the asker held.
 func (goEnvironment *GoEnvironment) contextFor(held Held) *build.Context {
 	buildContext := *goEnvironment.buildContext
 	buildContext.OpenFile = held.openFile()
 	return &buildContext
-}
-
-// goEnvironmentWatches are, by workspace, the counts of go env's asks a test watches (WatchGoEnvironmentAsks), under
-// goEnvironmentWatchesLock. Empty but in a test.
-var (
-	goEnvironmentWatchesLock sync.Mutex
-	goEnvironmentWatches     = map[string]*atomic.Int64{}
-)
-
-// WatchGoEnvironmentAsks counts every go env askGoEnvironment runs in workspace, absolute, until stop is called, for a
-// test holding a whole run to one ask per build. Only a test calls it; it is exported for the engine's tests, which
-// run the whole pipeline over a fixture, and keyed by workspace, since tests in one process run many workspaces at
-// once.
-func WatchGoEnvironmentAsks(workspace string) (asks *atomic.Int64, stop func()) {
-	asks = &atomic.Int64{}
-	goEnvironmentWatchesLock.Lock()
-	defer goEnvironmentWatchesLock.Unlock()
-	goEnvironmentWatches[workspace] = asks
-	return asks, func() {
-		goEnvironmentWatchesLock.Lock()
-		defer goEnvironmentWatchesLock.Unlock()
-		delete(goEnvironmentWatches, workspace)
-	}
-}
-
-// goEnvironmentAsked adds one ask in workspace to the count a test watches there, if any.
-func goEnvironmentAsked(workspace string) {
-	goEnvironmentWatchesLock.Lock()
-	defer goEnvironmentWatchesLock.Unlock()
-	if asks := goEnvironmentWatches[workspace]; asks != nil {
-		asks.Add(1)
-	}
 }

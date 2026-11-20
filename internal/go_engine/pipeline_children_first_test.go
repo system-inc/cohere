@@ -1,10 +1,13 @@
 package go_engine
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // A run of every build over a module whose census needs two extra builds starts every go command it needs
@@ -22,6 +25,35 @@ func TestARunWithBuildsStartsEveryGoCommandBeforeItsFirstLoad(test *testing.T) {
 	if lint.ChildProcessesAfterLoad != 0 || len(lint.ChildProcessesAfterLoadNamed) != 0 {
 		test.Errorf("the run started %d go commands after its first load began, want 0: %s",
 			lint.ChildProcessesAfterLoad, strings.Join(lint.ChildProcessesAfterLoadNamed, "; "))
+	}
+}
+
+// A run of every build over a module whose two extra builds' build lists print the host's runs one
+// `go list -m -json all`, the host's, which each build reads in place of its own (#sfjj2rh), and still starts no go
+// command after its first load began and finds what its expected stream holds, which each build listing its own wrote.
+func TestARunsExtraBuildsReadTheHostsBuildList(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	lists, stop := load.WatchBuildLists(root)
+	defer stop()
+	engine, stream := runOver(test, root, exitFindings)
+	if len(engine.buildRuns) != 3 {
+		test.Fatalf("the run checked %d builds, want the host's and two extra", len(engine.buildRuns))
+	}
+	if count := lists.Load(); count != 1 {
+		test.Errorf("the run ran %d build lists, want the host's alone", count)
+	}
+	lint := lintRecordOf(test, stream)
+	if lint.ChildProcessesAfterLoad != 0 || len(lint.ChildProcessesAfterLoadNamed) != 0 {
+		test.Errorf("the run started %d go commands after its first load began, want 0: %s",
+			lint.ChildProcessesAfterLoad, strings.Join(lint.ChildProcessesAfterLoadNamed, "; "))
+	}
+	expected, readError := os.ReadFile(expectedStreamPath("other-builds"))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if found, want := findingLines(stream), findingLines(string(expected)); !slices.Equal(found, want) {
+		test.Errorf("the run found\n%s\nwant\n%s", strings.Join(found, ""), strings.Join(want, ""))
 	}
 }
 
