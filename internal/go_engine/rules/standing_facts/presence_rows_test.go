@@ -264,7 +264,9 @@ func TestABodyHoldingAnyOrAMarkerOfItsOwnLeavesForPresence(test *testing.T) {
 // defined from values' result; Sorts names compare, defined from a literal whose parameters are keys; and Calls names
 // g, whose parameter feeds kept, an edge only g's body records, so it is read once g leaves for naming kept. values'
 // own body leaves as a key's function. Clones fixes P, which feeds Local's own candidate, a key seeded from a body, so
-// Clones leaves, as Local does for its own candidate. Plain touches nothing the flow routes to a key, and stands.
+// Clones leaves, as Local does for its own candidate. Fetches hands call fetch, defined from Getter's Get, an
+// interface method key read by name, so it leaves.
+// Plain touches nothing the flow routes to a key, and stands, and so does call, which names nothing a key routes to.
 func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "flowing")
@@ -274,9 +276,11 @@ func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
 		presenceUse{key: "flowing.compare", identity: found.identity("compare"), users: []string{"Sorts"}},
 		presenceUse{key: "flowing.kept", identity: found.identity("kept"), users: []string{"g"}},
 		presenceUse{key: "flowing.g", identity: found.identity("g"), users: []string{"Calls"}},
-		presenceUse{key: "flowing.P", identity: found.identity("P"), users: []string{"Clones", "Local"}})
+		presenceUse{key: "flowing.P", identity: found.identity("P"), users: []string{"Clones", "Local"}},
+		presenceUse{key: "flowing.fetch", identity: found.identity("fetch"), users: []string{"Fetches"}},
+		presenceUse{key: "flowing.call", identity: found.identity("call"), users: []string{"Fetches"}})
 	for _, name := range []string{"Prints", "values", "PrintsCached", "Sorts", "g", "Calls", "Plain", "Clones",
-		"Local"} {
+		"Local", "call", "Fetches"} {
 		host.functions = append(host.functions,
 			fact_reach.Function{Object: fact_reach.Object("flowing." + name), Identity: found.identity(name)})
 	}
@@ -285,7 +289,7 @@ func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"Prints": standing_presence.NoAny, "values": standing_presence.NoAny, "PrintsCached": standing_presence.NoAny,
 		"Sorts": standing_presence.NoAny, "g": standing_presence.NoAny, "Calls": standing_presence.NoAny,
-		"Clones": standing_presence.NoAny, "Local": standing_presence.NoAny,
+		"Clones": standing_presence.NoAny, "Local": standing_presence.NoAny, "Fetches": standing_presence.NoAny,
 	}, nil)
 }
 
@@ -299,4 +303,20 @@ func TestAGoStatementInAPackageNotImportingTestingTakesNothingOut(test *testing.
 	host.recordPresence(found)
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{}, nil)
+}
+
+// noany's fixed point is closed by the Reread after Settle (#xeafx79, round 2's S2): in rereading, the first round of
+// the bound reads no edge, so the keys do not grow and it ends, with Assigns taken out for naming held but unread.
+// Only once Settle has taken Assigns out does the Reread read its body, where y feeds held, so y is a key, and
+// Reclones, which fixes y, leaves there.
+func TestABodyOnlyTheRereadRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "rereading")
+	host := presenceHost(test, found, nil,
+		presenceUse{key: "rereading.held", identity: found.identity("held"), users: []string{"Assigns"}},
+		presenceUse{key: "rereading.y", identity: found.identity("y"), users: []string{"Assigns", "Reclones"}})
+	host.recordPresence(found)
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result, map[string]standing_presence.Row{
+		"Assigns": standing_presence.NoAny, "Reclones": standing_presence.NoAny}, nil)
 }

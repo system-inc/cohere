@@ -60,3 +60,20 @@ func Local() int {
 	var held []any = P
 	return len(held)
 }
+
+// Getter's Get is an interface method key, its result written any.
+type Getter interface{ Get() any }
+
+// source is a Getter, and fetch is defined from its Get, so a place fixing fetch fixes Get.
+var source Getter
+
+var fetch = source.Get
+
+// getting is a function of Get's type by another name, so a parameter of it is no candidate.
+type getting = func() item
+
+// call takes a function of Get's type.
+func call(function getting) bool { return function != nil }
+
+// Fetches hands fetch to call, whose parameter's type is no interface, which fixes fetch, and so Get.
+func Fetches() bool { return call(fetch) }

@@ -65,7 +65,10 @@ func noAnyBound(
 	var keyNamed []fact_reach.Named
 	var leaving []Leaving
 	// Each round reads the flows of what is present, closes the keys under them, and takes out what names a key, which
-	// is then present. The keys only grow, among the package's finitely many declarations, so the rounds end.
+	// is then present. The keys only grow, among the package's finitely many declarations, so the rounds end. They end
+	// when the keys stop growing, not when no body leaves, so a body that leaves in the last round is not read here:
+	// this loop is an early take, and the Reread after Settle, which reads every body that no longer stands, is what
+	// closes the fixed point.
 	for {
 		edges := consistency_no_any.RecordFlows(pass.TypesInfo, pass.Pkg, pass.Files,
 			func(declaration *ast.FuncDecl) bool {
