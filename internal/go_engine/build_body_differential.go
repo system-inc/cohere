@@ -153,10 +153,12 @@ func readsFacts(analyzer *analysis.Analyzer) bool {
 	return reads(analyzer)
 }
 
-// comparedBody is a body the differential compared, by where it lies, its declaration's first line to its body's
-// last, and how the census names it.
+// comparedBody is a body the differential compared, by where its findings are placed, the file as parsed and its
+// declaration's first line to its body's last as written (build_reads.RenderedBody), and how the census names it,
+// which is by the file and line a //line directive moves it to.
 type comparedBody struct {
 	body      reachedBody
+	file      string
 	firstLine int
 	lastLine  int
 }
@@ -223,8 +225,8 @@ func newBuildBodyDifferential(
 				builtBody.Facts); difference != "" {
 				differential.failures = append(differential.failures, body.String()+": "+difference)
 			}
-			differential.bodies = append(differential.bodies,
-				comparedBody{body: body, firstLine: body.line, lastLine: builtBody.LastLine})
+			differential.bodies = append(differential.bodies, comparedBody{body: body, file: builtBody.ParsedFile,
+				firstLine: builtBody.FirstLine, lastLine: builtBody.LastLine})
 		}
 	}
 	if differential.compared == 0 && census.recorded > 0 && census.byReason[reachedSizes] < census.total {
@@ -304,8 +306,10 @@ func (differential *buildBodyDifferential) compareFindings(
 			differential.takenOut++
 			continue
 		}
-		hostWritten := findingsWithin(hostFindings[compared.body.file], compared.firstLine, compared.lastLine)
-		builtWritten := findingsWithin(builtFindings[compared.body.file], compared.firstLine, compared.lastLine)
+		// A finding is keyed by its file as parsed and its line as written (check's newFinding), so a body under a
+		// //line directive is read there too, never in the file its positions claim (#99saas4).
+		hostWritten := findingsWithin(hostFindings[compared.file], compared.firstLine, compared.lastLine)
+		builtWritten := findingsWithin(builtFindings[compared.file], compared.firstLine, compared.lastLine)
 		if slices.Equal(hostWritten, builtWritten) {
 			continue
 		}
