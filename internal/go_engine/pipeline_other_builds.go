@@ -23,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
@@ -816,6 +817,8 @@ func (engine *pipeline) extraBuildRun(
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
 			FactReachSettle: settle,
 			FactReach:       engine.bodyDifferential && factHosts != nil,
+			// Read by standing_presence's reader, which check takes and never imports (#f5g7ym6), only under FactReach.
+			FactReachPresence: standing_presence.ReadPackage,
 			// Under `--timeline` the check stamps in the round of the load it runs over, the last one counted.
 			Timeline:       engine.buildTimeline(extra, len(run.checkedFromSourceRounds)-1),
 			StandingBodies: standingBodies,
