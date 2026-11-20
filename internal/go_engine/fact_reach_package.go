@@ -66,6 +66,10 @@ type factReachPackage struct {
 	users      map[fact_reach.Object][]fact_reach.Place
 	everything []fact_reach.Place
 
+	// usedObjects are the objects the bodies' records use, each once, with its identity, in the order of their keys:
+	// each key of users, and each object a body of everything uses that an identity names.
+	usedObjects []fact_reach.UsedObject
+
 	// functions are the functions a no-return fact is compared on, each once, in the order the record first names
 	// them: a function declared with a body where it is declared, then each function its body uses.
 	functions []fact_reach.Function
@@ -115,6 +119,11 @@ func (hosted *factReachPackage) Users(object fact_reach.Object) []fact_reach.Pla
 		return hosted.users[object]
 	}
 	return slices.Concat(hosted.users[object], hosted.everything)
+}
+
+// Used are the objects the package's bodies use, each once, with its identity, in the order of their keys.
+func (hosted *factReachPackage) Used() []fact_reach.UsedObject {
+	return hosted.usedObjects
 }
 
 // Recorded are the questions the host's answers about the function at place, and about its parameters, make.

@@ -12,6 +12,7 @@ type fakeHost struct {
 	imported   []fact_reach.Question
 	asking     map[string]fact_reach.Asking
 	orderBound []fact_reach.Named
+	used       []fact_reach.UsedObject
 	users      map[fact_reach.Object][]fact_reach.Place
 	recorded   map[fact_reach.Place][]fact_reach.Question
 	declared   map[fact_reach.Place][]fact_reach.Object
@@ -61,6 +62,11 @@ func (host *fakeHost) Asking(key string) (fact_reach.Asking, bool) {
 func (host *fakeHost) OrderBound() []fact_reach.Named {
 	host.count("OrderBound")
 	return host.orderBound
+}
+
+func (host *fakeHost) Used() []fact_reach.UsedObject {
+	host.count("Used")
+	return host.used
 }
 
 func (host *fakeHost) Users(object fact_reach.Object) []fact_reach.Place {

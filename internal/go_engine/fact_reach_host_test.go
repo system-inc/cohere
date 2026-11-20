@@ -223,6 +223,33 @@ func TestAnObjectsUsersAreTheBodiesThatNameOrSelectIt(test *testing.T) {
 	}
 }
 
+// The package's used objects are every object a body uses, each once, in the order of their keys, with the identity
+// that key is made of (#xeafx79): the keys Users is asked by, so a build that names one takes that object's users out.
+// A type only a signature names is no body's use, and none of them.
+func TestAPackagesUsedObjectsAreEveryObjectItsBodiesUseByKey(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	hosted := newFactReachPackage(fixture.inputs())
+	used := hosted.Used()
+	keys := make([]fact_reach.Object, 0, len(used))
+	for _, object := range used {
+		keys = append(keys, object.Object)
+		if key, isKnown := factReachObject(object.Identity); !isKnown || key != object.Object {
+			test.Errorf("the used object %q has the identity %s, whose key is %q", object.Object, object.Identity, key)
+		}
+	}
+	if want := slices.Sorted(maps.Keys(hosted.users)); !slices.Equal(keys, want) {
+		test.Errorf("the used objects are %q, want the keys of the users, in order, %q", keys, want)
+	}
+	if !slices.Contains(keys, fixture.key(test, fixture.function(test, "size"))) {
+		test.Errorf("size, which Warm calls, is no used object")
+	}
+	if slices.Contains(keys, fixture.key(test, fixture.own.Scope().Lookup("Label"))) {
+		test.Errorf("Label, which only a signature names, is a used object")
+	}
+}
+
 // A package's places are its function bodies in the order its files declare them, a function declared without a body
 // not among them.
 func TestAPackagesPlacesAreItsFunctionBodiesInTheOrderDeclared(test *testing.T) {

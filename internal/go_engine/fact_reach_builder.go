@@ -59,7 +59,7 @@ type factReachParameter struct {
 // identity and key, rendered once however many bodies use it. functions are the functions the record's declarations
 // declare, which the package's own answers are placed by, used the functions its bodies use, which another package's
 // answers are kept by, and parameters each parameter of either. met are the functions a no-return fact is compared
-// on already, by key.
+// on already, by key, and usedKeys the objects of any kind the bodies use, by key.
 type factReachBuilder struct {
 	inputs     factReachInputs
 	hosted     *factReachPackage
@@ -68,6 +68,7 @@ type factReachBuilder struct {
 	used       map[*types.Func]bool
 	parameters map[*types.Var]factReachParameter
 	met        map[fact_reach.Object]bool
+	usedKeys   map[fact_reach.Object]bool
 }
 
 // newFactReachPackage is the host's side of the package inputs are of (factReachPackage).
@@ -79,7 +80,7 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
-		met: map[fact_reach.Object]bool{},
+		met: map[fact_reach.Object]bool{}, usedKeys: map[fact_reach.Object]bool{},
 	}
 	// The parsed files placing a body in each name a reader sees, so a name two of them share, by their //line
 	// directives, is known (factReachPackage.shared).
@@ -146,6 +147,9 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		slices.SortFunc(questions, byKey)
 	}
 	slices.SortFunc(builder.hosted.imported, byKey)
+	slices.SortFunc(builder.hosted.usedObjects, func(first fact_reach.UsedObject, second fact_reach.UsedObject) int {
+		return cmp.Compare(first.Object, second.Object)
+	})
 	for _, object := range inputs.orderBound {
 		rendered := builder.render(object)
 		if !rendered.known {
@@ -229,11 +233,12 @@ func (builder *factReachBuilder) keepParameters(function *types.Func) {
 }
 
 // use makes the body at place, declared's, a user of each object its body uses, the object selected for a selection,
-// and meets each function among them, kept as used with its parameters. Its signature's uses are not its body's: a
-// rule reads a fact where a body names or selects its object. A body with a use no identity names is a user of every
-// object instead, as one the record marks unknown is. The recorder marks a body unknown wherever a use of it renders
-// unknown, by the renderer's own rule (build_reads.unplacedIdentity), so the second check finds nothing today, and
-// stands for a record made any other way.
+// meets each function among them, kept as used with its parameters, and keeps each object an identity names among the
+// package's used objects (fact_reach.Host.Used). Its signature's uses are not its body's: a rule reads a fact where a
+// body names or selects its object. A body with a use no identity names is a user of every object instead, as one the
+// record marks unknown is. The recorder marks a body unknown wherever a use of it renders unknown, by the renderer's
+// own rule (build_reads.unplacedIdentity), so the second check finds nothing today, and stands for a record made any
+// other way.
 func (builder *factReachBuilder) use(place fact_reach.Place, declared build_reads.DeclarationUses) {
 	isFollowed := !declared.BodyUnknown
 	keys := make([]fact_reach.Object, 0, len(declared.Body))
@@ -247,6 +252,13 @@ func (builder *factReachBuilder) use(place fact_reach.Place, declared build_read
 		rendered := builder.render(object)
 		isFollowed = isFollowed && rendered.known
 		keys = append(keys, rendered.key)
+		// Kept for a body of everything too, which is a user of each object anyway, so an object only it uses is
+		// still one a build can judge.
+		if rendered.known && !builder.usedKeys[rendered.key] {
+			builder.usedKeys[rendered.key] = true
+			builder.hosted.usedObjects = append(builder.hosted.usedObjects,
+				fact_reach.UsedObject{Object: rendered.key, Identity: rendered.identity})
+		}
 	}
 	if !isFollowed {
 		builder.hosted.everything = append(builder.hosted.everything, place)
