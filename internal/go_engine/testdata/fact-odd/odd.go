@@ -5,8 +5,12 @@
 // odd slice for one parameter, and only reading the other as unknown takes F, and FUser, out.
 package odd
 
+// anything is any by another name, so a parameter of it is no candidate of consistency-no-any, whose presence bound
+// would take G and F out before any fact could (#xeafx79), and so is any to every fact this fixture holds.
+type anything = any
+
 // G checks its first slice even, hands its second to platformPairs, and returns no error.
-func G(first []any, second []any) error {
+func G(first []anything, second []anything) error {
 	if len(first)%2 != 0 {
 		panic("odd")
 	}
@@ -28,7 +32,7 @@ func GFailed() bool {
 
 // F hands its slice on as G's second, so F's mark is G's second parameter's: needed even on windows alone. It names
 // only G, whose signature is the same in every build, so the reach leaves it standing.
-func F(values []any) {
+func F(values []anything) {
 	G(nil, values)
 }
 

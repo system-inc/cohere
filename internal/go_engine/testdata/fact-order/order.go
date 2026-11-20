@@ -6,6 +6,10 @@
 // take orderA's users out.
 package order
 
+// anything is any by another name, so orderB's values are no candidate of consistency-no-any, whose presence bound
+// would take orderB's users out before any fact could (#xeafx79), and so are any to every fact this fixture holds.
+type anything = any
+
 // failure is an error whose pointer is never nil.
 type failure struct{}
 
@@ -17,7 +21,7 @@ func (*failure) Error() string {
 // orderB calls platformHook, then returns a failure, never nil. It is declared before orderA, so a walk of the package
 // in the order of its declarations enters it first, and on windows reads orderA while orderB is begun. Its values are
 // there for a caller's odd count to ask the odd slice kind of it.
-func orderB(values ...any) error {
+func orderB(values ...anything) error {
 	platformHook()
 	return &failure{}
 }
