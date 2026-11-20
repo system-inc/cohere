@@ -14,6 +14,7 @@ package standing_presence
 
 import (
 	"go/types"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -27,13 +28,41 @@ type Leaving struct {
 	Reason fact_reach.Reason
 }
 
-// Present is what each row takes out of the standing set of the pass's package: the objects whose users leave, each
-// named with its row's reason, and the bodies that leave by themselves, none yet. find is the build's own
-// package-level variable or constant for a host's identity, and false where the build has none.
+// Present is what each row takes out of standing, the pass's package's standing set as the walk starts: the objects
+// whose users leave, each named with its row's reason, and the bodies that leave by themselves. find is the build's
+// own object for a host's identity, and false where the build has none. The named rows come first, then noany's bound,
+// and last the edge rows, which read which bodies the build holds present once the others have taken theirs out.
 func Present(
 	pass *analysis.Pass,
 	host fact_reach.Host,
+	standing map[fact_reach.Place]bool,
 	find func(identity build_reads.Identity) (types.Object, bool),
 ) ([]fact_reach.Named, []Leaving) {
-	return hostPortNamed(pass, host.Used(), find), nil
+	used := host.Used()
+	named := slices.Concat(
+		hostPortNamed(pass, used, find),
+		scannerErrorNamed(pass, used, find),
+		sqlRowsErrorNamed(pass, used, find),
+		screamingNamed(pass, used, find),
+		emptyFunctionNamed(pass, used, find),
+	)
+	noAnyNamed, leaving := noAnyBound(pass, host, used, find)
+	named = append(named, noAnyNamed...)
+	leaving = append(leaving, edgesLeaving(pass, host, standing, named, leaving)...)
+	return named, leaving
+}
+
+// packageVariable is the build's own package-level variable of the pass's package that identity names, and false for
+// any other object, or none.
+func packageVariable(
+	pass *analysis.Pass,
+	find func(identity build_reads.Identity) (types.Object, bool),
+	identity build_reads.Identity,
+) (*types.Var, bool) {
+	found, isFound := find(identity)
+	variable, isVariable := found.(*types.Var)
+	if !isFound || !isVariable || variable.Pkg() != pass.Pkg || variable.Parent() != pass.Pkg.Scope() {
+		return nil, false
+	}
+	return variable, true
 }

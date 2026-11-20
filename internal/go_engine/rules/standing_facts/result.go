@@ -41,6 +41,10 @@ type Result struct {
 	// a partial result.
 	PresenceNamed   map[standing_presence.Row]int
 	PresenceRemoved map[standing_presence.Row]int
+
+	// PresenceLeft are the bodies that left the standing set by themselves for a presence row, each with its row's
+	// reason, which the settlement, taking out only an object's users, never records.
+	PresenceLeft []standing_presence.Leaving
 }
 
 // Stands is whether the function body declared in the file parsed from filename, its `func` at offset, is left to the

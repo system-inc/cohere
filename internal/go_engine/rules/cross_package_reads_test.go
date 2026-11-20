@@ -99,6 +99,10 @@ var listedCrossPackageReads = map[string]listedRead{
 		class:  readDirectImports,
 		reason: "whether the judged package imports fmt, as hostport's own isJudged asks",
 	},
+	"standing_presence/testing_goroutine.go:testingGoroutineEdges": {
+		class:  readDirectImports,
+		reason: "whether the judged package imports testing, as testinggoroutine's own gather asks",
+	},
 	"staticcheck_code/is_main_like.go:IsMainLike": {class: readDirectImports},
 	"unused_code/graph_entry.go:(*graph).entry": {
 		class:  readOwnPackage,

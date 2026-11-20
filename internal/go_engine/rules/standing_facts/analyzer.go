@@ -153,7 +153,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// users leave, and each body that leaves by itself, taken out of the pass's own copy here, before the cycles are
 	// read, so a cycle that touches it is one the build lints, and among the bodies reached below, whose recorded
 	// answers the walk asks.
-	presenceNamed, leaving := standing_presence.Present(pass, host, functions.value)
+	presenceNamed, leaving := standing_presence.Present(pass, host, standing, functions.find)
 	named = append(named, presenceNamed...)
 	result.PresenceNamed = map[standing_presence.Row]int{}
 	result.PresenceRemoved = map[standing_presence.Row]int{}
@@ -167,6 +167,7 @@ func run(pass *analysis.Pass) (any, error) {
 			continue
 		}
 		delete(standing, left.Place)
+		result.PresenceLeft = append(result.PresenceLeft, left)
 		if row, isRow := standing_presence.RowOf(left.Reason); isRow {
 			result.PresenceRemoved[row]++
 		}

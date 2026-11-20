@@ -37,9 +37,8 @@ func hostPortNamed(
 	var values map[*types.Var]ast.Expr
 	var named []fact_reach.Named
 	for _, object := range used {
-		found, isFound := find(object.Identity)
-		variable, isVariable := found.(*types.Var)
-		if !isFound || !isVariable || variable.Pkg() != pass.Pkg {
+		variable, isVariable := packageVariable(pass, find, object.Identity)
+		if !isVariable {
 			continue
 		}
 		if values == nil {

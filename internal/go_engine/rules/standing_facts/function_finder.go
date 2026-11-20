@@ -10,9 +10,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )
 
-// functionFinder finds the build's own function, or package-level variable or constant, for an identity the host names
-// one by, for one pass, on one goroutine. The host's objects are another run's, of another type-check, so nothing of
-// them but the identity crosses, and the build looks its own object up by it.
+// functionFinder finds the build's own function, or any object, for an identity the host names one by, for one pass, on
+// one goroutine. The host's objects are another run's, of another type-check, so nothing of them but the identity
+// crosses, and the build looks its own object up by it.
 //
 // It reads only the build's own types, those of the pass's package and of what that imports, in the pass that asks,
 // and keeps nothing past the pass: the finder and its map of the imports go when run returns, so no later pass, build
@@ -35,25 +35,9 @@ func (finder *functionFinder) function(identity build_reads.Identity) (*types.Fu
 	return function, found && isFunction
 }
 
-// value is the build's package-level variable or constant for identity, and false when the build has none (find), or
-// when what it has is another kind of object, or one declared below package level, as a field an objectpath reaches.
-// It finds the objects a presence row judges (standing_presence), each of which only the build's own declaration of
-// it can make a candidate.
-func (finder *functionFinder) value(identity build_reads.Identity) (types.Object, bool) {
-	object, found := finder.find(identity)
-	if !found || object.Pkg() == nil || object.Parent() != object.Pkg().Scope() {
-		return nil, false
-	}
-	switch object.(type) {
-	case *types.Var, *types.Const:
-		return object, true
-	}
-	return nil, false
-}
-
 // find is the build's object for identity, and false when the build has none: a package the pass's package does not
 // import, a name or a path that reaches nothing, or an identity of a kind that names no object here, as an import's or
-// an unknown one.
+// an unknown one. The presence rows judge what it finds (standing_presence), each by its own declaration in the build.
 //
 // An object of the pass's own package must be declared in the file the identity names, since a platform's file that
 // declares the same name is another declaration, with another body or value and so other facts. Another package's
