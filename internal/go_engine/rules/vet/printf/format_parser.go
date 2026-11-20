@@ -31,8 +31,12 @@ type formatParser struct {
 // parseOperation parses the one operation format starts with, at its `%`, whose arguments start at firstArgument and
 // which formats argumentNumber next unless it says otherwise, or is the error that it is malformed: x/tools' fmtstr
 // parseOperation. The order is `%`, flags, `[n]*` or a width, `.` and `[n]*` or a precision, `[n]`, the verb.
-func parseOperation(format string, firstArgument int, argumentNumber int) (*formatParser, error) {
-	parser := &formatParser{
+//
+// The parser is returned by value, so it stays on the stack and each operation of a format allocates only its
+// formatOperation, which the caller keeps. Every method that moves it runs here, on this one variable, and the caller
+// only reads the copy, its operation and the argument it stopped at.
+func parseOperation(format string, firstArgument int, argumentNumber int) (formatParser, error) {
+	parser := formatParser{
 		operation: &formatOperation{
 			text:      format,
 			width:     emptySize,
@@ -45,20 +49,20 @@ func parseOperation(format string, firstArgument int, argumentNumber int) (*form
 	}
 	parser.parseFlags()
 	if indexError := parser.parseIndex(); indexError != nil {
-		return nil, indexError
+		return formatParser{}, indexError
 	}
 	parser.operation.width = parser.parseSize()
 	if precisionError := parser.parsePrecision(); precisionError != nil {
-		return nil, precisionError
+		return formatParser{}, precisionError
 	}
 	// The verb, maybe after an index, unless one was read already and is waiting for it.
 	if !parser.indexPending {
 		if indexError := parser.parseIndex(); indexError != nil {
-			return nil, indexError
+			return formatParser{}, indexError
 		}
 	}
 	if parser.consumed == len(parser.operation.text) {
-		return nil, fmt.Errorf("format %s is missing verb at end of string", parser.operation.text)
+		return formatParser{}, fmt.Errorf("format %s is missing verb at end of string", parser.operation.text)
 	}
 	verb, width := utf8.DecodeRuneInString(parser.operation.text[parser.consumed:])
 	if parser.indexPending {
