@@ -201,3 +201,30 @@ func parenthesizedNames(count int, value pair) {
 	_ = (count) == (count)
 	_ = (value.left) != (value.left)
 }
+
+// Found by both: literals spelled alike. Spellings the printer alone makes one, 0X1F and 0x1F, are held by
+// TestLiteralSpellingsSettleAsThePrinterPrints, since gofmt over this file would rewrite them to one spelling.
+func literalsSpelledAlike() {
+	_ = 'a' == 'a'
+	_ = `a` == `a`
+	_ = 0x1F == 0x1F
+	_ = 1i != 1i
+	var _ int = 1e3 - 1e3
+}
+
+// Found by neither: literals of one value spelled apart in ways the printer keeps, which the check tells apart by
+// their spellings without printing: another base, an underscore, a float's form, a raw string beside an interpreted
+// one, and a rune escaped. A hexadecimal digit's case, an imaginary number's form and two kinds are printed.
+func literalsSpelledApart() {
+	_ = 0x1 == 1
+	_ = 07 == 0o7
+	_ = 1_000 == 1000
+	_ = 0xa == 0xA
+	_ = 1i == 1.0i
+	var _ int = 1.0 - 1.
+	var _ int = 1e3 - 1000.
+	_ = "a" == `a`
+	_ = 'a' == '\x61'
+	_ = 'a' == '\u0061'
+	_ = 'a' == 97
+}
