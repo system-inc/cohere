@@ -340,7 +340,15 @@ func TestAnUnsurePackageHasNoCapture(test *testing.T) {
 	options.Resolver = resolver
 	options.Restored = func(restoring *packages.Package) bool { return restoring == low }
 	options.Restore = func(*checker.Action) error { return nil }
-	if _, analyzeError := checker.Analyze([]*analysis.Analyzer{reachNilnessAnalyzer}, []*packages.Package{low, high},
+	// Wrapped first, as Run wraps every analyzer before it analyzes: wrapRuns sets an analyzer's Run in place, under
+	// its mutex, the first time any run meets it, and this package's tests share reachNilnessAnalyzer and everything
+	// it requires. Analyze reads each of those Runs with no lock, so a bare call beside another test's first wrap is
+	// a race (#msx89hq). Once wrapped here, none of them is written again.
+	asking := []*analysis.Analyzer{reachNilnessAnalyzer}
+	if wrapError := wrapRuns(asking); wrapError != nil {
+		test.Fatal(wrapError)
+	}
+	if _, analyzeError := checker.Analyze(asking, []*packages.Package{low, high},
 		options); analyzeError != nil {
 		test.Fatalf("analyzing the unsure workspace: %v", analyzeError)
 	}
