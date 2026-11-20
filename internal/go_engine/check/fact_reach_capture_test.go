@@ -580,8 +580,13 @@ func TestAPackageWhoseBodiesWereNeverReadIsCapturedUnread(test *testing.T) {
 	options := DispatchOptions()
 	resolver := fact_resolver.New(nil)
 	options.Resolver = resolver
-	if _, analyzeError := checker.Analyze([]*analysis.Analyzer{reachNilnessAnalyzer}, analyzed,
-		options); analyzeError != nil {
+	// Wrapped first, as TestAnUnsurePackageHasNoCapture is and for its reason: the package's parallel runs wrap
+	// reachNilnessAnalyzer and what it requires in place, and Analyze reads their Runs with no lock (#9jkrq6h).
+	asking := []*analysis.Analyzer{reachNilnessAnalyzer}
+	if wrapError := wrapRuns(asking); wrapError != nil {
+		test.Fatal(wrapError)
+	}
+	if _, analyzeError := checker.Analyze(asking, analyzed, options); analyzeError != nil {
 		test.Fatalf("analyzing the reach workspace: %v", analyzeError)
 	}
 	byPath := map[string]*packages.Package{}
