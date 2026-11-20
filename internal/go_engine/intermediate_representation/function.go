@@ -282,8 +282,6 @@ type Function struct {
 	// fn.Parent()!=nil => fn.Parent().AnonymousFunctions[fn.anonymousIndex] == fn.
 	anonymousIndex int32
 
-	Sccs []*Scc // strongly connected components, a directed acyclic graph in reverse topological order
-
 	// receiver type parameters of this function.
 	// recvtypeparams.Len() > 0 => method on generic or instance of generic type
 	recvtypeparams *types.TypeParamList
@@ -314,12 +312,6 @@ type Function struct {
 	source          *Function                // nearest enclosing source function
 	exits           []*exit                  // exits of the function that need to be resolved
 	uniq            int64                    // source of unique ints within the source tree while building
-}
-
-type Scc struct {
-	Index                    int
-	Blocks                   []*BasicBlock
-	Predecessors, Successors []*Scc
 }
 
 // Pure values ----------------------------------------
@@ -930,8 +922,9 @@ func (function *Function) finishBody() {
 	optimizeBlocks(function)
 	buildReferrers(function)
 	buildDominatorTree(function)
-	buildSccs(function)
 
+	// go/ir builds its strongly connected components here, for its lift's Reaches; ours lifts through the shared
+	// core and no rule reads them, so none are built (#hd3gsem).
 	// Lifting, where go/ir lifts (#ee33njz): through the shared core, in lifting.go.
 	liftFunction(function)
 
