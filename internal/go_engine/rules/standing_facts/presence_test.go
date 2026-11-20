@@ -10,30 +10,34 @@ import (
 )
 
 // A standing body that names a variable hostport judges by its declaration leaves for presence (#xeafx79): Dial names
-// Address, whose sole value is fmt.Sprintf("%s:%d", ...), so it leaves with hostport's reason. Port names nothing, and
-// Counted names Count, whose format is "%d", so both stand. Remote names below.Address, another package's variable of
-// Address's own name, which the build finds as below's and so never judges, and it stands too.
+// Address, whose sole value is fmt.Sprintf("%s:%d", ...), so it leaves with hostport's reason. Port names nothing,
+// Counted names Count, whose format is "%d", and Joining names Joined, three arguments whose format is "%s-%s", so all
+// three stand. Remote names below.Address, another package's variable of Address's own name, which the build finds as
+// below's and so never judges, and it stands too.
 func TestAStandingBodyNamingAHostPortAddressLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "presence")
 	dial, port := found.place(test, "Dial"), found.place(test, "Port")
 	counted, remote := found.place(test, "Counted"), found.place(test, "Remote")
+	joining := found.place(test, "Joining")
 	host := &fakeHost{
-		standing: map[fact_reach.Place]bool{dial: true, port: true, counted: true, remote: true},
-		places:   []fact_reach.Place{dial, port, counted, remote},
+		standing: map[fact_reach.Place]bool{dial: true, port: true, counted: true, remote: true, joining: true},
+		places:   []fact_reach.Place{dial, port, counted, remote, joining},
 		used: []fact_reach.UsedObject{
 			{Object: "below.Address", Identity: imported("below", "Address")},
 			{Object: "presence.Address", Identity: found.identity("Address")},
 			{Object: "presence.Count", Identity: found.identity("Count")},
+			{Object: "presence.Joined", Identity: found.identity("Joined")},
 		},
 		users: map[fact_reach.Object][]fact_reach.Place{
 			"below.Address": {remote}, "presence.Address": {dial}, "presence.Count": {counted},
+			"presence.Joined": {joining},
 		},
 	}
 	result, _ := settle(test, found, host)
 	requireRemoved(test, result,
 		fact_reach.Removal{Place: dial, Object: "presence.Address", Reason: standing_presence.HostPort.Reason()})
-	for _, place := range []fact_reach.Place{port, counted, remote} {
+	for _, place := range []fact_reach.Place{port, counted, remote, joining} {
 		if !result.Stands(place.File, place.Offset) {
 			test.Errorf("the body at %v does not stand, though it names no hostport candidate", place)
 		}
