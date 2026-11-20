@@ -119,8 +119,8 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 // the answers the host read from other packages asked before the
 // walk and the objects they named, the order-bound objects and the members of the build's own cycles of calls named
 // before anything was asked, the answers the walk asked and those that read differing or unknown, by kind, the
-// functions of a body that left with no record of a kind, by kind, and the bodies the facts took out of the standing
-// set.
+// functions of a body that left with no record of a kind, by kind, the bodies the facts took out of the standing
+// set, and the objects each presence row named and the bodies that left for it, by row.
 type buildFactReach struct {
 	// unsettled is why the build settled nothing though it was asked to (check.Result.FactReachUnsettled), and every
 	// other count is zero then.
@@ -142,13 +142,16 @@ type buildFactReach struct {
 	unknown           map[string]int
 	unrecordedKinds   map[string]int
 	removed           int
+	presenceNamed     map[string]int
+	presenceRemoved   map[string]int
 }
 
 // newBuildFactReach is the census of the build whose passes were handed hosts, by package ID, and whose check.Run gave
 // result, the last load's.
 func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *buildFactReach {
 	census := &buildFactReach{sides: len(hosts), crashed: len(result.FactReachCrashes), differing: map[string]int{},
-		unknown: map[string]int{}, unrecordedKinds: map[string]int{}}
+		unknown: map[string]int{}, unrecordedKinds: map[string]int{}, presenceNamed: map[string]int{},
+		presenceRemoved: map[string]int{}}
 	for identifier, settled := range result.FactReachSettled {
 		packageSettled, isResult := settled.(*standing_facts.Result)
 		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil {
@@ -176,6 +179,12 @@ func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *
 			census.unrecordedKinds[kind] += count
 		}
 		census.removed += len(packageSettled.Settlement.Removed)
+		for row, count := range packageSettled.PresenceNamed {
+			census.presenceNamed[string(row)] += count
+		}
+		for row, count := range packageSettled.PresenceRemoved {
+			census.presenceRemoved[string(row)] += count
+		}
 	}
 	return census
 }
@@ -195,6 +204,8 @@ func writeBuildFactReach(written *strings.Builder, census *buildFactReach) {
 		byKind(census.differing), byKind(census.unknown), census.removed)
 	fmt.Fprintf(written, "    functions with no record of a kind %s; build order named %d; pushed facts compared %d, "+
 		"named %d\n", byKind(census.unrecordedKinds), census.buildOrderNamed, census.pushedCompared, census.pushedNamed)
+	fmt.Fprintf(written, "    presence named %s; bodies taken out for presence %s\n", byKind(census.presenceNamed),
+		byKind(census.presenceRemoved))
 }
 
 // byKind is counts written by kind, the kinds in order, or none.
