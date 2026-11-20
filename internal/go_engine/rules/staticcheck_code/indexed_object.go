@@ -12,9 +12,10 @@ import (
 // field or method the context's package uses, never the context's own; a package reached only through another
 // package's alias or variable is not held. It is the index's Object, which staticcheck's code.CouldMatchAny asks of
 // each symbol a pattern names, skipping the whole package when none is held: a port of a pattern that names a Symbol
-// below its root asks this before it walks anything.
+// below its root asks this before it walks anything. A port asking several names of one package asks IndexedPackage
+// once and looks each name up in what it holds, since finding the package is the costly part and never reads the name.
 func IndexedObject(context *rule.Context, path string, name string) types.Object {
-	indexed := indexedPackage(context, path)
+	indexed := IndexedPackage(context, path)
 	if indexed == nil {
 		return nil
 	}
@@ -22,8 +23,11 @@ func IndexedObject(context *rule.Context, path string, name string) types.Object
 	return context.LookupIn(indexed, name)
 }
 
-// indexedPackage is the package of path the type index holds for the context's package, or nil.
-func indexedPackage(context *rule.Context, path string) *types.Package {
+// IndexedPackage is the package of path the type index holds for the context's package, or nil. It reads every
+// file's imports and, when none is the package, every use the package's types record, which is a walk of the whole
+// package's uses for each call where the package is not imported. A name looked up in its answer with
+// context.LookupIn, as IndexedObject does, is IndexedObject's answer.
+func IndexedPackage(context *rule.Context, path string) *types.Package {
 	held := func(candidate *types.Package) bool {
 		return candidate != nil && candidate != context.Package && candidate.Path() == path
 	}

@@ -2,6 +2,7 @@ package staticcheck_code_test
 
 import (
 	"fmt"
+	"go/types"
 	"reflect"
 	"testing"
 
@@ -113,6 +114,10 @@ func compareIndexed(pass *analysis.Pass) (any, error) {
 	}
 	compared := &indexedComparison{met: map[string]int{}}
 	symbols := append([][2]string{{pass.Pkg.Path(), "Value"}}, indexedSymbols...)
+	// IndexedPackage is asked once for each path, as a port looking up several names of one package asks it, and each
+	// name of that path is looked up in its answer, so sort's Missing and aliased's Value are answered from the
+	// package found for the name asked before them.
+	heldPackages := map[string]*types.Package{}
 	for _, symbol := range symbols {
 		upstream := code.CouldMatchAny(pass, pattern.MustParse(fmt.Sprintf("(Symbol %q)", symbol[0]+"."+symbol[1])))
 		port := staticcheck_code.IndexedObject(context, symbol[0], symbol[1]) != nil
@@ -121,6 +126,16 @@ func compareIndexed(pass *analysis.Pass) (any, error) {
 			compared.mismatches = append(compared.mismatches, fmt.Sprintf(
 				"%s asked about %s.%s: staticcheck answered %t, the port %t",
 				pass.Pkg.Path(), symbol[0], symbol[1], upstream, port))
+		}
+		held, isAsked := heldPackages[symbol[0]]
+		if !isAsked {
+			held = staticcheck_code.IndexedPackage(context, symbol[0])
+			heldPackages[symbol[0]] = held
+		}
+		if fromHeld := held != nil && context.LookupIn(held, symbol[1]) != nil; upstream != fromHeld {
+			compared.mismatches = append(compared.mismatches, fmt.Sprintf(
+				"%s asked about %s.%s through its package found once: staticcheck answered %t, the port %t",
+				pass.Pkg.Path(), symbol[0], symbol[1], upstream, fromHeld))
 		}
 		name := symbol[0] + "." + symbol[1]
 		if symbol[0] == pass.Pkg.Path() {
