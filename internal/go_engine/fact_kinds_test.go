@@ -139,12 +139,13 @@ func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 // type each platform's file declares.
 //
 // The user of a callee whose answer is the same leaves too, never for that kind: a body the build lints with no
-// record of a kind reads unknown for it (#5vbs1np, must 1), and each equal callee lacks a record of some kind the host
-// answered about the package, the first by the kinds' names after those it holds. Triviality and the stopping calls
-// are not registered with the resolver (fact_resolver.Register), so the build cannot ask either again and reads every
-// answer of theirs as unknown, and their equal callees, which hold a record of their kind, take their users out for
-// that. The day each kind records what its judgments read, and the build can ask every kind, the equal callees' users
-// stand, and this test says so.
+// record of a kind reads unknown for it (#5vbs1np, must 1), unless the kind records every judgment, as purity, odd
+// slice and nil-ness do (#z9fze0t), and none is named for those. Each equal callee of theirs and of the no-return
+// fact lacks a record of triviality, which the host answered about the package and which makes no such claim, so its
+// user leaves for that. Triviality and the stopping calls are not registered with the resolver
+// (fact_resolver.Register), so the build cannot ask either again and reads every answer of theirs as unknown, and
+// their equal callees, which hold a record of their kind, take their users out for that. The day those two record
+// what their judgments read, and the build can ask every kind, the equal callees' users stand, and this test says so.
 func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndAnEqualOnesForNoRecord(test *testing.T) {
 	test.Parallel()
 
@@ -162,7 +163,7 @@ func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndAnEqualOnesForNoRecord(
 		{"no-return", "NoReturnUser", "halt", "no-return", "NoReturnStable", "haltAlways",
 			fact_reach.UnrecordedReason("function_triviality")},
 		{"nil-ness", "NilnessUser", "wrapped", fact_reach.DiffersReason("return_nil_ness"), "NilnessStable", "stable",
-			fact_reach.UnrecordedReason("function_purity")},
+			fact_reach.UnrecordedReason("function_triviality")},
 		{"purity", "Warm", "size", fact_reach.DiffersReason("function_purity"), "PurityStable", "width",
 			fact_reach.UnrecordedReason("function_triviality")},
 		{"odd slice", "OddUser", "pairs", fact_reach.DiffersReason("odd_slice_argument"), "OddStable", "pairsAlways",

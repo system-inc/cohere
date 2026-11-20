@@ -167,12 +167,25 @@ func run(pass *analysis.Pass) (any, error) {
 	// wherever the host answered it, since its judgments read callees' answers from its state as any kind's may.
 	// A registered kind the host answered nothing of here is read by the function: with no record of it anywhere, a
 	// body holds none by either unit.
+	//
+	// A kind that records every judgment is none of them (fact_resolver.Kind.RecordsEveryJudgment, #z9fze0t). The
+	// rule is there because a kind's judgment may read a callee's body and leave no record of it, so a body the build
+	// lints with no record of the kind may still have served an answer of the host's. Such a kind hands the resolver
+	// every verdict its judgments reach, once final, and reads another function's body only by way of a verdict, so
+	// its record in a package the host computed in is complete: a function the host holds no answer of the kind
+	// about is one the kind never judged there, no answer of the host's rests on its body, and there is nothing to
+	// compare. Where it did judge the function the host holds the answer, recorded at its body, which the walk asks
+	// as the body leaves. A package handed an unsure answer keeps nothing, and has no side here at all, so the build
+	// lints it whole (check.FactReachCapture.Packages).
 	units := map[string]bool{}
 	for _, name := range fact_resolver.RegisteredNames() {
 		units[name] = false
 	}
 	for _, kind := range host.Kinds() {
 		units[kind.Name] = kind.Parameters
+	}
+	for _, name := range fact_resolver.RecordingNames() {
+		delete(units, name)
 	}
 	var kinds []fact_reach.Kind
 	for _, name := range slices.Sorted(maps.Keys(units)) {

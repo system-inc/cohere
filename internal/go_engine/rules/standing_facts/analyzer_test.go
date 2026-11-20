@@ -374,11 +374,12 @@ func TestAPackageLintedWholeAsksNothing(test *testing.T) {
 	}
 }
 
-// A body the build lints that holds no record of a kind reads unknown for it, for every kind the build registers and
-// every kind the host answered about the package (#5vbs1np, must 1). size's purity is recorded and the build's own, but
-// the host answered triviality about the package, a kind this binary does not register, and size holds no record of
-// it, so Warm leaves for that, and then names itself for both kinds, holding no record at all. With the host answering
-// purity alone, the one kind registered here, Warm stands.
+// A body the build lints that holds no record of a kind reads unknown for it, for every kind the host answered about
+// the package and every kind the build registers, less each that records every judgment (#5vbs1np, must 1, and
+// #z9fze0t). size's purity is recorded and the build's own, but the host answered triviality about the package, a kind
+// that sets no such flag, and size holds no record of it, so Warm leaves for that, and then names itself for
+// triviality, holding no record at all. Purity records every judgment, so neither is named for it. With the host
+// answering purity alone, the one kind registered here, Warm stands.
 func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) {
 	test.Parallel()
 	found := loadFacts(test)
@@ -400,15 +401,43 @@ func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) 
 	result, _ := settle(test, found, host(fact_reach.Kind{Name: purity}, fact_reach.Kind{Name: triviality}))
 	requireRemoved(test, result,
 		fact_reach.Removal{Place: warm, Object: "facts.size", Reason: fact_reach.UnrecordedReason(triviality)})
-	if want := map[string]int{purity: 1, triviality: 2}; !reflect.DeepEqual(result.Settlement.Unrecorded, want) {
-		test.Errorf("unrecorded %v, want %v: size's triviality, and Warm's purity and triviality",
-			result.Settlement.Unrecorded, want)
+	if want := map[string]int{triviality: 2}; !reflect.DeepEqual(result.Settlement.Unrecorded, want) {
+		test.Errorf("unrecorded %v, want %v: size's triviality and Warm's", result.Settlement.Unrecorded, want)
 	}
 	// A run lets go of what it read of the packages below its roots, so the second takes a load of its own.
 	result, _ = settle(test, loadFacts(test), host(fact_reach.Kind{Name: purity}))
 	requireRemoved(test, result)
 	if !result.Stands(warm.File, warm.Offset) {
 		test.Errorf("Warm does not stand, though size holds a record of the one kind")
+	}
+}
+
+// A kind that records every judgment asks no record of a body the build lints (#z9fze0t,
+// fact_resolver.Kind.RecordsEveryJudgment): a function the host holds no answer of such a kind about is one the kind
+// never judged there, so no answer of the host rests on its body and there is nothing to compare. The build lints
+// size, which holds no record of purity, though the host answered purity about the package: nothing names size, and
+// Warm, its user, stands. Were purity read as any kind is, size would read unknown for it and take Warm out.
+func TestAKindThatRecordsEveryJudgmentAsksNoRecordOfABodyTheBuildLints(test *testing.T) {
+	test.Parallel()
+	if !slices.Contains(fact_resolver.RecordingNames(), purity) {
+		test.Fatalf("the kinds that record every judgment are %q, want %s among them", fact_resolver.RecordingNames(),
+			purity)
+	}
+	found := loadFacts(test)
+	size, warm := found.place(test, "size"), found.place(test, "Warm")
+	host := &fakeHost{
+		standing: map[fact_reach.Place]bool{warm: true},
+		places:   []fact_reach.Place{size, warm},
+		users:    map[fact_reach.Object][]fact_reach.Place{"facts.size": {warm}},
+		declared: map[fact_reach.Place][]fact_reach.Object{size: {"facts.size"}, warm: {"facts.Warm"}},
+		kinds:    []fact_reach.Kind{{Name: purity}},
+	}
+	result, _ := settle(test, found, host)
+	requireRemoved(test, result)
+	if !result.Stands(warm.File, warm.Offset) || len(result.Settlement.Unrecorded) != 0 {
+		test.Errorf("Warm stands %t with %v unrecorded, want it standing and nothing unrecorded: size holds no record "+
+			"of purity, which records every judgment", result.Stands(warm.File, warm.Offset),
+			result.Settlement.Unrecorded)
 	}
 }
 
