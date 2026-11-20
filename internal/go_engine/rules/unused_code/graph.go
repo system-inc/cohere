@@ -176,6 +176,11 @@ type graph struct {
 	namedTypes []*types.TypeName
 	// interfaceTypes is every interface type the walk read that declares at least one method or embeds a type.
 	interfaceTypes []*types.Interface
+
+	// recorder writes a record of what each function body adds to the graph, and is nil unless recordBodies asked for
+	// one, as it is on every run that reports. The walk tells it of each use, each object seen and the few other
+	// things a record holds, each behind one check that it is there.
+	recorder *bodyRecorder
 }
 
 // nodeIndex is a node's place in graph.nodes, the original's NodeID. The root is 0. The original's is 64 bits; 32 are
@@ -434,6 +439,11 @@ func (graph *graph) see(seen types.Object, owner types.Object) {
 	}
 
 	seenNode := graph.node(seen)
+	if graph.recorder != nil {
+		// node gives no object the root's index, so the root here is no owner. The owner's node is asked for after
+		// the seen one's, as below, so the nodes are made in the order they are without a recorder.
+		graph.recordSeen(seenNode, graph.node(owner))
+	}
 	if owner != nil {
 		graph.addOwned(graph.node(owner), seenNode)
 	}
@@ -466,6 +476,11 @@ func (graph *graph) use(used types.Object, by types.Object) {
 	if by != graph.lastBy {
 		graph.lastBy = by
 		graph.lastByNode = graph.node(by)
+	}
+	if graph.recorder != nil {
+		// Told above addUse's dedupe, which keeps an edge from the first walk that adds it alone: a body's record
+		// holds every edge its own walk adds.
+		graph.recordUse(graph.lastByNode, usedNode)
 	}
 	graph.addUse(graph.lastByNode, usedNode)
 }

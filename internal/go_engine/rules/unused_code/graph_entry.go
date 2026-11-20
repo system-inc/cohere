@@ -158,6 +158,9 @@ func (graph *graph) useIgnored(ignores map[ignoredKey]struct{}) {
 		if !isTypeName {
 			continue
 		}
+		if graph.recorder != nil {
+			graph.recordIgnoredType(nodeIndex(index))
+		}
 		if typeName.IsAlias() {
 			// DefaultOptions' ExportedIsUsed.
 			if named, isNamed := types.Unalias(typeName.Type()).(*types.Named); isNamed &&

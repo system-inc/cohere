@@ -246,6 +246,9 @@ func (graph *graph) readInterfaceType(interfaceSyntax *ast.InterfaceType, by typ
 	if len(interfaceSyntax.Methods.List) != 0 {
 		if interfaceType, isInterface := graph.typesInfo.TypeOf(interfaceSyntax).(*types.Interface); isInterface {
 			graph.interfaceTypes = append(graph.interfaceTypes, interfaceType)
+			if graph.recorder != nil {
+				graph.recordInterface(interfaceType)
+			}
 		}
 	}
 	for _, method := range interfaceSyntax.Methods.List {
@@ -355,6 +358,9 @@ func (graph *graph) write(syntax ast.Node, by types.Object) {
 		// every core.
 		if isGlobal(written) {
 			path := graph.fileSet.File(written.Pos()).Name()
+			if graph.recorder != nil {
+				graph.recordWritten(written)
+			}
 			if strings.HasSuffix(path, "_test.go") {
 				graph.use(written, by)
 			}
@@ -457,6 +463,9 @@ func (graph *graph) declaration(declaration ast.Decl, by types.Object) {
 				graph.seeScope(typeSpec, typeName)
 				if !typeSpec.Assign.IsValid() {
 					graph.namedTypes = append(graph.namedTypes, typeName)
+					if graph.recorder != nil {
+						graph.recordNamedType(typeName)
+					}
 				}
 				// DefaultOptions' ExportedIsUsed.
 				if token.IsExported(typeSpec.Name.Name) && isGlobal(typeName) {
@@ -632,8 +641,21 @@ func (graph *graph) functionDeclaration(declaration *ast.FuncDecl) {
 
 	// (4.1) functions use their receivers
 	graph.read(declaration.Recv, declared)
+	// A recorder's cursor opens on the body here, before the type is read and not as the body is entered: reading the
+	// type sees the scope go/types gives the function's type, which holds the body's immediate locals beside the
+	// parameters and the results (seeScope).
+	recording := graph.recorder != nil && declaration.Body != nil
+	if recording {
+		graph.openBody(declaration, graph.node(declared))
+	}
 	graph.read(declaration.Type, declared)
+	if recording {
+		graph.recorder.cursor.inSignature = false
+	}
 	graph.block(declaration.Body, declared)
+	if recording {
+		graph.closeBody()
+	}
 
 	// graph.read(declaration.Type) will ultimately call graph.seeScope and see parameters that way. But because it
 	// relies entirely on the syntax, it cannot resolve unnamed parameters to types.Object. For that reason we
