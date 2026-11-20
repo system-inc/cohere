@@ -455,6 +455,13 @@ func findingsWithin(findings []check.Finding, firstLine int, lastLine int) []str
 // load lints each file in one package alone (load's analyzedOfGraph), so a file's findings are that package's,
 // though the run's merge keeps no package of a finding. A finding in a file no package of analyzed compiles is in no
 // body of theirs, and left out.
+//
+// analyzed is a load's Packages, which check.Run gathers findings over and nothing else. A package Caching.Analyzes
+// turns down is left out of them and never analyzed, so no finding of it is in findings. So is one a build's restore
+// from the host's run leaves untouched (load.Loaded.Untouched), whose findings the merge takes from the host by its
+// files, never from the build's result; and a run judging dependence, the one run the census takes, restores nothing
+// from the host's run (censusKeepsHostRestoreOff), so it has none. An entry for either would say a package was linted
+// and found nothing.
 func findingsByPackage(
 	findings []check.Finding,
 	analyzed []*packages.Package,

@@ -67,3 +67,45 @@ func TestTheBodyDifferentialReadsEachSidesFindingsByThePairedPackage(test *testi
 			"got off %v, on %v", found[0], found[1])
 	}
 }
+
+// A build restoring from the host's run leaves a package nothing reaches untouched (load.Loaded.Untouched), analyzed
+// by nothing, so its findings are in no result of the build's and findingsByPackage gives it no entry. The census
+// never meets one: a run judging dependence restores nothing from the host's run (censusKeepsHostRestoreOff), with the
+// findings store on too, so the body differential compares noisy's Write, which nothing changes, with the findings
+// of noisy on both sides, unusedwrite's alike (#bed0mnk, the lead's read of the Square's should 1).
+func TestACensusRunLeavesNoPackageUntouched(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "body-reach-lint-package"))
+	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		engine.bodyDifferential = true
+	}, "--no-fix", "--build-dependence")
+	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
+	}
+	windows := on.buildRuns[1]
+	if len(windows.result.FromHost.Untouched) > 0 {
+		test.Errorf("windows left %v untouched, want nothing in a run judging dependence",
+			windows.result.FromHost.Untouched)
+	}
+	if reason := judgedBody(windows.bodyReach, "example.test/gate/noisy", "Write"); reason != "unreached" {
+		test.Errorf("windows's census judges noisy's Write %s, want it unreached, so compared", reason)
+	}
+	// Only gate's Target, which the host lints in its test variant, is linted apart.
+	if windows.bodyDifferential == nil || windows.bodyDifferential.lintedApart != 1 {
+		test.Error("want one body's findings counted apart, Target's, and noisy's Write compared")
+	}
+	noisy := func(run buildRun) []string {
+		var found []string
+		for _, finding := range run.result.Findings {
+			if filepath.Base(finding.File) == "noisy.go" {
+				found = append(found, finding.Rule)
+			}
+		}
+		return found
+	}
+	if !slices.Equal(noisy(windows), []string{"cohere-go/unusedwrite"}) {
+		test.Errorf("windows's own findings in noisy.go are %v, want unusedwrite's", noisy(windows))
+	}
+}
