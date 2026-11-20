@@ -301,7 +301,9 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 		predecessors += len(block.Predecessors)
 	}
 	scratch.slots = liftingCleared(scratch.slots, instructions)
-	// Grown before any view is carved, so no append below moves the array a view is carved from.
+	// Grown to the round's whole count first, so the appends below allocate at most once a round. It isn't what keeps
+	// the views right: a view carved before an append moved the array still reads its own ids, since nothing
+	// writes the old array again.
 	scratch.predecessors = slices.Grow(scratch.predecessors[:0], predecessors)
 	// Each instruction's id is its index in its block for the round, so a lifted cell, Load or debug reference is
 	// found by its block and id rather than through a map (#beapx0q). finishBody numbers them again after lifting.
