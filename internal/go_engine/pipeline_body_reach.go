@@ -125,7 +125,13 @@ func writeBuildBodyReach(written *strings.Builder, heading string, census *build
 		reasons = append(reasons, fmt.Sprintf("%s %d", reason, census.byReason[reason]))
 	}
 	fmt.Fprintf(written, "  reached by reason: %s\n", strings.Join(reasons, ", "))
+	writeSignatureReasons(written, census)
 	writeLoadModeCost(written, census)
+	fmt.Fprintf(written, "  lacked by the build and imported by a file it compiles, which starts the carry: %d "+
+		"packages\n", len(census.lackedImported))
+	for _, identifier := range census.lackedImported {
+		fmt.Fprintf(written, "    %s\n", identifier)
+	}
 	writeBodyReachDrivers(written, census)
 	fmt.Fprintf(written, "  declarations only: %d packages\n", len(census.declarationsOnly))
 	for _, identifier := range census.declarationsOnly {
@@ -175,6 +181,24 @@ func writeBodyReachDrivers(written *strings.Builder, census *buildBodyReach) {
 	for _, driver := range drivers[:min(len(drivers), bodyReachDrivers)] {
 		fmt.Fprintf(written, "    %d %s\n", counts[driver], driver)
 	}
+}
+
+// writeSignatureReasons writes to written the bodies census calls reached by their signatures, by the reason each
+// signature gave (reachedBody.partReason), every reason in the census's order: Signature says where a body was
+// reached and nothing of which rule found it there, which once hid that every such body of a run was the load mode's
+// (#wzre5eg).
+func writeSignatureReasons(written *strings.Builder, census *buildBodyReach) {
+	bySignature := map[bodyReachReason]int{}
+	for _, body := range census.bodies {
+		if body.reason == reachedSignature {
+			bySignature[body.partReason]++
+		}
+	}
+	reasons := make([]string, 0, len(bodyReachReasons))
+	for _, reason := range bodyReachReasons {
+		reasons = append(reasons, fmt.Sprintf("%s %d", reason, bySignature[reason]))
+	}
+	fmt.Fprintf(written, "  reached by Signature, by the reason its signature gave: %s\n", strings.Join(reasons, ", "))
 }
 
 // writeLoadModeCost writes to written what the general load mode rule costs beside the constants-only rule it

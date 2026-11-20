@@ -9,6 +9,7 @@ import (
 	"go/types"
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -20,13 +21,15 @@ import (
 
 // A use reaches its body by the load mode (#w72zxtq) when its object's package is one the host and the build load in
 // different modes, one from export data and the other from source: export data holds an untyped float as a 512-bit
-// binary fraction and a check from source holds it exactly, so at cohere's root, where the host reads math from the
-// system cache and a build under `--build-dependence` checks it from source, goja's math.Sqrt2 / 2 type-checks to two
+// binary fraction and a check from source holds it exactly, so at cohere's root, wherever the host reads math from the
+// system cache and a build misses its own there and checks it from source, goja's math.Sqrt2 / 2 type-checks to two
 // values. The Square ruled the rule general: every use of any object of such a package reaches, of any kind, and only
 // a package loaded alike reaches nothing. One the host does not hold has no mode to compare, and reaches, failing
-// wide. The census still counts the narrower rule it
-// replaced, an untyped float or complex constant read by its value alone. The engine's fixture cannot load a package
-// two ways, since a test's host checks the standard library from source, so the rule is pinned here.
+// wide, and so does one the host checked from source that the build's graph lacks: the direct rule reads a package by
+// its ID alone, whatever the carry makes of one the build lacks (#wzre5eg). The census still counts the narrower rule
+// it replaced, an untyped float or complex constant read by its value alone. A fixture loads a package two ways only
+// over a filled system cache, the whole standard library at once
+// (TestAPackageLoadedOtherwiseStillStartsTheCarryBesideALackedOne), so the rule's cases are pinned here.
 func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 	test.Parallel()
 
@@ -43,35 +46,50 @@ func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 		constant.MakeFloat64(3.14))
 	named := build_reads.UsedNamed
 	byValue := build_reads.UsedNamed | build_reads.UsedConstant
+	// lacked is the mode of a package the build's graph does not hold.
+	const lacked = builtLoadMode("")
 	cases := []struct {
-		name            string
-		object          types.Object
-		kinds           build_reads.UseKinds
-		hostExportData  bool
-		buildFromSource bool
-		general         bool
-		constantsOnly   bool
+		name           string
+		object         types.Object
+		kinds          build_reads.UseKinds
+		hostExportData bool
+		built          builtLoadMode
+		general        bool
+		constantsOnly  bool
 	}{
-		{"an untyped float, export data on the host and source in the build", sqrt2, byValue, true, true, true,
-			true},
-		{"an untyped float, source on the host and export data in the build", sqrt2, byValue, false, false, true,
-			true},
-		{"an untyped float, source in both", sqrt2, byValue, false, true, false, false},
-		{"an untyped float, export data in both", sqrt2, byValue, true, false, false, false},
-		{"an untyped complex, export data on the host and source in the build", imaginary, byValue, true, true, true,
-			true},
-		{"an untyped integer, export data on the host and source in the build", maximum, byValue, true, true, true,
+		{"an untyped float, export data on the host and source in the build", sqrt2, byValue, true, builtFromSource,
+			true, true},
+		{"an untyped float, source on the host and export data in the build", sqrt2, byValue, false, builtRestored,
+			true, true},
+		{"an untyped float, source in both", sqrt2, byValue, false, builtFromSource, false, false},
+		{"an untyped float, export data in both", sqrt2, byValue, true, builtRestored, false, false},
+		{"an untyped complex, export data on the host and source in the build", imaginary, byValue, true,
+			builtFromSource, true, true},
+		{"an untyped integer, export data on the host and source in the build", maximum, byValue, true,
+			builtFromSource, true, false},
+		{"a typed float, export data on the host and source in the build", typed, byValue, true, builtFromSource, true,
 			false},
-		{"a typed float, export data on the host and source in the build", typed, byValue, true, true, true, false},
-		{"a function, export data on the host and source in the build", function, named, true, true, true, false},
-		{"a function, source in both", function, named, false, true, false, false},
-		{"an untyped float of a package the host does not hold", elsewhere, byValue, true, true, true, true},
+		{"a function, export data on the host and source in the build", function, named, true, builtFromSource, true,
+			false},
+		{"a function, source in both", function, named, false, builtFromSource, false, false},
+		{"an untyped float of a package the host does not hold", elsewhere, byValue, true, builtFromSource, true,
+			true},
+		{"an untyped float, source on the host and no package of its ID in the build", sqrt2, byValue, false, lacked,
+			true, true},
+		{"a function, source on the host and no package of its ID in the build", function, named, false, lacked, true,
+			false},
+		{"a function, source on the host and export data in the build", function, named, false, builtRestored, true,
+			false},
 	}
 	for _, each := range cases {
+		graph := newReachBuiltGraph(&load.Loaded{})
+		if each.built != lacked {
+			graph.hold("math", "math", each.built)
+		}
 		reacher := &bodyReacher{
 			host: &bodyReachHost{identifiers: map[*types.Package]string{math: "math"},
 				dependence: &hostDependence{exportData: map[string]bool{"math": each.hostExportData}}},
-			fromSource: map[string]bool{"math": each.buildFromSource},
+			graph: graph,
 		}
 		if got := reacher.loadModeReaches(each.object, each.kinds); got != each.general {
 			test.Errorf("%s: the load mode reaches its body %t, want %t", each.name, got, each.general)
@@ -167,20 +185,17 @@ func reachRecorded(
 	host := newBodyReachHost(&hostDependence{exportData: map[string]bool{"math": true},
 		decoded: map[*types.Package]bool{}}, reads, nil)
 	hostFiles := map[string][]string{}
-	var roots []*packages.Package
-	fromSource := map[string]bool{}
 	for identifier, each := range checked {
 		hostFiles[identifier] = each.GoFiles
-		fromSource[identifier] = true
-		roots = append(roots, each)
 	}
-	built := reachBuiltPackages(&load.Loaded{Roots: roots}, hostFiles)
+	loaded := &load.Loaded{Roots: slices.Collect(maps.Values(checked))}
+	built := reachBuiltPackages(loaded, hostFiles)
 	if alter != nil {
 		for _, read := range built {
 			alter(read)
 		}
 	}
-	return host.reach(unchangedDependence(), built, fromSource, false)
+	return host.reach(unchangedDependence(), built, newReachBuiltGraph(loaded), false)
 }
 
 // mathSource is a math package of one untyped float constant, which the reach's unit tests load two ways.
@@ -277,11 +292,11 @@ func Still(angle float64) float64 { return -angle }
 		test.Errorf("want q's one body reached, Unrecorded, got %d", census.byReason[reachedUnrecorded])
 	}
 	// A build loading every package as the host does carries none of q's values, which can hold no other load's.
-	fromSource := map[string]bool{"math": true, "example.com/q": true, "example.com/a": true}
+	graph := newReachBuiltGraph(&load.Loaded{Roots: slices.Collect(maps.Values(checked))})
 	for _, mathExportData := range []bool{false, true} {
 		reacher := &bodyReacher{host: newBodyReachHost(&hostDependence{
 			exportData: map[string]bool{"math": mathExportData}, decoded: map[*types.Package]bool{}}, reads, nil),
-			fromSource: fromSource, carried: map[types.Object]bool{}}
+			graph: graph, carried: map[types.Object]bool{}}
 		reacher.carryUnrecorded(checked["example.com/q"].Types)
 		// TwoPi, q's one value, carried only where math loads otherwise.
 		want := 0
@@ -291,6 +306,161 @@ func Still(angle float64) float64 { return -angle }
 		if len(reacher.carried) != want {
 			test.Errorf("with math read from export data on the host %t, %d of q's values are carried, want %d",
 				mathExportData, len(reacher.carried), want)
+		}
+	}
+}
+
+// The carry starts by a package the build holds, never by one it lacks whole (#wzre5eg). The host holds tool by its
+// own ID, and the build's graph is read for tool's path: held by that ID, the two loads are compared as the direct
+// rule compares them; lacked by that ID and held as its test variant, which an extra build's load checks in a
+// command's place, the variant stands in, and the carry starts unless every package of the path is loaded in the
+// host's mode for tool; and with nothing of the path held, nothing the build compiles can have read tool, so no carry
+// starts. That last is held as a check, by the import specs of the files the build compiles: one that names the
+// path all the same, a vendored package's by its path past the vendor directory, starts the carry as before, and is
+// counted. No load makes such a graph, so the sets are built by hand.
+func TestTheCarryStartsOnlyByAPackageTheBuildHolds(test *testing.T) {
+	test.Parallel()
+
+	const tool = "example.com/tool"
+	const variant = "example.com/tool [example.com/tool.test]"
+	type held struct {
+		identifier string
+		mode       builtLoadMode
+	}
+	cases := []struct {
+		name           string
+		path           string
+		hostExportData bool
+		holds          []held
+		imported       string
+		starts         bool
+		byImport       bool
+	}{
+		{"held by its ID, source in both", tool, false, []held{{tool, builtFromSource}}, "", false, false},
+		{"held by its ID, source on the host and export data in the build", tool, false, []held{{tool, builtRestored}},
+			"", true, false},
+		{"held by its ID, export data on the host and source in the build", tool, true,
+			[]held{{tool, builtFromSource}}, "", true, false},
+		{"lacked whole, source on the host", tool, false, nil, "", false, false},
+		{"lacked whole, export data on the host", tool, true, nil, "", false, false},
+		{"lacked by its ID, its test variant checked from source as the host checked it", tool, false,
+			[]held{{variant, builtFromSource}}, "", false, false},
+		{"lacked by its ID, its test variant restored where the host checked it from source", tool, false,
+			[]held{{variant, builtRestored}}, "", true, false},
+		{"lacked by its ID, its test variant checked from source where the host read export data", tool, true,
+			[]held{{variant, builtFromSource}}, "", true, false},
+		{"lacked by its ID, its test variant restored as the host restored it", tool, true,
+			[]held{{variant, builtRestored}}, "", false, false},
+		{"lacked by its ID, one of two of its path loaded otherwise", tool, false,
+			[]held{{variant, builtFromSource}, {tool + " [example.com/other.test]", builtRestored}}, "", true, false},
+		{"lacked whole, and a file the build compiles imports it", tool, false, nil, tool, true, true},
+		{"lacked whole and vendored, and a file the build compiles imports it", "vendor/" + tool, false, nil, tool,
+			true, true},
+		{"lacked whole and vendored below a module, and a file the build compiles imports it",
+			"example.com/module/vendor/" + tool, false, nil, tool, true, true},
+		{"lacked whole, and a file the build compiles imports another path", tool, false, nil, tool + "/other", false,
+			false},
+	}
+	for _, each := range cases {
+		graph := newReachBuiltGraph(&load.Loaded{})
+		for _, standIn := range each.holds {
+			graph.hold(standIn.identifier, each.path, standIn.mode)
+		}
+		if each.imported != "" {
+			graph.imported[each.imported] = true
+		}
+		reacher := &bodyReacher{graph: graph, host: &bodyReachHost{dependence: &hostDependence{
+			paths: map[string]string{tool: each.path}, exportData: map[string]bool{tool: each.hostExportData}}}}
+		if starts, byImport := reacher.startsCarry(tool, each.path); starts != each.starts ||
+			byImport != each.byImport {
+			test.Errorf("%s: it starts the carry %t, by the check %t, want %t and %t", each.name, starts, byImport,
+				each.starts, each.byImport)
+		}
+		// The carry's trigger and the census's count read the same answer, over every package the host holds.
+		var wantCounted []string
+		if each.byImport {
+			wantCounted = []string{tool}
+		}
+		if some, counted := reacher.anyLoadModeDiffers(), reacher.lackedYetImported(); some != each.starts ||
+			!slices.Equal(counted, wantCounted) {
+			test.Errorf("%s: some package starts the carry %t, and the check counts %v, want %t and %v", each.name,
+				some, counted, each.starts, wantCounted)
+		}
+	}
+}
+
+// The check fires through a whole census (#wzre5eg): the host holds gone, the build's graph holds nothing of gone's
+// path, and a's file, which the build compiles, imports gone all the same, a graph no load makes, made here by taking
+// gone from a's imports once a is checked. The carry starts as it did before a lacked package was told apart, so
+// Around, reading the constant of q, a package with no record, is reached by the load mode, and the census counts
+// gone on the check's line. With gone held, loaded as the host loaded it, nothing starts the carry: Around stays
+// unreached and the line reads 0.
+func TestAPackageTheBuildLacksAndStillImportsStartsTheCarryAndIsCounted(test *testing.T) {
+	test.Parallel()
+
+	sources := []recordedSource{
+		{path: "example.com/gone", files: map[string]string{"/gone/gone.go": `package gone
+
+const Value = 1
+`}},
+		{path: "example.com/q", files: map[string]string{"/q/q.go": `package q
+
+const Scale = 3
+`}},
+		{path: "example.com/a", imports: []string{"example.com/gone", "example.com/q"},
+			files: map[string]string{"/a/a.go": `package a
+
+import (
+	_ "example.com/gone"
+	"example.com/q"
+)
+
+func Around(angle int) int { return angle * q.Scale }
+`}}}
+	for _, each := range []struct {
+		name     string
+		lacked   bool
+		around   string
+		line     string
+		byImport []string
+	}{
+		{"the build holding gone", false, "unreached",
+			"  lacked by the build and imported by a file it compiles, which starts the carry: 0 packages", nil},
+		{"the build lacking gone", true, "LoadMode",
+			"  lacked by the build and imported by a file it compiles, which starts the carry: 1 packages",
+			[]string{"example.com/gone"}},
+	} {
+		checked, reads := recordedPackages(test, sources)
+		// q's record taken away, as a package checked for its types alone or with cgo holds none.
+		reads[checked["example.com/q"]] = nil
+		if each.lacked {
+			delete(checked["example.com/a"].Imports, "example.com/gone")
+		}
+		// The host holds gone either way, the build only as a's imports reach it.
+		host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil)
+		hostFiles := map[string][]string{}
+		for identifier, hosted := range checked {
+			hostFiles[identifier] = hosted.GoFiles
+		}
+		loaded := &load.Loaded{Roots: []*packages.Package{checked["example.com/a"]}}
+		census := host.reach(unchangedDependence(), reachBuiltPackages(loaded, hostFiles), newReachBuiltGraph(loaded),
+			false)
+		around := ""
+		for _, body := range census.bodies {
+			if body.name == "Around" {
+				around = cmp.Or(string(body.reason), "unreached")
+			}
+		}
+		if around != each.around || !slices.Equal(census.lackedImported, each.byImport) {
+			test.Errorf("%s: Around is %s and the check counts %v, want %s and %v", each.name, around,
+				census.lackedImported, each.around, each.byImport)
+		}
+		var written strings.Builder
+		writeBuildBodyReach(&written, "build fixture", census)
+		lines := strings.Split(written.String(), "\n")
+		if !slices.Contains(lines, each.line) || each.lacked && !slices.Contains(lines, "    example.com/gone") {
+			test.Errorf("%s: the census has no line %q, or names no gone under it:\n%s", each.name, each.line,
+				written.String())
 		}
 	}
 }
@@ -418,12 +588,14 @@ func TestATypeArgumentReachesItsBodyByEitherBit(test *testing.T) {
 	elsewhere := types.NewPackage("example.com/elsewhere", "elsewhere")
 	number := types.NewTypeName(token.NoPos, elsewhere, "Number", nil)
 	types.NewNamed(number, types.Typ[types.Int], nil)
+	graph := newReachBuiltGraph(&load.Loaded{})
+	graph.hold("example.com/elsewhere", "example.com/elsewhere", builtFromSource)
 	reacher := &bodyReacher{
 		host: &bodyReachHost{dependence: &hostDependence{decoded: map[*types.Package]bool{}},
 			identifiers: map[*types.Package]string{elsewhere: "example.com/elsewhere"}},
 		dependence: build_dependence.NewGraph().Against(build_dependence.Difference{
 			DependentObject: func(types.Object) (bool, bool) { return false, true }}),
-		fromSource: map[string]bool{"example.com/elsewhere": true},
+		graph: graph,
 	}
 	reason, object, bits := reacher.useReason(build_reads.UsedEntry{Object: number}, build_reads.UsedTypeArgument)
 	if reason != reachedTypeArgument || object != number || bits != "underlying" {

@@ -314,13 +314,30 @@ type RestoredDependence struct {
 // whose standard-library graph is records, the store's, and the answers it could not place in any package that graph
 // holds, and UnkeyedParts says why, part by part, their sum being Unkeyed. Both are always written, beside the callers
 // the census counts, since those leave the facts out.
+//
+// WithoutSyntax, additive (#wzre5eg), counts the facts the census left out of the comparison, on either side, of a
+// package both builds have by one ID that the build restored, from the system cache or from its own store, rather
+// than checked from source: such a package has no syntax in the build, so the census compares none of its facts, the
+// standard library's in every build that restores it as a plain run's does. A fact is counted where the census would
+// have compared it, about the package itself or about an object in a file both builds compile, one both sides hold
+// counted on each, and so is each fact the build's entry holds by a path alone. It is always written, as Unkeyed is: a
+// census that counts no fact as different has compared only what Kinds counts, and this says what it did not.
+//
+// CompiledInOne, additive (#w5dbvdm), counts the facts the census left out, on either side, of a package both builds
+// have by one ID, about an object in a file the two do not both compile: the other build has no such object, so the
+// fact is no comparison's, whether the build checked the package from source or restored it, and neither Kinds nor
+// WithoutSyntax counts it. Each is counted on the side that holds it. It is always written, as WithoutSyntax is, which
+// it stands beside: the one says what was left out for want of the build's syntax, and this what was left out for
+// want of the other build's file. A package one build alone has is no census's, and its facts are in no count.
 type DependenceFacts struct {
-	Kinds        []FactKindCounts `json:"kinds"`
-	Workspace    FactCallers      `json:"workspace"`
-	Dependencies FactCallers      `json:"dependencies"`
-	Milliseconds int              `json:"milliseconds"`
-	Unkeyed      int              `json:"unkeyed"`
-	UnkeyedParts UnkeyedFacts     `json:"unkeyedParts"`
+	Kinds         []FactKindCounts `json:"kinds"`
+	Workspace     FactCallers      `json:"workspace"`
+	Dependencies  FactCallers      `json:"dependencies"`
+	Milliseconds  int              `json:"milliseconds"`
+	Unkeyed       int              `json:"unkeyed"`
+	UnkeyedParts  UnkeyedFacts     `json:"unkeyedParts"`
+	WithoutSyntax int              `json:"withoutSyntax"`
+	CompiledInOne int              `json:"compiledInOne"`
 }
 
 // UnkeyedFacts are the facts a census left out, by why (#h660y7d). Unnamed are the host's facts no name a record gives
