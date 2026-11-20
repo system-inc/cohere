@@ -124,9 +124,10 @@ func ReadWorkspace(root string) (Workspace, error) {
 // replacedDirectories are the directories inside root that the go.mod in directory replaces a module with,
 // relative to root and slash separated. Only a replace by a directory counts: one by a module and version
 // names no directory of the tree, and one that resolves outside root is no module the walk would meet. The go.mod is
-// read from contents, the bytes the caller already read of it, or from the file when contents is nil.
-func replacedDirectories(root string, directory string, contents []byte) ([]string, error) {
+// read from goMod, the bytes the caller already read of it, or from the file when goMod is nil.
+func replacedDirectories(root string, directory string, goMod []byte) ([]string, error) {
 	path := filepath.Join(root, filepath.FromSlash(directory), "go.mod")
+	contents := goMod
 	if contents == nil {
 		read, readError := os.ReadFile(path)
 		if readError != nil {

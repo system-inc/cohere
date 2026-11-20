@@ -225,7 +225,8 @@ func TestRefuseUnlistedModulesLeavesAVendoredReplaceTargetToItsUpstream(test *te
 func TestReplacedDirectoriesReadTheBytesAlreadyRead(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	goMod := []byte("module example.com/root/listed\n\ngo 1.25\n\nreplace example.com/vendored => ../third_party/vendored\n")
+	goMod := []byte("module example.com/root/listed\n\ngo 1.25\n\n" +
+		"replace example.com/vendored => ../third_party/vendored\n")
 	replaced, replacedError := replacedDirectories(root, "listed", goMod)
 	if replacedError != nil {
 		test.Fatalf("reading the replaces from bytes already read failed: %v", replacedError)
