@@ -350,6 +350,11 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 // the other build judges it itself, by that reason, whatever the inputs table declares for the rule, and the module
 // holds a quiet package beside it whose Stable stands in its place, so its run with the switch on still leaves a body
 // to the host's findings.
+//
+// What such a row no longer shows: the other build judges the reached declaration itself, so the row reads the same
+// whatever the inputs table declares for its rule, and nothing in it holds the rule's Composes declaration any more.
+// That comes back when the imports reason is rebuilt from the rules' own table (version (b), #bed0mnk). The finding
+// is still held to the build that opens the gate, with the switch on as off.
 type standingGate struct {
 	module   string
 	stood    string
