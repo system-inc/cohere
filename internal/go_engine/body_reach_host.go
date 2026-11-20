@@ -175,7 +175,7 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 			if isHosted && slices.Contains(hosted, name) {
 				read.sharedBodies += bodies
 				parsed := each.Fset.File(file.FileStart).Name()
-				if claims := unsharedLineClaims(each.Fset, file, hosted, read.files, hostCompiling[name],
+				if claims := unsharedLineClaims(each.Fset, file, hostCompiling[name],
 					builtCompiling[name]); len(claims) > 0 {
 					read.lineClaims[parsed] = claims
 				}
@@ -254,17 +254,18 @@ func compilingLists(lists iter.Seq[[]string]) map[string][][]string {
 // generated-file filter asks whether that file is one the pass's own package compiles as generated, so a body claiming
 // a platform sibling is judged by a file only one build holds, though nothing it uses differs.
 //
-// A claimed file is unshared where the sides disagree on holding it, by either of two pairs of lists: hostFiles and
-// builtFiles, the lists of the package's one ID, and hostCompiling and builtCompiling, the lists of every package of
-// each side that compiles file, whatever its ID, taken together (the Square's must 1). Each side lints a file in one
-// package of those that compile it, its in-package test variant where the package has test files there and the package
-// itself where it has none (load's analyzedOfGraph), while the census pairs the build's package with the host's of its
-// own ID. So where the host has test files and the build has none, the host lints the file in its variant, whose list
-// holds a test file, while the build's package is paired with the host's plain one: neither list of that ID holds the
-// test file, and a claim of it went unseen. Every package that compiles the file is that package, its variant or the
-// package built again for another's tests, and the variant's list holds each of the others', so a side's lists taken
-// together are the list of the package that side lints the file in, and the two sides disagree on a name exactly where
-// those two packages do. The one ID's lists can only reach more.
+// A claimed file is unshared where the sides disagree on holding it, by hostCompiling and builtCompiling, the lists of
+// every package of each side that compiles file, whatever its ID, taken together (the Square's must 1). Each side
+// lints a file in one package of those that compile it, its in-package test variant where the package has test files
+// there and the package itself where it has none (load's analyzedOfGraph), while the census pairs the build's package
+// with the host's of its own ID. So where the host has test files and the build has none, the host lints the file in
+// its variant, whose list holds a test file, while the build's package is paired with the host's plain one: neither
+// list of that ID holds the test file, and a claim of it went unseen. Every package that compiles the file is that
+// package, its variant or the package built again for another's tests, and the variant's list holds each of the
+// others', so a side's lists taken together are the list of the package that side lints the file in, and the two
+// sides disagree on a name exactly where those two packages do. The one ID's lists are among them, so asking those too
+// sees no claim more, and they are not asked. The one exception is a directive before the package clause, which has
+// the file's lists looked up under another name: #cpbx5rw's case, left as it is.
 //
 // The filter is not the one reader of a claimed name. The body differential read a compared body's findings in the
 // claimed file until #99saas4 had it read them where a finding is placed, by the file as parsed (check.newFinding),
@@ -281,8 +282,6 @@ func compilingLists(lists iter.Seq[[]string]) map[string][][]string {
 func unsharedLineClaims(
 	fileSet *token.FileSet,
 	file *ast.File,
-	hostFiles []string,
-	builtFiles map[string]bool,
 	hostCompiling [][]string,
 	builtCompiling [][]string,
 ) map[int]string {
@@ -326,8 +325,7 @@ func unsharedLineClaims(
 		if each.claimed == tokenFile.Name() {
 			continue
 		}
-		if slices.Contains(hostFiles, each.claimed) == builtFiles[each.claimed] &&
-			compiles(hostCompiling, each.claimed) == compiles(builtCompiling, each.claimed) {
+		if compiles(hostCompiling, each.claimed) == compiles(builtCompiling, each.claimed) {
 			continue
 		}
 		end := tokenFile.Size()
@@ -335,6 +333,7 @@ func unsharedLineClaims(
 			end = spans[index+1].start
 		}
 		for _, declaration := range file.Decls {
+			// `<=` and `<` judge alike: a declaration never ends at a line's start, nor at a block comment's end.
 			if tokenFile.Offset(declaration.End()) <= each.start ||
 				tokenFile.Offset(documentedStart(declaration)) >= end {
 				continue

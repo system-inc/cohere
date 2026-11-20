@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"cmp"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -60,7 +61,8 @@ var anchorFiles = map[string]string{
 // nothing target uses differs. The reach reaches a body whose positions claim a file the builds do not share,
 // LineClaim, so it is never compared and never stands. Each case is judged three ways: by windows's census, by the
 // body differential, which must read no failure, and by the second check, windows's own findings with the standing
-// bodies' switch off against on, which must be alike. And no body of any case may be reached by the general load
+// bodies' switch off against on, which must be alike, its off side holding the case's own findings in target's file
+// (wantOff), so a case with nothing to lose cannot pass it. And no body of any case may be reached by the general load
 // mode rule alone, which a claimed body would be if the claim were not the constants-only rule's reason too.
 //
 // The first four are the claim inside the body: of windows's file, of the host's platform's, of windows's again below
@@ -103,6 +105,10 @@ func TestTheReachReachesABodyWhoseLineDirectiveClaimsAnUnsharedFile(test *testin
 	// variant is the ID of the fixture's package with its in-package tests.
 	const variant = lineClaimPackage + " [" + lineClaimPackage + ".test]"
 	claimed, unreached := string(reachedLineClaim), "unreached"
+	// unsigned is how wantOff writes SA4003 in target.go, before the line and column.
+	const unsigned = "cohere-go/SA4003 target.go:"
+	// unused is how wantOff writes U1000 in target.go, before the line and column.
+	const unused = "cohere-go/U1000 target.go:"
 	for _, each := range []struct {
 		name string
 		// files are the files the case writes over the fixture, by path.
@@ -111,33 +117,40 @@ func TestTheReachReachesABodyWhoseLineDirectiveClaimsAnUnsharedFile(test *testin
 		identifier string
 		// want is how windows's census must judge each body it names.
 		want map[string]string
+		// wantOff are windows's own findings in target's file with the standing bodies' switch off, each `rule
+		// file:line:column`: its SA4003 where windows does not compile the claimed file as generated, and U1000, which
+		// shows windows linted target at all, so the second check has what a body left standing would change to see.
+		wantOff []string
 	}{
 		{name: "claiming windows's file", files: filesWith(inside("", "part_windows.go"), declaringPlatformFiles),
-			want: map[string]string{"target": claimed}},
+			want: map[string]string{"target": claimed}, wantOff: []string{unused + "4:6"}},
 		{name: "claiming the host's platform's file",
-			files: filesWith(inside("", "part_other.go"), declaringPlatformFiles),
-			want:  map[string]string{"target": claimed}},
+			files:   filesWith(inside("", "part_other.go"), declaringPlatformFiles),
+			want:    map[string]string{"target": claimed},
+			wantOff: []string{unsigned + "6:9", unused + "4:6"}},
 		// The directive before the claim names target's own file at a line past the file's last, with a statement
 		// under it.
 		{name: "claiming windows's file below a directive that moves its line",
 			files: filesWith(inside("//line target.go:900\n\t_ = value\n", "part_windows.go"),
 				declaringPlatformFiles),
-			want: map[string]string{"target": claimed}},
+			want: map[string]string{"target": claimed}, wantOff: []string{unused + "4:6"}},
 		{name: "claiming a file both builds compile", files: filesWith(inside("", "sibling.go"),
 			declaringPlatformFiles, map[string]string{"sibling.go": "package audit\n\n// sibling is every build's.\n" +
 				"func sibling() int {" + generatedMarker + "\treturn 2\n}\n"}),
-			want: map[string]string{"target": unreached}},
+			want: map[string]string{"target": unreached}, wantOff: []string{unused + "4:6"}},
 
 		{name: "claiming a test file the host alone compiles, inside the body", files: filesWith("package audit\n\n"+
 			"func target(value uint8) bool {\n//line helper_other_test.go:5\n\treturn value >= 0\n}\n", hostTestFile,
-			anchorFiles), want: map[string]string{"target": claimed}},
+			anchorFiles), want: map[string]string{"target": claimed},
+			wantOff: []string{unsigned + "5:9", unused + "3:6"}},
 		{name: "claiming a test file the host alone compiles, above the func",
-			files: filesWith(above("helper_other_test.go", "20"), hostTestFile, anchorFiles),
-			want:  map[string]string{"target": claimed}},
+			files:   filesWith(above("helper_other_test.go", "20"), hostTestFile, anchorFiles),
+			want:    map[string]string{"target": claimed},
+			wantOff: []string{unsigned + "5:9", unused + "4:6"}},
 		{name: "claiming windows's test file where both builds have test files",
 			files: filesWith(above("helper_windows_test.go", "7"), hostTestFile, windowsTestFile,
 				declaringPlatformFiles),
-			identifier: variant, want: map[string]string{"target": claimed}},
+			identifier: variant, want: map[string]string{"target": claimed}, wantOff: []string{unused + "4:6"}},
 		{name: "a test file claiming the host's test file where both builds have test files",
 			files: map[string]string{
 				"target_test.go":         above("helper_other_test.go", "7"),
@@ -145,28 +158,34 @@ func TestTheReachReachesABodyWhoseLineDirectiveClaimsAnUnsharedFile(test *testin
 				"helper_other_test.go":   hostTestFile["helper_other_test.go"],
 				"helper_windows_test.go": windowsTestFile["helper_windows_test.go"],
 			},
-			identifier: variant, want: map[string]string{"target": claimed}},
+			identifier: variant, want: map[string]string{"target": claimed},
+			wantOff: []string{"cohere-go/SA4003 target_test.go:5:9", "cohere-go/U1000 target_test.go:4:6"}},
 		{name: "claiming a test file windows alone compiles",
-			files: filesWith(above("helper_windows_test.go", "7"), windowsTestFile),
-			want:  map[string]string{"target": "unjudged"}},
+			files:   filesWith(above("helper_windows_test.go", "7"), windowsTestFile),
+			want:    map[string]string{"target": "unjudged"},
+			wantOff: []string{unused + "4:6"}},
 
 		{name: "a value spec claiming the host's platform's file, which declares nothing",
-			files: filesWith("package audit\n\n//line part_other.go:7\nvar hook = "+compares+"\n", barePlatformFiles),
-			want:  map[string]string{"hook": claimed}},
+			files:   filesWith("package audit\n\n//line part_other.go:7\nvar hook = "+compares+"\n", barePlatformFiles),
+			want:    map[string]string{"hook": claimed},
+			wantOff: []string{unsigned + "4:44", unused + "4:5"}},
 		{name: "a const group claiming windows's file, which declares nothing",
 			files: filesWith("package audit\n\nconst limit uint8 = 3\n\n//line part_windows.go:7\nconst (\n"+
 				"\tfirst = limit >= 0\n\tsecond\n)\n", barePlatformFiles),
-			want: map[string]string{"limit": unreached, "first": claimed, "second": claimed}},
+			want:    map[string]string{"limit": unreached, "first": claimed, "second": claimed},
+			wantOff: []string{unused + "3:7", unused + "7:2", unused + "8:2"}},
 		{name: "a block directive in the middle of a line", files: filesWith("package audit\n\n"+
 			"func target(value uint8) bool { return /*line part_other.go:7:2*/ value >= 0 }\n",
-			declaringPlatformFiles), want: map[string]string{"target": claimed}},
+			declaringPlatformFiles), want: map[string]string{"target": claimed},
+			wantOff: []string{unsigned + "3:67", unused + "3:6"}},
 		{name: "a block directive before the func, claiming a file that declares nothing",
 			files: filesWith("package audit\n\n/*line part_windows.go:7:1*/ func target(value uint8) bool { return "+
 				"value >= 0 }\n", barePlatformFiles),
-			want: map[string]string{"target": claimed}},
+			want: map[string]string{"target": claimed}, wantOff: []string{unused + "3:35"}},
 		{name: "a directive above the func, claiming a file that declares nothing",
-			files: filesWith(above("part_other.go", "7"), barePlatformFiles),
-			want:  map[string]string{"target": claimed}},
+			files:   filesWith(above("part_other.go", "7"), barePlatformFiles),
+			want:    map[string]string{"target": claimed},
+			wantOff: []string{unsigned + "5:9", unused + "4:6"}},
 		{name: "a later directive ending a claim", files: filesWith("package audit\n\n"+
 			"//line part_other.go:7\nfunc claimed(value uint8) bool {\n\treturn value >= 0\n}\n\n"+
 			"//line target.go:20\n\nfunc released(value uint8) bool {\n\treturn value >= 0\n}\n\n"+
@@ -174,15 +193,18 @@ func TestTheReachReachesABodyWhoseLineDirectiveClaimsAnUnsharedFile(test *testin
 			"//line target.go:50\nfunc adjoined(value uint8) bool {\n\treturn value >= 0\n}\n",
 			declaringPlatformFiles),
 			want: map[string]string{"claimed": claimed, "released": unreached, "again": claimed,
-				"adjoined": claimed}},
+				"adjoined": claimed},
+			wantOff: []string{unsigned + "11:9", unsigned + "16:9", unsigned + "21:9", unsigned + "5:9",
+				unused + "10:6", unused + "15:6", unused + "20:6", unused + "4:6"}},
 		{name: "a claim over a doc comment alone", files: filesWith("package audit\n\n//line part_other.go:7\n"+
 			"// target compares.\n//line target.go:6\nfunc target(value uint8) bool {\n\treturn value >= 0\n}\n",
-			barePlatformFiles), want: map[string]string{"target": claimed}},
+			barePlatformFiles), want: map[string]string{"target": claimed},
+			wantOff: []string{unsigned + "7:9", unused + "6:6"}},
 	} {
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
 
-			census, failures := runLineClaims(test, each.files)
+			census, failures := runLineClaims(test, each.files, nil)
 			for name, want := range each.want {
 				if reason := judgedBody(census, cmp.Or(each.identifier, lineClaimPackage), name); reason != want {
 					test.Errorf("windows's census judges %s %s, want %s", name, reason, want)
@@ -197,7 +219,11 @@ func TestTheReachReachesABodyWhoseLineDirectiveClaimsAnUnsharedFile(test *testin
 			if len(failures) > 0 {
 				test.Errorf("want the body differential to read no failure, got\n%s", strings.Join(failures, "\n"))
 			}
-			off, on := standingLineClaims(test, each.files)
+			off, on, offPlaced := standingLineClaims(test, each.files)
+			if !slices.Equal(offPlaced, each.wantOff) {
+				test.Errorf("windows's own findings with the standing bodies' switch off are\n%s\nwant\n%s",
+					strings.Join(offPlaced, "\n"), strings.Join(each.wantOff, "\n"))
+			}
 			if !slices.Equal(off, on) {
 				test.Errorf("want windows's own findings alike with the standing bodies' switch off and on, got\n"+
 					"lost with it on:\n%s\ninvented with it on:\n%s", strings.Join(lacking(off, on), "\n"),
@@ -218,8 +244,7 @@ func TestTheReachReachesABodyWhoseLineDirectiveClaimsAnUnsharedFile(test *testin
 // body its directive moves onto the lines of another body of its own file, one a claim reaches and whose SA4003 only
 // windows holds: its own findings are alike. A blank line parts that directive from the body, or it would be the
 // body's doc comment, under the claim before it, and the body claimed too. The silence, a body whose findings differ
-// read where nothing is, was a claim of a test file the host alone compiles, which the reach now reaches (the reach's
-// own test's cases of it), so no body left to compare shows it.
+// read where nothing is, is TestTheBodyDifferentialFailsAClaimedBodyWhoseFindingsDiffer's.
 func TestTheBodyDifferentialReadsABodysFindingsWhereTheyArePlaced(test *testing.T) {
 	test.Parallel()
 
@@ -246,12 +271,67 @@ func TestTheBodyDifferentialReadsABodysFindingsWhereTheyArePlaced(test *testing.
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
 
-			census, failures := runLineClaims(test, each.files)
+			census, failures := runLineClaims(test, each.files, nil)
 			if reason := judgedBody(census, lineClaimPackage, each.body); reason != "unreached" {
 				test.Fatalf("windows's census judges %s %s, want it unreached, so compared", each.body, reason)
 			}
 			if len(failures) > 0 {
 				test.Errorf("want the body differential to read no failure, got\n%s", strings.Join(failures, "\n"))
+			}
+		})
+	}
+}
+
+// A body under a `//line` directive whose findings differ fails the body differential, read where its findings are
+// placed (#99saas4, the Square's M2's silence, held again on #d2mqgfj's round 2). A claim of a test file the host
+// alone compiles is that body: the host lints target in its test variant, beside the generated test file, so SA4003 is
+// withheld there and windows's alone. The reach reaches it (LineClaim) and compares nothing, so, as
+// TestTheBodyDifferentialFailsABodyWhoseTypeDiffersByItsMethodSetAlone does, the differential is handed a census with
+// target's reason cleared, and must fail target once, by SA4003 at 5:9 on the build's side alone. Above the `func`,
+// the census names target by the file the claim moves it to, so a differential that left alone a body named by
+// another file than its own would read nothing there. Inside the body, the census names it by target.go, and a range
+// that ended before it began would read nothing.
+func TestTheBodyDifferentialFailsAClaimedBodyWhoseFindingsDiffer(test *testing.T) {
+	test.Parallel()
+
+	for _, each := range []struct {
+		name  string
+		files map[string]string
+		// place is target as the census lists it, `file:line`.
+		place string
+	}{
+		{name: "inside the body", place: "target.go:3", files: filesWith("package audit\n\n"+
+			"func target(value uint8) bool {\n//line helper_other_test.go:5\n\treturn value >= 0\n}\n", hostTestFile,
+			anchorFiles)},
+		{name: "above the func", place: "helper_other_test.go:20", files: filesWith("package audit\n\n"+
+			"//line helper_other_test.go:20\nfunc target(value uint8) bool {\n\treturn value >= 0\n}\n", hostTestFile,
+			anchorFiles)},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+
+			census, failures := runLineClaims(test, each.files, func(census *buildBodyReach) *buildBodyReach {
+				altered := *census
+				altered.bodies = slices.Clone(census.bodies)
+				for index, body := range altered.bodies {
+					if body.packageIdentifier == lineClaimPackage && body.name == "target" {
+						altered.bodies[index].reason = ""
+					}
+				}
+				return &altered
+			})
+			if reason := judgedBody(census, lineClaimPackage, "target"); reason != string(reachedLineClaim) {
+				test.Fatalf("windows's census judges target %s, want %s, so only the cleared census compares it",
+					reason, reachedLineClaim)
+			}
+			prefix := lineClaimPackage + " " + each.place + " target: findings differ: host ["
+			if len(failures) != 1 || !strings.HasPrefix(failures[0], prefix) {
+				test.Fatalf("want one failure, of target at %s by its findings, got\n%s", each.place,
+					strings.Join(failures, "\n"))
+			}
+			host, built, _ := strings.Cut(strings.TrimPrefix(failures[0], prefix), "], build [")
+			if strings.Contains(host, "SA4003 5:9 ") || !strings.Contains(built, "SA4003 5:9 ") {
+				test.Errorf("want SA4003 at 5:9 on the build's side alone, got\n%s", failures[0])
 			}
 		})
 	}
@@ -284,14 +364,20 @@ func writeLineClaimFiles(test *testing.T, files map[string]string) string {
 }
 
 // runLineClaims runs the engine over a copy of the body-reach-line-claims fixture with files written over it
-// (writeLineClaimFiles), under the census and the body differential, and returns windows's census and its
-// differential's failures, the copy's root taken out of each.
-func runLineClaims(test *testing.T, files map[string]string) (*buildBodyReach, []string) {
+// (writeLineClaimFiles), under the census and the body differential, handed differentialCensus's census where it is
+// set (pipeline.bodyDifferentialCensus), and returns windows's census and its differential's failures, the copy's root
+// taken out of each.
+func runLineClaims(
+	test *testing.T,
+	files map[string]string,
+	differentialCensus func(*buildBodyReach) *buildBodyReach,
+) (*buildBodyReach, []string) {
 	test.Helper()
 	root := writeLineClaimFiles(test, files)
 	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 		engine.bodyDifferential = true
+		engine.bodyDifferentialCensus = differentialCensus
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
@@ -309,8 +395,10 @@ func runLineClaims(test *testing.T, files map[string]string) (*buildBodyReach, [
 
 // standingLineClaims runs the engine twice more, each over a copy of the body-reach-line-claims fixture with files
 // written over it, under the census with the standing bodies' switch off, then on, and returns windows's own findings
-// of each run (rawFindings): the second check, which sees a body left standing whose findings are not the host's.
-func standingLineClaims(test *testing.T, files map[string]string) (off []string, on []string) {
+// of each run (rawFindings): the second check, which sees a body left standing whose findings are not the host's. And
+// it returns the first run's again in target's file, target.go or target_test.go, each written `rule
+// file:line:column` with the copy's root taken out.
+func standingLineClaims(test *testing.T, files map[string]string) (off []string, on []string, offPlaced []string) {
 	test.Helper()
 	var found [2][]string
 	for index, switched := range []bool{false, true} {
@@ -323,8 +411,20 @@ func standingLineClaims(test *testing.T, files map[string]string) (off []string,
 			test.Fatalf("want the host's build and windows's, got %d runs", len(standing.buildRuns))
 		}
 		found[index] = rawFindings(standing.buildRuns[1], root)
+		if !switched {
+			for _, finding := range standing.buildRuns[1].result.Findings {
+				relative := strings.TrimPrefix(finding.File, root+string(filepath.Separator))
+				// The generated marker shouts in every platform file, which nothing a claim changes.
+				if relative != "target.go" && relative != "target_test.go" {
+					continue
+				}
+				offPlaced = append(offPlaced, fmt.Sprintf("%s %s:%d:%d", finding.Rule, relative, finding.Line,
+					finding.Column))
+			}
+			slices.Sort(offPlaced)
+		}
 	}
-	return found[0], found[1]
+	return found[0], found[1], offPlaced
 }
 
 // lacking are the lines of held that other lacks, in held's order.

@@ -151,11 +151,17 @@ func readsFacts(analyzer *analysis.Analyzer) bool {
 	return reads(analyzer)
 }
 
-// comparedBody is a body the differential compared, by where its findings are placed, the file as parsed and its
-// declaration's first line to its body's last as written (build_reads.RenderedBody), and how the census names it,
-// which is by the file and line a //line directive moves it to.
+// comparedBody is a body the differential compared, by how the census names it, which is by the file and line a
+// //line directive moves it to, and by where each side's findings of it are placed, by that side's own rendering.
 type comparedBody struct {
-	body      reachedBody
+	body  reachedBody
+	host  placedLines
+	built placedLines
+}
+
+// placedLines are where one side's findings of a body are placed: the file as parsed and the body's declaration's
+// first line to its body's last as written (build_reads.RenderedBody).
+type placedLines struct {
 	file      string
 	firstLine int
 	lastLine  int
@@ -223,8 +229,11 @@ func newBuildBodyDifferential(
 				builtBody.Facts); difference != "" {
 				differential.failures = append(differential.failures, body.String()+": "+difference)
 			}
-			differential.bodies = append(differential.bodies, comparedBody{body: body, file: builtBody.ParsedFile,
-				firstLine: builtBody.FirstLine, lastLine: builtBody.LastLine})
+			differential.bodies = append(differential.bodies, comparedBody{body: body,
+				host: placedLines{file: hostBody.ParsedFile, firstLine: hostBody.FirstLine,
+					lastLine: hostBody.LastLine},
+				built: placedLines{file: builtBody.ParsedFile, firstLine: builtBody.FirstLine,
+					lastLine: builtBody.LastLine}})
 		}
 	}
 	if differential.compared == 0 && census.recorded > 0 && census.byReason[reachedSizes] < census.total {
@@ -303,9 +312,12 @@ func (differential *buildBodyDifferential) compareFindings(
 			continue
 		}
 		// A finding is keyed by its file as parsed and its line as written (check's newFinding), so a body under a
-		// //line directive is read there too, never in the file its positions claim (#99saas4).
-		hostWritten := findingsWithin(hostFindings[compared.file], compared.firstLine, compared.lastLine)
-		builtWritten := findingsWithin(builtFindings[compared.file], compared.firstLine, compared.lastLine)
+		// //line directive is read there too, never in the file its positions claim (#99saas4), each side by its own
+		// rendering, so a side whose bytes or root spelling differ still reads its own findings.
+		hostWritten := findingsWithin(hostFindings[compared.host.file], compared.host.firstLine,
+			compared.host.lastLine)
+		builtWritten := findingsWithin(builtFindings[compared.built.file], compared.built.firstLine,
+			compared.built.lastLine)
 		if slices.Equal(hostWritten, builtWritten) {
 			continue
 		}
