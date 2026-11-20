@@ -42,7 +42,7 @@ type shardInStore struct {
 }
 
 // ShardReading is a shard's stamp as the run read it: whether there was one, a directory the store holds, whether it
-// is trusted, its time more than racyStampWindow before the clock as it was read, so no write after the reading can
+// is trusted, its time at least racyStampWindow before the clock as it was read, so no write after the reading can
 // have left it where it was, and whether a store of the run has changed a file of the shard since it was read.
 type ShardReading struct {
 	Stamp   int64
