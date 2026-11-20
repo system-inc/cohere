@@ -165,8 +165,10 @@ func TestAStandingBodySelectingAMarkersMethodLeavesForPresence(test *testing.T) 
 // noany's bound (#xeafx79), one body taken out under each kind of key: Handle's parameter is a key, so Handle's own
 // body leaves and Calls, which names it, leaves too; Record's Payload is a field key, so Reads, which selects it, and
 // Builds, which builds Record, leave; Loose is a variable key, so Sets leaves; Getter's Get is an interface method
-// key, so Gets, which selects Box's Get, leaves. Anything keeps no declaration, so Holds, which names it, stands, and
-// so does Counts, which names Strict, a function holding no candidate.
+// key, so Gets, which selects Box's Get, leaves. Fills builds Rows, whose unkeyed element marks Inner's Note though it
+// names only Rows, and leaves, and Touches names settings, a variable of an anonymous struct, and leaves. Anything
+// keeps no declaration, so Holds, which names it, stands; so does Counts, which names Strict, a function holding no
+// candidate, and so does Fresh, whose struct of settings' shape is written in place, with fields of its own.
 func TestAStandingBodyTouchingANoAnyKeyLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "loose")
@@ -178,7 +180,9 @@ func TestAStandingBodyTouchingANoAnyKeyLeavesForPresence(test *testing.T) {
 		presenceUse{key: "loose.Loose", identity: found.identity("Loose"), users: []string{"Sets"}},
 		presenceUse{key: "loose.Box.Get", identity: found.method("Box", "Get"), users: []string{"Gets"}},
 		presenceUse{key: "loose.Anything", identity: found.identity("Anything"), users: []string{"Holds"}},
-		presenceUse{key: "loose.Strict", identity: found.identity("Strict"), users: []string{"Counts"}})
+		presenceUse{key: "loose.Strict", identity: found.identity("Strict"), users: []string{"Counts"}},
+		presenceUse{key: "loose.Rows", identity: found.identity("Rows"), users: []string{"Fills"}},
+		presenceUse{key: "loose.settings", identity: found.identity("settings"), users: []string{"Touches"}})
 	host.functions = []fact_reach.Function{
 		{Object: "loose.Handle", Identity: found.identity("Handle")},
 		{Object: "loose.Strict", Identity: found.identity("Strict")},
@@ -189,7 +193,8 @@ func TestAStandingBodyTouchingANoAnyKeyLeavesForPresence(test *testing.T) {
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"Handle": standing_presence.NoAny, "Calls": standing_presence.NoAny, "Builds": standing_presence.NoAny,
-		"Reads": standing_presence.NoAny, "Sets": standing_presence.NoAny, "Gets": standing_presence.NoAny})
+		"Reads": standing_presence.NoAny, "Sets": standing_presence.NoAny, "Gets": standing_presence.NoAny,
+		"Fills": standing_presence.NoAny, "Touches": standing_presence.NoAny})
 }
 
 // The edge rows' callee direction (#xeafx79): Start, TestRuns and Quiet are present. Start takes a test and starts

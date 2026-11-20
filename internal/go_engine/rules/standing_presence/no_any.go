@@ -33,9 +33,9 @@ type noAnyKeys struct {
 }
 
 // noAnyBound is what noany's bound takes out of the standing set, each with its reason: each function a key belongs
-// to is named, so its users leave, and its own body leaves; each field or variable key is named, and so is each struct
-// type that holds a field key, since a body building it in a literal can mark a field it never names; and each used
-// method of an interface method key's name is named, on any receiver, as emptyfunction's are.
+// to is named, so its users leave, and its own body leaves; each field or variable key is named, and so is each type a
+// literal of which can mark a field key it never names (holdsKeyField); and each used method of an interface method
+// key's name is named, on any receiver, as emptyfunction's are.
 func noAnyBound(
 	pass *analysis.Pass,
 	host fact_reach.Host,
@@ -79,7 +79,7 @@ func noAnyBound(
 		case *types.Var:
 			isKey = keys.variables[declared.Origin()]
 		case *types.TypeName:
-			isKey = holdsKeyField(declared.Type(), keys.variables)
+			isKey = holdsKeyField(declared.Type(), keys.variables, map[types.Type]bool{})
 		}
 		if isKey {
 			named = append(named, fact_reach.Named{Object: object.Object, Reason: NoAny.Reason()})
@@ -91,16 +91,34 @@ func noAnyBound(
 	return named, leaving
 }
 
-// holdsKeyField is whether the struct a named type declares holds a field that is a key.
-func holdsKeyField(declared types.Type, variables map[*types.Var]bool) bool {
-	structure, isStruct := declared.Underlying().(*types.Struct)
-	if !isStruct {
+// holdsKeyField is whether a composite literal of declared can hand a value to a field key: one of the struct it
+// declares, or of a struct a literal elides inside it, an element, a map's key or a pointer's target, through named
+// types too, so `Rows{{value}}` marks a field of Rows's elements, whose type it never names. No other literal reaches a
+// key's field. The rule takes a literal's field from the literal's own type, unkeyed by its index
+// (recordCompositeLiteral, rules/consistency_no_any/flow_analysis.go:201-235), and keys a field by its object
+// (referenceToObject, flow_analysis.go:442-459); go/types makes a struct's fields anew for each struct type written,
+// so a literal whose type is written in place, `struct{ rows []any }{value}`, marks fields of its own, never an
+// anonymous struct's key. A keyed element and a selection use the field itself, which the host's record holds.
+func holdsKeyField(declared types.Type, variables map[*types.Var]bool, seen map[types.Type]bool) bool {
+	if seen[declared] {
 		return false
 	}
-	for index := range structure.NumFields() {
-		if variables[structure.Field(index).Origin()] {
-			return true
+	seen[declared] = true
+	switch underlying := declared.Underlying().(type) {
+	case *types.Struct:
+		for index := range underlying.NumFields() {
+			if variables[underlying.Field(index).Origin()] {
+				return true
+			}
 		}
+	case *types.Slice:
+		return holdsKeyField(underlying.Elem(), variables, seen)
+	case *types.Array:
+		return holdsKeyField(underlying.Elem(), variables, seen)
+	case *types.Map:
+		return holdsKeyField(underlying.Key(), variables, seen) || holdsKeyField(underlying.Elem(), variables, seen)
+	case *types.Pointer:
+		return holdsKeyField(underlying.Elem(), variables, seen)
 	}
 	return false
 }

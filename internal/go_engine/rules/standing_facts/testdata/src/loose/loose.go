@@ -23,6 +23,15 @@ type Box struct{}
 // Get is of the interface method key's name.
 func (Box) Get() int { return 1 }
 
+// Inner's Note is a field key, which a literal reaches through Rows without naming Inner.
+type Inner struct{ Note any }
+
+// Rows holds Inners.
+type Rows []Inner
+
+// settings is a variable key, of an anonymous struct whose rows field is a key too.
+var settings struct{ rows []any }
+
 // Anything keeps no declaration, so no body can fix it.
 type Anything any
 
@@ -49,3 +58,15 @@ func Holds(value Anything) bool { return value == nil }
 
 // Counts names Strict.
 func Counts() int { return Strict(1) }
+
+// Fills builds Rows, whose unkeyed element marks Inner's Note, though it names neither Inner nor Note.
+func Fills() Rows { return Rows{{nil}} }
+
+// Touches names settings.
+func Touches() { settings.rows = nil }
+
+// Fresh builds a struct of settings' shape written in place, whose fields are its own and no key's.
+func Fresh() bool {
+	value := struct{ rows []any }{nil}
+	return value.rows == nil
+}
