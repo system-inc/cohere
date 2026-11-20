@@ -90,9 +90,8 @@ func (dependence *Dependence) ObjectBits(object types.Object) Bits {
 			Underlying: dependence.judging.answerObject(declared, true),
 		}
 	}
-	_, isConstant := declared.(*types.Const)
 	walker := &bitWalker{seen: map[walkKey]bool{}}
-	for _, through := range walker.references(declared.Type(), isConstant) {
+	for _, through := range walker.borrowedThroughReferences(declared) {
 		set := false
 		if node, isNode := resolved.objectNodes[through.object]; isNode {
 			set = dependence.bits[bit(node, through.touchesUnderlying)]

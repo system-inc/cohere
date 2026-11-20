@@ -24,9 +24,14 @@ import (
 // StandardLibraryDependenceRecordVersion is the format of a standard-library dependence record as the store keeps it,
 // hashed into its key apart from the host's records' version, so either changes alone. It moves with
 // DependenceRecordVersion when what the collector records changes, as it did at 2, at 3, at 4, where the name bit of a
-// type defined from another type's name reads that type in full, and at 5, where each unit carries whether it hangs
-// on the C side, one in a cgo tool's output or in any file of a package checked as written that has a cgo file.
-const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-5"
+// type defined from another type's name reads that type in full, at 5, where each unit carries whether it hangs
+// on the C side, one in a cgo tool's output or in any file of a package checked as written that has a cgo file, at 6,
+// where a member whose own type spells an unnamed struct reads what its own line observes of it, and at 7, where a
+// named type's underlying bit reads in full the element behind each pointer at its top and each embedded pointer, and
+// a member's bit reads its constraints and its receiver's as its line observes them, and at 8, where an alias's
+// underlying bit reads what the pointer rule reads of the type it names.
+// TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey names the version's text.
+const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-8"
 
 // StandardLibraryDependenceRecordKey is where the store keeps the dependence record of the standard-library package
 // whose standard-library key is standardLibraryKey (cache.StandardLibraryKeys), written by the engine whose identity is
