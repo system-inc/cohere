@@ -62,3 +62,19 @@ func TestAnObjectsOwnObservedFieldsAreInItsClosureDigest(test *testing.T) {
 		test.Error("V's digest is alike though its field f grows from one byte to two")
 	}
 }
+
+// A tree child's lowlink carries up to its parent (the walk's min after connect): in A to B to C to A, digested from A,
+// only C's edge back to A lowers anything, and B learns it from C. So all three are one component, and B, asked after
+// A, differs where only A's Change does. Carry no child's lowlink up and B becomes a root that pops B and C without A,
+// digested before A has a digest, so it reads alike in both builds.
+func TestADeepBackEdgeKeepsAThreeMemberCycleOneComponent(test *testing.T) {
+	test.Parallel()
+
+	host := "type A struct{ B *B; Change int }\n\ntype B struct{ C *C }\n\ntype C struct{ A *A }\n"
+	build := "type A struct{ B *B; Change string }\n\ntype B struct{ C *C }\n\ntype C struct{ A *A }\n"
+	for _, sizes := range []types.Sizes{nil, types.SizesFor("gc", "amd64")} {
+		if digestsAlike(test, host, build, sizes, []string{"A"}, "B") {
+			test.Errorf("sized %t: B's digest, asked after A's, is alike though A's Change differs", sizes != nil)
+		}
+	}
+}
