@@ -536,8 +536,8 @@ func TestTheRunReadsTheBodiesOfTheGivenPackagesAlone(test *testing.T) {
 		"go.mod": "module example.com/given\n\ngo 1.24\n",
 		"lower/lower.go": "// Package lower is a dependency of user.\npackage lower\n\n// Spin starts spun.\n" +
 			"func Spin() { go spun() }\n\nfunc spun() {}\n",
-		"user/user.go": "// Package user is the package the run is given.\npackage user\n\nimport \"example.com/given/lower\"\n\n" +
-			"// Use spins lower.\nfunc Use() { lower.Spin() }\n",
+		"user/user.go": "// Package user is the package the run is given.\npackage user\n\n" +
+			"import \"example.com/given/lower\"\n\n// Use spins lower.\nfunc Use() { lower.Spin() }\n",
 	})
 	loaded, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
 	if loadError != nil || len(loaded.Diagnostics) > 0 {
