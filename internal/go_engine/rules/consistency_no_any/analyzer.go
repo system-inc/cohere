@@ -71,10 +71,13 @@ type packageState struct {
 	candidates []candidate
 }
 
-// enterFile makes the package's flow analysis, the first time the walk enters one of its files.
+// enterFile makes the package's flow analysis, the first time the walk enters one of its files. A pass with no type
+// information makes none, so the rule judges nothing there: the registry hands this type-aware rule no such pass, but
+// a binary that links this package beside a walk that reads no types, as a syntax rule's typeless parity test on the
+// shared dispatcher, hands every listener of the dispatcher that walk's pass.
 func enterFile(context *rule.Context, _ *ast.File) {
 	state := rule.State[packageState](context)
-	if state.flows != nil {
+	if state.flows != nil || context.TypesInfo == nil {
 		return
 	}
 	state.flows = &flowAnalysis{
