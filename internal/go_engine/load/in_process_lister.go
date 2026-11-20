@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/mod/module"
 	"golang.org/x/tools/go/packages"
@@ -49,6 +50,13 @@ type inProcessLister struct {
 	// reads every directory itself.
 	headers *copiedbuild.Headers
 	held    Held
+
+	// packageReads is the run's reads of each package directory, which a listing takes a read from where its build
+	// selects every file of the directory as the read's did, nil when headers is (SharedReads). directoriesTaken counts
+	// the directories this listing took so, and directoriesRead those it read itself, which a test reads.
+	packageReads     *copiedbuild.PackageReads
+	directoriesTaken atomic.Int64
+	directoriesRead  atomic.Int64
 
 	// modules is the build list, the main modules first, as `go list -m -json all` gives it, and mainModules its
 	// main modules.
@@ -245,14 +253,17 @@ func newInProcessLister(
 		read.context.IsDir = shared.isDirectory
 	}
 	var headers *copiedbuild.Headers
+	var packageReads *copiedbuild.PackageReads
 	if shared != nil {
 		headers = shared.headers
+		packageReads = shared.packageReads
 	}
 	lister := &inProcessLister{
 		workspace:     goEnvironment.workspace,
 		environment:   goEnvironment.fullEnvironment,
 		context:       read.context,
 		headers:       headers,
+		packageReads:  packageReads,
 		held:          held,
 		modules:       read.modules,
 		inWorkspace:   read.workspaceFile != "",
@@ -747,7 +758,8 @@ func (lister *inProcessLister) locate(importPath string) (string, *packages.Modu
 
 // readDirectory is go/build's reading of directory under the lister's build context, read once: through the copy of
 // go/build's directory read, which reads each Go file's header once for every listing of the run, when the lister has
-// the run's headers, and through go/build otherwise. The two are the same Package and the same error.
+// the run's headers, taking an earlier listing's read where this build selects every file of the directory as that
+// listing's did (PackageReads), and through go/build otherwise. Each is the same Package and the same error.
 func (lister *inProcessLister) readDirectory(directory string) *directoryRead {
 	lister.mutex.Lock()
 	read := lister.reads[directory]
@@ -765,8 +777,14 @@ func (lister *inProcessLister) readDirectory(directory string) *directoryRead {
 				read.built, read.importError = lister.context.ImportDir(directory, 0)
 				return
 			}
-			read.built, read.importError = copiedbuild.ImportDirectory(lister.context, directory, lister.held,
-				lister.headers)
+			var taken bool
+			read.built, taken, read.importError = lister.packageReads.ImportDirectory(lister.context, directory,
+				lister.held, lister.headers)
+			if taken {
+				lister.directoriesTaken.Add(1)
+			} else {
+				lister.directoriesRead.Add(1)
+			}
 		})
 	})
 	return read
