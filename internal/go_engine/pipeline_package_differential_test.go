@@ -47,10 +47,11 @@ type skippedPackage struct {
 	identifier string
 }
 
-// skippedRecorder gathers every skip and every judgment the test's hooks are told, from whichever load's goroutine
-// told it.
+// skippedRecorder gathers every load, every skip and every judgment the test's hooks are told, from whichever load's
+// goroutine told it. loaded is the build of each load told, one for each.
 type skippedRecorder struct {
 	lock    sync.Mutex
+	loaded  []string
 	skipped []skippedPackage
 	judged  []skippedJudgment
 }
@@ -84,6 +85,13 @@ func (recorder *skippedRecorder) record(
 		judgment: judgment, why: why})
 }
 
+// loads are the build of every load recorded so far, a slice of their own.
+func (recorder *skippedRecorder) loads() []string {
+	recorder.lock.Lock()
+	defer recorder.lock.Unlock()
+	return slices.Clone(recorder.loaded)
+}
+
 // skips are every skip recorded so far, a slice of their own.
 func (recorder *skippedRecorder) skips() []skippedPackage {
 	recorder.lock.Lock()
@@ -99,10 +107,12 @@ func (recorder *skippedRecorder) judgments() []skippedJudgment {
 }
 
 // skippedTally is what one extra build skipped and how its skips were judged, each count over every load, so the
-// counts are of the same loads: skipped, the skips its loads told of; judged, the judgments it made, of which byTypes
-// are TypesHold's; and declined, the judgments that declined. lastLoad is the skips its last load recorded
-// (skippedOf), a part of skipped.
+// counts are of the same loads: loads, the loads themselves, the first and every one again, as the test's hook was
+// told them; skipped, the skips its loads told of; judged, the judgments it made, of which byTypes are TypesHold's;
+// and declined, the judgments that declined. lastLoad is the skips its last load recorded (skippedOf), a part of
+// skipped.
 type skippedTally struct {
+	loads    int
 	skipped  int
 	lastLoad int
 	judged   int
@@ -112,15 +122,22 @@ type skippedTally struct {
 
 // judgeSkips fails the test naming every judgment of judged that declined, every package a build of engine skipped in
 // more loads than it was judged in, so a hook that judged nothing proves nothing, and every package a build's last
-// load recorded as skipped (skippedOf) that no load told of. It returns each extra build's tally, by build.
+// load recorded as skipped (skippedOf) that no load told of. It returns each extra build's tally, by build, its loads
+// counted from loaded, the build of each load told.
 func judgeSkips(
 	test *testing.T,
 	engine *pipeline,
+	loaded []string,
 	skipped []skippedPackage,
 	judged []skippedJudgment,
 ) map[string]skippedTally {
 	test.Helper()
 	tallies := map[string]skippedTally{}
+	for _, build := range loaded {
+		tally := tallies[build]
+		tally.loads++
+		tallies[build] = tally
+	}
 	skips, judgments := map[skippedPackage]int{}, map[skippedPackage]int{}
 	for _, skip := range skipped {
 		tally := tallies[skip.build]
@@ -199,32 +216,39 @@ func logTallies(test *testing.T, label string, engine *pipeline, tallies map[str
 }
 
 // packageDifferentialFixtures are the fixtures with extra builds of the walk (TestTheWalkHoldsTheMergeOfEveryFixture)
-// and of block 1 (build-dependence), by directory under testdata, the exit each run makes, and, for a fixture whose
-// builds skip nothing, why that is right, empty for one that must skip and judge some package (the floor).
+// and of block 1 (build-dependence), by directory under testdata, the exit each run makes, how many times each of its
+// extra builds loads, and, for a fixture whose builds skip nothing, why that is right, empty for one that must skip
+// and judge some package (the floor). A build loads once, and once more for each round of packages its check declines:
+// walk-reload's, walk-rejudge's and restore-from-host's decline one round, and walk-redecline's two, the second of
+// which turns its restore off, so its third load skips nothing. Of the builds that load again only walk-reload's
+// skips a package in a later load.
 var packageDifferentialFixtures = []struct {
 	fixture      string
 	wantExit     int
+	wantLoads    int
 	skipsNothing string
 }{
-	{fixture: "walk-square", wantExit: exitFindings},
-	{fixture: "walk-reload", wantExit: exitFindings},
-	{fixture: "walk-rejudge", wantExit: exitFindings},
-	{fixture: "walk-redecline", wantExit: exitFindings,
+	{fixture: "walk-square", wantExit: exitFindings, wantLoads: 1},
+	{fixture: "walk-reload", wantExit: exitFindings, wantLoads: 2},
+	{fixture: "walk-rejudge", wantExit: exitFindings, wantLoads: 2},
+	{fixture: "walk-redecline", wantExit: exitFindings, wantLoads: 3,
 		skipsNothing: "windows visits every package it could restore, each reading platform or one visited for it"},
-	{fixture: "restore-from-host", wantExit: exitFindings,
+	{fixture: "restore-from-host", wantExit: exitFindings, wantLoads: 2,
 		skipsNothing: "windows visits every package it could restore, each reading platform or one visited for it"},
-	{fixture: "restore-instance", wantExit: exitFindings},
-	{fixture: "restore-bodiless", wantExit: exitClean},
-	{fixture: "other-builds", wantExit: exitFindings},
-	{fixture: "build-dependence", wantExit: exitClean},
+	{fixture: "restore-instance", wantExit: exitFindings, wantLoads: 1},
+	{fixture: "restore-bodiless", wantExit: exitClean, wantLoads: 1},
+	{fixture: "other-builds", wantExit: exitFindings, wantLoads: 1},
+	{fixture: "build-dependence", wantExit: exitClean, wantLoads: 1},
 }
 
 // Over every fixture of the walk and of block 1 with extra builds, under `--no-cache`, which checks every build, each
 // package an extra build skips without judging is judged as a visited one is, and the differential fails naming each
 // the judgment declines, by build, package, judgment and why. Each package a build's last load skipped must have been
 // judged, and some build of the fixture must have judged one by TypesHold, the floor, so a fixture whose builds stop
-// skipping fails rather than pass judging nothing, unless it says why it skips nothing. The hook changes nothing of the
-// run: the stream, restore, findings and counts with it, normalized, are the run's without it.
+// skipping fails rather than pass judging nothing, unless it says why it skips nothing. Each extra build loads as many
+// times as its fixture says, by the test's own count of the loads it was told, a load that skips nothing among them.
+// The hook changes nothing of the run: the stream, restore, findings and counts with it, normalized, are the run's
+// without it.
 func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 	test.Parallel()
 
@@ -239,8 +263,13 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 			if len(engine.buildRuns) < 2 {
 				test.Fatalf("the run checked %d builds, want an extra build beside the host's", len(engine.buildRuns))
 			}
-			tallies := judgeSkips(test, engine, recorder.skips(), recorder.judgments())
+			tallies := judgeSkips(test, engine, recorder.loads(), recorder.skips(), recorder.judgments())
 			logTallies(test, step.fixture, engine, tallies)
+			for _, run := range engine.buildRuns[1:] {
+				if loads := tallies[run.build.String()].loads; loads != step.wantLoads {
+					test.Errorf("%s: the test was told of %d loads, want %d", run.build, loads, step.wantLoads)
+				}
+			}
 			byTypes := 0
 			for _, tally := range tallies {
 				byTypes += tally.byTypes
@@ -284,7 +313,7 @@ func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
 	if len(engine.buildRuns) < 2 {
 		test.Skipf("the census of %s needs no extra build", root)
 	}
-	tallies := judgeSkips(test, engine, recorder.skips(), recorder.judgments())
+	tallies := judgeSkips(test, engine, recorder.loads(), recorder.skips(), recorder.judgments())
 	logTallies(test, root, engine, tallies)
 	judgedByTypes := 0
 	for _, tally := range tallies {
