@@ -14,11 +14,10 @@ type builtLoadMode string
 const (
 	// builtFromSource is a package the build type-checked from its source.
 	builtFromSource builtLoadMode = "FromSource"
-	// builtRestored is a package whose types the build read from export data, the findings store's or the system
-	// cache's.
+	// builtRestored is a package the build did not check from source: one whose types it read from export data, the
+	// findings store's or the system cache's, and one it restored and never read the types of, nothing it checked
+	// importing it. The two are one mode, since nothing reads them apart (checkedFromSource).
 	builtRestored builtLoadMode = "Restored"
-	// builtWithoutTypes is a package the build restored and never read the types of, nothing it checked importing it.
-	builtWithoutTypes builtLoadMode = "WithoutTypes"
 )
 
 // reachBuiltGraph is what the load mode rule reads of a build's whole graph (#wzre5eg): how the build holds each
@@ -37,18 +36,15 @@ func newReachBuiltGraph(loaded *load.Loaded) *reachBuiltGraph {
 	graph := &reachBuiltGraph{modes: map[string]builtLoadMode{}, identifiers: map[string][]string{},
 		imported: map[string]bool{}}
 	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
-		switch {
-		case each.TypesInfo != nil:
-			graph.hold(each.ID, each.PkgPath, builtFromSource)
-			for _, file := range each.Syntax {
-				for _, imported := range file.Imports {
-					graph.imported[strings.Trim(imported.Path.Value, "\"`")] = true
-				}
-			}
-		case each.Types != nil:
+		if each.TypesInfo == nil {
 			graph.hold(each.ID, each.PkgPath, builtRestored)
-		default:
-			graph.hold(each.ID, each.PkgPath, builtWithoutTypes)
+			return
+		}
+		graph.hold(each.ID, each.PkgPath, builtFromSource)
+		for _, file := range each.Syntax {
+			for _, imported := range file.Imports {
+				graph.imported[strings.Trim(imported.Path.Value, "\"`")] = true
+			}
 		}
 	})
 	return graph
