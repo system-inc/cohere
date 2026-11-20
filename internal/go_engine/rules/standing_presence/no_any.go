@@ -24,15 +24,18 @@ import (
 // rule's flow can route to a key, sound by construction whatever the flow makes of them, and no flow is reimplemented
 // here: the edges are the rule's.
 //
-// Only the declaration-level candidates are read: one written in a body is that body's own, the census's sixth reason,
-// which the host's presence record carries. A candidate that keeps no declaration, `type T any` or
-// `type F func(any)`, is reported whatever any body does, so it needs no body present.
+// Every candidate the rule judges seeds the keys, one written in a body too: settle spreads a fixed type into a local
+// of a body as into any declaration, so a body that fixes what feeds the local touches it (round 2's N1). A standing
+// body holding a candidate of its own leaves for it (the presence record's OwnAny), so it is present, and read here,
+// in the build's own syntax: its local keys need nothing of the record past that. A candidate that keeps no
+// declaration, `type T any` or `type F func(any)`, is reported whatever any body does, so it needs no body present.
 
 // noAnyBound is what noany's bound takes out of standing, each with its reason, once the keys are closed under the
 // rule's flow: each function a key belongs to is named, so its users leave, and its own body leaves; each field or
 // variable key is named, and so is each type a literal of which can mark a field key it never names (holdsKeyField);
 // and each used method of an interface method key's name is named, on any receiver, as emptyfunction's are. named are
-// the objects the other rows name, whose users leave and so are present, their flows read with the rest.
+// the objects the other rows name, whose users leave, and present the bodies the other rows take out by themselves,
+// a body's own candidate among them: all present, their flows read with the rest.
 func noAnyBound(
 	pass *analysis.Pass,
 	host fact_reach.Host,
@@ -40,6 +43,7 @@ func noAnyBound(
 	find func(identity build_reads.Identity) (types.Object, bool),
 	standing map[fact_reach.Place]bool,
 	named []fact_reach.Named,
+	present []Leaving,
 ) ([]fact_reach.Named, []Leaving) {
 	keys := noAnyKeysOf(pass)
 	if len(keys.functions)+len(keys.variables)+len(keys.methodNames)+len(keys.literals) == 0 {
@@ -50,6 +54,9 @@ func noAnyBound(
 	// The bodies that leave, the other rows' users among them, which are present and whose flows are read. The users
 	// leave only in Settle, so reading them here is an early take, which the Reread after Settle subsumes.
 	left := map[fact_reach.Place]bool{}
+	for _, body := range present {
+		left[body.Place] = true
+	}
 	for _, object := range named {
 		for _, user := range host.Users(object.Object) {
 			left[user] = true
@@ -155,9 +162,8 @@ func holdsKeyField(declared types.Type, variables map[*types.Var]bool) bool {
 	return holds(declared)
 }
 
-// noAnyKeysOf is what every declaration-level candidate of the pass's files keeps. The rule's dispatcher hears a
-// candidate anywhere in a file (rules/consistency_no_any/analyzer.go:92-100); the walk here skips every function's
-// body, a literal's too, so a candidate is read only where it is written in a declaration's type.
+// noAnyKeysOf is what every candidate of the pass's files keeps, wherever the rule's dispatcher hears one, bodies
+// included (rules/consistency_no_any/analyzer.go:92-100).
 func noAnyKeysOf(pass *analysis.Pass) noAnyKeys {
 	keys := noAnyKeys{functions: map[*types.Func]bool{}, variables: map[*types.Var]bool{},
 		methodNames: map[string]bool{}, literals: map[*ast.FuncLit]bool{}}
@@ -168,13 +174,6 @@ func noAnyKeysOf(pass *analysis.Pass) noAnyKeys {
 			if node == nil {
 				stack = stack[:len(stack)-1]
 				return true
-			}
-			if _, isBlock := node.(*ast.BlockStmt); isBlock && len(stack) > 0 {
-				switch stack[len(stack)-1].(type) {
-				case *ast.FuncDecl, *ast.FuncLit:
-					// Inspect calls no nil for a node whose children it skips, so it is never pushed.
-					return false
-				}
 			}
 			if spellsAny(pass.TypesInfo, node) {
 				if declarations, literal, judged := noAnyDeclarations(pass.TypesInfo, node, stack); judged {

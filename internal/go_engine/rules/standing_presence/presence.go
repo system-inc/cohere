@@ -55,10 +55,11 @@ func Present(
 		screamingNamed(pass, used, find),
 		emptyFunctionNamed(used, find, markers),
 	)
-	noAnyNamed, leaving := noAnyBound(pass, host, used, find, standing, named)
+	// The bodies the record and the markers take out by themselves come first, since noany reads their flows.
+	present := slices.Concat(recordedLeaving(records, standing), markerMethodsLeaving(syntaxOf(pass), markers, standing))
+	noAnyNamed, leaving := noAnyBound(pass, host, used, find, standing, named, present)
 	named = append(named, noAnyNamed...)
-	leaving = append(leaving, recordedLeaving(records, standing)...)
-	leaving = append(leaving, markerMethodsLeaving(syntaxOf(pass), markers, standing)...)
+	leaving = append(leaving, present...)
 	leaving = append(leaving, edgesLeaving(syntaxOf(pass), host, records, standing, named, leaving)...)
 	return named, leaving
 }
@@ -73,7 +74,7 @@ func Reread(
 	standing map[fact_reach.Place]bool,
 	find func(identity build_reads.Identity) (types.Object, bool),
 ) ([]fact_reach.Named, []Leaving) {
-	named, leaving := noAnyBound(pass, host, host.Used(), find, standing, nil)
+	named, leaving := noAnyBound(pass, host, host.Used(), find, standing, nil, nil)
 	leaving = append(leaving, edgesLeaving(syntaxOf(pass), host, presenceRecords(host), standing, named, leaving)...)
 	return named, leaving
 }
