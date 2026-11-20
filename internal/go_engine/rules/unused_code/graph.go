@@ -581,9 +581,11 @@ func (graph *graph) results() result {
 			verdict.unused = append(verdict.unused, worded)
 		}
 	}
-	// Stable, so objects sharing a position, the variables a type switch makes one a clause, stay in node order.
-	slices.SortStableFunc(verdict.unused, func(one object, other object) int {
-		return cmp.Compare(one.position, other.position)
+	// By position, then by name, so no order the walk met the nodes in shows: two objects at one position are one
+	// identifier's, as the two fields of `var a, b struct{ x int }` are, so they share a name too and either of them
+	// first words the same findings.
+	slices.SortFunc(verdict.unused, func(one object, other object) int {
+		return cmp.Or(cmp.Compare(one.position, other.position), cmp.Compare(one.name, other.name))
 	})
 	return verdict
 }

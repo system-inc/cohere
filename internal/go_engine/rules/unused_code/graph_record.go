@@ -30,6 +30,9 @@ type bodyRecorder struct {
 	// declared is each object declared outside a body that some body's record names, by its node: its place and
 	// whether the place finds it, each asked once however many bodies name it.
 	declared map[nodeIndex]declaredEnd
+	// parsedNames is how many of the package's files were parsed under each name (sharesParsedName), nil until a
+	// local is first recorded.
+	parsedNames map[string]int
 	// interfaceInstances is where the package's source instantiates one of its own generic interface types, sorted,
 	// the entries of typesInfo.Instances that entry adds to the interfaces a named type may implement.
 	interfaceInstances []token.Pos
@@ -212,12 +215,19 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 		record := &recorder.records[recorder.cursor.record]
 		worded := graph.objectOf(graph.nodes[index].typesObject)
 		placed := localOfRecord{record: recorder.cursor.record, local: len(record.Locals)}
+		place := graph.placeOf(worded.position)
 		record.Locals = append(record.Locals, recordedLocal{
-			Place:  graph.placeOf(worded.position),
+			Place:  place,
 			Kind:   worded.kind,
 			Name:   worded.name,
 			Owners: []recordedEnd{},
 		})
+		// A build places a spliced local in its own file set by the name its file was parsed under, which must be one
+		// file's alone there (positionAt): flagged here, as an end its place does not find is, rather than failing
+		// the build's splice.
+		if graph.sharesParsedName(place.File) {
+			record.Present.UnplacedEnd = true
+		}
 		recorder.locals[index] = placed
 		return recordedEnd{Kind: endLocal, Local: placed.local}
 	}
@@ -235,6 +245,19 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 		recorder.records[recorder.cursor.record].Present.UnplacedEnd = true
 	}
 	return recordedEnd{Kind: endDeclared, Place: declared.place}
+}
+
+// sharesParsedName is whether two of the package's files were parsed under name, so no place in either can say
+// which file it is in. The names are counted once a graph, the first time it is asked.
+func (graph *graph) sharesParsedName(name string) bool {
+	recorder := graph.recorder
+	if recorder.parsedNames == nil {
+		recorder.parsedNames = make(map[string]int, len(graph.files))
+		for _, file := range graph.files {
+			recorder.parsedNames[graph.tokenFileOf(file.FileStart).Name()]++
+		}
+	}
+	return recorder.parsedNames[name] > 1
 }
 
 // definedAt is the object the package's declaring identifier at place declares, the generic one as a node holds it,
@@ -359,9 +382,10 @@ func (graph *graph) recordSeen(seen nodeIndex, owner nodeIndex) {
 
 // recordWritten records the file written is declared in, a package-level variable whose file's name write read to
 // judge whether writing to it is a use. The name decides the edge, so it is an input of the record whichever way it
-// decided.
+// decided. Only a variable of this package is: one a dot import brings in is never a node, so its file decides no
+// edge, and a file of another package in the record would only keep a build from taking it.
 func (graph *graph) recordWritten(written types.Object) {
-	if !graph.recorder.isOpen {
+	if !graph.recorder.isOpen || written.Pkg() != graph.typesPackage {
 		return
 	}
 	graph.recorder.files[graph.placeOf(written.Pos()).File] = struct{}{}

@@ -118,7 +118,8 @@ type recordedPresence struct {
 	// does not find: a build resolves such an end by asking its own definitions for the object declared at that file
 	// and offset, and the host's definitions, asked the same, hand back another object or none. go/types checks
 	// the type of `var a, b struct{ x int }` once a variable and so makes x twice at one offset, keeping one for the
-	// identifier, and a selection of the other's x would resolve to the wrong field.
+	// identifier, and a selection of the other's x would resolve to the wrong field. It is set too for a local of the
+	// body declared in a file whose name another file of the package was parsed under, which a build cannot place.
 	UnplacedEnd bool `json:"unplacedEnd"`
 }
 

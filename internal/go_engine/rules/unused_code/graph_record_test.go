@@ -1043,6 +1043,51 @@ func TestRecorderKeepsNoRecordOfBodiesThatShareAKey(test *testing.T) {
 	}
 }
 
+// TestRecorderFlagsALocalOfAFileWhoseParsedNameIsShared holds a build to placing a spliced local in one file
+// (#xeafx79): a local is placed by the name its file was parsed under, and where two files of the package were parsed
+// under one name a build could place it in either, so the body is kept present. A body whose locals are all in a file
+// of its own name is not flagged.
+func TestRecorderFlagsALocalOfAFileWhoseParsedNameIsShared(test *testing.T) {
+	test.Parallel()
+	recorded := recordPackage(test, []recordedSource{
+		{"same.go", `package shape
+
+func First() int {
+	const limit = 1
+	return limit
+}
+`},
+		{"same.go", `package shape
+
+// Second is placed further into its file than First, so the two keys differ.
+func Second() int {
+	const limit = 2
+	return limit
+}
+`},
+		{"alone.go", `package shape
+
+func Third() int {
+	const limit = 3
+	return limit
+}
+`},
+	}, nil)
+	places := recorded.bodies(test)
+	flagged := map[recordedPlace]bool{}
+	for _, record := range recorded.graph.recorder.records {
+		if len(record.Locals) == 0 {
+			test.Fatalf("the body at %+v recorded no local, so its flag proves nothing", record.Body)
+		}
+		flagged[record.Body] = record.Present.UnplacedEnd
+	}
+	for name, want := range map[string]bool{"First": true, "Second": true, "Third": false} {
+		if got, isRecorded := flagged[places[name]]; !isRecorded || got != want {
+			test.Errorf("%s at %+v: recorded %t, unplacedEnd %t, want it %t", name, places[name], isRecorded, got, want)
+		}
+	}
+}
+
 // TestRecorderChangesNothingTheRuleFinds holds a graph that records to the graph that does not, over every package of
 // the copy of the original's testdata, test variants included (#xeafx79): the same nodes and edges, and the same
 // verdict on every object, which is also the verdict the analyzer itself returned. Every function declaration with a
