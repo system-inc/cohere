@@ -75,6 +75,7 @@ func newFactReachSides(
 			noReturn:   captured.NoReturn,
 			pushed:     captured.Pushed,
 			orderBound: captured.OrderBound,
+			presence:   captured.Presence,
 		})
 	}
 	return sides

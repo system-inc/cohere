@@ -15,10 +15,12 @@ import (
 // compiles, one only the other build does, and file, which both compile and which holds leaves, a body the other
 // build's difference never reaches that the row takes out, and stands, one it leaves standing. named is how many
 // objects the row names in the other build: none for an edge row, whose bodies leave by themselves. The other build is
-// windows's in every module but presence-requireparallel's, whose is the tag presence_b's: a subtest's signature holds
-// *testing.T, whose type each platform declares otherwise, so in windows's build the reach lints every subtest
-// already. Every module reads no type a platform declares otherwise where its bodies could see one, for the same
-// reason.
+// windows's in every module but presence-requireparallel's and presence-caller's, whose is the tag presence_b's: a
+// subtest's signature, and a caller's that testinggoroutine hears, holds *testing.T, whose type each platform declares
+// otherwise, so in windows's build the reach lints every such body already. Every module reads no type a platform
+// declares otherwise where its bodies could see one, for the same reason. presence-caller and presence-owning take
+// their bodies out by the host's presence record: Start starts helper, which the tagged build reaches, and Loose
+// writes interface{} of its own.
 type standingPresence struct {
 	module string
 	row    standing_presence.Row
@@ -46,6 +48,9 @@ var standingPresences = []standingPresence{
 		leaves: "helper", stands: "Port"},
 	{module: "presence-requireparallel", row: standing_presence.RequireParallel, file: "shared_test.go",
 		leaves: "subtest", stands: "count"},
+	{module: "presence-caller", row: standing_presence.TestingGoroutine, file: "shared.go", leaves: "Start",
+		stands: "Port"},
+	{module: "presence-owning", row: standing_presence.NoAny, file: "shared.go", leaves: "Loose", stands: "Port"},
 }
 
 // leftFor are the reasons the facts' settlement of run took the declaration named name, in file, out of the standing

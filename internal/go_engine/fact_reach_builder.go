@@ -10,6 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
 
 // factReachInputs are what one package's side is made from (newFactReachPackage), each the host's own:
@@ -22,6 +23,8 @@ import (
 //   - pushed are the host's other pushed facts of each object, by the analyzer that learns them, in their words
 //     (check.FactReachPackage.Pushed).
 //   - orderBound are the objects whose answers hang on the order the host walked the package in.
+//   - presence is what each body holds that the presence rows read, by its place, read off the package's syntax while
+//     the host's run held it (check.FactReachPackage.Presence).
 type factReachInputs struct {
 	fileSet    *token.FileSet
 	record     *build_reads.FunctionUses
@@ -31,6 +34,7 @@ type factReachInputs struct {
 	noReturn   func(function *types.Func) bool
 	pushed     map[string]map[types.Object]string
 	orderBound []types.Object
+	presence   map[fact_reach.Place]standing_presence.BodyRecord
 }
 
 // factReachRendered is an object as a package's side names it: its identity, and its key, known false for an object
@@ -77,7 +81,8 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		inputs: inputs,
 		hosted: &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{},
 			recorded: map[fact_reach.Place][]fact_reach.Question{}, askings: map[string]fact_reach.Asking{},
-			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{}},
+			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{},
+			presence: map[fact_reach.Place]fact_reach.PresenceRecord{}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
 		met: map[fact_reach.Object]bool{}, usedKeys: map[fact_reach.Object]bool{},
@@ -116,6 +121,7 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			builder.use(place, declared)
 		}
 	}
+	builder.readPresence()
 	for name, parsed := range parsedFiles {
 		if len(parsed) > 1 {
 			if builder.hosted.shared == nil {
@@ -160,6 +166,32 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			fact_reach.Named{Object: rendered.key, Reason: factReachOrderBound})
 	}
 	return builder.hosted
+}
+
+// readPresence keeps, by its place, what each body holds that the presence rows read, read off the host's own syntax
+// (fact_reach.Host.Presence), each function a body starts by its key. A function no identity names is counted
+// unplaced, as a body's use of one is, since no build could find which body it is.
+func (builder *factReachBuilder) readPresence() {
+	for place, body := range builder.inputs.presence {
+		record := fact_reach.PresenceRecord{OwnAny: body.OwnAny, LocalMarkers: body.LocalMarkers}
+		record.GoStarts = builder.startedKeys(body.GoStarts)
+		record.RunStarts = builder.startedKeys(body.RunStarts)
+		builder.hosted.presence[place] = record
+	}
+}
+
+// startedKeys are the keys of functions, in their order, counting each no identity names unplaced.
+func (builder *factReachBuilder) startedKeys(functions []*types.Func) []fact_reach.Object {
+	var keys []fact_reach.Object
+	for _, function := range functions {
+		rendered := builder.render(function)
+		if !rendered.known {
+			builder.hosted.unplaced++
+			continue
+		}
+		keys = append(keys, rendered.key)
+	}
+	return keys
 }
 
 // render is object's identity and key, rendered once.
