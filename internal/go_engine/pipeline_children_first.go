@@ -66,9 +66,12 @@ func (engine *pipeline) startChildrenNow(extras []project.Build) []*buildGoEnvir
 			})
 		})
 	}
+	// Every build here is waited out whole, joined and awaited by the one group: a run reaches startChildrenNow only
+	// under `--timing`, where nothing is predicted (the description starts the builds' commands in any other run that
+	// reads builds, startReadingBuilds), so no build's go env runs on past this wait and nothing is left to join later.
 	starts := &buildStarts{workspace: engine.described.workspace, host: engine.described.goEnvironment,
 		children: engine.described.children, contexts: engine.systemCache.contexts(), collector: engine.timing,
-		joined: &engine.buildsStarted, awaited: &awaited}
+		joined: &awaited, awaited: &awaited}
 	// Under `--timing` each build starts one at a time, and none predicts or keeps anything, so each step's children's
 	// CPU is of its own commands.
 	if engine.timing != nil {
@@ -83,14 +86,13 @@ func (engine *pipeline) startChildrenNow(extras []project.Build) []*buildGoEnvir
 }
 
 // joinChildren joins every go command the run started before its first load, each to its end: those describeProject
-// started (describedProject.awaitStarted) and those startChildrenNow did, so none outlives the run, whichever way it
-// ends.
+// started (describedProject.awaitStarted), so none outlives the run, whichever way it ends. startChildrenNow's own
+// have all ended before it returns.
 func (engine *pipeline) joinChildren() {
 	if engine.watchJoin != nil {
 		engine.watchJoin()
 	}
 	engine.described.awaitStarted()
-	engine.buildsStarted.Wait()
 }
 
 // childrenFirstStep runs step, one of startChildrenNow's, under oneAtATime in a run under `--timing`, and at once

@@ -180,10 +180,6 @@ type pipeline struct {
 	// Written before any build starts and only read after.
 	buildGoEnvironments map[string]*buildGoEnvironment
 
-	// buildsStarted counts the goroutines startChildrenNow starts until each ends, which the run joins before it
-	// returns (joinChildren).
-	buildsStarted sync.WaitGroup
-
 	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
 	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
 	// per core, and poolObserve, a test's too, is told of each slot taken, +1, and each given back, -1.
