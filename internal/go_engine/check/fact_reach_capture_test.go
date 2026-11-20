@@ -525,3 +525,38 @@ func TestTheCaptureHoldsNoPushedFactOfAFailedAction(test *testing.T) {
 			failed)
 	}
 }
+
+// The run reads presence's bodies of the packages it was given alone (#xeafx79, the reader's S4): user, given, imports
+// lower, which the run analyzes for its facts only, and whose side no build is ever handed, so lower's bodies, which
+// start a goroutine, are never read.
+func TestTheRunReadsTheBodiesOfTheGivenPackagesAlone(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeFiles(test, root, map[string]string{
+		"go.mod": "module example.com/given\n\ngo 1.24\n",
+		"lower/lower.go": "// Package lower is a dependency of user.\npackage lower\n\n// Spin starts spun.\n" +
+			"func Spin() { go spun() }\n\nfunc spun() {}\n",
+		"user/user.go": "// Package user is the package the run is given.\npackage user\n\nimport \"example.com/given/lower\"\n\n" +
+			"// Use spins lower.\nfunc Use() { lower.Spin() }\n",
+	})
+	loaded, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil || len(loaded.Diagnostics) > 0 {
+		test.Fatalf("loading the given workspace: %v %+v", loadError, loaded)
+	}
+	var given []*packages.Package
+	for _, loadedPackage := range loaded.Packages {
+		if loadedPackage.PkgPath == "example.com/given/user" {
+			given = append(given, loadedPackage)
+		}
+	}
+	if len(given) != 1 {
+		test.Fatalf("the workspace loaded %d packages of user, want one", len(given))
+	}
+	result, runError := Run(given, reachRules, Options{FactReach: true})
+	if runError != nil || result.FactReach == nil {
+		test.Fatalf("running with the switch: %v", runError)
+	}
+	if read := result.FactReach.BodiesRead; !slices.Equal(read, []string{given[0].ID}) {
+		test.Errorf("the run read the bodies of %v, want %s's alone", read, given[0].ID)
+	}
+}

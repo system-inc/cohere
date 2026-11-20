@@ -31,6 +31,10 @@ type FactReachCapture struct {
 	// Askers are the bodies whose rules asked each answer, by kind's name and object (fact_resolver.Resolver.Askers):
 	// an answer no rule asked, one a kind kept or computed inside another's judgment, has none.
 	Askers map[string]map[types.Object][]fact_resolver.Asker
+
+	// BodiesRead are the IDs of the packages whose bodies the run read for presence (FactReachPackage.Presence),
+	// sorted: the packages it was given, never a dependency, whose side no build is handed.
+	BodiesRead []string
 }
 
 // FactReachPackage is one analyzed package as the run held its facts.
@@ -92,7 +96,7 @@ func captureFactReach(
 	presence *factReachPresence,
 ) *FactReachCapture {
 	capture := &FactReachCapture{Packages: make(map[string]*FactReachPackage, len(analyzed)),
-		Askers: resolver.Askers()}
+		Askers: resolver.Askers(), BodiesRead: presence.packages()}
 	captured := make(map[*types.Package]*FactReachPackage, len(analyzed))
 	kinds := make(map[*types.Package]*factReachKinds, len(analyzed))
 	for _, analyzedPackage := range analyzed {

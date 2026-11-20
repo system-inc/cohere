@@ -1,6 +1,8 @@
 package check
 
 import (
+	"maps"
+	"slices"
 	"sync"
 
 	"golang.org/x/tools/go/packages"
@@ -23,6 +25,16 @@ func (presence *factReachPresence) readBodies(read *packages.Package) {
 	presence.lock.Lock()
 	defer presence.lock.Unlock()
 	presence.read[read.ID] = bodies
+}
+
+// packages are the IDs of the packages whose bodies were read, sorted, and none from no presence at all.
+func (presence *factReachPresence) packages() []string {
+	if presence == nil {
+		return nil
+	}
+	presence.lock.Lock()
+	defer presence.lock.Unlock()
+	return slices.Sorted(maps.Keys(presence.read))
 }
 
 // of is what was read of the bodies of the package of ID packageId, and whether they were read at all: a package
