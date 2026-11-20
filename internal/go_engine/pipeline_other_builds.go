@@ -645,6 +645,9 @@ func (engine *pipeline) extraBuildRun(
 		return gateError
 	}
 	var linting time.Duration
+	if engine.extraBuildLoads != nil {
+		engine.extraBuildLoads(extra)
+	}
 	started := time.Now()
 	loaded, loadError := engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 	elapsed := time.Since(started)
@@ -807,6 +810,9 @@ func (engine *pipeline) extraBuildRun(
 			// The reload's load, its end too, and the check over it, stamp in the round this load is of: 1 for the
 			// first reload.
 			caching.Timeline = engine.buildTimeline(extra, len(run.checkedFromSourceRounds))
+			if engine.extraBuildLoads != nil {
+				engine.extraBuildLoads(extra)
+			}
 			started := time.Now()
 			loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 			elapsed := time.Since(started)
