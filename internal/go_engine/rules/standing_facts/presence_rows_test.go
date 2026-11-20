@@ -253,3 +253,29 @@ func TestABodyHoldingAnyOrAMarkerOfItsOwnLeavesForPresence(test *testing.T) {
 		"seal": standing_presence.EmptyFunction,
 	}, nil)
 }
+
+// noany's bound closed under the rule's flow (#xeafx79, the reader's M1): a body that names only a declaration the
+// flow routes to a key leaves, as one naming the key does. Prints names x, defined from k; PrintsCached names cached,
+// defined from values' result; Sorts names compare, defined from a literal whose parameters are keys; and Calls names
+// g, whose parameter feeds kept, an edge only g's body records, so it is read once g leaves for naming kept. values'
+// own body leaves as a key's function. Plain touches nothing the flow routes to a key, and stands.
+func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "flowing")
+	host := presenceHost(test, found, nil,
+		presenceUse{key: "flowing.x", identity: found.identity("x"), users: []string{"Prints"}},
+		presenceUse{key: "flowing.cached", identity: found.identity("cached"), users: []string{"PrintsCached"}},
+		presenceUse{key: "flowing.compare", identity: found.identity("compare"), users: []string{"Sorts"}},
+		presenceUse{key: "flowing.kept", identity: found.identity("kept"), users: []string{"g"}},
+		presenceUse{key: "flowing.g", identity: found.identity("g"), users: []string{"Calls"}})
+	for _, name := range []string{"Prints", "values", "PrintsCached", "Sorts", "g", "Calls", "Plain"} {
+		host.functions = append(host.functions,
+			fact_reach.Function{Object: fact_reach.Object("flowing." + name), Identity: found.identity(name)})
+	}
+	host.recordPresence(found)
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result, map[string]standing_presence.Row{
+		"Prints": standing_presence.NoAny, "values": standing_presence.NoAny, "PrintsCached": standing_presence.NoAny,
+		"Sorts": standing_presence.NoAny, "g": standing_presence.NoAny, "Calls": standing_presence.NoAny,
+	}, nil)
+}
