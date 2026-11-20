@@ -110,9 +110,20 @@ func land(arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", branchCommitsError)
 		return 1
 	}
-	if len(commits) == 0 {
-		fmt.Fprintf(streams.Errors, "cohere-dev: nothing to land: main already holds %s\n", shortCommit(head))
-		return 2
+	// A head main already holds never takes a place in the line (land_held.go). A merge that conflicts is left to the
+	// loop below, which resolves or refuses it with the lock held.
+	// Ignored: a merge that fails is merged again after the wait, where its error is said.
+	beforeTree, _ := mergeOntoMain(worktree, mainCommit, head)
+	if len(commits) == 0 || beforeTree != "" {
+		held, heldError := heldByMain(worktree, mainCommit, head, beforeTree)
+		if heldError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: reading whether main holds %s: %v\n", shortCommit(head), heldError)
+			return 1
+		}
+		if held != "" {
+			fmt.Fprintf(streams.Errors, "cohere-dev: nothing to land, and no gate runs: %s\n", held)
+			return 2
+		}
 	}
 	vocabulary, subjectVocabularyError := subjectVocabulary(worktree, head)
 	if subjectVocabularyError != nil {
@@ -185,6 +196,16 @@ func land(arguments []string) int {
 		case mergeOntoMainError != nil:
 			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", mergeOntoMainError)
 			return 1
+		}
+		// What landed while this one waited may be this very work, so main is asked again, as it stands now.
+		held, heldError := heldByMain(worktree, mainCommit, head, tree)
+		if heldError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: reading whether main holds %s: %v\n", shortCommit(head), heldError)
+			return 1
+		}
+		if held != "" {
+			fmt.Fprintf(streams.Errors, "cohere-dev: nothing to land, and no gate runs: %s\n", held)
+			return 2
 		}
 		// The commit the gate runs on. The one that lands is made after it, of the same tree and parents, with
 		// the gate's account in its message.
