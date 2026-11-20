@@ -608,10 +608,16 @@ func TestTheClosureDigestLegFailsWhereNoNameItReachesHasABit(test *testing.T) {
 // host's load or a build's holds with errors fails that build (reportObjectDifferences). It runs in the ordinary run:
 // on the Mac, the host's load took 2.5 s and each build's load and comparison 1.4 s to 3 s, the test 6.9 s.
 //
-// Red under linux and windows on runtime.mPadded._, a field whose spelled type is an array of
+// One build more is the host's `GOOS` on another architecture, the other of amd64 and arm64, since a target the
+// settings list is built on its own architecture (project's listedBuilds) and no build above differs from the host by
+// one (#mtfdb1m): there internal/cpu's CacheLinePad is 64 bytes on amd64 and 128 on arm64, and the feature variables
+// that hold one in an unnamed struct, X86 and ARM64 among them, and runtime's trace, which holds one three named types
+// down, have lines that move with it. The leg added 1.9 s on the Mac.
+//
+// It was red under linux and windows on runtime.mPadded._, a field whose spelled type is an array of
 // `2048 - mallocHeaderSize - mRedZoneSize - unsafe.Sizeof(m{})` bytes, so its own line moves with m's layout, which
-// mOS gives each platform, while block 1 reads the type names a field's spelled type uses by their structure alone,
-// never in full as a constant's value reads them, so the field's bit stays unset.
+// mOS gives each platform, until block 1 read an array's length in a spelled type in full, as a constant's value is
+// read (build_dependence's usesVisitor): the field's bit is set there now, and both read 0 failures.
 func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	test.Parallel()
 
@@ -625,19 +631,30 @@ func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T)
 	test.Logf("host %s: %d packages loaded in %s", runtime.GOOS, len(host.packages),
 		time.Since(started).Round(time.Millisecond))
 	notWorkspace := func(*packages.Package) bool { return false }
+	var builds []objectBuild
 	judged := map[string]bool{runtime.GOOS: true}
 	for _, target := range release.Targets {
 		if judged[target.GoOperatingSystem] {
 			continue
 		}
 		judged[target.GoOperatingSystem] = true
+		builds = append(builds, objectBuild{name: target.GoOperatingSystem,
+			environment: objectEnvironment(target.GoOperatingSystem, "")})
+	}
+	otherArchitecture := "amd64"
+	if runtime.GOARCH == "amd64" {
+		otherArchitecture = "arm64"
+	}
+	builds = append(builds, objectBuild{name: runtime.GOOS + "/" + otherArchitecture,
+		environment: architectureEnvironment(runtime.GOOS, otherArchitecture)})
+	for _, build := range builds {
 		// Not parallel: one build's std at a time holds one load's memory beside the host's, and each stays its own
 		// subtest so a red names its build.
-		test.Run(target.GoOperatingSystem, func(test *testing.T) {
+		test.Run(build.name, func(test *testing.T) {
 			started := time.Now()
-			built := loadObjects(test, module, objectEnvironment(target.GoOperatingSystem, ""), "std", false)
+			built := loadObjects(test, module, build.environment, "std", false)
 			tally := objectDifferences(host, built, objectDependence(host, built, notWorkspace).ObjectBits)
-			reportObjectDifferences(test, target.GoOperatingSystem, tally, started)
+			reportObjectDifferences(test, build.name, tally, started)
 		})
 	}
 }

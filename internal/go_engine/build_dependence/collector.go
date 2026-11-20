@@ -256,9 +256,10 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	}
 	collecting.declare(unit, function)
 	collecting.collectMembers(unit, collecting.owning(function), false, declaration.Type)
-	// The signature's name bits, a signature moving being what a function's bit carries.
+	// The signature's name bits, a signature moving being what a function's bit carries, and what its own line
+	// observes of an unnamed struct among its parameters and results (bitWalker).
 	signature := function.Signature()
-	collecting.addEdges(function, false, collecting.walker.borrowedReferences(signature, false))
+	collecting.addEdges(function, false, collecting.walker.borrowedMemberReferences(signature))
 	collecting.addUses(function, false, false, declaration.Type)
 	receiver := signature.Recv()
 	if receiver == nil {
@@ -266,10 +267,11 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	}
 	// Method receivers are included, the larger set: without receiver edges the counter found 8 to 14% fewer
 	// dependent objects. A method's bit takes its receiver's name bit, since its method set moving is what the name
-	// bit carries.
+	// bit carries. Its receiver's type parameters' constraints are read as a member's own type, as its own line walks
+	// them (bitWalker).
 	collecting.addEdges(function, false, collecting.walker.borrowedReferences(receiver.Type(), false))
 	for parameter := range signature.RecvTypeParams().TypeParams() {
-		collecting.addEdges(function, false, collecting.walker.borrowedReferences(parameter.Constraint(), false))
+		collecting.addEdges(function, false, collecting.walker.borrowedMemberReferences(parameter.Constraint()))
 	}
 	receiverType := receiver.Type()
 	if pointer, isPointer := receiverType.(*types.Pointer); isPointer {
@@ -296,11 +298,12 @@ func (collecting *collector) collectType(tokenFile *token.File, spec *ast.TypeSp
 // methods, the name bits of its embedded fields, whose methods it promotes, for an interface its own underlying,
 // since an interface's methods are its underlying, and for a type defined from another type's name, `type T S`, S in
 // full, since T's fields and promoted methods are S's. The underlying bit reads everything the underlying type reaches
-// in full, as a value.
+// in full, as a value, and what a selection through the type dereferences with no expression of its own, behind a
+// pointer at its top or an embedded pointer (bitWalker.borrowedUnderlyingReferences).
 func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *ast.TypeSpec) {
 	switch declared := typeName.Type().(type) {
 	case *types.Named:
-		collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(declared.Underlying(), true))
+		collecting.addEdges(typeName, true, collecting.walker.borrowedUnderlyingReferences(declared.Underlying()))
 		if typeAndValue, isRecorded := collecting.typesInformation.Types[spec.Type]; isRecorded {
 			// `type T S` keeps S in its expression's type, where the resolved underlying has lost it, so S is read in
 			// full into T's underlying.
@@ -348,9 +351,13 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 			}
 		}
 	case *types.Alias:
-		// An alias is its target's bits.
+		// An alias is its target's bits, its underlying bit with what a selection through the target dereferences
+		// (bitWalker.borrowedUnderlyingReferences), since a type that embeds `type InnerPointer = *Inner` or
+		// `type Shared = struct{ *Inner }`, or points at Shared, reads that through the alias's underlying bit
+		// (#mtfdb1m).
 		collecting.addEdges(typeName, false, collecting.walker.borrowedReferences(declared.Rhs(), false))
 		collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(declared.Rhs(), true))
+		collecting.addEdges(typeName, true, collecting.walker.borrowedUnderlyingReferences(types.Unalias(declared)))
 		collecting.addUses(typeName, false, false, spec.Type)
 		collecting.addUses(typeName, true, false, spec.Type)
 		if spec.TypeParams != nil {
@@ -364,9 +371,9 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 }
 
 // collectMembers declares the struct fields and interface methods under root for unit, each depending on its own type
-// by name, and makes owners depend on each: on their underlying bit when ownerUnderlying is set, else on their only
-// bit. A field's own bit and its owner's underlying bit together are what carry a field whose array length hangs on a
-// constant into its struct's underlying.
+// by name, as a member's own type is read (bitWalker), and makes owners depend on each: on their underlying bit when
+// ownerUnderlying is set, else on their only bit. A field's own bit and its owner's underlying bit together are what
+// carry a field whose array length hangs on a constant into its struct's underlying.
 //
 // Mutates: unit declares the members, and collecting gains their edges
 func (collecting *collector) collectMembers(
@@ -409,7 +416,7 @@ func (collecting *collector) collectFields(
 			variable := declared.Field(index)
 			index++
 			collecting.declare(unit, variable)
-			collecting.addEdges(variable, false, collecting.walker.borrowedReferences(variable.Type(), false))
+			collecting.addEdges(variable, false, collecting.walker.borrowedMemberReferences(variable.Type()))
 			collecting.addUses(variable, false, false, field.Type)
 			for _, owner := range owners {
 				collecting.addEdge(kindEdge{from: owner, fromUnderlying: ownerUnderlying, to: variable})
@@ -436,8 +443,8 @@ func (collecting *collector) collectInterfaceMethods(
 			}
 			collecting.declare(unit, method)
 			signature := method.Signature()
-			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Params(), false))
-			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Results(), false))
+			collecting.addEdges(method, false, collecting.walker.borrowedMemberReferences(signature.Params()))
+			collecting.addEdges(method, false, collecting.walker.borrowedMemberReferences(signature.Results()))
 			collecting.addUses(method, false, false, field.Type)
 			for _, owner := range owners {
 				collecting.addEdge(kindEdge{from: owner, fromUnderlying: ownerUnderlying, to: method})
@@ -490,7 +497,12 @@ func (collecting *collector) collectValue(
 			// channels and signatures too. Its type as written can differ by what lies under a named type whose name
 			// bit no build sets, `rows[0]` an [8]int where the host's is a [4]int over `type Rows [2][Length]int`, so
 			// the types' names alone would leave its bit unset.
-			collecting.addEdges(object, false, collecting.walker.borrowedReferences(object.Type(), false))
+			//
+			// Its own type is a member's (bitWalker): where it spells an unnamed struct, the var's line writes each
+			// unexported field of it by the field's properties, and the var's is the one bit that can carry them,
+			// the struct having no name to hang an underlying bit on (#mtfdb1m). A var of a named type reads the
+			// name alone, as its line writes it, and the type's own underlying bit carries the rest.
+			collecting.addEdges(object, false, collecting.walker.borrowedMemberReferences(object.Type()))
 			collecting.addUses(object, false, false, specType)
 			if spec.Type == nil {
 				collecting.addUses(object, false, false, values...)

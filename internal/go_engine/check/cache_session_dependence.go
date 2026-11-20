@@ -26,10 +26,14 @@ import (
 // #6a3kjvz, piece 4). That record was made against other dependencies, and it is the package's as this run would
 // build it for two reasons, and no broader one. A record names each object of another package it reads, so this run
 // judges the object fresh, by the unit that declares it now, whatever the dependency changed. What a record keeps of
-// another package's types is the bits a read reached walking through one of its unnamed types, a struct with no name
-// of its own, and the second key holds the output of everything below the package, whose export rendering writes
-// each such type whole (writtenType, through types.TypeString, unexported fields and their types included), so a
-// change there moves the second key and no alias leads to the old record. The alias-records fixture pins that line
+// another package's types is the bits a read reached walking into them (build_dependence's bitWalker): through one of
+// its unnamed types, a struct with no name of its own; through the declaration of a named type, which an observed
+// field's type enters (#mtfdb1m); and through the element behind a pointer, which a named type's underlying reads at
+// its top and behind an embedded pointer field. Each is in the declaration of some package-level object of a package
+// below, and the second key is the closure of every output below the package (closureOf), each of whose export
+// rendering writes every package-level object whole, a defined type by its underlying, and each type in it through
+// types.TypeString, unexported fields and their types included (writtenType), so a change to anything such a walk
+// entered moves the second key and no alias leads to the old record. The alias-records fixture pins that line
 // (TestAnUnexportedFieldsTypeIsNeverReadStaleThroughAnAlias): a rendering that leaves out an unexported field of an
 // unnamed struct reads a stale record, and its graph differs from a cold run's. A hit by an alias with no record
 // beside its target stays without one, counted. Only the host writes a record, after its entry's write held, with no
@@ -45,8 +49,15 @@ import (
 // written that has a cgo file (build_dependence's cgo_files.go), which a build seeds wherever the package differs, and
 // whether the host's load withheld its body or initial value, which every build seeds, so a record of 4 holds neither
 // mark, and is encoded otherwise. At 6, a const spec that repeats the spec before it carries that spec's universe
-// names, so a record of 5 leaves it unseeded in a build that declares one of them.
-const DependenceRecordVersion = "dependence-record-6"
+// names, so a record of 5 leaves it unseeded in a build that declares one of them. At 9, a member whose own type
+// spells an unnamed struct reads what its own line observes of each unexported field of it that is not embedded, as
+// far as an observation reads it, a named type's underlying bit reads in full the element behind each pointer at its
+// top and behind each embedded pointer field, an alias's what the type it names hides, a member's bit observes what a
+// constraint's struct and a method's receiver's constraints show, and a body reads its local as a member's own type
+// (build_dependence's bitWalker, #mtfdb1m), so a record of 6 holds looser bits. 7 and 8 are skipped: that unit's
+// branch wrote records at each before it met 6, and none of them must be read.
+// TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey names the version's text.
+const DependenceRecordVersion = "dependence-record-9"
 
 // DependenceRecordKey is where the store keeps the dependence record of the package whose first key is key: apart from
 // every entry, export data and alias, and derived from the entry's key alone, so a record is read only by a run that
