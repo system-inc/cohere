@@ -41,3 +41,9 @@ func afterFact(t *testing.T) { t.Log("after") }
 
 // halt never returns in this build.
 func halt() { panic("halted") }
+
+// RunsOutside hands outsideSub to Run by name, in a file that is no test file, which requireparallel never reads.
+func RunsOutside(t *testing.T) { t.Run("outside", outsideSub) }
+
+// outsideSub logs.
+func outsideSub(t *testing.T) { t.Log("outside") }

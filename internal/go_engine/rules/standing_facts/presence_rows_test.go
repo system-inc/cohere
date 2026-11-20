@@ -218,11 +218,12 @@ func TestAStandingBodyTouchingANoAnyKeyLeavesForPresence(test *testing.T) {
 // which stands, so both callers leave. After the facts settle, Faulty, which leaves only for halt's no-return fact,
 // is present, and afterFact, which it starts, leaves. Quiet takes no test, so quietHelper stands, and Standing, which
 // stands, starts standingHelper, which stands too: a standing caller is stripped with its callee, and no rule reads
-// either.
+// either. RunsOutside hands outsideSub to Run in a file that is no test file, which requireparallel never reads, so
+// outsideSub stands though RunsOutside is present.
 func TestABodyAPresentCallerStartsLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadVariant(test, "edges", "edges [edges.test]")
-	host := presenceHost(test, found, []string{"Start", "TestRuns", "Quiet", "reached", "reachedSub"},
+	host := presenceHost(test, found, []string{"Start", "TestRuns", "Quiet", "reached", "reachedSub", "RunsOutside"},
 		presenceUse{key: "edges.halt", identity: found.identity("halt"), users: []string{"Faulty"}})
 	host.functions = []fact_reach.Function{{Object: "edges.halt", Identity: found.identity("halt")}}
 	host.recordPresence(found)
@@ -278,4 +279,16 @@ func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
 		"Prints": standing_presence.NoAny, "values": standing_presence.NoAny, "PrintsCached": standing_presence.NoAny,
 		"Sorts": standing_presence.NoAny, "g": standing_presence.NoAny, "Calls": standing_presence.NoAny,
 	}, nil)
+}
+
+// testinggoroutine judges only a package importing the standard library's testing (#xeafx79, the reader's S3): faking
+// writes *testing.T of another package imported under that name, so Start, present, starts helper unheard, and helper
+// stands.
+func TestAGoStatementInAPackageNotImportingTestingTakesNothingOut(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "faking")
+	host := presenceHost(test, found, []string{"Start"})
+	host.recordPresence(found)
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result, map[string]standing_presence.Row{}, nil)
 }
