@@ -102,6 +102,7 @@ func (graph *graph) spliceBody(record bodyRecord, function nodeIndex) error {
 		}
 		locals[index] = nodeIndex(len(graph.nodes))
 		graph.nodes = append(graph.nodes, node{})
+		graph.firstOwners = append(graph.firstOwners, 0)
 		graph.splice.locals[locals[index]] = object{
 			name:      local.Name,
 			shortName: shortNameOf(local.Name),
@@ -115,6 +116,11 @@ func (graph *graph) spliceBody(record bodyRecord, function nodeIndex) error {
 			if resolveError != nil {
 				return fmt.Errorf("splicing the body at %s, an owner of local %d: %w", placeText(record.Body), index,
 					resolveError)
+			}
+			if ownerNode == 0 {
+				// The recorder records no owner of the root's (recordSeen), and the graph has no place for one
+				// (addOwned).
+				return fmt.Errorf("splicing the body at %s: the root owns local %d", placeText(record.Body), index)
 			}
 			graph.addOwned(ownerNode, locals[index])
 		}

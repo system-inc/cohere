@@ -38,7 +38,7 @@ func TestGraphIsSizedOnceAndWordsNoObjectWhileBuilding(test *testing.T) {
 		graphs[index] = newStorageGraph()
 	}
 	for _, keyed := range []reflect.Type{
-		reflect.TypeOf(graphs[0].graph.usedEdges), reflect.TypeOf(graphs[0].graph.ownedEdges),
+		reflect.TypeOf(graphs[0].graph.usedEdges), reflect.TypeOf(graphs[0].graph.laterOwners),
 		reflect.TypeOf(graphs[0].graph.objects),
 	} {
 		if size := keyed.Key().Size(); size != 8 {
@@ -103,5 +103,40 @@ func (storage storageGraph) fill() {
 	for index := 1; index < len(storage.methods); index++ {
 		storage.graph.see(storage.methods[index], storage.methods[index-1])
 		storage.graph.use(storage.methods[index], storage.methods[index-1])
+	}
+}
+
+// TestOwnershipIsLinkedOncePerPair holds addOwned to one link for each owner and owned node, however often and in
+// whatever order the walk sees the pair: the first owner is answered by firstOwners, every later one by laterOwners,
+// and a pair either holds is never linked again. The order asks each answer twice over, the first owner straight
+// after itself and again after a later one, and a later owner before and after the first.
+func TestOwnershipIsLinkedOncePerPair(test *testing.T) {
+	test.Parallel()
+	storage := newStorageGraph()
+	owned := storage.methods[0]
+	owners := storage.methods[1:4]
+	for _, owner := range []int{0, 0, 1, 0, 1, 2, 2, 0, 1} {
+		storage.graph.see(owned, owners[owner])
+	}
+	ownedNode := storage.graph.node(owned)
+	for index, owner := range owners {
+		links := 0
+		ownerNode := storage.graph.node(owner)
+		for link := storage.graph.nodes[ownerNode].firstOwned; link != 0; link = storage.graph.owns[link].next {
+			if storage.graph.owns[link].to == ownedNode {
+				links++
+			}
+		}
+		if links != 1 {
+			test.Errorf("owner %d owns the node in %d links, not one", index, links)
+		}
+	}
+	if len(storage.graph.owns) != 1+len(owners) {
+		test.Errorf("the graph holds %d ownerships, not the %d pairs it was given", len(storage.graph.owns)-1,
+			len(owners))
+	}
+	if len(storage.graph.firstOwners) != len(storage.graph.nodes) {
+		test.Errorf("the graph holds %d first owners for its %d nodes", len(storage.graph.firstOwners),
+			len(storage.graph.nodes))
 	}
 }
