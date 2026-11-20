@@ -145,23 +145,37 @@ func buildFileStem(build project.Build) string {
 	return strings.NewReplacer("/", "_", " ", "_").Replace(build.String())
 }
 
+// keepMustCheckSet keeps set as extra's must-check set for the census to write, from the build's own goroutine.
+func (engine *pipeline) keepMustCheckSet(extra project.Build, set *mustCheckSet) {
+	engine.mustCheckSetsLock.Lock()
+	defer engine.mustCheckSetsLock.Unlock()
+	if engine.mustCheckSets == nil {
+		engine.mustCheckSets = map[string]*mustCheckSet{}
+	}
+	engine.mustCheckSets[extra.String()] = set
+}
+
 // writeMustCheckCensus writes each extra build's must-check set of runs, and its wide file, into the census's
-// directory, when the run was asked to and kept the build's set. A file that cannot be written is noted and changes
-// nothing else.
+// directory, when the run was asked to and kept the build's set (keepMustCheckSet). A file that cannot be written is
+// noted and changes nothing else.
 func (engine *pipeline) writeMustCheckCensus(runs []buildRun) {
 	if engine.mustCheckCensus == "" {
 		return
 	}
+	// Every build has ended here, but the lock costs the census alone, and holds the read to the writes' own rule.
+	engine.mustCheckSetsLock.Lock()
+	defer engine.mustCheckSetsLock.Unlock()
 	for _, run := range runs[1:] {
-		if run.mustCheck == nil {
+		set := engine.mustCheckSets[run.build.String()]
+		if set == nil {
 			continue
 		}
 		stem := filepath.Join(engine.mustCheckCensus, buildFileStem(run.build))
 		for _, file := range []struct {
 			name  string
 			lines []string
-		}{{stem + ".txt", run.mustCheck.lines}, {stem + ".wide.txt", run.mustCheck.wide},
-			{stem + ".judgment.txt", judgmentStamp(run.mustCheck)}} {
+		}{{stem + ".txt", set.lines}, {stem + ".wide.txt", set.wide},
+			{stem + ".judgment.txt", judgmentStamp(set)}} {
 			contents := ""
 			if len(file.lines) > 0 {
 				contents = strings.Join(file.lines, "\n") + "\n"

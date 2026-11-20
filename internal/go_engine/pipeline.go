@@ -272,6 +272,12 @@ type pipeline struct {
 	// nil in any other run (pipeline_plain_bits.go).
 	mustCheckCensus string
 	plainBits       *plainBits
+	// mustCheckSets are each extra build's must-check set, by its build's name, its judgment's under
+	// `--build-dependence` or the plain bits' on a plain run, written only under the census and under
+	// mustCheckSetsLock, since extra builds run at once. They live here and not on buildRun, which every run with extra
+	// builds makes one of per build, so the census leaves buildRun's size as it was (pipeline_build_run_size_test.go).
+	mustCheckSetsLock sync.Mutex
+	mustCheckSets     map[string]*mustCheckSet
 	// declarationsSteps, a test's alone, is told of each step of a plain run's declarations graph at the builds'
 	// start, in order (declarationsStepped).
 	declarationsSteps func(declarationsStep)
