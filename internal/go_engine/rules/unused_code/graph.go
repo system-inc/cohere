@@ -181,6 +181,16 @@ type graph struct {
 	// one, as it is on every run that reports. The walk tells it of each use, each object seen and the few other
 	// things a record holds, each behind one check that it is there.
 	recorder *bodyRecorder
+	// splice is the records the graph takes in place of walking their bodies, and is nil unless takeRecords handed it
+	// some, as it is on every run that reports.
+	splice *bodySplice
+	// skippedBody is the body of the function whose type the walk is reading when the graph takes that body from a
+	// record, and nil otherwise: seeScope sees none of the locals declared between its braces.
+	skippedBody *ast.BlockStmt
+	// defined is the object each declaring identifier of the package declares, by the identifier's place, which a
+	// recorder and a splice both ask to name an object declared outside a body (definedAt). It is nil until one of
+	// them first asks.
+	defined map[recordedPlace]types.Object
 }
 
 // nodeIndex is a node's place in graph.nodes, the original's NodeID. The root is 0. The original's is 64 bits; 32 are
@@ -200,9 +210,10 @@ type edgeLink struct {
 // too, for the merge and the Graphviz output; the port leaves both out, and a node's index is its place in
 // graph.nodes.
 type node struct {
-	// typesObject is the object the node stands for, the generic one of an instance. The root's is nil. The original
-	// words what a finding says of it, its object, when it makes the node; the port words it in results, from this same
-	// object, so a node is 24 bytes rather than 104 while the walk appends and copies the list.
+	// typesObject is the object the node stands for, the generic one of an instance. The root's is nil, and so is a
+	// spliced node's (isSpliced). The original words what a finding says of it, its object, when it makes the node; the
+	// port words it in results, from this same object, so a node is 24 bytes rather than 104 while the walk appends and
+	// copies the list.
 	typesObject types.Object
 
 	// firstUse is the first link of this node's chain in graph.uses, each node this one uses, the latest the walk
@@ -212,6 +223,13 @@ type node struct {
 	// firstOwned is the first link of this node's chain in graph.owns, each node this one owns, which is quiet when
 	// this one goes unused.
 	firstOwned linkIndex
+}
+
+// isSpliced is whether each was made from a record and not by the walk, a body's local that a splice made
+// (spliceBody), and so holds no object: what a finding says of it is graph.splice.locals'. The root holds no object
+// either, and every step that asks ranges past it.
+func isSpliced(each node) bool {
+	return each.typesObject == nil
 }
 
 // object is what a finding says of an object: its kind, its name and its position. The original's also carries an
@@ -526,7 +544,8 @@ func (graph *graph) colorAndQuieten() []nodeState {
 }
 
 // results is the graph's verdict on every node but the root, each node's object worded here from the object the node
-// stands for, as the original words it when it makes the node. The used and the quiet are in the order of the nodes.
+// stands for, as the original words it when it makes the node, or for a spliced node from the record that made it,
+// which is all it holds. The used and the quiet are in the order of the nodes.
 // The unused are sorted by position (#xeafx79): the order of the nodes is the order the walk met them, which a build
 // that takes a body's nodes from the host's record does not share, and the findings must not depend on it.
 func (graph *graph) results() result {
@@ -548,12 +567,18 @@ func (graph *graph) results() result {
 	}
 	for index, each := range graph.nodes[1:] {
 		state := states[index+1]
-		if state.seen() {
-			verdict.used = append(verdict.used, graph.objectOf(each.typesObject))
-		} else if state.quiet() {
-			verdict.quiet = append(verdict.quiet, graph.objectOf(each.typesObject))
+		var worded object
+		if isSpliced(each) {
+			worded = graph.splice.locals[nodeIndex(index+1)]
 		} else {
-			verdict.unused = append(verdict.unused, graph.objectOf(each.typesObject))
+			worded = graph.objectOf(each.typesObject)
+		}
+		if state.seen() {
+			verdict.used = append(verdict.used, worded)
+		} else if state.quiet() {
+			verdict.quiet = append(verdict.quiet, worded)
+		} else {
+			verdict.unused = append(verdict.unused, worded)
 		}
 	}
 	// Stable, so objects sharing a position, the variables a type switch makes one a clause, stay in node order.

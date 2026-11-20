@@ -30,10 +30,6 @@ type bodyRecorder struct {
 	// declared is each object declared outside a body that some body's record names, by its node: its place and
 	// whether the place finds it, each asked once however many bodies name it.
 	declared map[nodeIndex]declaredEnd
-	// defined is the object each declaring identifier of the package declares, by the identifier's place, as a build
-	// will index its own definitions to resolve an end (definedAt). It is nil until a body first names an object
-	// declared outside it.
-	defined map[recordedPlace]types.Object
 	// interfaceInstances is where the package's source instantiates one of its own generic interface types, sorted,
 	// the entries of typesInfo.Instances that entry adds to the interfaces a named type may implement.
 	interfaceInstances []token.Pos
@@ -242,12 +238,12 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 }
 
 // definedAt is the object the package's declaring identifier at place declares, the generic one as a node holds it,
-// and nil where no identifier declares one there or two do. It asks the host's own definitions the question a build
-// will ask its own to resolve a declared end, so the host learns here, and not the build at its splice, that a place
-// finds another object than the one the walk used. The definitions are indexed whole the first time it is asked.
+// and nil where no identifier declares one there or two do. The recorder asks it the question a splice asks to resolve
+// a declared end (spliceBody), one function for both, so the host learns as it records, and not the build at its
+// splice, that a place finds another object than the one the walk used. The definitions are indexed whole the first
+// time it is asked.
 func (graph *graph) definedAt(place recordedPlace) types.Object {
-	recorder := graph.recorder
-	if recorder.defined == nil {
+	if graph.defined == nil {
 		// Each identifier is placed from its own file's start, which the syntax holds, so indexing asks the shared
 		// file set once a file and not once an identifier. The files are sorted by where they start, so an
 		// identifier's is the last that starts at or before it.
@@ -265,7 +261,7 @@ func (graph *graph) definedAt(place recordedPlace) types.Object {
 		slices.SortFunc(parsedFiles, func(one parsedFile, other parsedFile) int {
 			return cmp.Compare(one.start, other.start)
 		})
-		recorder.defined = make(map[recordedPlace]types.Object, len(graph.typesInfo.Defs))
+		graph.defined = make(map[recordedPlace]types.Object, len(graph.typesInfo.Defs))
 		for identifier, defined := range graph.typesInfo.Defs {
 			if defined == nil {
 				// The package clause's name and a type switch's symbolic variable declare no object.
@@ -281,16 +277,16 @@ func (graph *graph) definedAt(place recordedPlace) types.Object {
 			}
 			parsed := parsedFiles[after-1]
 			identifierPlace := recordedPlace{File: parsed.name, Offset: int(identifier.Pos() - parsed.start)}
-			if _, isTaken := recorder.defined[identifierPlace]; isTaken {
+			if _, isTaken := graph.defined[identifierPlace]; isTaken {
 				// Two parsed files of one name: the place tells their identifiers apart for no build, so it finds
 				// neither, whichever the map's order handed over first.
-				recorder.defined[identifierPlace] = nil
+				graph.defined[identifierPlace] = nil
 			} else {
-				recorder.defined[identifierPlace] = origin(defined)
+				graph.defined[identifierPlace] = origin(defined)
 			}
 		}
 	}
-	return recorder.defined[place]
+	return graph.defined[place]
 }
 
 // recordUse records that by's node uses used's, which use is about to add to the graph. In an open body it is one of

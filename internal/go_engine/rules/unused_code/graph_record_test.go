@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
-	"go/types"
 	"reflect"
 	"strings"
 	"testing"
@@ -34,39 +32,21 @@ type recordedPackage struct {
 // builds its graph with a recorder on. Every call parses afresh, into a file set of its own.
 func recordPackage(test *testing.T, sources []recordedSource, generatedNames []string) recordedPackage {
 	test.Helper()
-	fileSet := token.NewFileSet()
-	recorded := recordedPackage{tokenFiles: map[string]*token.File{}, sources: map[string]string{}}
-	for _, each := range sources {
-		file, parseError := parser.ParseFile(fileSet, each.name, each.source, parser.ParseComments)
-		if parseError != nil {
-			test.Fatalf("parsing %s: %v", each.name, parseError)
-		}
-		recorded.files = append(recorded.files, file)
-		recorded.tokenFiles[each.name] = fileSet.File(file.FileStart)
+	checked := checkShapes(test, "recorded", sources, generatedNames)
+	recorded := recordedPackage{
+		files:      checked.files,
+		tokenFiles: map[string]*token.File{},
+		sources:    map[string]string{},
+	}
+	for index, each := range sources {
+		recorded.tokenFiles[each.name] = checked.fileSet.File(checked.files[index].FileStart)
 		recorded.sources[each.name] = each.source
 	}
-	typesInfo := &types.Info{
-		Defs:       map[*ast.Ident]types.Object{},
-		Uses:       map[*ast.Ident]types.Object{},
-		Implicits:  map[ast.Node]types.Object{},
-		Scopes:     map[ast.Node]*types.Scope{},
-		Selections: map[*ast.SelectorExpr]*types.Selection{},
-		Types:      map[ast.Expr]types.TypeAndValue{},
-		Instances:  map[*ast.Ident]types.Instance{},
+	built, buildError := checked.build(true, nil)
+	if buildError != nil {
+		test.Fatalf("building the graph: %v", buildError)
 	}
-	configuration := &types.Config{Importer: unsafeImporter{}}
-	typesPackage, checkError := configuration.Check("example.com/shape", fileSet, recorded.files, typesInfo)
-	if checkError != nil {
-		test.Fatalf("type-checking the package: %v", checkError)
-	}
-	generatedFiles := map[string]generated.Generator{}
-	for _, name := range generatedNames {
-		generatedFiles[name] = generated.Unknown
-	}
-	recorded.graph = newGraph(fileSet, recorded.files, typesPackage, typesInfo,
-		parseDirectives(recorded.files, fileSet), generatedFiles)
-	recorded.graph.recordBodies()
-	recorded.graph.entry()
+	recorded.graph = built
 	return recorded
 }
 
@@ -1092,7 +1072,9 @@ func TestRecorderChangesNothingTheRuleFinds(test *testing.T) {
 			if records {
 				built.recordBodies()
 			}
-			built.entry()
+			if entryError := built.entry(); entryError != nil {
+				test.Fatalf("%s: building the graph: %v", loaded, entryError)
+			}
 			return built
 		}
 		plain, recording, again := build(false), build(true), build(true)

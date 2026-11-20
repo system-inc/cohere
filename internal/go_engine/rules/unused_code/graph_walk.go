@@ -651,11 +651,22 @@ func (graph *graph) functionDeclaration(declaration *ast.FuncDecl) {
 	if recording {
 		graph.openBody(declaration, graph.node(declared))
 	}
+	// A body the graph takes from a record is not walked, and its immediate locals, which go/types puts in the scope
+	// of the function's type as above, are not seen there either: the record holds them, and seeing them too would
+	// make each a second node. A build that type-checks every body still finds them in that scope; once a build strips
+	// the bodies it stands on, the scope lists none of them, and the filter finds nothing to leave out.
+	taken := graph.splice != nil && declaration.Body != nil && graph.meetTaken(declaration, graph.node(declared))
+	if taken {
+		graph.skippedBody = declaration.Body
+	}
 	graph.read(declaration.Type, declared)
+	graph.skippedBody = nil
 	if recording {
 		graph.recorder.cursor.inSignature = false
 	}
-	graph.block(declaration.Body, declared)
+	if !taken {
+		graph.block(declaration.Body, declared)
+	}
 	if recording {
 		graph.closeBody()
 	}
@@ -707,6 +718,11 @@ func (graph *graph) seeScope(syntax ast.Node, by types.Object) {
 	}
 	for _, name := range scope.Names() {
 		declared := scope.Lookup(name)
+		if graph.skippedBody != nil && graph.skippedBody.Lbrace < declared.Pos() &&
+			declared.Pos() < graph.skippedBody.Rbrace {
+			// A local of a body the graph takes from its record (functionDeclaration).
+			continue
+		}
 		graph.see(declared, by)
 
 		if variable, isVariable := declared.(*types.Var); isVariable && !variable.IsField() {

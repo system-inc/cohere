@@ -43,7 +43,9 @@ func TestUnusedAreInPositionOrder(test *testing.T) {
 		test.Fatalf("type-checking the package: %v", checkError)
 	}
 	built := newGraph(fileSet, files, typesPackage, typesInfo, nil, nil)
-	built.entry()
+	if entryError := built.entry(); entryError != nil {
+		test.Fatalf("building the graph: %v", entryError)
+	}
 
 	names := []string{}
 	for _, each := range built.nodes[1:] {
