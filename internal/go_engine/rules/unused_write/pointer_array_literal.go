@@ -141,10 +141,14 @@ func inspectOwnSyntax(context *rule.Context, body *ast.BlockStmt, visit func(nod
 				visit(syntax)
 				for _, part := range []ast.Expr{syntax.Key, syntax.Value, syntax.X} {
 					if part != nil {
+						// The key, the value and the iterator function are the loop's own, but a function literal
+						// in them, as the iterator function written in place, is judged as a function of its own.
 						ast.Inspect(part, func(node ast.Node) bool {
-							if node != nil {
-								visit(node)
+							switch node.(type) {
+							case nil, *ast.FuncLit:
+								return false
 							}
+							visit(node)
 							return true
 						})
 					}

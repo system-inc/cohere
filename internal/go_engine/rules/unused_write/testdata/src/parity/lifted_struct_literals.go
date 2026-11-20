@@ -242,7 +242,7 @@ func deadLoadStraightThrough(other passing) passing {
 }
 
 // Reassigned and never read again in a function literal that is a loop's iterator function, which the walk of the
-// function around the loop reaches too, and which is judged as a function of its own, so its field is found once.
+// function around the loop passes over, since it is judged as a function of its own, so its field is found once.
 func reassignedInIteratorFunction() {
 	for range func(yield func(int) bool) {
 		good := &passing{strict: true}
