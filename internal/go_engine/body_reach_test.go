@@ -236,7 +236,8 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		"  bodies: 25, reached 17, unreached 8, absent 3, new 6",
 		// Accepted and Shifted, each by Number's name bit in its signature.
 		"  reached by Signature, by the reason its signature gave: Sizes 0, Unrecorded 0, Miscounted 0, Unknown 0, " +
-			"Signature 0, Named 2, Constant 0, LoadMode 0, Selected 0, ValueType 0, TypeArgument 0, Shadowed 0",
+			"Signature 0, Named 2, Constant 0, LoadMode 0, Selected 0, ValueType 0, TypeArgument 0, Shadowed 0, " +
+			"LineClaim 0, Imports 0, Initializers 0",
 		"  lacked by the build and imported by a file it compiles, which starts the carry: 0 packages",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
 		"  body differential: compared 8, failures 0",
@@ -697,23 +698,26 @@ func TestABodyIsClassedOnlyWhereOneStageOwnsEveryDifference(test *testing.T) {
 			stagePackageWide},
 	}
 	differential := &buildBodyDifferential{}
-	hostFindings := map[string][]check.Finding{}
-	builtFindings := map[string][]check.Finding{}
+	// Each side lints every body's file in the body's own package.
+	hostFindings := map[string]map[string][]check.Finding{"example.com/mixed": {}}
+	builtFindings := map[string]map[string][]check.Finding{"example.com/mixed": {}}
 	for index, each := range cases {
 		file := fmt.Sprintf("/mixed/body%d.go", index)
 		differential.bodies = append(differential.bodies, comparedBody{body: reachedBody{
-			packageIdentifier: "example.com/mixed", file: file, line: 1, name: each.name}, firstLine: 1, lastLine: 9})
+			packageIdentifier: "example.com/mixed", file: file, line: 1, name: each.name},
+			host: placedLines{file: file, firstLine: 1, lastLine: 9}, built: placedLines{file: file, firstLine: 1,
+				lastLine: 9}})
 		for line, rule := range each.host {
-			hostFindings[file] = append(hostFindings[file], check.Finding{File: file, Rule: rule, Line: line + 2,
-				Column: 1, Message: "m"})
+			hostFindings["example.com/mixed"][file] = append(hostFindings["example.com/mixed"][file],
+				check.Finding{File: file, Rule: rule, Line: line + 2, Column: 1, Message: "m"})
 		}
 		for line, rule := range each.built {
-			builtFindings[file] = append(builtFindings[file], check.Finding{File: file, Rule: rule, Line: line + 5,
-				Column: 1, Message: "m"})
+			builtFindings["example.com/mixed"][file] = append(builtFindings["example.com/mixed"][file],
+				check.Finding{File: file, Rule: rule, Line: line + 5, Column: 1, Message: "m"})
 		}
 	}
 	differential.compareFindings(hostFindings, builtFindings, stages,
-		&findingCauses{filesDiffer: map[string]bool{"example.com/mixed": true}}, nil)
+		&findingCauses{filesDiffer: map[string]bool{"example.com/mixed": true}}, nil, nil)
 	for _, each := range cases {
 		got := findingStage("")
 		for stage, lines := range differential.classed {

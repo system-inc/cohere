@@ -81,7 +81,9 @@ func (renderer *bodyRenderer) body(
 			compareBool(first.Use, second.Use), compareBool(first.Unknown, second.Unknown),
 			cmp.Compare(renderer.renderings.texts[first.Text], renderer.renderings.texts[second.Text]))
 	})
-	renderer.renderings.bodies[place] = RenderedBody{Facts: facts, LastLine: tokenFile.Position(end).Line}
+	// The place keys the body by the name a reader sees, and its findings are read by the file and lines as parsed.
+	renderer.renderings.bodies[place] = RenderedBody{Facts: facts, ParsedFile: tokenFile.Name(),
+		FirstLine: tokenFile.PositionFor(start, false).Line, LastLine: tokenFile.PositionFor(end, false).Line}
 }
 
 // add adds the fact of expression, its use when use is set, of an unknown identity when unknown is, rendered as text.

@@ -32,16 +32,19 @@ import (
 // name and the digest of its whole lines as the object differential renders a type name (check.NamedTypesWritten),
 // and every identifier's use, and the two must be the same: a use of the declaration's own object by its offset, and
 // one whose identity is unknown never alike, another unknown's included. Its findings: the build's raw findings within
-// the body's lines must be the host's. A body that differs is a failure, named by its build, package, file,
-// declaration and first difference, written to stderr and counted in the census. So is a build with recorded packages
-// that compares no body, unless its sizes reached every body, and a build the census has no judgment of
-// (writeBodyReachCensus), since a machine that compares nothing passes nothing. A body whose findings differ only by
-// rules a later stage owns, those that read a callee's facts (stage 4's, #h0k644s) or judge the package whole (stage
-// 5's, #xeafx79), all owed to one stage, is classed apart under that stage, counted and listed, and no failure, but
-// only where the build shows that stage's cause for the body (findingCauses): the reach does not stand for them, and
-// the later stage redoes the body only where its cause holds. Where the facts' reach settled a package (#5vbs1np), a
-// body it took out of the standing set is the build's to lint, so its findings are the build's own and no comparison
-// with the host's: it is counted apart, taken out by the facts' reach, and its findings are not compared.
+// the body's lines must be the host's, each side's of the body's own package (compareFindings). A body that differs is
+// a failure, named by its build, package, file, declaration and first difference, written to stderr and counted in the
+// census. So is a build with recorded packages that compares no body, unless its sizes reached every body, and a build
+// the census has no judgment of (writeBodyReachCensus), since a machine that compares nothing passes nothing. A body
+// whose findings differ only by rules a later stage owns, those that read a callee's facts (stage 4's, #h0k644s) or
+// judge the package whole (stage 5's, #xeafx79), all owed to one stage, is classed apart under that stage, counted and
+// listed, and no failure, but only where the build shows that stage's cause for the body (findingCauses): the reach
+// does not stand for them, and the later stage redoes the body only where its cause holds. Where the facts' reach
+// settled a package (#5vbs1np), a body it took out of the standing set is the build's to lint, so its findings are the
+// build's own and no comparison with the host's: it is counted apart, taken out by the facts' reach, and its findings
+// are not compared. So is every variable initializer of a package whose settlement named a function one of them uses
+// (#bed0mnk): they are one synthetic function, which a callee's no-return fact cuts and whose findings a callee's
+// answer moves.
 //
 // Its second leg (#adq5ahd) checks what the facts' reach left standing (#aswfm7a), once the build's rules have run:
 // the build lints whole today, so every answer its own run holds is real, and of each body the facts' fixed point left
@@ -74,6 +77,12 @@ type buildBodyDifferential struct {
 	// bodies compared by their types it took out of the standing set, whose findings were then left alone.
 	factsSettled bool
 	takenOut     int
+
+	// lintedApart is how many bodies compared by their types one side lints in another package than the body's own,
+	// and lintedByNeither how many in a package neither side lints, a dependency's or the standard library's checked
+	// from source, whose findings were in either case left alone (compareFindings).
+	lintedApart     int
+	lintedByNeither int
 
 	// standingCompared and standingFailed are the second leg's comparisons and failures by kind, an answer's kind or
 	// standingNoReturn; each failure's line is among failures too.
@@ -151,10 +160,18 @@ func readsFacts(analyzer *analysis.Analyzer) bool {
 	return reads(analyzer)
 }
 
-// comparedBody is a body the differential compared, by where it lies, its declaration's first line to its body's
-// last, and how the census names it.
+// comparedBody is a body the differential compared, by how the census names it, which is by the file and line a
+// //line directive moves it to, and by where each side's findings of it are placed, by that side's own rendering.
 type comparedBody struct {
-	body      reachedBody
+	body  reachedBody
+	host  placedLines
+	built placedLines
+}
+
+// placedLines are where one side's findings of a body are placed: the file as parsed and the body's declaration's
+// first line to its body's last as written (build_reads.RenderedBody).
+type placedLines struct {
+	file      string
 	firstLine int
 	lastLine  int
 }
@@ -221,8 +238,11 @@ func newBuildBodyDifferential(
 				builtBody.Facts); difference != "" {
 				differential.failures = append(differential.failures, body.String()+": "+difference)
 			}
-			differential.bodies = append(differential.bodies,
-				comparedBody{body: body, firstLine: body.line, lastLine: builtBody.LastLine})
+			differential.bodies = append(differential.bodies, comparedBody{body: body,
+				host: placedLines{file: hostBody.ParsedFile, firstLine: hostBody.FirstLine,
+					lastLine: hostBody.LastLine},
+				built: placedLines{file: builtBody.ParsedFile, firstLine: builtBody.FirstLine,
+					lastLine: builtBody.LastLine}})
 		}
 	}
 	if differential.compared == 0 && census.recorded > 0 && census.byReason[reachedSizes] < census.total {
@@ -280,28 +300,57 @@ func firstFactDifference(
 }
 
 // compareFindings compares, for each body compared by its types, the build's findings within its lines with the
-// host's, hostFindings and builtFindings each by file, adding a failure for each body where they differ, but where
-// every finding one side has and the other lacks is of rules stages owes to one later stage whose cause causes shows
-// for the body, which classes it there. A difference its rules owe to a stage whose cause is not shown stays a
-// failure, saying so. settled is the facts' reach's result by package ID (check.Result.FactReachSettled), nil where
-// it never ran: a body it took out of a package it settled in part is counted, never compared (takenOutByFacts).
+// host's, hostFindings and builtFindings each by the package that lints a file and then by the file
+// (findingsByPackage), adding a failure for each body where they differ, but where every finding one side has and the
+// other lacks is of rules stages owes to one later stage whose cause causes shows for the body, which classes it
+// there. A difference its rules owe to a stage whose cause is not shown stays a failure, saying so. settled is the
+// facts' reach's result by package ID (check.Result.FactReachSettled), nil where it never ran, and sides the host's
+// sides it settled by: a body it took out of a package it settled is counted, never compared (takenOutByFacts).
+//
+// Each side's findings of a body are those of the body's own package, the ID the census pairs it by, as standing
+// reads the host's entry of that same ID (check's hostStandingPackage), never another package's that lints the file
+// (#bed0mnk, the Square's should 1 on the three-piece head). Where only the host has an in-package test file, the host
+// lints a shared file in "p [p.test]" and the build in p, and read by the file alone, p's findings in the build were
+// compared with the variant's on the host, which may import what p does not. A body one side lints in another package
+// than its own is counted apart, lintedApart, and its findings are not compared: on the host, standing finds no
+// findings of the body's package there, so the build lints the body itself; in the build, the body's package lints
+// nothing there, so nothing of it stands. A body of a package neither side lints has no findings on either, and is
+// counted apart from those, lintedByNeither, so the count of bodies linted apart says only what its name says.
 func (differential *buildBodyDifferential) compareFindings(
-	hostFindings map[string][]check.Finding,
-	builtFindings map[string][]check.Finding,
+	hostFindings map[string]map[string][]check.Finding,
+	builtFindings map[string]map[string][]check.Finding,
 	stages map[string][]findingStage,
 	causes *findingCauses,
+	sides *factReachSides,
 	settled map[string]any,
 ) {
 	differential.factsSettled = settled != nil
-	takenOut := takenOutByFacts(settled)
+	takenOut := takenOutByFacts(sides, settled)
 	for _, compared := range differential.bodies {
 		if takenOut[compared.body.packageIdentifier][fact_reach.Place{File: compared.body.file,
 			Offset: compared.body.offset}] {
 			differential.takenOut++
 			continue
 		}
-		hostWritten := findingsWithin(hostFindings[compared.body.file], compared.firstLine, compared.lastLine)
-		builtWritten := findingsWithin(builtFindings[compared.body.file], compared.firstLine, compared.lastLine)
+		// A package a side lints holds an entry, empty where it found nothing, and the body is in a file of its
+		// package, so a side whose findings hold no entry of the package lints the file in another, or, where
+		// neither side holds one, the package is linted by neither.
+		hostFiles, hostLints := hostFindings[compared.body.packageIdentifier]
+		builtFiles, builtLints := builtFindings[compared.body.packageIdentifier]
+		if !hostLints && !builtLints {
+			differential.lintedByNeither++
+			continue
+		}
+		if !hostLints || !builtLints {
+			differential.lintedApart++
+			continue
+		}
+		// A finding is keyed by its file as parsed and its line as written (check's newFinding), so a body under a
+		// //line directive is read there too, never in the file its positions claim (#99saas4), each side by its own
+		// rendering, so a side whose bytes or root spelling differ still reads its own findings.
+		hostWritten := findingsWithin(hostFiles[compared.host.file], compared.host.firstLine, compared.host.lastLine)
+		builtWritten := findingsWithin(builtFiles[compared.built.file], compared.built.firstLine,
+			compared.built.lastLine)
 		if slices.Equal(hostWritten, builtWritten) {
 			continue
 		}
@@ -326,10 +375,16 @@ func (differential *buildBodyDifferential) compareFindings(
 	}
 }
 
-// takenOutByFacts are the bodies the facts' reach took out of the standing set, by package ID and place, of each
-// package settled holds a result of in part: the build lints them, so their findings are the build's own. A body the
-// reach never held standing, as a value's initializer, is not among them, nor is any of a package it did not settle.
-func takenOutByFacts(settled map[string]any) map[string]map[fact_reach.Place]bool {
+// takenOutByFacts are the bodies the facts' reach took out, by package ID and place, of each package settled holds a
+// settled result of: those that left the standing set, and every variable initializer of a package whose settlement
+// named an object one of them uses, the package's initializers being one asker that never stood
+// (factReachInitializers), which sides, the host's sides the build settled by, holds. The build lints them, so their
+// findings are the build's own. No body of a package the reach did not settle is among them. It settles a package
+// that has a side wherever a function of it stands or a variable initializer of it is unreached
+// (factReachSides.inBuild), so the initializers of a package with no function standing leave as any other's do. A
+// package with no side, or whose side holds something unplaced (factReachHost.Standing), is never settled, and its
+// initializers stay compared as its bodies do.
+func takenOutByFacts(sides *factReachSides, settled map[string]any) map[string]map[fact_reach.Place]bool {
 	takenOut := map[string]map[fact_reach.Place]bool{}
 	for identifier, result := range settled {
 		packageSettled, isResult := result.(*standing_facts.Result)
@@ -339,6 +394,13 @@ func takenOutByFacts(settled map[string]any) map[string]map[fact_reach.Place]boo
 		takenOut[identifier] = map[fact_reach.Place]bool{}
 		for _, removal := range packageSettled.Settlement.Removed {
 			takenOut[identifier][removal.Place] = true
+		}
+		// A package is settled only from its host's side, so sides holds one wherever the walk reaches here.
+		if hosted := sides.packages[identifier]; hosted != nil &&
+			hosted.initializers.leaveFor(packageSettled.Settlement.Named) {
+			for _, place := range hosted.initializers.places {
+				takenOut[identifier][place] = true
+			}
 		}
 	}
 	return takenOut
@@ -396,13 +458,37 @@ func findingsWithin(findings []check.Finding, firstLine int, lastLine int) []str
 	return slices.Compact(written)
 }
 
-// findingsByFile are findings by the file each is in.
-func findingsByFile(findings []check.Finding) map[string][]check.Finding {
-	byFile := map[string][]check.Finding{}
-	for _, finding := range findings {
-		byFile[finding.File] = append(byFile[finding.File], finding)
+// findingsByPackage are findings, a run's over analyzed, the packages it lints, by the ID of the one of analyzed that
+// compiles each finding's file and then by the file, with an entry, empty or not, for every package of analyzed. A
+// load lints each file in one package alone (load's analyzedOfGraph), so a file's findings are that package's,
+// though the run's merge keeps no package of a finding. A finding in a file no package of analyzed compiles is in no
+// body of theirs, and left out.
+//
+// analyzed is a load's Packages, which check.Run gathers findings over and nothing else. A package Caching.Analyzes
+// turns down is left out of them and never analyzed, so no finding of it is in findings. So is one a build's restore
+// from the host's run leaves untouched (load.Loaded.Untouched), whose findings the merge takes from the host by its
+// files, never from the build's result; and a run judging dependence, the one run the census takes, restores nothing
+// from the host's run (censusKeepsHostRestoreOff), so it has none. An entry for either would say a package was linted
+// and found nothing.
+func findingsByPackage(
+	findings []check.Finding,
+	analyzed []*packages.Package,
+) map[string]map[string][]check.Finding {
+	byPackage := make(map[string]map[string][]check.Finding, len(analyzed))
+	lintedIn := map[string]string{}
+	for _, each := range analyzed {
+		byPackage[each.ID] = map[string][]check.Finding{}
+		// A finding is placed in the file as parsed, a cgo package's translated file among the compiled ones.
+		for _, file := range slices.Concat(each.GoFiles, each.CompiledGoFiles) {
+			lintedIn[file] = each.ID
+		}
 	}
-	return byFile
+	for _, finding := range findings {
+		if identifier, isLinted := lintedIn[finding.File]; isLinted {
+			byPackage[identifier][finding.File] = append(byPackage[identifier][finding.File], finding)
+		}
+	}
+	return byPackage
 }
 
 // compareStanding is the second leg (see the file's comment) over the build named build: each package settled, by its

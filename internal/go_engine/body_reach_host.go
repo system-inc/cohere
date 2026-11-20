@@ -5,6 +5,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"iter"
+	"maps"
 	"slices"
 	"strings"
 
@@ -33,13 +35,28 @@ import (
 //     path is its own selection in the record, so reads its own name bit the same way.
 //   - ValueType and TypeArgument: both bits, since a value's copy, comparison or conversion and a constraint's check
 //     read its layout and its method set alike.
-// A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, its
-// package's bodies judged not the bodies the build counts in the files both compile (Miscounted), a part of it
-// unknown, its signature reaching (its body type-checks against the signature), its body reaching, by the first use
-// in the record's order that does, and a shadowed name in either part. A build whose word size or maximum alignment
-// differs from the host's (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift
-// past a word or `math.MaxInt` type-check to other constants there with no file differing, which no bit says, as the
-// restore's own sizes gate refuses such a build every package (check's hostSizesDiffer, #61qj12v).
+// A body is reached by the first of: the build's sizes differing from the host's, its package unrecorded, its package's
+// bodies judged not the bodies the build counts in the files both compile (Miscounted), a part of it unknown, its
+// signature reaching (its body type-checks against the signature), its body reaching, by the first use in the record's
+// order that does, and a shadowed name in either part. A package's variable initializers are one body (#bed0mnk): Go
+// lowers them into one synthetic function, in the order `types.Info.InitOrder` gives, dependencies first, declaration
+// order among the independent and files in the load's order, so an initializer that never returns leaves every one
+// after it unreachable, and a rule reading the representation reports nothing there. Where the package holds a body or
+// a name one side alone does, or any body of it is reached, every initializer of the package is reached, Initializers,
+// since the order and the cut hang on every body of the package an initializer may run (bodyReacher.reachInitializers).
+// A package whose files import other paths in the build than on the host, blank imports among them, is reached whole,
+// Imports (#bed0mnk): a rule may judge a body by what its package imports anywhere, as unusedwrite stands down where
+// any file imports `unsafe`, a gate no use of the body reads. So is a package one of whose imports resolves, in the
+// build, to a package of another ID than on the host, another package under the same path, as go test builds a package
+// again against a test variant: the objects its bodies read there are not the ones the host's record names
+// (differingImports). And so is a package whose rules asked its import closure for a package, io or hash, and get
+// another answer asked again in the build, where only a dependency's imports differ (differingClosureLookups). A body
+// whose positions a //line directive moves onto a file the builds do not share is reached, LineClaim (#d2mqgfj): a
+// rule may judge a finding by the file its position claims, as staticcheck's generated-file filter does
+// (unsharedLineClaims). A build whose word size or maximum alignment differs from the host's
+// (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or `math.MaxInt`
+// type-check to other constants there with no file differing, which no bit says, as the restore's own sizes gate
+// refuses such a build every package (check's hostSizesDiffer, #61qj12v).
 //
 // What the reach does not stand for, which the census says at its head: a finding that turns on a fact about a
 // function a body calls, its purity, that it never returns or that it wraps printf, is stage 4's (#h0k644s), since the
@@ -72,36 +89,41 @@ const (
 	reachedTypeArgument bodyReachReason = "TypeArgument"
 	reachedShadowed     bodyReachReason = "Shadowed"
 	reachedLoadMode     bodyReachReason = "LoadMode"
+	reachedInitializers bodyReachReason = "Initializers"
+	reachedImports      bodyReachReason = "Imports"
+	reachedLineClaim    bodyReachReason = "LineClaim"
 )
 
 // bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by.
 var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reachedMiscounted, reachedUnknown,
 	reachedSignature, reachedNamed, reachedConstant, reachedLoadMode, reachedSelected, reachedValueType,
-	reachedTypeArgument, reachedShadowed}
+	reachedTypeArgument, reachedShadowed, reachedLineClaim, reachedImports, reachedInitializers}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its
 // walk rendered them; the host's graph, with the types of the packages it took from the findings store's records
-// rather than from their syntax (hostDependence.decoded); and the host's findings by file, before the merge, which the
-// differential compares each skipped body's with.
+// rather than from their syntax (hostDependence.decoded); and the host's findings by the package that lints each file
+// and then by the file (findingsByPackage), which the differential compares each skipped body's with.
 type bodyReachHost struct {
 	packages   map[string]*packages.Package
 	reads      map[*packages.Package]*build_reads.Reads
 	dependence *hostDependence
-	findings   map[string][]check.Finding
+	findings   map[string]map[string][]check.Finding
 	// identifiers are the IDs of the host's packages by their types, by which the reach finds how a build loaded the
 	// package of an object the host's record names.
 	identifiers map[*types.Package]string
 }
 
-// newBodyReachHost is the census's host side from the host's whole reads (wholeReads), its graph and its findings.
+// newBodyReachHost is the census's host side from the host's whole reads (wholeReads), its graph and its findings over
+// analyzed, the packages it linted.
 func newBodyReachHost(
 	dependence *hostDependence,
 	reads map[*packages.Package]*build_reads.Reads,
 	findings []check.Finding,
+	analyzed []*packages.Package,
 ) *bodyReachHost {
 	host := &bodyReachHost{packages: make(map[string]*packages.Package, len(reads)), reads: reads,
-		dependence: dependence, findings: findingsByFile(findings),
+		dependence: dependence, findings: findingsByPackage(findings, analyzed),
 		identifiers: make(map[*types.Package]string, len(reads))}
 	for each := range reads {
 		host.packages[each.ID] = each
@@ -115,28 +137,40 @@ func newBodyReachHost(
 // reachBuiltPackage is what the census reads of one package a build checked from source, from the build's own syntax,
 // taken before its rules let the syntax go: the files it compiles as written, the bodies in the files the host's
 // package of its ID compiles too and in those only the build compiles, every file's when the host has no such package,
-// the names its build-only files declare at package level, and the paths each shared file imports by a dot, by the
-// file as parsed.
+// the names its build-only files declare at package level, the paths each shared file imports by a dot, by the file as
+// parsed, the paths its files import, each with the package it resolves to, by its load's import graph
+// (differingImports), its types, of which the host's Closure lookups are asked again (differingClosureLookups), and in
+// each shared file, by the file as parsed, the declarations a //line directive moves onto a file the builds do not
+// share, each by its offset with the file claimed (unsharedLineClaims).
 type reachBuiltPackage struct {
 	identifier      string
+	types           *types.Package
 	files           map[string]bool
 	sharedBodies    int
 	buildOnlyBodies int
 	buildOnlyNames  map[string]bool
 	dotImports      map[string][]string
+	imports         map[string]*packages.Package
+	lineClaims      map[string]map[int]string
 }
 
 // reachBuiltPackages are the packages of loaded's whole graph that it checked from source, as the census reads them
 // (reachBuiltPackage), each against hostFiles, the host's files of each package by its ID.
 func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*reachBuiltPackage {
+	// Every package's files on each side, whatever its ID, by which a //line claim is judged (unsharedLineClaims).
+	hostCompiling := compilingLists(maps.Values(hostFiles))
+	var builtLists [][]string
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) { builtLists = append(builtLists, each.GoFiles) })
+	builtCompiling := compilingLists(slices.Values(builtLists))
 	var built []*reachBuiltPackage
 	packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
 		if each.TypesInfo == nil {
 			return
 		}
 		hosted, isHosted := hostFiles[each.ID]
-		read := &reachBuiltPackage{identifier: each.ID, files: make(map[string]bool, len(each.GoFiles)),
-			buildOnlyNames: map[string]bool{}, dotImports: map[string][]string{}}
+		read := &reachBuiltPackage{identifier: each.ID, types: each.Types,
+			files: make(map[string]bool, len(each.GoFiles)), buildOnlyNames: map[string]bool{},
+			dotImports: map[string][]string{}, imports: each.Imports, lineClaims: map[string]map[int]string{}}
 		for _, file := range each.GoFiles {
 			read.files[file] = true
 		}
@@ -148,6 +182,10 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 			if isHosted && slices.Contains(hosted, name) {
 				read.sharedBodies += bodies
 				parsed := each.Fset.File(file.FileStart).Name()
+				if claims := unsharedLineClaims(each.Fset, file, hostCompiling[name],
+					builtCompiling[name]); len(claims) > 0 {
+					read.lineClaims[parsed] = claims
+				}
 				for _, imported := range file.Imports {
 					if imported.Name != nil && imported.Name.Name == "." {
 						read.dotImports[parsed] = append(read.dotImports[parsed],
@@ -156,6 +194,8 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 				}
 				continue
 			}
+			// A build-only variable initializer is among them, a value spec's, which reaches every one of the
+			// package's as any build-only body does (bodyReacher.reachInitializers).
 			read.buildOnlyBodies += bodies
 			if isHosted {
 				for _, declared := range build_dependence.PackageLevelNames(file) {
@@ -204,10 +244,146 @@ func syntaxBodies(file *ast.File) int {
 	return bodies
 }
 
+// compilingLists are lists, each one package's files, by each file they hold: every list of a package that compiles
+// the file, whatever the package's ID, its own, its test variant's and that of one built again for another's tests.
+func compilingLists(lists iter.Seq[[]string]) map[string][][]string {
+	compiling := map[string][][]string{}
+	for files := range lists {
+		for _, file := range files {
+			compiling[file] = append(compiling[file], files)
+		}
+	}
+	return compiling
+}
+
+// unsharedLineClaims are the declarations of file, a file both builds compile, by the offset the record places each at,
+// a function's at its `func` and a value spec's at its first name, whose positions a //line directive moves onto a file
+// the builds do not share, each with that file (#d2mqgfj). A rule reads the file a position claims: staticcheck's
+// generated-file filter asks whether that file is one the pass's own package compiles as generated, so a body claiming
+// a platform sibling is judged by a file only one build holds, though nothing it uses differs.
+//
+// A claimed file is unshared where the sides disagree on holding it, by hostCompiling and builtCompiling, the lists of
+// every package of each side that compiles file, whatever its ID, taken together (the Square's must 1). Each side
+// lints a file in one package of those that compile it, its in-package test variant where the package has test files
+// there and the package itself where it has none (load's analyzedOfGraph), while the census pairs the build's package
+// with the host's of its own ID. So where the host has test files and the build has none, the host lints the file in
+// its variant, whose list holds a test file, while the build's package is paired with the host's plain one: neither
+// list of that ID holds the test file, and a claim of it went unseen. Every package that compiles the file is that
+// package, its variant or the package built again for another's tests, and the variant's list holds each of the
+// others', so a side's lists taken together are the list of the package that side lints the file in, and the two
+// sides disagree on a name exactly where those two packages do. The one ID's lists are among them, so asking those too
+// sees no claim more, and they are not asked. The one exception is a directive before the package clause, which has
+// the file's lists looked up under another name: #cpbx5rw's case, left as it is.
+//
+// The filter is not the one reader of a claimed name. The body differential read a compared body's findings in the
+// claimed file until #99saas4 had it read them where a finding is placed, by the file as parsed (check.newFinding),
+// as check's withholding of house findings in generated and copied files and the suppression's directives read them.
+// Three readers take the name the package clause's position claims, which a directive before the clause moves,
+// cgo_call's parse of that file and staticcheck's configuration's two readings of a file's name: those are #cpbx5rw's,
+// and no claim here cures them.
+//
+// A claim is read from the position after its directive, as the scanner made it, and holds to the next directive or the
+// file's end; a declaration any claim it overlaps names such a file is claimed, from its doc comment on
+// (documentedStart), a whole var or const group when any of it is, a const spec repeating the expressions before it.
+// The file's bytes are the same in both builds, so its claims are too, and a claim of a file neither build compiles is
+// judged alike in both: no compiled file answers for it.
+func unsharedLineClaims(
+	fileSet *token.FileSet,
+	file *ast.File,
+	hostCompiling [][]string,
+	builtCompiling [][]string,
+) map[int]string {
+	tokenFile := fileSet.File(file.FileStart)
+	// spans are each claim's start, in the file's offsets, and the file it claims, in the file's order.
+	type span struct {
+		start   int
+		claimed string
+	}
+	var spans []span
+	for _, group := range file.Comments {
+		for _, comment := range group.List {
+			start := comment.End()
+			switch {
+			case strings.HasPrefix(comment.Text, "/*line "):
+			case strings.HasPrefix(comment.Text, "//line "):
+				// A line comment's directive moves the line after it, found by the directive's own line as written:
+				// File.Line reads it as a directive before it moved it, and LineStart takes none but the written.
+				line := tokenFile.PositionFor(comment.End(), false).Line
+				if line >= tokenFile.LineCount() {
+					continue
+				}
+				start = tokenFile.LineStart(line + 1)
+			default:
+				continue
+			}
+			spans = append(spans, span{start: tokenFile.Offset(start),
+				claimed: fileSet.PositionFor(start, true).Filename})
+		}
+	}
+	// compiles reports whether any of lists, the lists of the packages of one side that compile file, holds named.
+	compiles := func(lists [][]string, named string) bool {
+		return slices.ContainsFunc(lists, func(files []string) bool { return slices.Contains(files, named) })
+	}
+	claims := map[int]string{}
+	for index, each := range spans {
+		// A claim of the file's own name as parsed claims no other file. Where the file is read under its own name,
+		// that name is in every list asked below, which would skip it too. This skips alone only under a directive
+		// before the package clause, which has the file read, and its lists asked, under another name: #cpbx5rw's
+		// case, left as it is.
+		if each.claimed == tokenFile.Name() {
+			continue
+		}
+		if compiles(hostCompiling, each.claimed) == compiles(builtCompiling, each.claimed) {
+			continue
+		}
+		end := tokenFile.Size()
+		if index+1 < len(spans) {
+			end = spans[index+1].start
+		}
+		for _, declaration := range file.Decls {
+			// `<=` and `<` judge alike: a declaration never ends at a line's start, nor at a block comment's end.
+			if tokenFile.Offset(declaration.End()) <= each.start ||
+				tokenFile.Offset(documentedStart(declaration)) >= end {
+				continue
+			}
+			switch declaration := declaration.(type) {
+			case *ast.FuncDecl:
+				claims[tokenFile.Offset(declaration.Pos())] = each.claimed
+			case *ast.GenDecl:
+				for _, spec := range declaration.Specs {
+					if valueSpec, isValue := spec.(*ast.ValueSpec); isValue {
+						claims[tokenFile.Offset(valueSpec.Pos())] = each.claimed
+					}
+				}
+			}
+		}
+	}
+	return claims
+}
+
+// documentedStart is where declaration starts with its doc comment, where a standing span starts
+// (rule.StandingSpans), so a claim over the comment alone is a claim: a rule may report there. A directive written
+// directly above a declaration is its doc comment, or the last line of it, and lies under the claim before it, so
+// that claim claims the declaration too; one a blank line parts from the declaration is not.
+func documentedStart(declaration ast.Decl) token.Pos {
+	var documentation *ast.CommentGroup
+	switch declaration := declaration.(type) {
+	case *ast.FuncDecl:
+		documentation = declaration.Doc
+	case *ast.GenDecl:
+		documentation = declaration.Doc
+	}
+	if documentation != nil {
+		return documentation.Pos()
+	}
+	return declaration.Pos()
+}
+
 // buildBodyReach is one build's census: the packages it checked from source, those of them the host recorded and
 // those only the build has; their bodies, reached by reason, absent (in the host's files the build does not compile)
 // and new (in files only the build compiles, always checked); the recorded packages none of whose bodies is reached
-// and none new, which need their declarations alone; the recorded packages whose judged bodies are not the bodies the
+// and none new, which need their declarations alone, but for those the facts' reach then takes something out of, which
+// the census file leaves out (writeBuildBodyReach); the recorded packages whose judged bodies are not the bodies the
 // build counts in the files both compile, each reached whole; and every body of a recorded package, in the order the
 // packages' IDs and their records give, which the disagreements with the graph's unit verdict are read from.
 type buildBodyReach struct {

@@ -12,8 +12,8 @@ import (
 // The host's side of the facts' fixed point, stage 4 of #9paaen9 (#5vbs1np): for one package the host checked from
 // source, everything a build's pass is handed of the host's run (fact_reach.Host). The bodies that use each object
 // come from stage 1's record of what each declaration uses (build_reads.FunctionUses), the answers that rest on each
-// body's function, and those about the functions of other packages its bodies use, from what the host's fact
-// resolver computed (check.ExportedFact). All of that is the same in every build, and is made
+// body's function, and those about the functions of other packages its bodies and its variables' initializers use,
+// from what the host's fact resolver computed (check.ExportedFact). All of that is the same in every build, and is made
 // once (factReachPackage, by factReachBuilder); the standing set alone is a build's own (factReachHost). A run makes
 // each package's under the body reach census alone, once, as its extra builds start (newFactReachSides), and each
 // build hands its passes the side with its own standing set (factReachSides.inBuild).
@@ -66,8 +66,11 @@ type factReachPackage struct {
 	users      map[fact_reach.Object][]fact_reach.Place
 	everything []fact_reach.Place
 
+	// initializers are the package's variable initializers, as one asker (factReachInitializers).
+	initializers factReachInitializers
+
 	// usedObjects are the objects the bodies' records use, each once, with its identity, in the order of their keys:
-	// each key of users, and each object a body of everything uses that an identity names.
+	// each key of users, each object a body of everything uses that an identity names, and each the initializers use.
 	usedObjects []fact_reach.UsedObject
 
 	// presence is, by a body's place, what the body holds that the presence rows read and no use records
@@ -79,13 +82,15 @@ type factReachPackage struct {
 	markers []string
 
 	// functions are the functions a no-return fact is compared on, each once, in the order the record first names
-	// them: a function declared with a body where it is declared, then each function its body uses.
+	// them: a function declared with a body where it is declared, then each function its body uses, and each a
+	// variable's initializer uses where the initializer is declared.
 	functions []fact_reach.Function
 
 	// recorded are, by a body's place, the questions the host's answers about its function and its parameters make,
-	// and imported the questions its answers about the functions of other packages the bodies use make. Both are in
-	// the order of their keys, since the answers come in a map's order and the fixed point asks, and takes bodies out,
-	// in the order it reads them. askings are what a build is asked of each question of either, by the question's key.
+	// and imported the questions its answers about the functions of other packages the bodies and the variables'
+	// initializers use make. Both are in the order of their keys, since the answers come in a map's order and the fixed
+	// point asks, and takes bodies out, in the order it reads them. askings are what a build is asked of each question
+	// of either, by the question's key.
 	recorded map[fact_reach.Place][]fact_reach.Question
 	imported []fact_reach.Question
 	askings  map[string]fact_reach.Asking
@@ -112,12 +117,13 @@ type factReachPackage struct {
 
 	// unplaced counts what the package's side could not name, each a comparison a build would never make. An answer
 	// no body could take: one about the package, a function no declaration of the record declares or one no identity
-	// names. A body the file set places in no file, whose answers and uses have nowhere to rest. An order-bound
-	// object no identity names. A function a body starts that no identity names, and a package whose bodies' presence
-	// the host never read (factReachBuilder.readPresence). A package that has any is linted whole in every build
-	// (factReachHost.Standing), since what cannot be placed cannot be compared. An answer about a variable that is no
-	// declared function's parameter is none of these, nor is one its kind marks as its types' alone about a function
-	// no declaration declares, and each is left out uncounted (factReachBuilder.answer).
+	// names. A body the file set places in no file, whose answers and uses have nowhere to rest, or a variable's
+	// initializer it places in none. An order-bound object no identity names. A function a body starts that no
+	// identity names, and a package whose bodies' presence the host never read (factReachBuilder.readPresence). A
+	// package that has any is linted whole in every build (factReachHost.Standing), since what cannot be placed cannot
+	// be compared. An answer about a variable that is no declared function's parameter is none of these, nor is one its
+	// kind marks as its types' alone about a function no declaration declares, and each is left out uncounted
+	// (factReachBuilder.answer).
 	unplaced int
 }
 
@@ -156,14 +162,15 @@ func (hosted *factReachPackage) Places() []fact_reach.Place {
 }
 
 // Functions are the functions a body's findings can turn on the no-return fact of, each once, with the host's fact:
-// each the package declares with a body and each a body uses. A method of an interface is none of them, having no
-// body anywhere for a fact to be about, nor is a function no identity names, whose users use every object already.
+// each the package declares with a body and each a body or a variable's initializer uses. A method of an interface is
+// none of them, having no body anywhere for a fact to be about, nor is a function no identity names, whose users use
+// every object already.
 func (hosted *factReachPackage) Functions() []fact_reach.Function {
 	return hosted.functions
 }
 
-// Imported are the questions the host's answers about the functions of other packages the package's bodies use,
-// and about their parameters, make.
+// Imported are the questions the host's answers about the functions of other packages the package's bodies and its
+// variables' initializers use, and about their parameters, make.
 func (hosted *factReachPackage) Imported() []fact_reach.Question {
 	return hosted.imported
 }
@@ -195,8 +202,8 @@ func (hosted *factReachPackage) Declared(place fact_reach.Place) []fact_reach.Ob
 	return hosted.declared[place]
 }
 
-// inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build lints
-// the package in part rather than whole.
+// inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build settles
+// the package, which it does with standing empty where the package's variable initializers alone are unreached.
 func (hosted *factReachPackage) inBuild(standing map[fact_reach.Place]bool, partial bool) fact_reach.Host {
 	return factReachHost{factReachPackage: hosted, standing: standing, partial: partial}
 }
