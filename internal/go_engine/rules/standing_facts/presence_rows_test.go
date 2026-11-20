@@ -116,7 +116,8 @@ func (found fixture) fieldIdentity(test *testing.T, typeName string, field strin
 }
 
 // scannererr's row (#xeafx79): Lines names Input, a scanner over the process's input, and Open names Assigned, which
-// its own `=` makes a candidate, so both leave. Remembered names Memory, whose reader is in memory, and Count names
+// its own `=` makes a candidate, so both leave, and so does Remembered, which names Memory, whose reader is in memory,
+// since the row names every *bufio.Scanner whatever made it. Sourced names Source, no scanner, and Count names
 // nothing, so both stand.
 func TestAStandingBodyNamingAScannerLeavesForPresence(test *testing.T) {
 	test.Parallel()
@@ -124,10 +125,12 @@ func TestAStandingBodyNamingAScannerLeavesForPresence(test *testing.T) {
 	host := presenceHost(test, found, nil,
 		presenceUse{key: "scanning.Input", identity: found.identity("Input"), users: []string{"Lines"}},
 		presenceUse{key: "scanning.Assigned", identity: found.identity("Assigned"), users: []string{"Open"}},
-		presenceUse{key: "scanning.Memory", identity: found.identity("Memory"), users: []string{"Remembered"}})
+		presenceUse{key: "scanning.Memory", identity: found.identity("Memory"), users: []string{"Remembered"}},
+		presenceUse{key: "scanning.Source", identity: found.identity("Source"), users: []string{"Sourced"}})
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
-		"Lines": standing_presence.ScannerError, "Open": standing_presence.ScannerError}, nil)
+		"Lines": standing_presence.ScannerError, "Open": standing_presence.ScannerError,
+		"Remembered": standing_presence.ScannerError}, nil)
 }
 
 // sqlrowserr's row (#xeafx79): Next names Rows, the first name a query's rows are assigned to, and leaves. Statement

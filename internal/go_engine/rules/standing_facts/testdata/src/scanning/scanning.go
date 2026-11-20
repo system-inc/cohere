@@ -14,8 +14,12 @@ var Input = bufio.NewScanner(os.Stdin)
 // Assigned is a candidate too, made one by Open's `=` alone.
 var Assigned *bufio.Scanner
 
-// Memory is no candidate: its reader is in memory, and never fails.
+// Memory is no candidate of the rule's, whose reader is in memory and never fails, but it is a *bufio.Scanner, which
+// the row names whatever made it.
 var Memory = bufio.NewScanner(strings.NewReader("line"))
+
+// Source is no scanner at all.
+var Source = strings.NewReader("line")
 
 // Lines names Input.
 func Lines() int {
@@ -34,3 +38,6 @@ func Count() int { return 1 }
 
 // Remembered names Memory.
 func Remembered() bool { return Memory.Scan() }
+
+// Sourced names Source.
+func Sourced() int { return Source.Len() }

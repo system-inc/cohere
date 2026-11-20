@@ -23,6 +23,12 @@ import (
 // analyzer.go:283-300), and the variable the name or left side at the call's index names. As the census counter reads
 // it, a variable only ever assigned with `=` is a candidate too, though the rule can never report one, since the
 // assignment's own left side is a use that is no method's receiver: wider is the safe side.
+//
+// The syntax walk alone would fail open once a standing body is stripped: a variable a scanner is assigned to only in
+// such a body would be no candidate, its users would stand, and the assigning body would keep the host's finding. So
+// every package-level variable whose type is *bufio.Scanner is named, whatever made it, its types being the
+// package's own and kept by every strip. The walk stays for the one candidate the type misses, a variable whose type
+// is an interface a scanner is assigned to, which a strip of the assigning body still hides.
 func scannerErrorNamed(
 	pass *analysis.Pass,
 	used []fact_reach.UsedObject,
@@ -39,7 +45,7 @@ func scannerErrorNamed(
 		if candidates == nil {
 			candidates = scannerVariables(pass)
 		}
-		if candidates[variable] {
+		if isPointerToNamed(variable.Type(), "bufio", "Scanner") || candidates[variable] {
 			named = append(named, fact_reach.Named{Object: object.Object, Reason: ScannerError.Reason()})
 		}
 	}
