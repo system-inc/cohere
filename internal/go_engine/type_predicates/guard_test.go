@@ -93,6 +93,13 @@ var fieldWalkers = []fieldWalker{
 	},
 
 	{
+		file: "standing_presence/no_any.go",
+		why: "looks for the package's own field keys among the fields of a struct a used type's literal can build, " +
+			"its own and its elements', which another package's field never is, rendered whole or not, and never " +
+			"descends into a field, since no literal elides one; another package's generic holds a struct of ours " +
+			"only beside a type argument the body names, or an alias or type of ours, whose own struct it reads",
+	},
+	{
 		file: "staticcheck_code/same_syntax.go",
 		why:  "compares syntax nodes by reflection",
 	},
