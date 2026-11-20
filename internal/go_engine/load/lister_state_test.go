@@ -355,3 +355,49 @@ func TestABuildThatSharesTheBuildListSharesItsFailure(test *testing.T) {
 		test.Errorf("the tag build's lister doubts %q, want the host's %q", taggedDoubt, hostDoubt)
 	}
 }
+
+// An extra build is predicted to read the host's build list, before its go env answers, from its entries and the
+// host's answer alone: a tag build is, and each input the prediction reads, changed alone, refuses.
+func TestABuildIsPredictedToShareTheHostsBuildListFromItsEntries(test *testing.T) {
+	test.Parallel()
+	tagged := []string{"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0", "GOFLAGS=-p=4 -pgo=off -tags=cohere_extra"}
+	cases := []struct {
+		name        string
+		workspace   string
+		environment []string
+		change      func(host *GoEnvironment)
+		timed       bool
+		shares      bool
+	}{
+		{name: "a tag build", environment: tagged, shares: true},
+		{name: "another -pgo", environment: append(slices.Clone(tagged), "GOFLAGS=-p=4 -pgo=auto"), shares: true},
+		{name: "a run under timing", environment: tagged, timed: true},
+		{name: "another workspace", workspace: "/elsewhere", environment: tagged},
+		{name: "GOFIPS140 on in the host", environment: tagged, change: func(host *GoEnvironment) {
+			host.answer["GOFIPS140"] = "v1.0.0"
+		}},
+		{name: "no flags given", environment: append(slices.Clone(tagged), "GOFLAGS=")},
+		{name: "a lister's flag beyond -tags and -pgo", environment: append(slices.Clone(tagged),
+			"GOFLAGS=-p=4 -trimpath")},
+		{name: "-mod=mod in both", environment: append(slices.Clone(tagged), "GOFLAGS=-p=4 -mod=mod"),
+			change: func(host *GoEnvironment) {
+				withFlag(host, "-mod=mod")
+			}},
+	}
+	for _, each := range cases {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			host := ruleHost()
+			if each.change != nil {
+				each.change(host)
+			}
+			workspace := host.workspace
+			if each.workspace != "" {
+				workspace = each.workspace
+			}
+			if shares := ModulesPredictedShared(host, workspace, each.environment, each.timed); shares != each.shares {
+				test.Errorf("the build is predicted to share the host's build list: %t, want %t", shares, each.shares)
+			}
+		})
+	}
+}

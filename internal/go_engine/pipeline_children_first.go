@@ -3,7 +3,6 @@ package go_engine
 import (
 	"sync"
 
-	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
@@ -16,76 +15,79 @@ import (
 // run (extraBuildRun), and each answer's lister state is fetched once for every load under it
 // (load.GoEnvironment.FetchListerState). A build whose `go list -m -json all` prints what the host's does reads the
 // host's, its failure too, in place of running its own, and a build context the system cache keeps from an earlier run
-// is read from there, outside `--timing` (load.GoEnvironment.ShareModulesOf, load.GoEnvironment.KeepContextIn,
+// is read from there, outside `--timing` (load.GoEnvironment.ShareModulesOf, load.GoEnvironment.KeepContext,
 // #sfjj2rh).
 //
 // describeProject starts them beside its census and its reads, once it has read the builds, and the host's lister
-// state in any run that loads (earlyStart, #q9ezwvw), so here the run waits for whatever of them is left. Under
+// state in any run that loads (earlyStart, #q9ezwvw), so here the run waits for whatever of them is left: each to its
+// end, but a build predicted to fork nothing after its go env, whose wait ends once its go env has started, its go env
+// running on beside the host's listing, and its run waiting for it where it first reads it (buildStarts). Under
 // `--timing` they start here, one at a time, as the builds run, so each measurement of their children's CPU is of its
 // own commands alone, and a run of one build fetches its lister state within its first load.
 func (engine *pipeline) startChildrenFirst() {
-	// Whatever describeProject started ends first, so none of it starts or runs on after the first load begins.
-	engine.described.awaitStarted()
+	// Whatever describeProject started that the first load waits for has ended first, and an extra build predicted to
+	// fork nothing after its go env has started that, so none of it starts a child after the first load begins unless
+	// its own answer contradicts the prediction (buildStarts).
+	engine.described.awaitForked()
 	// A run that checks no extra build, or whose builds could not be read, starts nothing here.
 	_, extras, buildsError := engine.buildsBeside()
 	if !engine.keepsForBuilds() || buildsError != nil {
 		return
 	}
-	var goEnvironments []*load.GoEnvironment
+	var builds []*buildGoEnvironment
 	if engine.described.started != nil && engine.described.started.buildGoEnvironments != nil {
-		goEnvironments = engine.described.started.buildGoEnvironments
+		builds = engine.described.started.buildGoEnvironments
 		// Fetched beside the reads already, so this reads what they printed and starts nothing; it runs the two only
 		// when the early start did not.
 		if engine.described.goEnvironment != nil {
 			engine.described.goEnvironment.FetchListerState(engine.timing)
 		}
 	} else {
-		goEnvironments = engine.startChildrenNow(extras)
+		builds = engine.startChildrenNow(extras)
 	}
-	engine.buildGoEnvironments = map[string]*load.GoEnvironment{}
+	engine.buildGoEnvironments = map[string]*buildGoEnvironment{}
 	for index, extra := range extras {
-		if goEnvironments[index] != nil {
-			engine.buildGoEnvironments[extra.String()] = goEnvironments[index]
-		}
+		engine.buildGoEnvironments[extra.String()] = builds[index]
 	}
 }
 
-// startChildrenNow starts the host's lister state, and each of extras' go env and lister state, at once, or one at a
-// time under `--timing`, and returns each extra build's go env by its index, nil where go env failed: the path of a run
-// whose description started none of them (startChildrenFirst). A build that reads the host's build list waits for it,
-// or runs it, under the host's environment and guard, whichever step comes first.
-func (engine *pipeline) startChildrenNow(extras []project.Build) []*load.GoEnvironment {
-	goEnvironments := make([]*load.GoEnvironment, len(extras))
+// startChildrenNow starts the host's lister state, and each of extras' go env and lister state (buildStarts), at once,
+// or one at a time under `--timing`, and returns each extra build's go env by its index, once the first load may
+// begin: the path of a run whose description started none of them (startChildrenFirst). A build that reads the host's
+// build list waits for it, or runs it, under the host's environment and guard, whichever step comes first.
+func (engine *pipeline) startChildrenNow(extras []project.Build) []*buildGoEnvironment {
 	var oneAtATime sync.Mutex
-	var group sync.WaitGroup
+	var awaited sync.WaitGroup
 	// The host's answer is nil only for a census that judged no file, which reads no builds.
 	if engine.described.goEnvironment != nil {
-		group.Go(func() {
+		awaited.Go(func() {
 			engine.childrenFirstStep(&oneAtATime, func() {
 				engine.described.goEnvironment.FetchListerState(engine.timing)
 			})
 		})
 	}
-	for index, extra := range extras {
-		group.Go(func() {
-			engine.childrenFirstStep(&oneAtATime, func() {
-				// Ignored: when go env fails the build reads it again as it runs, as it did before, and fails with go
-				// env's own words.
-				goEnvironment, _ := load.ReadGoEnvironment(engine.described.workspace.Root,
-					extraBuildEnvironment(engine.described.workspace, extra), nil, engine.described.children)
-				if goEnvironment != nil {
-					// Under `--timing` each build lists its own, so each step's children's CPU is of its own commands.
-					goEnvironment.ShareModulesOf(engine.described.goEnvironment, engine.timing != nil)
-					goEnvironment.KeepContextIn(engine.systemCache.contexts(), engine.described.goEnvironment,
-						engine.timing != nil)
-					goEnvironment.FetchListerState(engine.timing)
-				}
-				goEnvironments[index] = goEnvironment
-			})
-		})
+	starts := &buildStarts{workspace: engine.described.workspace, host: engine.described.goEnvironment,
+		children: engine.described.children, contexts: engine.systemCache.contexts(), collector: engine.timing,
+		joined: &engine.buildsStarted, awaited: &awaited}
+	// Under `--timing` each build starts one at a time, and none predicts or keeps anything, so each step's children's
+	// CPU is of its own commands.
+	if engine.timing != nil {
+		starts.oneAtATime = &oneAtATime
 	}
-	group.Wait()
-	return goEnvironments
+	builds := make([]*buildGoEnvironment, len(extras))
+	for index, extra := range extras {
+		builds[index] = starts.start(extra)
+	}
+	awaited.Wait()
+	return builds
+}
+
+// joinChildren joins every go command the run started before its first load, each to its end: those describeProject
+// started (describedProject.awaitStarted) and those startChildrenNow did, so none outlives the run, whichever way it
+// ends.
+func (engine *pipeline) joinChildren() {
+	engine.described.awaitStarted()
+	engine.buildsStarted.Wait()
 }
 
 // childrenFirstStep runs step, one of startChildrenNow's, under oneAtATime in a run under `--timing`, and at once

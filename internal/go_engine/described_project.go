@@ -34,7 +34,8 @@ type describedProject struct {
 	children *load.Children
 
 	// started is the go commands describeProject started beside its census and its reads that may still run (see
-	// earlyStart), which the pipeline joins before its first load (awaitStarted). Nil, as a test's hand-made project
+	// earlyStart), which the pipeline waits for before its first load (awaitForked) and joins before it returns
+	// (awaitStarted). Nil, as a test's hand-made project
 	// has it, started none.
 	started *earlyStart
 
@@ -83,8 +84,8 @@ type describedProject struct {
 	unreadable []contract.UnreadableRecord
 }
 
-// awaitStarted joins every go command describeProject started beside its census and its reads (#q9ezwvw), so none of
-// them starts after the run's first load begins, and none outlives the run.
+// awaitStarted joins every go command describeProject started beside its census and its reads (#q9ezwvw), each to its
+// end, so none outlives the run (pipeline.joinChildren).
 func (described *describedProject) awaitStarted() {
 	if described.started != nil {
 		described.started.wait()
@@ -99,6 +100,15 @@ func (described *describedProject) openedSystemCache(request invocation) (*syste
 	}
 	shardStamps := cache.NewShardStamps(nil)
 	return openSystemCache(request, shardStamps), shardStamps
+}
+
+// awaitForked returns once every go command describeProject started that the run's first load waits for has ended,
+// and every extra build predicted to fork nothing after its go env has started that, whose go env may run on beside
+// the host's listing (earlyStart.awaitForked, #sfjj2rh). awaitStarted joins them all.
+func (described *describedProject) awaitForked() {
+	if described.started != nil {
+		described.started.awaitForked()
+	}
 }
 
 // readable are the in-scope files that could be read, in order: the files a phase that reads source is given.

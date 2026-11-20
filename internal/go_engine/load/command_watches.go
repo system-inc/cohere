@@ -39,7 +39,7 @@ func WatchBuildLists(workspace string) (lists *atomic.Int64, stop func()) {
 
 // WatchBuildContexts counts every go list of the build context (contextTemplate) the lister's state runs in
 // workspace, absolute, until stop is called, for a test holding a run to none where the system cache keeps every
-// build's (KeepContextIn). Only a test calls it, as WatchBuildLists.
+// build's (KeepContext). Only a test calls it, as WatchBuildLists.
 func WatchBuildContexts(workspace string) (contexts *atomic.Int64, stop func()) {
 	return listerCommandWatches[buildContext].watch(workspace)
 }

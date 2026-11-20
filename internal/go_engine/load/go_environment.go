@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/system-inc/cohere/internal/go_engine/staticcheck_configuration"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
@@ -75,15 +76,35 @@ var goEnvironmentNames = slices.Concat(listingEnvironment, []string{"GOENV", "GO
 // through contextFor. children is the run's account of the go commands it starts (see Children), which go env here and
 // every go list under the answer are recorded in, nil to record none.
 func ReadGoEnvironment(directory string, environment []string, held Held, children *Children) (*GoEnvironment, error) {
+	return ReadGoEnvironmentTelling(directory, environment, held, children, nil)
+}
+
+// ReadGoEnvironmentTelling is ReadGoEnvironment that calls started, when it is not nil, once go env's child has
+// started (askGoEnvironment), and goes on to read its answer: the early start waits for a build that forks nothing
+// after its go env only until then, and lets its go env run on beside the host's listing (#sfjj2rh). started is called
+// once on every path, as the call returns at the latest, so a go env that never started a child is told too.
+func ReadGoEnvironmentTelling(
+	directory string,
+	environment []string,
+	held Held,
+	children *Children,
+	started func(),
+) (*GoEnvironment, error) {
+	var tell func()
+	if started != nil {
+		tell = sync.OnceFunc(started)
+		defer tell()
+	}
 	workspace, absoluteError := filepath.Abs(directory)
 	if absoluteError != nil {
 		return nil, absoluteError
 	}
 	given := append(os.Environ(), environment...)
-	answer, askError := askGoEnvironment(workspace, given, children)
+	answer, askError := askGoEnvironment(workspace, given, children, tell)
 	if askError != nil {
 		return nil, askError
 	}
+	goEnvironmentHooks.called(workspace, environment, answer)
 	// The build cache holds the cgo tool's outputs a load reads, which the staticcheck.conf a package's rules read is
 	// never found beside, so the config analyzer skips them, and this is where it learns the run's (#sc5qmy7).
 	staticcheck_configuration.AddBuildCache(answer["GOCACHE"])
@@ -109,23 +130,42 @@ func ReadGoEnvironment(directory string, environment []string, held Held, childr
 // by name: the one go env the engine runs for a run's build (#4rpt1jh). It asks with `PWD` set to workspace, as
 // runList does, so the go.mod and go.work it reports, and the modules a go.work uses below it, are spelled under
 // workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh): a run
-// through a linked root then names its inputs as a run at the real root does. The command is recorded in children.
-func askGoEnvironment(workspace string, environment []string, children *Children) (map[string]string, error) {
+// through a linked root then names its inputs as a run at the real root does. The command is recorded in children, and
+// started, when it is not nil, is called once its child has started, or has failed to.
+func askGoEnvironment(
+	workspace string,
+	environment []string,
+	children *Children,
+	started func(),
+) (map[string]string, error) {
 	goEnvironmentWatches.counted(workspace)
 	arguments := append([]string{"env", "-json"}, goEnvironmentNames...)
 	children.started(arguments)
+	defer children.ended()
 	command := exec.Command("go", arguments...)
 	command.Dir = workspace
 	command.Env = append(slices.Clone(environment), "PWD="+workspace)
+	var output bytes.Buffer
 	var standardError bytes.Buffer
+	command.Stdout = &output
 	command.Stderr = &standardError
-	output, runError := command.Output()
-	if runError != nil {
-		return nil, fmt.Errorf("reading the go environment with go env in %s: %w: %s", workspace, runError,
+	// Start returns only once the child has run exec, or failed to: syscall.forkExec opens a pipe whose ends close on
+	// exec, forks, and reads the pipe until exec closes the child's end, or the child writes why it failed. So the
+	// child no longer shares this process's pages once Start returns, and the copy-on-write fault the early start
+	// avoids is behind it (#sktb2y8). Wait follows on every path that started it.
+	startError := command.Start()
+	if started != nil {
+		started()
+	}
+	if startError != nil {
+		return nil, fmt.Errorf("reading the go environment with go env in %s: %w", workspace, startError)
+	}
+	if waitError := command.Wait(); waitError != nil {
+		return nil, fmt.Errorf("reading the go environment with go env in %s: %w: %s", workspace, waitError,
 			strings.TrimSpace(standardError.String()))
 	}
 	answer := map[string]string{}
-	if decodeError := json.Unmarshal(output, &answer); decodeError != nil {
+	if decodeError := json.Unmarshal(output.Bytes(), &answer); decodeError != nil {
 		return nil, fmt.Errorf("reading the go environment with go env in %s: %w", workspace, decodeError)
 	}
 	return answer, nil

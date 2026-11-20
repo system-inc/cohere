@@ -169,11 +169,15 @@ type pipeline struct {
 	// collection, which each build's holdings are measured beyond (extraBuildRun), 0 in any other run.
 	timedHostLiveBytes uint64
 
-	// buildGoEnvironments are each extra build's go env, by the build's name (project.Build.String), read with its
+	// buildGoEnvironments are each extra build's go env, by the build's name (project.Build.String), started with its
 	// lister state before the host's first load (startChildrenFirst), which the build's run reads in place of asking
-	// again (extraBuildRun), nil in a run that checks no extra build. Written before any build starts and only read
-	// after.
-	buildGoEnvironments map[string]*load.GoEnvironment
+	// again, waiting there for one whose go env runs on (extraBuildRun), nil in a run that checks no extra build.
+	// Written before any build starts and only read after.
+	buildGoEnvironments map[string]*buildGoEnvironment
+
+	// buildsStarted counts the goroutines startChildrenNow starts until each ends, which the run joins before it
+	// returns (joinChildren).
+	buildsStarted sync.WaitGroup
 
 	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
 	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
@@ -430,7 +434,9 @@ func (engine *pipeline) run() int {
 			}
 		}
 	}
-	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8).
+	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8), and is joined
+	// on every way out, a return or a panic, so none outlives the run.
+	defer engine.joinChildren()
 	engine.startChildrenFirst()
 	var loaded *load.Loaded
 	var loadError error

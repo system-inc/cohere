@@ -160,7 +160,7 @@ func TestAKeptBuildContextIsGoListsOwnAnswer(test *testing.T) {
 			runs int64
 		}{{name: "first", runs: 1}, {name: "second", runs: 0}} {
 			kept := goEnvironmentOf(test, workspace, environment)
-			if !kept.KeepContextIn(store, host, false) {
+			if !kept.KeepContext(PredictContext(store, host, kept.environment, false)) {
 				test.Fatalf("the %s load under %q keeps no build context", round.name, environment)
 			}
 			contexts.Store(0)
@@ -204,7 +204,7 @@ func TestAContradictedBuildContextRunsItsCommand(test *testing.T) {
 	defer stop()
 
 	agreeing := goEnvironmentOf(test, workspace, buildEnvironment)
-	agreeing.KeepContextIn(store, host, false)
+	agreeing.KeepContext(PredictContext(store, host, agreeing.environment, false))
 	agreeingOutputs, _ := agreeing.listerState.fetch(agreeing, nil)
 	if !bytes.Equal(agreeingOutputs[buildContext], planted) || contexts.Load() != 0 {
 		test.Fatalf("a build its answer agrees with ran %d build contexts and read %q, want none and the store's",
@@ -212,7 +212,7 @@ func TestAContradictedBuildContextRunsItsCommand(test *testing.T) {
 	}
 
 	contradicted := goEnvironmentOf(test, workspace, buildEnvironment)
-	contradicted.KeepContextIn(store, host, false)
+	contradicted.KeepContext(PredictContext(store, host, contradicted.environment, false))
 	contradicted.answer = maps.Clone(contradicted.answer)
 	contradicted.answer["GOROOT"] = filepath.Join(test.TempDir(), "another-goroot")
 	outputs, failures := contradicted.listerState.fetch(contradicted, nil)
@@ -246,7 +246,7 @@ func TestAFailedBuildContextIsNeverKept(test *testing.T) {
 	defer stop()
 	for _, round := range []string{"first", "second"} {
 		goEnvironment := goEnvironmentOf(test, workspace, environment)
-		if !goEnvironment.KeepContextIn(store, goEnvironment, false) {
+		if !goEnvironment.KeepContext(PredictContext(store, goEnvironment, goEnvironment.environment, false)) {
 			test.Fatalf("the %s load keeps no build context", round)
 		}
 		if _, failures := goEnvironment.listerState.fetch(goEnvironment, nil); failures[buildContext] == nil {
@@ -268,17 +268,17 @@ func TestABuildContextIsKeptOnlyWhereItCanBe(test *testing.T) {
 	host := goEnvironmentOf(test, workspace, environment)
 	overlaid := &GoEnvironment{environment: slices.Concat(environment, []string{"GOFLAGS=-overlay=overlay.json"}),
 		listerState: &listerState{}}
-	if overlaid.KeepContextIn(newMemoryStore(), host, false) {
+	if overlaid.KeepContext(PredictContext(newMemoryStore(), host, overlaid.environment, false)) {
 		test.Error("a build under an overlay keeps its build context")
 	}
 	plain := goEnvironmentOf(test, workspace, environment)
-	if plain.KeepContextIn(newMemoryStore(), host, true) {
+	if plain.KeepContext(PredictContext(newMemoryStore(), host, plain.environment, true)) {
 		test.Error("a build in a run under timing keeps its build context")
 	}
-	if plain.KeepContextIn(nil, host, false) {
+	if plain.KeepContext(PredictContext(nil, host, plain.environment, false)) {
 		test.Error("a build with no store keeps its build context")
 	}
-	if !plain.KeepContextIn(newMemoryStore(), host, false) {
+	if !plain.KeepContext(PredictContext(newMemoryStore(), host, plain.environment, false)) {
 		test.Error("a plain build keeps no build context")
 	}
 }

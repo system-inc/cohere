@@ -137,13 +137,7 @@ func contextExecutable(executable string) string {
 // `CGO_ENABLED` environment's when it sets one, as an extra build always does, or host's. The answer's own key
 // (ownContextKey) checks it.
 func predictedContextKey(host *GoEnvironment, environment []string) ([sha256.Size]byte, bool) {
-	given := append(os.Environ(), environment...)
-	variables := map[string]string{}
-	for _, variable := range given {
-		if name, value, found := strings.Cut(variable, "="); found {
-			variables[name] = value
-		}
-	}
+	given, variables := givenVariables(environment)
 	goFlags := strings.Fields(host.answer["GOFLAGS"])
 	if value := variables["GOFLAGS"]; value != "" {
 		goFlags = strings.Fields(value)
@@ -155,28 +149,35 @@ func predictedContextKey(host *GoEnvironment, environment []string) ([sha256.Siz
 	return contextKey(given, append(goFlags, "-pgo=off"), cgoEnabled, host.answer)
 }
 
+// givenVariables is the environment a go command under environment is given, the caller's entries over the process's
+// own, and its variables by name, the last of a name as exec keeps it.
+func givenVariables(environment []string) ([]string, map[string]string) {
+	given := append(os.Environ(), environment...)
+	variables := map[string]string{}
+	for _, variable := range given {
+		if name, value, found := strings.Cut(variable, "="); found {
+			variables[name] = value
+		}
+	}
+	return given, variables
+}
+
 // ownContextKey is contextKey for go commands under goEnvironment, from its own answer.
 func ownContextKey(goEnvironment *GoEnvironment) ([sha256.Size]byte, bool) {
 	return contextKey(append(os.Environ(), goEnvironment.environment...), goEnvironment.reported.goFlags,
 		goEnvironment.answer["CGO_ENABLED"], goEnvironment.answer)
 }
 
-// KeepContextIn has every lister under the answer read its build context, go list's eight lines (contextTemplate),
-// from store, the system cache's, where a run kept it, in place of running the command, and keep it there when it
-// runs it and it succeeds, and reports whether it does (#sfjj2rh): a warm run's extra build then forks no go list.
-// The key is predicted from host's answer and the answer's environment as given, never from the answer itself, so it
-// can be made before the answer's go env runs, and the answer's own key checks it (keptContextKey). host is the host's
-// go env, the answer itself for the host's own, nil for none, and timed whether the run is under `--timing`, which
-// keeps none, so each step's children's CPU is of its own commands. store is nil under `--no-system-cache` or with no
-// system cache. Called once the answer is read and before anything fetches its lister state.
-func (goEnvironment *GoEnvironment) KeepContextIn(store ListingStore, host *GoEnvironment, timed bool) bool {
-	if store == nil || host == nil || timed {
+// KeepContext has every lister under the answer read its build context, go list's eight lines (contextTemplate), from
+// the system cache, where a run kept it under the key predicted from the host's go env (PredictContext), in place of
+// running the command, and keep it there when it runs it and it succeeds, and reports whether it does (#sfjj2rh): a
+// warm run's extra build then forks no go list. The answer's own key checks the prediction (keptContextKey), so one it
+// contradicts runs the command. predicted is nil, and nothing is kept, under `--no-system-cache`, with no system cache,
+// or under `--timing`. Called once the answer is read and before anything fetches its lister state.
+func (goEnvironment *GoEnvironment) KeepContext(predicted *PredictedContext) bool {
+	if predicted == nil {
 		return false
 	}
-	key, keeps := predictedContextKey(host, goEnvironment.environment)
-	if !keeps {
-		return false
-	}
-	goEnvironment.listerState.contextStore, goEnvironment.listerState.contextKey = store, key
+	goEnvironment.listerState.predictedContext = predicted
 	return true
 }

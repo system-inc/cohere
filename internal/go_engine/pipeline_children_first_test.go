@@ -1,12 +1,16 @@
 package go_engine
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -130,5 +134,194 @@ func TestARunOfOneBuildNamesItsListersCommands(test *testing.T) {
 	if lint.ChildProcessesAfterLoad != len(want) || !slices.Equal(named, want) {
 		test.Errorf("the run counted %d go commands after its first load began, named %q, want %d, named %q",
 			lint.ChildProcessesAfterLoad, named, len(want), want)
+	}
+}
+
+// runWithSystemCache is a run of every build over root, under `--no-cache` and extra, reading and writing the system
+// cache at systemCacheRoot, which runs given the same root share, with configure, when not nil, given the pipeline
+// before it runs, and its normalized stream and exit.
+func runWithSystemCache(
+	test *testing.T,
+	root string,
+	systemCacheRoot string,
+	configure func(*pipeline),
+	extra ...string,
+) (*pipeline, string, int) {
+	test.Helper()
+	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"}, extra...)
+	request, parseError := parseInvocation(arguments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	request.standardLibrary.systemCacheRoot = systemCacheRoot
+	engine, standardOutput, _, exitCode := runOverRequest(test, request, rules.All(), configure)
+	return engine, normalize(standardOutput, root), exitCode
+}
+
+// heldUntilLoadBegins is a hook of go env's answers (load.HookGoEnvironmentAnswers) that holds the windows build's
+// answer until loadBegan is closed, or a minute has passed, then hands it to change, when not nil, and reports in
+// released whether the load's beginning released it.
+func heldUntilLoadBegins(
+	loadBegan <-chan struct{},
+	released *atomic.Bool,
+	change func(answer map[string]string),
+) func(environment []string, answer map[string]string) {
+	return func(environment []string, answer map[string]string) {
+		if !slices.Contains(environment, "GOOS=windows") {
+			return
+		}
+		select {
+		case <-loadBegan:
+			released.Store(true)
+		case <-time.After(time.Minute):
+		}
+		if change != nil {
+			change(answer)
+		}
+	}
+}
+
+// watchingLoadBegin has a pipeline close loadBegan as its first load begins, once the run's account counts every go
+// command started after as late (load.Children.LoadBegins), then call then, when not nil.
+func watchingLoadBegin(loadBegan chan struct{}, then func()) func(*pipeline) {
+	return func(engine *pipeline) {
+		var once sync.Once
+		engine.watchPrelude = func(step preludeStep) {
+			if step != preludeLoadBegan {
+				return
+			}
+			once.Do(func() {
+				engine.described.children.LoadBegins()
+				close(loadBegan)
+			})
+			if then != nil {
+				then()
+			}
+		}
+	}
+}
+
+// requirePredictions fails unless every extra build of engine's run was predicted to fork nothing after its go env,
+// when want, or none was.
+func requirePredictions(test *testing.T, engine *pipeline, want bool) {
+	test.Helper()
+	if len(engine.buildGoEnvironments) != 2 {
+		test.Fatalf("the run started %d extra builds, want two", len(engine.buildGoEnvironments))
+	}
+	for name, build := range engine.buildGoEnvironments {
+		if build.answer(); build.forksNothingAfter != want {
+			test.Errorf("the %s build was predicted to fork nothing after its go env: %t, want %t", name,
+				build.forksNothingAfter, want)
+		}
+	}
+}
+
+// requireNoLateCommand fails unless the run's lint record names no go command started after its first load began.
+func requireNoLateCommand(test *testing.T, stream string, run string) {
+	test.Helper()
+	if lint := lintRecordOf(test, stream); lint.ChildProcessesAfterLoad != 0 {
+		test.Errorf("the %s run started %d go commands after its first load began, want 0: %s", run,
+			lint.ChildProcessesAfterLoad, strings.Join(lint.ChildProcessesAfterLoadNamed, "; "))
+	}
+}
+
+// A run over an empty system cache predicts no extra build to fork nothing after its go env, so it waits each out
+// whole before its first load, which starts no go command late; a run over the system cache the first kept predicts
+// both, and its first load begins before the windows build's go env has answered, which a hook holds until then, and
+// still starts no go command late, and finds what the first found (#sfjj2rh).
+func TestAWarmRunWaitsForABuildThatForksNothingAfterOnlyUntilItsGoEnvironmentStarts(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	systemCacheRoot := test.TempDir()
+	cold, coldStream, _ := runWithSystemCache(test, root, systemCacheRoot, nil)
+	requirePredictions(test, cold, false)
+	requireNoLateCommand(test, coldStream, "cold")
+
+	loadBegan := make(chan struct{})
+	var released atomic.Bool
+	stop := load.HookGoEnvironmentAnswers(root, heldUntilLoadBegins(loadBegan, &released, nil))
+	defer stop()
+	warm, warmStream, _ := runWithSystemCache(test, root, systemCacheRoot, watchingLoadBegin(loadBegan, nil))
+	requirePredictions(test, warm, true)
+	if !released.Load() {
+		test.Error("the warm run's first load did not begin before the windows build's go env answered")
+	}
+	requireNoLateCommand(test, warmStream, "warm")
+	if found, want := findingLines(warmStream), findingLines(coldStream); !slices.Equal(found, want) {
+		test.Errorf("the warm run found\n%s\nwant the cold run's\n%s", strings.Join(found, ""), strings.Join(want, ""))
+	}
+}
+
+// A build predicted to fork nothing after its go env whose own answer contradicts the prediction, as a go env file of
+// its own that the host's does not read would, runs its own build list and build context once the answer comes, after
+// the run's first load began, which the lint record names as late, and the run finds what a run over an empty system
+// cache found: the checks of the answer decide, never the prediction.
+func TestAContradictedPredictionRunsTheBuildsCommandsLate(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	systemCacheRoot := test.TempDir()
+	_, coldStream, _ := runWithSystemCache(test, root, systemCacheRoot, nil)
+
+	loadBegan := make(chan struct{})
+	var released atomic.Bool
+	stop := load.HookGoEnvironmentAnswers(root, heldUntilLoadBegins(loadBegan, &released,
+		func(answer map[string]string) {
+			answer["GOENV"] = filepath.Join(root, "another-go-env-file")
+		}))
+	defer stop()
+	warm, warmStream, _ := runWithSystemCache(test, root, systemCacheRoot, watchingLoadBegin(loadBegan, nil))
+	requirePredictions(test, warm, true)
+	if !released.Load() {
+		test.Fatal("the run's first load did not begin before the windows build's go env answered")
+	}
+	named := lintRecordOf(test, warmStream).ChildProcessesAfterLoadNamed
+	for _, command := range []string{"go list -e -f", "go list -m -json"} {
+		if !slices.Contains(named, command) {
+			test.Errorf("the run named %q as started after its first load began, want %s among them", named, command)
+		}
+	}
+	if found, want := findingLines(warmStream), findingLines(coldStream); !slices.Equal(found, want) {
+		test.Errorf("the run found\n%s\nwant the cold run's\n%s", strings.Join(found, ""), strings.Join(want, ""))
+	}
+}
+
+// errorStopped is the panic a test stops a run with as its first load begins.
+var errorStopped = errors.New("stopped as the first load began")
+
+// A run that stops once its first load has begun, here with a panic, joins every go command it started before it
+// returns: the windows build, predicted to fork nothing after its go env and contradicted by its answer, runs its own
+// commands as the run stops, and none is running once the run has returned.
+func TestARunThatStopsAfterItsFirstLoadBeganLeavesNoGoCommandRunning(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	systemCacheRoot := test.TempDir()
+	runWithSystemCache(test, root, systemCacheRoot, nil)
+
+	loadBegan := make(chan struct{})
+	var released atomic.Bool
+	stop := load.HookGoEnvironmentAnswers(root, heldUntilLoadBegins(loadBegan, &released,
+		func(answer map[string]string) {
+			answer["GOENV"] = filepath.Join(root, "another-go-env-file")
+		}))
+	defer stop()
+	var stopped *pipeline
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != errorStopped {
+				panic(recovered)
+			}
+		}()
+		runWithSystemCache(test, root, systemCacheRoot, func(engine *pipeline) {
+			stopped = engine
+			watchingLoadBegin(loadBegan, func() { panic(errorStopped) })(engine)
+		})
+		test.Fatal("the run returned though it was stopped")
+	}()
+	// Released as the load began, which ran before the stop, so a run that joined the windows build has seen it.
+	if !released.Load() {
+		test.Error("the windows build's go env was still held once the stopped run returned, which left it running")
+	}
+	if running := stopped.described.children.Running(); running != 0 {
+		test.Errorf("%d go commands are running once the stopped run has returned, want none", running)
 	}
 }

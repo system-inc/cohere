@@ -62,7 +62,7 @@ func systemStoreDirectory(root string) string {
 var errorNoSystemStore = errors.New("the run keeps no system cache")
 
 // contexts is where the run keeps each build's build context go list answers, the system cache's store
-// (load.GoEnvironment.KeepContextIn, #sfjj2rh), nil when the run keeps no system cache: under `--no-system-cache`, or
+// (load.GoEnvironment.KeepContext, #sfjj2rh), nil when the run keeps no system cache: under `--no-system-cache`, or
 // with no root.
 func (system *systemCache) contexts() load.ListingStore {
 	if system == nil || system.store == nil {

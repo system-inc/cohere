@@ -25,7 +25,7 @@ import (
 const listingFormatVersion = "go-engine-listing-1"
 
 // ListingStore is where the load keeps go list's answer between runs, by a sha256 key: the findings cache's store for
-// a listing, and the system cache's for a build context (KeepContextIn).
+// a listing, and the system cache's for a build context (KeepContext).
 type ListingStore interface {
 	Kept(key [sha256.Size]byte) ([]byte, bool)
 	Keep(key [sha256.Size]byte, listing []byte) error

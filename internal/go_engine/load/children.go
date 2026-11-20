@@ -17,11 +17,12 @@ const childNameArguments = 3
 // it is counted and named here, so a late one shows on the lint record. It is the run's own, never package-level
 // state, since tests run many pipelines in one process. A nil Children records nothing.
 type Children struct {
-	// loading is set once the run's first load has begun, and late names each go command started after, both under
-	// lock, since extra builds load at once.
+	// loading is set once the run's first load has begun, late names each go command started after, and running counts
+	// those started and not yet ended, each under lock, since extra builds load at once.
 	lock    sync.Mutex
 	loading bool
 	late    []string
+	running int
 }
 
 // LoadBegins marks the run's first load as begun, so every go command started after it is late. A later call changes
@@ -47,17 +48,39 @@ func (children *Children) Late() []string {
 	return slices.Sorted(slices.Values(children.late))
 }
 
+// Running is how many go commands are started and not yet ended, so a test can hold a run to leaving none running as
+// it returns.
+func (children *Children) Running() int {
+	if children == nil {
+		return 0
+	}
+	children.lock.Lock()
+	defer children.lock.Unlock()
+	return children.running
+}
+
 // started records a go command started with arguments, the go command's own, named when the run's first load has
-// begun.
+// begun, and running until ended.
 func (children *Children) started(arguments []string) {
 	if children == nil {
 		return
 	}
 	children.lock.Lock()
 	defer children.lock.Unlock()
+	children.running++
 	if children.loading {
 		children.late = append(children.late, childName(arguments))
 	}
+}
+
+// ended records that a go command started has ended, every child it ran waited for.
+func (children *Children) ended() {
+	if children == nil {
+		return
+	}
+	children.lock.Lock()
+	defer children.lock.Unlock()
+	children.running--
 }
 
 // childName is a go command named short: go and its first childNameArguments arguments, each up to any `=`, so

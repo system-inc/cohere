@@ -547,9 +547,10 @@ func (engine *pipeline) extraBuildRun(
 	timeline.Tell(stamp, "start")
 	environment := extraBuildEnvironment(engine.described.workspace, extra)
 	// The build's one go env, which its findings cache's key and its load, the lister and the kept listing among it,
-	// all read (#4rpt1jh), read with its lister state before the host's first load (earlyStart, startChildrenFirst),
-	// and read here only when that failed.
-	goEnvironment := engine.buildGoEnvironments[extra.String()]
+	// all read (#4rpt1jh), started with its lister state before the host's first load (earlyStart, startChildrenFirst)
+	// and waited for here when it ran on past that (buildGoEnvironment.answer, #sfjj2rh), and read here only when that
+	// failed.
+	goEnvironment := engine.buildGoEnvironments[extra.String()].answer()
 	if goEnvironment == nil {
 		// Ignored: when go env fails the answer is nil and each asks on its own, as before, so the cache notes it sat
 		// out and the load fails the build with go env's own words.

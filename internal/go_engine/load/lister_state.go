@@ -2,6 +2,7 @@ package load
 
 import (
 	"crypto/sha256"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -18,7 +19,7 @@ var listerCommands = [...][]string{
 
 // buildList is listerCommands' index of the build list, the one command an answer may read of another's
 // (modulesSharedWith), and buildContext its index of the build context, the one a run may read from the system cache
-// (KeepContextIn).
+// (KeepContext).
 const (
 	buildList    = 0
 	buildContext = 1
@@ -40,12 +41,11 @@ type listerState struct {
 	// Nil for an answer that lists its own. Set only before the state is first fetched (ShareModulesOf).
 	modulesFrom *GoEnvironment
 
-	// contextStore is where the build context is kept across runs, the system cache's store, under contextKey, the key
-	// predicted for it from the host's go env before this answer's own (predictedContextKey), read in place of running
-	// the command when this answer's own key is the predicted one and the store holds it, and written when the command
-	// runs and succeeds. Nil to keep none. Set only before the state is first fetched (KeepContextIn).
-	contextStore ListingStore
-	contextKey   [sha256.Size]byte
+	// predictedContext is where the build context is kept across runs, the system cache's store, under the key
+	// predicted for it from the host's go env before this answer's own, and what the store held there then: read in
+	// place of running the command when this answer's own key is the predicted one, and written when the command runs
+	// and succeeds. Nil to keep none. Set only before the state is first fetched (KeepContext).
+	predictedContext *PredictedContext
 }
 
 // listerCommand is one of listerCommands as it ran, what it printed and how it failed.
@@ -89,7 +89,7 @@ func (state *listerState) ran(index int, goEnvironment *GoEnvironment, collector
 	command.once.Do(func() {
 		key, keeps := state.keptContextKey(index, goEnvironment)
 		if keeps {
-			if kept, stored := state.contextStore.Kept(key); stored {
+			if kept, stored := state.predictedContext.read(); stored {
 				command.output = kept
 				return
 			}
@@ -102,22 +102,50 @@ func (state *listerState) ran(index int, goEnvironment *GoEnvironment, collector
 		if keeps && command.failure == nil {
 			// Ignored: a build context the store could not keep is asked of go list again next run, which is all its
 			// keeping saves, and the store says why it kept none (the engine's systemCache).
-			_ = state.contextStore.Keep(key, command.output)
+			_ = state.predictedContext.store.Keep(key, command.output)
 		}
 	})
 	return command.output, command.failure
 }
 
-// keptContextKey is where listerCommands[index] is kept in contextStore, and whether it is: only the build context,
+// keptContextKey is where listerCommands[index] is kept in the system cache, and whether it is: only the build context,
 // only with a store, and only when the key of goEnvironment's own answer is the one predicted from the host's before
 // it, so a prediction the answer contradicts, as a toolchain the build's go env names and the host's did not, runs
 // the command and keeps nothing.
 func (state *listerState) keptContextKey(index int, goEnvironment *GoEnvironment) ([sha256.Size]byte, bool) {
-	if index != buildContext || state.contextStore == nil {
+	if index != buildContext || state.predictedContext == nil {
 		return [sha256.Size]byte{}, false
 	}
 	key, keeps := ownContextKey(goEnvironment)
-	return key, keeps && key == state.contextKey
+	return key, keeps && key == state.predictedContext.key
+}
+
+// ModulesPredictedShared reports whether an extra build's go commands under environment, the caller's entries, in
+// workspace are predicted to read host's build list (modulesSharedWith), from what can be compared before the build's
+// go env answers (#sfjj2rh): not in a run under `--timing`; the same workspace; host's `GOFIPS140` off, which the
+// build's environment, the host's but its target, cgo and flags, keeps; and the build's flags as environment gives
+// them, with -pgo=off last as ReadGoEnvironment adds it, the same as host's once every -tags and -pgo is taken out,
+// each passing listerFlagsOnly. A build whose environment sets no flags reads its go env file's, which only its go env
+// answers, so it is predicted to list its own. The check once the build's go env answers (ShareModulesOf) decides;
+// this only says whether the build is waited out whole before the first load.
+func ModulesPredictedShared(host *GoEnvironment, workspace string, environment []string, timed bool) bool {
+	if timed || host == nil {
+		return false
+	}
+	absolute, absoluteError := filepath.Abs(workspace)
+	if absoluteError != nil || absolute != host.workspace {
+		return false
+	}
+	if fips140 := host.value("GOFIPS140"); fips140 != "" && fips140 != "off" {
+		return false
+	}
+	_, variables := givenVariables(environment)
+	if variables["GOFLAGS"] == "" {
+		return false
+	}
+	goFlags := append(strings.Fields(variables["GOFLAGS"]), "-pgo=off")
+	return slices.Equal(flagsBuildListReads(goFlags), flagsBuildListReads(host.reported.goFlags)) &&
+		listerFlagsOnly(strings.Join(goFlags, " ")) == "" && listerFlagsOnly(host.value("GOFLAGS")) == ""
 }
 
 // buildListUnread are the names of goEnvironmentNames whose answer the build list never reads, which an extra build's
