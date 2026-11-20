@@ -10,8 +10,10 @@ import (
 // differingModuleFiles are targetedModuleFiles with everything else a build's listing may hold that the host's does
 // not, so a listing that took anything of another build's shows it: a module of its own below the root, which the
 // root's walk passes by and only the windows file imports, so only the windows build reaches it, a directory that is
-// a package under windows and none under any other target, and a package with a cgo file, which a build without cgo
-// leaves out with its import.
+// a package under windows and none under any other target, one that is a package under unix and none under windows,
+// whose tag the host answers true and the windows build false (the other directories' tags go the other way, so a
+// comparison that refused only one way would pass them, #8ayj6jz), and a package with a cgo file, which a build
+// without cgo leaves out with its import.
 func differingModuleFiles() map[string]string {
 	files := maps.Clone(targetedModuleFiles)
 	files["go.mod"] = "module example.com/targeted\n\ngo 1.27\n\nrequire example.com/reached v0.0.0\n\n" +
@@ -22,6 +24,8 @@ func differingModuleFiles() map[string]string {
 	files["reached/reached.go"] = "// Package reached is a module only the windows build reaches.\npackage reached\n"
 	files["onlywindows/only_windows.go"] = "// Package onlywindows is a package under windows alone.\n" +
 		"package onlywindows\n"
+	files["unixonly/unix_only.go"] = "//go:build unix\n\n// Package unixonly is a package under unix alone.\n" +
+		"package unixonly\n"
 	files["withcgo/withcgo.go"] = "// Package withcgo holds a file only a build with cgo compiles.\npackage withcgo\n"
 	files["withcgo/translated.go"] = "package withcgo\n\n// int translated(void) { return 1; }\nimport \"C\"\n\n" +
 		"// Translated is what the C function returns.\nfunc Translated() int { return int(C.translated()) }\n"
@@ -91,6 +95,12 @@ func TestEachBuildsListingThroughTheHostsWalksIsItsOwn(test *testing.T) {
 				test.Errorf("%v: the listing holds %s is %t, want it under windows alone, of %q", target, path, listsIt,
 					paths)
 			}
+		}
+		const unixOnly = "example.com/targeted/unixonly"
+		if listsIt, windows := slices.Contains(paths, unixOnly), slices.Contains(target, "GOOS=windows"); listsIt ==
+			windows {
+			test.Errorf("%v: the listing holds %s is %t, want it under every target but windows, of %q", target,
+				unixOnly, listsIt, paths)
 		}
 		withCgo := through.byPath["example.com/targeted/withcgo"]
 		if withCgo == nil {
