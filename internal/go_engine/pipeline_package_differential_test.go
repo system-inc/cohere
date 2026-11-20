@@ -19,7 +19,9 @@ import (
 // by TypesHold, which is the judgment itself, and by every other way of leaving it unjudged, which skippedOf names,
 // today the walk's untouched (check's untouchedOf). Under the test's hooks (pipeline.skippedAtLoad and judgedSkipped)
 // each load tells of each package it skips, each of those is judged beside the run as a visited one is
-// (check.CacheSession's JudgeSkipped), and the differential fails naming every one the judgment declines.
+// (check.CacheSession's JudgeSkipped), and the differential fails naming every one the judgment declines. Each load
+// tells of itself too (pipeline.extraBuildLoads), so a build's loads are the test's own count, never one read from
+// the run's records (#tfvrsf3).
 
 // skippedOf is the seam: the packages run, an extra build's, skipped over its last load without judging them by
 // TypesHold, by ID, as the run records them, each of which some load must have told the hook of. A later stage that
@@ -56,13 +58,21 @@ type skippedRecorder struct {
 	judged  []skippedJudgment
 }
 
-// hook has engine tell the recorder of every skip of every load and of its judgment (pipeline.skippedAtLoad and
-// judgedSkipped).
+// hook has engine tell the recorder of every load of every extra build, of every skip of each and of its judgment
+// (pipeline.extraBuildLoads, skippedAtLoad and judgedSkipped).
 //
-// Mutates: engine its two hooks are the recorder's
+// Mutates: engine its three hooks are the recorder's
 func (recorder *skippedRecorder) hook(engine *pipeline) {
+	engine.extraBuildLoads = recorder.load
 	engine.skippedAtLoad = recorder.skip
 	engine.judgedSkipped = recorder.record
+}
+
+// load is the test's hook for a load (pipeline.extraBuildLoads).
+func (recorder *skippedRecorder) load(build project.Build) {
+	recorder.lock.Lock()
+	defer recorder.lock.Unlock()
+	recorder.loaded = append(recorder.loaded, build.String())
 }
 
 // skip is the test's hook for a skip (pipeline.skippedAtLoad).
@@ -188,10 +198,14 @@ func compareSkippedPackages(first skippedPackage, second skippedPackage) int {
 	return strings.Compare(first.identifier, second.identifier)
 }
 
-// logTallies logs a line for every extra build engine ran, zeros included: its tally, how many times it reloaded, what
-// its last load visited and restored from the host's run, and every package it never made a candidate or declined, by
-// the first word of why. It fails naming every build the census needs beside the host's that has no line, since a
-// build the differential says nothing of cannot be told apart from one it never judged.
+// logTallies logs a line for every extra build engine ran, zeros included: its tally, the loads first, which are the
+// test's own count, and then what the run's record says of its restore from the host's run (check.HostRestoreCounts),
+// each said as the load it is of. Restored is the last load's, none once the restore is off. Visited is the last load's
+// that had the restore on, since a load with it off, which a second round of declines leaves it, counts nothing anew.
+// Not restored are the packages never made candidates or declined, by the first word of why, the load's over that
+// same load and check's over every load. How many times the build loaded again is not read from that record, which
+// counts only the loads its own declines asked for. It fails naming every build the census needs beside the host's
+// that has no line, since a build the differential says nothing of cannot be told apart from one it never judged.
 func logTallies(test *testing.T, label string, engine *pipeline, tallies map[string]skippedTally) {
 	test.Helper()
 	lined := map[string]bool{}
@@ -201,10 +215,10 @@ func logTallies(test *testing.T, label string, engine *pipeline, tallies map[str
 		if run.result != nil {
 			fromHost = run.result.FromHost
 		}
-		test.Logf("%s, %s: %d skipped over every load, %d of them by the last, %d judged (%d by TypesHold), %d "+
-			"declined; reloaded %d times, the last load visited %d and restored %d, not restored by %v", label,
-			run.build, tally.skipped, tally.lastLoad, tally.judged, tally.byTypes, tally.declined,
-			fromHost.ReloadRounds, fromHost.Visited, len(fromHost.Restored), fromHost.DeclinedBy)
+		test.Logf("%s, %s: loaded %d times, %d skipped over every load, %d of them by the last, %d judged (%d by "+
+			"TypesHold), %d declined; the last load restored %d, the last with the restore on visited %d, not "+
+			"restored by %v", label, run.build, tally.loads, tally.skipped, tally.lastLoad, tally.judged,
+			tally.byTypes, tally.declined, len(fromHost.Restored), fromHost.Visited, fromHost.DeclinedBy)
 		lined[run.build.String()] = true
 	}
 	for _, build := range engine.described.builds[1:] {
@@ -294,9 +308,9 @@ const packageDifferentialRootVariable = "COHERE_VERDICT_DIFFERENTIAL_ROOT"
 
 // The package differential over the tree packageDifferentialRootVariable names, run in place under `--no-fix`, so
 // nothing of the tree is written, with the findings cache off, every build checked, every package an extra build
-// skips judged as a visited one is. It logs, for each extra build, the packages its last load skipped, the judgments
-// made and those declined, and fails naming every decline and every skipped package never judged. A tree whose census
-// needs no extra build is skipped.
+// skips judged as a visited one is. It logs, for each extra build, the times it loaded, the packages its last load
+// skipped, the judgments made and those declined, and fails naming every decline and every skipped package never
+// judged. A tree whose census needs no extra build is skipped.
 func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
 	test.Parallel()
 
