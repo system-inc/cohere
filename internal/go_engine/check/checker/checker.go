@@ -795,13 +795,29 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	// cohere: each analyzer's required fact analyzers, computed once for the
 	// whole graph rather than once for each action that asks (factRequirements).
 	requiredFacts := &factRequirements{of: map[*analysis.Analyzer][]*analysis.Analyzer{}}
+	// cohere: actions are made actionsPerBlock at a time, one allocation for
+	// a block rather than one for each action, a graph holding thousands. A
+	// block lives while any action in it does, which costs nothing: actions
+	// holds every action until Analyze returns, and the graph every one it
+	// keeps after, through Roots, Beside and Deps, so none is collected
+	// before its block-mates. releaseInputs and releaseSyntax free what an
+	// action holds, never the action. The only actions that went sooner are
+	// those ForDependents drops, never run, which hold their Deps alone.
+	// Only mkAction takes from the block, on Analyze's own goroutine.
+	const actionsPerBlock = 32
+	var actionBlock []Action
 
 	var mkAction func(a *analysis.Analyzer, pkg *packages.Package) *Action
 	mkAction = func(a *analysis.Analyzer, pkg *packages.Package) *Action {
 		k := key{a, pkg}
 		act, ok := actions[k]
 		if !ok {
-			act = &Action{Analyzer: a, Package: pkg, opts: opts}
+			// cohere: the block's next action, a new block once it is spent.
+			if len(actionBlock) == 0 {
+				actionBlock = make([]Action, actionsPerBlock)
+			}
+			act, actionBlock = &actionBlock[0], actionBlock[1:]
+			act.Analyzer, act.Package, act.opts = a, pkg, opts
 
 			// Add a dependency on each required analyzers.
 			// cohere: unless the package is restored, since then nothing on it runs.
