@@ -3,6 +3,7 @@ package go_engine
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
@@ -398,7 +400,10 @@ func storeListing(test *testing.T, root string) []string {
 	return listing
 }
 
-// buildReads is what an extra build read of the host's run and of its stores, as its record in the lint record says.
+// buildReads is what an extra build read of the host's run and of its stores, as its record in the lint record says,
+// but the shard stamps its packs read, left at 0 here and counted over the run (shardReadsOf): a shard's stamp is read
+// once a run, by the build that asks first (cache.ShardStamps.Of), and counted by that build alone, so how builds
+// side by side split them is the order they asked in, and only their sum is the run's (#nyrys1z).
 type buildReads struct {
 	target           string
 	restoredFromHost int
@@ -418,52 +423,184 @@ func buildReadsOf(lint contract.LintRecord) []buildReads {
 			untouched: build.Untouched, writtenThrough: build.WrittenThrough}
 		if build.Packs != nil {
 			read.packs = *build.Packs
+			read.packs.ShardReads = 0
 		}
 		reads = append(reads, read)
 	}
 	return reads
 }
 
-// `--timeline` changes nothing about the run: over one tree, each from an empty store and an empty system cache, a run
-// with it and one without, their builds forced two at once, write the same findings, the same files into the findings
-// cache's store, the same cache counts, the system cache's among them, each build restoring, leaving untouched and
-// writing through as many packages and reading its packs alike, and run two builds at once (#3v2zp7g), where
-// `--timing` turns the cache off and runs the builds one at a time.
-func TestTheTimelineChangesNothingAboutTheRun(test *testing.T) {
-	test.Parallel()
-	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	mapped := otherBuildsRun(test, root, 2, nil, "--timeline")
-	mappedStore := storeListing(test, root)
-	if removeError := os.RemoveAll(cache_directory.Of(root)); removeError != nil {
-		test.Fatal(removeError)
+// shardReadsOf is the shard stamps each extra build of lint read, by its target, and their sum, the run's.
+func shardReadsOf(lint contract.LintRecord) (map[string]int, int) {
+	byBuild, sum := map[string]int{}, 0
+	for _, build := range lint.Builds {
+		if build.Host || build.Packs == nil {
+			continue
+		}
+		byBuild[build.Target] = build.Packs.ShardReads
+		sum += build.Packs.ShardReads
 	}
-	plain := otherBuildsRun(test, root, 2, nil)
-	plainStore := storeListing(test, root)
-	if len(plainStore) == 0 {
-		test.Fatal("the run without --timeline wrote nothing to its store, so there is nothing to compare")
+	return byBuild, sum
+}
+
+// comparedRun is one of two runs over one tree that a test compares (requireTheSameRun): what a message calls it, its
+// stream, and the files it left in the findings cache's store (storeListing).
+type comparedRun struct {
+	name   string
+	stream string
+	store  []string
+}
+
+// requireTheSameRun fails the test for each thing a run fixes that left and right, two runs over one tree with their
+// builds forced two at once, do not share: the findings, the files in the findings cache's store, the cache counts,
+// the system cache's and the builds' shard reads summed among them, each build restoring, leaving untouched and
+// writing through as many packages and reading its packs alike but for its share of the shard reads (buildReads), and
+// the two builds at once.
+func requireTheSameRun(test *testing.T, left comparedRun, right comparedRun) {
+	test.Helper()
+	if len(left.store) == 0 {
+		test.Fatalf("the run %s wrote nothing to its store, so there is nothing to compare", left.name)
 	}
-	if !slices.Equal(plainStore, mappedStore) {
-		test.Errorf("the store holds\n  %q\nwithout --timeline, and\n  %q\nwith it", plainStore, mappedStore)
+	if !slices.Equal(left.store, right.store) {
+		test.Errorf("the store holds\n  %q\n%s, and\n  %q\n%s", left.store, left.name, right.store, right.name)
 	}
-	plainFindings := findingLines(strings.Join(plain, "\n"))
-	mappedFindings := findingLines(strings.Join(mapped, "\n"))
-	if len(plainFindings) == 0 || !slices.Equal(plainFindings, mappedFindings) {
-		test.Errorf("the findings are\n%s\nwithout --timeline, and\n%s\nwith it", strings.Join(plainFindings, ""),
-			strings.Join(mappedFindings, ""))
+	leftFindings, rightFindings := findingLines(left.stream), findingLines(right.stream)
+	if len(leftFindings) == 0 || !slices.Equal(leftFindings, rightFindings) {
+		test.Errorf("the findings are\n%s\n%s, and\n%s\n%s", strings.Join(leftFindings, ""), left.name,
+			strings.Join(rightFindings, ""), right.name)
 	}
-	plainLint := lintRecordOf(test, strings.Join(plain, "\n"))
-	mappedLint := lintRecordOf(test, strings.Join(mapped, "\n"))
-	for name, lint := range map[string]contract.LintRecord{"without --timeline": plainLint, "with it": mappedLint} {
+	leftLint, rightLint := lintRecordOf(test, left.stream), lintRecordOf(test, right.stream)
+	for name, lint := range map[string]contract.LintRecord{left.name: leftLint, right.name: rightLint} {
 		if lint.BuildsAtOnce != 2 {
 			test.Errorf("the builds ran %d at once %s, want the 2 forced", lint.BuildsAtOnce, name)
 		}
 	}
-	if !reflect.DeepEqual(plainLint.Cache, mappedLint.Cache) {
-		test.Errorf("the cache counts are\n  %+v\nwithout --timeline, and\n  %+v\nwith it", plainLint.Cache,
-			mappedLint.Cache)
+	if !reflect.DeepEqual(leftLint.Cache, rightLint.Cache) {
+		test.Errorf("the cache counts are\n  %+v\n%s, and\n  %+v\n%s", leftLint.Cache, left.name, rightLint.Cache,
+			right.name)
 	}
-	if plainReads, mappedReads := buildReadsOf(plainLint), buildReadsOf(mappedLint); len(plainReads) == 0 ||
-		!reflect.DeepEqual(plainReads, mappedReads) {
-		test.Errorf("the builds read\n  %+v\nwithout --timeline, and\n  %+v\nwith it", plainReads, mappedReads)
+	if leftReads, rightReads := buildReadsOf(leftLint), buildReadsOf(rightLint); len(leftReads) == 0 ||
+		!reflect.DeepEqual(leftReads, rightReads) {
+		test.Errorf("the builds read\n  %+v\n%s, and\n  %+v\n%s", leftReads, left.name, rightReads, right.name)
+	}
+	leftSplit, leftShardReads := shardReadsOf(leftLint)
+	rightSplit, rightShardReads := shardReadsOf(rightLint)
+	if leftShardReads == 0 || leftShardReads != rightShardReads {
+		test.Errorf("the builds read %d shard stamps %s, split %v, and %d %s, split %v, want some and as many",
+			leftShardReads, left.name, leftSplit, rightShardReads, right.name, rightSplit)
+	}
+}
+
+// `--timeline` changes nothing about the run: over one tree, each from an empty store and an empty system cache, a run
+// with it and one without, their builds forced two at once, write the same findings, the same files into the findings
+// cache's store, the same cache counts, the system cache's among them, each build restoring, leaving untouched and
+// writing through as many packages and reading its packs alike, and run two builds at once (#3v2zp7g), where
+// `--timing` turns the cache off and runs the builds one at a time. The shard stamps the builds read are compared as
+// their sum, never build by build: which of two builds side by side reads a shard's stamp is whichever asks first
+// (TestTheBuildsOrderMovesOnlyTheSplitOfTheirShardReads), which no switch decides (#nyrys1z).
+func TestTheTimelineChangesNothingAboutTheRun(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	mapped := comparedRun{name: "with it", stream: strings.Join(otherBuildsRun(test, root, 2, nil, "--timeline"), "\n"),
+		store: storeListing(test, root)}
+	if removeError := os.RemoveAll(cache_directory.Of(root)); removeError != nil {
+		test.Fatal(removeError)
+	}
+	plain := comparedRun{name: "without --timeline", stream: strings.Join(otherBuildsRun(test, root, 2, nil), "\n"),
+		store: storeListing(test, root)}
+	requireTheSameRun(test, plain, mapped)
+}
+
+// buildFirst is a pipeline's configuration that forces its extra builds two at once and has the one first names end
+// before any other starts (extraBuildStarts, extraBuildEnds), so that build asks first for everything the run's builds
+// read once between them, each shard's stamp among it. A build held past besideWait fails the test and goes on, so a
+// first build that never ended reads as a failure rather than a run that never ends.
+func buildFirst(test *testing.T, first func(build project.Build) bool) func(*pipeline) {
+	ended := make(chan struct{})
+	return func(engine *pipeline) {
+		engine.buildsWidthForced = 2
+		// The width applies whether or not the builds restore from the host's run.
+		engine.buildsWidthUnguarded = true
+		engine.extraBuildStarts = func(extra project.Build) {
+			if first(extra) {
+				return
+			}
+			select {
+			case <-ended:
+			case <-time.After(besideWait):
+				test.Errorf("the build %s was held for a first build that never ended", extra)
+			}
+		}
+		engine.extraBuildEnds = func(extra project.Build, _ io.Writer) error {
+			if first(extra) {
+				close(ended)
+			}
+			return nil
+		}
+	}
+}
+
+// sharedShardPackages is how many packages a test adds to its copy of the other-builds fixture so that its two extra
+// builds are sure to share a shard (withSharedShards). A build asks its store for a key of each package it loads, a
+// key's shard is its first byte (cache.ShardOf), and a key holds the path of each of its package's files
+// (cache.Keys), so which shards two builds share varies with where the copy lies: over the fixture's three packages
+// most copies share none, and the builds have no stamp to race for. With 150 more, each build's keys fall in about
+// 115 of the store's 256 shards, and the odds that two such builds share none are under 1 in 10^30.
+const sharedShardPackages = 150
+
+// withSharedShards is a copy of the other-builds fixture with sharedShardPackages more packages, each one file every
+// build compiles alike.
+func withSharedShards(test *testing.T) string {
+	test.Helper()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	files := map[string]string{}
+	for index := range sharedShardPackages {
+		files[fmt.Sprintf("internal/keyed%d/keyed.go", index)] = fmt.Sprintf("// Package keyed%d is one more package "+
+			"every build keys.\npackage keyed%d\n\n// Value is the package's value.\nconst Value = %d\n", index, index,
+			index)
+	}
+	writeFixtureFiles(test, root, files)
+	return root
+}
+
+// The order two builds side by side ask in moves how they split the shard stamps they read, and nothing else of the
+// run (#nyrys1z): over one tree whose builds share shards (withSharedShards), each from an empty store and an empty
+// system cache, a run whose tagged build ends before its windows build starts and one the other way round
+// (buildFirst), both forced two at once, are the same run by everything TestTheTimelineChangesNothingAboutTheRun
+// compares (requireTheSameRun), the shard reads summed among it, and split those reads otherwise: each build reads
+// more of them asking first than held, when the build before it has read the stamps of the shards the two share.
+func TestTheBuildsOrderMovesOnlyTheSplitOfTheirShardReads(test *testing.T) {
+	test.Parallel()
+	root := withSharedShards(test)
+	tagged := func(build project.Build) bool { return slices.Contains(build.Tags, "cohere_extra") }
+	ordered := func(name string, first func(build project.Build) bool) comparedRun {
+		test.Helper()
+		_, stream := runOverConfigured(test, root, exitFindings, buildFirst(test, first), "--no-fix")
+		run := comparedRun{name: name, stream: stream, store: storeListing(test, root)}
+		if removeError := os.RemoveAll(cache_directory.Of(root)); removeError != nil {
+			test.Fatal(removeError)
+		}
+		return run
+	}
+	taggedFirst := ordered("with the tagged build first", tagged)
+	windowsFirst := ordered("with the windows build first", func(build project.Build) bool { return !tagged(build) })
+	requireTheSameRun(test, taggedFirst, windowsFirst)
+
+	taggedFirstSplit, _ := shardReadsOf(lintRecordOf(test, taggedFirst.stream))
+	windowsFirstSplit, _ := shardReadsOf(lintRecordOf(test, windowsFirst.stream))
+	if len(taggedFirstSplit) != 2 || len(windowsFirstSplit) != 2 {
+		test.Fatalf("the runs' extra builds read %v and %v, and the fixture has two", taggedFirstSplit,
+			windowsFirstSplit)
+	}
+	for target, askingFirst := range taggedFirstSplit {
+		held := windowsFirstSplit[target]
+		if !strings.Contains(target, "cohere_extra") {
+			askingFirst, held = held, askingFirst
+		}
+		if askingFirst <= held {
+			test.Errorf("the build %s read %d shard stamps asking first and %d held until the other build ended, want "+
+				"more asking first: the builds split them %v with the tagged build first and %v with the windows "+
+				"build first", target, askingFirst, held, taggedFirstSplit, windowsFirstSplit)
+		}
 	}
 }
