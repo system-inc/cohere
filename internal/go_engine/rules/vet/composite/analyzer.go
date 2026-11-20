@@ -115,11 +115,10 @@ func checkLiteral(context *rule.Context, node ast.Node, _ []ast.Node) {
 	}
 	// The struct type the literal builds. A type parameter's literal is judged by the first term of its term set, an
 	// arbitrary one, as the original chooses it, and a type set that is invalid or empty is left alone.
-	terms, termsError := normalTerms(literalType)
-	if termsError != nil || len(terms) == 0 {
+	chosen := firstNormalTerm(literalType)
+	if chosen == nil {
 		return
 	}
-	chosen := terms[0].Type()
 	// An elided `&T` in a literal of `[]*T` is typed `*T`, so a pointer is looked through to its struct.
 	structure, isStruct := dereference(chosen).Underlying().(*types.Struct)
 	if !isStruct {
