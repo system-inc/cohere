@@ -204,8 +204,10 @@ func compareSkippedPackages(first skippedPackage, second skippedPackage) int {
 // that had the restore on, since a load with it off, which a second round of declines leaves it, counts nothing anew.
 // Not restored are the packages never made candidates or declined, by the first word of why, the load's over that
 // same load and check's over every load. How many times the build loaded again is not read from that record, which
-// counts only the loads its own declines asked for. It fails naming every build the census needs beside the host's
-// that has no line, since a build the differential says nothing of cannot be told apart from one it never judged.
+// counts only the loads its own declines asked for. It fails naming every build with a line that was told of no load:
+// a build engine ran loaded, so the hook is not wired and nothing was counted. It fails naming every build the census
+// needs beside the host's that has no line, since a build the differential says nothing of cannot be told apart from
+// one it never judged.
 func logTallies(test *testing.T, label string, engine *pipeline, tallies map[string]skippedTally) {
 	test.Helper()
 	lined := map[string]bool{}
@@ -215,10 +217,14 @@ func logTallies(test *testing.T, label string, engine *pipeline, tallies map[str
 		if run.result != nil {
 			fromHost = run.result.FromHost
 		}
-		test.Logf("%s, %s: loaded %d times, %d skipped over every load, %d of them by the last, %d judged (%d by "+
+		test.Logf("%s, %s: loads %d, %d skipped over every load, %d of them by the last, %d judged (%d by "+
 			"TypesHold), %d declined; the last load restored %d, the last with the restore on visited %d, not "+
 			"restored by %v", label, run.build, tally.loads, tally.skipped, tally.lastLoad, tally.judged,
 			tally.byTypes, tally.declined, len(fromHost.Restored), fromHost.Visited, fromHost.DeclinedBy)
+		if tally.loads == 0 {
+			test.Errorf("%s, %s: was told of no load: the hook is not wired, so the line counts nothing of its loads",
+				label, run.build)
+		}
 		lined[run.build.String()] = true
 	}
 	for _, build := range engine.described.builds[1:] {
