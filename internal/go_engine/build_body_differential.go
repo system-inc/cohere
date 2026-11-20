@@ -529,8 +529,8 @@ func (differential *buildBodyDifferential) compareStandingPackage(
 					fmt.Sprint(capturedPackage.NoReturn(function)))
 			}
 			// The function's other pushed facts, by their analyzer's name, wherever both runs held its facts of the
-			// package: a wrapper's, which the facts' reach compares, and a deprecation, which it leaves to the reach by
-			// its written argument (standing_facts' pushedFacts), proven here on every census.
+			// package: a wrapper's and a deprecation, each of which the facts' reach compares (standing_facts'
+			// pushedFacts), checked here on every census.
 			for _, analyzer := range slices.Sorted(maps.Keys(hostFunction.Pushed)) {
 				builtFacts, isHeld := capturedPackage.Pushed[analyzer]
 				if !isHeld {
