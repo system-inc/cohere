@@ -471,10 +471,25 @@ func (reacher *bodyReacher) readCarryStarts() {
 //
 // In practice the second case is every command with an in-package test that nothing imports, 31 of cohere's own: an
 // extra build's load leaves such a root p out (load.Caching's AnalyzedRootsOnly) and checks its test variant
-// "p [p.test]", which holds every file of p, in its place, so the host's p is held against that variant. The third is
-// a package only the host's platform compiles, as internal/syscall/unix is to a windows build. Read by its ID alone,
-// either was a package the host checked from source and the build did not, loaded in another mode, and carried every
-// value of every unrecorded package in every run, 9,624 bodies reached at cohere's root that nothing differed for.
+// "p [p.test]" in its place, so the host's p is held against that variant. The third is a package only the host's
+// platform compiles, as internal/syscall/unix is to a windows build. Read by its ID alone, either was a package the
+// host checked from source and the build did not, loaded in another mode, and carried every value of every unrecorded
+// package in every run, 9,624 bodies reached at cohere's root that nothing differed for.
+//
+// The variant holds every file of p, which is true of its files and not of what they mean. It holds its in-package
+// test files too, and one of those can declare at package level a name p's own files read from the universe, as
+// `const true = false` does, so a constant of the variant need not be p's, nor one of any package go test builds again
+// against the variant: a package built again for another's tests can differ from its plain self, with no load mode
+// differing. The second case answers for the load mode alone, and nothing of the carry covers a body that reads a
+// stand-in, the carry being of an unrecorded package's values. What reaches such a body is the direct rule's wide
+// answer (loadModeDiffers), which calls a package the build lacks by its ID loaded otherwise, under a label that names
+// the wrong cause, and the imports (differingImports). Two holes the reader left open are closed so (#bed0mnk):
+//   - The host restored p, from its findings store say, and the build holds only its variant: read by the mode alone,
+//     export data on the host and nothing checked from source in the build were loaded alike, and a body that names an
+//     object of p went unreached. The direct rule now calls p lacked by its ID differing whatever the host's mode.
+//   - The build holds every ID the host does, loaded alike, and a body's import resolves there to a package of another
+//     ID, one built again for a test ("q [p.test]" for q): no rule asked which package of a path a body's package
+//     imports. Its package's imports now differ, and reach its bodies.
 func (reacher *bodyReacher) startsCarry(identifier string, path string) (starts bool, byImport bool) {
 	if reacher.graph.holds(identifier) {
 		return reacher.identifiedLoadModeDiffers(identifier), false

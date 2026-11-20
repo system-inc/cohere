@@ -1323,6 +1323,12 @@ of such a package, so none of its facts is compared, the standard library's in e
 counted where it would have been compared, about the package itself or about an object in a file both builds compile,
 one both sides hold counted on each, and so is each fact the build's entry holds by a path alone. It is always written
 too: a census that counts no fact as different has compared only what `"kinds"` counts, and this says what it did not.
+`"compiledInOne"`, additive (#w5dbvdm), counts the facts the census left out, on either side, of a package both builds
+have by one ID, about an object in a file the two do not both compile: the other build has no such object, so the fact
+is no comparison's, of a build that checked the package from source and of one that restored it alike, and neither
+`"kinds"` nor `"withoutSyntax"` counts it. Each is counted on the side that holds it, and it is always written, beside
+`"withoutSyntax"`: that says what was left out for want of the build's syntax, and this what was left out for want of
+the other build's file. A package one build alone has is no census's, and its facts are in no count.
 `"milliseconds"` is the comparison's wall time.
 
 ### `phase`
