@@ -131,3 +131,27 @@ func TestALoadThatFindsNothingFailsTheObjectDifferential(test *testing.T) {
 		test.Errorf("want the report to fail once, saying %q, got %q", want, report.failed)
 	}
 }
+
+// The fixtures' judgment (judgeFixture) reports every build, a build a fixture loads with errors under among them,
+// and never skips one: over broken_build, broken on linux alone, it judges all three builds, logs each one's counts
+// and fails once, linux's report naming the three packages linux holds with errors. No fixture of block 1 is broken
+// under any build, so the loop over them could skip a broken build unseen, and this is what would see it (#3096be2).
+func TestTheFixturesJudgmentReportsABuildTheFixtureIsBrokenUnder(test *testing.T) {
+	test.Parallel()
+
+	var report recordedReport
+	judged := judgeFixture(test, &report, filepath.Join("testdata", "broken_build"))
+	var wantJudged []string
+	for _, build := range objectFixtureBuilds {
+		wantJudged = append(wantJudged, build.name)
+	}
+	if !slices.Equal(judged, wantJudged) {
+		test.Errorf("want every build judged, %q, got %q", wantJudged, judged)
+	}
+	if len(report.logged) != len(objectFixtureBuilds) {
+		test.Errorf("want each build's counts logged, got %q", report.logged)
+	}
+	if len(report.failed) != 1 || !strings.HasPrefix(report.failed[0], "linux: 3 packages loaded with errors") {
+		test.Errorf("want linux's report to fail once, for the 3 packages it holds with errors, got %q", report.failed)
+	}
+}

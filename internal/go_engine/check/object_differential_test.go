@@ -481,12 +481,36 @@ func objectFixtureWorkspace(loaded *packages.Package) bool {
 	return !strings.HasSuffix(loaded.PkgPath, "/dependency")
 }
 
+// judgeFixture judges the fixture in directory as TestEveryObjectWhoseLinesDifferHasItsBitSet judges each of block
+// 1's: loaded from source on the darwin host, which must type-check, and under each of objectFixtureBuilds, every
+// object of every package both hold compared, each build's differential reported to report, a test or a record of
+// its words (objectReporter). It returns the names of the builds it judged, each once it is reported.
+func judgeFixture(test *testing.T, report objectReporter, directory string) []string {
+	test.Helper()
+	host := loadObjects(test, directory, objectEnvironment("darwin", ""), "./...", true)
+	if len(host.broken) > 0 {
+		test.Fatalf("the fixture does not type-check on the darwin host: %q", host.broken)
+	}
+	var judged []string
+	for _, build := range objectFixtureBuilds {
+		started := time.Now()
+		built := loadObjects(test, directory, build.environment, "./...", true)
+		dependence := objectDependence(host, built, objectFixtureWorkspace)
+		tally := objectDifferences(host, built, dependence.ObjectBits)
+		reportObjectDifferences(report, build.name, tally, started)
+		judged = append(judged, build.name)
+	}
+	return judged
+}
+
 // Block 1's bits are a cheaper proof of TypesHold's lines, one level below a reader: every object block 1 calls
 // unchanged must render alike, so wherever a line TypesHold writes of an object differs between two builds, the bit
 // its verdict gates that read by must be set (objectDifferences). Over every fixture of block 1's testdata, loaded
 // from source on the darwin host and under each of objectFixtureBuilds, every object of every package both hold is
-// compared. Every fixture type-checks under every one of those builds, and one that does not fails there as any tree
-// does, by the report (reportObjectDifferences): no build is left out for its errors (#3096be2).
+// compared (judgeFixture). Every fixture type-checks under every one of those builds, and one that does not fails
+// there as any tree does, by the report (reportObjectDifferences): no build is left out for its errors (#3096be2),
+// and once every fixture's subtest is done, each build must have judged every fixture whose subtest ran, those -run
+// selects, so a fixture skipped under a build fails here whatever the reason it was skipped for.
 func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	test.Parallel()
 
@@ -495,6 +519,20 @@ func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
+	var (
+		counting    sync.Mutex
+		ran         int
+		judgedUnder = map[string]int{}
+	)
+	// Cleanup runs once every parallel subtest below is done, so the counts are whole when it reads them.
+	test.Cleanup(func() {
+		for _, build := range objectFixtureBuilds {
+			if judgedUnder[build.name] != ran {
+				test.Errorf("%s: judged %d of the %d fixtures run, so the loop skipped some", build.name,
+					judgedUnder[build.name], ran)
+			}
+		}
+	})
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -502,17 +540,14 @@ func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 		test.Run(entry.Name(), func(test *testing.T) {
 			test.Parallel()
 
-			directory := filepath.Join(fixtures, entry.Name())
-			host := loadObjects(test, directory, objectEnvironment("darwin", ""), "./...", true)
-			if len(host.broken) > 0 {
-				test.Fatalf("the fixture does not type-check on the darwin host: %q", host.broken)
-			}
-			for _, build := range objectFixtureBuilds {
-				started := time.Now()
-				built := loadObjects(test, directory, build.environment, "./...", true)
-				dependence := objectDependence(host, built, objectFixtureWorkspace)
-				tally := objectDifferences(host, built, dependence.ObjectBits)
-				reportObjectDifferences(test, build.name, tally, started)
+			counting.Lock()
+			ran++
+			counting.Unlock()
+			judged := judgeFixture(test, test, filepath.Join(fixtures, entry.Name()))
+			counting.Lock()
+			defer counting.Unlock()
+			for _, name := range judged {
+				judgedUnder[name]++
 			}
 		})
 	}
