@@ -231,6 +231,10 @@ type pipeline struct {
 	// (runRename), and but where the host listed nothing, its listing kept, and in both the builds walk among
 	// themselves. That is the stricter of two reasons, each enough: a walk reads directory names and the presence of a
 	// go.mod alone, which no write of the run changes (reads' invariant).
+	//
+	// Each build reads this field as its run starts (extraBuildRun), and every heldChanged is on the pipeline's own
+	// goroutine before any extra build starts, so no build meets a swap. A unit that starts a build's listing before
+	// the host's last write must hand the build its walks, never have it read the field.
 	walks *load.PackageWalks
 
 	// moduleRootWalks are the walks of the module roots every load's inputs name, the host's and each extra build's,
