@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"maps"
 	"reflect"
 	"slices"
@@ -108,7 +109,7 @@ func Check(context *rule.Context, binary *ast.BinaryExpr, ancestors []ast.Node) 
 		return
 	}
 	// A float can differ from itself, NaN does, so floats are left alone for every operator.
-	if type_predicates.MayHoldFloat(context.TypesInfo.TypeOf(binary.X)) {
+	if mayHoldFloat(context, context.TypesInfo.TypeOf(binary.X)) {
 		return
 	}
 	if !printSame(context, binary.X, binary.Y) {
@@ -123,6 +124,35 @@ func Check(context *rule.Context, binary *ast.BinaryExpr, ancestors []ast.Node) 
 	}
 	staticcheck_report.Report(context, binary,
 		fmt.Sprintf("identical expressions on the left and right side of the '%s' operator", binary.Op))
+}
+
+// fileState is what the rule keeps over one file, held in its file state (rule.FileState).
+type fileState struct {
+	// floatAnswers is type_predicates.MayHoldFloat's answer for each operand type the file has asked about, by the
+	// type itself.
+	floatAnswers map[types.Type]bool
+}
+
+// mayHoldFloat is type_predicates.MayHoldFloat's answer for valueType, asked once for each type in a file. Asking
+// builds the type's term set on the heap every time, and the file asks with every binary expression it reaches, the
+// same few types over and over, the universe's one error type for every `err != nil`. The answer is kept by the type's
+// identity, the pointer go/types hands for it: MayHoldFloat reads nothing but the type, which the type checker no
+// longer changes, so one type always has one answer. Two identical types held under two pointers, two
+// instantiations of one generic type, are kept apart and each asked once, which costs a second asking, never a
+// wrong answer, while a key that merged types by what they print would merge two declared in two functions under one
+// name. The answers live with the file's state, so they go with the rule's context of the package whose types they
+// name, and the one file's walk is the only reader and writer.
+func mayHoldFloat(context *rule.Context, valueType types.Type) bool {
+	state := rule.FileState[fileState](context)
+	if answer, isAnswered := state.floatAnswers[valueType]; isAnswered {
+		return answer
+	}
+	answer := type_predicates.MayHoldFloat(valueType)
+	if state.floatAnswers == nil {
+		state.floatAnswers = map[types.Type]bool{}
+	}
+	state.floatAnswers[valueType] = answer
+	return answer
 }
 
 // printSame is whether left and right, of one syntax kind, print the same through staticcheck_report.Render, as the

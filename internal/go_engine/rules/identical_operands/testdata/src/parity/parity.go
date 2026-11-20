@@ -138,6 +138,29 @@ func genericFloats[T ~int | ~float64, U comparable](value T, other U) {
 	_ = other == other
 }
 
+// Found by neither: a type declared in a function as a float, and a type parameter that is one, each under the name
+// the two below give a type that is not, which the check keeps apart by type, not by name.
+func localFloat(value float64) {
+	type reading float64
+	measured := reading(value)
+	_ = measured == measured
+}
+
+func genericLocalFloat[T ~float64](value T) {
+	_ = value == value
+}
+
+// Found by both: a type declared in a function, and a type parameter, of the names above, neither a float.
+func localInteger(value int) {
+	type reading int
+	counted := reading(value)
+	_ = counted == counted
+}
+
+func genericLocalInteger[T ~int](value T) {
+	_ = value == value
+}
+
 // Found by neither: a blank variable given two empty literals compared, a compile-time assertion of comparability.
 var _ = point{} == point{}
 
