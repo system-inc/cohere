@@ -95,6 +95,10 @@ var listedCrossPackageReads = map[string]listedRead{
 		class:  readHostNamed,
 		reason: "looks up the package-level name a host's identity names a function by",
 	},
+	"standing_presence/host_port.go:judgesHostPort": {
+		class:  readDirectImports,
+		reason: "whether the judged package imports fmt, as hostport's own isJudged asks",
+	},
 	"staticcheck_code/is_main_like.go:IsMainLike": {class: readDirectImports},
 	"unused_code/graph_entry.go:(*graph).entry": {
 		class:  readOwnPackage,
