@@ -375,11 +375,11 @@ func TestAPackageLintedWholeAsksNothing(test *testing.T) {
 }
 
 // A body the build lints that holds no record of a kind reads unknown for it, for every kind the host answered about
-// the package and every kind the build registers, less each that records every judgment (#5vbs1np, must 1, and
-// #z9fze0t). size's purity is recorded and the build's own, but the host answered triviality about the package, a kind
-// that sets no such flag, and size holds no record of it, so Warm leaves for that, and then names itself for
-// triviality, holding no record at all. Purity records every judgment, so neither is named for it. With the host
-// answering purity alone, the one kind registered here, Warm stands.
+// the package less each that records every judgment (#5vbs1np, must 1, and #z9fze0t). size's purity is recorded and
+// the build's own, but the host answered triviality about the package, a kind that sets no such flag, and size holds
+// no record of it, so Warm leaves for that, and then names itself for triviality, holding no record at all. Purity
+// records every judgment, so neither is named for it. With the host answering purity alone, the one kind registered
+// here, Warm stands.
 func TestABodyTheBuildLintsWithNoRecordOfAKindTakesItsUsersOut(test *testing.T) {
 	test.Parallel()
 	found := loadFacts(test)

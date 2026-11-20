@@ -162,11 +162,12 @@ func run(pass *analysis.Pass) (any, error) {
 			reached = append(reached, place)
 		}
 	}
-	// Every kind the build can ask again, and every kind the host answered about the package, which a body that leaves
-	// reads unknown for where it holds no record of it (fact_reach.Settle). A kind the build cannot ask is among them
-	// wherever the host answered it, since its judgments read callees' answers from its state as any kind's may.
-	// A registered kind the host answered nothing of here is read by the function: with no record of it anywhere, a
-	// body holds none by either unit.
+	// Every kind the host answered about the package, by the unit its answers are in, which a body that leaves reads
+	// unknown for where it holds no record of it (fact_reach.Settle). A kind the build cannot ask is among them, since
+	// its judgments read callees' answers from its state as any kind's may. A kind the host answered nothing of here is
+	// not, registered or not: no answer of the host's about the package's objects is one of it, so it served none of
+	// the package's bodies, whatever its judgments read (fact_reach.Host.Kinds), and an answer of it about another
+	// package's object is compared before the walk (Imported).
 	//
 	// A kind that records every judgment is none of them (fact_resolver.Kind.RecordsEveryJudgment, #z9fze0t). The
 	// rule is there because a kind's judgment may read a callee's body and leave no record of it, so a body the build
@@ -178,9 +179,6 @@ func run(pass *analysis.Pass) (any, error) {
 	// as the body leaves. A package handed an unsure answer keeps nothing, and has no side here at all, so the build
 	// lints it whole (check.FactReachCapture.Packages).
 	units := map[string]bool{}
-	for _, name := range fact_resolver.RegisteredNames() {
-		units[name] = false
-	}
 	for _, kind := range host.Kinds() {
 		units[kind.Name] = kind.Parameters
 	}

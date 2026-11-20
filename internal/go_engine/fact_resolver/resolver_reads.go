@@ -209,16 +209,6 @@ func ZeroAnswer(kindName string) ([]byte, bool) {
 	return nil, false
 }
 
-// RegisteredNames are the names of every kind registered, sorted: the kinds a run can ask again.
-func RegisteredNames() []string {
-	var names []string
-	for _, registered := range registeredKinds() {
-		names = append(names, registered.kind.Name)
-	}
-	slices.Sort(names)
-	return names
-}
-
 // RecordingNames are the names of every kind registered that says it records every judgment
 // (Kind.RecordsEveryJudgment), sorted: the kinds a function with no answer of is one no answer of the run rests on.
 func RecordingNames() []string {
