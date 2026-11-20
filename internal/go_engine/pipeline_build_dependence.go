@@ -447,7 +447,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	record.Dependencies = dependenceCounts(counts.Dependencies)
 	if engine.mustCheckCensus != "" {
 		// A package the host restored with no record that the standard library's graph does not hold either is in no
-		// graph, so whatever of it a unit reads is answered wide.
+		// graph, so whatever of it a unit reads is answered wide, and it is in the set as NoGraph.
 		var notHeld []string
 		for identifier := range engine.dependence.restored {
 			isHeld := false
@@ -461,7 +461,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 		}
 		judged.mustCheck = &mustCheckSet{
 			lines: mustCheckLines([]build_dependence.Difference{difference, standardLibraryDiffering},
-				[]*build_dependence.Dependence{judged.dependence, standardLibraryJudged}),
+				[]*build_dependence.Dependence{judged.dependence, standardLibraryJudged}, notHeld),
 			wide:   mustCheckWide(notHeld, counterparts.Counts().WithoutCounterpart),
 			at:     mustCheckAtLoad,
 			judged: time.Since(started),

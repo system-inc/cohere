@@ -40,6 +40,11 @@ type collector struct {
 	// for universeNamesFromUses, which places each use in its unit.
 	spans []unitSpan
 
+	// repeats are the const specs that repeat the spec before them, each its unit's index and the index of the unit of
+	// the spec it repeats, which repeatUniverseNames gives the first the second's universe names once every unit has
+	// its own.
+	repeats []unitRepeat
+
 	// fromCgo says the file being collected hangs on the C side (fromCgo), set for each file's walk
 	// (Graph.addPackage), which every unit of the file takes as its mark (unitRecord.fromCgo).
 	fromCgo bool
@@ -83,6 +88,13 @@ type unitSpan struct {
 	index     int
 }
 
+// unitRepeat is a const spec that repeats the spec before it (collector.repeats): its unit's index among the
+// collector's units, and the index of the unit of the spec it repeats.
+type unitRepeat struct {
+	unit     int
+	repeated int
+}
+
 // collectFile collects every unit of file, whose place tokenFile holds. Imports are no units.
 func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) {
 	for _, declaration := range file.Decls {
@@ -95,25 +107,46 @@ func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) 
 			}
 			var lastType ast.Expr
 			var lastValues []ast.Expr
+			// The unit of the last const spec with a type or values, none before the block's first.
+			lastUnit := -1
 			for _, spec := range declaration.Specs {
 				switch spec := spec.(type) {
 				case *ast.TypeSpec:
 					collecting.collectType(tokenFile, spec)
 				case *ast.ValueSpec:
 					specType, specValues := spec.Type, spec.Values
+					repeats := false
 					if declaration.Tok == token.CONST {
 						// A const spec with neither type nor values repeats the last one's, and depends on what
 						// that one's value refers to.
 						if spec.Type == nil && len(spec.Values) == 0 {
 							specType, specValues = lastType, lastValues
+							repeats = lastUnit >= 0
 						} else {
-							lastType, lastValues = spec.Type, spec.Values
+							lastType, lastValues, lastUnit = spec.Type, spec.Values, len(collecting.units)
 						}
 					}
 					collecting.collectValue(tokenFile, declaration.Tok, spec, specType, specValues)
+					if repeats {
+						// Its span holds none of the names the expression it repeats uses, so it takes those of the
+						// spec it repeats (repeatUniverseNames): `Second` after `First = iota` means another value in
+						// a build that declares its own iota (#anfjtr3).
+						collecting.repeats = append(collecting.repeats,
+							unitRepeat{unit: len(collecting.units) - 1, repeated: lastUnit})
+					}
 				}
 			}
 		}
+	}
+}
+
+// repeatUniverseNames gives each const spec that repeats the spec before it the universe names of that spec's unit,
+// once every unit has its own, from its walk or from the package's uses (universeNamesFromUses), so a build that
+// declares a name the repeated expression uses seeds both specs (judgment.seedShadowed). Every repeat of a block
+// repeats the block's one spec with a type or values, so no repeat takes names from another repeat.
+func (collecting *collector) repeatUniverseNames() {
+	for _, repeat := range collecting.repeats {
+		collecting.units[repeat.unit].universeNames |= collecting.units[repeat.repeated].universeNames
 	}
 }
 

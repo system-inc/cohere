@@ -44,8 +44,9 @@ import (
 // unit carries whether it hangs on the C side, one in a cgo tool's output or in any file of a package checked as
 // written that has a cgo file (build_dependence's cgo_files.go), which a build seeds wherever the package differs, and
 // whether the host's load withheld its body or initial value, which every build seeds, so a record of 4 holds neither
-// mark, and is encoded otherwise.
-const DependenceRecordVersion = "dependence-record-5"
+// mark, and is encoded otherwise. At 6, a const spec that repeats the spec before it carries that spec's universe
+// names, so a record of 5 leaves it unseeded in a build that declares one of them.
+const DependenceRecordVersion = "dependence-record-6"
 
 // DependenceRecordKey is where the store keeps the dependence record of the package whose first key is key: apart from
 // every entry, export data and alias, and derived from the entry's key alone, so a record is read only by a run that
@@ -64,8 +65,9 @@ func DependenceRecordKey(key cache.Key) cache.Key {
 
 // DeclarationsRecordVersion is the format of a declarations-only record as the store keeps it, hashed into its key
 // (DeclarationsRecordKey) apart from the whole records' version: it changes whenever the record's encoding does, or
-// what a declarations-only graph collects into it.
-const DeclarationsRecordVersion = "declarations-record-1"
+// what a declarations-only graph collects into it. At 2, a const spec that repeats the spec before it carries that
+// spec's universe names, as a whole record does at its 6.
+const DeclarationsRecordVersion = "declarations-record-2"
 
 // DeclarationsRecordKey is where the store keeps the declarations-only record of the package whose first key is key:
 // apart from every entry, export data, alias and whole record, and derived from the entry's key alone, as

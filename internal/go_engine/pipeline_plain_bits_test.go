@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"errors"
 	"maps"
 	"os"
 	"path/filepath"
@@ -383,5 +384,74 @@ func TestABuildsJudgmentWaitsForTheWholeGraph(test *testing.T) {
 	ready, judging := slices.Index(steps, declarationsReady), slices.Index(steps, declarationsJudging)
 	if ready < 0 || judging < 0 || judging < ready || slices.Index(steps, declarationsListedWaiting) > ready {
 		test.Errorf("want the build's listing to wait, then the graph whole, then the judgment, got %q", steps)
+	}
+}
+
+// bufferedFixture is the build-dependence-embedded fixture with a package of its own, buffered, that embeds bytes'
+// Buffer, alike in every build, so buffered declares a dependent object in no build.
+func bufferedFixture(test *testing.T) string {
+	test.Helper()
+	root := copyFixture(test, filepath.Join("testdata", "build-dependence-embedded"))
+	buffered := "// Package buffered embeds bytes' Buffer, alike in every build.\npackage buffered\n\n" +
+		"import \"bytes\"\n\n// Buffered is a buffer.\ntype Buffered struct {\n\tbytes.Buffer\n}\n"
+	if makeError := os.Mkdir(filepath.Join(root, "buffered"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	if writeError := os.WriteFile(filepath.Join(root, "buffered", "buffered.go"), []byte(buffered),
+		0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	return root
+}
+
+// A package a plain run's judgment holds in no graph is in the build's set as NoGraph, and named in its wide file, and
+// a package that reads it is in the set for its declarations, each object it reads answered dependent (#anfjtr3). Over
+// the buffered fixture, whose system cache a run without the census filled, so it holds no declarations record, a
+// census run under `--no-cache` side-loads its standard library, and the side load fails: every standard-library
+// package of the host's listing is in no graph. Of the windows build's, bytes, whose files are alike, is in the set
+// as NoGraph alone, and syscall, whose files differ, as Files,NoGraph; buffered, which embeds bytes' Buffer, is in the
+// set for its declarations, though the whole graph's set, from a run that loads every package from source, holds no
+// buffered: only bytes answered wide puts it there. Answer what no graph holds narrow and buffered leaves the set;
+// write no package in the wide file, or find none in no graph, and their lines go.
+func TestAPackageInNoGraphIsInTheSet(test *testing.T) {
+	test.Parallel()
+
+	reference := test.TempDir()
+	whole, _ := runOverConfigured(test, bufferedFixture(test), exitClean,
+		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		"--build-dependence")
+	if len(whole.buildRuns) != 2 || whole.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got %d runs", len(whole.buildRuns))
+	}
+	stem := buildFileStem(whole.buildRuns[1].build)
+	buffered := embeddedModule + "/buffered"
+	for _, line := range censusLines(test, filepath.Join(reference, stem+".txt")) {
+		if strings.HasPrefix(line, buffered+"\t") {
+			test.Errorf("want buffered in no set of the whole graph's, got %q", line)
+		}
+	}
+
+	filledCache, census := test.TempDir(), test.TempDir()
+	runOverConfigured(test, bufferedFixture(test), exitClean, sharingSystemCache(filledCache), "--no-cache")
+	refused := errors.New("the side load is refused")
+	plain, _ := runOverConfigured(test, bufferedFixture(test), exitClean, func(engine *pipeline) {
+		sharingSystemCache(filledCache)(engine)
+		engine.mustCheckCensus = census
+		engine.sideLoadRefused = refused
+	}, "--no-cache")
+	if plain.plainBits == nil || !errors.Is(plain.plainBits.sideLoadProblem, refused) {
+		test.Fatal("want the plain run's side load refused")
+	}
+	lines := censusLines(test, filepath.Join(census, stem+".txt"))
+	for _, want := range []string{"bytes\tNoGraph", "syscall\tFiles,NoGraph", buffered + "\tDeclares"} {
+		if !slices.Contains(lines, want) {
+			test.Errorf("want the line %q in the windows build's set, got %q", want, lines)
+		}
+	}
+	wide := censusLines(test, filepath.Join(census, stem+".wide.txt"))
+	for _, want := range []string{"bytes\tNoGraph", "syscall\tNoGraph"} {
+		if !slices.Contains(wide, want) {
+			test.Errorf("want the line %q in the windows build's wide file, got %q", want, wide)
+		}
 	}
 }

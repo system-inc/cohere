@@ -263,6 +263,42 @@ func TestANameOfTheUniverseABodyUsesSeedsItsUnitInADeclarationsGraph(test *testi
 	}
 }
 
+// On windows a file only the build compiles declares iota and int8 at package level, so each means another object in
+// every file of the repeated fixture's package. A const spec with neither type nor values repeats the spec before it,
+// so Second is iota and Other an int8 though neither's span names it: each is seeded with the spec it repeats, First
+// and Small, in the whole graph and the declarations-only one alike, and Kept, which repeats Steady's 3, is not
+// (#anfjtr3). Give a repeated spec only its own span's universe names, and Second and Other are left unseeded.
+func TestARepeatedConstSpecUsesTheUniverseNamesOfTheSpecItRepeats(test *testing.T) {
+	test.Parallel()
+
+	windowsBuild := fixtureBuild{name: "windows", environment: buildEnvironment("windows", "")}
+	judged := judge(test, "repeated", windowsBuild)
+	declarations := declarationsGraphOf(judged.host, nil).Against(judged.difference)
+	seeded := Bits{Name: true, Underlying: true}
+	for _, name := range []struct {
+		local string
+		want  Bits
+	}{
+		{"First", seeded},
+		{"Second", seeded},
+		{"Small", seeded},
+		{"Other", seeded},
+		{"Steady", Bits{}},
+		{"Kept", Bits{}},
+	} {
+		for _, judgment := range []struct {
+			graph      string
+			dependence *Dependence
+		}{{"whole", judged.dependence}, {"declarations-only", declarations}} {
+			bits, isDeclared := judgment.dependence.NameBits("example.com/repeated", name.local)
+			if !isDeclared || bits != name.want {
+				test.Errorf("%s: want its bits %+v on windows in the %s graph, got %+v, declared %t", name.local,
+					name.want, judgment.graph, bits, isDeclared)
+			}
+		}
+	}
+}
+
 // A declarations-only graph collects no unit's body: where the whole graph's resolution holds units' reads, their
 // reads of packages it does not hold, their calls and their calls into such packages, the declarations-only graph's
 // holds none of any. The layout fixture's workspace, without its dependency, gives all four from function bodies, and

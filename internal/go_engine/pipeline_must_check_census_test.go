@@ -72,7 +72,7 @@ func TestEachBuildWritesItsMustCheckSet(test *testing.T) {
 	buildEnvironment := append(slices.Clone(hostEnvironment), on.buildRuns[1].build.Environment()...)
 	library := libraryJudgment(test, root, hostEnvironment, buildEnvironment)
 	want := mustCheckLines([]build_dependence.Difference{library.difference},
-		[]*build_dependence.Dependence{library.judged})
+		[]*build_dependence.Dependence{library.judged}, nil)
 	if !slices.Equal(lines, want) {
 		test.Errorf("the windows build's set is\n%s\nwant the library's\n%s", strings.Join(lines, "\n"),
 			strings.Join(want, "\n"))
@@ -84,6 +84,36 @@ func TestEachBuildWritesItsMustCheckSet(test *testing.T) {
 	for _, run := range off.buildRuns {
 		if run.judged != nil && run.judged.mustCheck != nil {
 			test.Errorf("a run without the census kept the must-check set of %s", run.build)
+		}
+	}
+}
+
+// The build-dependence-repeated fixture's reader reads position's Second, a const spec that repeats First's iota, which
+// windows declares for itself in a file of position's own, so Second differs there though its own span names nothing:
+// reader declares a dependent object on windows, though no file of its own differs, on the plain run's declarations
+// graph and on `--build-dependence`'s whole one alike (#anfjtr3). Give a repeated spec only its own span's universe
+// names, and reader is in neither set.
+func TestARepeatedConstSpecsReaderIsInTheSet(test *testing.T) {
+	test.Parallel()
+
+	fixture := filepath.Join("testdata", "build-dependence-repeated")
+	want := "example.com/repeated/reader\tDeclares"
+	for _, path := range []struct {
+		name  string
+		flags []string
+	}{
+		{"the plain run", []string{"--no-cache", "--no-system-cache"}},
+		{"build dependence", []string{"--no-cache", "--no-system-cache", "--build-dependence"}},
+	} {
+		census := test.TempDir()
+		engine, _ := runOverConfigured(test, copyFixture(test, fixture), exitClean,
+			func(engine *pipeline) { engine.mustCheckCensus = census }, path.flags...)
+		if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
+			test.Fatalf("%s: want the host's build and windows's, got %d runs", path.name, len(engine.buildRuns))
+		}
+		lines := censusLines(test, filepath.Join(census, buildFileStem(engine.buildRuns[1].build)+".txt"))
+		if !slices.Contains(lines, want) {
+			test.Errorf("%s: want the line %q in the windows build's set, got %q", path.name, want, lines)
 		}
 	}
 }

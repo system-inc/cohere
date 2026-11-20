@@ -25,8 +25,8 @@ import (
 // cache from the one kept beside its entry there (check.KeepDeclarationsRecords); one of those with no record is loaded
 // from source once, beside the builds (sideLoadStandardLibrary). Once the walks have ended, each package with no record
 // has its record written (completePlainBits). A package still in no graph, one a failed side load left out or a store
-// hit by an alias whose target has no record, is named in the wide file, and each of its objects a unit reads is
-// answered dependent on both bits.
+// hit by an alias whose target has no record, is in each build's set that lists it as NoGraph and named in the wide
+// file, and each of its objects a unit reads is answered dependent on both bits.
 
 // declarationsStep is a step of a plain run's declarations graph, which a test's hook is told of as it is reached
 // (pipeline.declarationsSteps): the host's walks whole, so the graph holds every package it will; its completion
@@ -103,9 +103,10 @@ func (engine *pipeline) plainMustCheckOf(reachable []*packages.Package) *mustChe
 	difference.DependentName = func(string, string) (bool, bool, bool) { return true, true, false }
 	dependence := bits.declarations.graph.Against(difference)
 	return &mustCheckSet{
-		lines: mustCheckLines([]build_dependence.Difference{difference}, []*build_dependence.Dependence{dependence}),
-		wide:  mustCheckWide(bits.notHeld, 0),
-		at:    mustCheckAtListing,
+		lines: mustCheckLines([]build_dependence.Difference{difference}, []*build_dependence.Dependence{dependence},
+			bits.notHeld),
+		wide: mustCheckWide(bits.notHeld, 0),
+		at:   mustCheckAtListing,
 
 		judged: time.Since(started),
 		waited: started.Sub(waitStarted),
@@ -180,6 +181,9 @@ func (engine *pipeline) sideLoadStandardLibrary(
 	})
 	if len(paths) == 0 {
 		return nil, nil
+	}
+	if engine.sideLoadRefused != nil {
+		return nil, engine.sideLoadRefused
 	}
 	sideLoaded, loadError := engine.loadPackages(loadRequest{
 		environment: engine.described.workspace.Environment(),

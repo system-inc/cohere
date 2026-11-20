@@ -226,6 +226,7 @@ func (graph *Graph) addPackage(loaded *packages.Package, workspace bool, withhel
 		if collecting.declarationsOnly {
 			collecting.universeNamesFromUses(loaded.Fset)
 		}
+		collecting.repeatUniverseNames()
 		units, edges = collecting.units, collecting.edges
 	}
 	var typesPackage *types.Package

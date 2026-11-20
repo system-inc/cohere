@@ -301,8 +301,10 @@ type pipeline struct {
 	mustCheckSetsLock sync.Mutex
 	mustCheckSets     map[string]*mustCheckSet
 	// declarationsSteps, a test's alone, is told of each step of a plain run's declarations graph at the builds'
-	// start, in order (declarationsStepped).
+	// start, in order (declarationsStepped). sideLoadRefused, a test's alone too, fails a plain run's standard-library
+	// side load with itself in place of the load, as a load that failed would (sideLoadStandardLibrary).
 	declarationsSteps func(declarationsStep)
+	sideLoadRefused   error
 
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
 	// run found no build beside the host's to check.

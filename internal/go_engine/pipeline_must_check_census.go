@@ -20,12 +20,13 @@ import (
 // the build (buildFileStem): `<build>.txt`, its set, one package a line as `<ID>\t<reasons>`, sorted by ID, and
 // `<build>.wide.txt`, what its judgment answered wide for want of any declarations, empty when nothing was, beside
 // `<build>.judgment.txt`, where and how long it was judged (judgmentStamp). A package
-// is in the set for any of three reasons, written in this order, comma-separated (mustCheckReasons):
+// is in the set for any of four reasons, written in this order, comma-separated (mustCheckReasons):
 //   - Files: both builds have it and its files differ: a file one compiles and the other does not, a line directive
 //     in one they do not share, or a cgo tool on either side (filesDiffer);
 //   - BuildOnly: only the build has it;
 //   - Declares: a unit of it declares an object the build makes dependent (build_dependence.Dependence's
-//     DependentPackages).
+//     DependentPackages);
+//   - NoGraph: the judgment holds it in no graph, so nothing says what the build does to its declarations.
 //
 // A package only the host has is in no build's set: the build has nothing of it to check, though every unit of it is
 // dependent there and it may declare a dependent object. The wide file names, a line each as `<ID>\tNoGraph`, every
@@ -44,10 +45,11 @@ const (
 	mustCheckFiles     mustCheckReason = "Files"
 	mustCheckBuildOnly mustCheckReason = "BuildOnly"
 	mustCheckDeclares  mustCheckReason = "Declares"
+	mustCheckNoGraph   mustCheckReason = "NoGraph"
 )
 
 // mustCheckReasons are the reasons in the order a line writes them.
-var mustCheckReasons = []mustCheckReason{mustCheckFiles, mustCheckBuildOnly, mustCheckDeclares}
+var mustCheckReasons = []mustCheckReason{mustCheckFiles, mustCheckBuildOnly, mustCheckDeclares, mustCheckNoGraph}
 
 // mustCheckSet is one build's must-check census, each as its file writes it: lines its set's, and wide what its
 // judgment answered wide. The judgment's stamp is written apart (judgmentStamp): at, where the build was judged,
@@ -79,9 +81,13 @@ func judgmentStamp(set *mustCheckSet) []string {
 
 // mustCheckLines are the set's lines of the build differences describe, judged by judgments, each a graph's judgment
 // of its own difference, nil for a graph that judged nothing: every package a difference holds, by whether the build
-// alone has it, and every package a judgment's dependent objects are declared in, less every package a difference
-// says only the host has.
-func mustCheckLines(differences []build_dependence.Difference, judgments []*build_dependence.Dependence) []string {
+// alone has it, every package a judgment's dependent objects are declared in, and each of notHeld, a package the
+// judgment holds in no graph, less every package a difference says only the host has.
+func mustCheckLines(
+	differences []build_dependence.Difference,
+	judgments []*build_dependence.Dependence,
+	notHeld []string,
+) []string {
 	hostOnly := map[string]bool{}
 	for _, difference := range differences {
 		maps.Copy(hostOnly, difference.HostOnlyPackages)
@@ -112,6 +118,9 @@ func mustCheckLines(differences []build_dependence.Difference, judgments []*buil
 		for identifier := range judged.DependentPackages() {
 			add(identifier, mustCheckDeclares)
 		}
+	}
+	for _, identifier := range notHeld {
+		add(identifier, mustCheckNoGraph)
 	}
 	lines := make([]string, 0, len(reasons))
 	for _, identifier := range slices.Sorted(maps.Keys(reasons)) {
