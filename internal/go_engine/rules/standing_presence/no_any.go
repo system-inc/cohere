@@ -8,87 +8,112 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_any"
 )
 
 // The noany row is a bound, never the rule's flow. consistency-no-any reports an any or an empty interface written in
-// a declaration's type unless something in the package fixes that type, and what fixes it is a value a body hands the
-// declaration, read by a whole-package flow of six node kinds (the report on it, #xeafx79, sections 2 and 8). A record
-// of that flow per body is no small thing, and no set of used objects can say it. What a set of used objects can say
-// is which bodies could touch a key at all: a body marks or feeds a key only if it is the key's own function, names or
-// calls that function, names the key, builds the key's struct type in a literal, or selects a method of an interface
-// method key's name. So every such body is kept present: a superset of the bodies the rule's flow reads, which is
-// sound by construction, whatever the flow makes of them, and no flow is reimplemented here.
+// a declaration's type unless something in the package fixes that type, and what fixes it is a value a body hands a
+// declaration, which the rule's settle then spreads: a fixing place on a variable back along what it was defined from,
+// and a value from elsewhere forward along every declaration it feeds (rules/consistency_no_any/flow_analysis.go,
+// settle). So a body touches a key whenever it names, calls or builds in a literal a declaration settle routes to the
+// key, through any number of declarations of no candidate's own. The row closes the keys the candidates keep under the
+// rule's own two tables (consistency_no_any.RecordFlows), recorded over the build's present syntax: every declaration
+// and initializer, and every body that does not stand. A declaration defined from a key, or one that feeds a key, is a
+// key too, and so on, and a parameter or result that becomes one makes its function one. The bodies that then name a
+// key leave, and their flows are read in turn, until the keys stop growing. That is a superset of the bodies the
+// rule's flow can route to a key, sound by construction whatever the flow makes of them, and no flow is reimplemented
+// here: the edges are the rule's.
 //
 // Only the declaration-level candidates are read: one written in a body is that body's own, the census's sixth reason,
-// which wave 3's record carries. A candidate that keeps no declaration, `type T any` or `type F func(any)`, is reported
-// whatever any body does, so it needs no body present.
+// which the host's presence record carries. A candidate that keeps no declaration, `type T any` or
+// `type F func(any)`, is reported whatever any body does, so it needs no body present.
 
-// noAnyKeys are the declarations the package's declaration-level candidates keep, as the rule keys each, by its
-// generic origin: the functions a parameter or result key belongs to, the variables kept, fields, parameters, results
-// and package-level variables among them, and the names of the interface methods kept.
-type noAnyKeys struct {
-	functions   map[*types.Func]bool
-	variables   map[*types.Var]bool
-	methodNames map[string]bool
-}
-
-// noAnyBound is what noany's bound takes out of the standing set, each with its reason: each function a key belongs
-// to is named, so its users leave, and its own body leaves; each field or variable key is named, and so is each type a
-// literal of which can mark a field key it never names (holdsKeyField); and each used method of an interface method
-// key's name is named, on any receiver, as emptyfunction's are.
+// noAnyBound is what noany's bound takes out of standing, each with its reason, once the keys are closed under the
+// rule's flow: each function a key belongs to is named, so its users leave, and its own body leaves; each field or
+// variable key is named, and so is each type a literal of which can mark a field key it never names (holdsKeyField);
+// and each used method of an interface method key's name is named, on any receiver, as emptyfunction's are. named are
+// the objects the other rows name, whose users leave and so are present, their flows read with the rest.
 func noAnyBound(
 	pass *analysis.Pass,
 	host fact_reach.Host,
 	used []fact_reach.UsedObject,
 	find func(identity build_reads.Identity) (types.Object, bool),
+	standing map[fact_reach.Place]bool,
+	named []fact_reach.Named,
 ) ([]fact_reach.Named, []Leaving) {
 	keys := noAnyKeysOf(pass)
-	if len(keys.functions) == 0 && len(keys.variables) == 0 && len(keys.methodNames) == 0 {
+	if len(keys.functions)+len(keys.variables)+len(keys.methodNames)+len(keys.literals) == 0 {
 		return nil, nil
 	}
-	var named []fact_reach.Named
+	syntax := syntaxOf(pass)
+	owners := flowOwners(pass)
+	// The bodies that leave, the other rows' users among them, which are present and whose flows are read.
+	left := map[fact_reach.Place]bool{}
+	for _, object := range named {
+		for _, user := range host.Users(object.Object) {
+			left[user] = true
+		}
+	}
+	var keyNamed []fact_reach.Named
 	var leaving []Leaving
-	if len(keys.functions) > 0 {
-		// The place of each function the host declares with a body, by its key, as buildOrderNamed maps one to the
-		// other.
-		places := map[fact_reach.Object]fact_reach.Place{}
-		for _, place := range host.Places() {
-			for _, key := range host.Declared(place) {
-				places[key] = place
+	// Each round reads the flows of what is present, closes the keys under them, and takes out what names a key, which
+	// is then present. The keys only grow, among the package's finitely many declarations, so the rounds end.
+	for {
+		edges := consistency_no_any.RecordFlows(pass.TypesInfo, pass.Pkg, pass.Files,
+			func(declaration *ast.FuncDecl) bool {
+				place := placeOf(syntax, declaration)
+				return !standing[place] || left[place]
+			})
+		grew := keys.close(edges, owners)
+		keyNamed, leaving = keys.named(host, used, find)
+		for _, body := range leaving {
+			left[body.Place] = true
+		}
+		for _, object := range keyNamed {
+			for _, user := range host.Users(object.Object) {
+				left[user] = true
 			}
 		}
-		for _, function := range host.Functions() {
-			found, isFound := find(function.Identity)
-			declared, isFunction := found.(*types.Func)
-			if !isFound || !isFunction || !keys.functions[declared.Origin()] {
-				continue
-			}
-			named = append(named, fact_reach.Named{Object: function.Object, Reason: NoAny.Reason()})
-			if place, isPlaced := places[function.Object]; isPlaced {
-				leaving = append(leaving, Leaving{Place: place, Reason: NoAny.Reason()})
+		if !grew {
+			return keyNamed, leaving
+		}
+	}
+}
+
+// flowOwners are the function declarations, function literals and interface methods of the pass's files by each of
+// their parameters and results, so a parameter or result that becomes a key makes what it belongs to one.
+func flowOwners(pass *analysis.Pass) map[*types.Var]consistency_no_any.FlowNode {
+	owners := map[*types.Var]consistency_no_any.FlowNode{}
+	own := func(signature *types.Signature, owner consistency_no_any.FlowNode) {
+		for _, tuple := range []*types.Tuple{signature.Params(), signature.Results()} {
+			for index := range tuple.Len() {
+				owners[tuple.At(index)] = owner
 			}
 		}
 	}
-	for _, object := range used {
-		found, isFound := find(object.Identity)
-		if !isFound {
-			continue
-		}
-		isKey := false
-		switch declared := found.(type) {
-		case *types.Var:
-			isKey = keys.variables[declared.Origin()]
-		case *types.TypeName:
-			isKey = holdsKeyField(declared.Type(), keys.variables)
-		}
-		if isKey {
-			named = append(named, fact_reach.Named{Object: object.Object, Reason: NoAny.Reason()})
-		}
+	for _, file := range pass.Files {
+		ast.Inspect(file, func(node ast.Node) bool {
+			switch declared := node.(type) {
+			case *ast.FuncDecl:
+				if function, isFunction := pass.TypesInfo.Defs[declared.Name].(*types.Func); isFunction {
+					own(function.Signature(), consistency_no_any.FlowNode{Object: function})
+				}
+			case *ast.FuncLit:
+				if signature, isSignature := pass.TypesInfo.TypeOf(declared).(*types.Signature); isSignature {
+					own(signature, consistency_no_any.FlowNode{Literal: declared})
+				}
+			case *ast.InterfaceType:
+				if written, isInterface := pass.TypesInfo.TypeOf(declared).(*types.Interface); isInterface {
+					for index := range written.NumExplicitMethods() {
+						method := written.ExplicitMethod(index)
+						own(method.Signature(), consistency_no_any.FlowNode{Object: method})
+					}
+				}
+			}
+			return true
+		})
 	}
-	if len(keys.methodNames) > 0 {
-		named = append(named, methodsNamed(used, keys.methodNames, find, NoAny.Reason())...)
-	}
-	return named, leaving
+	return owners
 }
 
 // holdsKeyField is whether a composite literal of declared can hand a value to a field key: one of the struct it
@@ -134,7 +159,7 @@ func holdsKeyField(declared types.Type, variables map[*types.Var]bool) bool {
 // body, a literal's too, so a candidate is read only where it is written in a declaration's type.
 func noAnyKeysOf(pass *analysis.Pass) noAnyKeys {
 	keys := noAnyKeys{functions: map[*types.Func]bool{}, variables: map[*types.Var]bool{},
-		methodNames: map[string]bool{}}
+		methodNames: map[string]bool{}, literals: map[*ast.FuncLit]bool{}}
 	for _, file := range pass.Files {
 		// The ancestors of the node being heard, the file first, as the rule's dispatcher hands them over.
 		stack := []ast.Node{}
@@ -151,8 +176,11 @@ func noAnyKeysOf(pass *analysis.Pass) noAnyKeys {
 				}
 			}
 			if spellsAny(pass.TypesInfo, node) {
-				if declarations, judged := noAnyDeclarations(pass.TypesInfo, node, stack); judged {
+				if declarations, literal, judged := noAnyDeclarations(pass.TypesInfo, node, stack); judged {
 					addNoAnyKeys(keys, declarations)
+					if literal != nil {
+						keys.literals[literal] = true
+					}
 				}
 			}
 			stack = append(stack, node)
@@ -194,8 +222,13 @@ func spellsAny(information *types.Info, node ast.Node) bool {
 // noAnyDeclarations climbs from a candidate through the type it is written in to the declaration that states it, and
 // is each declaration on the way, arm for arm as the rule's declarationsAround does
 // (rules/consistency_no_any/flow_analysis.go:491-537). judged is false where the rule's is: the climb left type syntax
-// for an expression, or passed through a constraint, a receiver or an interface's embedded element.
-func noAnyDeclarations(information *types.Info, node ast.Node, stack []ast.Node) ([]types.Object, bool) {
+// for an expression, or passed through a constraint, a receiver or an interface's embedded element. literal is the
+// function literal the climb ended at, a key with no object, and nil for any other end.
+func noAnyDeclarations(
+	information *types.Info,
+	node ast.Node,
+	stack []ast.Node,
+) ([]types.Object, *ast.FuncLit, bool) {
 	declarations := []types.Object{}
 	child := node
 	for index := len(stack) - 1; index >= 0; index-- {
@@ -206,38 +239,38 @@ func noAnyDeclarations(information *types.Info, node ast.Node, stack []ast.Node)
 		case *ast.Field:
 			fieldDeclarations, judged := noAnyFieldDeclarations(information, parent, stack[:index])
 			if !judged {
-				return nil, false
+				return nil, nil, false
 			}
 			declarations = append(declarations, fieldDeclarations...)
 		case *ast.FuncDecl:
 			if child != parent.Type {
-				return nil, false
+				return nil, nil, false
 			}
 			if object := information.Defs[parent.Name]; object != nil {
 				declarations = append(declarations, object)
 			}
-			return declarations, true
+			return declarations, nil, true
 		case *ast.FuncLit:
-			// A literal is a key of its own that no body names, so it keeps nothing here.
-			return declarations, child == parent.Type
+			// A literal is a key of its own, with no object, which a variable defined from it routes to.
+			return declarations, parent, child == parent.Type
 		case *ast.TypeSpec:
-			return declarations, child == parent.Type
+			return declarations, nil, child == parent.Type
 		case *ast.ValueSpec:
 			if child != parent.Type {
-				return nil, false
+				return nil, nil, false
 			}
 			for _, name := range parent.Names {
 				if object := information.Defs[name]; object != nil {
 					declarations = append(declarations, object)
 				}
 			}
-			return declarations, true
+			return declarations, nil, true
 		default:
-			return nil, false
+			return nil, nil, false
 		}
 		child = stack[index]
 	}
-	return nil, false
+	return nil, nil, false
 }
 
 // noAnyFieldDeclarations are the declarations field states, its ancestors in above, as the rule's fieldDeclarations

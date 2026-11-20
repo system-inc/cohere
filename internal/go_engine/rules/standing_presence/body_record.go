@@ -106,7 +106,7 @@ func readBody(information *types.Info, body *ast.BlockStmt) (bool, []string) {
 			return true
 		}
 		if !ownAny && spellsAny(information, node) {
-			_, ownAny = noAnyDeclarations(information, node, stack)
+			_, _, ownAny = noAnyDeclarations(information, node, stack)
 		}
 		if specification, isTypeSpecification := node.(*ast.TypeSpec); isTypeSpecification {
 			if name, isMarker := markerName(information, specification); isMarker && !slices.Contains(markers, name) {

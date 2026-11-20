@@ -55,11 +55,26 @@ func Present(
 		screamingNamed(pass, used, find),
 		emptyFunctionNamed(used, find, markers),
 	)
-	noAnyNamed, leaving := noAnyBound(pass, host, used, find)
+	noAnyNamed, leaving := noAnyBound(pass, host, used, find, standing, named)
 	named = append(named, noAnyNamed...)
 	leaving = append(leaving, recordedLeaving(records, standing)...)
 	leaving = append(leaving, markerMethodsLeaving(syntaxOf(pass), markers, standing)...)
 	leaving = append(leaving, edgesLeaving(syntaxOf(pass), host, records, standing, named, leaving)...)
+	return named, leaving
+}
+
+// Reread is what noany's bound and the edge rows take out of standing, what still stands once the facts have settled
+// (fact_reach.Settle), read again: a body that left only for a differing fact is present now, so its flows may route
+// to a key, and it may start a function that still stands, or be started by one. The caller settles again with the
+// objects named and the bodies taken out as reached, and asks again until a round takes nothing.
+func Reread(
+	pass *analysis.Pass,
+	host fact_reach.Host,
+	standing map[fact_reach.Place]bool,
+	find func(identity build_reads.Identity) (types.Object, bool),
+) ([]fact_reach.Named, []Leaving) {
+	named, leaving := noAnyBound(pass, host, host.Used(), find, standing, nil)
+	leaving = append(leaving, edgesLeaving(syntaxOf(pass), host, presenceRecords(host), standing, named, leaving)...)
 	return named, leaving
 }
 

@@ -7,6 +7,8 @@ package odd
 
 // anything is any by another name, so a parameter of it is no candidate of consistency-no-any, whose presence bound
 // would take G and F out before any fact could (#xeafx79), and so is any to every fact this fixture holds.
+// platformPairs writes it too in each platform's file, since a candidate there would make every parameter that
+// feeds it a key, the bound being closed under the rule's flow.
 type anything = any
 
 // G checks its first slice even, hands its second to platformPairs, and returns no error.

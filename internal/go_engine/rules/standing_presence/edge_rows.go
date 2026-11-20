@@ -5,8 +5,6 @@ import (
 	"go/types"
 	"slices"
 
-	"golang.org/x/tools/go/analysis"
-
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
 
@@ -109,14 +107,6 @@ func edgesLeaving(
 		}
 	}
 	return taken
-}
-
-// Reread is what the edge rows take out of standing, what still stands once the facts have settled
-// (fact_reach.Settle), read in both directions again: a body that left only for a differing fact may start a function
-// that still stands, or be started by one. The caller settles again with what this takes out as reached, and asks
-// again until this takes nothing.
-func Reread(pass *analysis.Pass, host fact_reach.Host, standing map[fact_reach.Place]bool) []Leaving {
-	return edgesLeaving(syntaxOf(pass), host, presenceRecords(host), standing, nil, nil)
 }
 
 // presenceRecords are the host's records of the bodies that hold anything presence reads, by place.

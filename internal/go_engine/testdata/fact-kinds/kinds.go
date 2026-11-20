@@ -15,6 +15,8 @@ import (
 
 // anything is any by another name, so the odd slice callees' values are no candidate of consistency-no-any, whose
 // presence bound would take their users out before any fact could (#xeafx79), and so are any to every fact here.
+// platformPairs writes it too in each platform's file, since a candidate there would make every parameter that
+// feeds it a key, the bound being closed under the rule's flow.
 type anything = any
 
 // failure is an error whose nil pointer is never a nil error.

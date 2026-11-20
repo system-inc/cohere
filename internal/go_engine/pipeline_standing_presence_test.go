@@ -25,9 +25,9 @@ import (
 // writes interface{} of its own. The two presence-marker modules take out the empty method a marker's name declares,
 // whose finding hangs on a selection only one build compiles: windows's alone in -win, the host's alone in -host.
 type standingPresence struct {
-	module string
-	row    standing_presence.Row
-	file   string
+	module  string
+	row     standing_presence.Row
+	file    string
 	leaves  string
 	stands  string
 	named   int

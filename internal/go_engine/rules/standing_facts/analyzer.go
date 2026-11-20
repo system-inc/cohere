@@ -203,21 +203,28 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 
-	// The edge rows again, to a fixed point with the facts: a body that left only for a differing fact may start a
-	// function that still stands, or be started by one, so what still stands is read in both directions again, and
-	// what that takes out is settled as reached, until a round takes nothing. Each round takes a body out of the
-	// standing set or ends, so there are at most as many rounds as bodies stood. A question asked in an earlier round
-	// is answered from the same verdicts again, and counted again where a later round's body records it.
+	// noany's bound and the edge rows again, to a fixed point with the facts: a body that left only for a differing
+	// fact is present now, so its flows may route to a key, and it may start a function that still stands, or be
+	// started by one. What still stands is read again, and what that names and takes out is settled, the bodies as
+	// reached, until a round takes nothing out. Each round takes a body out of the standing set or ends, so there are
+	// at most as many rounds as bodies stood. A question asked in an earlier round is answered from the same verdicts
+	// again, and counted again where a later round's body records it.
 	for {
+		namedAgain, leavingAgain := standing_presence.Reread(pass, host, result.Settlement.Standing, functions.find)
 		again := maps.Clone(result.Settlement.Standing)
-		reachedAgain := result.keepLeaving(again, standing_presence.Reread(pass, host, result.Settlement.Standing))
-		if len(reachedAgain) == 0 {
-			break
-		}
+		reachedAgain := result.keepLeaving(again, leavingAgain)
 		for _, left := range reachedAgain {
 			delete(again, left)
 		}
-		settled := fact_reach.Settle(again, reachedAgain, nil, kinds, host, asked.compare)
+		settled := fact_reach.Settle(again, reachedAgain, namedAgain, kinds, host, asked.compare)
+		if len(reachedAgain) == 0 && len(settled.Removed) == 0 {
+			break
+		}
+		for _, removal := range settled.Removed {
+			if row, isRow := standing_presence.RowOf(removal.Reason); isRow {
+				result.PresenceRemoved[row]++
+			}
+		}
 		result.Settlement.Standing = settled.Standing
 		result.Settlement.Removed = append(result.Settlement.Removed, settled.Removed...)
 		result.Settlement.Asked += settled.Asked
