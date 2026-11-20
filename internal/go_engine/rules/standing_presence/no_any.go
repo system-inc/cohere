@@ -47,7 +47,8 @@ func noAnyBound(
 	}
 	syntax := syntaxOf(pass)
 	owners := flowOwners(pass)
-	// The bodies that leave, the other rows' users among them, which are present and whose flows are read.
+	// The bodies that leave, the other rows' users among them, which are present and whose flows are read. The users
+	// leave only in Settle, so reading them here is an early take, which the Reread after Settle subsumes.
 	left := map[fact_reach.Place]bool{}
 	for _, object := range named {
 		for _, user := range host.Users(object.Object) {

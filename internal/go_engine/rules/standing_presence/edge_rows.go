@@ -54,6 +54,9 @@ func edgesLeaving(
 	for _, body := range leaving {
 		left[body.Place] = true
 	}
+	// The users of each object named leave in Settle, so they are present already. Reading them so here is an early
+	// take, which the Reread after Settle subsumes, since it reads what Settle left: it settles in one round what
+	// would otherwise take two, and removes nothing the Reread would not.
 	for _, object := range named {
 		for _, user := range host.Users(object.Object) {
 			left[user] = true
