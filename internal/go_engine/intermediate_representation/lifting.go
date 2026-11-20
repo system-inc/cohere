@@ -101,6 +101,9 @@ func liftingRound(function *Function, options liftingOptions, scratch *liftingSc
 	scratch.work = liftingCleared(scratch.work, len(function.Blocks))
 	liftingNumber(function, scratch)
 	scratch.runDefers = liftingCleared(scratch.runDefers, len(function.Blocks))
+	// Taken before the array starts again, so allocationsUsed holds the most any earlier round lifted, at no cost to
+	// the appends below.
+	scratch.allocationsUsed = max(scratch.allocationsUsed, len(scratch.allocations))
 	scratch.allocations = scratch.allocations[:0]
 	// Cleared whether or not the function has Locals, so a lookup never finds an earlier round's.
 	clear(scratch.localsInBlocks)
@@ -289,6 +292,8 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 	lifting.declarations = liftingCleared(lifting.declarations, len(allocations))
 	lifting.blocks = liftingCleared(lifting.blocks, len(function.Blocks))
 	scratch.blockValues = liftingCleared(scratch.blockValues, len(function.Blocks))
+	// Marked before the round writes a block, so release clears what a round wrote however far it got.
+	scratch.blockValuesUsed = max(scratch.blockValuesUsed, len(scratch.blockValues))
 	instructions := 0
 	for _, block := range function.Blocks {
 		instructions += len(block.Instructions)
@@ -488,6 +493,8 @@ type liftingDefinition struct {
 // Mutates: scratch its definitions are the round's
 func liftingResolve(lifting *liftingFunction, scratch *liftingScratch) {
 	scratch.definitions = liftingCleared(scratch.definitions, len(lifting.declarations))
+	// Marked before the resolve writes a definition, so release clears what a resolve wrote however far it got.
+	scratch.definitionsUsed = max(scratch.definitionsUsed, len(scratch.definitions))
 	for _, block := range lifting.blocks {
 		for index, slot := range block.slots {
 			if !slot.isPlace {

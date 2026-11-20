@@ -1034,7 +1034,54 @@ func normalize(stream string, root string) string {
 	normalized = lintWaitedPattern.ReplaceAllString(normalized, "")
 	normalized = buildsAtOncePattern.ReplaceAllString(normalized, "")
 	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)
+	normalized = withHostArchitectureUnnamed(normalized, runtime.GOARCH)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
+}
+
+// withHostArchitectureUnnamed is stream with architecture, the host's, written `architecture` in the two reasons that
+// name a platform the engine made on the host's own architecture (#h7cztk1): the project record's reason for a file
+// only a cgo build of another platform compiles, which the engine reaches only for a platform on the host's
+// architecture (one on another architecture is given its own reason first, project.BuildsFor), and the lint record's
+// reason an extra build linted none of a file, which names the build. The fixtures that hold them name no target
+// platform, so each such build is made on the host's `GOARCH`, and the architecture in them is always the machine's.
+func withHostArchitectureUnnamed(stream string, architecture string) string {
+	return strings.NewReplacer(
+		"/"+architecture+" cgo builds it, and cgo is on only for the host's own platform",
+		"/architecture cgo builds it, and cgo is on only for the host's own platform",
+		"/"+architecture+" build compiles it, and its load found",
+		"/architecture build compiles it, and its load found",
+	).Replace(stream)
+}
+
+// The two reasons that name the host's architecture read alike whichever architecture the machine has (#h7cztk1): a
+// line written on an arm64 host and the same line written on an amd64 host normalize to one, so the goldens hold on
+// either, and a line that names another architecture than the host's is left as it was.
+func TestTheHostsArchitectureReadsAlikeInEveryReasonThatNamesIt(test *testing.T) {
+	test.Parallel()
+	lineOn := func(architecture string) string {
+		return `{"reason":"only windows/` + architecture + ` cgo builds it, and cgo is on only for the host's own ` +
+			`platform"},{"notLintedReason":"the windows/` + architecture + ` build compiles it, and its load found ` +
+			`a type error"}`
+	}
+	fromArm, fromAmd := withHostArchitectureUnnamed(
+		lineOn("arm64"),
+		"arm64",
+	), withHostArchitectureUnnamed(lineOn("amd64"),
+		"amd64")
+	if fromArm != fromAmd || strings.Contains(fromArm, "arm64") {
+		test.Errorf(
+			"the line from an arm64 host normalizes to\n%s\nand from an amd64 host to\n%s\nwant one, naming no "+
+				"architecture",
+			fromArm,
+			fromAmd,
+		)
+	}
+	if other := lineOn("amd64"); withHostArchitectureUnnamed(other, "arm64") != other {
+		test.Errorf(
+			"a line naming amd64 on an arm64 host was rewritten to %s",
+			withHostArchitectureUnnamed(other, "arm64"),
+		)
+	}
 }
 
 // inputsInside is an inputs record's line with only the paths at or below root kept, or the line as it was when it
@@ -1193,7 +1240,7 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 	var phases []string
 	findings, findingsInPhase, filesRewritten, changedFiles := 0, 0, 0, 0
 	gap, summarized := false, false
-	inputsLine := -1
+	inputsLine, timelineLine := -1, -1
 	for index, line := range lines {
 		var record struct {
 			Kind               string            `json:"kind"`
@@ -1261,10 +1308,25 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 			if len(phases) != 4 {
 				test.Errorf("line %d is the inputs record after phases %v, and it follows every phase", index+1, phases)
 			}
+		case "timeline":
+			if timelineLine >= 0 {
+				test.Errorf("line %d is a second timeline record", index+1)
+			}
+			timelineLine = index
 		case "summary":
 			summarized = true
-			if inputsLine >= 0 && inputsLine != index-1 {
-				test.Errorf("the inputs record is on line %d, and it comes just before the summary", inputsLine+1)
+			// The timeline, under `--timeline`, is the last before the summary, and the inputs just before it.
+			last := index - 1
+			if timelineLine >= 0 {
+				if timelineLine != index-1 {
+					test.Errorf("the timeline record is on line %d, and it comes just before the summary",
+						timelineLine+1)
+				}
+				last = index - 2
+			}
+			if inputsLine >= 0 && inputsLine != last {
+				test.Errorf("the inputs record is on line %d, and it comes just before the summary or the timeline",
+					inputsLine+1)
 			}
 			if !slices.Equal(phases, []string{"fix", "types", "lint", "unused"}) {
 				test.Errorf("phases %v, want fix, types, lint and unused once each, in order", phases)

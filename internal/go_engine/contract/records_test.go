@@ -411,6 +411,14 @@ func populatedRecords() []Record {
 			MeasuredCalls:            2300,
 			MeasuringCpuMicroseconds: 230,
 		},
+		TimelineRecord{
+			Unavailable: "the process's CPU clock could not be read",
+			Timed:       true,
+			Stamps: []TimelineStamp{
+				{Build: "windows/amd64", Round: 1, Label: "listing.end", WallMicroseconds: 3200, UserMicroseconds: 2100,
+					SystemMicroseconds: 900},
+			},
+		},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1, UnguardedWorkspaceSums: []string{"/work/go.work.sum"}},
 	}
 }
@@ -507,6 +515,7 @@ func TestFixtureRecordsReencodeToTheSameJson(test *testing.T) {
 		KindMemory:     func() Record { return &MemoryRecord{} },
 		KindInputs:     func() Record { return &InputsRecord{} },
 		KindTiming:     func() Record { return &TimingRecord{} },
+		KindTimeline:   func() Record { return &TimelineRecord{} },
 		KindSummary:    func() Record { return &SummaryRecord{} },
 	}
 	fixtures, globError := filepath.Glob(contractFixtures)
@@ -726,6 +735,22 @@ func TestMemoryRecordWritesNoRaisesAsAnEmptyList(test *testing.T) {
 	}
 	if want := `{"kind":"memory","raisedToBytes":[]}` + "\n"; !strings.HasSuffix(output.String(), want) {
 		test.Errorf("a memory record with no raises wrote %s, want it to end %s", output.String(), want)
+	}
+}
+
+// TestTimelineRecordWritesNoStampsAsAnEmptyList keeps a timeline with no stamps from writing null, which would read as
+// "not recorded" rather than "nothing stamped", and leaves out `timed` and `unavailable` when they say nothing.
+func TestTimelineRecordWritesNoStampsAsAnEmptyList(test *testing.T) {
+	test.Parallel()
+	var output bytes.Buffer
+	writer := NewWriter(&output)
+	for _, record := range []Record{ProvenanceRecord{Contract: Version}, TimelineRecord{}} {
+		if writeError := writer.Write(record); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	if want := `{"kind":"timeline","stamps":[]}` + "\n"; !strings.HasSuffix(output.String(), want) {
+		test.Errorf("a timeline with no stamps wrote %s, want it to end %s", output.String(), want)
 	}
 }
 

@@ -93,9 +93,10 @@ func (engine *pipeline) plainMustCheckOf(reachable []*packages.Package) *mustChe
 		built[each.ID] = each
 	}
 	read := engine.sourceReader(nil, nil)
-	// The judgment's shared files and packages are the facts census's, which a plain run keeps none of.
+	// The judgment's shared files and packages, and those without syntax, are the facts census's, which a plain run
+	// keeps none of.
 	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
-		filesDiffer: map[string]bool{}}
+		withoutSyntax: map[string]bool{}, filesDiffer: map[string]bool{}}
 	difference := engine.listingDifference(bits.host, built, token.NewFileSet(), read,
 		func(file string) bool { return holdsLineDirectiveOnce(&bits.lineDirectives, file, read) }, judged)
 	difference.DependentObject = func(types.Object) (bool, bool) { return true, true }

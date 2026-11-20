@@ -59,12 +59,17 @@ func runGoEngineVerb(
 // `timing` asks the engine for its timing record, what the run's CPU went to, which the front door prints as
 // TypeScript's timing table (#3apgjer). The run cache never admits it (see runCacheAdmits).
 //
+// `timeline` is Go's alone too: the engine's timeline record, when each phase and each build began and ended on the
+// run's clock, which the front door prints as a table (#3v2zp7g). It changes nothing of the run, but a replay would
+// print another run's clock, so the run cache never admits it either.
+//
 // `stdin-filepath` is the editor's save (#qtna8m4), forwarded with its absolute path, and run by runGoStdin rather
 // than as a check: the engine reads the buffer on stdin and writes the file's text where a check writes records.
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-		"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "timing", "duplicates",
+		"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "timing", "timeline",
+		"duplicates",
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open", "stdin-filepath",
@@ -116,6 +121,7 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.requested = engineRequestedPhases(given, flagValue)
 	run.timingRequested = given["timing"] && flagValue("timing") == "true"
+	run.timelineRequested = given["timeline"] && flagValue("timeline") == "true"
 	run.duplicatesRequested = given["duplicates"] && flagValue("duplicates") == "true"
 	run.engineEnvironment = []string{goEngineChildVariable + "=1"}
 	// os.Stderr is read here, after the run cache began, so the engine writes into the recording's tee.

@@ -360,9 +360,21 @@ func rootResults(
 	analyzers ...*analysis.Analyzer,
 ) map[*analysis.Analyzer]any {
 	test.Helper()
+	return rootResultsOver(test, "functions", options, analyzers...)
+}
+
+// rootResultsOver is rootResults over the package at importPath, a fixture's or the standard library's, and not over
+// the test variants the load brings with one that has tests.
+func rootResultsOver(
+	test *testing.T,
+	importPath string,
+	options *checker.Options,
+	analyzers ...*analysis.Analyzer,
+) map[*analysis.Analyzer]any {
+	test.Helper()
 	directory := analysistest.TestData()
 	// The fixture is a tree laid out by import path, loaded as analysistest loads one.
-	loaded, loadError := load.Packages(directory, []string{"functions"}, []string{
+	loaded, loadError := load.Packages(directory, []string{importPath}, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
 	}, nil)
 	if loadError != nil {
@@ -377,7 +389,9 @@ func rootResults(
 		if action.Err != nil {
 			test.Fatalf("running %s: %v", action, action.Err)
 		}
-		results[action.Analyzer] = action.Result
+		if action.Package.ID == importPath {
+			results[action.Analyzer] = action.Result
+		}
 	}
 	return results
 }

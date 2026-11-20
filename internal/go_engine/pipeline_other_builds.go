@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
@@ -22,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // errorRefusedAtGate is the error a build refused at the share gate ends its load with, since a build before it in
@@ -42,6 +44,7 @@ var errorRefusedAtGate = errors.New("refused at the share gate: a build before i
 func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []buildRun {
 	// The standard library's graph under `--build-dependence` ran beside the host's lint, and is over before anything
 	// of the builds is measured or started.
+	engine.request.timeline.Stamp("handover.begin")
 	engine.awaitStandardLibrary()
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
@@ -62,6 +65,7 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	waitStarted := time.Now()
 	hostReads := wholeReads(pass.result)
 	waited := time.Since(waitStarted)
+	engine.request.timeline.Stamp("host.readwalks.end")
 	// The walks are over, so a plain run's declarations graph for the must-check census holds every package it will,
 	// and its records are written beside the builds, joined before the run's record.
 	if pass.declarations != nil {
@@ -78,6 +82,11 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		if pass.result.FactReach != nil {
 			engine.factReachSides = newFactReachSides(engine.bodyReachHost, pass.result.FactReach, loaded.Packages)
 			pass.result.FactReach = nil
+		}
+		// The rules confined for the standing bodies, judged once for every build, and only where any body may stand.
+		if engine.leavesBodiesStanding() {
+			enabled, _ := engine.enabledRules()
+			engine.standingConfined = engine.standingConfinedRules(enabled)
 		}
 	}
 	// And the host's dependence sets are in its memo, each computed as its package's walk ended, so no build computes
@@ -155,8 +164,10 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 			return measured
 		}
 	}
+	engine.request.timeline.Stamp("handover.end")
 	extraRuns, extraError := engine.extraBuildRuns(extras, heaviestFirst(host, extras), ours, pass.result.Host, width,
 		fromHostLive, measure)
+	engine.request.timeline.Stamp("builds.end")
 	if extraError != nil {
 		engine.otherBuildsFailed(extraError)
 		return nil
@@ -537,6 +548,15 @@ func (engine *pipeline) extraBuildRun(
 	afterLoad func(loaded bool),
 	atGate func(fromSource int, packages int) error,
 ) (buildRun, error) {
+	// A test's hold on the build before it reads anything (extraBuildStarts), nil in every run but a test's.
+	if engine.extraBuildStarts != nil {
+		engine.extraBuildStarts(extra)
+	}
+	// Under `--timeline` the build's stamps, each under the build's name, in its first round: its own steps, and its
+	// first load's and check's. A reload's are in the reload's round, the rounds checkedFromSourceRounds counts. The
+	// name is asked only of a run that stamps (buildTimeline).
+	stamp := engine.buildTimeline(extra, 0)
+	timeline.Tell(stamp, "start")
 	environment := extraBuildEnvironment(engine.described.workspace, extra)
 	// The build's one go env, which its findings cache's key and its load, the lister and the kept listing among it,
 	// all read (#4rpt1jh), read with its lister state before the host's first load (earlyStart, startChildrenFirst),
@@ -557,7 +577,12 @@ func (engine *pipeline) extraBuildRun(
 		if engine.session != nil {
 			hostFiles = engine.session.Files()
 		}
-		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes, engine.extraBuildSystemCache())
+		// The build reads and writes the run's system cache in every run, one judging each build's dependence too
+		// (#wzre5eg): its standard library is then loaded as a plain run's build loads it, restored where the system
+		// cache holds it under the build's own key and checked from source and written there where it does not, so the
+		// body reach's load mode rule compares the two loads a plain run has (bodyReacher.loadModeReaches). The facts
+		// census compares no fact of a package the build restored, and counts each (compareFacts).
+		session = engine.cacheSession(environment, goEnvironment, hostFiles, notes)
 		// Each extra build reads one pack of each store rather than open every record it hits (#b2t9xmf); the host's
 		// session keeps none.
 		if session != nil {
@@ -597,6 +622,8 @@ func (engine *pipeline) extraBuildRun(
 		SharedReads:       engine.reads,
 		Fingerprints:      engine.fingerprints,
 		Walks:             engine.walks,
+		// Under `--timeline` the build's load stamps its listing's end, its restore and its first parse.
+		Timeline: stamp,
 	}
 	if session != nil {
 		caching.Restorer = session
@@ -646,6 +673,7 @@ func (engine *pipeline) extraBuildRun(
 	elapsed := time.Since(started)
 	loading += elapsed
 	loadWall += elapsed
+	timeline.Tell(stamp, "load.end")
 	// The first build's load has ended and its rules have not started: it holds none of the run's slots, and every
 	// other build waits at the share gate, before its type check, so the width is measured here, before any other
 	// build is admitted (extraBuildRuns). Their listings, graphs and restores are live as it measures, so the holding
@@ -707,6 +735,13 @@ func (engine *pipeline) extraBuildRun(
 		run.lintWait = time.Since(waitStarted)
 	}
 	engine.lintStepped(extra, lintStepTaken, weight)
+	timeline.Tell(stamp, "gate.taken")
+	// The build's standing bodies, made once for every load of it, only where the run leaves bodies standing, and read
+	// by a load only where its passes are handed the host's sides.
+	var standing *buildStanding
+	if engine.standingConfined != nil {
+		standing = newBuildStanding(host, enabled, engine.standingConfined)
+	}
 	// A nil *check.HostInheritance would be a non-nil rule.Inheritance, which every pass would read as one.
 	var inherits rule.Inheritance
 	if inheritance != nil {
@@ -721,18 +756,15 @@ func (engine *pipeline) extraBuildRun(
 		}
 		if engine.bodyReachHost != nil && run.judged != nil {
 			built := reachBuiltPackages(over, engine.dependence.files)
-			fromSource := make(map[string]bool, len(built))
-			for _, read := range built {
-				fromSource[read.identifier] = true
-			}
+			graph := newReachBuiltGraph(over)
 			sizesDiffer := buildSizesDiffer(engine.dependence.from, over)
-			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence, built, fromSource, sizesDiffer)
+			run.bodyReach = engine.bodyReachHost.reach(run.judged.dependence, built, graph, sizesDiffer)
 			// The same census again over the packages a plain run of the build checks from source, beside the whole.
 			if recorded := engine.recordedFromSource(extra); recorded != nil {
 				run.bodyReachFromSource = engine.bodyReachHost.reach(run.judged.dependence,
 					slices.DeleteFunc(slices.Clone(built), func(read *reachBuiltPackage) bool {
 						return !recorded[read.identifier]
-					}), fromSource, sizesDiffer)
+					}), graph, sizesDiffer)
 			}
 			if engine.bodyDifferential {
 				census := run.bodyReach
@@ -749,6 +781,15 @@ func (engine *pipeline) extraBuildRun(
 			hosts := engine.factReachSides.inBuild(run.bodyReach)
 			run.factHosts = hosts
 			factHosts = func(packageId string) fact_reach.Host { return hosts[packageId] }
+		}
+		settle := engine.factReachSettle(factHosts != nil)
+		// A package whose pass is handed a host's side lints only what does not stand once standing_facts has settled
+		// it there, whose action every dispatcher's action on the package follows, and the representation's build too,
+		// which then leaves unbuilt what stands for every rule its dispatcher starts.
+		var standingBodies func(packageId string, after any) rule.StandingBodies
+		var standingAfter *analysis.Analyzer
+		if standing != nil && settle != nil {
+			standingBodies, standingAfter = standing.bodiesOf, settle
 		}
 		started := time.Now()
 		defer func() { linting += time.Since(started) }()
@@ -768,8 +809,12 @@ func (engine *pipeline) extraBuildRun(
 			FactHosts:   factHosts,
 			// The standing bodies each pass's side leaves are settled, for the census to count, and under the body
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
-			FactReachSettle: engine.factReachSettle(factHosts != nil),
+			FactReachSettle: settle,
 			FactReach:       engine.bodyDifferential && factHosts != nil,
+			// Under `--timeline` the check stamps in the round of the load it runs over, the last one counted.
+			Timeline:       engine.buildTimeline(extra, len(run.checkedFromSourceRounds)-1),
+			StandingBodies: standingBodies,
+			StandingAfter:  standingAfter,
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
@@ -792,11 +837,15 @@ func (engine *pipeline) extraBuildRun(
 		// package restored from the host's run whose facts or answers do not hold here (check.Result.Reloads).
 		for checkError == nil && len(result.Reloads) > 0 && session != nil && session.Reload(result.Reloads) {
 			reloads := strings.Join(result.Reloads, ", ")
+			// The reload's load, its end too, and the check over it, stamp in the round this load is of: 1 for the
+			// first reload.
+			caching.Timeline = engine.buildTimeline(extra, len(run.checkedFromSourceRounds))
 			started := time.Now()
 			loaded, loadError = engine.loadPackages(loadRequest{environment: environment, caching: &caching})
 			elapsed := time.Since(started)
 			loading += elapsed
 			loadWall += elapsed
+			timeline.Tell(caching.Timeline, "load.end")
 			if loadError != nil {
 				return nil, fmt.Errorf("loading the build %s again to check %s from source: %w", extra, reloads,
 					loadError)
@@ -871,24 +920,24 @@ func (engine *pipeline) extraBuildRun(
 		engine.buildLoadTimes(extra, loadWall, shareGateWait)
 	}
 	run.inheritedFiles, run.inheritedFindings = inheritance.Counts()
+	run.standingDeclarations, run.standingFindings = standing.counts()
 	if engine.extraBuildEnds != nil {
 		if endError := engine.extraBuildEnds(extra, notes); endError != nil {
 			return buildRun{}, fmt.Errorf("the build %s: %w", extra, endError)
 		}
 	}
+	timeline.Tell(stamp, "end")
 	return run, nil
 }
 
-// extraBuildSystemCache is the system cache an extra build reads its standard library from and writes it to: the
-// run's, but none in a run judging each build's dependence. There the facts census compares each build's facts and
-// answers with the host's through the build's standard library's syntax, which a package restored from the system
-// cache's store does not have, so such a build computes its standard library, as the census needs, and keeps it in
-// the project's store, as before the system cache.
-func (engine *pipeline) extraBuildSystemCache() *systemCache {
-	if engine.request.judgesDependence() {
-		return &systemCache{off: true}
+// buildTimeline is extra's timeline hook in round under `--timeline` (timeline.Recorder's Hook), and nil for a run
+// that did not ask. The build reaches the recorder's interface only past the nil check, so a run without the switch
+// copies no build into an interface for it, and asks no name of it.
+func (engine *pipeline) buildTimeline(extra project.Build, round int) func(label string) {
+	if engine.request.timeline == nil {
+		return nil
 	}
-	return engine.systemCache
+	return engine.request.timeline.Hook(extra, round, "")
 }
 
 // wholeReads is result's reads once every type-read walk the run left running has ended (check.Result.ReadWalks):
@@ -967,8 +1016,10 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			// An extra build's alone, under `--build-dependence`: nil otherwise, which the record leaves out.
 			Dependence: run.dependence,
 			// An extra build's alone: 0 otherwise, which the record leaves out.
-			InheritedFiles:    run.inheritedFiles,
-			InheritedFindings: run.inheritedFindings,
+			InheritedFiles:       run.inheritedFiles,
+			InheritedFindings:    run.inheritedFindings,
+			StandingDeclarations: run.standingDeclarations,
+			StandingFindings:     run.standingFindings,
 		}
 		recordTimes(&record, run)
 		if run.result != nil {

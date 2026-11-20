@@ -3,6 +3,11 @@
 # Composes, as inputs.go defines each), and FullKind when the inventory's section 2 found it reading more of a named
 # type than its name. Sorted by name.
 #
+# A constant's value is part of what a unit names, so a unit that reads a constant's folded value is PerUnit, the
+# body reach reaching it by its Constant reason when the value differs. A same-package callee's no-return is a fact the
+# unit reads, though ctrlflow computes it in place, so a unit whose findings turn on it is PerUnit too, the facts' reach
+# taking it out of the standing set when the fact differs (#3rcmc3h).
+#
 # TestEveryRegisteredRuleHasItsInputsInTheTable holds the registry to this table both ways: a rule with no line here
 # fails, so a new rule is read for its inputs before it lands, and so does a line naming no registered rule. A change
 # here is a change to the inventory, made with the reading behind it, and cohere-dev's land gate isolates every rule a
@@ -12,6 +17,21 @@
 # unit_isolation_test.go): scannererr and sqlrowserr judge a package-level variable by its uses in every unit, at
 # PackageExit. SA2002 is PerUnit because it asks the fact resolver which calls of the same-package function a go
 # statement starts stop the test (its test_stopping_calls answers), where testinggoroutine reads that function's body.
+#
+# Seven are Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
+# (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26):
+#   - SA4029 judges no assignment unless the package's type index holds one of sort's slice types, which an import or
+#     a use in any file puts there.
+#   - SA5008 accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags.
+#   - tests judges an example's name by the package's scope, by every import of its files, and by the fields and
+#     methods of the type it names.
+#   - consistency-no-abbreviated-identifier suggests a name no file of the package declares; keeps free the name of
+#     every package its imports reach, its whole import closure, not only its own imports (isTakenInGo); and leaves a
+#     method alone where an interface of any package its imports reach fixes its name and signature, as sort's does
+#     for Len, the receiver's whole method set read across the package's files.
+#   - S1018 offers copy() for a sliding loop, S1025 a conversion to string, and stringintconv an import of fmt under
+#     that name, only while no file of the package declares copy, string or fmt, a universe name or a free name looked
+#     up in the package's scope.
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind
@@ -28,15 +48,15 @@ cohere-go/S1011 PerUnit FullKind
 cohere-go/S1012 PerUnit
 cohere-go/S1016 PerUnit FullKind
 cohere-go/S1017 PerUnit
-cohere-go/S1018 PerUnit
+cohere-go/S1018 Composes
 cohere-go/S1019 PerUnit
 cohere-go/S1020 PerUnit
 cohere-go/S1021 PerUnit
 cohere-go/S1023 PerUnit
 cohere-go/S1024 PerUnit FullKind
-cohere-go/S1025 PerUnit FullKind
+cohere-go/S1025 Composes FullKind
 cohere-go/S1028 PerUnit
-cohere-go/S1029 PerUnit
+cohere-go/S1029 PerUnit FullKind
 cohere-go/S1030 PerUnit
 cohere-go/S1031 PerUnit
 cohere-go/S1032 PerUnit
@@ -61,7 +81,7 @@ cohere-go/SA1010 PerUnit
 cohere-go/SA1011 PerUnit
 cohere-go/SA1012 PerUnit
 cohere-go/SA1013 PerUnit FullKind
-cohere-go/SA1014 PerUnit
+cohere-go/SA1014 PerUnit FullKind
 cohere-go/SA1015 PerUnit
 cohere-go/SA1016 PerUnit FullKind
 cohere-go/SA1017 PerUnit
@@ -74,7 +94,7 @@ cohere-go/SA1024 PerUnit
 cohere-go/SA1025 PerUnit FullKind
 cohere-go/SA1026 PerUnit FullKind
 cohere-go/SA1027 PerUnit FullKind
-cohere-go/SA1028 PerUnit
+cohere-go/SA1028 PerUnit FullKind
 cohere-go/SA1029 PerUnit FullKind
 cohere-go/SA1030 PerUnit
 cohere-go/SA1031 PerUnit
@@ -88,7 +108,7 @@ cohere-go/SA3001 PerUnit
 cohere-go/SA4000 PerUnit FullKind
 cohere-go/SA4001 PerUnit
 cohere-go/SA4003 PerUnit FullKind
-cohere-go/SA4004 PerUnit
+cohere-go/SA4004 PerUnit FullKind
 cohere-go/SA4005 PerUnit FullKind
 cohere-go/SA4006 PerUnit
 cohere-go/SA4008 PerUnit
@@ -98,7 +118,7 @@ cohere-go/SA4011 PerUnit
 cohere-go/SA4012 PerUnit
 cohere-go/SA4013 PerUnit
 cohere-go/SA4014 PerUnit
-cohere-go/SA4015 PerUnit
+cohere-go/SA4015 PerUnit FullKind
 cohere-go/SA4016 PerUnit
 cohere-go/SA4017 PerUnit FullKind
 cohere-go/SA4018 PerUnit FullKind
@@ -106,15 +126,17 @@ cohere-go/SA4019 FileSyntax
 cohere-go/SA4020 PerUnit FullKind
 cohere-go/SA4021 PerUnit
 cohere-go/SA4022 PerUnit
-cohere-go/SA4023 PerUnit
+cohere-go/SA4023 PerUnit FullKind
 cohere-go/SA4024 PerUnit
 cohere-go/SA4025 PerUnit
 cohere-go/SA4026 PerUnit
 cohere-go/SA4027 PerUnit
 cohere-go/SA4028 PerUnit
-cohere-go/SA4029 PerUnit FullKind
+cohere-go/SA4029 Composes FullKind
 cohere-go/SA4030 PerUnit FullKind
-cohere-go/SA4031 PerUnit
+cohere-go/SA4031 PerUnit FullKind
+# SA4032 is carried by construction: it reads only its own file's build constraint and name, and a body stands only in
+# a file both builds compile, where both read them the same.
 cohere-go/SA4032 PerUnit
 cohere-go/SA5000 PerUnit
 cohere-go/SA5001 PerUnit FullKind
@@ -123,13 +145,13 @@ cohere-go/SA5003 PerUnit
 cohere-go/SA5004 PerUnit
 cohere-go/SA5005 PerUnit
 cohere-go/SA5007 PerUnit
-cohere-go/SA5008 PerUnit FullKind
+cohere-go/SA5008 Composes FullKind
 cohere-go/SA5010 PerUnit FullKind
-cohere-go/SA5012 PerUnit
-cohere-go/SA6000 PerUnit
-cohere-go/SA6001 PerUnit
-cohere-go/SA6002 PerUnit
-cohere-go/SA6003 PerUnit
+cohere-go/SA5012 PerUnit FullKind
+cohere-go/SA6000 PerUnit FullKind
+cohere-go/SA6001 PerUnit FullKind
+cohere-go/SA6002 PerUnit FullKind
+cohere-go/SA6003 PerUnit FullKind
 cohere-go/SA6005 PerUnit FullKind
 cohere-go/SA6006 PerUnit FullKind
 cohere-go/SA9001 PerUnit
@@ -165,7 +187,7 @@ cohere-go/concurrency-no-kill-by-name PerUnit
 cohere-go/concurrency-require-escape-hatch-reason PerUnit
 cohere-go/concurrency-require-joined-pipe-reader PerUnit
 cohere-go/consistency-no-abbreviated-file-name FileSyntax
-cohere-go/consistency-no-abbreviated-identifier PerUnit FullKind
+cohere-go/consistency-no-abbreviated-identifier Composes FullKind
 cohere-go/consistency-no-ambiguous-identifier PerUnit FullKind
 cohere-go/consistency-no-any Composes FullKind
 cohere-go/consistency-no-boolean-outcome PerUnit FullKind
@@ -232,7 +254,7 @@ cohere-go/slog PerUnit FullKind
 cohere-go/sqlrowserr Composes
 cohere-go/stdmethods PerUnit FullKind
 cohere-go/stdversion PerUnit
-cohere-go/stringintconv PerUnit FullKind
+cohere-go/stringintconv Composes FullKind
 cohere-go/structtag PerUnit FullKind
 cohere-go/testing-no-machine-path PerUnit
 cohere-go/testing-no-timing-assertion PerUnit
@@ -240,7 +262,7 @@ cohere-go/testing-no-uncached-run PerUnit
 cohere-go/testing-require-failure-path PerUnit
 cohere-go/testing-require-parallel Composes
 cohere-go/testinggoroutine Composes FullKind
-cohere-go/tests PerUnit FullKind
+cohere-go/tests Composes FullKind
 cohere-go/timeformat PerUnit
 cohere-go/unmarshal PerUnit
 cohere-go/unreachable PerUnit

@@ -2,10 +2,13 @@ package dispatch
 
 import (
 	"go/ast"
+	"go/token"
 	"reflect"
 	"slices"
 
 	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // syntaxWalk is the walk of one package's files, which keeps the ancestors of the node it visits as it goes.
@@ -18,6 +21,11 @@ type syntaxWalk struct {
 	// nodes, the slice a listener is handed with the last left out. Both are reused across the whole walk.
 	spine     []inspector.Cursor
 	ancestors []ast.Node
+	// standing is the standing spans of the file the walk is in, sorted by where each starts, when some run is
+	// confined on that file, and nil otherwise, when no node's position is tested. standingNext is the first of them
+	// the walk has not passed the end of (see inStandingBody).
+	standing     []rule.StandingSpan
+	standingNext int
 }
 
 // newSyntaxWalk is the walk calling started's listeners, each kind they list found by its number where nodeKindOf
@@ -48,10 +56,29 @@ func (walk *syntaxWalk) visit(cursor inspector.Cursor) bool {
 	if number == 0 {
 		runs = walk.started.byKind[reflect.TypeOf(node)]
 	}
+	// Tested once for every run the node reaches, and never in a file no run is confined on (#e4rd5dw). The walk
+	// descends into a standing body all the same, since a run that is not confined hears every node of it.
+	deaf := walk.standing != nil && walk.inStandingBody(node.Pos())
 	for called := 0; called < len(runs); {
-		called = walk.callNodes(runs, called, cursor, node, ancestors)
+		called = walk.callNodes(runs, called, cursor, node, ancestors, deaf)
 	}
 	return true
+}
+
+// inStandingBody is whether position, a node's the walk is visiting, lies in a standing body of the file the walk is
+// in: from a standing span's opening brace to its end. A standing declaration's own node, at its `func`, and its
+// receiver, name and type lie before the brace, so every run hears them.
+//
+// The spans are sorted and the walk goes through the file's declarations in source order, so it passes each span's
+// end once and tests a position against one span, the first it has not passed. A node of a declaration lies inside
+// that declaration, its doc comment aside, which lies before it, so no node of a span follows one past the span's
+// end. Were one to, the walk would only call a confined run for a node in a standing body, as it does on the host,
+// and the rule's action drops what the run finds there (rule.OutsideStanding).
+func (walk *syntaxWalk) inStandingBody(position token.Pos) bool {
+	for walk.standingNext < len(walk.standing) && walk.standing[walk.standingNext].End < position {
+		walk.standingNext++
+	}
+	return walk.standingNext < len(walk.standing) && position >= walk.standing[walk.standingNext].Body
 }
 
 // callNodes calls the Node of each of runs from the one at from on, in order, on node with its ancestors, each
@@ -63,12 +90,16 @@ func (walk *syntaxWalk) visit(cursor inspector.Cursor) bool {
 // in the same order with what it was handed before, and one that panics is the same crash, spelled from the same
 // frames, and is called no more on the package. A Node that panics leaves its context's cursor held, which is
 // harmless: the run has crashed, and nothing calls it again.
+//
+// deaf is whether node lies in a standing body, when a run confined on the file is not called for it: the host's
+// findings there are the rule's (rule.StandingFiles). Every other run is called for it as for any node.
 func (walk *syntaxWalk) callNodes(
 	runs []*listenerRun,
 	from int,
 	cursor inspector.Cursor,
 	node ast.Node,
 	ancestors []ast.Node,
+	deaf bool,
 ) (next int) {
 	calling := from
 	defer func() {
@@ -79,8 +110,9 @@ func (walk *syntaxWalk) callNodes(
 	}()
 	for ; calling < len(runs); calling++ {
 		run := runs[calling]
-		// A run whose rule inherits the file the walk is in hears none of its nodes (#y6q1x2j).
-		if run.crash != nil || run.skipping {
+		// A run whose rule inherits the file the walk is in hears none of its nodes (#y6q1x2j), and one confined on
+		// it none inside a standing body (#e4rd5dw).
+		if run.crash != nil || run.skipping || (deaf && run.confined) {
 			continue
 		}
 		run.context.EnterNode(cursor)

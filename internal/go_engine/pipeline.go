@@ -25,6 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -138,6 +139,10 @@ type pipeline struct {
 	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
 	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
 	// notes, and fails the build when it returns an error, so a test can note from a build and fail one by name.
+	// extraBuildStarts, a test's alone too, is called as each extra build's run starts, on the build's own goroutine,
+	// before the build makes its session or reads anything of the run's stores, so a test can hold a build there until
+	// another has ended, and so decide which of two builds side by side asks first for what the run reads once, as a
+	// shard's stamp (cache.ShardStamps).
 	// lintSteps, a test's alone too, is told each step of an extra build's lint at the gate with the weight it takes
 	// (lintStep), on the build's own goroutine, so a test can count the lints holding weight and hold a build at a
 	// step.
@@ -158,6 +163,7 @@ type pipeline struct {
 	buildsWidthForced       int
 	buildsWidthAtGateForced int
 	buildsWidthUnguarded    bool
+	extraBuildStarts        func(extra project.Build)
 	extraBuildEnds          func(extra project.Build, notes io.Writer) error
 	lintSteps               func(extra project.Build, step lintStep, weight int)
 	shareGateSteps          func(extra project.Build, position int, step shareGateStep)
@@ -189,6 +195,14 @@ type pipeline struct {
 	// a goroutine of its own, so each is added when it ends.
 	hostLoading atomic.Int64
 	hostLinting atomic.Int64
+
+	// hostLoads counts the host's loads of the workspace as each starts, every one through loadWorkspacePackages and
+	// the load of what a rename wrote (runRename), so under `--timeline` each load's stamps, and the stamps of the lint
+	// pass over it (lintPackages), carry its round, 0 for the first, and no two stamps of the run are alike (#3v2zp7g).
+	// The rename's load stamps nothing, since it reads no findings cache to hand a hook, and counts all the same, so
+	// the pass over it is a round of its own. A pass beside the load reads it on a goroutine of its own, once the load
+	// that begins it has counted itself, and before any other load starts.
+	hostLoads atomic.Int32
 
 	// reads are the directory and file reads every in-process listing of the run shares, the host's and each extra
 	// build's, so an extra build's listing reads nothing the host's already did (#yyvstj6). Every load of the run may
@@ -259,6 +273,14 @@ type pipeline struct {
 	// factReachSides are the host's side of each package for the facts' reach, made beside bodyReachHost from what the
 	// host's lint captured of its facts, and nil whenever it is (fact_reach_sides.go, #aswfm7a).
 	factReachSides *factReachSides
+
+	// standingBodies is whether an extra build on the census path leaves the bodies that stand to the host's findings,
+	// from `COHERE_STANDING_BODIES=1`, off by default (pipeline_standing_bodies.go, #e4rd5dw), and standingConfined the
+	// rules confined there, by name, made once as the extra builds start in a run that leaves bodies standing, nil in
+	// any other. plantedInputs, a test's alone, are inputs declared for rules it planted, which the table never names.
+	standingBodies   bool
+	standingConfined map[string]bool
+	plantedInputs    map[string]rules.Declared
 
 	// bodyReachFromSourceRecord is the directory each extra build's from-source packages are recorded into, and
 	// bodyReachFromSource the one the census reads them back from, each empty unless asked
@@ -416,7 +438,7 @@ func (engine *pipeline) run() int {
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
 		engine.session = engine.cacheSession(engine.described.workspace.Environment(),
-			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError, engine.systemCache)
+			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
 		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
 		if engine.session != nil && engine.keepsForBuilds() {
 			engine.session.KeepForBuilds()
@@ -492,6 +514,12 @@ func (engine *pipeline) run() int {
 	exitCode := exitClean
 	if engine.findingsWritten > 0 || engine.incomplete {
 		exitCode = exitFindings
+	}
+	// The timeline, under `--timeline`, is the last record before the summary, so its last stamp is the run's end. A
+	// run also under `--timing` says so, since its shape is a timed run's: no cache, and the builds one at a time.
+	if engine.request.timeline != nil {
+		engine.request.timeline.Stamp("run.end")
+		engine.write(engine.request.timeline.Record(engine.timing != nil))
 	}
 	engine.write(contract.SummaryRecord{
 		Findings: engine.findingsWritten, Complete: !engine.incomplete, ExitCode: exitCode,

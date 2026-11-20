@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // invocation is one command line, read and checked.
@@ -43,9 +44,26 @@ type invocation struct {
 	// its questions computed, for a test of the reload such an entry makes, never read from the command line.
 	answersInPart map[string]bool
 
+	// timeline is the run's recorder under `--timeline`, made as the command line is read (newTimeline), nil for a run
+	// that did not ask, never read from the command line.
+	timeline *timeline.Recorder
+
+	// timelineClock is the clock the run's recorder reads (newTimeline), the zero Clock for the system's unless a test
+	// counts the run's reads of it, never read from the command line.
+	timelineClock timeline.Clock
+
 	// readFromDisk is how read reads a file from disk, os.ReadFile unless a test watches the run's reads, never read
 	// from the command line.
 	readFromDisk func(file string) ([]byte, error)
+}
+
+// timelineRefusals are the runs that refuse `--timeline`, by mode, each with what it does in place of a check: only a
+// check run has phases and builds to map, and a switch accepted and ignored reads as a run that did what was asked.
+var timelineRefusals = map[mode]string{
+	modeRules:        "lists the rules",
+	modeRulesEnabled: "lists the rules the settings turn on",
+	modeVersion:      "prints the version",
+	modeStdin:        "is the editor's save, which prints one file's text",
 }
 
 // check refuses what each flag allows alone but the command line does not allow as a whole.
@@ -66,6 +84,10 @@ func (request invocation) check() error {
 	}
 	if stdinError := request.checkStdin(); stdinError != nil {
 		return stdinError
+	}
+	if refused, isRefused := timelineRefusals[request.mode()]; isRefused && request.switches["timeline"] {
+		return fmt.Errorf("--timeline maps a check run's phases and builds, and this run %s, so it was refused "+
+			"rather than run without it", refused)
 	}
 	for _, refused := range refusedTogether {
 		if !request.switches[refused.name] {
@@ -165,11 +187,11 @@ func (request invocation) read(file string) ([]byte, error) {
 
 // judgesDependence reports whether the run computes each extra build's dependence (#qkq4gx5): `--build-dependence`
 // in a run of every build, which alone has extra builds to judge. Such a run reads the findings cache and the system
-// cache's standard-library entries as any other run does; the standard library it restores is judged on a graph of its
-// own, loaded from source beside the host's lint, and anything else restored fails wide (buildDependenceGraph,
-// #ss4t5g6). Its rules wait for the load's end (lintOverlaps), since they let go of each package's syntax as they
-// finish with it, and its extra builds restore nothing from the host's run (censusKeepsHostRestoreOff), for the facts
-// census.
+// cache's standard-library entries as any other run does, its host and each extra build alike (#wzre5eg); the standard
+// library the host restores is judged on a graph of its own, loaded from source beside the host's lint, and anything
+// else restored fails wide (buildDependenceGraph, #ss4t5g6). Its rules wait for the load's end (lintOverlaps), since
+// they let go of each package's syntax as they finish with it, and its extra builds restore nothing from the host's
+// run (censusKeepsHostRestoreOff), for the facts census.
 func (request invocation) judgesDependence() bool {
 	return request.switches["build-dependence"] && request.checksEveryBuild()
 }

@@ -12,6 +12,7 @@
         { "$ref": "#/$defs/duplicateRefused" },
         { "$ref": "#/$defs/duplicateCoverage" },
         { "$ref": "#/$defs/timing" },
+        { "$ref": "#/$defs/timeline" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -283,6 +284,62 @@
                 "measuringCpuMicroseconds": {
                     "type": "integer",
                     "description": "What those reads cost, already taken out of the rows."
+                }
+            }
+        },
+        "timeline": {
+            "description": "When each phase and each build of a Go run began and ended, under --timeline: the Go engine's timeline record, written through once before the summary. Every stamp's wall is from the moment the engine package initialized and its CPU the process's user and system CPU from the process's start, so the cores busy between two stamps are their CPU's difference over their wall's, and the first stamp's ratio is no figure. No two stamps share their build, round and label, and begins and ends need not pair: a run with no extra build has no handover.end, and a build that fails or finds type errors has no end. It changes nothing of the run. A run that is not Go, or not under --timeline, writes none.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "stamps"],
+            "properties": {
+                "kind": { "const": "timeline" },
+                "unavailable": {
+                    "type": "string",
+                    "description": "Why no CPU was read, when the process's CPU clock cannot be read. Every CPU figure is then 0 and means nothing; the wall is still real. Absent when the CPU was read."
+                },
+                "timed": {
+                    "const": true,
+                    "description": "The run was also under --timing, so its shape is a timed run's: no cache, and the builds one at a time. Absent otherwise."
+                },
+                "stamps": {
+                    "type": "array",
+                    "description": "Each stamp in the order taken, which is the order of its wall. Empty when nothing was stamped.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["label", "wallMicroseconds", "userMicroseconds", "systemMicroseconds"],
+                        "properties": {
+                            "build": {
+                                "type": "string",
+                                "description": "The extra build the stamp is of, as the summary's builds name it, such as windows/amd64. Absent for the host's run and the run's own steps."
+                            },
+                            "round": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "description": "A load's round: 1 for a load that runs again after its first, as the long-line wrap's load or a reload for a question does, 2 for the next. Absent for the first. A check carries the round of the load it runs over, so a run's only check can read 1."
+                            },
+                            "label": {
+                                "type": "string",
+                                "description": "The moment, such as host.load.end, handover.begin, or a build's step, such as gate.taken."
+                            },
+                            "wallMicroseconds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "Wall time from the moment the engine package initialized."
+                            },
+                            "userMicroseconds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "The process's user CPU from its start."
+                            },
+                            "systemMicroseconds": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "The process's system CPU from its start."
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -724,6 +781,14 @@
                             "inheritedFindings": {
                                 "type": "integer",
                                 "description": "The findings this build took from the host's run on the files it inherited, each rule's on each file once. Absent when 0."
+                            },
+                            "standingDeclarations": {
+                                "type": "integer",
+                                "description": "The standing declarations this build's confined rules took the host's findings in, rather than hear those function bodies again, under COHERE_STANDING_BODIES=1 on the body reach census's path, each counted once per file of each package that took it. Absent when 0."
+                            },
+                            "standingFindings": {
+                                "type": "integer",
+                                "description": "The findings this build's confined rules took from the host's run in its standing declarations. Absent when 0."
                             },
                             "loadMilliseconds": {
                                 "type": "integer",

@@ -156,7 +156,7 @@ func hostLoad(test *testing.T, root string, run string) (*pipeline, *load.Loaded
 	// The load alone is asked, so no lint starts beside it.
 	engine.overlaps = false
 	engine.session = engine.cacheSession(engine.described.workspace.Environment(),
-		engine.described.goEnvironment, cache.FileDigests{}, engine.standardError, engine.systemCache)
+		engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
 	if engine.session == nil || !engine.session.HasStore() {
 		test.Fatalf("%s has no findings cache with a store, so its load keeps no listing", run)
 	}

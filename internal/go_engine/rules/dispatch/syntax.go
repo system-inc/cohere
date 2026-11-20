@@ -118,10 +118,16 @@ func walkFiles(started *startedRuns, files []inspector.Cursor) {
 		// Checked as files were gathered, so the assertion holds.
 		file, _ := fileCursor.Node().(*ast.File)
 		// Each run's FileState is the file's from here through FileExit (see rule.FileState). A run whose rule
-		// inherits the file hears none of it.
+		// inherits the file hears none of it, and one confined on it hears nothing inside its standing bodies, whose
+		// spans every run confined on the file holds alike, so the walk reads them off any one. With no run confined
+		// on the file the walk holds none, and tests no node's position there.
 		tokenFile := started.runs[0].pass.Fset.File(file.Pos())
+		walk.standing, walk.standingNext = nil, 0
 		for _, run := range started.runs {
 			run.skipping = run.inherited[tokenFile]
+			if standing := run.standing[tokenFile]; len(standing) > 0 {
+				run.confined, walk.standing = true, standing
+			}
 			run.context.EnterFile(file, tokenFile)
 			run.fileEnter(file)
 		}
@@ -136,6 +142,7 @@ func walkFiles(started *startedRuns, files []inspector.Cursor) {
 			run.fileExit(file)
 			run.context.EnterFile(nil, nil)
 			run.skipping = false
+			run.confined = false
 		}
 	}
 }

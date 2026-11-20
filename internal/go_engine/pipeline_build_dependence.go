@@ -388,7 +388,7 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	// for one it holds nothing for (sourceReader).
 	read := engine.sourceReader(nil, nil)
 	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
-		filesDiffer: map[string]bool{}}
+		withoutSyntax: map[string]bool{}, filesDiffer: map[string]bool{}}
 	difference := engine.listingDifference(hostListing{files: engine.dependence.files,
 		cgoFiles: engine.dependence.cgoFiles, paths: engine.dependence.paths}, built, fileSet, read,
 		engine.holdsLineDirective, judged)
@@ -484,10 +484,10 @@ type hostListing struct {
 // with all its files, and each only the host has. It reads nothing but the two listings, the bytes of the build's own
 // files, read and parsed into fileSet, and the scan for a line directive, so it is known as soon as the build has
 // listed. It records into judged the files both builds compile of each package both have by one ID, the packages both
-// have by one ID that the build checked from source, and those whose files differ, which the facts census and the body
-// differential read.
+// have by one ID that the build checked from source, those it did not (withoutSyntax), and those whose files differ,
+// which the facts census and the body differential read.
 //
-// Mutates: judged gains the shared files, the shared packages and the packages whose files differ
+// Mutates: judged gains the shared files, the shared packages, those without syntax and the packages whose files differ
 func (engine *pipeline) listingDifference(
 	host hostListing,
 	built map[string]*packages.Package,
@@ -513,10 +513,14 @@ func (engine *pipeline) listingDifference(
 			continue
 		}
 		// A package the build restored has its facts' objects from export data, whose positions are no offsets in
-		// its files, so the census leaves it out; one the host restored is keyed through its counterpart in the
-		// standard library's graph (indexHostFacts).
-		if !asVariant && counterpart.TypesInfo != nil {
-			judged.sharedPackages[identifier] = true
+		// its files, so the census leaves it out, and counts what it leaves (withoutSyntax); one the host restored is
+		// keyed through its counterpart in the standard library's graph (indexHostFacts).
+		if !asVariant {
+			if counterpart.TypesInfo != nil {
+				judged.sharedPackages[identifier] = true
+			} else {
+				judged.withoutSyntax[identifier] = true
+			}
 		}
 		builtFiles := counterpart.GoFiles
 		if asVariant {

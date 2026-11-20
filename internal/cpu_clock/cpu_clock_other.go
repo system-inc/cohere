@@ -16,6 +16,11 @@ func Process() (time.Duration, bool) {
 	return 0, false
 }
 
+// ProcessUserSystem has no clock to read here.
+func ProcessUserSystem() (user time.Duration, system time.Duration, known bool) {
+	return 0, 0, false
+}
+
 // Children has no clock to read here.
 func Children() (time.Duration, bool) {
 	return 0, false

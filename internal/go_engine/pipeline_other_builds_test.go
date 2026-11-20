@@ -111,6 +111,20 @@ func runOverExiting(
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
+	return runOverRequest(test, request, registered, configure)
+}
+
+// runOverRequest is runOverExiting's run from request as parsed, for a test that sets in it what no command line does,
+// such as the clock its timeline reads.
+func runOverRequest(
+	test *testing.T,
+	request invocation,
+	registered []rule.Rule,
+	configure func(*pipeline),
+) (*pipeline, string, string, int) {
+	test.Helper()
+	// Made as the engine makes it as the command line is read (runOverlapping), nil for a run without `--timeline`.
+	request.timeline = newTimeline(request)
 	ruleSettings, settingsError := loadSettings(request, registered)
 	if settingsError != nil {
 		test.Fatal(settingsError)
@@ -464,10 +478,11 @@ func withoutCache(stream string) string {
 // (contract.BuildRecord), each written only when not 0, with the packages an extra build checked from source, which
 // are what it did not restore, that count load by load, and at the share gate (#ghb3rcn), and the files and findings
 // an extra build inherited from the host for its syntax-only rules, which only a package it checks from source
-// inherits (#y6q1x2j).
+// inherits (#y6q1x2j), and the standing declarations and findings it took from the host (#e4rd5dw).
 var hostRestoreCounts = regexp.MustCompile(
 	`,"(entriesKept|restoredFromHost|untouched|visited|declinedAtLoad|declinedAtCheck|reloadRounds|writtenThrough|` +
-		`sharedBodyHits|checkedFromSource|checkedFromSourceAtGate|inheritedFiles|inheritedFindings)":[0-9]+|` +
+		`sharedBodyHits|checkedFromSource|checkedFromSourceAtGate|inheritedFiles|inheritedFindings|` +
+		`standingDeclarations|standingFindings)":[0-9]+|` +
 		`,"(declinedBy|reloadRoundsBy)":\{[^}]*\}|,"checkedFromSourceRounds":\[[0-9,]*\]`)
 
 // extraAnalyzedPackages is an extra build's record's count of the packages it analyzed, which its walk's untouched

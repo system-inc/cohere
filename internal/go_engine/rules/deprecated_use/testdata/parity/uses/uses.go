@@ -73,10 +73,6 @@ func deprecatedUser() {
 	_ = func() int { return library.OldVariable }
 }
 
-// Found by neither: a package-level variable after a deprecated function in its file is judged as if inside it, the
-// original's false negative.
-var afterDeprecatedFunction = library.OldFunction()
-
 func notDeprecated() {
 	// Found by both: the function declaration is no longer the deprecated one.
 	_ = library.OldVariable

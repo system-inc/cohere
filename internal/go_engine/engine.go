@@ -140,6 +140,7 @@ func runOverlapping(
 	}
 	request.standardLibrary = source
 	request.answersInPart = answersInPart
+	request.timeline = newTimeline(request)
 	switch request.mode() {
 	case modeVersion:
 		return writeVersion(standardOutput, standardError)
@@ -185,6 +186,7 @@ func runOverlapping(
 	engine.overlaps = overlaps
 	engine.bodyReachCensus = os.Getenv(bodyReachCensusVariable)
 	engine.bodyDifferential = os.Getenv(bodyDifferentialVariable) == "1"
+	engine.standingBodies = os.Getenv(standingBodiesVariable) == "1"
 	engine.bodyReachFromSourceRecord = os.Getenv(bodyReachFromSourceRecordVariable)
 	engine.bodyReachFromSource = os.Getenv(bodyReachFromSourceVariable)
 	engine.mustCheckCensus = os.Getenv(mustCheckCensusVariable)

@@ -324,3 +324,50 @@ func TestTheDefaultShardSplitsWhatEndsACohereRun(test *testing.T) {
 		}
 	}
 }
+
+// The pin of the shards and the standing bodies (#e4rd5dw): in a package split into shards, where a listener marked
+// FileLocal runs once per shard and one left unmarked once over every file, and every run is confined on first.go
+// alone, the host holding neither rule's findings on second.go, first.go's standing functions are never built, the
+// function literal inside one included, while second.go's, which both runs hear, are built and heard.
+func TestASplitPackageLeavesUnbuiltWhatStandsWhereEveryRunIsConfined(test *testing.T) {
+	test.Parallel()
+	requireSplitting(test)
+	dispatcher := NewIntermediateRepresentation()
+	dispatcher.shardBytes = 1
+	heard := newHeardCalls()
+	analyzers := []*analysis.Analyzer{
+		dispatcher.RuleAnalyzer(rule.Namespace+"local", "local", "records every call", heard.listen("local", true)),
+		dispatcher.RuleAnalyzer(rule.Namespace+"whole", "whole", "records every call", heard.listen("whole", false)),
+	}
+	standing := newPlantedStanding(test, everyStandingFunction, hostsFindingsOnStanding(), rule.Namespace+"local",
+		rule.Namespace+"whole")
+	standing.withheld[rule.Namespace+"local second.go"] = true
+	standing.withheld[rule.Namespace+"whole second.go"] = true
+	graph, analyzeError := checker.Analyze(analyzers, loadFixture(test, "standing"), standing.options())
+	if analyzeError != nil {
+		test.Fatalf("analyzing the fixture: %v", analyzeError)
+	}
+	for _, action := range graph.Roots {
+		if action.Err != nil {
+			test.Fatalf("running %s: %v", action, action.Err)
+		}
+	}
+	if len(heard.contexts["local"]) < 2 || len(heard.contexts["whole"]) != 1 {
+		test.Fatalf("the file-local listener ran in %d contexts and the unmarked one in %d, want a split and one run",
+			len(heard.contexts["local"]), len(heard.contexts["whole"]))
+	}
+	if heard.irPackage == nil {
+		test.Fatal("no listener was handed a function, so the test read no package")
+	}
+	expected := slices.Sorted(slices.Values(append(slices.Clone(neverStandingFunctions), "alsoStood")))
+	if built := builtFunctions(heard.irPackage); !slices.Equal(built, expected) {
+		test.Errorf("once the run was over the built functions were\n%s\nwant first.go's standing ones left out\n%s",
+			strings.Join(built, "\n"), strings.Join(expected, "\n"))
+	}
+	for _, name := range []string{"local", "whole"} {
+		if heardBy := heard.heardBy(name); !slices.Equal(heardBy, everyCallOf(expected...)) {
+			test.Errorf("the %s listener heard\n%s\nwant every built function\n%s", name,
+				strings.Join(heardBy, "\n"), strings.Join(everyCallOf(expected...), "\n"))
+		}
+	}
+}

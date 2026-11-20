@@ -20,6 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
+	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
 // lintSuppressionRules are suppression's two rules, which run in the lint phase on the directives themselves.
@@ -97,6 +98,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				ran = append(ran, enabledRule.Name)
 			}
 			verdict = engine.mergeBuildRuns(runs, ran)
+			engine.request.timeline.Stamp("merge.end")
 			outcome = suppressedFindings{
 				kept:              verdict.merged.kept,
 				directiveFindings: verdict.merged.directiveFindings,
@@ -340,7 +342,13 @@ func (engine *pipeline) lintPackages(
 			}
 		}
 	}
+	// Under `--timeline` the host's check stamps its analysis and its save, and its end below, in the round of the load
+	// it runs over, as a build's check does, so a reader joins a check to its load by round: the host's last load, the
+	// one a pass beside the load is begun inside and every other pass follows, a rename's counted though it stamps
+	// nothing (hostLoads).
+	options.Timeline = engine.request.timeline.Hook(nil, int(engine.hostLoads.Load()-1), "host.")
 	result, checkError := check.Run(analyzed, enabled, options)
+	timeline.Tell(options.Timeline, "lint.check.end")
 	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}
@@ -433,15 +441,14 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // session without a store when lintCache gives none, since the host's keeps its packages' entries for the extra
 // builds and theirs restore from them (#b2t9xmf); under `--timing` it gets none, so nothing is restored from the host.
 // files must be of the files as they are on disk when the load runs (see extraBuildRun). Why the cache sat out is
-// noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns). system is the
-// system cache the build reads its standard library from and writes it to under its own keys: the run's, or none for
-// an extra build that must compute its own standard library (extraBuildSystemCache).
+// noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns). Every build
+// reads its standard library from the run's system cache and writes it there under its own keys, the host's and each
+// extra build's, in a run judging each build's dependence as in any other (#wzre5eg).
 func (engine *pipeline) cacheSession(
 	environment []string,
 	goEnvironment *load.GoEnvironment,
 	files cache.FileDigests,
 	notes io.Writer,
-	system *systemCache,
 ) *check.CacheSession {
 	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
 	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
@@ -451,7 +458,7 @@ func (engine *pipeline) cacheSession(
 	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled, engine.described.children, system, engine.shardStamps)
+		enabled, engine.described.children, engine.systemCache, engine.shardStamps)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}

@@ -13,10 +13,11 @@ import (
 )
 
 // The body reach census's base, the packages each build checks from source today (#w72zxtq): under
-// `--build-dependence` a build restores nothing from the host's run, so it checks every package from source, and the
-// reach is read beside today's verdict only over those a plain run checks. A plain run records them under
-// `COHERE_BODY_REACH_FROM_SOURCE_RECORD=<directory>`, a file per extra build, and the census reads them back under
-// `COHERE_BODY_REACH_FROM_SOURCE=<directory>`, counting every number again for that subset beside the whole.
+// `--build-dependence` a build restores nothing from the host's run, so it checks from source every package its own
+// stores do not hold, the project's and the system cache's, and the reach is read beside today's verdict only over
+// those a plain run checks. A plain run records them under `COHERE_BODY_REACH_FROM_SOURCE_RECORD=<directory>`, a file
+// per extra build, and the census reads them back under `COHERE_BODY_REACH_FROM_SOURCE=<directory>`, counting every
+// number again for that subset beside the whole.
 
 // bodyReachFromSourceRecordVariable names the directory a run records each extra build's from-source packages into.
 const bodyReachFromSourceRecordVariable = "COHERE_BODY_REACH_FROM_SOURCE_RECORD"

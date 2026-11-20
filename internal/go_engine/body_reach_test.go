@@ -234,6 +234,10 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 			"the package holds a dependent unit, and fails a callee's fact's until the build can show one differs " +
 			"(#5vbs1np).",
 		"  bodies: 25, reached 17, unreached 8, absent 3, new 6",
+		// Accepted and Shifted, each by Number's name bit in its signature.
+		"  reached by Signature, by the reason its signature gave: Sizes 0, Unrecorded 0, Miscounted 0, Unknown 0, " +
+			"Signature 0, Named 2, Constant 0, LoadMode 0, Selected 0, ValueType 0, TypeArgument 0, Shadowed 0",
+		"  lacked by the build and imported by a file it compiles, which starts the carry: 0 packages",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
 		"  body differential: compared 8, failures 0",
 		"  taken out by the facts' reach 1",
