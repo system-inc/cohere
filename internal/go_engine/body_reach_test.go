@@ -698,7 +698,8 @@ func TestABodyIsClassedOnlyWhereOneStageOwnsEveryDifference(test *testing.T) {
 	for index, each := range cases {
 		file := fmt.Sprintf("/mixed/body%d.go", index)
 		differential.bodies = append(differential.bodies, comparedBody{body: reachedBody{
-			packageIdentifier: "example.com/mixed", file: file, line: 1, name: each.name}, firstLine: 1, lastLine: 9})
+			packageIdentifier: "example.com/mixed", file: file, line: 1, name: each.name}, file: file, firstLine: 1,
+			lastLine: 9})
 		for line, rule := range each.host {
 			hostFindings[file] = append(hostFindings[file], check.Finding{File: file, Rule: rule, Line: line + 2,
 				Column: 1, Message: "m"})
