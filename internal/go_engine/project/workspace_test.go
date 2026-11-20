@@ -219,3 +219,18 @@ func TestRefuseUnlistedModulesLeavesAVendoredReplaceTargetToItsUpstream(test *te
 		}
 	}
 }
+
+// A module's replaces are read from the go.mod bytes its path was read from, when the caller has them, and the file
+// is not read again: here it is gone from the disk, and the bytes still answer.
+func TestReplacedDirectoriesReadTheBytesAlreadyRead(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	goMod := []byte("module example.com/root/listed\n\ngo 1.25\n\nreplace example.com/vendored => ../third_party/vendored\n")
+	replaced, replacedError := replacedDirectories(root, "listed", goMod)
+	if replacedError != nil {
+		test.Fatalf("reading the replaces from bytes already read failed: %v", replacedError)
+	}
+	if want := []string{"third_party/vendored"}; !slices.Equal(replaced, want) {
+		test.Errorf("the replaced directories read %q, want %q", replaced, want)
+	}
+}
