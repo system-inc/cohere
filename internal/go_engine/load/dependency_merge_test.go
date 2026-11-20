@@ -103,3 +103,32 @@ func TestDepsMergedAreTheWalksOnRandomGraphs(test *testing.T) {
 		}
 	}
 }
+
+// A package walked to that is already in the Deps of the package with the most is passed over, and the answer is still
+// everything reached: root walks to wide, the most Deps, to mid and leaf, both inside wide's, to mid twice, and to
+// side, outside wide's Deps and reaching what wide does not, so a merge that passed over wide itself, or side, or that
+// missed what mid reaches, shows.
+func TestDepsPassOverAWalkInsideTheMostDepsAndStillHoldEverything(test *testing.T) {
+	test.Parallel()
+	byPath := graphOf(map[string][]string{
+		"root":  {"mid", "wide", "leaf", "side", "mid"},
+		"wide":  {"mid", "other"},
+		"mid":   {"leaf", "deep"},
+		"side":  {"far"},
+		"other": nil,
+		"leaf":  nil,
+		"deep":  nil,
+		"far":   nil,
+	})
+	var merging dependencyMerge
+	for _, importPath := range []string{"leaf", "deep", "far", "other", "mid", "wide", "side", "root"} {
+		byPath[importPath].listed.Deps = merging.deps(byPath[importPath], byPath)
+	}
+	want := []string{"deep", "far", "leaf", "mid", "other", "side", "wide"}
+	if got := byPath["root"].listed.Deps; !slices.Equal(got, want) {
+		test.Errorf("root's Deps are %q, want %q", got, want)
+	}
+	if walked := walkedDeps(byPath["root"], byPath); !slices.Equal(walked, want) {
+		test.Fatalf("the fixture's walk reaches %q, want %q", walked, want)
+	}
+}
