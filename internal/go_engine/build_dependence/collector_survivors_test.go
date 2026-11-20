@@ -6,19 +6,13 @@ import (
 	"testing"
 )
 
-// besideAHostOnlyWidth is the package survivors of shared, a file both builds compile, beside host.go, a file only the
-// host compiles that declares Width, judged with every unit of host.go a seed, so Width's bits are set and whatever
-// reads Width is dependent through its kind edges alone.
+// besideAHostOnlyWidth is the package survivors of shared beside host.go, which declares Width (sharedBesideWidth),
+// judged with every unit of host.go a seed (widthDifference), so Width's bits are set and whatever reads Width is
+// dependent through its kind edges alone.
 func besideAHostOnlyWidth(test *testing.T, shared string) (loadedBuild, *Dependence) {
 	test.Helper()
-	loaded := parsedPackage(test, "survivors", [][2]string{
-		{"shared.go", "package survivors\n\n" + shared},
-		{"host.go", "package survivors\n\nconst Width = 4\n"},
-	})
-	graph := NewGraph()
-	graph.AddPackage(loaded, true, nil)
-	return loadedBuild{loaded.ID: loaded}, graph.Against(Difference{Packages: map[string]PackageDifference{
-		loaded.ID: {SharedFiles: []string{"shared.go"}, HostOnlyFiles: []string{"host.go"}}}})
+	loaded := sharedBesideWidth(test, "survivors", shared)
+	return loadedBuild{loaded.ID: loaded}, graphOfParsed(loaded).Against(widthDifference(loaded))
 }
 
 // expectNameBits fails for every local of the survivors package whose bits are not want's.

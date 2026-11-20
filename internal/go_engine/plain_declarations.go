@@ -38,7 +38,10 @@ func newPlainDeclarations(
 // add adds loaded to the graph once, from its live syntax and type information, and returns only once it is added: a
 // walk that hands loaded on after another started its add waits for it, so neither lets the syntax go while it is read.
 // A package with no type information, one restored from export data, is added by no one, and its objects are answered
-// wide wherever a unit reads them. It is check.Options.Declarations.
+// wide wherever a unit reads them, and so is one the type checker found errors in, its own or an import's
+// (IllTyped): a lint beside the load hands one on before the load's end shows them (#jzzdvcf), whose syntax need not
+// match its types, a field named twice declared once, and the graph holds only syntax its types match. Its load then
+// ends with diagnostics, so the pass is abandoned with the graph. It is check.Options.Declarations.
 func (declarations *plainDeclarations) add(loaded *packages.Package) {
 	stored, _ := declarations.added.LoadOrStore(loaded, &sync.Once{})
 	once, isOnce := stored.(*sync.Once)
@@ -48,7 +51,7 @@ func (declarations *plainDeclarations) add(loaded *packages.Package) {
 	}
 	once.Do(func() {
 		// A package added from its record needs no walk of its syntax.
-		if loaded.TypesInfo == nil || declarations.holds(loaded.ID) {
+		if loaded.TypesInfo == nil || loaded.IllTyped || declarations.holds(loaded.ID) {
 			return
 		}
 		declarations.graph.AddPackage(loaded, declarations.inScope(loaded), declarations.withheldOf(loaded))

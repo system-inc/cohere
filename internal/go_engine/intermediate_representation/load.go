@@ -11,8 +11,11 @@ package intermediate_representation
 //	t2 = Load <int> t1
 type Load struct {
 	register
-	X Value
+	X       Value
+	comment string // what lifting made the Load for
 }
+
+func (load *Load) Comment() string { return load.comment }
 
 func (load *Load) Operands(rands []*Value) []*Value {
 	return append(rands, &load.X)

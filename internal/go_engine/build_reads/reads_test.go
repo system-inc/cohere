@@ -8,6 +8,8 @@ import (
 	"slices"
 	"sync"
 	"testing"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // readFact is a fact type for the tests.
@@ -369,5 +371,107 @@ func TestAnAdderThatAddsNothingNewKeepsTheList(test *testing.T) {
 	}
 	if !sameList(lookups, every.reads.Lookups()) {
 		test.Error("AddLookup of a question the reads hold dropped the kept lookups, want the same slice")
+	}
+}
+
+// Objects of one package and name are ordered by how go/types writes them, then by position, in each of the four
+// lists whose sort compares objects. Each sort remembers the text it wrote for each object, so this holds that the
+// text is the object's own: text remembered under the wrong key would make the tied objects write alike and leave
+// their order to position, which here is another order.
+func TestTiedObjectsAreOrderedByTheirTextThenPosition(test *testing.T) {
+	test.Parallel()
+	owner := types.NewPackage("example.com/owner", "owner")
+	field := func(position token.Pos, kind types.BasicKind) types.Object {
+		return types.NewField(position, owner, "Value", types.Typ[kind], false)
+	}
+	// By text, `field Value bool`, `field Value int` twice, then `field Value string`; by position, 1, 2, 4, 7.
+	laterInt, text, earlierBool, earlierInt := field(7, types.Int), field(2, types.String), field(1, types.Bool),
+		field(4, types.Int)
+	wantObjects := []types.Object{earlierBool, earlierInt, laterInt, text}
+	// By text, `type example.com/owner.Holder int` before its struct twin; by position, the struct first.
+	integerHolder := types.NewTypeName(9, owner, "Holder", nil)
+	types.NewNamed(integerHolder, types.Typ[types.Int], nil)
+	structHolder := types.NewTypeName(3, owner, "Holder", nil)
+	types.NewNamed(structHolder, types.NewStruct(nil, nil), nil)
+	wantReceivers := []*types.TypeName{integerHolder, structHolder}
+
+	reads := &Reads{}
+	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
+	for _, object := range []types.Object{laterInt, text, earlierBool, earlierInt} {
+		collected.uses[ObjectUse{Object: object, Kind: UseMember}] = true
+	}
+	for _, receiver := range []*types.TypeName{structHolder, integerHolder} {
+		selection := Selection{Receiver: receiver, Name: "Value", Index: []int{0}, Selected: text}
+		collected.selections[selectionKey(selection)] = selection
+	}
+	reads.publishTypes(collected)
+	for _, object := range []types.Object{text, laterInt, earlierInt, earlierBool} {
+		reads.AddFact(Fact{Object: object, Package: owner, FactType: reflect.TypeFor[*readFact](), Found: true})
+		reads.AddLookup(Lookup{Query: QueryMethod, Path: owner.Path(), Name: "Value", Subject: object, Rule: "test"})
+	}
+
+	uses, facts, lookups, selections := reads.Uses(), reads.Facts(), reads.Lookups(), reads.Selections()
+	if len(uses) != len(wantObjects) || len(facts) != len(wantObjects) || len(lookups) != len(wantObjects) ||
+		len(selections) != len(wantReceivers) {
+		test.Fatalf("got %d uses, %d facts, %d lookups and %d selections, want %d, %d, %d and %d", len(uses),
+			len(facts), len(lookups), len(selections), len(wantObjects), len(wantObjects), len(wantObjects),
+			len(wantReceivers))
+	}
+	for index, object := range wantObjects {
+		if uses[index].Object != object {
+			test.Errorf("use %d is %s at %d, want %s at %d", index, uses[index].Object, uses[index].Object.Pos(),
+				object, object.Pos())
+		}
+		if facts[index].Object != object {
+			test.Errorf("fact %d is of %s at %d, want %s at %d", index, facts[index].Object,
+				facts[index].Object.Pos(), object, object.Pos())
+		}
+		if lookups[index].Subject != object {
+			test.Errorf("lookup %d is of %s at %d, want %s at %d", index, lookups[index].Subject,
+				lookups[index].Subject.Pos(), object, object.Pos())
+		}
+	}
+	for index, receiver := range wantReceivers {
+		if selections[index].Receiver != receiver {
+			test.Errorf("selection %d is through %s at %d, want %s at %d", index, selections[index].Receiver,
+				selections[index].Receiver.Pos(), receiver, receiver.Pos())
+		}
+	}
+}
+
+// BenchmarkSortingTheReadsOfRealPackages sorts the uses and selections the walk records of two real packages of the
+// repository, this one and the engine's check package, both reading go/ast and go/types throughout, whose many
+// methods and fields of one name, twelve fields of go/ast named X among them, tie on package and name and are told
+// apart by how go/types writes them. Each iteration drops the kept lists and asks for them again, so each is one
+// sort of each list. The packages are loaded with go/packages, since the engine's own loader imports this package.
+// It is skipped under -short.
+func BenchmarkSortingTheReadsOfRealPackages(benchmark *testing.B) {
+	if testing.Short() {
+		benchmark.Skip("loads packages of the repository")
+	}
+	configuration := &packages.Config{
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes |
+			packages.NeedTypesInfo | packages.NeedImports,
+	}
+	roots, loadError := packages.Load(configuration, ".", "github.com/system-inc/cohere/internal/go_engine/check")
+	if loadError != nil {
+		benchmark.Fatal(loadError)
+	}
+	recorded := []*Reads{}
+	for _, root := range roots {
+		if len(root.Errors) > 0 {
+			benchmark.Fatalf("package %s does not load clean: %v", root.ID, root.Errors)
+		}
+		reads := &Reads{}
+		reads.RecordTypes(root.Types, root.TypesInfo, root.Syntax)
+		recorded = append(recorded, reads)
+	}
+	benchmark.ReportAllocs()
+	for benchmark.Loop() {
+		for _, reads := range recorded {
+			reads.sortedUses, reads.sortedSelections = nil, nil
+			reads.Uses()
+			reads.Selections()
+		}
 	}
 }

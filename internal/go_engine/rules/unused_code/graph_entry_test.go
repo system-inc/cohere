@@ -71,7 +71,9 @@ func TestEntryAsksNoFileWhereNoFileDecides(test *testing.T) {
 	build := func(graphFileSet *token.FileSet) (verdict result, panicked any) {
 		defer func() { panicked = recover() }()
 		built := newGraph(graphFileSet, files, typesPackage, typesInfo, nil, map[string]generated.Generator{})
-		built.entry()
+		if entryError := built.entry(); entryError != nil {
+			test.Fatalf("building the graph: %v", entryError)
+		}
 		return built.results(), nil
 	}
 

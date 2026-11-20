@@ -1,14 +1,17 @@
 package composite
 
 import (
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/composite"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
@@ -87,4 +90,62 @@ func TestPortMatchesOriginalWithTheAllowListOff(test *testing.T) {
 	}
 	parity.RequireIdenticalDespiteLoadErrors(test, composite.Analyzer, port, analysistest.TestData(), fixtureLoadErrors,
 		"a", "typeparams", "parity")
+}
+
+// BenchmarkOverTheCheckPackage weighs the port over the engine's check package, a real package of the repository
+// and one of its largest, whose unkeyed literals, slices of every kind among them, each have their type's terms
+// read. The package is loaded once and every prerequisite run once on it, so each iteration is the dispatcher's walk
+// with the port's listener alone, and the allocations reported are the walk's and the port's. It is skipped under
+// -short.
+func BenchmarkOverTheCheckPackage(benchmark *testing.B) {
+	if testing.Short() {
+		benchmark.Skip("loads a package of the repository")
+	}
+	loaded, loadError := load.Packages(".", []string{"github.com/system-inc/cohere/internal/go_engine/check"}, nil, nil)
+	if loadError != nil {
+		benchmark.Fatal(loadError)
+	}
+	// A dispatcher names each rule once, and the shared one already holds the port, so the benchmark's is new.
+	dispatcher := dispatch.NewSyntax()
+	newAnalyzer(dispatcher)
+	passes := []*analysis.Pass{}
+	for _, root := range loaded.Roots {
+		if len(root.Errors) > 0 {
+			benchmark.Fatalf("package %s does not load clean: %v", root.ID, root.Errors)
+		}
+		results := map[*analysis.Analyzer]any{}
+		passOf := func(analyzer *analysis.Analyzer) *analysis.Pass {
+			return &analysis.Pass{
+				Analyzer: analyzer, Fset: root.Fset, Files: root.Syntax, Pkg: root.Types, TypesInfo: root.TypesInfo,
+				TypesSizes: root.TypesSizes, ResultOf: results, ReadFile: os.ReadFile,
+				Report: func(analysis.Diagnostic) {
+					// The findings are the tests' to compare; this weighs only what finding them costs.
+				},
+			}
+		}
+		// Every prerequisite runs once, in the order its own requirements need, before the walk is weighed.
+		var prepare func(analyzer *analysis.Analyzer)
+		prepare = func(analyzer *analysis.Analyzer) {
+			for _, required := range analyzer.Requires {
+				if _, prepared := results[required]; !prepared {
+					prepare(required)
+					result, runError := required.Run(passOf(required))
+					if runError != nil {
+						benchmark.Fatalf("running %s on %s: %v", required.Name, root.ID, runError)
+					}
+					results[required] = result
+				}
+			}
+		}
+		prepare(dispatcher.Analyzer())
+		passes = append(passes, passOf(dispatcher.Analyzer()))
+	}
+	benchmark.ReportAllocs()
+	for benchmark.Loop() {
+		for _, pass := range passes {
+			if _, runError := dispatcher.Analyzer().Run(pass); runError != nil {
+				benchmark.Fatal(runError)
+			}
+		}
+	}
 }

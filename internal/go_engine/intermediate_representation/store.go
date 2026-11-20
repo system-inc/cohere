@@ -15,7 +15,10 @@ type Store struct {
 	anInstruction
 	Address Value
 	Value   Value
+	comment string // what lifting made the Store for
 }
+
+func (store *Store) Comment() string { return store.comment }
 
 func (store *Store) Operands(rands []*Value) []*Value {
 	return append(rands, &store.Address, &store.Value)
