@@ -48,3 +48,15 @@ func Calls() { g(foreign.Values()) }
 
 // Plain touches nothing the flow routes to a key.
 func Plain() int { return 1 }
+
+// P is written L, so it is no candidate, and Local's own local, written []any, is fed by it.
+var P L
+
+// Clones gives P another package's clone of it, which fixes P, and so the local P feeds.
+func Clones() { P = slices.Clone(P) }
+
+// Local writes a candidate of its own, which P feeds.
+func Local() int {
+	var held []any = P
+	return len(held)
+}

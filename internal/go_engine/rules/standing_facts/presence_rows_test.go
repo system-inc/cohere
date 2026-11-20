@@ -259,7 +259,8 @@ func TestABodyHoldingAnyOrAMarkerOfItsOwnLeavesForPresence(test *testing.T) {
 // flow routes to a key leaves, as one naming the key does. Prints names x, defined from k; PrintsCached names cached,
 // defined from values' result; Sorts names compare, defined from a literal whose parameters are keys; and Calls names
 // g, whose parameter feeds kept, an edge only g's body records, so it is read once g leaves for naming kept. values'
-// own body leaves as a key's function. Plain touches nothing the flow routes to a key, and stands.
+// own body leaves as a key's function. Clones fixes P, which feeds Local's own candidate, a key seeded from a body, so
+// Clones leaves, as Local does for its own candidate. Plain touches nothing the flow routes to a key, and stands.
 func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "flowing")
@@ -268,8 +269,10 @@ func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
 		presenceUse{key: "flowing.cached", identity: found.identity("cached"), users: []string{"PrintsCached"}},
 		presenceUse{key: "flowing.compare", identity: found.identity("compare"), users: []string{"Sorts"}},
 		presenceUse{key: "flowing.kept", identity: found.identity("kept"), users: []string{"g"}},
-		presenceUse{key: "flowing.g", identity: found.identity("g"), users: []string{"Calls"}})
-	for _, name := range []string{"Prints", "values", "PrintsCached", "Sorts", "g", "Calls", "Plain"} {
+		presenceUse{key: "flowing.g", identity: found.identity("g"), users: []string{"Calls"}},
+		presenceUse{key: "flowing.P", identity: found.identity("P"), users: []string{"Clones", "Local"}})
+	for _, name := range []string{"Prints", "values", "PrintsCached", "Sorts", "g", "Calls", "Plain", "Clones",
+		"Local"} {
 		host.functions = append(host.functions,
 			fact_reach.Function{Object: fact_reach.Object("flowing." + name), Identity: found.identity(name)})
 	}
@@ -278,6 +281,7 @@ func TestABodyTheFlowRoutesToANoAnyKeyLeavesForPresence(test *testing.T) {
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"Prints": standing_presence.NoAny, "values": standing_presence.NoAny, "PrintsCached": standing_presence.NoAny,
 		"Sorts": standing_presence.NoAny, "g": standing_presence.NoAny, "Calls": standing_presence.NoAny,
+		"Clones": standing_presence.NoAny, "Local": standing_presence.NoAny,
 	}, nil)
 }
 
