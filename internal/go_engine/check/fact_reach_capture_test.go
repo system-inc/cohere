@@ -13,11 +13,13 @@ import (
 	"honnef.co/go/tools/analysis/facts/deprecated"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
 
 // reachFiles are the workspace the capture of the facts' reach is read over. reach holds a cycle above its floor,
@@ -558,5 +560,39 @@ func TestTheRunReadsTheBodiesOfTheGivenPackagesAlone(test *testing.T) {
 	}
 	if read := result.FactReach.BodiesRead; !slices.Equal(read, []string{given[0].ID}) {
 		test.Errorf("the run read the bodies of %v, want %s's alone", read, given[0].ID)
+	}
+}
+
+// A package whose bodies presence never read is captured unread, end to end through the capture (#xeafx79, round 2's
+// S4): with reach's bodies read and floored's not, reach is read, its bodies' record carried, and floored is unread,
+// which its side counts unplaced, so every build lints it whole.
+func TestAPackageWhoseBodiesWereNeverReadIsCapturedUnread(test *testing.T) {
+	test.Parallel()
+	analyzed := loadReach(test)
+	options := DispatchOptions()
+	resolver := fact_resolver.New(nil)
+	options.Resolver = resolver
+	if _, analyzeError := checker.Analyze([]*analysis.Analyzer{reachNilnessAnalyzer}, analyzed,
+		options); analyzeError != nil {
+		test.Fatalf("analyzing the reach workspace: %v", analyzeError)
+	}
+	byPath := map[string]*packages.Package{}
+	for _, analyzedPackage := range analyzed {
+		byPath[analyzedPackage.PkgPath] = analyzedPackage
+	}
+	reach, floored := byPath["example.com/reach/reach"], byPath["example.com/reach/floored"]
+	if reach == nil || floored == nil {
+		test.Fatalf("the load holds %v, want reach and floored", byPath)
+	}
+	presence := &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{reach.ID: {}},
+		markers: map[string][]string{}}
+	capture := captureFactReach(resolver, analyzed, nil, presence)
+	read, unread := capture.Packages[reach.ID], capture.Packages[floored.ID]
+	if read == nil || unread == nil {
+		test.Fatalf("the capture holds reach %v and floored %v, want both", read, unread)
+	}
+	if !read.PresenceRead || unread.PresenceRead {
+		test.Errorf("reach is read %t and floored %t, want reach read and floored unread", read.PresenceRead,
+			unread.PresenceRead)
 	}
 }

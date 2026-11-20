@@ -77,3 +77,18 @@ func TestAVariableMadeOnlyInAStrippedBodyIsNamed(test *testing.T) {
 		test.Errorf("sqlrowserr named %v, want queried.rows alone", named)
 	}
 }
+
+// A local marker whose declaring body is stripped is seen only through the host's record (#xeafx79, round 2's mutant
+// 6): with Sealed's body taken away, the build's syntax declares no marker, and seal is a marker's name only because
+// the record says Sealed declares one.
+func TestALocalMarkerOfAStrippedBodyIsReadFromTheRecord(test *testing.T) {
+	test.Parallel()
+
+	sealing := strippedPass(test, "sealing", "Sealed")
+	if presentMarkers(sealing, nil)["seal"] {
+		test.Fatalf("the stripped build's own syntax declares seal's marker, so the record is not what names it")
+	}
+	if !presentMarkers(sealing, []string{"seal"})["seal"] {
+		test.Errorf("seal, a marker the record says Sealed declares, is not among the markers")
+	}
+}

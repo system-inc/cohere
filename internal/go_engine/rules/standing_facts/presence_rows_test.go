@@ -167,6 +167,7 @@ func TestAStandingBodyNamingASystemConstantLeavesForPresence(test *testing.T) {
 // which selects Other's isShape, a method of the marker's name on a receiver that does not implement shape. Firsts
 // selects wide's first, and wide is no marker, so it stands, as Count, which selects nothing, does. Each method
 // declared under the marker's name, isShape, leaves too: the rule's verdict on an empty one hangs on every selection.
+// isPart, a plain function of another marker's name, is no method, and stands.
 func TestAStandingBodySelectingAMarkersMethodLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "marking")

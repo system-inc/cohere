@@ -40,5 +40,11 @@ func Firsts() { Pair{}.first() }
 // Count selects nothing.
 func Count() int { return 1 }
 
+// part is a marker too, whose name no method takes.
+type part interface{ isPart() }
+
+// isPart is a plain function of part's method's name, no method, so the rule never reads it as a marker's.
+func isPart() int { return 1 }
+
 // Keeping wide in use.
 var _ wide = Pair{}
