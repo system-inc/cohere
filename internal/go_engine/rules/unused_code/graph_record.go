@@ -1,6 +1,7 @@
 package unused_code
 
 import (
+	"cmp"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -26,9 +27,13 @@ type bodyRecorder struct {
 	locals map[nodeIndex]localOfRecord
 	// rooted is each local a step after the walk made the root use, so a local two steps reach is recorded once.
 	rooted map[nodeIndex]struct{}
-	// declared is the place of each object declared outside a body that some body's record names, asked of the file
-	// set once however many bodies name it.
-	declared map[nodeIndex]recordedPlace
+	// declared is each object declared outside a body that some body's record names, by its node: its place and
+	// whether the place finds it, each asked once however many bodies name it.
+	declared map[nodeIndex]declaredEnd
+	// defined is the object each declaring identifier of the package declares, by the identifier's place, as a build
+	// will index its own definitions to resolve an end (definedAt). It is nil until a body first names an object
+	// declared outside it.
+	defined map[recordedPlace]types.Object
 	// interfaceInstances is where the package's source instantiates one of its own generic interface types, sorted,
 	// the entries of typesInfo.Instances that entry adds to the interfaces a named type may implement.
 	interfaceInstances []token.Pos
@@ -57,6 +62,13 @@ type bodyCursor struct {
 	inSignature bool
 }
 
+// declaredEnd is an object declared outside the bodies that name it: its place, and whether the package's
+// definitions, asked for what is declared at that place, hand back this object.
+type declaredEnd struct {
+	place     recordedPlace
+	isDefined bool
+}
+
 // localOfRecord is a local's record, by its index in bodyRecorder.records, and its index among that record's locals.
 type localOfRecord struct {
 	record int
@@ -69,7 +81,7 @@ func (graph *graph) recordBodies() {
 	recorder := &bodyRecorder{
 		locals:   map[nodeIndex]localOfRecord{},
 		rooted:   map[nodeIndex]struct{}{},
-		declared: map[nodeIndex]recordedPlace{},
+		declared: map[nodeIndex]declaredEnd{},
 		uses:     map[uint64]struct{}{},
 		owned:    map[uint64]struct{}{},
 		files:    map[string]struct{}{},
@@ -213,13 +225,72 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 		recorder.locals[index] = placed
 		return recordedEnd{Kind: endLocal, Local: placed.local}
 	}
-	place, isPlaced := recorder.declared[index]
+	declared, isPlaced := recorder.declared[index]
 	if !isPlaced {
-		place = graph.placeOf(graph.nodes[index].typesObject.Pos())
-		recorder.declared[index] = place
+		typesObject := graph.nodes[index].typesObject
+		declared.place = graph.placeOf(typesObject.Pos())
+		declared.isDefined = graph.definedAt(declared.place) == typesObject
+		recorder.declared[index] = declared
 	}
-	recorder.files[place.File] = struct{}{}
-	return recordedEnd{Kind: endDeclared, Place: place}
+	recorder.files[declared.place.File] = struct{}{}
+	if !declared.isDefined {
+		// The record still names the end by its place, so it says what the walk found. The flag is what keeps a
+		// build from resolving it.
+		recorder.records[recorder.cursor.record].Present.UnplacedEnd = true
+	}
+	return recordedEnd{Kind: endDeclared, Place: declared.place}
+}
+
+// definedAt is the object the package's declaring identifier at place declares, the generic one as a node holds it,
+// and nil where no identifier declares one there or two do. It asks the host's own definitions the question a build
+// will ask its own to resolve a declared end, so the host learns here, and not the build at its splice, that a place
+// finds another object than the one the walk used. The definitions are indexed whole the first time it is asked.
+func (graph *graph) definedAt(place recordedPlace) types.Object {
+	recorder := graph.recorder
+	if recorder.defined == nil {
+		// Each identifier is placed from its own file's start, which the syntax holds, so indexing asks the shared
+		// file set once a file and not once an identifier. The files are sorted by where they start, so an
+		// identifier's is the last that starts at or before it.
+		type parsedFile struct {
+			start token.Pos
+			name  string
+		}
+		parsedFiles := make([]parsedFile, 0, len(graph.files))
+		for _, file := range graph.files {
+			parsedFiles = append(parsedFiles, parsedFile{
+				start: file.FileStart,
+				name:  graph.tokenFileOf(file.FileStart).Name(),
+			})
+		}
+		slices.SortFunc(parsedFiles, func(one parsedFile, other parsedFile) int {
+			return cmp.Compare(one.start, other.start)
+		})
+		recorder.defined = make(map[recordedPlace]types.Object, len(graph.typesInfo.Defs))
+		for identifier, defined := range graph.typesInfo.Defs {
+			if defined == nil {
+				// The package clause's name and a type switch's symbolic variable declare no object.
+				continue
+			}
+			after, _ := slices.BinarySearchFunc(parsedFiles, identifier.Pos()+1,
+				func(parsed parsedFile, at token.Pos) int {
+					return cmp.Compare(parsed.start, at)
+				})
+			if after == 0 {
+				// An identifier before every file of the package is in none of them, so no place names it.
+				continue
+			}
+			parsed := parsedFiles[after-1]
+			identifierPlace := recordedPlace{File: parsed.name, Offset: int(identifier.Pos() - parsed.start)}
+			if _, isTaken := recorder.defined[identifierPlace]; isTaken {
+				// Two parsed files of one name: the place tells their identifiers apart for no build, so it finds
+				// neither, whichever the map's order handed over first.
+				recorder.defined[identifierPlace] = nil
+			} else {
+				recorder.defined[identifierPlace] = origin(defined)
+			}
+		}
+	}
+	return recorder.defined[place]
 }
 
 // recordUse records that by's node uses used's, which use is about to add to the graph. In an open body it is one of

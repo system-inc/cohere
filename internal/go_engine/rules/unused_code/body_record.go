@@ -90,7 +90,7 @@ const (
 	endRoot endKind = "root"
 )
 
-// recordedPresence is the five reasons a body cannot be summarized by its record. Each reads the build's own types
+// recordedPresence is the six reasons a body cannot be summarized by its record. Each reads the build's own types
 // past what a record of positions can replay, in a step after the walk or in the walk itself, so a build keeps such
 // a body present and walks it itself.
 type recordedPresence struct {
@@ -114,6 +114,12 @@ type recordedPresence struct {
 	// structs.HostLayout field. Through a named pointer type, `type P *T` and `unsafe.Pointer(p)`, that reads fields
 	// of a type nothing in the body names.
 	AllFieldsUsed bool `json:"allFieldsUsed"`
+	// UnplacedEnd is whether an end of one of the body's edges is an object declared outside the body that its place
+	// does not find: a build resolves such an end by asking its own definitions for the object declared at that file
+	// and offset, and the host's definitions, asked the same, hand back another object or none. go/types checks
+	// the type of `var a, b struct{ x int }` once a variable and so makes x twice at one offset, keeping one for the
+	// identifier, and a selection of the other's x would resolve to the wrong field.
+	UnplacedEnd bool `json:"unplacedEnd"`
 }
 
 // encoded is record in its canonical form: JSON, every field in its declared order and no map among them, so one

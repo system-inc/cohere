@@ -153,6 +153,9 @@ func (recorded recordedPackage) described(record bodyRecord) string {
 	if record.Present.AllFieldsUsed {
 		flags = append(flags, "allFieldsUsed")
 	}
+	if record.Present.UnplacedEnd {
+		flags = append(flags, "unplacedEnd")
+	}
 	fmt.Fprintf(&text, "present: %s\n", joinedOrNone(flags))
 	return text.String()
 }
@@ -848,6 +851,35 @@ use: function -> local 1
 rooted: local 0 local 1
 files: shape.go
 present: ignoredType
+`,
+		},
+	},
+	{
+		// go/types makes the field once a variable and keeps the second for the one identifier, as it does for two
+		// locals, but here both fields are declared outside the bodies, where an end is its place alone. The first
+		// variable's field is not what its place finds, so the body that selects it is kept present, and the body that
+		// selects the second's is not.
+		name: "two package-level variables of one anonymous struct type",
+		sources: []recordedSource{{"shape.go", `package shape
+
+var first, second struct{ value int }
+
+func ReadFirst() int { return first.value }
+
+func ReadSecond() int { return second.value }
+`}},
+		bodies: map[string]string{
+			"ReadFirst": `use: function -> first at shape.go:3:5
+use: function -> value at shape.go:3:27
+rooted: none
+files: shape.go
+present: unplacedEnd
+`,
+			"ReadSecond": `use: function -> second at shape.go:3:12
+use: function -> value at shape.go:3:27
+rooted: none
+files: shape.go
+present: none
 `,
 		},
 	},
