@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/check"
 )
 
 // lineClaimPackage is the ID of the body-reach-line-claims fixture's own package, the one each case writes target.go
@@ -332,6 +334,69 @@ func TestTheBodyDifferentialFailsAClaimedBodyWhoseFindingsDiffer(test *testing.T
 			host, built, _ := strings.Cut(strings.TrimPrefix(failures[0], prefix), "], build [")
 			if strings.Contains(host, "SA4003 5:9 ") || !strings.Contains(built, "SA4003 5:9 ") {
 				test.Errorf("want SA4003 at 5:9 on the build's side alone, got\n%s", failures[0])
+			}
+		})
+	}
+}
+
+// The body differential reads each side's findings of a compared body by that side's own placement, the file as
+// parsed and the lines as written of its own rendering (#d2mqgfj's round 3, the Square's pin on 314da6ec9). A shared
+// file has the same bytes on both sides, so no module shows the two sides placing a body apart, and compareFindings is
+// handed one body directly: the census names it by the file a `//line` directive claims, the host places it in its
+// file at 3 to 9, and the build in another file, its root spelled otherwise, at 5 to 12. Each side holds the same
+// finding at line 6, inside both ranges, and a decoy just outside its own range and inside the other side's, so a
+// side read by the other's file finds nothing and one read by the other's lines finds the decoy. Alike, the body must
+// not fail; with one finding more in the build, it must fail once, by that finding alone.
+func TestTheBodyDifferentialReadsEachSideByItsOwnPlacement(test *testing.T) {
+	test.Parallel()
+
+	const hostFile = "/host/audit/target.go"
+	const builtFile = "/build/audit/target.go"
+	// shared is the finding both sides hold at line 6, in either side's own file.
+	shared := func(file string) check.Finding {
+		return check.Finding{File: file, Rule: "cohere-go/SA4003", Line: 6, Column: 9, Message: "m"}
+	}
+	for _, each := range []struct {
+		name string
+		// extra are the build's findings in its own file beyond the shared one and its decoy.
+		extra []check.Finding
+		// want is the failure's tail after the body's name, empty for none.
+		want string
+	}{
+		{name: "alike"},
+		{name: "one finding more in the build",
+			extra: []check.Finding{{File: builtFile, Rule: "cohere-go/S1000", Line: 8, Column: 2, Message: "m"}},
+			want: ": findings differ: host [cohere-go/SA4003 6:9 m], build [cohere-go/S1000 8:2 m; " +
+				"cohere-go/SA4003 6:9 m]"},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+
+			differential := &buildBodyDifferential{bodies: []comparedBody{{
+				body: reachedBody{packageIdentifier: "example.com/placed", file: "/claimed/part_other.go", line: 7,
+					name: "target"},
+				host:  placedLines{file: hostFile, firstLine: 3, lastLine: 9},
+				built: placedLines{file: builtFile, firstLine: 5, lastLine: 12},
+			}}}
+			// Each decoy lies past its own side's range and inside the other's: the host's at 11, the build's at 4.
+			hostFindings := map[string][]check.Finding{hostFile: {shared(hostFile),
+				{File: hostFile, Rule: "cohere-go/U1000", Line: 11, Column: 6, Message: "m"}}}
+			builtFindings := map[string][]check.Finding{builtFile: append([]check.Finding{shared(builtFile),
+				{File: builtFile, Rule: "cohere-go/U1000", Line: 4, Column: 6, Message: "m"}}, each.extra...)}
+			differential.compareFindings(hostFindings, builtFindings, nil, &findingCauses{}, nil, nil)
+
+			if len(differential.classed) > 0 {
+				test.Errorf("want nothing classed, got %v", differential.classed)
+			}
+			if each.want == "" {
+				if len(differential.failures) > 0 {
+					test.Errorf("want no failure, got\n%s", strings.Join(differential.failures, "\n"))
+				}
+				return
+			}
+			if len(differential.failures) != 1 || !strings.HasSuffix(differential.failures[0], " target"+each.want) {
+				test.Errorf("want one failure ending %q, got\n%s", " target"+each.want,
+					strings.Join(differential.failures, "\n"))
 			}
 		})
 	}
