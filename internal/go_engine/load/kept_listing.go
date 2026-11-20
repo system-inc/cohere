@@ -61,8 +61,41 @@ type keptListing struct {
 // every module file a go command of the run can rewrite is read again at each ask (listingFingerprint). The listing
 // adds its CPU to collector; a kept answer's fingerprint adds nothing but what the caller measures on its own
 // goroutine, since a run under `--timing` keeps no listing.
+//
+// Before any of that, a listing a load of the run already made or read kept under the same fingerprints and key is
+// answered as it was, with whether it was kept (Fingerprints.remembered): an extra build lists twice, for its first
+// load and again for a load after its first check, and with no store each was a listing of its own, 0.47 s of a
+// Loom run under `--no-cache` (#32594zm). Whatever this ask lists or reads kept is remembered for the asks after it
+// (Fingerprints.remember). A nil fingerprints remembers and answers nothing.
 func cachedList(
 	goEnvironment *GoEnvironment,
+	patterns []string,
+	listings ListingStore,
+	held Held,
+	shared *SharedReads,
+	fingerprints *Fingerprints,
+	walks *PackageWalks,
+	collector *timing.Collector,
+) (*listing, bool, error) {
+	key := listingKey(goEnvironment, patterns)
+	if listed, kept, remembered := fingerprints.remembered(key); remembered {
+		return listed, kept, nil
+	}
+	listed, kept, listError := storedList(goEnvironment, key, patterns, listings, held, shared, fingerprints, walks,
+		collector)
+	if listError != nil {
+		return nil, false, listError
+	}
+	fingerprints.remember(goEnvironment, key, listed, kept)
+	return listed, kept, nil
+}
+
+// storedList is cachedList once the run remembers no listing for key, listingKey's of goEnvironment and patterns: list,
+// answered from listings when nothing go list reads has moved since it last answered, and kept there for the next run.
+// It reports whether the answer was kept.
+func storedList(
+	goEnvironment *GoEnvironment,
+	key [sha256.Size]byte,
 	patterns []string,
 	listings ListingStore,
 	held Held,
@@ -75,7 +108,6 @@ func cachedList(
 		listed, listError := list(goEnvironment, patterns, held, shared, walks, collector)
 		return listed, false, listError
 	}
-	key := listingKey(goEnvironment, patterns)
 	rewritesModules := goFlagsRewriteModules(goEnvironment.value("GOFLAGS"))
 	if contents, stored := listings.Kept(key); stored {
 		var kept keptListing
@@ -131,17 +163,10 @@ func listingKey(goEnvironment *GoEnvironment, patterns []string) [sha256.Size]by
 	return [sha256.Size]byte(digest.Sum(nil))
 }
 
-// keepListing is listed as the store keeps it: the roots the patterns walk, every directory of a listed package
-// that can move, the module files of the workspace and of every module such a package is in, vendor's modules.txt
-// among them, and their fingerprint as it is now. It reports whether the listing may be kept at all: one with an
-// error in it, an import that does not resolve, say, or a fingerprint with anything unreadable, never is.
-//
-// A package's directory is left out only when it cannot move: one in the module cache whose module has a version,
-// which the cache never rewrites under that version, and one in the toolchain's root that is in no module, the
-// standard library, which moves only with the toolchain's version the key hashes. Anything else there, a replace
-// into the module cache by path, say, is read like any directory of the workspace. Each file held holds is
-// fingerprinted from its held bytes, and the fingerprint read as listingFingerprint reads it, under rewritesModules,
-// through fingerprints when it is set.
+// keepListing is listed as the store keeps it: what it was read from (listingInputs), and their fingerprint as it is
+// now. It reports whether the listing may be kept at all: one with an error in it, an import that does not resolve,
+// say, or a fingerprint with anything unreadable, never is. Each file held holds is fingerprinted from its held bytes,
+// and the fingerprint read as listingFingerprint reads it, under rewritesModules, through fingerprints when it is set.
 func keepListing(
 	workspace string,
 	moduleCache string,
@@ -151,6 +176,27 @@ func keepListing(
 	held Held,
 	fingerprints *Fingerprints,
 ) (keptListing, bool) {
+	kept, keepable := listingInputs(workspace, moduleCache, toolchainRoot, listed)
+	if !keepable {
+		return keptListing{}, false
+	}
+	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, rewritesModules, held,
+		fingerprints)
+	kept.Fingerprint = fingerprint
+	return kept, certain
+}
+
+// listingInputs is listed as the store keeps it but for its fingerprint: the roots the patterns walk, every directory
+// of a listed package that can move, and the module files of the workspace and of every module such a package is in,
+// vendor's modules.txt among them. It reports whether the listing may be kept, or remembered for the run
+// (Fingerprints.remember), at all: one with an error in it, an import that does not resolve, say, which another ask
+// could answer otherwise, never is.
+//
+// A package's directory is left out only when it cannot move: one in the module cache whose module has a version,
+// which the cache never rewrites under that version, and one in the toolchain's root that is in no module, the
+// standard library, which moves only with the toolchain's version the key hashes. Anything else there, a replace
+// into the module cache by path, say, is read like any directory of the workspace.
+func listingInputs(workspace string, moduleCache string, toolchainRoot string, listed *listing) (keptListing, bool) {
 	roots := []string{workspace}
 	directories := map[string]bool{}
 	moduleFiles := map[string]bool{}
@@ -178,18 +224,14 @@ func keepListing(
 			}
 		}
 	}
-	kept := keptListing{
+	return keptListing{
 		Roots:       roots,
 		Directories: sortedKeys(directories),
 		ModuleFiles: sortedKeys(moduleFiles),
 		Packages:    listed.packages,
 		RootPaths:   sortedKeys(listed.roots),
 		TestOnly:    sortedKeys(listed.testOnly),
-	}
-	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, rewritesModules, held,
-		fingerprints)
-	kept.Fingerprint = fingerprint
-	return kept, certain
+	}, true
 }
 
 // listing is the kept answer as list gives it.

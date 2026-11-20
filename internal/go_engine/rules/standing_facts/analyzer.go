@@ -20,7 +20,9 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
+	"honnef.co/go/tools/analysis/facts/deprecated"
 
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -41,15 +43,16 @@ const (
 
 // Analyzer hands the package's rules the bodies that stand in this build, which each asks of one body at a time
 // (Result.Stands). It requires ctrlflow for the build's no-return facts, and because the resolver learns a package as
-// ctrlflow finishes there, so every package a question can reach is held before one is asked; and printf for its
-// wrapper facts, which the checker pushes too (#wxx4ar6), and which it compares. It is rooted only beside a census
-// build's rules, which a run measuring the reach takes, so a project whose rules need no printf runs it there alone,
-// and its facts reach no entry or key (check's fact reach settle tests).
+// ctrlflow finishes there, so every package a question can reach is held before one is asked; and printf and the
+// deprecated facts analyzer for their facts, wrapper facts and deprecations, which the checker pushes too (#wxx4ar6),
+// and which it compares. It is rooted only beside a census build's rules, which a run measuring the reach takes, so a
+// project whose rules need neither runs them there alone, and their facts reach no entry or key (check's fact reach
+// settle tests).
 var Analyzer = &analysis.Analyzer{
 	Name:       analyzerName,
 	Doc:        "settles which function bodies an extra build leaves to the host's findings once facts are compared",
 	Run:        run,
-	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer, printf.Analyzer},
+	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer, printf.Analyzer, deprecated.Analyzer},
 	ResultType: reflect.TypeFor[*Result](),
 }
 
@@ -85,19 +88,29 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("settling the standing bodies of %s: printf's result is a %T", pass.Pkg.Path(),
 			pass.ResultOf[printf.Analyzer])
 	}
-	pushed := pushedFacts{wrappers: wrappers}
+	deprecations, isDeprecations := pass.ResultOf[deprecated.Analyzer].(deprecated.Result)
+	if !isDeprecations {
+		return nil, fmt.Errorf("settling the standing bodies of %s: the deprecated facts' result is a %T",
+			pass.Pkg.Path(), pass.ResultOf[deprecated.Analyzer])
+	}
+	// Ignored: a run that records no reads hands none, and a recorded question then records nothing.
+	reads, _ := pass.ResultOf[rule.Recorded].(*build_reads.Reads)
+	pushed := pushedFacts{wrappers: wrappers, deprecations: deprecations, reads: reads, home: pass.Pkg}
 	result := &Result{Partial: true}
 	functions := &functionFinder{pass: pass}
 	// A copy, since the host's own list is not this pass's to append to.
 	named := slices.Clone(host.OrderBound())
+	// The package's own functions named for their deprecation, by key.
+	ownDeprecations := map[fact_reach.Object]bool{}
 
 	// The no-return fact of each function a body's findings can turn on, the host's beside ctrlflow's here. For a
 	// function of this package CFGs.NoReturn is the fact itself. For another package's it is the fact only where
 	// this package calls the function as a statement, and reads false anywhere else, so a host's fact the package
 	// never reads that way can name an object whose fact is in truth equal. That is the safe side: it only lints a
 	// body the host's findings would have served. Then each other fact the checker pushes that the host held of the
-	// function and a build compares, its wrapper fact, where the host ran printf on the package: one the build's printf
-	// never looked up reads unknown.
+	// function and a build compares, its wrapper fact, where the host ran printf on the package, one the build's printf
+	// never looked up reading unknown, and its deprecation, where the host ran the deprecated facts analyzer there
+	// (pushedFacts).
 	for _, function := range host.Functions() {
 		result.FunctionsCompared++
 		own, found := functions.function(function.Identity)
@@ -126,6 +139,19 @@ func run(pass *analysis.Pass) (any, error) {
 				continue
 			}
 			result.PushedNamed++
+			if analyzer == deprecated.Analyzer.Name && own.Pkg() == pass.Pkg {
+				ownDeprecations[function.Object] = true
+			}
+		}
+	}
+	// Each function of the package named for its own deprecation is a user of it at the place that declares it
+	// (ownDeprecationUsers).
+	source := ownDeprecationUsers{Host: host, declaring: map[fact_reach.Object][]fact_reach.Place{}}
+	for _, place := range host.Places() {
+		for _, object := range host.Declared(place) {
+			if ownDeprecations[object] {
+				source.declaring[object] = append(source.declaring[object], place)
+			}
 		}
 	}
 
@@ -209,7 +235,7 @@ func run(pass *analysis.Pass) (any, error) {
 	for _, name := range slices.Sorted(maps.Keys(units)) {
 		kinds = append(kinds, fact_reach.Kind{Name: name, Parameters: units[name]})
 	}
-	result.Settlement = fact_reach.Settle(standing, reached, named, kinds, host, asked.compare)
+	result.Settlement = fact_reach.Settle(standing, reached, named, kinds, source, asked.compare)
 	for _, removal := range result.Settlement.Removed {
 		if row, isRow := standing_presence.RowOf(removal.Reason); isRow {
 			result.PresenceRemoved[row]++
@@ -229,7 +255,7 @@ func run(pass *analysis.Pass) (any, error) {
 		for _, left := range reachedAgain {
 			delete(again, left)
 		}
-		settled := fact_reach.Settle(again, reachedAgain, namedAgain, kinds, host, asked.compare)
+		settled := fact_reach.Settle(again, reachedAgain, namedAgain, kinds, source, asked.compare)
 		if len(reachedAgain) == 0 && len(settled.Removed) == 0 {
 			break
 		}

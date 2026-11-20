@@ -136,7 +136,9 @@ func TestSharedHooksImportEveryDirectoryAsGoBuildsOwn(test *testing.T) {
 // Every extra build's listing is the one it makes with nothing shared, its kept answer and that answer's fingerprint
 // included, as the engine lists them (#5jpss95): the host's through the run's reads alone, then each extra build's
 // through the reads, the builds' fingerprints and the builds' walks (#tb538na), a first time, keeping its answer, and
-// a second, reading it kept. A fingerprint read once for every build is each build's own, since a directory's
+// in the next run, under fingerprints and walks of its own as each run has, a second, reading it kept: under the
+// first run's, each would be answered from what that run remembers (#32594zm), and nothing would be read kept. A
+// fingerprint read once for every build is each build's own, since a directory's
 // fingerprint is of its entries and headers, which no build changes, and so is a walk, which reads only entries. It
 // holds on a module of targeted files, on the engine's cgo fixture, on a module whose builds' kept listings name other
 // directories, and on a go.work root of two modules, whose kept listings name two roots and two go.mod files, each
@@ -171,8 +173,6 @@ func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 	} {
 		directory := fixture.directory
 		shared := NewSharedReads()
-		fingerprints := NewFingerprints()
-		walks := NewPackageWalks()
 		ownListings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 		sharedListings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 		patterns := fixture.patterns
@@ -183,6 +183,8 @@ func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 			test.Fatalf("%s: the host's listing: %v", directory, listError)
 		}
 		for round := range 2 {
+			fingerprints := NewFingerprints()
+			walks := NewPackageWalks()
 			for _, target := range sharedListingTargets[1:] {
 				goEnvironment := goEnvironmentOf(test, directory, append(slices.Clone(fixture.environment), target...))
 				alone, aloneKept, aloneError := cachedList(goEnvironment, patterns, ownListings, nil, nil, nil, nil,
@@ -221,15 +223,17 @@ func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
 	}
 }
 
-// Each directory is fingerprinted once a run however many builds list it (#5jpss95): five extra builds, each keeping
-// its listing and then reading it kept, ask for every directory's fingerprint ten times, and each is hashed once.
+// Each directory is fingerprinted once a run however many builds list it (#5jpss95): five extra builds keep their
+// listings in one run, and in the next, under fingerprints of its own, as each run has, five read them kept, asking
+// for every directory's fingerprint five times, and each is hashed once.
 func TestEachDirectoryIsFingerprintedOnceARun(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	writeListingFiles(test, directory, targetedModuleFiles)
-	fingerprints := NewFingerprints()
+	var fingerprints *Fingerprints
 	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 	for range 2 {
+		fingerprints = NewFingerprints()
 		for _, target := range sharedListingTargets[1:] {
 			goEnvironment := goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
 			if _, _, listError := cachedList(goEnvironment, []string{"./..."}, listings, nil, NewSharedReads(),
@@ -297,14 +301,14 @@ func decodedKeptListing(test *testing.T, listings *listingMap, key [sha256.Size]
 }
 
 // A kept listing's steady fingerprint is read once a run for every build whose kept listing names the same inputs
-// (#qqyq61s): five extra builds side by side, each keeping its listing and then reading it kept, ask for it ten
-// times, and it is read once, its root walked once and each steady module file read once. Each build reads its listing
-// kept the second time.
+// (#qqyq61s): five extra builds side by side keep their listings in one run, and in the next, under fingerprints of
+// its own, as each run has, five read them kept, and it is read once, its root walked once and each steady module
+// file read once. Each build reads its listing kept the second time.
 func TestAListingFingerprintIsReadOnceARunForEachSetOfInputs(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	writeListingFiles(test, directory, targetedModuleFiles)
-	fingerprints := NewFingerprints()
+	var fingerprints *Fingerprints
 	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
 	targets := sharedListingTargets[1:]
 	environments := make([]*GoEnvironment, len(targets))
@@ -312,6 +316,7 @@ func TestAListingFingerprintIsReadOnceARunForEachSetOfInputs(test *testing.T) {
 		environments[index] = goEnvironmentOf(test, directory, append([]string{"GOWORK=off"}, target...))
 	}
 	for round := range 2 {
+		fingerprints = NewFingerprints()
 		var group sync.WaitGroup
 		for index, goEnvironment := range environments {
 			group.Go(func() {

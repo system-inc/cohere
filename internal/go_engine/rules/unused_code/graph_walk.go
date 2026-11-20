@@ -246,6 +246,9 @@ func (graph *graph) readInterfaceType(interfaceSyntax *ast.InterfaceType, by typ
 	if len(interfaceSyntax.Methods.List) != 0 {
 		if interfaceType, isInterface := graph.typesInfo.TypeOf(interfaceSyntax).(*types.Interface); isInterface {
 			graph.interfaceTypes = append(graph.interfaceTypes, interfaceType)
+			if graph.recorder != nil {
+				graph.recordInterface(interfaceType)
+			}
 		}
 	}
 	for _, method := range interfaceSyntax.Methods.List {
@@ -316,6 +319,9 @@ func (graph *graph) readCall(call *ast.CallExpr, by types.Object) {
 
 // useAllFieldsRecursively uses every field of goType, and every field of theirs, through arrays too.
 func (graph *graph) useAllFieldsRecursively(goType types.Type, by types.Object) {
+	if graph.recorder != nil {
+		graph.recordAllFieldsUsed()
+	}
 	switch underlying := goType.Underlying().(type) {
 	case *types.Struct:
 		for field := range underlying.Fields() {
@@ -355,6 +361,9 @@ func (graph *graph) write(syntax ast.Node, by types.Object) {
 		// every core.
 		if isGlobal(written) {
 			path := graph.fileSet.File(written.Pos()).Name()
+			if graph.recorder != nil {
+				graph.recordWritten(written)
+			}
 			if strings.HasSuffix(path, "_test.go") {
 				graph.use(written, by)
 			}
@@ -457,6 +466,9 @@ func (graph *graph) declaration(declaration ast.Decl, by types.Object) {
 				graph.seeScope(typeSpec, typeName)
 				if !typeSpec.Assign.IsValid() {
 					graph.namedTypes = append(graph.namedTypes, typeName)
+					if graph.recorder != nil {
+						graph.recordNamedType(typeName)
+					}
 				}
 				// DefaultOptions' ExportedIsUsed.
 				if token.IsExported(typeSpec.Name.Name) && isGlobal(typeName) {
@@ -632,8 +644,32 @@ func (graph *graph) functionDeclaration(declaration *ast.FuncDecl) {
 
 	// (4.1) functions use their receivers
 	graph.read(declaration.Recv, declared)
+	// A recorder's cursor opens on the body here, before the type is read and not as the body is entered: reading the
+	// type sees the scope go/types gives the function's type, which holds the body's immediate locals beside the
+	// parameters and the results (seeScope).
+	recording := graph.recorder != nil && declaration.Body != nil
+	if recording {
+		graph.openBody(declaration, graph.node(declared))
+	}
+	// A body the graph takes from a record is not walked, and its immediate locals, which go/types puts in the scope
+	// of the function's type as above, are not seen there either: the record holds them, and seeing them too would
+	// make each a second node. A build that type-checks every body still finds them in that scope; once a build strips
+	// the bodies it stands on, the scope lists none of them, and the filter finds nothing to leave out.
+	taken := graph.splice != nil && declaration.Body != nil && graph.meetTaken(declaration, graph.node(declared))
+	if taken {
+		graph.skippedBody = declaration.Body
+	}
 	graph.read(declaration.Type, declared)
-	graph.block(declaration.Body, declared)
+	graph.skippedBody = nil
+	if recording {
+		graph.recorder.cursor.inSignature = false
+	}
+	if !taken {
+		graph.block(declaration.Body, declared)
+	}
+	if recording {
+		graph.closeBody()
+	}
 
 	// graph.read(declaration.Type) will ultimately call graph.seeScope and see parameters that way. But because it
 	// relies entirely on the syntax, it cannot resolve unnamed parameters to types.Object. For that reason we
@@ -682,6 +718,11 @@ func (graph *graph) seeScope(syntax ast.Node, by types.Object) {
 	}
 	for _, name := range scope.Names() {
 		declared := scope.Lookup(name)
+		if graph.skippedBody != nil && graph.skippedBody.Lbrace < declared.Pos() &&
+			declared.Pos() < graph.skippedBody.Rbrace {
+			// A local of a body the graph takes from its record (functionDeclaration).
+			continue
+		}
 		graph.see(declared, by)
 
 		if variable, isVariable := declared.(*types.Var); isVariable && !variable.IsField() {
