@@ -56,7 +56,14 @@ func (source *sourceFile) gatherLongLines() []longLine {
 	var long []longLine
 	for line := 1; line <= len(source.lines); line++ {
 		start, end := source.lineStart(line), source.lineEnd(line)
-		length := columnsOf(source.content[start:end])
+		text := source.content[start:end]
+		// A tab is one byte read as TabColumns, and every other rune, or a byte that is no rune, is one column from at
+		// least one byte, so a line reads no wider than its bytes with each tab's extra columns added. A line within
+		// the limit by that bound is within it rune by rune, and counting tabs is cheaper than decoding every rune.
+		if len(text)+(TabColumns-1)*bytes.Count(text, []byte{'\t'}) <= Limit {
+			continue
+		}
+		length := columnsOf(text)
 		if length > Limit {
 			long = append(long, longLine{line: line, start: start, end: end, length: length})
 		}
