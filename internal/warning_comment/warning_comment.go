@@ -30,7 +30,7 @@ var (
 	// its third opening backtick and first closing one make.
 	inlineBackticks = regexp.MustCompile("`[^`]*`")
 
-	// warningWords are the words, written once: warningWord and holdsWarningWord are both built from this list, so
+	// warningWords are the words, written once: warningWord and HoldsWarningWord are both built from this list, so
 	// the two can't disagree about which words there are.
 	warningWords = []string{"TODO", "FIXME", "XXX"}
 
@@ -84,7 +84,7 @@ func WordsIn(texts []string) []Word {
 	text := joined.String()
 	// Most comments hold none of the words, so they skip the masking, and the substring searches turn them away
 	// before the regexp is asked.
-	if !holdsWarningWord(text) || !warningWord.MatchString(text) {
+	if !HoldsWarningWord(text) || !warningWord.MatchString(text) {
 		return nil
 	}
 	// Code blocks are masked before backticks, in the order the shouting rule masks them, so a backtick inside a code
@@ -112,12 +112,16 @@ func WordsIn(texts []string) []Word {
 	return words
 }
 
-// holdsWarningWord is whether text holds one of warningWords anywhere, read as plain substring searches. Go's regexp
+// HoldsWarningWord is whether text holds one of warningWords anywhere, read as plain substring searches. Go's regexp
 // runs in linear time, but it steps its matcher through the text a byte at a time, so over a comment that holds none
 // of the words it costs many times what a substring search does. Since warningWord is warningWords quoted and joined,
 // in capitals and with no word boundary, this is exactly warningWord.MatchString, and it turns away no comment the
 // regexp would read.
-func holdsWarningWord(text string) bool {
+//
+// It is exported as an engine's gate: every Word WordsIn returns is texts[Comment][Start:End], one of the words spelled
+// in that comment's own text, so a group none of whose texts it holds for has no Word, and an engine may skip
+// gathering the group at all.
+func HoldsWarningWord(text string) bool {
 	for _, word := range warningWords {
 		if strings.Contains(text, word) {
 			return true

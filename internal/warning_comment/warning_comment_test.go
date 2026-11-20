@@ -80,7 +80,7 @@ func TestWordsInFindsEachWordWhereverItStands(test *testing.T) {
 	}
 }
 
-// holdsWarningWord says yes wherever the regexp would match and no wherever it would not, so it turns away exactly the
+// HoldsWarningWord says yes wherever the regexp would match and no wherever it would not, so it turns away exactly the
 // texts the regexp would and no other: lowercase and mixed case, a word cut short, and an empty text are turned away,
 // and a word inside a longer one passes on to the whole-word test.
 func TestHoldsWarningWordAgreesWithTheRegexp(test *testing.T) {
@@ -91,8 +91,8 @@ func TestHoldsWarningWordAgreesWithTheRegexp(test *testing.T) {
 		"TODO", "FIXME", "XXX", "TODOS", "TODO_LIST", "XXXX", "0xXXX", "ÜTODO", "a\nFIXME", "ends in XXX",
 	} {
 		want := warningWord.MatchString(text)
-		if got := holdsWarningWord(text); got != want {
-			test.Errorf("holdsWarningWord(%q) = %t, want %t as the regexp says", text, got, want)
+		if got := HoldsWarningWord(text); got != want {
+			test.Errorf("HoldsWarningWord(%q) = %t, want %t as the regexp says", text, got, want)
 		}
 	}
 }
