@@ -351,10 +351,12 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 // holds a quiet package beside it whose Stable stands in its place, so its run with the switch on still leaves a body
 // to the host's findings.
 //
-// What such a row no longer shows: the other build judges the reached declaration itself, so the row reads the same
-// whatever the inputs table declares for its rule, and nothing in it holds the rule's Composes declaration any more.
-// That comes back when the imports reason is rebuilt from the rules' own table (version (b), #bed0mnk). The finding
-// is still held to the build that opens the gate, with the switch on as off.
+// What such a row no longer shows by a standing body: the other build judges the reached declaration itself, so its
+// findings read the same whatever the inputs table declares for the rule, and a rule flipped to PerUnit there would
+// pass every one of them. So the row holds the table's line directly: its rule is absent from the run's confined set
+// (pipeline.standingConfined), as a dispatched rule declared Composes is and one declared PerUnit is not. That line
+// is what the imports reason will be rebuilt from, the rules' own table (version (b), #bed0mnk), and a standing body
+// shows it again then. The finding is still held to the build that opens the gate, with the switch on as off.
 type standingGate struct {
 	module   string
 	stood    string
@@ -511,7 +513,8 @@ func reachedByImports(run buildRun, stood string, file string) bool {
 // in the inputs table, so it is never confined, and the other build judges the standing body itself for it, where the
 // host's findings there would be wrong. Where an import in the declaration's own package flips the gate, the reach
 // has reached the package whole already (#bed0mnk), so the declaration does not stand, the other build judges it
-// whatever the table declares, and the module's quiet package is what stands (standingGate.imports).
+// whatever the table declares, the module's quiet package is what stands, and the rule is held out of the run's
+// confined set in the standing body's place (standingGate.imports).
 func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 	test.Parallel()
 
@@ -533,6 +536,13 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 				if !stoodIn(on.buildRuns[1], "Stable", "quiet.go") {
 					test.Error("with the switch on the quiet package's Stable did not stand in the other build, so " +
 						"the module's run leaves nothing standing")
+				}
+				// Nothing above reads the inputs table for a reached declaration, so its line for the rule is held
+				// here: a rule it declares Composes is never confined. A run that confined nothing at all has no
+				// set to read the rule's absence from.
+				if on.standingConfined == nil || on.standingConfined[rule.Namespace+gate.rule] {
+					test.Errorf("with the switch on the run confines %s for the standing bodies, or has no confined "+
+						"set, want a set without the rule, which the inputs table declares Composes", gate.rule)
 				}
 			case !stoodIn(on.buildRuns[1], gate.stood, gate.file):
 				test.Errorf("with the switch on %s did not stand in the other build, so the module holds nothing of "+
