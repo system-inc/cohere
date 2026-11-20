@@ -162,15 +162,8 @@ func run(pass *analysis.Pass) (any, error) {
 			result.PresenceNamed[row]++
 		}
 	}
-	for _, left := range leaving {
-		if !standing[left.Place] {
-			continue
-		}
-		delete(standing, left.Place)
-		result.PresenceLeft = append(result.PresenceLeft, left)
-		if row, isRow := standing_presence.RowOf(left.Reason); isRow {
-			result.PresenceRemoved[row]++
-		}
+	for _, left := range result.keepLeaving(standing, leaving) {
+		delete(standing, left)
 	}
 
 	// The members of each cycle of calls in the build that touches a body it lints, whose answers may hang on the order
@@ -209,5 +202,37 @@ func run(pass *analysis.Pass) (any, error) {
 			result.PresenceRemoved[row]++
 		}
 	}
+
+	// The edge rows again, to a fixed point with the facts: a body that left only for a differing fact may start a
+	// function that still stands, or be started by one, so what still stands is read in both directions again, and
+	// what that takes out is settled as reached, until a round takes nothing. Each round takes a body out of the
+	// standing set or ends, so there are at most as many rounds as bodies stood. A question asked in an earlier round
+	// is answered from the same verdicts again, and counted again where a later round's body records it.
+	for {
+		again := maps.Clone(result.Settlement.Standing)
+		reachedAgain := result.keepLeaving(again, standing_presence.Reread(pass, host, result.Settlement.Standing))
+		if len(reachedAgain) == 0 {
+			break
+		}
+		for _, left := range reachedAgain {
+			delete(again, left)
+		}
+		settled := fact_reach.Settle(again, reachedAgain, nil, kinds, host, asked.compare)
+		result.Settlement.Standing = settled.Standing
+		result.Settlement.Removed = append(result.Settlement.Removed, settled.Removed...)
+		result.Settlement.Asked += settled.Asked
+		result.Settlement.Differing = summedCounts(result.Settlement.Differing, settled.Differing)
+		result.Settlement.Unknown = summedCounts(result.Settlement.Unknown, settled.Unknown)
+		result.Settlement.Unrecorded = summedCounts(result.Settlement.Unrecorded, settled.Unrecorded)
+	}
 	return result, nil
+}
+
+// summedCounts are each kind's count of first and second, summed, in a map of their own.
+func summedCounts(first map[string]int, second map[string]int) map[string]int {
+	summed := maps.Clone(first)
+	for kind, count := range second {
+		summed[kind] += count
+	}
+	return summed
 }

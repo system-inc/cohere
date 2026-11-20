@@ -79,7 +79,7 @@ func noAnyBound(
 		case *types.Var:
 			isKey = keys.variables[declared.Origin()]
 		case *types.TypeName:
-			isKey = holdsKeyField(declared.Type(), keys.variables, map[types.Type]bool{})
+			isKey = holdsKeyField(declared.Type(), keys.variables)
 		}
 		if isKey {
 			named = append(named, fact_reach.Named{Object: object.Object, Reason: NoAny.Reason()})
@@ -99,28 +99,34 @@ func noAnyBound(
 // (referenceToObject, flow_analysis.go:442-459); go/types makes a struct's fields anew for each struct type written,
 // so a literal whose type is written in place, `struct{ rows []any }{value}`, marks fields of its own, never an
 // anonymous struct's key. A keyed element and a selection use the field itself, which the host's record holds.
-func holdsKeyField(declared types.Type, variables map[*types.Var]bool, seen map[types.Type]bool) bool {
-	if seen[declared] {
+func holdsKeyField(declared types.Type, variables map[*types.Var]bool) bool {
+	// Each type is read once, since a named type's elements can name the type again.
+	seen := map[types.Type]bool{}
+	var holds func(current types.Type) bool
+	holds = func(current types.Type) bool {
+		if seen[current] {
+			return false
+		}
+		seen[current] = true
+		switch underlying := current.Underlying().(type) {
+		case *types.Struct:
+			for index := range underlying.NumFields() {
+				if variables[underlying.Field(index).Origin()] {
+					return true
+				}
+			}
+		case *types.Slice:
+			return holds(underlying.Elem())
+		case *types.Array:
+			return holds(underlying.Elem())
+		case *types.Map:
+			return holds(underlying.Key()) || holds(underlying.Elem())
+		case *types.Pointer:
+			return holds(underlying.Elem())
+		}
 		return false
 	}
-	seen[declared] = true
-	switch underlying := declared.Underlying().(type) {
-	case *types.Struct:
-		for index := range underlying.NumFields() {
-			if variables[underlying.Field(index).Origin()] {
-				return true
-			}
-		}
-	case *types.Slice:
-		return holdsKeyField(underlying.Elem(), variables, seen)
-	case *types.Array:
-		return holdsKeyField(underlying.Elem(), variables, seen)
-	case *types.Map:
-		return holdsKeyField(underlying.Key(), variables, seen) || holdsKeyField(underlying.Elem(), variables, seen)
-	case *types.Pointer:
-		return holdsKeyField(underlying.Elem(), variables, seen)
-	}
-	return false
+	return holds(declared)
 }
 
 // noAnyKeysOf is what every declaration-level candidate of the pass's files keeps. The rule's dispatcher hears a
@@ -144,8 +150,8 @@ func noAnyKeysOf(pass *analysis.Pass) noAnyKeys {
 					return false
 				}
 			}
-			if spellsAny(pass, node) {
-				if declarations, judged := noAnyDeclarations(pass, node, stack); judged {
+			if spellsAny(pass.TypesInfo, node) {
+				if declarations, judged := noAnyDeclarations(pass.TypesInfo, node, stack); judged {
 					addNoAnyKeys(keys, declarations)
 				}
 			}
@@ -175,10 +181,10 @@ func addNoAnyKeys(keys noAnyKeys, declarations []types.Object) {
 
 // spellsAny is whether node is the predeclared any, by its object, or an interface type with an empty method list
 // (candidateAt, rules/consistency_no_any/flow_analysis.go:462-485).
-func spellsAny(pass *analysis.Pass, node ast.Node) bool {
+func spellsAny(information *types.Info, node ast.Node) bool {
 	switch written := node.(type) {
 	case *ast.Ident:
-		return written.Name == "any" && pass.TypesInfo.Uses[written] == types.Universe.Lookup("any")
+		return written.Name == "any" && information.Uses[written] == types.Universe.Lookup("any")
 	case *ast.InterfaceType:
 		return written.Methods == nil || len(written.Methods.List) == 0
 	}
@@ -189,7 +195,7 @@ func spellsAny(pass *analysis.Pass, node ast.Node) bool {
 // is each declaration on the way, arm for arm as the rule's declarationsAround does
 // (rules/consistency_no_any/flow_analysis.go:491-537). judged is false where the rule's is: the climb left type syntax
 // for an expression, or passed through a constraint, a receiver or an interface's embedded element.
-func noAnyDeclarations(pass *analysis.Pass, node ast.Node, stack []ast.Node) ([]types.Object, bool) {
+func noAnyDeclarations(information *types.Info, node ast.Node, stack []ast.Node) ([]types.Object, bool) {
 	declarations := []types.Object{}
 	child := node
 	for index := len(stack) - 1; index >= 0; index-- {
@@ -198,7 +204,7 @@ func noAnyDeclarations(pass *analysis.Pass, node ast.Node, stack []ast.Node) ([]
 			*ast.IndexExpr, *ast.IndexListExpr, *ast.FuncType, *ast.FieldList, *ast.StructType, *ast.InterfaceType:
 			// Type syntax, which the climb passes through.
 		case *ast.Field:
-			fieldDeclarations, judged := noAnyFieldDeclarations(pass, parent, stack[:index])
+			fieldDeclarations, judged := noAnyFieldDeclarations(information, parent, stack[:index])
 			if !judged {
 				return nil, false
 			}
@@ -207,7 +213,7 @@ func noAnyDeclarations(pass *analysis.Pass, node ast.Node, stack []ast.Node) ([]
 			if child != parent.Type {
 				return nil, false
 			}
-			if object := pass.TypesInfo.Defs[parent.Name]; object != nil {
+			if object := information.Defs[parent.Name]; object != nil {
 				declarations = append(declarations, object)
 			}
 			return declarations, true
@@ -221,7 +227,7 @@ func noAnyDeclarations(pass *analysis.Pass, node ast.Node, stack []ast.Node) ([]
 				return nil, false
 			}
 			for _, name := range parent.Names {
-				if object := pass.TypesInfo.Defs[name]; object != nil {
+				if object := information.Defs[name]; object != nil {
 					declarations = append(declarations, object)
 				}
 			}
@@ -238,7 +244,11 @@ func noAnyDeclarations(pass *analysis.Pass, node ast.Node, stack []ast.Node) ([]
 // reads them (rules/consistency_no_any/flow_analysis.go:542-590): the parameters or results of a function whose
 // signature is known, a struct's fields, or an interface's method. judged is false for a type parameter, a receiver
 // and an interface's embedded element.
-func noAnyFieldDeclarations(pass *analysis.Pass, field *ast.Field, above []ast.Node) ([]types.Object, bool) {
+func noAnyFieldDeclarations(
+	information *types.Info,
+	field *ast.Field,
+	above []ast.Node,
+) ([]types.Object, bool) {
 	if len(above) < 2 {
 		return nil, false
 	}
@@ -251,7 +261,7 @@ func noAnyFieldDeclarations(pass *analysis.Pass, field *ast.Field, above []ast.N
 		if list == owner.TypeParams {
 			return nil, false
 		}
-		signature := noAnySignature(pass, owner, above[:len(above)-2])
+		signature := noAnySignature(information, owner, above[:len(above)-2])
 		// A function type written as a type declares no variables.
 		if signature == nil {
 			return nil, true
@@ -262,7 +272,7 @@ func noAnyFieldDeclarations(pass *analysis.Pass, field *ast.Field, above []ast.N
 		}
 		return fieldVariables(list, field, variables.Len(), variables.At), true
 	case *ast.StructType:
-		structure, isStruct := pass.TypesInfo.TypeOf(owner).(*types.Struct)
+		structure, isStruct := information.TypeOf(owner).(*types.Struct)
 		if !isStruct {
 			return nil, true
 		}
@@ -271,7 +281,7 @@ func noAnyFieldDeclarations(pass *analysis.Pass, field *ast.Field, above []ast.N
 		if len(field.Names) == 0 {
 			return nil, false
 		}
-		if method := pass.TypesInfo.Defs[field.Names[0]]; method != nil {
+		if method := information.Defs[field.Names[0]]; method != nil {
 			return []types.Object{method}, true
 		}
 		return nil, true
@@ -282,18 +292,18 @@ func noAnyFieldDeclarations(pass *analysis.Pass, field *ast.Field, above []ast.N
 // noAnySignature is the signature of the function, function literal or interface method functionType belongs to, its
 // ancestors in above, or nil for a function type written as a type (signatureOwning,
 // rules/consistency_no_any/flow_analysis.go:594-620).
-func noAnySignature(pass *analysis.Pass, functionType *ast.FuncType, above []ast.Node) *types.Signature {
+func noAnySignature(information *types.Info, functionType *ast.FuncType, above []ast.Node) *types.Signature {
 	if len(above) == 0 {
 		return nil
 	}
 	switch owner := above[len(above)-1].(type) {
 	case *ast.FuncDecl:
-		if declared, isFunction := pass.TypesInfo.Defs[owner.Name].(*types.Func); isFunction &&
+		if declared, isFunction := information.Defs[owner.Name].(*types.Func); isFunction &&
 			owner.Type == functionType {
 			return declared.Signature()
 		}
 	case *ast.FuncLit:
-		signature, _ := pass.TypesInfo.TypeOf(owner).(*types.Signature)
+		signature, _ := information.TypeOf(owner).(*types.Signature)
 		return signature
 	case *ast.Field:
 		if len(owner.Names) == 0 || owner.Type != functionType || len(above) < 3 {
@@ -302,7 +312,7 @@ func noAnySignature(pass *analysis.Pass, functionType *ast.FuncType, above []ast
 		if _, isInterface := above[len(above)-3].(*ast.InterfaceType); !isInterface {
 			return nil
 		}
-		if method, isFunction := pass.TypesInfo.Defs[owner.Names[0]].(*types.Func); isFunction {
+		if method, isFunction := information.Defs[owner.Names[0]].(*types.Func); isFunction {
 			return method.Signature()
 		}
 	}

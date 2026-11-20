@@ -70,6 +70,10 @@ type factReachPackage struct {
 	// each key of users, and each object a body of everything uses that an identity names.
 	usedObjects []fact_reach.UsedObject
 
+	// presence is, by a body's place, what the body holds that the presence rows read and no use records
+	// (fact_reach.Host.Presence), and no entry for a body that holds none of it.
+	presence map[fact_reach.Place]fact_reach.PresenceRecord
+
 	// functions are the functions a no-return fact is compared on, each once, in the order the record first names
 	// them: a function declared with a body where it is declared, then each function its body uses.
 	functions []fact_reach.Function
@@ -124,6 +128,11 @@ func (hosted *factReachPackage) Users(object fact_reach.Object) []fact_reach.Pla
 // Used are the objects the package's bodies use, each once, with its identity, in the order of their keys.
 func (hosted *factReachPackage) Used() []fact_reach.UsedObject {
 	return hosted.usedObjects
+}
+
+// Presence is what the body at place holds that the presence rows read, the zero record for none.
+func (hosted *factReachPackage) Presence(place fact_reach.Place) fact_reach.PresenceRecord {
+	return hosted.presence[place]
 }
 
 // Recorded are the questions the host's answers about the function at place, and about its parameters, make.

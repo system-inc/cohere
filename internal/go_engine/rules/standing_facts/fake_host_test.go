@@ -1,9 +1,11 @@
 package standing_facts_test
 
 import (
+	"go/types"
 	"maps"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
 
 // fakeHost is a host's side of the facts package as a test writes it, counting each call the build's pass makes of
@@ -17,6 +19,7 @@ type fakeHost struct {
 	asking     map[string]fact_reach.Asking
 	orderBound []fact_reach.Named
 	used       []fact_reach.UsedObject
+	presence   map[fact_reach.Place]fact_reach.PresenceRecord
 	users      map[fact_reach.Object][]fact_reach.Place
 	recorded   map[fact_reach.Place][]fact_reach.Question
 	declared   map[fact_reach.Place][]fact_reach.Object
@@ -74,6 +77,11 @@ func (host *fakeHost) Used() []fact_reach.UsedObject {
 	return host.used
 }
 
+func (host *fakeHost) Presence(place fact_reach.Place) fact_reach.PresenceRecord {
+	host.count("Presence")
+	return host.presence[place]
+}
+
 func (host *fakeHost) Users(object fact_reach.Object) []fact_reach.Place {
 	host.count("Users")
 	host.usersAsked = append(host.usersAsked, object)
@@ -98,4 +106,30 @@ func (host *fakeHost) Kinds() []fact_reach.Kind {
 func (host *fakeHost) Parameters(key fact_reach.Object) int {
 	host.count("Parameters")
 	return host.parameters[key]
+}
+
+// recordPresence holds the presence record the host's own run would make of each body of found
+// (standing_presence.ReadBodies), each function's key the fixture's package path and its name, and declares each body's
+// function at its place under that key.
+func (host *fakeHost) recordPresence(found fixture) {
+	key := func(name string) fact_reach.Object { return fact_reach.Object(found.root.PkgPath + "." + name) }
+	keys := func(functions []*types.Func) []fact_reach.Object {
+		var started []fact_reach.Object
+		for _, function := range functions {
+			started = append(started, key(function.Name()))
+		}
+		return started
+	}
+	host.presence = map[fact_reach.Place]fact_reach.PresenceRecord{}
+	read := standing_presence.ReadBodies(found.root.Fset, found.root.Syntax, found.root.TypesInfo, found.root.Types)
+	for place, body := range read {
+		host.presence[place] = fact_reach.PresenceRecord{GoStarts: keys(body.GoStarts),
+			RunStarts: keys(body.RunStarts), OwnAny: body.OwnAny, LocalMarkers: body.LocalMarkers}
+	}
+	if host.declared == nil {
+		host.declared = map[fact_reach.Place][]fact_reach.Object{}
+	}
+	for name, place := range found.places {
+		host.declared[place] = []fact_reach.Object{key(name)}
+	}
 }

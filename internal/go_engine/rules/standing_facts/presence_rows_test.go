@@ -48,27 +48,34 @@ func presenceHost(test *testing.T, found fixture, present []string, uses ...pres
 }
 
 // requirePresence fails unless the bodies of leaves, by their functions' names, are exactly those that left the
-// standing set, each for its row: every other body that stood stands, every body the settlement took out was taken out
-// for its row's reason, and the result counts by row the bodies of leaves.
+// standing set for presence, each for its row, and those of facts the ones that left for a fact: every other body that
+// stood stands, every body the settlement took out was taken out for its row's reason or its fact's, and the result
+// counts by row the bodies of leaves.
 func requirePresence(
 	test *testing.T,
 	found fixture,
 	host *fakeHost,
 	result *standing_facts.Result,
 	leaves map[string]standing_presence.Row,
+	facts map[string]fact_reach.Reason,
 ) {
 	test.Helper()
 	names := map[fact_reach.Place]string{}
 	for name, place := range found.places {
 		names[place] = name
 		_, leaving := leaves[name]
-		if want := host.standing[place] && !leaving; result.Stands(place.File, place.Offset) != want {
+		_, factLeaving := facts[name]
+		if want := host.standing[place] && !leaving && !factLeaving; result.Stands(place.File, place.Offset) != want {
 			test.Errorf("%s stands %t, want %t", name, !want, want)
 		}
 	}
 	for _, removal := range result.Settlement.Removed {
-		if row := leaves[names[removal.Place]]; removal.Reason != row.Reason() {
-			test.Errorf("%s left for %q, want %q", names[removal.Place], removal.Reason, row.Reason())
+		want := leaves[names[removal.Place]].Reason()
+		if reason, isFact := facts[names[removal.Place]]; isFact {
+			want = reason
+		}
+		if removal.Reason != want {
+			test.Errorf("%s left for %q, want %q", names[removal.Place], removal.Reason, want)
 		}
 	}
 	want := map[standing_presence.Row]int{}
@@ -120,7 +127,7 @@ func TestAStandingBodyNamingAScannerLeavesForPresence(test *testing.T) {
 		presenceUse{key: "scanning.Memory", identity: found.identity("Memory"), users: []string{"Remembered"}})
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
-		"Lines": standing_presence.ScannerError, "Open": standing_presence.ScannerError})
+		"Lines": standing_presence.ScannerError, "Open": standing_presence.ScannerError}, nil)
 }
 
 // sqlrowserr's row (#xeafx79): Next names Rows, the first name a query's rows are assigned to, and leaves. Statement
@@ -132,7 +139,8 @@ func TestAStandingBodyNamingQueriedRowsLeavesForPresence(test *testing.T) {
 		presenceUse{key: "rowing.Rows", identity: found.identity("Rows"), users: []string{"Next"}},
 		presenceUse{key: "rowing.Prepared", identity: found.identity("Prepared"), users: []string{"Statement"}})
 	result, _ := settle(test, found, host)
-	requirePresence(test, found, host, result, map[string]standing_presence.Row{"Next": standing_presence.SqlRowsError})
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"Next": standing_presence.SqlRowsError}, nil)
 }
 
 // screaming's row (#xeafx79): Reads compares with O_RDONLY, an underscored constant of a file importing syscall, and
@@ -144,7 +152,8 @@ func TestAStandingBodyNamingASystemConstantLeavesForPresence(test *testing.T) {
 		presenceUse{key: "screaming.O_RDONLY", identity: found.identity("O_RDONLY"), users: []string{"Reads"}},
 		presenceUse{key: "screaming.ReadOnly", identity: found.identity("ReadOnly"), users: []string{"Plain"}})
 	result, _ := settle(test, found, host)
-	requirePresence(test, found, host, result, map[string]standing_presence.Row{"Reads": standing_presence.Screaming})
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"Reads": standing_presence.Screaming}, nil)
 }
 
 // emptyfunction's row (#xeafx79): shape is a marker, so Check, which selects its isShape, leaves, and so does Odd,
@@ -159,7 +168,7 @@ func TestAStandingBodySelectingAMarkersMethodLeavesForPresence(test *testing.T) 
 		presenceUse{key: "marking.Pair.first", identity: found.method("Pair", "first"), users: []string{"Firsts"}})
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
-		"Check": standing_presence.EmptyFunction, "Odd": standing_presence.EmptyFunction})
+		"Check": standing_presence.EmptyFunction, "Odd": standing_presence.EmptyFunction}, nil)
 }
 
 // noany's bound (#xeafx79), one body taken out under each kind of key: Handle's parameter is a key, so Handle's own
@@ -194,20 +203,47 @@ func TestAStandingBodyTouchingANoAnyKeyLeavesForPresence(test *testing.T) {
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"Handle": standing_presence.NoAny, "Calls": standing_presence.NoAny, "Builds": standing_presence.NoAny,
 		"Reads": standing_presence.NoAny, "Sets": standing_presence.NoAny, "Gets": standing_presence.NoAny,
-		"Fills": standing_presence.NoAny, "Touches": standing_presence.NoAny})
+		"Fills": standing_presence.NoAny, "Touches": standing_presence.NoAny}, nil)
 }
 
-// The edge rows' callee direction (#xeafx79): Start, TestRuns and Quiet are present. Start takes a test and starts
-// helper with go, so helper leaves for testinggoroutine, and helper, present now, starts deeper, which leaves too.
-// TestRuns hands subtest to Run by name, so subtest leaves for requireparallel. Quiet takes no test, so the go
-// statement in it is never heard and quietHelper stands, and Standing, which stands, starts standingHelper, which
-// stands too: a standing caller is stripped with its callee, and no rule reads either.
+// The edge rows (#xeafx79), each direction. Start, TestRuns, Quiet, reached and reachedSub are present. By the callee
+// direction, Start takes a test and starts helper with go, so helper leaves for testinggoroutine, and helper, present
+// now, starts deeper, which leaves too; TestRuns hands subtest to Run by name, so subtest leaves for requireparallel.
+// By the caller direction, the host's record says Late starts reached and TestLate hands reachedSub to Run, neither of
+// which stands, so both callers leave. After the facts settle, Faulty, which leaves only for halt's no-return fact,
+// is present, and afterFact, which it starts, leaves. Quiet takes no test, so quietHelper stands, and Standing, which
+// stands, starts standingHelper, which stands too: a standing caller is stripped with its callee, and no rule reads
+// either.
 func TestABodyAPresentCallerStartsLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadVariant(test, "edges", "edges [edges.test]")
-	host := presenceHost(test, found, []string{"Start", "TestRuns", "Quiet"})
+	host := presenceHost(test, found, []string{"Start", "TestRuns", "Quiet", "reached", "reachedSub"},
+		presenceUse{key: "edges.halt", identity: found.identity("halt"), users: []string{"Faulty"}})
+	host.functions = []fact_reach.Function{{Object: "edges.halt", Identity: found.identity("halt")}}
+	host.recordPresence(found)
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"helper": standing_presence.TestingGoroutine, "deeper": standing_presence.TestingGoroutine,
-		"subtest": standing_presence.RequireParallel})
+		"subtest": standing_presence.RequireParallel, "Late": standing_presence.TestingGoroutine,
+		"TestLate": standing_presence.RequireParallel, "afterFact": standing_presence.TestingGoroutine,
+	}, map[string]fact_reach.Reason{"Faulty": "no-return"})
+}
+
+// A body that writes a candidate of consistency-no-any's of its own, or declares a marker interface, leaves for the
+// host's record of it (#xeafx79): Loose writes interface{} in a local variable's type, which no use records, and
+// Literal writes any in a function literal's parameter, so both leave for noany; Sealed declares a marker of its own,
+// so it leaves for emptyfunction, and so does Seals, which selects Box's method of the marker's name. Plain writes no
+// candidate, and Opens selects a method of another name, so both stand.
+func TestABodyHoldingAnyOrAMarkerOfItsOwnLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "owning")
+	host := presenceHost(test, found, nil,
+		presenceUse{key: "owning.Box.seal", identity: found.method("Box", "seal"), users: []string{"Seals"}},
+		presenceUse{key: "owning.Box.open", identity: found.method("Box", "open"), users: []string{"Opens"}})
+	host.recordPresence(found)
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result, map[string]standing_presence.Row{
+		"Loose": standing_presence.NoAny, "Literal": standing_presence.NoAny,
+		"Sealed": standing_presence.EmptyFunction, "Seals": standing_presence.EmptyFunction,
+	}, nil)
 }

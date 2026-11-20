@@ -13,57 +13,63 @@ import (
 )
 
 // emptyFunctionNamed names, with emptyfunction's reason, each method the package's bodies use under the name of a
-// package-level marker interface's one method: the rule leaves an empty method of that name alone only while no
-// selection in the package names a method of it whose receiver implements the interface (unusedMarkerInterfaces,
+// marker interface's one method: the rule leaves an empty method of that name alone only while no selection in the
+// package names a method of it whose receiver implements the interface (unusedMarkerInterfaces,
 // rules/consistency_no_empty_function/analyzer.go:105-157), so each body that selects one must be present. Any
 // receiver, of any package, since a selection the rule reads is judged by whether its receiver implements the
 // interface, which the build cannot judge of a body it never holds.
 //
-// A marker is as the rule reads one: an interface type the package defines with exactly one explicit method, the
-// method unexported, and nothing embedded (analyzer.go:107-126). The rule reads every type name the package defines,
-// at any level; one a body declares is the census's local marker, wave 3's record, and only a package-level one is
-// read here.
+// A marker is as the rule reads one: an interface type the package defines, at any level, with exactly one explicit
+// method, the method unexported, and nothing embedded (analyzer.go:107-126). The build reads every one its own syntax
+// declares, and recorded are the names of those the host's record says a body declares, which the build's syntax
+// holds no longer once the body is stripped.
 func emptyFunctionNamed(
 	pass *analysis.Pass,
 	used []fact_reach.UsedObject,
 	find func(identity build_reads.Identity) (types.Object, bool),
+	recorded []string,
 ) []fact_reach.Named {
 	markers := markerNames(pass)
+	for _, name := range recorded {
+		markers[name] = true
+	}
 	if len(markers) == 0 {
 		return nil
 	}
 	return methodsNamed(used, markers, find, EmptyFunction.Reason())
 }
 
-// markerNames are the names of the one method of each package-level marker interface of the pass's files.
+// markerNames are the names of the one method of each marker interface the pass's files declare, at any level.
 func markerNames(pass *analysis.Pass) map[string]bool {
 	names := map[string]bool{}
 	for _, file := range pass.Files {
-		for _, declaration := range file.Decls {
-			general, isGeneral := declaration.(*ast.GenDecl)
-			if !isGeneral || general.Tok != token.TYPE {
-				continue
-			}
-			for _, specification := range general.Specs {
-				typeSpecification, isTypeSpecification := specification.(*ast.TypeSpec)
-				if !isTypeSpecification {
-					continue
-				}
-				typeName, isTypeName := pass.TypesInfo.Defs[typeSpecification.Name].(*types.TypeName)
-				if !isTypeName {
-					continue
-				}
-				declared, isInterface := typeName.Type().Underlying().(*types.Interface)
-				if !isInterface || declared.NumExplicitMethods() != 1 || declared.NumEmbeddeds() != 0 {
-					continue
-				}
-				if method := declared.ExplicitMethod(0); !method.Exported() {
-					names[method.Name()] = true
+		ast.Inspect(file, func(node ast.Node) bool {
+			if specification, isTypeSpecification := node.(*ast.TypeSpec); isTypeSpecification {
+				if name, isMarker := markerName(pass.TypesInfo, specification); isMarker {
+					names[name] = true
 				}
 			}
-		}
+			return true
+		})
 	}
 	return names
+}
+
+// markerName is the name of the one method of the interface specification declares, when it is a marker.
+func markerName(information *types.Info, specification *ast.TypeSpec) (string, bool) {
+	typeName, isTypeName := information.Defs[specification.Name].(*types.TypeName)
+	if !isTypeName {
+		return "", false
+	}
+	declared, isInterface := typeName.Type().Underlying().(*types.Interface)
+	if !isInterface || declared.NumExplicitMethods() != 1 || declared.NumEmbeddeds() != 0 {
+		return "", false
+	}
+	method := declared.ExplicitMethod(0)
+	if method.Exported() {
+		return "", false
+	}
+	return method.Name(), true
 }
 
 // methodsNamed names, with reason, each used object that is a method of one of names, on any receiver: a method's

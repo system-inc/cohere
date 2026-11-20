@@ -1,6 +1,8 @@
 package standing_facts
 
 import (
+	"slices"
+
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
@@ -45,6 +47,26 @@ type Result struct {
 	// PresenceLeft are the bodies that left the standing set by themselves for a presence row, each with its row's
 	// reason, which the settlement, taking out only an object's users, never records.
 	PresenceLeft []standing_presence.Leaving
+}
+
+// keepLeaving keeps on result each body of leaving that standing holds, once, counting it by its row, and is the
+// places it kept, in leaving's order, for the caller to take out of standing.
+func (result *Result) keepLeaving(
+	standing map[fact_reach.Place]bool,
+	leaving []standing_presence.Leaving,
+) []fact_reach.Place {
+	var kept []fact_reach.Place
+	for _, left := range leaving {
+		if !standing[left.Place] || slices.Contains(kept, left.Place) {
+			continue
+		}
+		kept = append(kept, left.Place)
+		result.PresenceLeft = append(result.PresenceLeft, left)
+		if row, isRow := standing_presence.RowOf(left.Reason); isRow {
+			result.PresenceRemoved[row]++
+		}
+	}
+	return kept
 }
 
 // Stands is whether the function body declared in the file parsed from filename, its `func` at offset, is left to the

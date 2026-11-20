@@ -23,3 +23,21 @@ func Standing(t *testing.T) { go standingHelper(t) }
 
 // standingHelper logs.
 func standingHelper(t *testing.T) { t.Log("standing") }
+
+// Late takes a test and starts reached with go, which does not stand, so Late leaves by the caller direction.
+func Late(t *testing.T) { go reached(t) }
+
+// reached logs.
+func reached(t *testing.T) { t.Log("reached") }
+
+// Faulty starts afterFact with go and halts.
+func Faulty(t *testing.T) {
+	go afterFact(t)
+	halt()
+}
+
+// afterFact logs.
+func afterFact(t *testing.T) { t.Log("after") }
+
+// halt never returns in this build.
+func halt() { panic("halted") }

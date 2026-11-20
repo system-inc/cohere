@@ -4,11 +4,9 @@ import (
 	"go/ast"
 	"go/types"
 	"strings"
-
-	"golang.org/x/tools/go/analysis"
 )
 
-// requireParallelEdges are the edges testing-require-parallel reads, in the order of the pass's files: each
+// requireParallelEdges are the edges testing-require-parallel reads, in the order of syntax's files: each
 // (*testing.T).Run in a _test.go file handed, by name, a function or method the package declares with a body and one
 // parameter, whose body it judges for its first statement.
 //
@@ -18,10 +16,10 @@ import (
 // analyzer.go:259-277), and a function named by its argument, an instantiation's taken to its origin, declared in the
 // package with a body and one parameter (subtestFunction, analyzer.go:140-187). A function literal is the caller's own
 // body, no edge.
-func requireParallelEdges(pass *analysis.Pass, declarations map[*types.Func]*ast.FuncDecl) []presenceEdge {
+func requireParallelEdges(syntax packageSyntax, declarations map[*types.Func]*ast.FuncDecl) []presenceEdge {
 	var edges []presenceEdge
-	for _, file := range pass.Files {
-		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
+	for _, file := range syntax.files {
+		if !strings.HasSuffix(syntax.fileSet.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
 		for _, declaration := range file.Decls {
@@ -31,7 +29,7 @@ func requireParallelEdges(pass *analysis.Pass, declarations map[*types.Func]*ast
 				if !isCall {
 					return true
 				}
-				if target := subtestDeclaration(pass, call, declarations); target != nil {
+				if target := subtestDeclaration(syntax.information, call, declarations); target != nil {
 					edges = append(edges, presenceEdge{caller: caller, callee: target,
 						reason: RequireParallel.Reason()})
 				}
@@ -45,7 +43,7 @@ func requireParallelEdges(pass *analysis.Pass, declarations map[*types.Func]*ast
 // subtestDeclaration is the declaration whose body call runs as a subtest, when call is a (*testing.T).Run handed a
 // function of the package by name, and nil otherwise.
 func subtestDeclaration(
-	pass *analysis.Pass,
+	information *types.Info,
 	call *ast.CallExpr,
 	declarations map[*types.Func]*ast.FuncDecl,
 ) *ast.FuncDecl {
@@ -56,7 +54,7 @@ func subtestDeclaration(
 	if !isSelector {
 		return nil
 	}
-	selection, isSelection := pass.TypesInfo.Selections[selector]
+	selection, isSelection := information.Selections[selector]
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return nil
 	}
@@ -73,12 +71,12 @@ func subtestDeclaration(
 	var object types.Object
 	switch named := unwrapped.(type) {
 	case *ast.Ident:
-		object = pass.TypesInfo.Uses[named]
+		object = information.Uses[named]
 	case *ast.SelectorExpr:
-		if selected, isSelected := pass.TypesInfo.Selections[named]; isSelected {
+		if selected, isSelected := information.Selections[named]; isSelected {
 			object = selected.Obj()
 		} else {
-			object = pass.TypesInfo.Uses[named.Sel]
+			object = information.Uses[named.Sel]
 		}
 	}
 	function, isFunction := object.(*types.Func)

@@ -13,7 +13,9 @@
 package standing_presence
 
 import (
+	"cmp"
 	"go/types"
+	"maps"
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
@@ -31,7 +33,8 @@ type Leaving struct {
 // Present is what each row takes out of standing, the pass's package's standing set as the walk starts: the objects
 // whose users leave, each named with its row's reason, and the bodies that leave by themselves. find is the build's
 // own object for a host's identity, and false where the build has none. The named rows come first, then noany's bound,
-// and last the edge rows, which read which bodies the build holds present once the others have taken theirs out.
+// then the bodies the host's record says hold what a row reads, and last the edge rows, which read which bodies the
+// build holds present once the others have taken theirs out.
 func Present(
 	pass *analysis.Pass,
 	host fact_reach.Host,
@@ -39,17 +42,51 @@ func Present(
 	find func(identity build_reads.Identity) (types.Object, bool),
 ) ([]fact_reach.Named, []Leaving) {
 	used := host.Used()
+	records := presenceRecords(host)
+	var recordedMarkers []string
+	for _, record := range records {
+		recordedMarkers = append(recordedMarkers, record.LocalMarkers...)
+	}
 	named := slices.Concat(
 		hostPortNamed(pass, used, find),
 		scannerErrorNamed(pass, used, find),
 		sqlRowsErrorNamed(pass, used, find),
 		screamingNamed(pass, used, find),
-		emptyFunctionNamed(pass, used, find),
+		emptyFunctionNamed(pass, used, find, recordedMarkers),
 	)
 	noAnyNamed, leaving := noAnyBound(pass, host, used, find)
 	named = append(named, noAnyNamed...)
-	leaving = append(leaving, edgesLeaving(pass, host, standing, named, leaving)...)
+	leaving = append(leaving, recordedLeaving(records, standing)...)
+	leaving = append(leaving, edgesLeaving(syntaxOf(pass), host, records, standing, named, leaving)...)
 	return named, leaving
+}
+
+// recordedLeaving are the standing bodies that leave for what the host's record says they hold, in the order of their
+// places: one that writes a candidate of consistency-no-any's of its own, noany's census reason 6, which the rule
+// reads wherever the body is present and no use records when it is spelled interface{}; and one that declares a
+// marker interface, which emptyfunction reads as it reads a package-level one.
+func recordedLeaving(
+	records map[fact_reach.Place]fact_reach.PresenceRecord,
+	standing map[fact_reach.Place]bool,
+) []Leaving {
+	var leaving []Leaving
+	for _, place := range slices.SortedFunc(maps.Keys(records), comparePlace) {
+		if !standing[place] {
+			continue
+		}
+		switch {
+		case records[place].OwnAny:
+			leaving = append(leaving, Leaving{Place: place, Reason: NoAny.Reason()})
+		case len(records[place].LocalMarkers) > 0:
+			leaving = append(leaving, Leaving{Place: place, Reason: EmptyFunction.Reason()})
+		}
+	}
+	return leaving
+}
+
+// comparePlace orders two places by file and then by offset.
+func comparePlace(first fact_reach.Place, second fact_reach.Place) int {
+	return cmp.Or(cmp.Compare(first.File, second.File), cmp.Compare(first.Offset, second.Offset))
 }
 
 // packageVariable is the build's own package-level variable of the pass's package that identity names, and false for

@@ -5,11 +5,10 @@ import (
 	"go/types"
 	"slices"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 )
 
-// testingGoroutineEdges are the edges testinggoroutine reads, in the order of the pass's files: each go statement it
+// testingGoroutineEdges are the edges testinggoroutine reads, in the order of syntax's files: each go statement it
 // hears that statically calls a function or method the package declares with a body, whose body it judges as the
 // goroutine's region, one level, following no call from there.
 //
@@ -20,15 +19,15 @@ import (
 // in the package (goAsynchronousCall, analyzer.go:204-222). The rule first asks whether the callee is a variable first
 // assigned a function literal, which is then its region; a variable is no static callee, so asking for the static
 // callee alone finds the same declarations, as the census counter reads it.
-func testingGoroutineEdges(pass *analysis.Pass, declarations map[*types.Func]*ast.FuncDecl) []presenceEdge {
-	importsTesting := slices.ContainsFunc(pass.Pkg.Imports(), func(imported *types.Package) bool {
+func testingGoroutineEdges(syntax packageSyntax, declarations map[*types.Func]*ast.FuncDecl) []presenceEdge {
+	importsTesting := slices.ContainsFunc(syntax.own.Imports(), func(imported *types.Package) bool {
 		return imported.Path() == "testing"
 	})
 	if !importsTesting {
 		return nil
 	}
 	var edges []presenceEdge
-	for _, file := range pass.Files {
+	for _, file := range syntax.files {
 		for _, declaration := range file.Decls {
 			// The rule never descends into a declaration that takes no test, and hears an initializer's whole.
 			caller, isFunction := declaration.(*ast.FuncDecl)
@@ -40,7 +39,7 @@ func testingGoroutineEdges(pass *analysis.Pass, declarations map[*types.Func]*as
 				if !isGo {
 					return true
 				}
-				callee := typeutil.StaticCallee(pass.TypesInfo, statement.Call)
+				callee := typeutil.StaticCallee(syntax.information, statement.Call)
 				if target := declarations[callee]; target != nil && target.Body != nil {
 					edges = append(edges, presenceEdge{caller: caller, callee: target,
 						reason: TestingGoroutine.Reason()})
