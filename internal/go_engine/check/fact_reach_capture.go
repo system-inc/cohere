@@ -72,6 +72,10 @@ type FactReachPackage struct {
 	// PresenceRead is whether the run read the package's bodies for Presence at all. One it never read holds nothing
 	// in Presence that says its bodies hold nothing, so its side counts it unplaced, and a build lints it whole.
 	PresenceRead bool
+
+	// Markers are the method names of every marker interface the package's syntax declares, read with its bodies
+	// (standing_presence.ReadMarkers), sorted.
+	Markers []string
 }
 
 // factReachKinds is what one captured package's answers are, by kind: each kind that answered about its objects, in the
@@ -110,6 +114,7 @@ func captureFactReach(
 		}
 		hosted := &FactReachPackage{NoReturn: home.NoReturn, OrderKnown: true}
 		hosted.Presence, hosted.PresenceRead = presence.of(analyzedPackage.ID)
+		hosted.Markers = presence.markersOf(analyzedPackage.ID)
 		capture.Packages[analyzedPackage.ID], captured[analyzedPackage.Types] = hosted, hosted
 		kinds[analyzedPackage.Types] = &factReachKinds{functions: map[*fact_resolver.Kind][]*types.Func{}}
 	}

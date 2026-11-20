@@ -45,6 +45,11 @@ type Host interface {
 	// zero record for a body that holds none of it, or for a place that is no body's.
 	Presence(place Place) PresenceRecord
 
+	// Markers are the method names of every marker interface the host's syntax of the package declares, a one-method
+	// unexported interface with nothing embedded, at any level, sorted: a marker only a file the host compiles
+	// declares decides the host's verdict on every empty method of its name.
+	Markers() []string
+
 	// Kinds are the fact kinds the host answered about the package's objects, sorted by name, each answering about
 	// parameters where the host's answers of it are: each a kind a body that leaves reads unknown for where it holds no
 	// record of it, beside every kind the build registers. A kind the host never answered about the package served no

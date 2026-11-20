@@ -439,7 +439,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	var presence *factReachPresence
 	if options.FactReach {
 		resolver.RecordAskers()
-		presence = &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{}}
+		presence = &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{},
+			markers: map[string][]string{}}
 		checkerOptions.BodiesRead = presence.readBodies
 	}
 	session := options.Cache

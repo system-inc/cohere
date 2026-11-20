@@ -74,6 +74,10 @@ type factReachPackage struct {
 	// (fact_reach.Host.Presence), and no entry for a body that holds none of it.
 	presence map[fact_reach.Place]fact_reach.PresenceRecord
 
+	// markers are the method names of the marker interfaces the host's syntax of the package declares, sorted
+	// (fact_reach.Host.Markers).
+	markers []string
+
 	// functions are the functions a no-return fact is compared on, each once, in the order the record first names
 	// them: a function declared with a body where it is declared, then each function its body uses.
 	functions []fact_reach.Function
@@ -134,6 +138,11 @@ func (hosted *factReachPackage) Used() []fact_reach.UsedObject {
 // Presence is what the body at place holds that the presence rows read, the zero record for none.
 func (hosted *factReachPackage) Presence(place fact_reach.Place) fact_reach.PresenceRecord {
 	return hosted.presence[place]
+}
+
+// Markers are the method names of the marker interfaces the package declares, sorted.
+func (hosted *factReachPackage) Markers() []string {
+	return hosted.markers
 }
 
 // Recorded are the questions the host's answers about the function at place, and about its parameters, make.

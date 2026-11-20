@@ -20,6 +20,7 @@ type fakeHost struct {
 	orderBound []fact_reach.Named
 	used       []fact_reach.UsedObject
 	presence   map[fact_reach.Place]fact_reach.PresenceRecord
+	markers    []string
 	users      map[fact_reach.Object][]fact_reach.Place
 	recorded   map[fact_reach.Place][]fact_reach.Question
 	declared   map[fact_reach.Place][]fact_reach.Object
@@ -80,6 +81,11 @@ func (host *fakeHost) Used() []fact_reach.UsedObject {
 func (host *fakeHost) Presence(place fact_reach.Place) fact_reach.PresenceRecord {
 	host.count("Presence")
 	return host.presence[place]
+}
+
+func (host *fakeHost) Markers() []string {
+	host.count("Markers")
+	return host.markers
 }
 
 func (host *fakeHost) Users(object fact_reach.Object) []fact_reach.Place {

@@ -14,17 +14,30 @@ import (
 // factReachPresence is what each package's bodies hold that the presence rows read, by package ID, read as the last
 // action on the package finishes (checker.Options.BodiesRead), on whichever goroutine finished it.
 type factReachPresence struct {
-	lock sync.Mutex
-	read map[string]map[fact_reach.Place]standing_presence.BodyRecord
+	lock    sync.Mutex
+	read    map[string]map[fact_reach.Place]standing_presence.BodyRecord
+	markers map[string][]string
 }
 
-// readBodies reads read's bodies while its syntax and type information are whole, and keeps an entry even where none
+// readBodies reads read's bodies, and its marker interfaces, while its syntax and type information are whole, and keeps an entry even where none
 // holds anything, so a package read apart from one never read.
 func (presence *factReachPresence) readBodies(read *packages.Package) {
 	bodies := standing_presence.ReadBodies(read.Fset, read.Syntax, read.TypesInfo, read.Types)
+	markers := standing_presence.ReadMarkers(read.Syntax, read.TypesInfo)
 	presence.lock.Lock()
 	defer presence.lock.Unlock()
 	presence.read[read.ID] = bodies
+	presence.markers[read.ID] = markers
+}
+
+// markersOf are the marker method names read off the package of ID packageId, none for one never read.
+func (presence *factReachPresence) markersOf(packageId string) []string {
+	if presence == nil {
+		return nil
+	}
+	presence.lock.Lock()
+	defer presence.lock.Unlock()
+	return presence.markers[packageId]
 }
 
 // packages are the IDs of the packages whose bodies were read, sorted, and none from no presence at all.

@@ -47,7 +47,7 @@ func Present(
 	for _, record := range records {
 		recordedMarkers = append(recordedMarkers, record.LocalMarkers...)
 	}
-	markers := presentMarkers(pass, recordedMarkers)
+	markers := presentMarkers(pass, append(recordedMarkers, host.Markers()...))
 	named := slices.Concat(
 		hostPortNamed(pass, used, find),
 		scannerErrorNamed(pass, used, find),

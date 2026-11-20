@@ -24,7 +24,8 @@ import (
 //     (check.FactReachPackage.Pushed).
 //   - orderBound are the objects whose answers hang on the order the host walked the package in.
 //   - presence is what each body holds that the presence rows read, by its place, read off the package's syntax while
-//     the host's run held it (check.FactReachPackage.Presence), and presenceRead whether it was read at all.
+//     the host's run held it (check.FactReachPackage.Presence), presenceRead whether it was read at all, and markers
+//     the method names of the marker interfaces the package declares (check.FactReachPackage.Markers).
 type factReachInputs struct {
 	fileSet      *token.FileSet
 	record       *build_reads.FunctionUses
@@ -36,6 +37,7 @@ type factReachInputs struct {
 	orderBound   []types.Object
 	presence     map[fact_reach.Place]standing_presence.BodyRecord
 	presenceRead bool
+	markers      []string
 }
 
 // factReachRendered is an object as a package's side names it: its identity, and its key, known false for an object
@@ -123,6 +125,7 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		}
 	}
 	builder.readPresence()
+	builder.hosted.markers = inputs.markers
 	for name, parsed := range parsedFiles {
 		if len(parsed) > 1 {
 			if builder.hosted.shared == nil {

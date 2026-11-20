@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"maps"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -34,8 +36,9 @@ func emptyFunctionNamed(
 // presentMarkers are the method names of every marker interface the package declares, as the rule reads one: an
 // interface type the package defines, at any level, with exactly one explicit method, the method unexported, and
 // nothing embedded (analyzer.go:107-126). The build reads every one its own syntax declares, and recorded are the
-// names of those the host's record says a body declares, which the build's syntax holds no longer once the body is
-// stripped.
+// names of those the host declares: every one the host's syntax holds (fact_reach.Host.Markers), a marker only a
+// host's file declares among them, and every one the host's record says a body declares, which the build's syntax
+// holds no longer once the body is stripped.
 func presentMarkers(pass *analysis.Pass, recorded []string) map[string]bool {
 	markers := markerNames(pass)
 	for _, name := range recorded {
@@ -75,11 +78,24 @@ func markerMethodsLeaving(
 
 // markerNames are the names of the one method of each marker interface the pass's files declare, at any level.
 func markerNames(pass *analysis.Pass) map[string]bool {
+	return markerNamesOf(pass.Files, pass.TypesInfo)
+}
+
+// ReadMarkers are the method names of every marker interface the package whose syntax and types these are declares,
+// at any level, sorted, as the host reads them off its own syntax. The build carries the host's
+// (fact_reach.Host.Markers): a marker only the host declares, in a file only the host compiles, decides the host's
+// verdict on every method of its name, though the build's own syntax holds no trace of it (round 2's N2).
+func ReadMarkers(files []*ast.File, information *types.Info) []string {
+	return slices.Sorted(maps.Keys(markerNamesOf(files, information)))
+}
+
+// markerNamesOf are the method names of every marker interface files declare, at any level, by information.
+func markerNamesOf(files []*ast.File, information *types.Info) map[string]bool {
 	names := map[string]bool{}
-	for _, file := range pass.Files {
+	for _, file := range files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			if specification, isTypeSpecification := node.(*ast.TypeSpec); isTypeSpecification {
-				if name, isMarker := markerName(pass.TypesInfo, specification); isMarker {
+				if name, isMarker := markerName(information, specification); isMarker {
 					names[name] = true
 				}
 			}
