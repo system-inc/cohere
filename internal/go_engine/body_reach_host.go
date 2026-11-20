@@ -49,9 +49,11 @@ import (
 // any file imports `unsafe`, a gate no use of the body reads. So is a package one of whose imports resolves, in the
 // build, to a package of another ID than on the host, another package under the same path, as go test builds a package
 // again against a test variant: the objects its bodies read there are not the ones the host's record names
-// (differingImports). A body whose positions a //line directive moves onto a file the builds do not share is reached,
-// LineClaim (#d2mqgfj): a rule may judge a finding by the file its position claims, as staticcheck's generated-file
-// filter does (unsharedLineClaims). A build whose word size or maximum alignment differs from the host's
+// (differingImports). And so is a package whose rules asked its import closure for a package, io or hash, and get
+// another answer asked again in the build, where only a dependency's imports differ (differingClosureLookups). A body
+// whose positions a //line directive moves onto a file the builds do not share is reached, LineClaim (#d2mqgfj): a
+// rule may judge a finding by the file its position claims, as staticcheck's generated-file filter does
+// (unsharedLineClaims). A build whose word size or maximum alignment differs from the host's
 // (buildSizesDiffer) reaches every body of every package, Sizes: `unsafe.Sizeof`, a shift past a word or `math.MaxInt`
 // type-check to other constants there with no file differing, which no bit says, as the restore's own sizes gate
 // refuses such a build every package (check's hostSizesDiffer, #61qj12v).
@@ -136,10 +138,12 @@ func newBodyReachHost(
 // the names its build-only files declare at package level, the paths each shared file imports by a dot, by the file
 // as parsed, whether a build-only file declares a variable initializer, which reaches every one of the package's
 // (bodyReacher.reachInitializers), the paths its files import, each with the package it resolves to, by its load's
-// import graph (differingImports), and in each shared file, by the file as parsed, the declarations a //line directive
-// moves onto a file the builds do not share, each by its offset with the file claimed (unsharedLineClaims).
+// import graph (differingImports), its types, of which the host's Closure lookups are asked again
+// (differingClosureLookups), and in each shared file, by the file as parsed, the declarations a //line directive moves
+// onto a file the builds do not share, each by its offset with the file claimed (unsharedLineClaims).
 type reachBuiltPackage struct {
 	identifier            string
+	types                 *types.Package
 	files                 map[string]bool
 	sharedBodies          int
 	buildOnlyBodies       int
@@ -164,9 +168,9 @@ func reachBuiltPackages(loaded *load.Loaded, hostFiles map[string][]string) []*r
 			return
 		}
 		hosted, isHosted := hostFiles[each.ID]
-		read := &reachBuiltPackage{identifier: each.ID, files: make(map[string]bool, len(each.GoFiles)),
-			buildOnlyNames: map[string]bool{}, dotImports: map[string][]string{}, imports: each.Imports,
-			lineClaims: map[string]map[int]string{}}
+		read := &reachBuiltPackage{identifier: each.ID, types: each.Types,
+			files: make(map[string]bool, len(each.GoFiles)), buildOnlyNames: map[string]bool{},
+			dotImports: map[string][]string{}, imports: each.Imports, lineClaims: map[string]map[int]string{}}
 		for _, file := range each.GoFiles {
 			read.files[file] = true
 		}

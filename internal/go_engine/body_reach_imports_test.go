@@ -17,10 +17,23 @@ import (
 // the fourth the paths the host's alone does, either half of differingImports (the Square's surviving mutant). The
 // reach reaches a package whole when its files import other paths in the build than on the host, Imports, so Target
 // is never compared and the body differential reads no failure.
+//
+// Two rules gate on the import closure, not the direct imports (the Square's must on the three-piece head):
+// correctness-no-caller-data-mutation exempts a Read's buffer only where io is in it, and
+// correctness-require-handled-error a digest's dropped Write only where hash is. In closure-io and closure-hash the
+// gate package's direct imports are the same in both builds, dep alone, and dep imports the gating path in a file of
+// the host's alone; closure-io-build and closure-hash-build import it in windows's alone, either half of the
+// comparison (differingClosureLookups). The import is blank in closure-io and closure-hash-build, as the reader's
+// module has it, and typed in the other two, which holds where dep comes from export data. The reach asks each Closure
+// lookup the host's rules recorded of the package again of the build's types, and reaches the gated body, Read or
+// Target, by Imports.
 func TestAPackageWhoseImportsDifferIsReachedWhole(test *testing.T) {
 	test.Parallel()
 
-	for _, module := range []string{"unsafe", "cobra", "goflags", "unsafe-host"} {
+	// Each module, by the gate package's body whose finding the gate flips.
+	for module, gated := range map[string]string{"unsafe": "Target", "cobra": "Target", "goflags": "Target",
+		"unsafe-host": "Target", "closure-io": "Source.Read", "closure-io-build": "Source.Read",
+		"closure-hash": "Target", "closure-hash-build": "Target"} {
 		test.Run(module, func(test *testing.T) {
 			test.Parallel()
 
@@ -45,9 +58,9 @@ func TestAPackageWhoseImportsDifferIsReachedWhole(test *testing.T) {
 				}
 			}
 			// Under the constants-only load mode rule too, whose count the census reads beside the general one's.
-			if got["Target"] != string(reachedImports) || constantsOnly["Target"] != string(reachedImports) {
+			if got[gated] != string(reachedImports) || constantsOnly[gated] != string(reachedImports) {
 				test.Errorf("windows's census judges the gate package's bodies %v, and %v under the constants-only "+
-					"rule, want Target reached by %s under both", got, constantsOnly, reachedImports)
+					"rule, want %s reached by %s under both", got, constantsOnly, gated, reachedImports)
 			}
 			var failures []string
 			for _, failure := range differential.failures {

@@ -140,7 +140,12 @@ func (reacher *bodyReacher) reachPackage(
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 				declared.Declaration.Offset)})
 	}
-	if differing := differingImports(hosted.Imports, read.imports); len(differing) > 0 {
+	differing := differingImports(hosted.Imports, read.imports)
+	// A package's reads hold its lookups, as its function uses (bodyReachHost.judge).
+	if reads := reacher.host.reads[hosted]; reads != nil {
+		differing = append(differing, differingClosureLookups(reads.Lookups(), hosted, read)...)
+	}
+	if len(differing) > 0 {
 		driver := "the package's imports differing, by " + strings.Join(differing, ", ")
 		for index := range bodies {
 			if bodies[index].reason == "" {
@@ -201,6 +206,67 @@ func differingImports(hosted map[string]*packages.Package, built map[string]*pac
 	}
 	slices.Sort(differing)
 	return differing
+}
+
+// differingClosureLookups are the Closure lookups among lookups, the questions the host's rules asked of hosted's
+// import closure (build_reads.QueryClosure), that the build answers otherwise, asked again of read's types of the
+// package of hosted's ID, each written with what either side found (#bed0mnk, the Square's must on the three-piece
+// head). correctness-no-caller-data-mutation exempts a Read's buffer only where io is in the closure, and
+// correctness-require-handled-error a dropped Write of a digest only where hash is, gates no use of a body reads, and
+// a dependency that imports io on one platform alone flips them where the package's own imports are the same.
+//
+// The question is the rule's own (build_reads.ClosureInterface), asked of the closure from the package itself, which
+// holds the closure from its imports that correctness-no-caller-data-mutation asks: the two differ only at the
+// package's own path, which is skipped, being the package itself in both builds, its declarations judged by the
+// bodies and names of each side's files. A lookup differs where it is found on one side alone, either way round, or
+// where both find it in a package of other IDs, read by the path in each side's import graph, which holds one package
+// of a path. The host's answer is its recorded one, never asked again.
+//
+// The package grain's comparison (check's lookupHolds) reads more than these: the answer's object by its objectpath
+// and its closure's digest, from a memo the census does not hold. The answer here is an interface of the standard
+// library that no platform declares otherwise, so its package's ID stands for it. Only the two lookups are compared,
+// never the whole closures, which differ for nearly every package: `os` alone imports a platform's own packages.
+func differingClosureLookups(
+	lookups []build_reads.Lookup,
+	hosted *packages.Package,
+	read *reachBuiltPackage,
+) []string {
+	var differing []string
+	for _, lookup := range lookups {
+		if lookup.Query != build_reads.QueryClosure || lookup.Path == hosted.PkgPath {
+			continue
+		}
+		asked := lookup.Path + "." + lookup.Name + " in the import closure, "
+		_, declared := build_reads.ClosureInterface([]*types.Package{read.types}, lookup.Path, lookup.Name)
+		switch {
+		case lookup.Found && declared == nil:
+			differing = append(differing, asked+"found on the host and not in the build")
+		case !lookup.Found && declared != nil:
+			differing = append(differing, asked+"found in the build and not on the host")
+		case lookup.Found && declared != nil:
+			hostIdentifier, builtIdentifier := closureIdentifier(hosted.Imports, lookup.Path),
+				closureIdentifier(read.imports, lookup.Path)
+			if hostIdentifier != builtIdentifier {
+				differing = append(differing, asked+"found in "+hostIdentifier+" on the host and in "+builtIdentifier+
+					" in the build")
+			}
+		}
+	}
+	return differing
+}
+
+// closureIdentifier is the ID of the package of path in the import graph from imports, a package's imports by path,
+// empty where the graph holds none.
+func closureIdentifier(imports map[string]*packages.Package, path string) string {
+	identifier := ""
+	packages.Visit(slices.Collect(maps.Values(imports)), func(each *packages.Package) bool {
+		if each.PkgPath == path {
+			identifier = each.ID
+		}
+		// Past the package found, or once one is, nothing more is asked.
+		return identifier == ""
+	}, nil)
+	return identifier
 }
 
 // reachInitializers judges a package's variable initializers, the bodies at initializers's indexes, as one body
