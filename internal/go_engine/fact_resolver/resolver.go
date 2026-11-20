@@ -125,6 +125,13 @@ type Kind struct {
 	// and no finding turns on one build's rather than another's. Nil says no answer of the kind is, as a hook
 	// answering false says of one object, which is what a reader takes wherever nobody has argued otherwise: saying
 	// an answer is its types' alone takes an argument of its own, as an order bound does.
+	//
+	// Neither a cgo package nor a test variant hands a reader that leaves out a marked answer with no declaration
+	// (go_engine's factReachBuilder.answer) one an ordinary package would not. A function the cgo tool generates is
+	// declared by its object in a file of the package, as any function is, and a package the tool translated holds no
+	// record of its declarations at all, its outputs naming symbols by go:linkname, so no side is made of it. A test
+	// variant is a package of its own, with its own answers and record, whose `init` functions declare no object, as
+	// any package's.
 	TypesAlone func(object types.Object) bool
 
 	// RecordsEveryJudgment is the kind's word that the answers the resolver holds are a complete record of what its
