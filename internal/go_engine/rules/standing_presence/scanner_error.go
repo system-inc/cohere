@@ -24,11 +24,12 @@ import (
 // it, a variable only ever assigned with `=` is a candidate too, though the rule can never report one, since the
 // assignment's own left side is a use that is no method's receiver: wider is the safe side.
 //
-// The syntax walk alone would fail open once a standing body is stripped: a variable a scanner is assigned to only in
-// such a body would be no candidate, its users would stand, and the assigning body would keep the host's finding. So
-// every package-level variable whose type is *bufio.Scanner is named, whatever made it, its types being the
-// package's own and kept by every strip. The walk stays for the one candidate the type misses, a variable whose type
-// is an interface a scanner is assigned to, which a strip of the assigning body still hides.
+// The walk is what names every candidate the rule can report: a package-level variable assigned with `=` in a body is
+// never reportable, since that left side is a use (analyzer.go:217-242) and a use that is no method's receiver ends
+// the judgment (analyzer.go:248-253), so a reportable one is made only in a package-level `var` specification, which
+// the build always holds, however its bodies are stripped. Every package-level variable whose type is *bufio.Scanner
+// is named besides, whatever made it: cheap safety, wider than the rule, which costs the bodies that name such a
+// variable and loses nothing.
 func scannerErrorNamed(
 	pass *analysis.Pass,
 	used []fact_reach.UsedObject,

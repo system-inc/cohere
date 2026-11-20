@@ -41,3 +41,15 @@ func Remembered() bool { return Memory.Scan() }
 
 // Sourced names Source.
 func Sourced() int { return Source.Len() }
+
+// lineReader is an interface a scanner implements, which In is read through.
+type lineReader interface {
+	Scan() bool
+	Err() error
+}
+
+// In is a candidate only the walk names: a package-level specification makes it, and its type is no *bufio.Scanner.
+var In lineReader = bufio.NewScanner(os.Stdin)
+
+// ReadsIn names In.
+func ReadsIn() bool { return In.Scan() }

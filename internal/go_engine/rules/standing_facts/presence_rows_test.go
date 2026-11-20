@@ -117,7 +117,8 @@ func (found fixture) fieldIdentity(test *testing.T, typeName string, field strin
 
 // scannererr's row (#xeafx79): Lines names Input, a scanner over the process's input, and Open names Assigned, which
 // its own `=` makes a candidate, so both leave, and so does Remembered, which names Memory, whose reader is in memory,
-// since the row names every *bufio.Scanner whatever made it. Sourced names Source, no scanner, and Count names
+// since the row names every *bufio.Scanner whatever made it. ReadsIn names In, a lineReader a package-level
+// specification makes a scanner, which only the syntax walk names. Sourced names Source, no scanner, and Count names
 // nothing, so both stand.
 func TestAStandingBodyNamingAScannerLeavesForPresence(test *testing.T) {
 	test.Parallel()
@@ -126,24 +127,27 @@ func TestAStandingBodyNamingAScannerLeavesForPresence(test *testing.T) {
 		presenceUse{key: "scanning.Input", identity: found.identity("Input"), users: []string{"Lines"}},
 		presenceUse{key: "scanning.Assigned", identity: found.identity("Assigned"), users: []string{"Open"}},
 		presenceUse{key: "scanning.Memory", identity: found.identity("Memory"), users: []string{"Remembered"}},
-		presenceUse{key: "scanning.Source", identity: found.identity("Source"), users: []string{"Sourced"}})
+		presenceUse{key: "scanning.Source", identity: found.identity("Source"), users: []string{"Sourced"}},
+		presenceUse{key: "scanning.In", identity: found.identity("In"), users: []string{"ReadsIn"}})
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"Lines": standing_presence.ScannerError, "Open": standing_presence.ScannerError,
-		"Remembered": standing_presence.ScannerError}, nil)
+		"Remembered": standing_presence.ScannerError, "ReadsIn": standing_presence.ScannerError}, nil)
 }
 
-// sqlrowserr's row (#xeafx79): Next names Rows, the first name a query's rows are assigned to, and leaves. Statement
-// names Prepared, a prepared statement, and Count names nothing, so both stand.
+// sqlrowserr's row (#xeafx79): Next names Rows, the first name a query's rows are assigned to, and leaves, and so does
+// IterReads, which names Iter, rows a package-level specification gives a variable of no *sql.Rows type, which only
+// the syntax walk names. Statement names Prepared, a prepared statement, and Count names nothing, so both stand.
 func TestAStandingBodyNamingQueriedRowsLeavesForPresence(test *testing.T) {
 	test.Parallel()
 	found := loadFixture(test, "rowing")
 	host := presenceHost(test, found, nil,
 		presenceUse{key: "rowing.Rows", identity: found.identity("Rows"), users: []string{"Next"}},
-		presenceUse{key: "rowing.Prepared", identity: found.identity("Prepared"), users: []string{"Statement"}})
+		presenceUse{key: "rowing.Prepared", identity: found.identity("Prepared"), users: []string{"Statement"}},
+		presenceUse{key: "rowing.Iter", identity: found.identity("Iter"), users: []string{"IterReads"}})
 	result, _ := settle(test, found, host)
-	requirePresence(test, found, host, result,
-		map[string]standing_presence.Row{"Next": standing_presence.SqlRowsError}, nil)
+	requirePresence(test, found, host, result, map[string]standing_presence.Row{
+		"Next": standing_presence.SqlRowsError, "IterReads": standing_presence.SqlRowsError}, nil)
 }
 
 // screaming's row (#xeafx79): Reads compares with O_RDONLY, an underscored constant of a file importing syscall, and

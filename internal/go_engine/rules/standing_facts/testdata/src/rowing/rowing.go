@@ -21,3 +21,12 @@ func Count() int { return 1 }
 
 // Statement names Prepared.
 func Statement() *sql.Stmt { return Prepared }
+
+// anything is any by another name, so Iter and iterError are no candidate of consistency-no-any.
+type anything = any
+
+// Iter is a candidate only the walk names: a package-level specification makes it, and its type is no *sql.Rows.
+var Iter, iterError anything = database.Query("select 2")
+
+// IterReads names Iter.
+func IterReads() bool { return Iter != nil }

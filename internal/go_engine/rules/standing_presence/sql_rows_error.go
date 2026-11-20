@@ -40,9 +40,9 @@ var sqlQueryMethods = [...]sqlQueryMethod{
 // since each of the seven is declared on its type and none is promoted, and needs no look outside the package. As the
 // census counter reads it, a variable only ever assigned with `=` is a candidate too.
 //
-// As scannererr's, the walk alone would fail open once the assigning body is stripped, so every package-level
-// variable whose type is *sql.Rows is named, whatever made it, and the walk stays for a variable whose type is an
-// interface rows are assigned to.
+// As scannererr's, the walk names every candidate the rule can report, made only in a package-level `var`
+// specification the build always holds, since an `=` left side is a use that ends the judgment
+// (analyzer.go:252-280); every package-level variable whose type is *sql.Rows is named besides, as cheap safety.
 func sqlRowsErrorNamed(
 	pass *analysis.Pass,
 	used []fact_reach.UsedObject,
