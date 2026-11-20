@@ -436,7 +436,9 @@ const leftOutNamed = 5
 // reportObjectDifferences logs what tally compared under the build named name and fails naming each failure, and
 // fails once more where a package was left out for its errors, saying how many were and naming the first few
 // (leftOutNamed), each with the load it has errors in and its first error there: what the differential still compared
-// is no judgment of the tree, whatever its failures count (#3096be2).
+// is no judgment of the tree, whatever its failures count (#3096be2). It fails too where it compared no object, as a
+// load that found nothing, a pattern matching no package, returns no error and leaves nothing out, and a report of
+// nothing compared is no judgment either, under any caller.
 func reportObjectDifferences(test objectReporter, name string, tally objectTally, started time.Time) {
 	test.Helper()
 	var byKind []string
@@ -449,6 +451,9 @@ func reportObjectDifferences(test objectReporter, name string, tally objectTally
 		time.Since(started).Round(time.Millisecond))
 	for _, failure := range tally.failures {
 		test.Errorf("%s: %s", name, failure)
+	}
+	if tally.compared == 0 {
+		test.Errorf("%s: compared no object, so the load found nothing", name)
 	}
 	if len(tally.leftOut) == 0 {
 		return
@@ -600,9 +605,6 @@ func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T)
 			built := loadObjects(test, module, objectEnvironment(target.GoOperatingSystem, ""), "std", false)
 			tally := objectDifferences(host, built, objectDependence(host, built, notWorkspace).ObjectBits)
 			reportObjectDifferences(test, target.GoOperatingSystem, tally, started)
-			if tally.compared == 0 {
-				test.Error("compared no object, so the load found nothing")
-			}
 		})
 	}
 }

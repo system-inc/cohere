@@ -99,7 +99,7 @@ func TestAReportCountsEveryPackageLeftOutAndNamesTheFirstFew(test *testing.T) {
 		seven = append(seven, fmt.Sprintf("p%d in the build: its error", index))
 	}
 	var report recordedReport
-	reportObjectDifferences(&report, "linux", objectTally{leftOut: seven}, time.Now())
+	reportObjectDifferences(&report, "linux", objectTally{compared: 1, leftOut: seven}, time.Now())
 	wantFailure := "linux: 7 packages loaded with errors, so the differential compared nothing of them and what it " +
 		"compared is the tree in part; the first 5: " + strings.Join(seven[:5], "; ")
 	if !slices.Equal(report.failed, []string{wantFailure}) {
