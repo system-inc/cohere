@@ -12,23 +12,45 @@ import (
 )
 
 // standingPresence is a module of the standing gates' shape for one presence row (#xeafx79): a file only the host
-// compiles, one only the other build does, and shared.go, which both compile and which declares the row's candidate,
-// leaves, a body the other build's difference never reaches that names the candidate, and stands, one that names
-// none.
+// compiles, one only the other build does, and file, which both compile and which holds leaves, a body the other
+// build's difference never reaches that the row takes out, and stands, one it leaves standing. named is how many
+// objects the row names in the other build: none for an edge row, whose bodies leave by themselves. The other build is
+// windows's in every module but presence-requireparallel's, whose is the tag presence_b's: a subtest's signature holds
+// *testing.T, whose type each platform declares otherwise, so in windows's build the reach lints every subtest
+// already. Every module reads no type a platform declares otherwise where its bodies could see one, for the same
+// reason.
 type standingPresence struct {
 	module string
 	row    standing_presence.Row
+	file   string
 	leaves string
 	stands string
+	named  int
 }
 
 // standingPresences are the presence rows' modules, one a row.
 var standingPresences = []standingPresence{
-	{module: "presence-hostport", row: standing_presence.HostPort, leaves: "Dial", stands: "Port"},
+	{module: "presence-hostport", row: standing_presence.HostPort, file: "shared.go", leaves: "Dial", stands: "Port",
+		named: 1},
+	{module: "presence-scannererr", row: standing_presence.ScannerError, file: "shared.go", leaves: "Lines",
+		stands: "Port", named: 1},
+	{module: "presence-sqlrowserr", row: standing_presence.SqlRowsError, file: "shared.go", leaves: "Next",
+		stands: "Port", named: 1},
+	{module: "presence-screaming", row: standing_presence.Screaming, file: "shared.go", leaves: "Reads",
+		stands: "Port", named: 1},
+	{module: "presence-emptyfunction", row: standing_presence.EmptyFunction, file: "shared.go", leaves: "Check",
+		stands: "Port", named: 1},
+	{module: "presence-noany", row: standing_presence.NoAny, file: "shared.go", leaves: "Build", stands: "Port",
+		named: 1},
+	{module: "presence-testinggoroutine", row: standing_presence.TestingGoroutine, file: "shared.go",
+		leaves: "helper", stands: "Port"},
+	{module: "presence-requireparallel", row: standing_presence.RequireParallel, file: "shared_test.go",
+		leaves: "subtest", stands: "count"},
 }
 
 // leftFor are the reasons the facts' settlement of run took the declaration named name, in file, out of the standing
-// set for, in any package of the build: none for a body that stands or that the reach lints already.
+// set for, and those presence took it out by itself for, in any package of the build: none for a body that stands or
+// that the reach lints already.
 func leftFor(run buildRun, name string, file string) []fact_reach.Reason {
 	var reasons []fact_reach.Reason
 	for _, body := range run.bodyReach.bodies {
@@ -46,15 +68,20 @@ func leftFor(run buildRun, name string, file string) []fact_reach.Reason {
 					reasons = append(reasons, removal.Reason)
 				}
 			}
+			for _, left := range packageSettled.PresenceLeft {
+				if left.Place == place {
+					reasons = append(reasons, left.Reason)
+				}
+			}
 		}
 	}
 	return reasons
 }
 
-// A standing body that names a row's candidate leaves the standing set in the other build, so the row's rule reads it
-// there once standing bodies are stripped (#xeafx79): over each presence module, the reach leaves both of shared.go's
-// bodies unreached, and the facts' settlement takes the one that names the candidate out, with the row's reason alone,
-// while the other stands. Nothing is stripped yet, so the findings with the switch on are those with it off.
+// A standing body a row reads leaves the standing set in the other build, so the row's rule reads it there once
+// standing bodies are stripped (#xeafx79): over each presence module, the reach leaves both of its file's bodies
+// unreached, and presence takes the one the row reads out, with the row's reason alone, while the other stands.
+// Nothing is stripped yet, so the findings with the switch on are those with it off.
 func TestAStandingBodyThatNamesARowsCandidateLeavesTheStandingSet(test *testing.T) {
 	test.Parallel()
 
@@ -68,23 +95,23 @@ func TestAStandingBodyThatNamesARowsCandidateLeavesTheStandingSet(test *testing.
 					len(on.buildRuns))
 			}
 			other := on.buildRuns[1]
-			if reasons := leftFor(other, presence.leaves, "shared.go"); !slices.Equal(reasons,
+			if reasons := leftFor(other, presence.leaves, presence.file); !slices.Equal(reasons,
 				[]fact_reach.Reason{presence.row.Reason()}) {
 				test.Errorf("%s left the other build's standing set for %q, want for %q alone", presence.leaves,
 					reasons, presence.row.Reason())
 			}
-			if stoodIn(other, presence.leaves, "shared.go") {
+			if stoodIn(other, presence.leaves, presence.file) {
 				test.Errorf("%s stands in the other build, though it names %s's candidate", presence.leaves,
 					presence.row)
 			}
-			if !stoodIn(other, presence.stands, "shared.go") {
+			if !stoodIn(other, presence.stands, presence.file) {
 				test.Errorf("%s does not stand in the other build, so the module holds nothing that stays",
 					presence.stands)
 			}
-			if other.factReach == nil || other.factReach.presenceNamed[string(presence.row)] != 1 ||
+			if other.factReach == nil || other.factReach.presenceNamed[string(presence.row)] != presence.named ||
 				other.factReach.presenceRemoved[string(presence.row)] != 1 {
-				test.Errorf("the other build's census of the facts' reach is %+v, want one object named and one body "+
-					"taken out for %s", other.factReach, presence.row)
+				test.Errorf("the other build's census of the facts' reach is %+v, want %d objects named and one body "+
+					"taken out for %s", other.factReach, presence.named, presence.row)
 			}
 			if !slices.Equal(findingLines(onStream), findingLines(offStream)) {
 				test.Errorf("the findings with the switch on are\n%s\nwant those with it off\n%s",
