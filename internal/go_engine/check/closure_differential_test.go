@@ -186,13 +186,10 @@ func analyzeClosure(test *testing.T, root string, patterns ...string) *closureRu
 		run.ruleOf[registered.Analyzer] = registered
 		analyzers = append(analyzers, registered.Analyzer)
 	}
-	if wrapError := wrapRuns(analyzers); wrapError != nil {
-		test.Fatal(wrapError)
-	}
 	options := DispatchOptions()
 	run.resolver = fact_resolver.New(answerlessStore{})
 	options.Resolver = run.resolver
-	graph, analyzeError := checker.Analyze(analyzers, loaded.Packages, options)
+	graph, analyzeError := analyzeWrapped(analyzers, loaded.Packages, options)
 	if analyzeError != nil {
 		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
 	}

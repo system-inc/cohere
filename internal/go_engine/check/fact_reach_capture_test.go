@@ -469,15 +469,7 @@ func TestAnUnsurePackageHasNoCapture(test *testing.T) {
 	options.Resolver = resolver
 	options.Restored = func(restoring *packages.Package) bool { return restoring == low }
 	options.Restore = func(*checker.Action) error { return nil }
-	// Wrapped first, as Run wraps every analyzer before it analyzes: wrapRuns sets an analyzer's Run in place, under
-	// its mutex, the first time any run meets it, and this package's tests share reachNilnessAnalyzer and everything
-	// it requires. Analyze reads each of those Runs with no lock, so a bare call beside another test's first wrap is
-	// a race (#msx89hq). Once wrapped here, none of them is written again.
-	asking := []*analysis.Analyzer{reachNilnessAnalyzer}
-	if wrapError := wrapRuns(asking); wrapError != nil {
-		test.Fatal(wrapError)
-	}
-	if _, analyzeError := checker.Analyze(asking, []*packages.Package{low, high},
+	if _, analyzeError := analyzeWrapped([]*analysis.Analyzer{reachNilnessAnalyzer}, []*packages.Package{low, high},
 		options); analyzeError != nil {
 		test.Fatalf("analyzing the unsure workspace: %v", analyzeError)
 	}
@@ -580,13 +572,8 @@ func TestAPackageWhoseBodiesWereNeverReadIsCapturedUnread(test *testing.T) {
 	options := DispatchOptions()
 	resolver := fact_resolver.New(nil)
 	options.Resolver = resolver
-	// Wrapped first, as TestAnUnsurePackageHasNoCapture is and for its reason: the package's parallel runs wrap
-	// reachNilnessAnalyzer and what it requires in place, and Analyze reads their Runs with no lock (#9jkrq6h).
-	asking := []*analysis.Analyzer{reachNilnessAnalyzer}
-	if wrapError := wrapRuns(asking); wrapError != nil {
-		test.Fatal(wrapError)
-	}
-	if _, analyzeError := checker.Analyze(asking, analyzed, options); analyzeError != nil {
+	if _, analyzeError := analyzeWrapped([]*analysis.Analyzer{reachNilnessAnalyzer}, analyzed,
+		options); analyzeError != nil {
 		test.Fatalf("analyzing the reach workspace: %v", analyzeError)
 	}
 	byPath := map[string]*packages.Package{}

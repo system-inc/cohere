@@ -184,9 +184,6 @@ func runIsolatedWith(
 		ruleOf[registered.Analyzer] = registered
 		analyzers = append(analyzers, registered.Analyzer)
 	}
-	if wrapError := wrapRuns(analyzers); wrapError != nil {
-		return nil, wrapError
-	}
 	options := DispatchOptions()
 	resolver := fact_resolver.New(nil)
 	if held != nil {
@@ -196,7 +193,7 @@ func runIsolatedWith(
 	if configure != nil {
 		configure(options)
 	}
-	graph, analyzeError := checker.Analyze(analyzers, analyzed, options)
+	graph, analyzeError := analyzeWrapped(analyzers, analyzed, options)
 	if analyzeError != nil {
 		return nil, analyzeError
 	}
