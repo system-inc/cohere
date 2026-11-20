@@ -38,8 +38,9 @@ const RestoredFromCache = "restored from the findings cache; its reads are not s
 // Each sorted list, Uses, Selections, Facts and Lookups, is kept the first time it is asked and handed to every later
 // caller, the same slice, until a read of its kind is added. The verdicts of every extra build ask the host's reads
 // for the same lists (check.TypesHold, check.FactsHold and check.ReadFactTypes), and copying and sorting them anew for
-// each build cost a run at cohere's root, with every build, 0.09 s of wall, 0.94 s of user time, 0.39 GB and 3.0
-// million objects allocated, and 0.21 GiB of its peak, 9.00 against 8.79 (#f7qsmdf).
+// each build cost a run at cohere's root, with every build and no findings cache, 0.06 s of wall, 0.93 s of user
+// time, 0.36 GB and 2.6 million objects allocated, and about 160 MiB of its peak, measured as the pair of release
+// binaries with and without the kept lists (#f7qsmdf). A host alone asks each list once and reads level.
 //
 // So a list is shared, and a caller ranges over it and never sorts it, appends to it or writes an element: ranging is
 // all those three do. That is safe for builds running side by side, since the lock is held for the read of a kept
