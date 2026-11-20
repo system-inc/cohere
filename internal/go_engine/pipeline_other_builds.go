@@ -540,6 +540,10 @@ func (engine *pipeline) extraBuildRun(
 	afterLoad func(loaded bool),
 	atGate func(fromSource int, packages int) error,
 ) (buildRun, error) {
+	// A test's hold on the build before it reads anything (extraBuildStarts), nil in every run but a test's.
+	if engine.extraBuildStarts != nil {
+		engine.extraBuildStarts(extra)
+	}
 	// Under `--timeline` the build's stamps, each under the build's name, in its first round: its own steps, and its
 	// first load's and check's. A reload's are in the reload's round, the rounds checkedFromSourceRounds counts. The
 	// name is asked only of a run that stamps (buildTimeline).
