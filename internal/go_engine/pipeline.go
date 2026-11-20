@@ -112,6 +112,11 @@ type pipeline struct {
 	judgedSkipped func(build project.Build, identifier string, judgment check.SkippedJudgment, why string)
 	skippedAtLoad func(build project.Build, identifier string)
 
+	// extraBuildLoads, set only by a test and by no run, is told each load of an extra build as it starts, the first
+	// and every one again, so the test counts a build's loads itself, one that skips nothing among them, which
+	// skippedAtLoad never tells of (#tfvrsf3). It is called from the builds' own goroutines, side by side.
+	extraBuildLoads func(extra project.Build)
+
 	// keepsInheritanceOff, set only by a test, has every extra build run its syntax-only rules on every file it checks
 	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.
 	keepsInheritanceOff bool
