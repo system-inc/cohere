@@ -317,6 +317,10 @@ type pipeline struct {
 	// does it (see pipeline_load_beside_fix.go).
 	watchPrelude func(step preludeStep)
 
+	// watchJoin is a test's look at the run's join of the go commands it started before its first load, nil outside a
+	// test: told as the join begins (joinChildren).
+	watchJoin func()
+
 	// unguardedSums are the go.work.sum files a load's go list ran beside with no side copy of the go.work, so go may
 	// have rewritten them (load.Loaded.UnguardedWorkspaceSum), under unguardedSumsLock, since extra builds load at
 	// once. The summary names them.

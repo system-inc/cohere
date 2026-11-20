@@ -290,7 +290,7 @@ func TestABuildContextIsKeptOnlyWhereItCanBe(test *testing.T) {
 func TestCoheresOwnBuildsBuildContextKeysArePredicted(test *testing.T) {
 	test.Parallel()
 	workspace, builds := coheresBuilds(test)
-	host := goEnvironmentOf(test, workspace.Root, workspace.Environment())
+	host := goEnvironmentOf(test, workspace.Root, slices.Concat(workspace.Environment(), noGoEnvironmentFile))
 	requirePredicted := func(test *testing.T, goEnvironment *GoEnvironment) {
 		test.Helper()
 		predicted, predictedKeeps := predictedContextKey(host, goEnvironment.environment)
@@ -305,7 +305,7 @@ func TestCoheresOwnBuildsBuildContextKeysArePredicted(test *testing.T) {
 		test.Run(strings.NewReplacer("/", "_", " ", "_", ",", "_").Replace(extra.String()), func(test *testing.T) {
 			test.Parallel()
 			requirePredicted(test, goEnvironmentOf(test, workspace.Root,
-				slices.Concat(workspace.Environment(), extra.Environment())))
+				slices.Concat(workspace.Environment(), noGoEnvironmentFile, extra.Environment())))
 		})
 	}
 }

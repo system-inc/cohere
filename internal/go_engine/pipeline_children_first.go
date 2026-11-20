@@ -86,6 +86,9 @@ func (engine *pipeline) startChildrenNow(extras []project.Build) []*buildGoEnvir
 // started (describedProject.awaitStarted) and those startChildrenNow did, so none outlives the run, whichever way it
 // ends.
 func (engine *pipeline) joinChildren() {
+	if engine.watchJoin != nil {
+		engine.watchJoin()
+	}
 	engine.described.awaitStarted()
 	engine.buildsStarted.Wait()
 }

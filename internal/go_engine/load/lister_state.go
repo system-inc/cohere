@@ -176,8 +176,11 @@ var buildListUnread = map[string]bool{
 // or a purego tag beside a `GOFIPS140` snapshot. Not unless their flags are the same once every -tags and -pgo is
 // taken out, since the build list reads neither, and an extra build holds -pgo=off twice, its own and the host's
 // it copies (project.Build.Flags). And not unless go env answers every other name the same, buildListUnread's left
-// out, so a name nobody thought of refuses. The cheapest comparisons are first, since an extra build's tag builds
-// share all but their -tags.
+// out, so a name nobody thought of refuses. That fails closed only over the names go env is asked
+// (goEnvironmentNames): a variable go reads and is not asked about, as `GOAUTH`, `GIT_*` or `HOME`, is the same for
+// host and build only because both run under the same process environment, the build's with just its four entries
+// added (project.Build.Environment). The cheapest comparisons are first, since an extra build's tag builds share all
+// but their -tags.
 func modulesSharedWith(build *GoEnvironment, host *GoEnvironment, timed bool) bool {
 	if timed || build.workspace != host.workspace {
 		return false

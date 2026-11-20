@@ -289,8 +289,10 @@ func TestAContradictedPredictionRunsTheBuildsCommandsLate(test *testing.T) {
 var errorStopped = errors.New("stopped as the first load began")
 
 // A run that stops once its first load has begun, here with a panic, joins every go command it started before it
-// returns: the windows build, predicted to fork nothing after its go env and contradicted by its answer, runs its own
-// commands as the run stops, and none is running once the run has returned.
+// returns: the windows build, predicted to fork nothing after its go env and contradicted by its answer, starts its own
+// commands once the first load has begun, the first of which is held running until the run's join begins, and the run
+// stops only once it has started. The run then joins it, so none is running once it has returned; a run that did not
+// join would leave it held.
 func TestARunThatStopsAfterItsFirstLoadBeganLeavesNoGoCommandRunning(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
@@ -304,6 +306,13 @@ func TestARunThatStopsAfterItsFirstLoadBeganLeavesNoGoCommandRunning(test *testi
 			answer["GOENV"] = filepath.Join(root, "another-go-env-file")
 		}))
 	defer stop()
+	lateStarted := make(chan struct{})
+	lateEnds := make(chan struct{})
+	letLateEnd := sync.OnceFunc(func() { close(lateEnds) })
+	// On every way out too, so the held command ends before the test's cleanup joins what the run started.
+	defer letLateEnd()
+	var held atomic.Bool
+	var joined atomic.Bool
 	var stopped *pipeline
 	func() {
 		defer func() {
@@ -313,13 +322,40 @@ func TestARunThatStopsAfterItsFirstLoadBeganLeavesNoGoCommandRunning(test *testi
 		}()
 		runWithSystemCache(test, root, systemCacheRoot, func(engine *pipeline) {
 			stopped = engine
-			watchingLoadBegin(loadBegan, func() { panic(errorStopped) })(engine)
+			holdOnce := sync.OnceFunc(func() {
+				held.Store(true)
+				close(lateStarted)
+				<-lateEnds
+			})
+			engine.described.children.WatchStarted(func(name string) {
+				select {
+				case <-loadBegan:
+				default:
+					return
+				}
+				if name == "go list -m -json" || name == "go list -e -f" {
+					holdOnce()
+				}
+			})
+			engine.watchJoin = func() {
+				joined.Store(true)
+				letLateEnd()
+			}
+			watchingLoadBegin(loadBegan, func() {
+				select {
+				case <-lateStarted:
+				case <-time.After(time.Minute):
+				}
+				panic(errorStopped)
+			})(engine)
 		})
 		test.Fatal("the run returned though it was stopped")
 	}()
-	// Released as the load began, which ran before the stop, so a run that joined the windows build has seen it.
-	if !released.Load() {
-		test.Error("the windows build's go env was still held once the stopped run returned, which left it running")
+	if !released.Load() || !held.Load() {
+		test.Fatal("the windows build started no command of its own once the first load began, so nothing was held")
+	}
+	if !joined.Load() {
+		test.Error("the stopped run returned without joining the go commands it started")
 	}
 	if running := stopped.described.children.Running(); running != 0 {
 		test.Errorf("%d go commands are running once the stopped run has returned, want none", running)

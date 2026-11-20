@@ -171,8 +171,9 @@ var sharedBuildListFiles = map[string]string{
 }
 
 // writeSharedBuildList writes files to a workspace of its own and is it and the environment its go commands run under:
-// `GOTOOLCHAIN=local`, so neither the toolchain line nor a go env file has go switch to another toolchain, which it
-// would download; no proxy, so nothing is fetched; and an empty `GOWORK`, so go finds the workspace's go.work.
+// `GOENV=off`, so no go env file of the person's, as one setting `GOFLAGS`, moves what go answers; `GOTOOLCHAIN=local`,
+// so the toolchain line never has go switch to another toolchain, which it would download; no proxy, so nothing is
+// fetched; and an empty `GOWORK`, so go finds the workspace's go.work.
 func writeSharedBuildList(test *testing.T, files map[string]string) (string, []string) {
 	test.Helper()
 	directory, resolveError := filepath.EvalSymlinks(test.TempDir())
@@ -181,7 +182,7 @@ func writeSharedBuildList(test *testing.T, files map[string]string) (string, []s
 	}
 	workspace := filepath.Join(directory, "workspace")
 	writeListingFiles(test, workspace, files)
-	return workspace, []string{"GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off",
+	return workspace, []string{"GOENV=off", "GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off",
 		"GOMODCACHE=" + filepath.Join(directory, "modules"), "GOWORK="}
 }
 
@@ -244,11 +245,12 @@ func TestTheBuildListIsTheSameBytesUnderEveryBuild(test *testing.T) {
 func TestCoheresOwnBuildsShareTheHostsBuildList(test *testing.T) {
 	test.Parallel()
 	workspace, builds := coheresBuilds(test)
-	host := goEnvironmentOf(test, workspace.Root, workspace.Environment())
+	host := goEnvironmentOf(test, workspace.Root, slices.Concat(workspace.Environment(), noGoEnvironmentFile))
 	for _, extra := range builds[1:] {
 		test.Run(strings.NewReplacer("/", "_", " ", "_", ",", "_").Replace(extra.String()), func(test *testing.T) {
 			test.Parallel()
-			build := goEnvironmentOf(test, workspace.Root, slices.Concat(workspace.Environment(), extra.Environment()))
+			build := goEnvironmentOf(test, workspace.Root, slices.Concat(workspace.Environment(), noGoEnvironmentFile,
+				extra.Environment()))
 			if !modulesSharedWith(build, host, false) {
 				differing := []string{}
 				for _, name := range slices.Sorted(maps.Keys(build.answer)) {

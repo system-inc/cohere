@@ -23,6 +23,9 @@ type Children struct {
 	loading bool
 	late    []string
 	running int
+
+	// watchStarted is a test's look at each go command started, nil outside a test (WatchStarted), under lock.
+	watchStarted func(name string)
 }
 
 // LoadBegins marks the run's first load as begun, so every go command started after it is late. A later call changes
@@ -59,17 +62,29 @@ func (children *Children) Running() int {
 	return children.running
 }
 
+// WatchStarted has watch told the name of each go command started from now on (childName), on the goroutine that
+// starts it, once it is counted running and before it runs, so a test can hold a command there. Only a test calls it.
+func (children *Children) WatchStarted(watch func(name string)) {
+	children.lock.Lock()
+	defer children.lock.Unlock()
+	children.watchStarted = watch
+}
+
 // started records a go command started with arguments, the go command's own, named when the run's first load has
-// begun, and running until ended.
+// begun, and running until ended, and tells a test watching (WatchStarted).
 func (children *Children) started(arguments []string) {
 	if children == nil {
 		return
 	}
 	children.lock.Lock()
-	defer children.lock.Unlock()
 	children.running++
 	if children.loading {
 		children.late = append(children.late, childName(arguments))
+	}
+	watch := children.watchStarted
+	children.lock.Unlock()
+	if watch != nil {
+		watch(childName(arguments))
 	}
 }
 
