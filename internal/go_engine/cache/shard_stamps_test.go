@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -126,5 +127,104 @@ func TestAStoreOfTheRunMarksAShardItChangesMoved(test *testing.T) {
 	}
 	if got := readingOf(damaged); !got.Moved {
 		test.Errorf("the removal of a damaged entry left its shard unmoved: %+v", got)
+	}
+}
+
+// stampedShard is a store under a temporary root holding the shard of sampleKey, its directory's time set to stamp.
+func stampedShard(test *testing.T, stamp time.Time) *Store {
+	test.Helper()
+	store := Open(test.TempDir(), nil)
+	directory := filepath.Join(store.directory, hex.EncodeToString([]byte{ShardOf(sampleKey)}))
+	if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	if timesError := os.Chtimes(directory, stamp, stamp); timesError != nil {
+		test.Fatal(timesError)
+	}
+	return store
+}
+
+// A stamp is trusted once it is at least racyStampWindow, two seconds, behind the clock as it is read, exactly two
+// seconds included, and not a nanosecond before, so a shard written in the two seconds before the run read it is never
+// served from a pack (#b2t9xmf). The stamp is a whole second, which any file system's times hold.
+func TestAShardStampIsTrustedFromTheEndOfTheRacyWindow(test *testing.T) {
+	test.Parallel()
+
+	stamp := time.Unix(1_700_000_000, 0)
+	store := stampedShard(test, stamp)
+	for _, judged := range []struct {
+		behind  time.Duration
+		trusted bool
+	}{
+		{behind: 0, trusted: false},
+		{behind: 1500 * time.Millisecond, trusted: false},
+		{behind: 2*time.Second - time.Nanosecond, trusted: false},
+		{behind: 2 * time.Second, trusted: true},
+		{behind: 2500 * time.Millisecond, trusted: true},
+	} {
+		readAt := stamp.Add(judged.behind)
+		reading, _ := NewShardStamps(func() time.Time { return readAt }).Of(store, ShardOf(sampleKey))
+		if !reading.Known || reading.Stamp != stamp.UnixNano() || reading.Trusted != judged.trusted {
+			test.Errorf("a stamp %v behind the clock reads %+v, want known at %d and trusted %v", judged.behind,
+				reading, stamp.UnixNano(), judged.trusted)
+		}
+	}
+}
+
+// A run's stamps given no clock judge by the system's, as every run's are (NewShardStamps(nil)), so a shard last
+// written an hour ago is trusted, and a pack can serve it.
+func TestAShardStampIsJudgedByTheSystemClockByDefault(test *testing.T) {
+	test.Parallel()
+
+	store := stampedShard(test, time.Now().Add(-time.Hour))
+	if reading, _ := NewShardStamps(nil).Of(store, ShardOf(sampleKey)); !reading.Known || !reading.Trusted {
+		test.Errorf("a stamp an hour old reads %+v under the system clock, want known and trusted", reading)
+	}
+}
+
+// A run removes the packs of other engines from each store directory once, at its first ask, however many builds
+// write packs there or through however many stores, so no build after the first lists the directory again; another
+// directory is swept at its own first ask, and a store holding no stamps, or another run's, sweeps each time it asks.
+func TestARunSweepsEachStoreOfOtherEnginesPacksOnce(test *testing.T) {
+	test.Parallel()
+
+	ours := PackIdentity("this engine")
+	other := PackPlace{Identity: PackIdentity("another engine"), Name: PackName([]string{"other"})}
+	swept := func(store *Store) bool {
+		test.Helper()
+		if writeError := store.WritePack(other, nil, nil); writeError != nil {
+			test.Fatal(writeError)
+		}
+		store.RemoveOtherEnginesPacks(ours)
+		_, refused := store.ReadPack(other)
+		return refused == PackMissing
+	}
+
+	root := test.TempDir()
+	run := NewShardStamps(nil)
+	first := Open(root, run)
+	if !swept(first) {
+		test.Error("the run's first ask left another engine's pack")
+	}
+	for name, store := range map[string]*Store{"the same store": first, "another store of the run": Open(root, run)} {
+		if swept(store) {
+			test.Errorf("%s swept the directory again", name)
+		}
+	}
+	elsewhere := Open(test.TempDir(), run)
+	if !swept(elsewhere) {
+		test.Error("the run's first ask of another directory left another engine's pack")
+	}
+	if swept(elsewhere) {
+		test.Error("the run swept another directory twice")
+	}
+	if !swept(Open(root, NewShardStamps(nil))) {
+		test.Error("another run's first ask left another engine's pack")
+	}
+	unstamped := Open(root, nil)
+	for ask := range 2 {
+		if !swept(unstamped) {
+			test.Errorf("a store holding no stamps left another engine's pack at its ask %d", ask+1)
+		}
 	}
 }
