@@ -147,10 +147,9 @@ func (naming *namer) through(object types.Object, walker *bitWalker) []recordedB
 	if bits, isKnown := naming.throughs[object]; isKnown {
 		return bits
 	}
-	_, isConstant := object.(*types.Const)
 	var bits []recordedBit
 	// Naming an object walks no type, so the walker's own buffer serves; bits is made fresh, the record keeping it.
-	for _, reached := range walker.borrowedReferences(object.Type(), isConstant) {
+	for _, reached := range walker.borrowedThroughReferences(object) {
 		if naming.own(reached.object) {
 			if _, isDeclared := naming.declared[reached.object]; !isDeclared {
 				continue

@@ -827,3 +827,83 @@ func Plain() string {
 		test.Errorf("windows's warm census judges user's bodies\n%v\nwant\n%v", got, want)
 	}
 }
+
+// A body that reaches a struct's layout through a pointer no expression of it names is reached where the layout
+// differs (#mtfdb1m): the body-reach-pointed fixture's Pad is 32 bytes on amd64 and 64 on arm64, and the target is
+// linux on whichever of the two the host is not, whose sizes are the host's, so nothing is reached by them. Shifted
+// shifts by `unsafe.Offsetof(counted.counter)` through Counted, a defined pointer to an unnamed struct holding a Pad,
+// so vet's shift reports it on arm64 alone; Bump selects the same counter through Counted, and BumpHeld one promoted
+// through Holder's embedded pointer to an Inner. The same spelled through an alias: BumpAliasHeld through AliasHolder,
+// which embeds `InnerPointer = *Inner`; BumpWrapped through Wrapper, which embeds `Shared = struct{ *Inner }`; and
+// BumpShared through SharedPointer, a defined pointer to Shared. None of them holds an expression of the struct's
+// type: each is reached by its signature, by the underlying bit of the type it takes, which reads the struct behind
+// the pointer in full, through the alias's own underlying bit where an alias spells it, and the graph's unit verdict
+// agrees. Offset takes `unsafe.Offsetof` of a struct that sits alike in both builds, and is unreached: the builtin's
+// own use reaches nothing. Before the rule the first three were unreached too, and the body differential failed
+// Shifted by its findings; before an alias's underlying bit read what a selection dereferences, the three through an
+// alias were.
+func TestABodyReachingAStructThroughAPointerNoExpressionNamesIsReached(test *testing.T) {
+	test.Parallel()
+
+	other := "amd64"
+	if runtime.GOARCH == "amd64" {
+		other = "arm64"
+	}
+	target := "linux/" + other
+	root := copyFixture(test, filepath.Join("testdata", "body-reach-pointed"))
+	if writeError := os.WriteFile(filepath.Join(root, "CohereSettings.json"),
+		[]byte(`{"go": {"rules": {}, "targets": ["`+target+`"]}}`), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	on, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		engine.bodyDifferential = true
+	}, "--no-cache", "--no-fix", "--build-dependence")
+
+	var census *buildBodyReach
+	var differential *buildBodyDifferential
+	for _, run := range on.buildRuns[1:] {
+		if run.build.OperatingSystem+"/"+run.build.Architecture == target {
+			census, differential = run.bodyReach, run.bodyDifferential
+		}
+	}
+	if census == nil || differential == nil {
+		test.Fatalf("want a census and a body differential of %s", target)
+	}
+	got := map[string]string{}
+	for _, body := range census.bodies {
+		if body.packageIdentifier != "example.com/pointed" {
+			continue
+		}
+		got[body.name] = cmp.Or(string(body.reason), "unreached") + " " +
+			strings.ReplaceAll(body.driver, root+string(filepath.Separator), "") + fmt.Sprintf(" dependent %t",
+			body.unitDependent)
+	}
+	want := map[string]string{
+		"Shifted": "Signature example.com/pointed.Counted (pointed.go) ValueType underlying in the signature " +
+			"dependent true",
+		"Bump": "Signature example.com/pointed.Counted (pointed.go) ValueType underlying in the signature " +
+			"dependent true",
+		"BumpHeld": "Signature example.com/pointed.Holder (pointed.go) ValueType underlying in the signature " +
+			"dependent true",
+		"BumpAliasHeld": "Signature example.com/pointed.AliasHolder (pointed.go) ValueType underlying in the " +
+			"signature dependent true",
+		"BumpWrapped": "Signature example.com/pointed.Wrapper (pointed.go) ValueType underlying in the signature " +
+			"dependent true",
+		"BumpShared": "Signature example.com/pointed.SharedPointer (pointed.go) ValueType underlying in the " +
+			"signature dependent true",
+		"Offset": "unreached  dependent false",
+	}
+	if !maps.Equal(got, want) {
+		test.Errorf("%s's census judges the fixture's bodies\n%v\nwant\n%v", target, got, want)
+	}
+	for _, failure := range differential.failures {
+		if strings.HasPrefix(failure, "example.com/pointed ") {
+			test.Errorf("a body of the fixture left unreached differs on %s: %s", target, failure)
+		}
+	}
+	// The fixture's premise: vet's shift reports Shifted on arm64 alone, the host's side or the target's.
+	if !strings.Contains(stream, "too small for shift of 64") && runtime.GOARCH == "arm64" {
+		test.Errorf("want the host's run on arm64 to report Shifted's shift, and it does not:\n%s", stream)
+	}
+}

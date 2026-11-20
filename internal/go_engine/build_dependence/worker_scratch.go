@@ -71,6 +71,8 @@ func (scratch *workerScratch) release() {
 	clear(scratch.walker.seen)
 	scratch.walker.collected = emptied(scratch.walker.collected)
 	scratch.walker.entering = false
+	scratch.walker.member = false
+	scratch.walker.within = emptied(scratch.walker.within)
 
 	scratch.bodies.typesInformation = nil
 	clear(scratch.bodies.typeReferences)
