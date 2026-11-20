@@ -80,7 +80,7 @@ type inProcessLister struct {
 	// visited is how far order's walk has got with each package, by import path.
 	visited map[string]visitState
 
-	// walks is each pattern's walk of package directories, shared by the run's extra builds when set (PackageWalks).
+	// walks is each pattern's walk of package directories, shared by the run's loads when set (PackageWalks).
 	walks *PackageWalks
 
 	mutex  sync.Mutex

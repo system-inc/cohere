@@ -203,6 +203,14 @@ type pipeline struct {
 	// build's, so an extra build's listing reads nothing the host's already did (#yyvstj6). Every load of the run may
 	// share them: each reads a file the run holds from its held bytes, which follow every write, and the run adds or
 	// removes no file.
+	//
+	// That is the one invariant every table of the run that a load before a write may fill rests on, these reads'
+	// directory entries, walks and moduleRootWalks: no write of a run leaves a directory made, removed or renamed, nor
+	// a file, a go.mod among them, outside a directory whose name starts with a dot, which no listing and no walk
+	// enters. Every write of a project file replaces one existing file's bytes under its own name, through a temporary
+	// file beside it, named with a dot and renamed over it (format's stage and putInPlace), and the findings store
+	// writes only below the root's `.cache`. TestAFixingRunLeavesItsDirectoriesAndModuleFilesAsTheyWere holds a run
+	// that writes to it.
 	reads *load.SharedReads
 
 	// fingerprints are the kept listing's directory fingerprints every load of the run shares, the host's and each
@@ -216,15 +224,18 @@ type pipeline struct {
 	// load reads them again (load.Fingerprints). One a run, made here, so nothing is carried to the next.
 	fingerprints *load.Fingerprints
 
-	// walks are the package directories each pattern's walk finds, which the extra builds share, each walked once for
-	// every build (#tb538na). Only the extra builds read them, as fingerprints: a walk reads directory entries alone,
-	// which no write of the run changes, but the builds are the loads after which nothing writes at all, so no reader
-	// need know which writes a walk reads past.
+	// walks are the package directories each pattern's walk finds, which every load of the run shares, the host's and
+	// each extra build's, each pattern walked once (#tb538na, #vnb7btx). They start over with the fingerprints, at
+	// every change to the bytes the run holds (heldChanged), so the builds take the walks read since the run last
+	// changed those bytes: the host's last load's, but after a rename, whose load of what it wrote shares nothing
+	// (runRename), and but where the host listed nothing, its listing kept, and in both the builds walk among
+	// themselves. That is the stricter of two reasons, each enough: a walk reads directory names and the presence of a
+	// go.mod alone, which no write of the run changes (reads' invariant).
 	walks *load.PackageWalks
 
 	// moduleRootWalks are the walks of the module roots every load's inputs name, the host's and each extra build's,
 	// each root walked once for the run (#ybjbqm2): a walk reads directory entries alone, which no write of the run
-	// changes, so the host's load may share them as the builds' do.
+	// changes (reads' invariant), so the host's load may share them as the builds' do.
 	moduleRootWalks *load.ModuleRootWalks
 
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
@@ -871,9 +882,11 @@ func (engine *pipeline) reread(file string) {
 }
 
 // heldChanged starts the run's fingerprints over, since the bytes they were read from have changed: a load after it
-// reads every directory again from the bytes the change left, and keeps what it reads for the loads after it.
+// reads every directory again from the bytes the change left, and keeps what it reads for the loads after it. The
+// pattern walks start over with them, so the builds take no walk a load made before the change (#vnb7btx).
 func (engine *pipeline) heldChanged() {
 	engine.fingerprints = load.NewFingerprints()
+	engine.walks = load.NewPackageWalks()
 }
 
 // held is the bytes the run holds for file, as load.Held asks: described.contents, every readable file in scope as it
