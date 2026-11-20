@@ -41,7 +41,9 @@ import (
 // only where the build shows that stage's cause for the body (findingCauses): the reach does not stand for them, and
 // the later stage redoes the body only where its cause holds. Where the facts' reach settled a package (#5vbs1np), a
 // body it took out of the standing set is the build's to lint, so its findings are the build's own and no comparison
-// with the host's: it is counted apart, taken out by the facts' reach, and its findings are not compared.
+// with the host's: it is counted apart, taken out by the facts' reach, and its findings are not compared. So is every
+// variable initializer of a package whose settlement named a function one of them uses (#bed0mnk): they are one
+// synthetic function, which a callee's no-return fact cuts and whose findings a callee's answer moves.
 //
 // Its second leg (#adq5ahd) checks what the facts' reach left standing (#aswfm7a), once the build's rules have run:
 // the build lints whole today, so every answer its own run holds is real, and of each body the facts' fixed point left
@@ -284,16 +286,18 @@ func firstFactDifference(
 // every finding one side has and the other lacks is of rules stages owes to one later stage whose cause causes shows
 // for the body, which classes it there. A difference its rules owe to a stage whose cause is not shown stays a
 // failure, saying so. settled is the facts' reach's result by package ID (check.Result.FactReachSettled), nil where
-// it never ran: a body it took out of a package it settled in part is counted, never compared (takenOutByFacts).
+// it never ran, and sides the host's sides it settled by: a body it took out of a package it settled is counted,
+// never compared (takenOutByFacts).
 func (differential *buildBodyDifferential) compareFindings(
 	hostFindings map[string][]check.Finding,
 	builtFindings map[string][]check.Finding,
 	stages map[string][]findingStage,
 	causes *findingCauses,
+	sides *factReachSides,
 	settled map[string]any,
 ) {
 	differential.factsSettled = settled != nil
-	takenOut := takenOutByFacts(settled)
+	takenOut := takenOutByFacts(sides, settled)
 	for _, compared := range differential.bodies {
 		if takenOut[compared.body.packageIdentifier][fact_reach.Place{File: compared.body.file,
 			Offset: compared.body.offset}] {
@@ -326,10 +330,16 @@ func (differential *buildBodyDifferential) compareFindings(
 	}
 }
 
-// takenOutByFacts are the bodies the facts' reach took out of the standing set, by package ID and place, of each
-// package settled holds a result of in part: the build lints them, so their findings are the build's own. A body the
-// reach never held standing, as a value's initializer, is not among them, nor is any of a package it did not settle.
-func takenOutByFacts(settled map[string]any) map[string]map[fact_reach.Place]bool {
+// takenOutByFacts are the bodies the facts' reach took out, by package ID and place, of each package settled holds a
+// settled result of: those that left the standing set, and every variable initializer of a package whose settlement
+// named an object one of them uses, the package's initializers being one asker that never stood
+// (factReachInitializers), which sides, the host's sides the build settled by, holds. The build lints them, so their
+// findings are the build's own. No body of a package the reach did not settle is among them. It settles a package
+// that has a side wherever a function of it stands or a variable initializer of it is unreached
+// (factReachSides.inBuild), so the initializers of a package with no function standing leave as any other's do. A
+// package with no side, or whose side holds something unplaced (factReachHost.Standing), is never settled, and its
+// initializers stay compared as its bodies do.
+func takenOutByFacts(sides *factReachSides, settled map[string]any) map[string]map[fact_reach.Place]bool {
 	takenOut := map[string]map[fact_reach.Place]bool{}
 	for identifier, result := range settled {
 		packageSettled, isResult := result.(*standing_facts.Result)
@@ -339,6 +349,13 @@ func takenOutByFacts(settled map[string]any) map[string]map[fact_reach.Place]boo
 		takenOut[identifier] = map[fact_reach.Place]bool{}
 		for _, removal := range packageSettled.Settlement.Removed {
 			takenOut[identifier][removal.Place] = true
+		}
+		// A package is settled only from its host's side, so sides holds one wherever the walk reaches here.
+		if hosted := sides.packages[identifier]; hosted != nil &&
+			hosted.initializers.leaveFor(packageSettled.Settlement.Named) {
+			for _, place := range hosted.initializers.places {
+				takenOut[identifier][place] = true
+			}
 		}
 	}
 	return takenOut

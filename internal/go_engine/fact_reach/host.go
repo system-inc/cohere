@@ -11,7 +11,8 @@ type Host interface {
 	Source
 
 	// Standing is the bodies the reach leaves to the host in this build as the walk starts, the caller's own copy to
-	// take bodies out of, and false for a package the build lints whole, where nothing is asked.
+	// take bodies out of, and false for a package the build lints whole, where nothing is asked. It may be empty and
+	// true: the build lints all of such a package too, and settles it for an asker that is no body.
 	Standing() (map[Place]bool, bool)
 
 	// Places are the package's function bodies in the files the host compiles, in the order they are declared. Those
@@ -19,7 +20,8 @@ type Host interface {
 	Places() []Place
 
 	// Functions are the functions whose no-return fact a body's findings can turn on: each the package declares with
-	// a body and each function a body uses, its own package's or another's, once, with the host's fact.
+	// a body and each function a body or a variable's initializer uses, its own package's or another's, once, with the
+	// host's fact.
 	Functions() []Function
 
 	// Imported are the answers the host's analysis of the package read from other packages, each asked of the build

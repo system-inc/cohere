@@ -461,7 +461,8 @@ func Around(angle int) int { return angle * q.Scale }
 				census.lackedImported, each.around, each.byImport)
 		}
 		var written strings.Builder
-		writeBuildBodyReach(&written, "build fixture", census)
+		// No rule ran, so the facts' reach took nothing out.
+		writeBuildBodyReach(&written, "build fixture", census, nil)
 		lines := strings.Split(written.String(), "\n")
 		if !slices.Contains(lines, each.line) || each.lacked && !slices.Contains(lines, "    example.com/gone") {
 			test.Errorf("%s: the census has no line %q, or names no gone under it:\n%s", each.name, each.line,

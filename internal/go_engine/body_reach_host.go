@@ -242,7 +242,8 @@ func declaresVariableInitializer(file *ast.File) bool {
 // buildBodyReach is one build's census: the packages it checked from source, those of them the host recorded and
 // those only the build has; their bodies, reached by reason, absent (in the host's files the build does not compile)
 // and new (in files only the build compiles, always checked); the recorded packages none of whose bodies is reached
-// and none new, which need their declarations alone; the recorded packages whose judged bodies are not the bodies the
+// and none new, which need their declarations alone, but for those the facts' reach then takes something out of, which
+// the census file leaves out (writeBuildBodyReach); the recorded packages whose judged bodies are not the bodies the
 // build counts in the files both compile, each reached whole; and every body of a recorded package, in the order the
 // packages' IDs and their records give, which the disagreements with the graph's unit verdict are read from.
 type buildBodyReach struct {

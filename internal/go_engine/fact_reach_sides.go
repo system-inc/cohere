@@ -82,10 +82,14 @@ func newFactReachSides(
 
 // inBuild is, by package ID, the side the build whose body reach census is reach hands its passes on each package that
 // has one and that the census judged: the package's bodies the reach leaves unreached are its standing set, and the
-// build lints it in part when any stands, whole when none does (factReachPackage.inBuild). Only the side's own places
-// stand, its function bodies, never a value's initializer, which the census judges too and no fact's reach follows;
-// two bodies at one place, as a cgo package may hold, stand once. Any other package has no side here, and the build
-// lints it whole. It only reads the sides, on the build's own goroutine, so every build may call it at once.
+// build settles the package when any stands or any of its variable initializers is unreached, and lints it whole,
+// asking nothing, otherwise (factReachPackage.inBuild). Only the side's own places stand, its function bodies, never
+// a value's initializer, which the census judges too: the facts' reach follows a package's variable initializers as
+// one asker that is no place and never stands (factReachInitializers). So a package with initializers alone unreached
+// is settled with nothing standing (#bed0mnk): the build still lints all of it, and the settlement says whether its
+// initializers leave, which the body differential would else compare with the host's whatever a fact reads there. Two
+// bodies at one place, as a cgo package may hold, stand once. Any other package has no side here, and the build lints
+// it whole. It only reads the sides, on the build's own goroutine, so every build may call it at once.
 func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reach.Host {
 	unreached := map[string]map[fact_reach.Place]bool{}
 	for _, body := range reach.bodies {
@@ -107,13 +111,14 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 				standing[place] = true
 			}
 		}
-		hosts[identifier] = sides.packages[identifier].inBuild(standing, len(standing) > 0)
+		hosts[identifier] = sides.packages[identifier].inBuild(standing,
+			len(standing) > 0 || sides.packages[identifier].initializers.anyAmong(bodies))
 	}
 	return hosts
 }
 
 // buildFactReach is one build's census of the facts' reach, of its last load: sides, the packages it handed a host's
-// side, and of them settled, those whose standing bodies it settled, the build linting them in part
+// side, and of them settled, those it settled, with bodies standing or with none
 // (standing_facts.Result.Partial), crashed, those it failed to settle on; and, summed over the settled ones, the
 // no-return facts compared and the objects they named, the other pushed facts compared and the functions they named,
 // the answers the host read from other packages asked before the

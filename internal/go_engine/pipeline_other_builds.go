@@ -871,7 +871,7 @@ func (engine *pipeline) extraBuildRun(
 	if run.bodyDifferential != nil {
 		run.bodyDifferential.compareFindings(engine.bodyReachHost.findings, findingsByFile(result.Findings),
 			findingStagesOf(enabled), &findingCauses{dependence: run.judged.dependence,
-				filesDiffer: run.judged.filesDiffer}, result.FactReachSettled)
+				filesDiffer: run.judged.filesDiffer}, engine.factReachSides, result.FactReachSettled)
 		if result.FactReach != nil && result.FactReachSettled != nil {
 			built := make(map[string]*packages.Package, len(loaded.Packages))
 			for _, each := range loaded.Packages {
