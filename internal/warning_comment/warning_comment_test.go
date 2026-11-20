@@ -80,6 +80,26 @@ func TestWordsInFindsEachWordWhereverItStands(test *testing.T) {
 	}
 }
 
+// A group with none of the words is turned away before its bodies are joined, so it allocates nothing, and nearly
+// every group an engine hands over is that. The group has capitals in a row, the words in lowercase, and a word cut
+// in two across a pair of comments, which the joined text holds only with a newline inside it, so it is no word
+// either way.
+//
+// Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
+// add to.
+func TestWordsInAllocatesNothingForAGroupWithoutTheWords(test *testing.T) {
+	texts := []string{"// HTTP and JSON, a todo list and a fixme branch, then FIX", "// ME and TO", "/* DO */"}
+	var words []Word
+	allocations := testing.AllocsPerRun(10, func() { words = WordsIn(texts) })
+	if len(words) != 0 {
+		test.Errorf("WordsIn(%q) = %v, want none", texts, words)
+	}
+	if allocations != 0 {
+		test.Errorf("WordsIn allocated %.0f times over a group with none of the words: it joined the group before "+
+			"asking whether any comment holds one", allocations)
+	}
+}
+
 // HoldsWarningWord says yes wherever the regexp would match and no wherever it would not, so it turns away exactly the
 // texts the regexp would and no other: lowercase and mixed case, a word cut short, and an empty text are turned away,
 // and a word inside a longer one passes on to the whole-word test.

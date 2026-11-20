@@ -17,6 +17,7 @@ package warning_comment
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -65,6 +66,13 @@ type Word struct {
 // is its whole text, since the mask knows its gutter. Every body is a suffix of its comment's text, so an offset in
 // the body maps back by the length cut.
 func WordsIn(texts []string) []Word {
+	// Most groups hold none of the words, so they are turned away before the join, which costs a builder, a slice of
+	// spans and the joined string. Asking each text alone turns away exactly the groups the joined text would: a word
+	// holds no newline, so none crosses the one between two bodies, and what a body cuts from its text, the slashes
+	// and one space, holds no word.
+	if !slices.ContainsFunc(texts, HoldsWarningWord) {
+		return nil
+	}
 	type commentSpan struct {
 		start int
 		end   int
@@ -82,11 +90,6 @@ func WordsIn(texts []string) []Word {
 		spans = append(spans, commentSpan{start: start, end: joined.Len(), cut: len(text) - len(body)})
 	}
 	text := joined.String()
-	// Most comments hold none of the words, so they skip the masking, and the substring searches turn them away
-	// before the regexp is asked.
-	if !HoldsWarningWord(text) || !warningWord.MatchString(text) {
-		return nil
-	}
 	// Code blocks are masked before backticks, in the order the shouting rule masks them, so a backtick inside a code
 	// block opens no span over the prose after it. Each byte of a span becomes one space and each newline stays, so
 	// every offset still points into the source.
