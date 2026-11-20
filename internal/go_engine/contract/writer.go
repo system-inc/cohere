@@ -17,11 +17,22 @@ type Writer struct {
 	output            io.Writer
 	provenanceWritten bool
 	summaryWritten    bool
+
+	// line is the record being written, encoded by encoder, which writes into it, and emptied before the next. One
+	// buffer serves every record, since a run writes thousands of findings and each would otherwise encode into a
+	// buffer of its own and be copied into a line of its own. Its last reader is output's Write, which io.Writer
+	// forbids to keep it: the engine's stdout copies it out to the pipe, and a test's bytes.Buffer into its own bytes.
+	line    bytes.Buffer
+	encoder *json.Encoder
 }
 
 // NewWriter is a Writer onto output, which is the engine's stdout outside a test.
 func NewWriter(output io.Writer) *Writer {
-	return &Writer{output: output}
+	writer := &Writer{output: output}
+	writer.encoder = json.NewEncoder(&writer.line)
+	// A message that says `a <- b` should read that way in the stream too (encodeWithoutHtmlEscaping).
+	writer.encoder.SetEscapeHTML(false)
+	return writer
 }
 
 // Write writes one record as one line, with `kind` first, as the fixtures in swift/Contract/ write it.
@@ -40,7 +51,7 @@ func (writer *Writer) Write(record Record) error {
 		return fmt.Errorf("a second provenance record")
 	}
 
-	line, encodeError := encodeLine(record)
+	line, encodeError := writer.encodeLine(record)
 	if encodeError != nil {
 		return fmt.Errorf("a %q record that does not encode: %w", record.kind(), encodeError)
 	}
@@ -57,27 +68,28 @@ func (writer *Writer) Write(record Record) error {
 	return nil
 }
 
-// encodeLine is a record as one line of JSON ending in a newline, with its kind as the first field.
-func encodeLine(record Record) ([]byte, error) {
-	fields, encodeError := encodeWithoutHtmlEscaping(record)
-	if encodeError != nil {
+// encodeLine is a record as one line of JSON ending in a newline, with its kind as the first field, in writer.line:
+// the line is good until the next record is encoded, which empties the buffer under it.
+func (writer *Writer) encodeLine(record Record) ([]byte, error) {
+	writer.line.Reset()
+	writer.line.WriteString(`{"kind":`)
+	if encodeError := writer.encoder.Encode(record.kind()); encodeError != nil {
 		return nil, encodeError
 	}
-	kind, encodeError := encodeWithoutHtmlEscaping(record.kind())
-	if encodeError != nil {
+	// The encoder ends every value with a newline, which the kind is not the end of.
+	writer.line.Truncate(writer.line.Len() - 1)
+	fieldsStart := writer.line.Len()
+	if encodeError := writer.encoder.Encode(record); encodeError != nil {
 		return nil, encodeError
 	}
-	// Every record type is a struct with fields, so fields is an object with at least one member, and
-	// the kind goes in after its opening brace.
+	line := writer.line.Bytes()
+	fields := line[fieldsStart : len(line)-1]
+	// Every record type is a struct with fields, so fields is an object with at least one member, and its opening
+	// brace becomes the comma between the kind and its first member.
 	if len(fields) < 2 || fields[0] != '{' || string(fields) == "{}" {
 		return nil, fmt.Errorf("it encodes as %s, which is not an object with fields", fields)
 	}
-	line := make([]byte, 0, len(fields)+len(kind)+12)
-	line = append(line, `{"kind":`...)
-	line = append(line, kind...)
-	line = append(line, ',')
-	line = append(line, fields[1:]...)
-	line = append(line, '\n')
+	line[fieldsStart] = ','
 	return line, nil
 }
 
