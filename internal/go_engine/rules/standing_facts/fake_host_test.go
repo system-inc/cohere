@@ -1,6 +1,10 @@
 package standing_facts_test
 
-import "github.com/system-inc/cohere/internal/go_engine/fact_reach"
+import (
+	"maps"
+
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+)
 
 // fakeHost is a host's side of the facts package as a test writes it, counting each call the build's pass makes of
 // it. whole is a package the build lints whole, whose Standing reports false.
@@ -32,9 +36,10 @@ func (host *fakeHost) count(call string) {
 	host.calls[call]++
 }
 
+// Standing is a copy of standing at each call, as a host's is, since the pass takes bodies out of it.
 func (host *fakeHost) Standing() (map[fact_reach.Place]bool, bool) {
 	host.count("Standing")
-	return host.standing, !host.whole
+	return maps.Clone(host.standing), !host.whole
 }
 
 func (host *fakeHost) Places() []fact_reach.Place {
