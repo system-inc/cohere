@@ -84,8 +84,11 @@ func (block *BasicBlock) Control() Instruction {
 // Parent returns the function that contains block b.
 func (block *BasicBlock) Parent() *Function { return block.parent }
 
+// Reaches reports whether control can pass from block to basicBlock. go/ir answers from a reachability set it
+// builds for every strongly connected component of every function, and nothing in the engine asks, so ours walks
+// when asked instead (Reachable), which answers the same for every block the entry reaches (#z844663).
 func (block *BasicBlock) Reaches(basicBlock *BasicBlock) bool {
-	return block.Scc.reachable.Bit(basicBlock.Scc.Index) != 0
+	return Reachable(block, basicBlock)
 }
 
 // String returns a human-readable label of this block.
@@ -99,6 +102,16 @@ func (block *BasicBlock) String() string {
 func (block *BasicBlock) emit(instruction Instruction, source ast.Node) Value {
 	instruction.setSource(source)
 	instruction.setBlock(block)
+	if block.Instructions == nil {
+		// A block whose first instruction doesn't end it holds at least two, so it starts with room for four, one
+		// array where append from nothing would make arrays of one, two and four (#z844663). A block its first
+		// instruction ends keeps the one slot append makes.
+		switch instruction.(type) {
+		case *Jump, *If, *Return, *Panic, *Unreachable, *ConstantSwitch:
+		default:
+			block.Instructions = make([]Instruction, 0, 4)
+		}
+	}
 	block.Instructions = append(block.Instructions, instruction)
 	value, _ := instruction.(Value)
 	return value
