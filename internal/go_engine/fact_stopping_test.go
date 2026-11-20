@@ -21,7 +21,8 @@ func TestABodyTheBuildLintsWithNoRecordOfTheStoppingCallsTakesItsUserOut(test *t
 		test.Fatal("the reach left helper unreached, want it reached, so that the build asks its records")
 	}
 	if reason := settled.bodies["stopVia"].reason; reason != "" {
-		test.Fatalf("the reach reached stopVia for %q, want it unreached, so that only the facts can take it out", reason)
+		test.Fatalf("the reach reached stopVia for %q, want it unreached, so that only the facts can take it out",
+			reason)
 	}
 	settled.requireRemovedBy(test, "stopVia", "helper", fact_reach.UnrecordedReason("test_stopping_calls"))
 }

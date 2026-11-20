@@ -25,7 +25,8 @@ type FactReachCapture struct {
 	// store gave an answer about one of its objects (fact_resolver.Package.AnsweredFromStore), as a package loaded from
 	// source to answer a question is answered from its entry. The answer was judged in another run, and nothing of what
 	// it rests on in this one, so a function the run holds no answer of a kind about may be one it rests on: no kind's
-	// record of the package is complete (fact_resolver.Kind.RecordsEveryJudgment), and the package is one to lint whole.
+	// record of the package is complete (fact_resolver.Kind.RecordsEveryJudgment), and the package is one to lint
+	// whole.
 	StoreAnswered map[string]bool
 
 	// Answers are every answer the run holds, about every package's objects, as fact_resolver.Answered orders them, the

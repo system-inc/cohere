@@ -324,7 +324,8 @@ func acrossPair(test *testing.T, kind recordingKind) (*packages.Package, *packag
 	if loadError != nil {
 		test.Fatalf("loading %s's two packages: %v", kind.across, loadError)
 	}
-	var lower, upper *packages.Package
+	var lower *packages.Package
+	var upper *packages.Package
 	for _, root := range loaded.Roots {
 		switch root.PkgPath {
 		case kind.across + "/lower":
@@ -425,8 +426,8 @@ func TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswerAcrossAPackage(test *te
 				test.Error(disagreement)
 			}
 			if coverage.stubbed == 0 || coverage.compared == 0 {
-				test.Errorf("the differential stubbed %d functions of lower and compared %d answers, want some of each, "+
-					"or it holds nothing", coverage.stubbed, coverage.compared)
+				test.Errorf("the differential stubbed %d functions of lower and compared %d answers, want some of "+
+					"each, or it holds nothing", coverage.stubbed, coverage.compared)
 			}
 			test.Logf("%s: %d functions of lower stubbed, %d answers the same", kind.kind.Name, coverage.stubbed,
 				coverage.compared)

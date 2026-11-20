@@ -201,7 +201,8 @@ func TestAQuestionRecordedUnderTwoBodiesIsARecordAtEach(test *testing.T) {
 		kinds, source, compare)
 	if !settlement.Standing[outer] || len(settlement.Unrecorded) != 0 || asked[purityOfWarm.Key] != 1 {
 		test.Errorf("removed %v with %v unrecorded, Warm's purity asked %d times, want Outer standing, nothing "+
-			"unrecorded and Warm's purity asked once", settlement.Removed, settlement.Unrecorded, asked[purityOfWarm.Key])
+			"unrecorded and Warm's purity asked once", settlement.Removed, settlement.Unrecorded,
+			asked[purityOfWarm.Key])
 	}
 	source = warmFixture()
 	delete(source.recorded, warm)

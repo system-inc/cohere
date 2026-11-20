@@ -49,7 +49,8 @@ func TestNilnessKeptAnswersTakeEachChainsUserOutThroughBothWalks(test *testing.T
 		}
 	}
 	if len(settled.settlement.Unrecorded) != 0 {
-		test.Errorf("functions were named for holding no record of a kind, %v, want none", settled.settlement.Unrecorded)
+		test.Errorf("functions were named for holding no record of a kind, %v, want none",
+			settled.settlement.Unrecorded)
 	}
 	compares := func(findings []check.Finding, user string) bool {
 		return slices.ContainsFunc(findings, func(finding check.Finding) bool {
