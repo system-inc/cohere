@@ -53,8 +53,8 @@ var Analyzer = &analysis.Analyzer{
 }
 
 // run is the package's standing set in this build, settled: nothing for a package the checker handed no host's side
-// of, or that the build lints whole, and else what the host's set keeps once every differing fact and answer has
-// taken its users out.
+// of, or that the host's side has the build settle nothing of, and else what the host's set keeps, which may be
+// nothing as the walk starts, once every differing fact and answer has taken its users out.
 func run(pass *analysis.Pass) (any, error) {
 	host, held := pass.ResultOf[rule.FactHost].(fact_reach.Host)
 	if !held {
@@ -62,7 +62,7 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	standing, partial := host.Standing()
 	if !partial {
-		// The build lints the package whole, so nothing is compared: no body's findings are the host's.
+		// The build lints the package whole and reads no settlement of it, so nothing is compared.
 		return &Result{}, nil
 	}
 	resolver, resolverError := fact_resolver.Of(pass)

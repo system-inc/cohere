@@ -173,8 +173,8 @@ func (hosted *factReachPackage) Declared(place fact_reach.Place) []fact_reach.Ob
 	return hosted.declared[place]
 }
 
-// inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build lints
-// the package in part rather than whole.
+// inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build settles
+// the package, which it does with standing empty where the package's variable initializers alone are unreached.
 func (hosted *factReachPackage) inBuild(standing map[fact_reach.Place]bool, partial bool) fact_reach.Host {
 	return factReachHost{factReachPackage: hosted, standing: standing, partial: partial}
 }

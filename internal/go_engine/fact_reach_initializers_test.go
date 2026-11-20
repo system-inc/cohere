@@ -22,8 +22,12 @@ import (
 // The reader's two modules: first calls dep.Other, which stops under the audit_b tag, and with a function of the
 // package calling it as a statement, where ctrlflow reads another package's no-return fact, the build's initializer is
 // cut after first and parsed's SA1007 is the host's alone; with no such body the fact is never read, both builds
-// report, and nothing is settled. Then a function named that no initializer uses, which leaves the initializers
+// report, and nothing is named. Then a function named that no initializer uses, which leaves the initializers
 // compared, and a function the initializers alone use, named by its purity, an answer the host read of dep.
+//
+// Then the two shapes with no function declared, where nothing can stand and the package is settled all the same: the
+// statement in a function literal an initializer holds, and the answer with the initializer alone. With the standing
+// bodies on, the build still lints such a package whole: its findings and the stream's are those with the switch off.
 func TestTheFactsReachTakesAPackagesVariableInitializersOutTogether(test *testing.T) {
 	test.Parallel()
 
@@ -102,6 +106,21 @@ func idle() int {
 	return 1
 }
 `
+	const literal = bare + `
+// asker calls dep.Other as a statement, in a function literal.
+var asker = func() {
+	dep.Other()
+}
+`
+	const alone = `
+// Package audit holds one variable initializer and nothing else, which uses dep.Other.
+package audit
+
+import "example.com/audit/dep"
+
+// A blank spec, whose call's results are discarded, a finding where dep.Other is pure.
+var _, _ = dep.Other(1)
+`
 	for _, each := range []struct {
 		name string
 		// dep is the dep package's files and shared the audit package's one file.
@@ -111,9 +130,10 @@ func idle() int {
 		// differential counts taken out by the facts' reach.
 		initializers []string
 		takenOut     int
-		// partial is whether the build lints the package in part, and declarationsOnly whether the census file lists
-		// it under "declarations only".
-		partial          bool
+		// stands is how many functions of the package stand as the walk starts. The build settles the package with
+		// none standing too, its initializers being unreached, and then still lints it whole. declarationsOnly is
+		// whether the census file lists the package under "declarations only".
+		stands           int
 		declarationsOnly bool
 		// rule is the finding of an initializer the builds may differ on, hostReports and buildReports whether each
 		// reports it.
@@ -121,31 +141,40 @@ func idle() int {
 		hostReports  bool
 		buildReports bool
 	}{
-		{"a statement in a function of the package", stopping, statement, []string{"first", "parsed"}, 3, true, false,
+		{"a statement in a function of the package", stopping, statement, []string{"first", "parsed"}, 3, 1, false,
 			"cohere-go/SA1007", true, false},
-		{"no asking body", stopping, bare, []string{"first", "parsed"}, 0, false, true, "cohere-go/SA1007", true,
-			true},
-		{"a named function no initializer uses", stopping, unused, []string{"parsed"}, 1, true, false,
+		{"no asking body", stopping, bare, []string{"first", "parsed"}, 0, 0, true, "cohere-go/SA1007", true, true},
+		{"a named function no initializer uses", stopping, unused, []string{"parsed"}, 1, 1, false,
 			"cohere-go/SA1007", true, true},
-		{"an answer about a function the initializers alone use", quieting, answered, []string{"_"}, 1, true, false,
+		{"an answer about a function the initializers alone use", quieting, answered, []string{"_"}, 1, 1, false,
 			"cohere-go/SA4017", false, true},
+		{"a statement in a function literal, no function declared", stopping, literal,
+			[]string{"first", "parsed", "asker"}, 3, 0, false, "cohere-go/SA1007", true, false},
+		{"an answer, no function declared", quieting, alone, []string{"_"}, 1, 0, false, "cohere-go/SA4017", false,
+			true},
 	} {
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
 
-			root := copyFixture(test, filepath.Join("testdata", "body-reach-initializer-causes"))
 			files := map[string]string{"shared.go": strings.TrimPrefix(each.shared, "\n")}
 			for name, contents := range each.dep {
 				files[name] = contents
 			}
-			for name, contents := range files {
-				if makeError := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); makeError != nil {
-					test.Fatal(makeError)
+			// written is a fresh copy of the fixture holding the case's module.
+			written := func() string {
+				root := copyFixture(test, filepath.Join("testdata", "body-reach-initializer-causes"))
+				for name, contents := range files {
+					if makeError := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); makeError != nil {
+						test.Fatal(makeError)
+					}
+					writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644)
+					if writeError != nil {
+						test.Fatal(writeError)
+					}
 				}
-				if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
-					test.Fatal(writeError)
-				}
+				return root
 			}
+			root := written()
 			censusFile := filepath.Join(test.TempDir(), "reach.txt")
 			on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
 				engine.bodyReachCensus = censusFile
@@ -189,17 +218,26 @@ func idle() int {
 					reports(on.buildRuns[0]), reports(run), each.hostReports, each.buildReports)
 			}
 
-			// No initializer is a place of the side's, so none stands as the walk starts or after it, and a package of
-			// initializers alone is linted whole.
+			// No initializer is a place of the side's, so none stands as the walk starts or after it. The build settles
+			// the package all the same, with every function standing or with none, and its counts are filled, which the
+			// census sums: dep.Other's no-return fact is compared wherever anything of the package uses it.
 			hosted := run.factHosts["example.com/audit"]
 			if hosted == nil {
 				test.Fatal("the tagged build handed its passes no side of the package")
 			}
-			standing, partial := hosted.Standing()
-			if partial != each.partial {
-				test.Errorf("the build lints the package in part %t, want %t", partial, each.partial)
+			standing, isSettled := hosted.Standing()
+			if !isSettled || len(standing) != each.stands {
+				test.Errorf("the build settles the package %t with %d bodies standing, want it settled with %d",
+					isSettled, len(standing), each.stands)
 			}
 			settled, _ := run.result.FactReachSettled["example.com/audit"].(*standing_facts.Result)
+			if settled == nil || !settled.Partial || settled.Settlement == nil || settled.FunctionsCompared == 0 {
+				test.Fatalf("the package's settled result is %+v, want one settled, its functions compared", settled)
+			}
+			if run.factReach == nil || run.factReach.settled == 0 || run.factReach.functionsCompared == 0 {
+				test.Errorf("the build's census of the facts' reach is %+v, want the package among those settled",
+					run.factReach)
+			}
 			for _, body := range run.bodyReach.bodies {
 				if body.packageIdentifier != "example.com/audit" || !slices.Contains(each.initializers, body.name) {
 					continue
@@ -215,12 +253,12 @@ func idle() int {
 			}
 
 			// The census file's "declarations only" list, the lines under its count.
-			written, readError := os.ReadFile(censusFile)
+			census, readError := os.ReadFile(censusFile)
 			if readError != nil {
 				test.Fatal(readError)
 			}
 			isListed, inList := false, false
-			for line := range strings.Lines(string(written)) {
+			for line := range strings.Lines(string(census)) {
 				switch {
 				case strings.HasPrefix(line, "  declarations only: "):
 					inList = true
@@ -232,7 +270,39 @@ func idle() int {
 			}
 			if isListed != each.declarationsOnly {
 				test.Errorf("the census file lists the package under \"declarations only\" %t, want %t:\n%s", isListed,
-					each.declarationsOnly, written)
+					each.declarationsOnly, census)
+			}
+
+			// A package settled with nothing standing is still linted whole with the standing bodies on: the tagged
+			// build's own findings and the stream's are those with the switch off, none missing and none added.
+			if each.stands > 0 {
+				return
+			}
+			var found [2][]string
+			var streams [2][]string
+			for index, switched := range []bool{false, true} {
+				standingRoot := written()
+				switchedRun, stream := runOverConfigured(test, standingRoot, exitFindings, func(engine *pipeline) {
+					engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+					engine.standingBodies = switched
+				}, "--no-cache", "--no-fix", "--build-dependence")
+				streams[index] = findingLines(normalize(stream, standingRoot))
+				at := slices.IndexFunc(switchedRun.buildRuns, func(run buildRun) bool {
+					return slices.Contains(run.build.Tags, "audit_b")
+				})
+				if at < 0 {
+					test.Fatalf("with the standing bodies %t, want a build under the audit_b tag", switched)
+				}
+				found[index] = rawFindings(switchedRun.buildRuns[at], standingRoot)
+				if switchedRun.buildRuns[at].standingDeclarations != 0 {
+					test.Errorf("with the standing bodies %t the tagged build shows the host's findings in %d "+
+						"declarations, want none", switched, switchedRun.buildRuns[at].standingDeclarations)
+				}
+			}
+			if len(found[0]) == 0 || !slices.Equal(found[0], found[1]) || !slices.Equal(streams[0], streams[1]) {
+				test.Errorf("with the standing bodies on the tagged build's findings are\n%s\nand off\n%s\nand the "+
+					"streams' findings alike %t, want the same findings, and some", strings.Join(found[1], "\n"),
+					strings.Join(found[0], "\n"), slices.Equal(streams[0], streams[1]))
 			}
 		})
 	}

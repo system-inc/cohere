@@ -11,7 +11,8 @@ type Host interface {
 	Source
 
 	// Standing is the bodies the reach leaves to the host in this build as the walk starts, the caller's own copy to
-	// take bodies out of, and false for a package the build lints whole, where nothing is asked.
+	// take bodies out of, and false for a package the build lints whole, where nothing is asked. It may be empty and
+	// true: the build lints all of such a package too, and settles it for an asker that is no body.
 	Standing() (map[Place]bool, bool)
 
 	// Places are the package's function bodies in the files the host compiles, in the order they are declared. Those

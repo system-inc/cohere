@@ -286,8 +286,8 @@ func firstFactDifference(
 // every finding one side has and the other lacks is of rules stages owes to one later stage whose cause causes shows
 // for the body, which classes it there. A difference its rules owe to a stage whose cause is not shown stays a
 // failure, saying so. settled is the facts' reach's result by package ID (check.Result.FactReachSettled), nil where
-// it never ran, and sides the host's sides it settled by: a body it took out of a package it settled in part is
-// counted, never compared (takenOutByFacts).
+// it never ran, and sides the host's sides it settled by: a body it took out of a package it settled is counted,
+// never compared (takenOutByFacts).
 func (differential *buildBodyDifferential) compareFindings(
 	hostFindings map[string][]check.Finding,
 	builtFindings map[string][]check.Finding,
@@ -331,12 +331,14 @@ func (differential *buildBodyDifferential) compareFindings(
 }
 
 // takenOutByFacts are the bodies the facts' reach took out, by package ID and place, of each package settled holds a
-// result of in part: those that left the standing set, and every variable initializer of a package whose settlement
+// settled result of: those that left the standing set, and every variable initializer of a package whose settlement
 // named an object one of them uses, the package's initializers being one asker that never stood
 // (factReachInitializers), which sides, the host's sides the build settled by, holds. The build lints them, so their
-// findings are the build's own. No body of a package the reach did not settle is among them, and it settles a package
-// only where a function of it stands (factReachSides.inBuild): the initializers of a package with no function
-// standing stay compared, whatever a fact reads there.
+// findings are the build's own. No body of a package the reach did not settle is among them. It settles a package
+// that has a side wherever a function of it stands or a variable initializer of it is unreached
+// (factReachSides.inBuild), so the initializers of a package with no function standing leave as any other's do. A
+// package with no side, or whose side holds something unplaced (factReachHost.Standing), is never settled, and its
+// initializers stay compared as its bodies do.
 func takenOutByFacts(sides *factReachSides, settled map[string]any) map[string]map[fact_reach.Place]bool {
 	takenOut := map[string]map[fact_reach.Place]bool{}
 	for identifier, result := range settled {

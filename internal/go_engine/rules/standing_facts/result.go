@@ -3,10 +3,14 @@ package standing_facts
 import "github.com/system-inc/cohere/internal/go_engine/fact_reach"
 
 // Result is one package's standing bodies in one build, settled, and what settling them took, for the build's census.
-// A nil Result, and the empty one a package with no host's side or one linted whole has, hold nothing standing.
+// A nil Result, and the empty one a package with no host's side or one the build settles nothing of has, hold nothing
+// standing.
 type Result struct {
-	// Partial is whether the build lints only part of the package, so that facts were compared at all: false for a
-	// package the checker handed no host's side of, and for one the host's side says the build lints whole.
+	// Partial is whether the build settled this package, so that facts were compared at all: false for a package the
+	// checker handed no host's side of, and for one the host's side says the build lints whole and asks nothing of. A
+	// settled package may leave nothing standing, and may have had nothing standing as the walk started, as one whose
+	// variable initializers alone the reach leaves unreached: the build lints all of it, and its settlement says what
+	// was named.
 	Partial bool
 
 	// Settlement is what the fixed point left standing, took out and asked (fact_reach.Settle), nil when Partial is

@@ -244,6 +244,17 @@ func TestAPackagesVariableInitializersAreOneAskerThatIsNoPlace(test *testing.T) 
 		test.Errorf("started's place is among the package's places %t and size's users %t, want neither",
 			slices.Contains(hosted.Places(), started), slices.Contains(hosted.Users(size), started))
 	}
+	// A build settles the package for its initializers where the reach leaves started unreached, and for no other
+	// place's sake.
+	if !hosted.initializers.anyAmong(map[fact_reach.Place]bool{started: true}) ||
+		hosted.initializers.anyAmong(map[fact_reach.Place]bool{hosted.Places()[0]: true}) ||
+		hosted.initializers.anyAmong(nil) {
+		test.Errorf("the initializers are among the unreached places with started %t, with a function's body alone "+
+			"%t and with none %t, want only the first",
+			hosted.initializers.anyAmong(map[fact_reach.Place]bool{started: true}),
+			hosted.initializers.anyAmong(map[fact_reach.Place]bool{hosted.Places()[0]: true}),
+			hosted.initializers.anyAmong(nil))
+	}
 	for _, each := range []struct {
 		name  string
 		named []fact_reach.Named
