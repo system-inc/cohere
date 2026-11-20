@@ -116,8 +116,7 @@ func (counterparts *Counterparts) objectByName(object types.Object) (bool, bool)
 		}
 	}
 	counterparts.counts.Answered++
-	_, isConstant := declared.(*types.Const)
-	for _, reached := range counterparts.walker.references(declared.Type(), isConstant) {
+	for _, reached := range counterparts.walker.borrowedThroughReferences(declared) {
 		local := localName(&counterparts.paths, reached.object)
 		if local == "" {
 			return true, true

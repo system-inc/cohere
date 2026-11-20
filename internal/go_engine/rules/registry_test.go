@@ -1244,8 +1244,9 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // itself, child_process names the pipe, command and wait the two rules about a child's piped output share, and
 // load_memo keeps what the rules reading the import closure read off each package once for the whole load,
 // function_triviality judges which of a package's functions are trivial for the rule asking whether a callee does
-// real work, and standing_facts settles which function bodies an extra build leaves to the host's findings, for every
-// rule to ask of a body before it lints it (#5vbs1np).
+// real work, standing_facts settles which function bodies an extra build leaves to the host's findings, for every
+// rule to ask of a body before it lints it (#5vbs1np), and standing_presence takes out of that set the bodies a
+// package-wide rule reads along one edge, which standing_facts asks it of (#xeafx79).
 // One name a line, in a slice rather than a map, since gofmt aligns a map's values to its longest key and would rewrite
 // every line when a branch adds a longer one; a line of a slice is never rewritten for another's sake.
 var sharedReaders = []string{
@@ -1262,6 +1263,7 @@ var sharedReaders = []string{
 	"return_nil_ness",
 	"served",
 	"standing_facts",
+	"standing_presence",
 	"staticcheck_call",
 	"staticcheck_code",
 	"staticcheck_report",

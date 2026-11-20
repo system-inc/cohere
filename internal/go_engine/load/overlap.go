@@ -34,6 +34,10 @@ type Overlap struct {
 
 	// ended is closed when the load returns, whatever it returns.
 	ended <-chan struct{}
+
+	// withheld points at the positions of what the load withheld of each package that withholds
+	// (withholdCgoDeclarations), set once every package is checked and before ended closes (Withheld).
+	withheld *map[*packages.Package][]string
 }
 
 // Ready is closed once analyzed is final for analysis: its syntax, types, errors and IllTyped set, none of them
@@ -48,6 +52,17 @@ func (overlap *Overlap) Ready(analyzed *packages.Package) <-chan struct{} {
 		return overlap.ended
 	}
 	return current.done
+}
+
+// Withheld are the positions, "file:line:column", of the declarations the load gave the analyzers of analyzed without
+// their bodies or initial values, as Loaded.Withheld's Declarations gives them of a package it checked from source,
+// read only once Ready(analyzed) has closed: a package that withholds is ready only as the load ends, once every
+// package is checked and its positions are known, and every other has none.
+func (overlap *Overlap) Withheld(analyzed *packages.Package) []string {
+	if current, held := overlap.nodes[analyzed]; held && !current.withholds {
+		return nil
+	}
+	return (*overlap.withheld)[analyzed]
 }
 
 // PackagesOverlapping is Packages calling begin once the graph is built and before any package is type-checked,

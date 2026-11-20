@@ -17,7 +17,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
-	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -76,7 +75,8 @@ type pipeline struct {
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
 
-	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache).
+	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache): the
+	// description's, which its early start kept each build's build context in.
 	systemCache *systemCache
 
 	// shardStamps are the run's stamps of its stores' shard directories, which every extra build's packs read, each
@@ -112,6 +112,11 @@ type pipeline struct {
 	judgedSkipped func(build project.Build, identifier string, judgment check.SkippedJudgment, why string)
 	skippedAtLoad func(build project.Build, identifier string)
 
+	// extraBuildLoads, set only by a test and by no run, is told each load of an extra build as it starts, the first
+	// and every one again, so the test counts a build's loads itself, one that skips nothing among them, which
+	// skippedAtLoad never tells of (#tfvrsf3). It is called from the builds' own goroutines, side by side.
+	extraBuildLoads func(extra project.Build)
+
 	// keepsInheritanceOff, set only by a test, has every extra build run its syntax-only rules on every file it checks
 	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.
 	keepsInheritanceOff bool
@@ -139,6 +144,10 @@ type pipeline struct {
 	// apply to builds that restore nothing, so a test can show the width reaches no key with builds that each check
 	// every package. extraBuildEnds, also a test's alone, is called as each extra build's run ends with the build's own
 	// notes, and fails the build when it returns an error, so a test can note from a build and fail one by name.
+	// extraBuildStarts, a test's alone too, is called as each extra build's run starts, on the build's own goroutine,
+	// before the build makes its session or reads anything of the run's stores, so a test can hold a build there until
+	// another has ended, and so decide which of two builds side by side asks first for what the run reads once, as a
+	// shard's stamp (cache.ShardStamps).
 	// lintSteps, a test's alone too, is told each step of an extra build's lint at the gate with the weight it takes
 	// (lintStep), on the build's own goroutine, so a test can count the lints holding weight and hold a build at a
 	// step.
@@ -159,6 +168,7 @@ type pipeline struct {
 	buildsWidthForced       int
 	buildsWidthAtGateForced int
 	buildsWidthUnguarded    bool
+	extraBuildStarts        func(extra project.Build)
 	extraBuildEnds          func(extra project.Build, notes io.Writer) error
 	lintSteps               func(extra project.Build, step lintStep, weight int)
 	shareGateSteps          func(extra project.Build, position int, step shareGateStep)
@@ -168,11 +178,11 @@ type pipeline struct {
 	// collection, which each build's holdings are measured beyond (extraBuildRun), 0 in any other run.
 	timedHostLiveBytes uint64
 
-	// buildGoEnvironments are each extra build's go env, by the build's name (project.Build.String), read with its
+	// buildGoEnvironments are each extra build's go env, by the build's name (project.Build.String), started with its
 	// lister state before the host's first load (startChildrenFirst), which the build's run reads in place of asking
-	// again (extraBuildRun), nil in a run that checks no extra build. Written before any build starts and only read
-	// after.
-	buildGoEnvironments map[string]*load.GoEnvironment
+	// again, waiting there for one whose go env runs on (extraBuildRun), nil in a run that checks no extra build.
+	// Written before any build starts and only read after.
+	buildGoEnvironments map[string]*buildGoEnvironment
 
 	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
 	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
@@ -203,6 +213,14 @@ type pipeline struct {
 	// build's, so an extra build's listing reads nothing the host's already did (#yyvstj6). Every load of the run may
 	// share them: each reads a file the run holds from its held bytes, which follow every write, and the run adds or
 	// removes no file.
+	//
+	// That is the one invariant every table of the run that a load before a write may fill rests on, these reads'
+	// directory entries, walks and moduleRootWalks: no write of a run leaves a directory made, removed or renamed, nor
+	// a file, a go.mod among them, outside a directory whose name starts with a dot, which no listing and no walk
+	// enters. Every write of a project file replaces one existing file's bytes under its own name, through a temporary
+	// file beside it, named with a dot and renamed over it (format's stage and putInPlace), and the findings store
+	// writes only below the root's `.cache`. TestAFixingRunLeavesItsDirectoriesAndModuleFilesAsTheyWere holds a run
+	// that writes to it.
 	reads *load.SharedReads
 
 	// fingerprints are the kept listing's directory fingerprints every load of the run shares, the host's and each
@@ -216,15 +234,22 @@ type pipeline struct {
 	// load reads them again (load.Fingerprints). One a run, made here, so nothing is carried to the next.
 	fingerprints *load.Fingerprints
 
-	// walks are the package directories each pattern's walk finds, which the extra builds share, each walked once for
-	// every build (#tb538na). Only the extra builds read them, as fingerprints: a walk reads directory entries alone,
-	// which no write of the run changes, but the builds are the loads after which nothing writes at all, so no reader
-	// need know which writes a walk reads past.
+	// walks are the package directories each pattern's walk finds, which every load of the run shares, the host's and
+	// each extra build's, each pattern walked once (#tb538na, #vnb7btx). They start over with the fingerprints, at
+	// every change to the bytes the run holds (heldChanged), so the builds take the walks read since the run last
+	// changed those bytes: the host's last load's, but after a rename, whose load of what it wrote shares nothing
+	// (runRename), and but where the host listed nothing, its listing kept, and in both the builds walk among
+	// themselves. That is the stricter of two reasons, each enough: a walk reads directory names and the presence of a
+	// go.mod alone, which no write of the run changes (reads' invariant).
+	//
+	// Each build reads this field as its run starts (extraBuildRun), and every heldChanged is on the pipeline's own
+	// goroutine before any extra build starts, so no build meets a swap. A unit that starts a build's listing before
+	// the host's last write must hand the build its walks, never have it read the field.
 	walks *load.PackageWalks
 
 	// moduleRootWalks are the walks of the module roots every load's inputs name, the host's and each extra build's,
 	// each root walked once for the run (#ybjbqm2): a walk reads directory entries alone, which no write of the run
-	// changes, so the host's load may share them as the builds' do.
+	// changes (reads' invariant), so the host's load may share them as the builds' do.
 	moduleRootWalks *load.ModuleRootWalks
 
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
@@ -283,6 +308,24 @@ type pipeline struct {
 	bodyReachFromSourceRecord string
 	bodyReachFromSource       string
 
+	// mustCheckCensus is the directory each extra build's must-check set is written into, from
+	// `COHERE_MUST_CHECK_CENSUS`, empty for a run that writes none (pipeline_must_check_census.go, #anfjtr3); and
+	// plainBits what a plain run judges each extra build on for it, made from the host's lint pass as the builds start,
+	// nil in any other run (pipeline_plain_bits.go).
+	mustCheckCensus string
+	plainBits       *plainBits
+	// mustCheckSets are each extra build's must-check set, by its build's name, its judgment's under
+	// `--build-dependence` or the plain bits' on a plain run, written only under the census and under
+	// mustCheckSetsLock, since extra builds run at once. They live here and not on buildRun, which every run with extra
+	// builds makes one of per build, so the census leaves buildRun's size as it was (pipeline_build_run_size_test.go).
+	mustCheckSetsLock sync.Mutex
+	mustCheckSets     map[string]*mustCheckSet
+	// declarationsSteps, a test's alone, is told of each step of a plain run's declarations graph at the builds'
+	// start, in order (declarationsStepped). sideLoadRefused, a test's alone too, fails a plain run's standard-library
+	// side load with itself in place of the load, as a load that failed would (sideLoadStandardLibrary).
+	declarationsSteps func(declarationsStep)
+	sideLoadRefused   error
+
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil under `--host-build-only` and when the
 	// run found no build beside the host's to check.
 	buildRuns []buildRun
@@ -307,6 +350,10 @@ type pipeline struct {
 	// does it (see pipeline_load_beside_fix.go).
 	watchPrelude func(step preludeStep)
 
+	// watchJoin is a test's look at the run's join of the go commands it started before its first load, nil outside a
+	// test: told as the join begins (joinChildren).
+	watchJoin func()
+
 	// unguardedSums are the go.work.sum files a load's go list ran beside with no side copy of the go.work, so go may
 	// have rewritten them (load.Loaded.UnguardedWorkspaceSum), under unguardedSumsLock, since extra builds load at
 	// once. The summary names them.
@@ -323,8 +370,9 @@ func newPipeline(
 	standardError io.Writer,
 	memory *engineMemory,
 ) *pipeline {
-	// Made before the system cache's store, which holds them, as every store the run opens does (cache.Open).
-	shardStamps := cache.NewShardStamps(nil)
+	// The description's, opened before the go commands it started, with the shard stamps its store holds, as every
+	// store the run opens holds them (cache.Open).
+	systemCache, shardStamps := described.openedSystemCache(request)
 	return &pipeline{
 		request:       request,
 		described:     described,
@@ -338,7 +386,7 @@ func newPipeline(
 		// The facts census reads each build's own facts, which a restore from the host's run would replace.
 		censusKeepsHostRestoreOff: request.judgesDependence(),
 		timing:                    newTiming(request),
-		systemCache:               openSystemCache(request, shardStamps),
+		systemCache:               systemCache,
 		shardStamps:               shardStamps,
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),
@@ -424,11 +472,19 @@ func (engine *pipeline) run() int {
 			// Under `--build-dependence` the host's graph is read from the records the store keeps of the packages it
 			// restores, and the records of those it checks are written beside their entries (#6a3kjvz).
 			if engine.request.judgesDependence() && engine.request.requests(contract.PhaseLint) {
-				engine.session.KeepDependenceRecords(build_dependence.DecodeRecord)
+				engine.session.KeepDependenceRecords(decodeWholeRecord)
+			}
+			// A plain run asked for the must-check census reads its declarations-only graph's records of the packages
+			// it restores instead, and writes those it builds once its walks end (#anfjtr3).
+			if engine.mustCheckCensus != "" && !engine.request.judgesDependence() &&
+				engine.request.requests(contract.PhaseLint) {
+				engine.session.KeepDeclarationsRecords(decodeDeclarationsRecord)
 			}
 		}
 	}
-	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8).
+	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8), and is joined
+	// on every way out, a return or a panic, so none outlives the run.
+	defer engine.joinChildren()
 	engine.startChildrenFirst()
 	var loaded *load.Loaded
 	var loadError error
@@ -871,9 +927,11 @@ func (engine *pipeline) reread(file string) {
 }
 
 // heldChanged starts the run's fingerprints over, since the bytes they were read from have changed: a load after it
-// reads every directory again from the bytes the change left, and keeps what it reads for the loads after it.
+// reads every directory again from the bytes the change left, and keeps what it reads for the loads after it. The
+// pattern walks start over with them, so the builds take no walk a load made before the change (#vnb7btx).
 func (engine *pipeline) heldChanged() {
 	engine.fingerprints = load.NewFingerprints()
+	engine.walks = load.NewPackageWalks()
 }
 
 // held is the bytes the run holds for file, as load.Held asks: described.contents, every readable file in scope as it

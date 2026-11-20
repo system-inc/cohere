@@ -79,3 +79,17 @@ func OwnerOf(home *fact_resolver.Package, parameter *types.Var) *ParameterOwner 
 func OwnersByWalk(home *fact_resolver.Package) map[*types.Var]ParameterOwner {
 	return ownersByWalk(home)
 }
+
+// SettledMarks is the mark of every parameter of every function SA5012's own state holds settled in home, marked or
+// not, by the parameter, read under home's lock.
+func SettledMarks(home *fact_resolver.Package) map[*types.Var]bool {
+	home.Lock()
+	defer home.Unlock()
+	settled := map[*types.Var]bool{}
+	for function, marked := range fact_resolver.StateOf[marks](home, Kind).functions {
+		for parameter := range ownParameters(function).Variables() {
+			settled[parameter] = marked[parameter]
+		}
+	}
+	return settled
+}

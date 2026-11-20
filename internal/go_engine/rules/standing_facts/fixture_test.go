@@ -3,6 +3,7 @@ package standing_facts_test
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -25,8 +26,8 @@ import (
 // binary, so the kind is registered.
 var purity = function_purity.Kind.Name
 
-// fixture is the facts package as one load made it, the build's side of a test: its file as the load names it, and
-// each of its function bodies' places by the function's name, a method's by its own.
+// fixture is a fixture package as one load made it, the build's side of a test: its first file as the load names it,
+// and each of its function bodies' places by the function's name, a method's by its own.
 type fixture struct {
 	root   *packages.Package
 	file   string
@@ -37,23 +38,46 @@ type fixture struct {
 // checker takes a load of its own, since a run lets go of what it read of the packages below its roots.
 func loadFacts(test *testing.T) fixture {
 	test.Helper()
+	return loadFixture(test, "facts")
+}
+
+// loadFixture loads the fixture package at path, of one file, and what it imports, as loadFacts loads facts. Each
+// presence fixture is a package of its own, since each imports what its row reads, whose closure every other test
+// would load for nothing.
+func loadFixture(test *testing.T, path string) fixture {
+	test.Helper()
+	found := loadVariant(test, path, path)
+	if len(found.root.Syntax) != 1 {
+		test.Fatalf("the %s fixture has %d files, want one", path, len(found.root.Syntax))
+	}
+	return found
+}
+
+// loadVariant loads the fixture package at path and what it imports, and is its root of the ID id: the package
+// itself, or its test variant, `edges [edges.test]`, which holds its _test.go files too. file is the root's first
+// file, the one identity names objects in, and the places are every file's.
+func loadVariant(test *testing.T, path string, id string) fixture {
+	test.Helper()
 	directory := analysistest.TestData()
-	loaded, loadError := load.Packages(directory, []string{"facts"}, []string{
+	loaded, loadError := load.Packages(directory, []string{path}, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
 	}, nil)
 	if loadError != nil {
-		test.Fatalf("loading the facts fixture: %v", loadError)
+		test.Fatalf("loading the %s fixture: %v", path, loadError)
 	}
-	if len(loaded.Roots) != 1 || loaded.Roots[0].ID != "facts" || len(loaded.Roots[0].Syntax) != 1 {
-		test.Fatalf("the load's roots are %v, want the facts package alone, of one file", loaded.Roots)
+	rootAt := slices.IndexFunc(loaded.Roots, func(root *packages.Package) bool { return root.ID == id })
+	if rootAt < 0 || len(loaded.Roots[rootAt].Syntax) == 0 {
+		test.Fatalf("the load's roots are %v, want %s among them, of a file or more", loaded.Roots, id)
 	}
-	found := fixture{root: loaded.Roots[0], places: map[string]fact_reach.Place{}}
-	syntax := found.root.Syntax[0]
-	found.file = found.root.Fset.File(syntax.FileStart).Name()
-	for _, declaration := range syntax.Decls {
-		if function, isFunction := declaration.(*ast.FuncDecl); isFunction {
-			found.places[function.Name.Name] = fact_reach.Place{File: found.file,
-				Offset: found.root.Fset.Position(function.Pos()).Offset}
+	found := fixture{root: loaded.Roots[rootAt], places: map[string]fact_reach.Place{}}
+	found.file = found.root.Fset.File(found.root.Syntax[0].FileStart).Name()
+	for _, syntax := range found.root.Syntax {
+		file := found.root.Fset.File(syntax.FileStart).Name()
+		for _, declaration := range syntax.Decls {
+			if function, isFunction := declaration.(*ast.FuncDecl); isFunction {
+				found.places[function.Name.Name] = fact_reach.Place{File: file,
+					Offset: found.root.Fset.Position(function.Pos()).Offset}
+			}
 		}
 	}
 	return found
@@ -64,21 +88,21 @@ func (found fixture) place(test *testing.T, name string) fact_reach.Place {
 	test.Helper()
 	place, declared := found.places[name]
 	if !declared {
-		test.Fatalf("the facts fixture declares no function named %s", name)
+		test.Fatalf("the %s fixture declares no function named %s", found.root.ID, name)
 	}
 	return place
 }
 
-// identity is how a host names the fixture's package-level function named name, in the file the build declares it in.
+// identity is how a host names the fixture's package-level object named name, in the file the build declares it in.
 func (found fixture) identity(name string) build_reads.Identity {
-	return build_reads.Identity{Kind: build_reads.IdentityObject, PackagePath: "facts", Path: objectpath.Path(name),
-		File: found.file}
+	return build_reads.Identity{Kind: build_reads.IdentityObject, PackagePath: found.root.PkgPath,
+		Path: objectpath.Path(name), File: found.file}
 }
 
 // method is how a host names the method named methodName of the fixture's type named typeName, in the file the build
 // declares it in.
 func (found fixture) method(typeName string, methodName string) build_reads.Identity {
-	return build_reads.Identity{Kind: build_reads.IdentityMethod, PackagePath: "facts",
+	return build_reads.Identity{Kind: build_reads.IdentityMethod, PackagePath: found.root.PkgPath,
 		Path: objectpath.Path(typeName), Method: methodName, File: found.file}
 }
 
@@ -124,13 +148,14 @@ func analyze(
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{analyzer}, []*packages.Package{found.root}, options)
 	if analyzeError != nil {
-		test.Fatalf("analyzing the facts fixture: %v", analyzeError)
+		test.Fatalf("analyzing the %s fixture: %v", found.root.ID, analyzeError)
 	}
 	if len(graph.Roots) != 1 {
-		test.Fatalf("running %s on the facts fixture left %d root actions, want one", analyzer.Name, len(graph.Roots))
+		test.Fatalf("running %s on the %s fixture left %d root actions, want one", analyzer.Name, found.root.ID,
+			len(graph.Roots))
 	}
 	if graph.Roots[0].Err != nil {
-		test.Fatalf("running %s on the facts fixture: %v", analyzer.Name, graph.Roots[0].Err)
+		test.Fatalf("running %s on the %s fixture: %v", analyzer.Name, found.root.ID, graph.Roots[0].Err)
 	}
 	return graph.Roots[0], resolver
 }

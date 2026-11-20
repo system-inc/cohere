@@ -41,7 +41,7 @@ func platformError() error {
 }
 
 // platformPairs takes any number of values on windows.
-func platformPairs(values []any) {
+func platformPairs(values []anything) {
 	println(len(values))
 }
 

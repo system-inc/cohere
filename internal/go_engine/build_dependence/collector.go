@@ -1,9 +1,11 @@
 package build_dependence
 
 import (
+	"cmp"
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 )
 
 // kindEdge says the from object's bit depends on the to object's bit (rule 3): from is an object a unit declares, and
@@ -28,9 +30,20 @@ type collector struct {
 	bodies           *bodyWalk
 
 	// declarationsOnly says the walk collects no unit's references or callees, its graph's mode
-	// (Graph.declarationsOnly), set for each package's walk (Graph.addPackage). Every unit's size, universe names
-	// and declares and every kind edge are collected as a whole walk collects them.
+	// (Graph.declarationsOnly), set for each package's walk (Graph.addPackage). Every unit's universe names and
+	// declares and every kind edge are collected as a whole walk collects them, the names from the package's uses at
+	// once (universeNamesFromUses), and no unit's size, which only the counts read and a declarations-only graph
+	// refuses.
 	declarationsOnly bool
+
+	// spans are each unit's token file and offsets there, by its index among units, kept by a declarations-only walk
+	// for universeNamesFromUses, which places each use in its unit.
+	spans []unitSpan
+
+	// repeats are the const specs that repeat the spec before them, each its unit's index and the index of the unit of
+	// the spec it repeats, which repeatUniverseNames gives the first the second's universe names once every unit has
+	// its own.
+	repeats []unitRepeat
 
 	// fromCgo says the file being collected hangs on the C side (fromCgo), set for each file's walk
 	// (Graph.addPackage), which every unit of the file takes as its mark (unitRecord.fromCgo).
@@ -66,6 +79,22 @@ type collector struct {
 	initializerWalk initializerVisitor
 }
 
+// unitSpan is one unit's place as universeNamesFromUses finds a use in it: its file as the type checker holds it, the
+// unit's start and end offsets there, and its index among the collector's units.
+type unitSpan struct {
+	tokenFile *token.File
+	start     int
+	end       int
+	index     int
+}
+
+// unitRepeat is a const spec that repeats the spec before it (collector.repeats): its unit's index among the
+// collector's units, and the index of the unit of the spec it repeats.
+type unitRepeat struct {
+	unit     int
+	repeated int
+}
+
 // collectFile collects every unit of file, whose place tokenFile holds. Imports are no units.
 func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) {
 	for _, declaration := range file.Decls {
@@ -78,34 +107,64 @@ func (collecting *collector) collectFile(tokenFile *token.File, file *ast.File) 
 			}
 			var lastType ast.Expr
 			var lastValues []ast.Expr
+			// The unit of the last const spec with a type or values, none before the block's first.
+			lastUnit := -1
 			for _, spec := range declaration.Specs {
 				switch spec := spec.(type) {
 				case *ast.TypeSpec:
 					collecting.collectType(tokenFile, spec)
 				case *ast.ValueSpec:
 					specType, specValues := spec.Type, spec.Values
+					repeats := false
 					if declaration.Tok == token.CONST {
 						// A const spec with neither type nor values repeats the last one's, and depends on what
 						// that one's value refers to.
 						if spec.Type == nil && len(spec.Values) == 0 {
 							specType, specValues = lastType, lastValues
+							repeats = lastUnit >= 0
 						} else {
-							lastType, lastValues = spec.Type, spec.Values
+							lastType, lastValues, lastUnit = spec.Type, spec.Values, len(collecting.units)
 						}
 					}
 					collecting.collectValue(tokenFile, declaration.Tok, spec, specType, specValues)
+					if repeats {
+						// Its span holds none of the names the expression it repeats uses, so it takes those of the
+						// spec it repeats (repeatUniverseNames): `Second` after `First = iota` means another value in
+						// a build that declares its own iota (#anfjtr3).
+						collecting.repeats = append(collecting.repeats,
+							unitRepeat{unit: len(collecting.units) - 1, repeated: lastUnit})
+					}
 				}
 			}
 		}
 	}
 }
 
+// repeatUniverseNames gives each const spec that repeats the spec before it the universe names of that spec's unit,
+// once every unit has its own, from its walk or from the package's uses (universeNamesFromUses), so a build that
+// declares a name the repeated expression uses seeds both specs (judgment.seedShadowed). Every repeat of a block
+// repeats the block's one spec with a type or values, so no repeat takes names from another repeat.
+func (collecting *collector) repeatUniverseNames() {
+	for _, repeat := range collecting.repeats {
+		collecting.units[repeat.unit].universeNames |= collecting.units[repeat.repeated].universeNames
+	}
+}
+
 // newUnit adds the unit of declaration to the collector's units, sized and placed, and the universe's names it uses,
-// with nothing declared yet, its size and names read in one walk of it. It is the last unit until the next newUnit,
-// and nothing else adds one, so its collector fills it in place through the pointer.
+// with nothing declared yet, its size and names read in one walk of it, or, in a declarations-only walk, placed alone,
+// its names read afterwards with every other unit's (universeNamesFromUses). It is the last unit until the next
+// newUnit, and nothing else adds one, so its collector fills it in place through the pointer.
 func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node) *unitRecord {
 	collecting.unitWalk = unitVisitor{typesInformation: collecting.typesInformation}
-	ast.Walk(&collecting.unitWalk, declaration)
+	if collecting.declarationsOnly {
+		// Placed for universeNamesFromUses, which reads the package's uses once in place of a walk of each declaration,
+		// the larger part of a declarations-only add (#anfjtr3); no node is counted.
+		collecting.spans = append(collecting.spans, unitSpan{tokenFile: tokenFile,
+			start: tokenFile.Offset(declaration.Pos()), end: tokenFile.Offset(declaration.End()),
+			index: len(collecting.units)})
+	} else {
+		ast.Walk(&collecting.unitWalk, declaration)
+	}
 	withheld := false
 	if collecting.withheld != nil {
 		// The position as the load wrote it, past any //line directive, so the two name one declaration alike.
@@ -128,6 +187,41 @@ func (collecting *collector) newUnit(tokenFile *token.File, declaration ast.Node
 	})
 	collecting.declaresStart = len(collecting.declareStore)
 	return &collecting.units[len(collecting.units)-1]
+}
+
+// universeNamesFromUses gives each unit the universe's names a use in its span resolves to, reading the package's
+// uses once (types.Info.Uses), as newUnit's walk of each declaration would have read them in a whole walk: an
+// identifier the type checker resolved to an object of the universe, placed in the unit whose span in its file holds
+// it. A use in no unit's span, one in an import, is no unit's, as no walk reached it. fileSet is the package's, where
+// each use's file is found.
+func (collecting *collector) universeNamesFromUses(fileSet *token.FileSet) {
+	compareSpans := func(left unitSpan, right unitSpan) int {
+		if left.tokenFile != right.tokenFile {
+			return cmp.Compare(left.tokenFile.Base(), right.tokenFile.Base())
+		}
+		return cmp.Compare(left.start, right.start)
+	}
+	slices.SortFunc(collecting.spans, compareSpans)
+	for identifier, object := range collecting.typesInformation.Uses {
+		if object.Parent() != types.Universe {
+			continue
+		}
+		bit := universeNameBit(object.Name())
+		tokenFile := fileSet.File(identifier.Pos())
+		if bit == 0 || tokenFile == nil {
+			continue
+		}
+		offset := tokenFile.Offset(identifier.Pos())
+		// The last span starting at or before offset is the one that can hold it: units never overlap.
+		after, _ := slices.BinarySearchFunc(collecting.spans, unitSpan{tokenFile: tokenFile, start: offset + 1},
+			compareSpans)
+		if after == 0 {
+			continue
+		}
+		if span := collecting.spans[after-1]; span.tokenFile == tokenFile && offset < span.end {
+			collecting.units[span.index].universeNames |= bit
+		}
+	}
 }
 
 // declare adds object to what unit declares, unit being the one newUnit added last: its declares are a slice of the
@@ -162,9 +256,10 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	}
 	collecting.declare(unit, function)
 	collecting.collectMembers(unit, collecting.owning(function), false, declaration.Type)
-	// The signature's name bits, a signature moving being what a function's bit carries.
+	// The signature's name bits, a signature moving being what a function's bit carries, and what its own line
+	// observes of an unnamed struct among its parameters and results (bitWalker).
 	signature := function.Signature()
-	collecting.addEdges(function, false, collecting.walker.borrowedReferences(signature, false))
+	collecting.addEdges(function, false, collecting.walker.borrowedMemberReferences(signature))
 	collecting.addUses(function, false, false, declaration.Type)
 	receiver := signature.Recv()
 	if receiver == nil {
@@ -172,10 +267,11 @@ func (collecting *collector) collectFunction(tokenFile *token.File, declaration 
 	}
 	// Method receivers are included, the larger set: without receiver edges the counter found 8 to 14% fewer
 	// dependent objects. A method's bit takes its receiver's name bit, since its method set moving is what the name
-	// bit carries.
+	// bit carries. Its receiver's type parameters' constraints are read as a member's own type, as its own line walks
+	// them (bitWalker).
 	collecting.addEdges(function, false, collecting.walker.borrowedReferences(receiver.Type(), false))
 	for parameter := range signature.RecvTypeParams().TypeParams() {
-		collecting.addEdges(function, false, collecting.walker.borrowedReferences(parameter.Constraint(), false))
+		collecting.addEdges(function, false, collecting.walker.borrowedMemberReferences(parameter.Constraint()))
 	}
 	receiverType := receiver.Type()
 	if pointer, isPointer := receiverType.(*types.Pointer); isPointer {
@@ -202,11 +298,12 @@ func (collecting *collector) collectType(tokenFile *token.File, spec *ast.TypeSp
 // methods, the name bits of its embedded fields, whose methods it promotes, for an interface its own underlying,
 // since an interface's methods are its underlying, and for a type defined from another type's name, `type T S`, S in
 // full, since T's fields and promoted methods are S's. The underlying bit reads everything the underlying type reaches
-// in full, as a value.
+// in full, as a value, and what a selection through the type dereferences with no expression of its own, behind a
+// pointer at its top or an embedded pointer (bitWalker.borrowedUnderlyingReferences).
 func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *ast.TypeSpec) {
 	switch declared := typeName.Type().(type) {
 	case *types.Named:
-		collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(declared.Underlying(), true))
+		collecting.addEdges(typeName, true, collecting.walker.borrowedUnderlyingReferences(declared.Underlying()))
 		if typeAndValue, isRecorded := collecting.typesInformation.Types[spec.Type]; isRecorded {
 			// `type T S` keeps S in its expression's type, where the resolved underlying has lost it, so S is read in
 			// full into T's underlying.
@@ -254,9 +351,13 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 			}
 		}
 	case *types.Alias:
-		// An alias is its target's bits.
+		// An alias is its target's bits, its underlying bit with what a selection through the target dereferences
+		// (bitWalker.borrowedUnderlyingReferences), since a type that embeds `type InnerPointer = *Inner` or
+		// `type Shared = struct{ *Inner }`, or points at Shared, reads that through the alias's underlying bit
+		// (#mtfdb1m).
 		collecting.addEdges(typeName, false, collecting.walker.borrowedReferences(declared.Rhs(), false))
 		collecting.addEdges(typeName, true, collecting.walker.borrowedReferences(declared.Rhs(), true))
+		collecting.addEdges(typeName, true, collecting.walker.borrowedUnderlyingReferences(types.Unalias(declared)))
 		collecting.addUses(typeName, false, false, spec.Type)
 		collecting.addUses(typeName, true, false, spec.Type)
 		if spec.TypeParams != nil {
@@ -270,9 +371,9 @@ func (collecting *collector) collectTypeKinds(typeName *types.TypeName, spec *as
 }
 
 // collectMembers declares the struct fields and interface methods under root for unit, each depending on its own type
-// by name, and makes owners depend on each: on their underlying bit when ownerUnderlying is set, else on their only
-// bit. A field's own bit and its owner's underlying bit together are what carry a field whose array length hangs on a
-// constant into its struct's underlying.
+// by name, as a member's own type is read (bitWalker), and makes owners depend on each: on their underlying bit when
+// ownerUnderlying is set, else on their only bit. A field's own bit and its owner's underlying bit together are what
+// carry a field whose array length hangs on a constant into its struct's underlying.
 //
 // Mutates: unit declares the members, and collecting gains their edges
 func (collecting *collector) collectMembers(
@@ -315,7 +416,7 @@ func (collecting *collector) collectFields(
 			variable := declared.Field(index)
 			index++
 			collecting.declare(unit, variable)
-			collecting.addEdges(variable, false, collecting.walker.borrowedReferences(variable.Type(), false))
+			collecting.addEdges(variable, false, collecting.walker.borrowedMemberReferences(variable.Type()))
 			collecting.addUses(variable, false, false, field.Type)
 			for _, owner := range owners {
 				collecting.addEdge(kindEdge{from: owner, fromUnderlying: ownerUnderlying, to: variable})
@@ -342,8 +443,8 @@ func (collecting *collector) collectInterfaceMethods(
 			}
 			collecting.declare(unit, method)
 			signature := method.Signature()
-			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Params(), false))
-			collecting.addEdges(method, false, collecting.walker.borrowedReferences(signature.Results(), false))
+			collecting.addEdges(method, false, collecting.walker.borrowedMemberReferences(signature.Params()))
+			collecting.addEdges(method, false, collecting.walker.borrowedMemberReferences(signature.Results()))
 			collecting.addUses(method, false, false, field.Type)
 			for _, owner := range owners {
 				collecting.addEdge(kindEdge{from: owner, fromUnderlying: ownerUnderlying, to: method})
@@ -396,7 +497,12 @@ func (collecting *collector) collectValue(
 			// channels and signatures too. Its type as written can differ by what lies under a named type whose name
 			// bit no build sets, `rows[0]` an [8]int where the host's is a [4]int over `type Rows [2][Length]int`, so
 			// the types' names alone would leave its bit unset.
-			collecting.addEdges(object, false, collecting.walker.borrowedReferences(object.Type(), false))
+			//
+			// Its own type is a member's (bitWalker): where it spells an unnamed struct, the var's line writes each
+			// unexported field of it by the field's properties, and the var's is the one bit that can carry them,
+			// the struct having no name to hang an underlying bit on (#mtfdb1m). A var of a named type reads the
+			// name alone, as its line writes it, and the type's own underlying bit carries the rest.
+			collecting.addEdges(object, false, collecting.walker.borrowedMemberReferences(object.Type()))
 			collecting.addUses(object, false, false, specType)
 			if spec.Type == nil {
 				collecting.addUses(object, false, false, values...)

@@ -7,22 +7,6 @@ import (
 	"math"
 )
 
-// Record is a package's record decoded from its bytes, for a caller that decodes it apart from adding it to a graph
-// (Graph.AddDecoded): the findings cache decodes each record it reads beside the entries, so one that does not decode
-// is its own to say and to write again (#6a3kjvz).
-type Record struct {
-	record *packageRecord
-}
-
-// DecodeRecord is the record encoded holds (EncodedRecord), or why it holds none.
-func DecodeRecord(encoded []byte) (*Record, error) {
-	record, decodeError := decodeRecord(encoded)
-	if decodeError != nil {
-		return nil, decodeError
-	}
-	return &Record{record: record}, nil
-}
-
 // errorRecordShort is a record whose bytes end before it does.
 var errorRecordShort = errors.New("the record ends early")
 
@@ -94,15 +78,20 @@ func (reader *recordReader) object() recordedObject {
 	return recordedObject{path: reader.text(), local: reader.text()}
 }
 
-// decodeRecord is the record encoded holds, with no live object, or why it holds none: another format, or bytes that
-// end early or name what the record does not hold.
+// decodeRecord is the record encoded holds, with no live object, whole or declarations-only as its format says, or why
+// it holds none: another format, or bytes that end early or name what the record does not hold.
 func decodeRecord(encoded []byte) (*packageRecord, error) {
+	declarationsOnly := false
 	head := append([]byte(recordFormat), 0)
-	if len(encoded) < len(head) || string(encoded[:len(head)]) != string(head) {
+	if !opensWith(encoded, head) {
+		declarationsOnly, head = true, append([]byte(declarationsRecordFormat), 0)
+	}
+	if !opensWith(encoded, head) {
 		return nil, errors.New("decoding a dependence record: it is in another format")
 	}
 	reader := &recordReader{data: encoded, at: len(head)}
-	record := &packageRecord{identifier: reader.raw(), path: reader.raw(), workspace: reader.flag()}
+	record := &packageRecord{identifier: reader.raw(), path: reader.raw(), workspace: reader.flag(),
+		declarationsOnly: declarationsOnly}
 	reader.strings = make([]string, reader.count())
 	for index := range reader.strings {
 		reader.strings[index] = reader.raw()
@@ -123,7 +112,7 @@ func decodeRecord(encoded []byte) (*packageRecord, error) {
 	}
 	record.units = make([]recordedUnit, reader.count())
 	for index := range record.units {
-		record.units[index] = reader.unit(record.path, len(record.objects))
+		record.units[index] = reader.unit(record.path, len(record.objects), declarationsOnly)
 	}
 	record.edges = make([]recordedEdge, reader.count())
 	for index := range record.edges {
@@ -143,6 +132,11 @@ func decodeRecord(encoded []byte) (*packageRecord, error) {
 	return record, nil
 }
 
+// opensWith reports whether encoded opens with head, a format's words and the byte that ends them.
+func opensWith(encoded []byte, head []byte) bool {
+	return len(encoded) >= len(head) && string(encoded[:len(head)]) == string(head)
+}
+
 // index reads an index into a table of count entries.
 func (reader *recordReader) index(count int) int32 {
 	value := reader.number()
@@ -152,11 +146,12 @@ func (reader *recordReader) index(count int) int32 {
 	return int32(value)
 }
 
-// unit reads one unit of the package at path, whose record's table holds objects entries. A unit whose start, end or
-// size passes what a unit column holds (column) is refused here, a number no source file under 2 GiB gives: added to a
-// graph, the record would panic every run that resolves it until the store let it go, where a record refused is the
-// findings cache's to say and to write again (Record).
-func (reader *recordReader) unit(path string, objects int) recordedUnit {
+// unit reads one unit of the package at path, whose record's table holds objects entries, with no reads or callees
+// when the record is declarationsOnly, whose format writes none. A unit whose start, end or size passes what a unit
+// column holds (column) is refused here, a number no source file under 2 GiB gives: added to a graph, the record would
+// panic every run that resolves it until the store let it go, where a record refused is the findings cache's to say
+// and to write again (Record).
+func (reader *recordReader) unit(path string, objects int, declarationsOnly bool) recordedUnit {
 	unit := recordedUnit{file: reader.text()}
 	start, length, nodes := reader.number(), reader.number(), reader.number()
 	if reader.failed == nil && (start > math.MaxInt32 || length > math.MaxInt32-start || nodes > math.MaxInt32) {
@@ -174,6 +169,9 @@ func (reader *recordReader) unit(path string, objects int) recordedUnit {
 	unit.declares = make([]recordedObject, reader.count())
 	for index := range unit.declares {
 		unit.declares[index] = recordedObject{path: path, local: reader.text()}
+	}
+	if declarationsOnly {
+		return unit
 	}
 	unit.reads = make([]recordedRead, reader.count())
 	for index := range unit.reads {

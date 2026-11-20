@@ -41,7 +41,7 @@ func TestValuesArePairedWithoutAllocating(test *testing.T) {
 	spread, called := assignments[0], assignments[1]
 	context := rule.NewContext(Name, checked.pass, listener.Requires, flag.NewFlagSet(Name, flag.ContinueOnError), nil,
 		nil)
-	flows := &flowAnalysis{context: context}
+	flows := &flowAnalysis{context: context, information: context.TypesInfo, own: context.Package}
 
 	values := flows.valuesOf(spread.Rhs, len(spread.Lhs))
 	if len(values) != 3 || cap(values) != 3 {

@@ -28,6 +28,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -95,6 +96,13 @@ type Options struct {
 	// the package by (#b2t9xmf). The run marks the packages it cannot vouch for, and hands them all back in
 	// Result.Reads. The findings are the same either way.
 	Reads map[*packages.Package]*build_reads.Reads
+
+	// Declarations, when not nil, is handed each package checked from source while its syntax and type information are
+	// whole, in its type-read walk (checker.Options.Declarations), every package of Reads no action reached included
+	// (recordUnreachedTypes), so the must-check census's declarations graph holds every one (#anfjtr3). It needs Reads,
+	// whose packages are every package the run walks. It may be handed a package more than once, from two walks at
+	// once, and adds each once. Nil, as in every run but that census's, the walks are as they were.
+	Declarations func(*packages.Package)
 
 	// WalkSlots, when not nil, are the load's slots (load.Loaded.WalkSlots or load.Overlap.WalkSlots), which each
 	// type-read walk takes one of below every package's work, so a walk beside the load never displaces its chain.
@@ -397,6 +405,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, wrapError
 	}
 	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
+	if options.Declarations != nil && options.Reads == nil {
+		return nil, errors.New("handing on the packages' declarations: the run records no reads, whose packages are " +
+			"every one a walk reaches, so a package no action reached would be handed on by none")
+	}
 	if options.Ready != nil && options.Cache != nil && options.Cache.HasStore() {
 		return nil, errors.New("running the rules beside the load: the findings cache's store restores packages the " +
 			"load never checks and analyzes in waves, so a run with it waits for the load")
@@ -407,6 +419,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions.Timing, checkerOptions.Timed = options.Timing, rule.Timed
 	checkerOptions.Reads = options.Reads
+	checkerOptions.Declarations = options.Declarations
 	checkerOptions.Inheritance = options.Inheritance
 	checkerOptions.FactHosts = options.FactHosts
 	// The standing bodies follow StandingAfter, on the census path the analyzer the facts' reach settles by, so a run
@@ -433,8 +446,14 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Resolver = resolver
 	// A run whose capture the body differential reads records who asked each answer (FactReachCapture.Askers), on
 	// every resolver it asks through, before any pass runs.
+	// And reads what each body holds that the presence rows read, while each package's syntax is whole: no later point
+	// holds it (checker.Options.BodiesRead).
+	var presence *factReachPresence
 	if options.FactReach {
 		resolver.RecordAskers()
+		presence = &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{},
+			markers: map[string][]string{}}
+		checkerOptions.BodiesRead = presence.readBodies
 	}
 	session := options.Cache
 	// A package anything stands in is never written to the store, whose entry would carry the host's findings there.
@@ -512,7 +531,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, ErrAbandoned
 	}
 	graphs = append(graphs, graph)
-	recordUnreachedTypes(options.Reads, options.Ready, walks)
+	recordUnreachedTypes(options.Reads, options.Ready, walks, options.Declarations)
 	// What the packages restored from the host's run read of other packages' answers is decided now, with no pass
 	// running, before anything is saved over them.
 	var hostReloads []string
@@ -689,7 +708,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Read as the rules' passes left the resolver, before the save computes packages whole for the store: that replays
 	// walks no rule asked for and keeps an answer of every function they judge, which no body's rules read.
 	if options.FactReach {
-		result.FactReach = captureFactReach(resolver, analyzed, graphs)
+		result.FactReach = captureFactReach(resolver, analyzed, graphs, presence)
 	}
 	if session != nil {
 		timeline.Tell(options.Timeline, "check.save.begin")
@@ -726,20 +745,35 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 // Every package then ends its run in one of three ways. One checked from source and reached by an action is walked
 // by the checker; one checked from source and reached by none, here; one the load knows can never be restored (types
 // alone, cgo) or restored from the findings cache, marked never by the load or by Run.
+//
+// Under declarations (Options.Declarations), each walk here hands its package on first, and a package whose reads are
+// claimed already that no walk was started for, one marked never that no action reached, is walked for its
+// declarations alone, but for one the findings cache restored, which has none; declarations itself passes over a
+// package with no type information, read once the walk runs.
 func recordUnreachedTypes(
 	reads map[*packages.Package]*build_reads.Reads,
 	ready func(*packages.Package) <-chan struct{},
 	walks *build_reads.Walks,
+	declarations func(*packages.Package),
 ) {
 	for unreached, packageReads := range reads {
-		if packageReads.Claimed() {
-			continue
-		}
 		var final <-chan struct{}
 		if ready != nil {
 			final = ready(unreached)
 		}
+		if packageReads.Claimed() {
+			// The checker walks every package it ran on, so a walk not started is of a package no action reached. One
+			// the findings cache restored has no type information to add, so it is walked for nothing.
+			if declarations != nil && !walks.Started(unreached) &&
+				packageReads.Never() != build_reads.RestoredFromCache {
+				walks.Go(unreached, final, func() { declarations(unreached) })
+			}
+			continue
+		}
 		walks.Go(unreached, final, func() {
+			if declarations != nil {
+				declarations(unreached)
+			}
 			if !packageReads.Claim() || unreached.TypesInfo == nil {
 				return
 			}

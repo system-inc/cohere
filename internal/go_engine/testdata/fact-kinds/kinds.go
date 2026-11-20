@@ -13,6 +13,12 @@ import (
 	"testing"
 )
 
+// anything is any by another name, so the odd slice callees' values are no candidate of consistency-no-any, whose
+// presence bound would take their users out before any fact could (#xeafx79), and so are any to every fact here.
+// platformPairs writes it too in each platform's file, since a candidate there would make every parameter that
+// feeds it a key, the bound being closed under the rule's flow.
+type anything = any
+
 // failure is an error whose nil pointer is never a nil error.
 type failure struct{}
 
@@ -28,8 +34,9 @@ func size() int {
 }
 
 // helper returns platformSize's double, which counts its calls on every platform but windows, so helper is pure on
-// windows alone. No body asks helper's purity: size's judgment reads it from the kind's own state, so the host holds
-// no record of it, and only that a body the build lints holds no record takes size out (#5vbs1np, must 1).
+// windows alone. No body asks helper's purity: size's judgment judges it inside its own walk, which hands the resolver
+// helper's verdict all the same (#z9fze0t), so the host holds a record of it, and its differing on windows takes size
+// out.
 func helper(base int) int {
 	return platformSize(base)
 }
@@ -102,7 +109,7 @@ func NilnessStable() bool {
 }
 
 // Odd slice. pairs passes its values to platformPairs, which needs them even on every platform but windows.
-func pairs(values ...any) {
+func pairs(values ...anything) {
 	platformPairs(values)
 }
 
@@ -112,7 +119,7 @@ func OddUser() {
 }
 
 // pairsAlways needs its values even in every build, after naming the platform.
-func pairsAlways(values ...any) {
+func pairsAlways(values ...anything) {
 	println(platformName())
 	if len(values)%2 != 0 {
 		panic("odd")

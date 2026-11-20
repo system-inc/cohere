@@ -84,7 +84,7 @@ func (packs *buildPacks) fresh(pack *buildPack, shards []byte) bool {
 		if !trusted {
 			return false
 		}
-		// The pack records only a stamp trusted as it was read, more than racyStampWindow behind the clock, so no
+		// The pack records only a stamp trusted as it was read, at least racyStampWindow behind the clock, so no
 		// write since can have left the shard's time where it was, and an equal stamp is an unchanged shard.
 		if reading := packs.stamp(pack.store, shard); !reading.Known || reading.Moved || reading.Stamp != recorded {
 			return false

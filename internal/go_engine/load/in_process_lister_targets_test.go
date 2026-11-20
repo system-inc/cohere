@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -85,8 +86,13 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 	}
 }
 
+// noGoEnvironmentFile is the entry that has go read no go env file, so a test's answers are never moved by a person's
+// (`go env -w`).
+var noGoEnvironmentFile = []string{"GOENV=off"}
+
 // coheresBuilds is cohere's own workspace and the builds the engine checks it under, as a run of every build reads
-// them for cohere's census, the host's first: its go block's targets matched to the toolchain's ports.
+// them for cohere's census, the host's first: its go block's targets matched to the toolchain's ports, read with no go
+// env file.
 func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
 	test.Helper()
 	root, absoluteError := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -105,7 +111,9 @@ func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
 	if portsError != nil {
 		test.Fatal(portsError)
 	}
-	goEnvironment, environmentError := ReadGoEnvironment(workspace.Root, workspace.Environment(), nil, nil)
+	// With no go env file, so the builds' flags, which each copies from the host's, are never a person's.
+	goEnvironment, environmentError := ReadGoEnvironment(workspace.Root,
+		slices.Concat(workspace.Environment(), noGoEnvironmentFile), nil, nil)
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}

@@ -36,10 +36,25 @@ type Host interface {
 	// order being another (#h0k644s, the order rule): their users leave before anything is asked.
 	OrderBound() []Named
 
+	// Used are the objects the package's bodies' records use, each once, by its key, with the identity the build finds
+	// its own object by, in the order of their keys. A rule that reads the bodies naming an object needs those bodies
+	// present, so the build judges its own object of each identity it can find and names the key where the rule
+	// would read them (standing_presence); an object the build has no own of is never judged.
+	Used() []UsedObject
+
+	// Presence is what the body at place holds that a package-wide rule reads and stage 1's record does not, read off
+	// the host's own syntax, so the build can keep present what a standing body would need once it is stripped: the
+	// zero record for a body that holds none of it, or for a place that is no body's.
+	Presence(place Place) PresenceRecord
+
+	// Markers are the method names of every marker interface the host's syntax of the package declares, a one-method
+	// unexported interface with nothing embedded, at any level, sorted: a marker only a file the host compiles
+	// declares decides the host's verdict on every empty method of its name.
+	Markers() []string
+
 	// Kinds are the fact kinds the host answered about the package's objects, sorted by name, each answering about
 	// parameters where the host's answers of it are: each a kind a body that leaves reads unknown for where it holds no
-	// record of it, beside every kind the build registers. A kind the host never answered about the package served no
-	// body of it, whatever its judgments read.
+	// record of it. A kind the host never answered about the package served no body of it, whatever its judgments read.
 	Kinds() []Kind
 }
 
@@ -52,6 +67,26 @@ type Function struct {
 	Identity build_reads.Identity
 	NoReturn bool
 	Pushed   map[string]string
+}
+
+// UsedObject is one object the package's bodies use: its key, the one Users is asked by, and the identity that names
+// it in any build.
+type UsedObject struct {
+	Object   Object
+	Identity build_reads.Identity
+}
+
+// PresenceRecord is what one body holds that the presence rows read (standing_presence) and no use of stage 1's
+// record says: GoStarts are the keys of the package's functions the body starts with go where testinggoroutine hears
+// the statement, and RunStarts those it hands by name to (*testing.T).Run in a _test.go file, each once, in the order
+// the body names them; OwnAny is whether the body writes a candidate of consistency-no-any's of its own, an any or an
+// interface{} in a local's, a function literal's or a local type's declaration, which a use of interface{} never
+// records; and LocalMarkers are the method names of the one-method unexported interfaces the body declares, sorted.
+type PresenceRecord struct {
+	GoStarts     []Object
+	RunStarts    []Object
+	OwnAny       bool
+	LocalMarkers []string
 }
 
 // Asking is one question as the build is asked it: the fact kind's name, the function the answer is of, or that

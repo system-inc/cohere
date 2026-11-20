@@ -32,12 +32,11 @@ func TestAPrintfWrapperFactThatDiffersTakesItsUserOut(test *testing.T) {
 	}
 }
 
-// The deprecation facts are pushed and never compared by the facts' reach, by its written argument (standing_facts'
-// pushed facts): a deprecation is read from its declaration's doc comment, so it differs between two builds only where
-// the declaration's text does or it sits in a file one build alone compiles, and the reach at body grain takes out
-// every user of such a declaration (#5vbs1np). q's Old is deprecated in the file every platform but windows compiles,
-// and current in windows's own, so windows's reach lints Caller, which calls it, before any fact is compared, and the
-// deprecated use is the host's finding alone: Caller's findings on windows are the build's own.
+// A deprecation declared in a file one build alone compiles is taken out by the reach at body grain before any fact
+// is compared (#5vbs1np): q's Old is deprecated in the file every platform but windows compiles, and current in
+// windows's own, so windows's reach lints Caller, which calls it, and the deprecated use is the host's finding alone:
+// Caller's findings on windows are the build's own. A deprecation that differs with its declaration's text and file the
+// same is the facts' reach's to compare (TestADeprecationCarriedPastAnEmptyGroupTakesItsUserOut).
 func TestADeprecationThatDiffersIsTakenOutByTheReach(test *testing.T) {
 	test.Parallel()
 

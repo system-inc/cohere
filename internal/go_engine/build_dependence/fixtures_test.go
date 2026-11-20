@@ -9,6 +9,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -75,8 +76,10 @@ func expectVerdicts(test *testing.T, judged map[string]bool, want map[string]boo
 
 // On linux, the layout fixture's Size is 2 where the host's is 4. Every unit that reads Size by value, or touches the
 // underlying of a type whose layout hangs on it, is dependent; a unit that hands such a type on by pointer, uses it by
-// name, or merely calls a function whose body reads Size is not. The dependency's Width differs the same way. Mapped,
-// which a reader sees in mapped.source, a file neither build lists, is a seed of a package with a host-only file.
+// name, or merely calls a function whose body reads Size is not. Shell, which embeds a pointer to a Holder, is
+// dependent: a selection through it dereferences the pointer with no expression of its own, so its underlying reads
+// Holder in full (#mtfdb1m). The dependency's Width differs the same way. Mapped, which a reader sees in mapped.source,
+// a file neither build lists, is a seed of a package with a host-only file.
 func TestLayoutVerdictsOnLinux(test *testing.T) {
 	test.Parallel()
 
@@ -96,7 +99,7 @@ func TestLayoutVerdictsOnLinux(test *testing.T) {
 		"func NewHolder":         true,
 		"method Holder.Capacity": true,
 		"func PassesHolder":      false,
-		"type Shell":             false,
+		"type Shell":             true,
 		"func ShellCount":        true,
 		"type Inner":             true,
 		"type Opaque":            true,
@@ -174,9 +177,10 @@ func TestMethodsVerdictsUnderATag(test *testing.T) {
 // The unit-level check: for every fixture and build, every unit in a file both builds compile that the judgment calls
 // independent records the same types, constants, uses, definitions and selections in the host and in the build, each
 // fully loaded. The one difference allowed is the exception class unexportedUntouched names, and each fixture's
-// exceptions are pinned exactly, so one that grows fails: on linux, Forward and Shell name Holder, whose unexported
-// slots array hangs on Size, and types.ObjectString writes Holder's whole struct, though neither selects slots. Beside
-// them a strict case stays pinned: PassesHolder holds a Holder by pointer too, from a constructor in another file,
+// exceptions are pinned exactly, so one that grows fails: on linux, Forward names Holder, whose unexported slots array
+// hangs on Size, and types.ObjectString writes Holder's whole struct, though it never selects slots. Shell, which did
+// the same, is dependent since its underlying reads the Holder its embedded pointer promotes from (#mtfdb1m). Beside
+// it a strict case stays pinned: PassesHolder holds a Holder by pointer too, from a constructor in another file,
 // never names it, only passes it on and calls a method on it, and records exactly alike, not even the exception. On
 // linux the layout fixture's dependent units really differ, which shows the comparison can see a difference.
 func TestEveryIndependentUnitRecordsTheSameInBothBuilds(test *testing.T) {
@@ -197,7 +201,7 @@ func TestEveryIndependentUnitRecordsTheSameInBothBuilds(test *testing.T) {
 				onLinux := fixture == "layout" && build.name == linuxBuild.name
 				var wantUntouched []string
 				if onLinux {
-					wantUntouched = []string{"func Forward", "type Shell"}
+					wantUntouched = []string{"func Forward"}
 				}
 				if !slices.Equal(checked.unexportedUntouched, wantUntouched) {
 					test.Errorf("want exactly %d units differing only in unexported fields they never select, %q, "+
@@ -239,7 +243,7 @@ func TestLayoutCountsOnLinux(test *testing.T) {
 		counts ScopeCounts
 		want   ScopeCounts
 	}{
-		{"workspace", counts.Workspace, ScopeCounts{Units: 29, DependentUnits: 18, Nodes: nodes[true], Packages: 1,
+		{"workspace", counts.Workspace, ScopeCounts{Units: 29, DependentUnits: 19, Nodes: nodes[true], Packages: 1,
 			DependentPackages: 1, DependentPackageNodes: nodes[true], BuildOnlyUnits: 2}},
 		{"dependencies", counts.Dependencies, ScopeCounts{Units: 4, DependentUnits: 3, Nodes: nodes[false],
 			Packages: 1, DependentPackages: 1, DependentPackageNodes: nodes[false], BuildOnlyUnits: 1}},
@@ -904,6 +908,202 @@ func TestATypeDefinedFromAPlatformTypeReadsItsShape(test *testing.T) {
 			case !name.named && bits != (Bits{}):
 				test.Errorf("%s: want neither bit set on linux in %s, as no build changes it, got %+v", name.local,
 					graph.name, bits)
+			}
+		}
+	}
+}
+
+// A member's bit reads what its own line observes (#mtfdb1m). The line of a var, a function, a field or an interface's
+// method writes every unexported field that is not embedded of each unnamed struct its type reaches before a named
+// type by the field's properties in the build, its size first, and such a struct has no name whose underlying bit
+// could carry them. In the observed fixture Pad is 4 bytes on the host and 8 on linux and Guard's word an int32 and a
+// func(), while every declaration reads alike, so only Pad's and Guard's underlying bits are seeded through.
+//
+// Set: Held, whose struct holds a Pad by value; Behind, which points at such a struct, since the line writes the
+// field wherever the struct is; Shelved, whose struct holds a Shelf, neither of whose bits is set, since a field
+// prints as the Guards behind Shelf's slice do and only a walk that enters Shelf's declaration finds them; Give, by
+// its result; Outer's Inner, a field; and Taker's Take, an interface's method. Unset, each line reading alike:
+// Pointed and Guarded, a pointer being as long and printing alike whatever it points at; Named, written by its name;
+// and Exported and Embedded, whose fields the line enters and writes by name. Inferred's Inner is a field no unit
+// declares, its var declaring no type, and is read through its type as a member's own, both bits set, by each reader
+// of such an object: the live graph, the graph read back from its records by the object's name, and another graph's
+// counterparts by that name; and SelectsLocal, which selects such a field of a local, is dependent by what its
+// record keeps of the field's type. PassesLocal, which hands on a local of an unnamed struct holding Guards, is
+// dependent, a body's local read as a package-level var of its type is; ReentersLocal, whose local holds a Box of
+// itself in an observed field and a Shelf beside it, is dependent, the observation meeting the local within the
+// local's own walk and entering it again; and Sharer's Share is set, whose parameter holds one instance in an observed
+// field and in an exported one, so one walk meets its type argument both ways. The graph read back from its records
+// resolves and judges alike.
+//
+// Read a member's own type as any name (borrowedMemberReferences) and each of the set ones is unset; stop observe at a
+// named type and Shelved alone is; read an object no unit declares through its type as any name, in any one of its
+// five readers, and Inferred's Inner is unset there, or SelectsLocal or PassesLocal independent; let a type met in an
+// observation stand for one met in the member's walk (walkKey) and Share is unset; let an observation that meets a
+// local within the local's own walk read only its type arguments (enter) and ReentersLocal is independent.
+func TestAMemberReadsWhatItsOwnLineObservesOfAnUnnamedStruct(test *testing.T) {
+	test.Parallel()
+
+	judged := judge(test, "observed", linuxBuild)
+	held, isHeld := judged.host["example.com/observed"]
+	if !isHeld {
+		test.Fatal("the observed fixture has no package example.com/observed")
+	}
+	scope := held.Types.Scope()
+	firstField := func(name string) types.Object {
+		structure, isStruct := scope.Lookup(name).Type().Underlying().(*types.Struct)
+		if !isStruct || structure.NumFields() == 0 {
+			test.Fatalf("the observed fixture's %s is no struct with a field", name)
+		}
+		return structure.Field(0)
+	}
+	firstMethod := func(name string) types.Object {
+		declared, isInterface := scope.Lookup(name).Type().Underlying().(*types.Interface)
+		if !isInterface || declared.NumExplicitMethods() == 0 {
+			test.Fatalf("the observed fixture's %s is no interface with a method", name)
+		}
+		return declared.ExplicitMethod(0)
+	}
+
+	live := graphOf(judged.host, nil)
+	expectNoUnnameable(test, "observed", live)
+	recorded := recordedGraphOf(test, live)
+	expectAlike(test, "observed resolved", resolvedLines(live), resolvedLines(recorded))
+	recordedDependence := recorded.Against(judged.difference)
+	expectAlike(test, "observed under linux", unitVerdicts(judged.dependence), unitVerdicts(recordedDependence))
+	identified := NewIdentifiedObjects(recordedDependence, map[*types.Package]string{held.Types: held.ID})
+	byName := NewCounterparts(recorded, recordedDependence)
+	for _, graph := range []struct {
+		name       string
+		dependence *Dependence
+	}{
+		{"the live graph", judged.dependence},
+		{"the graph read back from its records", recordedDependence},
+	} {
+		judgedUnits := verdicts(test, judged.host, graph.dependence)
+		for _, name := range []string{"func SelectsLocal", "func PassesLocal", "func ReentersLocal"} {
+			if !judgedUnits[name] {
+				test.Errorf("%s: want it dependent on linux in %s, by what its local's type observes, got independent",
+					name, graph.name)
+			}
+		}
+	}
+
+	for _, each := range []struct {
+		name   string
+		object types.Object
+		want   Bits
+	}{
+		{"Pad", scope.Lookup("Pad"), Bits{Underlying: true}},
+		{"Guard", scope.Lookup("Guard"), Bits{Underlying: true}},
+		{"Shelf", scope.Lookup("Shelf"), Bits{}},
+		{"Held", scope.Lookup("Held"), Bits{Name: true}},
+		{"Behind", scope.Lookup("Behind"), Bits{Name: true}},
+		{"Shelved", scope.Lookup("Shelved"), Bits{Name: true}},
+		{"Pointed", scope.Lookup("Pointed"), Bits{}},
+		{"Guarded", scope.Lookup("Guarded"), Bits{}},
+		{"Named", scope.Lookup("Named"), Bits{}},
+		{"Exported", scope.Lookup("Exported"), Bits{}},
+		{"Embedded", scope.Lookup("Embedded"), Bits{}},
+		{"Give", scope.Lookup("Give"), Bits{Name: true}},
+		{"Outer's Inner", firstField("Outer"), Bits{Name: true}},
+		{"Taker's Take", firstMethod("Taker"), Bits{Name: true}},
+		{"Sharer's Share", firstMethod("Sharer"), Bits{Name: true}},
+		{"Inferred's Inner, which no unit declares", firstField("Inferred"), Bits{Name: true, Underlying: true}},
+	} {
+		if got := judged.dependence.ObjectBits(each.object); got != each.want {
+			test.Errorf("%s: want its bits %+v on linux, got %+v", each.name, each.want, got)
+		}
+		if got := identified.Bits(each.object); got != each.want {
+			test.Errorf("%s: want its bits %+v on linux by its name in the graph read back, got %+v", each.name,
+				each.want, got)
+		}
+		name, underlying := byName.DependentObject(each.object)
+		if got := (Bits{Name: name, Underlying: underlying}); got != each.want {
+			test.Errorf("%s: want its bits %+v on linux by its counterpart's name, got %+v", each.name, each.want, got)
+		}
+	}
+}
+
+// architectureBuild is a linux build on architecture, named by both, whatever the host's `GOARCH`: loading for another
+// architecture needs no machine of it, so two such builds differ by architecture on any host.
+func architectureBuild(architecture string) fixtureBuild {
+	var environment []string
+	for _, pair := range buildEnvironment("linux", "") {
+		if !strings.HasPrefix(pair, "GOARCH=") {
+			environment = append(environment, pair)
+		}
+	}
+	return fixtureBuild{name: "linux/" + architecture, environment: append(environment, "GOARCH="+architecture)}
+}
+
+// A named type's underlying bit reads a struct behind a pointer that no expression names (#mtfdb1m). A selection
+// through a defined pointer type dereferences it, and so does a field promoted through an embedded pointer, and the
+// body holds no expression of the struct's type for its own reads to stop at, so the named type's underlying bit is
+// the one read that carries the struct's layout. In the pointed fixture Pad's length moves with the architecture,
+// while every declaration reads alike, loaded as amd64 against arm64 and as 386 against arm, each pair on any host:
+// the bits read no word size, so a 32-bit pair, where SA1027 judges a field's offset, reads as a 64-bit one does.
+//
+// Underlying set: Counted and Exposed, defined pointers to an unnamed struct holding a Pad, its fields unexported and
+// exported; Pointer and Pointers, to an Inner through one pointer and two; Holder, which embeds a pointer to an Inner;
+// and Chained, which embeds a pointer to a Holder. The same spelled through an alias, each underlying set:
+// InnerPointer, `= *Inner`, and AliasHolder, which embeds it; Shared, `= struct{ *Inner }`, and Wrapper, which embeds
+// it, so the embedded pointer sits inside a struct no named type declares; and SharedPointer, a defined pointer to
+// Shared. Neither bit set: Linked, whose pointer is a field it does not embed, and Listed, a slice of pointers, which a
+// body names by expressions of their own. Each name bit is unset, as no build changes what a name of them carries. The
+// graph read back from its records resolves and judges alike.
+//
+// Read a named type's underlying with a name behind each pointer, as before the rule, and every set one is unset; read
+// an embedded pointer's element as a name and Holder and Chained are; read it for a field that is not embedded and
+// Linked is set; read an alias's underlying bit as its target in full alone, with no pointer rule, and InnerPointer,
+// Shared and Wrapper are unset, and AliasHolder and SharedPointer too unless the rule sees through an alias
+// (types.Unalias) itself.
+func TestANamedTypesUnderlyingReadsAStructBehindAPointerNoExpressionNames(test *testing.T) {
+	test.Parallel()
+
+	for _, pair := range []struct{ host, build string }{{"amd64", "arm64"}, {"386", "arm"}} {
+		host := loadFixture(test, "pointed", architectureBuild(pair.host))
+		built := loadFixture(test, "pointed", architectureBuild(pair.build))
+		difference := differenceOf(host, built)
+		live := graphOf(host, nil)
+		expectNoUnnameable(test, "pointed", live)
+		recorded := recordedGraphOf(test, live)
+		expectAlike(test, "pointed resolved", resolvedLines(live), resolvedLines(recorded))
+		against := pair.build + " against " + pair.host
+		for _, graph := range []struct {
+			name       string
+			dependence *Dependence
+		}{
+			{"the live graph", live.Against(difference)},
+			{"the graph read back from its records", recorded.Against(difference)},
+		} {
+			for _, each := range []struct {
+				local string
+				want  Bits
+			}{
+				{"Pad", Bits{Underlying: true}},
+				{"Counted", Bits{Underlying: true}},
+				{"Exposed", Bits{Underlying: true}},
+				{"Inner", Bits{Underlying: true}},
+				{"Pointer", Bits{Underlying: true}},
+				{"Pointers", Bits{Underlying: true}},
+				{"Holder", Bits{Underlying: true}},
+				{"Chained", Bits{Underlying: true}},
+				{"InnerPointer", Bits{Underlying: true}},
+				{"AliasHolder", Bits{Underlying: true}},
+				{"Shared", Bits{Underlying: true}},
+				{"Wrapper", Bits{Underlying: true}},
+				{"SharedPointer", Bits{Underlying: true}},
+				{"Linked", Bits{}},
+				{"Listed", Bits{}},
+			} {
+				bits, isDeclared := graph.dependence.NameBits("example.com/pointed", each.local)
+				switch {
+				case !isDeclared:
+					test.Errorf("%s: no unit of the pointed fixture declares it in %s", each.local, graph.name)
+				case bits != each.want:
+					test.Errorf("%s: want its bits %+v on %s in %s, got %+v", each.local, each.want, against,
+						graph.name, bits)
+				}
 			}
 		}
 	}

@@ -150,11 +150,12 @@ func (fixture *factReachFixture) key(test *testing.T, object types.Object) fact_
 }
 
 // inputs are what the fixture's host side is made from with no answer of its own or imported, no object bound to the
-// order and no function holding the no-return fact, for a test to add its own to.
+// order, no function holding the no-return fact and no body holding anything presence reads, its bodies read, for a
+// test to add its own to.
 func (fixture *factReachFixture) inputs() factReachInputs {
 	return factReachInputs{fileSet: fixture.fileSet, record: fixture.record,
 		renderer: build_reads.NewIdentityRenderer(fixture.fileSet, nil),
-		noReturn: func(*types.Func) bool { return false }}
+		noReturn: func(*types.Func) bool { return false }, presenceRead: true}
 }
 
 // placesOf are the places of names, in their order.
@@ -278,6 +279,55 @@ func TestAPackagesVariableInitializersAreOneAskerThatIsNoPlace(test *testing.T) 
 		!unfollowed.leaveFor([]fact_reach.Named{{Object: warm, Reason: "no-return"}}) || unfollowed.leaveFor(nil) {
 		test.Errorf("the unfollowed fixture's initializers are %+v, want its one place, a user of every object, "+
 			"which leaves for anything named and for nothing else", unfollowed)
+	}
+}
+
+// The package's used objects are every object a body uses, each once, in the order of their keys, with the identity
+// that key is made of (#xeafx79): the keys Users is asked by, so a build that names one takes that object's users out.
+// A type only a signature names is no body's use, and none of them.
+func TestAPackagesUsedObjectsAreEveryObjectItsBodiesUseByKey(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	hosted := newFactReachPackage(fixture.inputs())
+	used := hosted.Used()
+	keys := make([]fact_reach.Object, 0, len(used))
+	for _, object := range used {
+		keys = append(keys, object.Object)
+		if key, isKnown := factReachObject(object.Identity); !isKnown || key != object.Object {
+			test.Errorf("the used object %q has the identity %s, whose key is %q", object.Object, object.Identity, key)
+		}
+	}
+	if want := slices.Sorted(maps.Keys(hosted.users)); !slices.Equal(keys, want) {
+		test.Errorf("the used objects are %q, want the keys of the users, in order, %q", keys, want)
+	}
+	if !slices.Contains(keys, fixture.key(test, fixture.function(test, "size"))) {
+		test.Errorf("size, which Warm calls, is no used object")
+	}
+	if slices.Contains(keys, fixture.key(test, fixture.own.Scope().Lookup("Label"))) {
+		test.Errorf("Label, which only a signature names, is a used object")
+	}
+}
+
+// A package whose bodies' presence the host never read fails closed (#xeafx79): no record would read as no body
+// holding anything, so a standing body that starts a goroutine or writes its own any would stand unproven. Its side
+// counts it unplaced, and every build lints it whole, while the same package read, with nothing in its bodies,
+// stands as the reach leaves it.
+func TestAPackageWhosePresenceWasNeverReadIsLintedWhole(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	read := newFactReachPackage(fixture.inputs())
+	if _, partial := read.inBuild(fixture.standing("size"), true).Standing(); !partial || read.unplaced != 0 {
+		test.Fatalf("read, the package is partial %t with %d unplaced, want partial and none", partial, read.unplaced)
+	}
+	inputs := fixture.inputs()
+	inputs.presenceRead = false
+	unread := newFactReachPackage(inputs)
+	standing, partial := unread.inBuild(fixture.standing("size"), true).Standing()
+	if partial || standing != nil || unread.unplaced != 1 {
+		test.Errorf("never read, the package is partial %t, standing %v, with %d unplaced, want linted whole and one "+
+			"unplaced", partial, standing, unread.unplaced)
 	}
 }
 

@@ -51,7 +51,8 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	line := "fact reach: packages given a side 1; none, uncaptured 0, unrecorded 0, order unknown 0"
+	line := "fact reach: packages given a side 1; none, uncaptured 0, answered from the store 0, unrecorded 0, order " +
+		"unknown 0"
 	if !slices.Contains(strings.Split(string(written), "\n"), line) {
 		test.Errorf("the census file has no line %q:\n%s", line, written)
 	}
@@ -213,10 +214,10 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 // The second leg fails where what stands differs, shown by handing it a host's side that says otherwise of Stable
 // (#5vbs1np, must 4): the build's answer about Stable's nil-ness is its own, so a host's answer of other bytes is a
 // failure on a line of its own, counted under the kind, and in the census, and so is none at all, since StableFailed,
-// the body whose rule asks it, stands (must 5): its findings would rest on an answer the host never had. So is a
-// deprecation of Stable the host held and the build does not, which the facts' reach leaves to the reach by its
-// argument and the leg checks. Nothing else moves: Stable stands, so the facts' reach never asks the answer, and the
-// leg alone reads it.
+// the body whose rule asks it, stands (must 5): its findings would rest on an answer the host never had. Nothing else
+// moves: Stable stands, so the facts' reach never asks the answer, and the leg alone reads it. A deprecation the host
+// held and the build does not is the facts' reach's own to compare, before the leg reads anything
+// (TestAHostsDeprecationTheBuildLacksTakesTheFunctionAndItsUserOut).
 func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 	test.Parallel()
 
@@ -246,16 +247,6 @@ func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 			key, asking := stableAsking(hosted)
 			delete(hosted.askings, key)
 			return " Stable return_nil_ness: host none, build " + string(asking.Encoded)
-		}},
-		{"deprecation", "fact_deprecated", func(hosted *factReachPackage) string {
-			for index, function := range hosted.functions {
-				if function.Identity.Path == "Stable" {
-					pushed := maps.Clone(function.Pushed)
-					pushed["fact_deprecated"] = "Deprecated: otherwise"
-					hosted.functions[index].Pushed = pushed
-				}
-			}
-			return ` Stable fact_deprecated: host "Deprecated: otherwise", build ""`
 		}},
 	} {
 		test.Run(each.name, func(test *testing.T) {
@@ -293,6 +284,58 @@ func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 				test.Errorf("the census file has no line %q:\n%s", line, written)
 			}
 		})
+	}
+}
+
+// A deprecation the host held and the build does not is compared by the facts' reach (#7v2bzvd), shown by handing
+// windows's build a host's side that says Stable is deprecated: Stable is named for "deprecation", and both
+// StableFailed, which calls it, and Stable's own body, whose findings read whether Stable itself is deprecated, leave
+// the standing set for it, and for nothing else. Nothing that stands differs, so the second leg fails nothing.
+func TestAHostsDeprecationTheBuildLacksTakesTheFunctionAndItsUserOut(test *testing.T) {
+	test.Parallel()
+
+	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "standing-facts")), exitFindings,
+		func(engine *pipeline) {
+			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			engine.bodyDifferential = true
+			// Windows's is the one extra build, and its census comes before its passes read the side.
+			engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
+				hosted := engine.factReachSides.packages["example.com/standing"]
+				for index, function := range hosted.functions {
+					if function.Identity.Path == "Stable" {
+						pushed := maps.Clone(function.Pushed)
+						pushed["fact_deprecated"] = "Deprecated: otherwise"
+						hosted.functions[index].Pushed = pushed
+					}
+				}
+				return census
+			}
+		}, "--no-cache", "--no-fix", "--build-dependence")
+	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
+		test.Fatalf("want windows's body differential, got %d runs", len(on.buildRuns))
+	}
+	settled, isSettled := on.buildRuns[1].result.FactReachSettled["example.com/standing"].(*standing_facts.Result)
+	if !isSettled || settled.Settlement == nil {
+		test.Fatalf("windows settled example.com/standing as %+v, want it settled in part", settled)
+	}
+	names := map[fact_reach.Place]string{}
+	for _, body := range on.buildRuns[1].bodyReach.bodies {
+		names[fact_reach.Place{File: body.file, Offset: body.offset}] = body.name
+	}
+	removed := map[string]fact_reach.Reason{}
+	for _, removal := range settled.Settlement.Removed {
+		if slices.Contains(strings.Split(string(removal.Object), "\x00"), "Stable") {
+			removed[names[removal.Place]] = removal.Reason
+		}
+	}
+	if want := map[string]fact_reach.Reason{"Stable": "deprecation", "StableFailed": "deprecation"}; !maps.Equal(
+		removed, want) {
+		test.Errorf("Stable took out %v, want %v", removed, want)
+	}
+	differential := on.buildRuns[1].bodyDifferential
+	if len(differential.standingFailed) > 0 {
+		test.Errorf("windows's second leg failed %v, with the failures\n%s\nwant nothing standing that differs",
+			differential.standingFailed, strings.Join(differential.failures, "\n"))
 	}
 }
 

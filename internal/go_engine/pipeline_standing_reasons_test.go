@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
@@ -74,6 +75,22 @@ func taggedRun(test *testing.T, engine *pipeline) buildRun {
 	return engine.buildRuns[at]
 }
 
+// unrecordedOf is how many functions of the bodies run lints the facts' reach named for holding no record of each
+// kind, by kind, over every package it settled.
+func unrecordedOf(run buildRun) map[string]int {
+	unrecorded := map[string]int{}
+	for _, settled := range run.result.FactReachSettled {
+		packageSettled, isResult := settled.(*standing_facts.Result)
+		if !isResult || packageSettled.Settlement == nil {
+			continue
+		}
+		for kind, count := range packageSettled.Settlement.Unrecorded {
+			unrecorded[kind] += count
+		}
+	}
+	return unrecorded
+}
+
 // targetLeft is why `target` did not stand in run: the body reach census's reason for its body, and the reason the
 // facts' reach took it out of the standing set with, each empty where that reach did not, and whether it stands once
 // the facts settled. A body the census never judged fails the test, since nothing could then be said of it.
@@ -114,6 +131,10 @@ func sharedFindings(run buildRun, root string) []string {
 // its module expects, and the tagged build's own findings, and the stream's, with the standing bodies' switch on are
 // those with it off. shared.go finds otherwise in the tagged build than on the host in each, so a `target` left
 // standing with the host's findings would fail the comparison.
+//
+// The callee modules rest on the no-return comparison alone (#z9fze0t): `other`, which the build lints, holds no
+// record of odd slice, and no function is named for that any more, the kind recording every judgment, so nothing but
+// `other`'s differing no-return takes `target` out.
 func TestNoTargetStandsWhoseCalleeStopsReturningOrWhoseConstantDiffers(test *testing.T) {
 	test.Parallel()
 
@@ -132,6 +153,12 @@ func TestNoTargetStandsWhoseCalleeStopsReturningOrWhoseConstantDiffers(test *tes
 				test.Errorf("in the tagged build target stands %t, reached by %q and taken out by the facts' reach "+
 					"for %q, want it not standing, reached by %q and taken out for %q", stands, bodyReason,
 					factsReason, each.bodyReach, each.factsReach)
+			}
+			for _, kind := range fact_resolver.RecordingNames() {
+				if count := unrecordedOf(onTagged)[kind]; count != 0 {
+					test.Errorf("the tagged build named %d functions for holding no record of %s, a kind that records "+
+						"every judgment, want none", count, kind)
+				}
 			}
 			onFound, offFound := rawFindings(onTagged, onRoot), rawFindings(offTagged, offRoot)
 			if !slices.Equal(onFound, offFound) {

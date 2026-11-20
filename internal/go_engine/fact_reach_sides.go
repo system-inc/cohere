@@ -19,14 +19,16 @@ import (
 // start, on the pipeline's goroutine, and only read after, by every build at once (factReachPackage). packages are the
 // sides by package ID: one for each package the host analyzed whose side could be made. Every other package gets
 // none, and a build lints it whole; the census counts why: uncaptured, a package the host's run holds no side of,
-// restored or handed an unsure answer (check.FactReachCapture.Packages); unrecorded, one with no record of what each
-// of its declarations uses; and orderUnknown, one whose answers hang on the host's order in a way no kind could say
-// (check.FactReachPackage.OrderKnown).
+// restored or handed an unsure answer (check.FactReachCapture.Packages); storeAnswered, one the run learned and the
+// store answered a question about, whose record no kind can call complete (check.FactReachCapture.StoreAnswered);
+// unrecorded, one with no record of what each of its declarations uses; and orderUnknown, one whose answers hang on the
+// host's order in a way no kind could say (check.FactReachPackage.OrderKnown).
 type factReachSides struct {
-	packages     map[string]*factReachPackage
-	uncaptured   int
-	unrecorded   int
-	orderUnknown int
+	packages      map[string]*factReachPackage
+	uncaptured    int
+	storeAnswered int
+	unrecorded    int
+	orderUnknown  int
 }
 
 // newFactReachSides is the host's side of each of analyzed, the packages the host's lint ran over, from host, the body
@@ -42,7 +44,11 @@ func newFactReachSides(
 	for _, analyzedPackage := range analyzed {
 		captured := capture.Packages[analyzedPackage.ID]
 		if captured == nil {
-			sides.uncaptured++
+			if capture.StoreAnswered[analyzedPackage.ID] {
+				sides.storeAnswered++
+			} else {
+				sides.uncaptured++
+			}
 			continue
 		}
 		hosted := host.packages[analyzedPackage.ID]
@@ -67,14 +73,17 @@ func newFactReachSides(
 			}
 		}
 		sides.packages[analyzedPackage.ID] = newFactReachPackage(factReachInputs{
-			fileSet:    hosted.Fset,
-			record:     record,
-			renderer:   build_reads.NewIdentityRenderer(hosted.Fset, nil),
-			answers:    captured.Answers,
-			imported:   imported,
-			noReturn:   captured.NoReturn,
-			pushed:     captured.Pushed,
-			orderBound: captured.OrderBound,
+			fileSet:      hosted.Fset,
+			record:       record,
+			renderer:     build_reads.NewIdentityRenderer(hosted.Fset, nil),
+			answers:      captured.Answers,
+			imported:     imported,
+			noReturn:     captured.NoReturn,
+			pushed:       captured.Pushed,
+			orderBound:   captured.OrderBound,
+			presence:     captured.Presence,
+			presenceRead: captured.PresenceRead,
+			markers:      captured.Markers,
 		})
 	}
 	return sides
@@ -124,8 +133,8 @@ func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reac
 // the answers the host read from other packages asked before the
 // walk and the objects they named, the order-bound objects and the members of the build's own cycles of calls named
 // before anything was asked, the answers the walk asked and those that read differing or unknown, by kind, the
-// functions of a body that left with no record of a kind, by kind, and the bodies the facts took out of the standing
-// set.
+// functions of a body that left with no record of a kind, by kind, the bodies the facts took out of the standing
+// set, and the objects each presence row named and the bodies that left for it, by row.
 type buildFactReach struct {
 	// unsettled is why the build settled nothing though it was asked to (check.Result.FactReachUnsettled), and every
 	// other count is zero then.
@@ -147,13 +156,16 @@ type buildFactReach struct {
 	unknown           map[string]int
 	unrecordedKinds   map[string]int
 	removed           int
+	presenceNamed     map[string]int
+	presenceRemoved   map[string]int
 }
 
 // newBuildFactReach is the census of the build whose passes were handed hosts, by package ID, and whose check.Run gave
 // result, the last load's.
 func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *buildFactReach {
 	census := &buildFactReach{sides: len(hosts), crashed: len(result.FactReachCrashes), differing: map[string]int{},
-		unknown: map[string]int{}, unrecordedKinds: map[string]int{}}
+		unknown: map[string]int{}, unrecordedKinds: map[string]int{}, presenceNamed: map[string]int{},
+		presenceRemoved: map[string]int{}}
 	for identifier, settled := range result.FactReachSettled {
 		packageSettled, isResult := settled.(*standing_facts.Result)
 		if !isResult || !packageSettled.Partial || packageSettled.Settlement == nil {
@@ -181,6 +193,12 @@ func newBuildFactReach(hosts map[string]fact_reach.Host, result *check.Result) *
 			census.unrecordedKinds[kind] += count
 		}
 		census.removed += len(packageSettled.Settlement.Removed)
+		for row, count := range packageSettled.PresenceNamed {
+			census.presenceNamed[string(row)] += count
+		}
+		for row, count := range packageSettled.PresenceRemoved {
+			census.presenceRemoved[string(row)] += count
+		}
 	}
 	return census
 }
@@ -200,6 +218,8 @@ func writeBuildFactReach(written *strings.Builder, census *buildFactReach) {
 		byKind(census.differing), byKind(census.unknown), census.removed)
 	fmt.Fprintf(written, "    functions with no record of a kind %s; build order named %d; pushed facts compared %d, "+
 		"named %d\n", byKind(census.unrecordedKinds), census.buildOrderNamed, census.pushedCompared, census.pushedNamed)
+	fmt.Fprintf(written, "    presence named %s; bodies taken out for presence %s\n", byKind(census.presenceNamed),
+		byKind(census.presenceRemoved))
 }
 
 // byKind is counts written by kind, the kinds in order, or none.

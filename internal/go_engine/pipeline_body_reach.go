@@ -53,9 +53,9 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		"show one differs (#5vbs1np).\n")
 	// The host's sides for the facts' reach, under the census, ahead of every build that reads them.
 	if engine.factReachSides != nil {
-		fmt.Fprintf(&written, "fact reach: packages given a side %d; none, uncaptured %d, unrecorded %d, order "+
-			"unknown %d\n", len(engine.factReachSides.packages), engine.factReachSides.uncaptured,
-			engine.factReachSides.unrecorded, engine.factReachSides.orderUnknown)
+		fmt.Fprintf(&written, "fact reach: packages given a side %d; none, uncaptured %d, answered from the store %d, "+
+			"unrecorded %d, order unknown %d\n", len(engine.factReachSides.packages), engine.factReachSides.uncaptured,
+			engine.factReachSides.storeAnswered, engine.factReachSides.unrecorded, engine.factReachSides.orderUnknown)
 	}
 	for index, run := range runs {
 		if run.bodyReach == nil {

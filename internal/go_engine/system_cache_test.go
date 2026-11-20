@@ -45,6 +45,12 @@ func TestMain(suite *testing.M) {
 		os.Exit(refuse(os.Stderr, isolateError))
 	}
 	testsSystemCache = os.Getenv(system_cache_testing.Variable)
+	// And no go command of this process or its children reads the person's go env file (`go env -w`), whose
+	// `GOFLAGS=-mod=mod` or `GOAMD64` would change what the engine's go commands answer and redden tests that never
+	// asked for it (#sfjj2rh, the reader's S6). A test about the file sets one of its own.
+	if setError := os.Setenv("GOENV", "off"); setError != nil {
+		os.Exit(refuse(os.Stderr, setError))
+	}
 	code := suite.Run()
 	removeSystemCache()
 	os.Exit(code)

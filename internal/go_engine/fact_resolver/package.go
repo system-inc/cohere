@@ -48,6 +48,10 @@ type Package struct {
 	// so PlacedIn reads the package's own answers without walking the whole run's (see noteAnswered).
 	answeredLock sync.Mutex
 	answered     map[answerKey]bool
+
+	// storeAnswered is whether the store gave an answer about one of the package's objects (see AnsweredFromStore),
+	// set by whichever question took it, from any goroutine.
+	storeAnswered atomic.Bool
 }
 
 // Lock takes the package's lock, under which a kind computes in it. A computation holding it takes another package's
@@ -78,6 +82,14 @@ func (resolved *Package) Info() *types.Info {
 // after its predicate was set, so nothing writes it once the package can be read.
 func (resolved *Package) NoReturn(function *types.Func) bool {
 	return resolved.noReturn(function)
+}
+
+// AnsweredFromStore reports whether the store gave the run an answer about one of the package's objects, a package
+// the run learned (answerOf): one loaded from source to answer a question, whose entry held answers an earlier run
+// computed. Such an answer was judged in that run, so nothing of what it rests on was judged in this one, and a
+// function of the package the resolver holds no answer about may be one it rests on (Kind.RecordsEveryJudgment).
+func (resolved *Package) AnsweredFromStore() bool {
+	return resolved.storeAnswered.Load()
 }
 
 // Function is the package's declared function or method whose object is function, built, or nil when function is no
