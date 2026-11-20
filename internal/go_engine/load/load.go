@@ -209,9 +209,9 @@ type Caching struct {
 	// change to the bytes it holds, so a load after a write reads them again (#t7h2sm4).
 	Fingerprints *Fingerprints
 
-	// Walks is the package directories the loads after every write of the run share, nil for none (see PackageWalks):
-	// set on each extra build's load and never on the host's, since the long-line wrap writes between the host's first
-	// load and the builds.
+	// Walks is the package directories the run's loads share, nil for none (see PackageWalks): set on the host's load
+	// and each extra build's, and started over by the run at every change to the bytes it holds, so the builds take the
+	// walks read since the last one (#vnb7btx).
 	Walks *PackageWalks
 
 	// Pool is the run's one set of slots, which every load and check of the run shares, the host's and every extra

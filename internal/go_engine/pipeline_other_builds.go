@@ -604,7 +604,8 @@ func (engine *pipeline) extraBuildRun(
 	// action reaches, a command main whose test variant is analyzed in its place, is left out of the build's load
 	// (#ws2ptvf): the host checked it, and its variant carries its files here. The listing reads through the host's
 	// directory reads (#yyvstj6), its kept answer's fingerprint through the builds' own (#5jpss95), and its patterns'
-	// walks through the builds' own too (#tb538na).
+	// walks through the ones read since the run last changed the bytes it holds, the host's last load's but after a
+	// rename (#tb538na, #vnb7btx).
 	caching := load.Caching{
 		Held:              engine.held,
 		GoEnvironment:     goEnvironment,

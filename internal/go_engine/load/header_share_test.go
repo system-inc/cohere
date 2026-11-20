@@ -87,8 +87,10 @@ func TestEveryDirectoryReadsAsGoBuildReadsIt(test *testing.T) {
 	}
 }
 
-// The same holds at cohere's own root, under every build the engine checks it with, the host's first, each listing
-// the whole workspace through the one run's shared reads, all at once, as the extra builds list side by side.
+// The same holds at cohere's own root, under every build the engine checks it with, each listing the whole workspace
+// through the one run's shared reads: the host's first, as its load comes before the builds', and then the extra
+// builds all at once, as they list side by side, each taking the reads it selects every file of alike
+// (PackageReads, #y8cf1wf). How many directories each build took and read again is logged.
 func TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds(test *testing.T) {
 	test.Parallel()
 	workspace, builds := coheresBuilds(test)
@@ -102,15 +104,18 @@ func TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds(test *testing.T) {
 			test.Fatalf("%s: no lister: %s", each, doubts[index])
 		}
 	}
+	_, doubts[0] = listers[0].list(workspace.Patterns())
 	var group sync.WaitGroup
-	for index := range builds {
-		group.Go(func() { _, doubts[index] = listers[index].list(workspace.Patterns()) })
+	for index := range builds[1:] {
+		group.Go(func() { _, doubts[index+1] = listers[index+1].list(workspace.Patterns()) })
 	}
 	group.Wait()
 	for index, each := range builds {
 		if doubts[index] != "" {
 			test.Fatalf("%s: the lister did not answer: %s", each, doubts[index])
 		}
+		test.Logf("%s: %d directories taken, %d read again", each, listers[index].directoriesTaken.Load(),
+			listers[index].directoriesRead.Load())
 		for _, directory := range slices.Sorted(maps.Keys(listers[index].reads)) {
 			requireGoBuildsRead(test, listers[index], directory, each.String())
 		}

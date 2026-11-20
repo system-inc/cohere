@@ -47,6 +47,9 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 		SharedReads:   engine.reads,
 		// The fingerprints the builds share (#t7h2sm4): the host's last load reads the bytes the builds read.
 		Fingerprints: engine.fingerprints,
+		// And the pattern walks (#vnb7btx): the builds take the ones read since the run last changed the bytes it
+		// holds.
+		Walks: engine.walks,
 	}
 	// Under `--timeline` the host's load stamps its listing's end, its restore and its first parse, and its end below,
 	// each in the load's round: 0 for the run's first, 1 for the wrap's load or a reload for a question after it.

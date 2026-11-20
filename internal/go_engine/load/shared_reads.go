@@ -52,6 +52,11 @@ type SharedReads struct {
 	// when headersUnshared says why every listing parses each header itself.
 	headers         *copiedbuild.Headers
 	headersUnshared string
+
+	// packageReads is each package directory's reads, a listing's under its build kept for every later listing whose
+	// build selects the directory's files alike, which takes the read (#y8cf1wf): read through the copy of go/build, as
+	// headers are, so nil when headers is.
+	packageReads *copiedbuild.PackageReads
 }
 
 // sharedDirectory is one directory's entries, read once.
@@ -79,6 +84,7 @@ func newSharedReads(linked string) *SharedReads {
 	shared := &SharedReads{directories: map[string]*sharedDirectory{}, files: map[string]*sharedFile{}}
 	if sharing, unshared := copiedbuild.Sharing(linked); sharing {
 		shared.headers = copiedbuild.NewHeaders()
+		shared.packageReads = copiedbuild.NewPackageReads()
 	} else {
 		shared.headersUnshared = unshared
 	}
