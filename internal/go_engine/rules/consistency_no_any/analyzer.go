@@ -79,6 +79,8 @@ func enterFile(context *rule.Context, _ *ast.File) {
 	}
 	state.flows = &flowAnalysis{
 		context:     context,
+		information: context.TypesInfo,
+		own:         context.Package,
 		sinkFixed:   map[flowKey]bool{},
 		definedFrom: map[flowKey][]flowKey{},
 		sourceFixed: map[flowKey]bool{},
