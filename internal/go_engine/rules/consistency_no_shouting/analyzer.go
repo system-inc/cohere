@@ -108,7 +108,7 @@ type commentSpan struct {
 // finding per word covering the word's bytes, so a fix lands on what shouted rather than the whole comment. marker is
 // the file's generated-code marker, or nil.
 func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Comment) {
-	if !anyCommentHasAdjacentUppercaseLetters(group) {
+	if !anyReadCommentShouts(group, marker) {
 		return
 	}
 	var joined strings.Builder
@@ -128,8 +128,8 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 		spans = append(spans, commentSpan{comment: comment, start: start, end: joined.Len(), bodyStart: bodyStart})
 	}
 	text := joined.String()
-	// The shared gate: a word masking leaves is a word of the text, so a text whose capital words are all acronyms
-	// reports nothing, and most groups that reach here skip the masking.
+	// Asked again of the joined text, since a comment the gate admitted for its go/doc note marker alone holds no
+	// shout once the marker is blanked, and masking costs more than the asking.
 	if !shouting.HasShoutedToken(text) {
 		return
 	}
@@ -152,13 +152,23 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 	}
 }
 
-// anyCommentHasAdjacentUppercaseLetters is the shared gate asked of each comment's own text, before judgeGroup builds
-// the joined text it would otherwise ask, so a group with no two capitals in a row allocates nothing. It cannot change
-// a finding: each body is a piece of its comment's text with at most a note marker blanked, and the joined text puts a
-// newline between bodies, so two capitals in a row there are two capitals in a row in some comment's text.
-func anyCommentHasAdjacentUppercaseLetters(group *ast.CommentGroup) bool {
+// anyReadCommentShouts is the gate asked of each comment's own text before judgeGroup joins the group, so a group
+// whose capitals are all acronyms, or sit only in a directive or the generated-code marker, allocates nothing. Two
+// capitals in a row are asked first, being the cheaper scan, and the directive and the marker are passed over as
+// judgeGroup passes over them.
+//
+// It cannot skip a finding. A finding is a shouted token of the masked joined text, so by shouting.HasShoutedToken's
+// argument a shouted token of the joined text, and a token holds no newline, so it lies in one comment's body. That
+// body is the comment's text with only its delimiters cut and a go/doc note marker blanked, and every byte beside
+// what was cut or blanked, a slash, a star, a space or the marker's closing parenthesis, is neither a word character
+// nor a hyphen or ampersand that joins a run. So a token, and the run it is judged in, reads the same in the text as
+// in the body, and the comment's text holds it. The marker's own capitals can only admit a group, never hide one.
+func anyReadCommentShouts(group *ast.CommentGroup, marker *ast.Comment) bool {
 	for _, comment := range group.List {
-		if shouting.HasAdjacentUppercaseLetters(comment.Text) {
+		if comment == marker || !shouting.HasAdjacentUppercaseLetters(comment.Text) {
+			continue
+		}
+		if !directive.MatchString(comment.Text) && shouting.HasShoutedToken(comment.Text) {
 			return true
 		}
 	}

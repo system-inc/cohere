@@ -77,12 +77,10 @@ func run(pass *analysis.Pass) (any, error) {
 // or one anywhere in a block from which the exit's block can be reached, its own block included when a loop leads
 // back to it. A defer in a loop's body is pending at an exit the next turn meets, so that exit is reported too.
 func judgeGraph(pass *analysis.Pass, graph *cfg.CFG) {
-	predecessors := map[*cfg.Block][]*cfg.Block{}
-	for _, block := range graph.Blocks {
-		for _, successor := range block.Succs {
-			predecessors[successor] = append(predecessors[successor], block)
-		}
-	}
+	// Only the backward walk reads the predecessors, and only for an exit with no defer ahead of it in its own block,
+	// so a graph with no such exit, which is nearly every graph, never builds them. The graph does not change while
+	// it is judged, so the index built at the first exit that needs it serves every later one unchanged.
+	var predecessors map[*cfg.Block][]*cfg.Block
 	for _, block := range graph.Blocks {
 		if !block.Live {
 			continue
@@ -96,8 +94,13 @@ func judgeGraph(pass *analysis.Pass, graph *cfg.CFG) {
 			if callee == "" {
 				continue
 			}
-			if !holdsDefer(block.Nodes[:index]) && !reachedByDefer(block, predecessors) {
-				continue
+			if !holdsDefer(block.Nodes[:index]) {
+				if predecessors == nil {
+					predecessors = predecessorsOf(graph)
+				}
+				if !reachedByDefer(block, predecessors) {
+					continue
+				}
 			}
 			pass.Report(analysis.Diagnostic{
 				Pos:      call.Pos(),
@@ -107,6 +110,18 @@ func judgeGraph(pass *analysis.Pass, graph *cfg.CFG) {
 			})
 		}
 	}
+}
+
+// predecessorsOf indexes each block of graph by the blocks with an edge into it. The index is never nil, even for a
+// graph with no edges, so a nil index always means one not built yet.
+func predecessorsOf(graph *cfg.CFG) map[*cfg.Block][]*cfg.Block {
+	predecessors := map[*cfg.Block][]*cfg.Block{}
+	for _, block := range graph.Blocks {
+		for _, successor := range block.Succs {
+			predecessors[successor] = append(predecessors[successor], block)
+		}
+	}
+	return predecessors
 }
 
 // exitCall is the call a graph node makes as a statement of its own, or as a deferred call: os.Exit and log.Fatal

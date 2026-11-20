@@ -147,12 +147,19 @@ type graph struct {
 	// generated is each generated file of the package, by its name, which staticcheck's generated analyzer read.
 	generated map[string]generated.Generator
 
-	// usedEdges and ownedEdges are every use and every ownership between nodes, each keyed by edgeKey. This data is
-	// also present in the nodes' chains, but there it can't be accessed in constant time; these deduplicate edges. The
-	// original keeps one map keyed by a struct of both nodes and the kind; a map per kind keyed by one word keeps a
-	// third of the bytes per key, hashes it on the runtime's path for 64-bit keys, and holds the same edges.
-	usedEdges  map[uint64]struct{}
-	ownedEdges map[uint64]struct{}
+	// usedEdges is every use between nodes, keyed by edgeKey. This data is also present in the nodes' chains, but
+	// there it can't be accessed in constant time; it deduplicates uses. The original keeps one map keyed by a struct
+	// of both nodes and the kind; a map keyed by one word keeps a third of the bytes per key, hashes it on the
+	// runtime's path for 64-bit keys, and holds the same edges.
+	usedEdges map[uint64]struct{}
+	// firstOwners and laterOwners deduplicate ownerships in place of a map of them all. Nearly every node has one
+	// owner at most, which the walk often sees twice, so firstOwners holds each node's first owner by the owned node's
+	// index, 4 bytes a node and no hash, 0 while it has none: the root owns nothing (addOwned). laterOwners is each
+	// ownership by an owner other than the first, keyed by edgeKey, and nil until a node has a second owner, as the
+	// field of `var a, b struct{ x int }` does. firstOwners is as long as nodes, so each place a node is made adds a
+	// slot to both.
+	firstOwners []nodeIndex
+	laterOwners map[uint64]struct{}
 	// nodes is every node, by its index, the root first.
 	nodes []node
 	// uses and owns are every use and every ownership as a link of its node's chain, which node.firstUse and
@@ -256,7 +263,7 @@ type result struct {
 }
 
 // edgeKey is the edge from one node to another as one word, from in the high half and to in the low, which
-// graph.usedEdges and graph.ownedEdges are keyed by. It is exact, two edges sharing a key only when they share both
+// graph.usedEdges and graph.laterOwners are keyed by. It is exact, two edges sharing a key only when they share both
 // nodes, because a node's index is 32 bits.
 func edgeKey(from nodeIndex, to nodeIndex) uint64 {
 	return uint64(from)<<32 | uint64(to)
@@ -273,10 +280,10 @@ func newGraph(
 ) *graph {
 	// Almost every node is an object a declaration in the package names, each in typesInfo.Defs. Over cohere's own
 	// packages the nodes and the ownerships come to a little under one per declaration, and the uses to about one and
-	// a half, under two in nearly every package. Sized so up front, the node list and the maps seldom grow while the
-	// walk fills them. The lists of links grow by append, where room left over is a copy, not a rehash, so they take
-	// what nine packages in ten need: the uses one and a half a declaration, the ownerships one. A size is only room:
-	// it changes no node, no order and no edge, so no finding.
+	// a half, under two in nearly every package. Sized so up front, the node list, its first owners and the maps
+	// seldom grow while the walk fills them. The lists of links grow by append, where room left over is a copy, not a
+	// rehash, so they take what nine packages in ten need: the uses one and a half a declaration, the ownerships one. A
+	// size is only room: it changes no node, no order and no edge, so no finding.
 	declared := len(typesInfo.Defs)
 	return &graph{
 		typesPackage: typesPackage,
@@ -286,10 +293,10 @@ func newGraph(
 		generated:    generatedFiles,
 		fileSet:      fileSet,
 		nodes:        make([]node, 1, declared+1),
+		firstOwners:  make([]nodeIndex, 1, declared+1),
 		uses:         make([]edgeLink, 1, declared+declared/2+1),
 		owns:         make([]edgeLink, 1, declared+1),
 		usedEdges:    make(map[uint64]struct{}, 2*declared),
-		ownedEdges:   make(map[uint64]struct{}, declared),
 		objects:      make(map[unsafe.Pointer]nodeIndex, declared),
 	}
 }
@@ -394,6 +401,7 @@ func (graph *graph) node(typesObject types.Object) nodeIndex {
 	}
 	index := nodeIndex(len(graph.nodes))
 	graph.nodes = append(graph.nodes, node{typesObject: generic})
+	graph.firstOwners = append(graph.firstOwners, 0)
 	graph.objects[key] = index
 	return index
 }
@@ -410,13 +418,32 @@ func origin(typesObject types.Object) types.Object {
 	}
 }
 
-// addOwned records that owner owns owned. Like addUse, it stores the edge's key and reads whether the map grew, one
-// hash where a lookup and then a store would be two.
+// addOwned records that owner owns owned, linking the pair once however often it is asked. The pair is new exactly
+// when owned has no first owner yet, or has another and laterOwners lacks the pair: each pair is linked only as the
+// first owner or as a key of laterOwners, and neither is ever taken back.
 func (graph *graph) addOwned(owner nodeIndex, owned nodeIndex) {
-	before := len(graph.ownedEdges)
-	graph.ownedEdges[edgeKey(owner, owned)] = struct{}{}
-	if len(graph.ownedEdges) == before {
+	if owner == 0 {
+		// Invariant: see makes an owner's node only from an object, which node never gives the root's index, and a
+		// splice refuses a record whose local the root owns. Were the root an owner, firstOwners' 0 would read as no
+		// owner and a repeat of the pair would be linked again.
+		panic("the root owns a node")
+	}
+	switch graph.firstOwners[owned] {
+	case owner:
 		return
+	case 0:
+		graph.firstOwners[owned] = owner
+	default:
+		if graph.laterOwners == nil {
+			graph.laterOwners = map[uint64]struct{}{}
+		}
+		// Like addUse, it stores the key and reads whether the map grew, one hash where a lookup and then a store
+		// would be two.
+		before := len(graph.laterOwners)
+		graph.laterOwners[edgeKey(owner, owned)] = struct{}{}
+		if len(graph.laterOwners) == before {
+			return
+		}
 	}
 	graph.owns = append(graph.owns, edgeLink{to: owned, next: graph.nodes[owner].firstOwned})
 	graph.nodes[owner].firstOwned = newestLink(graph.owns)

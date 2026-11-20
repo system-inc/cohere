@@ -95,6 +95,24 @@ var zero = constant.MakeInt64(0)
 // Check judges one binary expression: an unsigned value compared with a literal zero, and an integer whose type set
 // has one core type compared with that type's least or greatest value, by the math package's name or as a literal.
 func Check(context *rule.Context, binary *ast.BinaryExpr) {
+	// Every comparison is turned to `greater >= lesser` or `greater > lesser` by swapping the operands of <= and <.
+	// Any other operator returns here, before the type set is built: the unsigned judgment below names only these
+	// four operators, so an equality or an arithmetic expression could never be reported, and building its type set
+	// on the heap, for every binary expression of a package, was work no finding read. The unsigned judgment reads
+	// binary's own operator and operands, not the swapped ones.
+	greater, lesser, operator := binary.X, binary.Y, binary.Op
+	switch operator {
+	case token.GEQ, token.GTR:
+	case token.LEQ:
+		greater, lesser = lesser, greater
+		operator = token.GEQ
+	case token.LSS:
+		greater, lesser = lesser, greater
+		operator = token.GTR
+	default:
+		return
+	}
+
 	leftType := context.TypesInfo.TypeOf(binary.X)
 	typeSet := typeutil.NewTypeSet(leftType)
 	allUnsigned := typeSet.All(func(term *types.Term) bool {
@@ -122,20 +140,6 @@ func Check(context *rule.Context, binary *ast.BinaryExpr) {
 	// A basic kind with no limits here, a float or a string, has every name empty and every literal nil, so nothing
 	// below matches it.
 	bounds := limitsOf[core.Kind()]
-
-	// Every comparison is turned to `greater >= lesser` or `greater > lesser` by swapping the operands of <= and <.
-	greater, lesser, operator := binary.X, binary.Y, binary.Op
-	switch operator {
-	case token.GEQ, token.GTR:
-	case token.LEQ:
-		greater, lesser = lesser, greater
-		operator = token.GEQ
-	case token.LSS:
-		greater, lesser = lesser, greater
-		operator = token.GTR
-	default:
-		return
-	}
 
 	if isLimit(context, lesser, bounds.greatestName, bounds.greatestValue) {
 		report(context, binary, fmt.Sprintf("no value of type %s is greater than %s", leftType, bounds.greatestName))

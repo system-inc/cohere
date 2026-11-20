@@ -62,6 +62,9 @@ func unsignedGreatest(u8 uint8, u16 uint16, u32 uint32, u64 uint64, u uint, name
 	_ = u8 > uint8(255)
 	_ = u8 > 254+1
 	_ = u > math.MaxUint32
+	// Found by neither: equality with a limit, which the port turns away before it reads a type.
+	_ = u8 == math.MaxUint8
+	_ = math.MaxUint8 != u8
 }
 
 func signedLimits(i8 int8, i16 int16, i32 int32, i64 int64, i int, r rune, named signed) {
@@ -89,6 +92,9 @@ func signedLimits(i8 int8, i16 int16, i32 int32, i64 int64, i int, r rune, named
 	_ = i8 < -127
 	_ = i16 > math.MaxInt8
 	_ = i > math.MaxInt32
+	// Found by neither: equality with a limit.
+	_ = i8 == math.MinInt8
+	_ = i8 != math.MaxInt8
 }
 
 func others(value float64, text string, p pointer) {

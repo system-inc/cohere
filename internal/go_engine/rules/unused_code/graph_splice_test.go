@@ -423,7 +423,8 @@ func Count() int {
 
 // TestSpliceRefusesWhatItCannotTake holds the splice to failing by name (#xeafx79), never dropping an edge and never
 // panicking: a record a flag keeps present, two of one key, one a graph that records is handed, one keyed where no
-// body is, and an end it cannot resolve, each an error naming the body, and the place where it has one.
+// body is, an end it cannot resolve and a local the root owns, each an error naming the body, and the place where it
+// has one.
 func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 	test.Parallel()
 	checked := checkShapes(test, "refused", []recordedSource{{"shape.go", refusedSource}}, nil)
@@ -482,6 +483,14 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 				}
 			}),
 			names: []string{placeText(count.Body), placeText(unplaced)},
+		},
+		{
+			// The recorder never writes it, and the graph's first owners read the root's index as no owner at all.
+			name: "a local the root owns",
+			taken: withRecord(func(record *bodyRecord) {
+				record.Locals[0].Owners = append(slices.Clone(record.Locals[0].Owners), recordedEnd{Kind: endRoot})
+			}),
+			names: []string{placeText(count.Body)},
 		},
 		{
 			name: "a local past the record's locals",

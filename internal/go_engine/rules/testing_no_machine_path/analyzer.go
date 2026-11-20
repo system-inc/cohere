@@ -150,14 +150,33 @@ func judgeLiteral(context *rule.Context, node ast.Node, stack []ast.Node) {
 
 // mayNameHomeDirectory is whether a string literal, as its source spells it, could name a home directory once
 // unquoted, read without unquoting it, since nearly no literal does and unquoting allocates. A match of homeDirectory
-// holds /Users/ or /home/ as written. Unquoting changes the text only through an escape, which starts with a
-// backslash, or, in a raw string, by dropping a carriage return, so a literal holding neither is its own value and
-// holds those words only if its source does. One holding either is unquoted and matched as before.
+// holds /Users/ or /home/, so a source holding either as written is kept. Otherwise only unquoting could make one, and
+// it changes the text in two ways alone. A raw string drops its carriage returns, which can join a word's letters. An
+// interpreted string turns each escape into the character it stands for, and a one-character escape, \n or \" or \\,
+// stands for a character neither word holds: it can sit only between a word's letters, never be one, so the word
+// would stand in the source already. Only a numeric escape, octal, \x, \u or \U, can spell a slash or a letter, so a
+// literal holding none is set aside without unquoting, as a "%s\n" or an escaped quote is.
 func mayNameHomeDirectory(source string) bool {
-	if strings.ContainsAny(source, "\\\r") {
+	if holdsHomeWords(source) {
 		return true
 	}
-	return holdsHomeWords(source)
+	if strings.HasPrefix(source, "`") {
+		return strings.Contains(source, "\r")
+	}
+	// Each backslash opens an escape and the byte after it says which. An escaped backslash is stepped over whole, so
+	// the backslash it stands for opens nothing.
+	rest := source
+	for {
+		backslash := strings.IndexByte(rest, '\\')
+		if backslash < 0 || backslash+1 == len(rest) {
+			return false
+		}
+		switch rest[backslash+1] {
+		case '0', '1', '2', '3', '4', '5', '6', '7', 'x', 'u', 'U':
+			return true
+		}
+		rest = rest[backslash+2:]
+	}
 }
 
 // holdsHomeWords is whether text holds /Users/ or /home/ as written, which every match of homeDirectory does, so text

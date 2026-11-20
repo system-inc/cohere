@@ -61,14 +61,18 @@ var Analyzer = dispatch.RuleAnalyzer(
 // this package defined as iota with the value zero, or a literal zero. Shifts are left alone, since `x << 0` is often
 // the first of a pattern, `x << 0, x << 8, x << 16`.
 func Check(context *rule.Context, binary *ast.BinaryExpr) {
+	// The operator is read before the type, though the original reads the type first: both are guards that only
+	// return, so their order can't change a finding, and the operator costs a field read where typeutil.All builds
+	// the type's term set afresh on the heap, which every binary expression of a package paid for, though most are
+	// no bitwise operation at all.
+	if binary.Op != token.AND && binary.Op != token.OR && binary.Op != token.XOR {
+		return
+	}
 	isInteger := typeutil.All(context.TypesInfo.TypeOf(binary), func(term *types.Term) bool {
 		basic, isBasic := term.Type().Underlying().(*types.Basic)
 		return isBasic && basic.Info()&types.IsInteger != 0
 	})
 	if !isInteger {
-		return
-	}
-	if binary.Op != token.AND && binary.Op != token.OR && binary.Op != token.XOR {
 		return
 	}
 	if name, isName := binary.Y.(*ast.Ident); isName {
