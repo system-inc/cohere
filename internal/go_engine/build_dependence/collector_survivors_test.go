@@ -137,3 +137,213 @@ func Fixeds() *Fixed { return nil }
 		"value Width": true,
 	})
 }
+
+// A const spec with neither type nor values repeats the last one's expression, so it reads what that expression reads
+// (collectFile, collectValue): Second, after `First = Width`, has its name bit set and is dependent, though its own
+// span names nothing. FixedAgain, after `Fixed = 1`, keeps both bits unset. Keep no values for the spec to repeat, or
+// read a repeat's own empty values, and Second's name bit is unset and Second independent.
+func TestARepeatedConstSpecReadsWhatTheExpressionItRepeatsReads(test *testing.T) {
+	test.Parallel()
+
+	host, dependence := besideAHostOnlyWidth(test, `const (
+	First = Width
+	Second
+)
+
+const (
+	Fixed = 1
+	FixedAgain
+)
+`)
+	expectNameBits(test, dependence, map[string]Bits{
+		"First":      {Name: true},
+		"Second":     {Name: true},
+		"Fixed":      {},
+		"FixedAgain": {},
+	})
+	expectVerdicts(test, verdicts(test, host, dependence), map[string]bool{
+		"value First":      true,
+		"value Second":     true,
+		"value Fixed":      false,
+		"value FixedAgain": false,
+		"value Width":      true,
+	})
+}
+
+// A constant's value reads a type it names in full (addUse): `unsafe.Sizeof(Layout{})` is Layout's size, which moves
+// with Layout's underlying alone, so Size has its name bit set and is dependent while Layout's name bit stays unset.
+// SteadySize, the size of a fixed layout, keeps both bits unset. Read the named type by its name alone and Size's name
+// bit is unset and Size independent.
+func TestAConstantReadsTheLayoutOfATypeItsValueNames(test *testing.T) {
+	test.Parallel()
+
+	host, dependence := besideAHostOnlyWidth(test, `import "unsafe"
+
+type Layout struct{ items [Width]byte }
+
+const Size = unsafe.Sizeof(Layout{})
+
+type Steady struct{ items [1]byte }
+
+const SteadySize = unsafe.Sizeof(Steady{})
+`)
+	expectNameBits(test, dependence, map[string]Bits{
+		"Layout":     {Underlying: true},
+		"Size":       {Name: true},
+		"Steady":     {},
+		"SteadySize": {},
+	})
+	expectVerdicts(test, verdicts(test, host, dependence), map[string]bool{
+		"type Layout":      true,
+		"value Size":       true,
+		"type Steady":      false,
+		"value SteadySize": false,
+		"value Width":      true,
+	})
+}
+
+// A constant's value reads a var it names in full (addUse): `unsafe.Sizeof(Changing)` is the size of Changing's type,
+// a Layout, which moves with Layout's underlying alone, so Size has its name bit set and is dependent while Changing's
+// bits, read by its type's name, stay unset. FixedSize, the size of a fixed array, keeps both bits unset. Read the var
+// by its own bit alone, or in full only where its value is not read in full, and Size's name bit is unset and Size
+// independent.
+func TestAConstantReadsTheLayoutOfAVariableItsValueNames(test *testing.T) {
+	test.Parallel()
+
+	host, dependence := besideAHostOnlyWidth(test, `import "unsafe"
+
+type Layout [Width]byte
+
+var Changing Layout
+
+const Size = unsafe.Sizeof(Changing)
+
+var Steady [1]byte
+
+const FixedSize = unsafe.Sizeof(Steady)
+`)
+	expectNameBits(test, dependence, map[string]Bits{
+		"Layout":    {Underlying: true},
+		"Changing":  {},
+		"Size":      {Name: true},
+		"Steady":    {},
+		"FixedSize": {},
+	})
+	expectVerdicts(test, verdicts(test, host, dependence), map[string]bool{
+		"type Layout":     true,
+		"value Changing":  false,
+		"value Size":      true,
+		"value Steady":    false,
+		"value FixedSize": false,
+		"value Width":     true,
+	})
+}
+
+// A generic type's or alias's name bit reads its type parameters' constraints (collectTypeKinds): a constraint
+// spelled `~[Width]byte` reaches Width only through its syntax, the type checker's `~[4]byte` having lost the name, so
+// Box and Rows have their name bits set; and a named Constraint, an interface over Width, is reached through its type,
+// so Held and Bytes have theirs set too. Pointer, HeldPointer, RowsOf and BytesOf, which read them by name, are
+// dependent. The same over a fixed length keeps every bit unset. Leave out a type's or an alias's walk of its type
+// parameters' syntax, or of their constraints' types, and its name bit is unset and its reader independent. Bytes uses
+// no type parameter on its right-hand side, since an alias whose right-hand side reads one, `= []T`, reaches its
+// constraint through that walk as well, where interfaces read alike in either mode.
+func TestAGenericsNameBitReadsItsConstraints(test *testing.T) {
+	test.Parallel()
+
+	host, dependence := besideAHostOnlyWidth(test, `type Constraint interface{ ~[Width]byte }
+
+type Box[T ~[Width]byte] struct{ value T }
+
+func Pointer() *Box[[4]byte] { return nil }
+
+type Held[T Constraint] struct{ value T }
+
+func HeldPointer() *Held[[4]byte] { return nil }
+
+type Rows[T ~[Width]byte] = []T
+
+func RowsOf() Rows[[4]byte] { return nil }
+
+type Bytes[T Constraint] = []byte
+
+func BytesOf() Bytes[[4]byte] { return nil }
+
+type Fixed interface{ ~[1]byte }
+
+type SteadyBox[T ~[1]byte] struct{ value T }
+
+type SteadyHeld[T Fixed] struct{ value T }
+
+type SteadyRows[T ~[1]byte] = []T
+
+type SteadyBytes[T Fixed] = []byte
+
+func SteadyOf() (*SteadyBox[[1]byte], *SteadyHeld[[1]byte], SteadyRows[[1]byte], SteadyBytes[[1]byte]) {
+	return nil, nil, nil, nil
+}
+`)
+	expectNameBits(test, dependence, map[string]Bits{
+		"Box":         {Name: true},
+		"Held":        {Name: true, Underlying: true},
+		"Rows":        {Name: true, Underlying: true},
+		"Bytes":       {Name: true},
+		"SteadyBox":   {},
+		"SteadyHeld":  {},
+		"SteadyRows":  {},
+		"SteadyBytes": {},
+	})
+	expectVerdicts(test, verdicts(test, host, dependence), map[string]bool{
+		"type Constraint":  true,
+		"type Box":         true,
+		"func Pointer":     true,
+		"type Held":        true,
+		"func HeldPointer": true,
+		"type Rows":        true,
+		"func RowsOf":      true,
+		"type Bytes":       true,
+		"func BytesOf":     true,
+		"type Fixed":       false,
+		"type SteadyBox":   false,
+		"type SteadyHeld":  false,
+		"type SteadyRows":  false,
+		"type SteadyBytes": false,
+		"func SteadyOf":    false,
+		"value Width":      true,
+	})
+}
+
+// A type defined from another type's name reads it in full into its name bit (collectTypeKinds, #9paaen9): Derived is
+// Base's shape, whose layout alone moves, so Derived's name bit is set beside its underlying bit, and Pointer, whose
+// result points at a Derived and reads it by name alone, is dependent. Kept, defined from a fixed layout, keeps both
+// bits unset, and KeptPointer is not. Read Base by its name alone and Derived's name bit is unset and Pointer
+// independent.
+func TestATypeDefinedFromANameReadsItInFullIntoItsNameBit(test *testing.T) {
+	test.Parallel()
+
+	host, dependence := besideAHostOnlyWidth(test, `type Base struct{ items [Width]byte }
+
+type Derived Base
+
+func Pointer() *Derived { return nil }
+
+type Steady struct{ items [1]byte }
+
+type Kept Steady
+
+func KeptPointer() *Kept { return nil }
+`)
+	expectNameBits(test, dependence, map[string]Bits{
+		"Base":    {Underlying: true},
+		"Derived": {Name: true, Underlying: true},
+		"Kept":    {},
+	})
+	expectVerdicts(test, verdicts(test, host, dependence), map[string]bool{
+		"type Base":        true,
+		"type Derived":     true,
+		"func Pointer":     true,
+		"type Steady":      false,
+		"type Kept":        false,
+		"func KeptPointer": false,
+		"value Width":      true,
+	})
+}
