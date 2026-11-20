@@ -442,9 +442,9 @@ func TestTiedObjectsAreOrderedByTheirTextThenPosition(test *testing.T) {
 // BenchmarkSortingTheReadsOfRealPackages sorts the uses and selections the walk records of two real packages of the
 // repository, this one and the engine's check package, both reading go/ast and go/types throughout, whose many
 // methods and fields of one name, twelve fields of go/ast named X among them, tie on package and name and are told
-// apart by how go/types writes them. Each iteration drops the kept lists and asks for them again, so each is one sort of each
-// list. The packages are loaded with go/packages, since the engine's own loader imports this package. It is skipped
-// under -short.
+// apart by how go/types writes them. Each iteration drops the kept lists and asks for them again, so each is one
+// sort of each list. The packages are loaded with go/packages, since the engine's own loader imports this package.
+// It is skipped under -short.
 func BenchmarkSortingTheReadsOfRealPackages(benchmark *testing.B) {
 	if testing.Short() {
 		benchmark.Skip("loads packages of the repository")
