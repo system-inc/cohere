@@ -596,6 +596,12 @@ type Graph struct {
 	// factAnalyzersRequired, kept so a test reads that each analyzer's was
 	// computed once.
 	requiredFacts *factRequirements
+
+	// cohere: actions is how many actions Analyze made for this graph,
+	// every one All can reach and the roots beside too, so All's walk
+	// sizes its set of those seen once. A graph made elsewhere holds 0,
+	// a set grown from empty as upstream's is.
+	actions int
 }
 
 // All returns an iterator over the action graph in depth-first postorder.
@@ -607,7 +613,8 @@ type Graph struct {
 //	}
 func (g *Graph) All() iter.Seq[*Action] {
 	return func(yield func(*Action) bool) {
-		forEach(g.Roots, func(act *Action) error {
+		// cohere: sized by the graph's count of actions (see forEach).
+		forEach(g.Roots, g.actions, func(act *Action) error {
 			if !yield(act) {
 				return io.EOF // any error will do
 			}
@@ -888,8 +895,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 		keepForDependents(all, opts.ForDependents)
 		reached := make(map[*Action]bool, len(actions))
-		// cohere: from every root, beside ones too.
-		forEach(allRoots, func(act *Action) error {
+		// cohere: from every root, beside ones too, sized by every action
+		// made, the most the walk can reach.
+		forEach(allRoots, len(actions), func(act *Action) error {
 			reached[act] = true
 			return nil
 		})
@@ -950,8 +958,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	}
 	readers := make(map[*packages.Package]*syntaxReaders)
 	var groups []*syntaxReaders
-	// cohere: from every root, beside ones too, so each is scheduled.
-	forEach(allRoots, func(act *Action) error {
+	// cohere: from every root, beside ones too, so each is scheduled, sized
+	// by every action kept, each of which the walk reaches.
+	forEach(allRoots, len(actions), func(act *Action) error {
 		shared, ok := readers[act.Package]
 		if !ok {
 			shared = &syntaxReaders{given: given[act.Package]}
@@ -984,9 +993,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 	}
 
-	// cohere: the graph keeps requiredFacts for a test to read, and the
-	// roots beside apart from Roots.
-	return &Graph{Roots: roots, Beside: beside, requiredFacts: requiredFacts}, nil
+	// cohere: the graph keeps requiredFacts for a test to read, the
+	// roots beside apart from Roots, and its count of actions for All.
+	return &Graph{Roots: roots, Beside: beside, requiredFacts: requiredFacts, actions: len(actions)}, nil
 }
 
 func init() {
@@ -1863,8 +1872,12 @@ func (act *Action) AllPackageFacts() []analysis.PackageFact {
 // applies function f to each action in the graph reachable from
 // roots, in depth-first postorder. If any call to f returns an error,
 // the traversal is aborted and ForEach returns the error.
-func forEach(roots []*Action, f func(*Action) error) error {
-	seen := make(map[*Action]bool)
+//
+// cohere: actions is how many actions the walk can reach at most, which
+// sizes seen once, where a set grown from empty allocates its table again
+// at each doubling; 0 grows it as upstream's does.
+func forEach(roots []*Action, actions int, f func(*Action) error) error {
+	seen := make(map[*Action]bool, actions)
 	var visitAll func(actions []*Action) error
 	visitAll = func(actions []*Action) error {
 		for _, act := range actions {
