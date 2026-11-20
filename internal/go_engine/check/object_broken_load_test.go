@@ -36,18 +36,22 @@ func (report *recordedReport) Errorf(format string, arguments ...any) {
 // there are and the first of them with each one's first error, beside the counts of what it still compared, so a tree
 // someone named and the test could not judge whole never reads as one that passed (#3096be2). In the broken_build
 // fixture partial type-checks on darwin and not on linux, where the file only linux compiles declares an int from a
-// string, and whole type-checks in both: on linux whole is still compared, with no failure of its own, and the report
-// fails once, naming partial, the build it is broken in and its error's place.
+// string, unprovided is linux's alone and imports a path no module provides, a list error as a tree missing its
+// modules loads with, never a type error, and whole type-checks in both: on linux whole is still compared, with no
+// failure of its own, and the report fails once, naming the three packages linux holds with errors, partial,
+// unprovided and the path it imports, each in the build, partial's error by its place and the path's as go list
+// says it.
 func TestAPackageLoadedWithErrorsFailsTheObjectDifferential(test *testing.T) {
 	test.Parallel()
 
 	directory := filepath.Join("testdata", "broken_build")
 	host := loadObjects(test, directory, objectEnvironment("darwin", ""), "./...", true)
 	built := loadObjects(test, directory, objectEnvironment("linux", ""), "./...", true)
-	partial := "example.com/brokenbuild/partial"
-	if len(host.broken) > 0 || !slices.Equal(built.broken, []string{partial}) {
-		test.Fatalf("want the fixture whole on darwin and %s alone with errors on linux, got %q and %q", partial,
-			host.broken, built.broken)
+	partial, unprovided, absent := "example.com/brokenbuild/partial", "example.com/brokenbuild/unprovided",
+		"example.com/nowhere/absent"
+	if want := []string{partial, unprovided, absent}; len(host.broken) > 0 || !slices.Equal(built.broken, want) {
+		test.Fatalf("want the fixture whole on darwin and %q with errors on linux, got %q and %q", want, host.broken,
+			built.broken)
 	}
 	tally := objectDifferences(host, built, objectDependence(host, built, objectFixtureWorkspace).ObjectBits)
 	if tally.compared == 0 || len(tally.failures) > 0 {
@@ -60,16 +64,19 @@ func TestAPackageLoadedWithErrorsFailsTheObjectDifferential(test *testing.T) {
 		test.Fatalf("want the report to fail once, for the package it left out, got %q", report.failed)
 	}
 	for _, words := range []string{
-		"linux: 1 package loaded with errors",
+		"linux: 3 packages loaded with errors",
 		partial + " in the build: ",
 		"limit_linux.go",
+		unprovided + " in the build: ",
+		absent + " in the build: ",
+		"no required module provides package " + absent,
 	} {
 		if !strings.Contains(report.failed[0], words) {
 			test.Errorf("want the failure to say %q, got %q", words, report.failed[0])
 		}
 	}
-	if len(report.logged) != 1 || !strings.Contains(report.logged[0], "packages with errors left out: 1") {
-		test.Errorf("want the counts to say 1 package with errors was left out, got %q", report.logged)
+	if len(report.logged) != 1 || !strings.Contains(report.logged[0], "packages with errors left out: 3") {
+		test.Errorf("want the counts to say 3 packages with errors were left out, got %q", report.logged)
 	}
 }
 
