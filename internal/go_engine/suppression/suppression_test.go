@@ -645,7 +645,8 @@ func TestApplyKeepsOneIndexPerFile(test *testing.T) {
 func TestApplyKeepsTheFirstIndexOfAFileEvenWithNoDirective(test *testing.T) {
 	test.Parallel()
 	directed := "package fixture\n//cohere:ignore printf the format is built at run time\nvar first = risky()\n"
-	indexes := []*Index{Build("a.go", []byte("package fixture\n\nvar first = risky()\n")), Build("a.go", []byte(directed))}
+	undirected := "package fixture\n\nvar first = risky()\n"
+	indexes := []*Index{Build("a.go", []byte(undirected)), Build("a.go", []byte(directed))}
 	findings := []Finding{{Rule: "cohere-go/printf", File: "a.go", Line: 3}}
 
 	outcome := Apply(knownRules, knownRules, indexes, findings)

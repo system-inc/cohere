@@ -109,9 +109,9 @@ func Apply(knownRules []string, rulesRan []string, indexes []*Index, findings []
 
 	// One index per file, the first: a second copy's directives would be built as states of their own, and a
 	// finding credits only one of them, so the other would be reported unused for withholding what its twin did. Most
-	// files hold no directive, so only a file whose first index has one is kept: walking the indexes from the last, each
-	// index replaces what a later copy of its file left, so the first copy decides, and one with no directive takes
-	// its file out, a later copy's directives with it.
+	// files hold no directive, so only a file whose first index has one is kept: walking the indexes from the last,
+	// each index replaces what a later copy of its file left, so the first copy decides, and one with no directive
+	// takes its file out, a later copy's directives with it.
 	firstIndexes := map[string]*Index{}
 	for _, index := range slices.Backward(indexes) {
 		if len(index.directives) == 0 {
