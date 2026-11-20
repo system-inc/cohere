@@ -24,20 +24,22 @@ import (
 )
 
 // recordingKind is one kind the stub differential holds to its flag (fact_resolver.Kind.RecordsEveryJudgment): the
-// kind, the directory of its package, whose testdata is the `GOPATH` root of its fixtures, and whether its answers are
-// about a function's parameters, where a question of a function is one of each parameter.
+// kind, the directory of its package, whose testdata is the `GOPATH` root of its fixtures, whether its answers are
+// about a function's parameters, where a question of a function is one of each parameter, and the directory of its two
+// packages in the recording_across fixture, lower and upper, which imports it.
 type recordingKind struct {
 	kind        *fact_resolver.Kind
 	directory   string
 	byParameter bool
+	across      string
 }
 
 // recordingKinds are the kinds the differential runs over, which TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer
 // holds to be every registered kind that sets the flag.
 var recordingKinds = []recordingKind{
-	{kind: function_purity.Kind, directory: "function_purity"},
-	{kind: odd_slice_argument.Kind, directory: "odd_slice_argument", byParameter: true},
-	{kind: return_nil_ness.Kind, directory: "return_nil_ness"},
+	{kind: function_purity.Kind, directory: "function_purity", across: "purity"},
+	{kind: odd_slice_argument.Kind, directory: "odd_slice_argument", byParameter: true, across: "odd"},
+	{kind: return_nil_ness.Kind, directory: "return_nil_ness", across: "nilness"},
 }
 
 // recordingQuestions is one copy of a fixture package and the questions asked of it: the package it copies, what the
@@ -309,6 +311,125 @@ func TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer(test *testing.T) {
 			}
 			test.Logf("%s: %d copies asked, %d with a function to stub, %d functions stubbed, %d answers the same",
 				kind.kind.Name, coverage.copies, coverage.variants, coverage.stubbed, coverage.compared)
+		})
+	}
+}
+
+// acrossPair is the two packages of one kind's directory in the recording_across fixture, from a load of their own:
+// lower, and upper, which imports it.
+func acrossPair(test *testing.T, kind recordingKind) (*packages.Package, *packages.Package) {
+	test.Helper()
+	fixture := gopathFixture(test, "recording_across", filepath.Join("testdata", "recording_across"))
+	loaded, loadError := load.Packages(fixture.directory, []string{kind.across + "/..."}, fixture.environment, nil)
+	if loadError != nil {
+		test.Fatalf("loading %s's two packages: %v", kind.across, loadError)
+	}
+	var lower, upper *packages.Package
+	for _, root := range loaded.Roots {
+		switch root.PkgPath {
+		case kind.across + "/lower":
+			lower = root
+		case kind.across + "/upper":
+			upper = root
+		}
+	}
+	if lower == nil || upper == nil || upper.Imports[kind.across+"/lower"] != lower {
+		test.Fatalf("the load of %s holds lower %v and upper %v, want both, upper importing lower", kind.across,
+			lower, upper)
+	}
+	return lower, upper
+}
+
+// stubAcross runs one kind's differential across a package boundary, over its two packages in the recording_across
+// fixture: upper is asked of every function it declares, in one run, and then again, in a second run over a second
+// load, with the body of every function of lower the first run held no answer about replaced by a stub, and upper
+// type-checked again over that lower. It is what it compared and every disagreement: an answer about either package's
+// objects the first run held that the second holds otherwise, or not at all.
+func stubAcross(test *testing.T, kind recordingKind) (recordingCoverage, []string) {
+	test.Helper()
+	lower, upper := acrossPair(test, kind)
+	asked := recordingQuestions{original: upper, asked: "every function of upper", units: functionUnits(upper)}
+	wholeAnswers, noReturn, wholeError := askRecording(kind, []*packages.Package{lower, upper},
+		map[*types.Package]recordingQuestions{upper.Types: asked})
+	if wholeError != nil {
+		test.Fatalf("asking %s of %s whole: %v", kind.kind.Name, kind.across, wholeError)
+	}
+	var stubbed []functionUnit
+	var stubbedNames []string
+	for _, unit := range functionUnits(lower) {
+		isAnswered := false
+		for at := range wholeAnswers[lower.Types] {
+			isAnswered = isAnswered || unitHolds(unit, at)
+		}
+		if !isAnswered {
+			stubbed = append(stubbed, unit)
+			stubbedNames = append(stubbedNames, unit.name)
+		}
+	}
+	freshLower, freshUpper := acrossPair(test, kind)
+	lowerVariant, lowerError := variantOf(freshLower, 1, stubbed, noReturn)
+	if lowerError != nil {
+		test.Fatalf("stubbing %s: %v", freshLower.ID, lowerError)
+	}
+	// upper as the second load holds it, importing the stubbed lower, which variantOf type-checks it against.
+	importing := *freshUpper
+	importing.Imports = maps.Clone(freshUpper.Imports)
+	importing.Imports[lowerVariant.PkgPath] = lowerVariant
+	upperVariant, upperError := variantOf(&importing, 1, nil, nil)
+	if upperError != nil {
+		test.Fatalf("checking %s over the stubbed lower: %v", freshUpper.ID, upperError)
+	}
+	variantAnswers, _, variantError := askRecording(kind, []*packages.Package{lowerVariant, upperVariant},
+		map[*types.Package]recordingQuestions{upperVariant.Types: asked})
+	if variantError != nil {
+		test.Fatalf("asking %s of %s over the stubbed lower: %v", kind.kind.Name, kind.across, variantError)
+	}
+	coverage := recordingCoverage{copies: 1, variants: 1, stubbed: len(stubbed)}
+	var disagreements []string
+	for _, pair := range [][2]*packages.Package{{lower, lowerVariant}, {upper, upperVariant}} {
+		units := functionUnits(pair[0])
+		for at, whole := range wholeAnswers[pair[0].Types] {
+			coverage.compared++
+			stubbedAnswer, isHeld := variantAnswers[pair[1].Types][at]
+			if isHeld && stubbedAnswer == whole {
+				continue
+			}
+			disagreements = append(disagreements, fmt.Sprintf("%s, asked of every function of %s: the answer in %s "+
+				"of %s at %s:%d is %s, and %q (held: %t) once lower's bodies the run held no answer about are stubs, "+
+				"%s", kind.kind.Name, upper.ID, unitNamed(units, at), pair[0].ID, filepath.Base(at.file), at.offset,
+				whole, stubbedAnswer, isHeld, strings.Join(stubbedNames, ", ")))
+		}
+	}
+	slices.Sort(disagreements)
+	return coverage, disagreements
+}
+
+// The second half of what a kind's flag claims, run across a package boundary, where a judgment reaches a callee of
+// another package: no answer the run holds rests on the body of a function of another package it holds no answer
+// about. For each flagged kind, upper is asked of its functions, each resting on a function of lower, and then asked
+// the same again with every function of lower the first run held no answer about a stub: every answer the first run
+// held, about either package's objects, is held the same by the second. A judgment that read lower's function in place,
+// with no answer of it asked, would leave that function with no answer, and its stub would change upper's.
+// TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer stubs only a package's own functions, which no such read
+// reaches.
+func TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswerAcrossAPackage(test *testing.T) {
+	test.Parallel()
+	for _, kind := range recordingKinds {
+		if !kind.kind.RecordsEveryJudgment {
+			continue
+		}
+		test.Run(kind.kind.Name, func(test *testing.T) {
+			test.Parallel()
+			coverage, disagreements := stubAcross(test, kind)
+			for _, disagreement := range disagreements {
+				test.Error(disagreement)
+			}
+			if coverage.stubbed == 0 || coverage.compared == 0 {
+				test.Errorf("the differential stubbed %d functions of lower and compared %d answers, want some of each, "+
+					"or it holds nothing", coverage.stubbed, coverage.compared)
+			}
+			test.Logf("%s: %d functions of lower stubbed, %d answers the same", kind.kind.Name, coverage.stubbed,
+				coverage.compared)
 		})
 	}
 }
