@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -102,4 +103,57 @@ func bareAnalyzes(fileSet *token.FileSet, parsed *ast.File) []token.Position {
 		})
 	}
 	return found
+}
+
+// The guard's reading is held on sources of its own, so a guard that stopped seeing a bare Analyze fails here, not
+// silently on the package's own files: each source is parsed as the guard parses a test file, and bareAnalyzes must
+// name exactly the lines given.
+func TestTheGuardNamesEachBareAnalyzeByTheFilesOwnNameForTheChecker(test *testing.T) {
+	test.Parallel()
+	imported := "package check\n\nimport \"" + checkerPath + "\"\n\n"
+	for _, guarded := range []struct {
+		name   string
+		source string
+		lines  []int
+	}{
+		{name: "a bare call is found", source: imported + "func run() {\n\tchecker.Analyze(nil, nil, nil)\n}\n",
+			lines: []int{6}},
+		{name: "an aliased import's call is found",
+			source: "package check\n\nimport analyzing \"" + checkerPath + "\"\n\n" +
+				"func run() {\n\tanalyzing.Analyze(nil, nil, nil)\n}\n",
+			lines: []int{6}},
+		{name: "Analyze handed on as a value is found", source: imported + "var analyze = checker.Analyze\n",
+			lines: []int{5}},
+		{name: "a dot import is named itself",
+			source: "package check\n\nimport . \"" + checkerPath + "\"\n\nfunc run() {\n\tAnalyze(nil, nil, nil)\n}\n",
+			lines:  []int{3}},
+		{name: "a blank import names nothing",
+			source: "package check\n\nimport _ \"" + checkerPath + "\"\n\n" +
+				"func run() {\n\tchecker.Analyze(nil, nil, nil)\n}\n"},
+		{name: "the helper's own body is exempt",
+			source: imported + "func analyzeWrapped() {\n\tchecker.Analyze(nil, nil, nil)\n}\n"},
+		{name: "a method named as the helper is not exempt",
+			source: imported + "func (run *runner) analyzeWrapped() {\n\tchecker.Analyze(nil, nil, nil)\n}\n",
+			lines:  []int{6}},
+		{name: "another package's Analyze is not found",
+			source: "package check\n\nimport (\n\t\"" + checkerPath + "\"\n\t\"example.com/other\"\n)\n\n" +
+				"var graph checker.Graph\n\nfunc run() {\n\tother.Analyze(nil)\n}\n"},
+	} {
+		test.Run(guarded.name, func(test *testing.T) {
+			test.Parallel()
+			fileSet := token.NewFileSet()
+			parsed, parseError := parser.ParseFile(fileSet, "guarded_test.go", guarded.source,
+				parser.SkipObjectResolution)
+			if parseError != nil {
+				test.Fatal(parseError)
+			}
+			var lines []int
+			for _, position := range bareAnalyzes(fileSet, parsed) {
+				lines = append(lines, position.Line)
+			}
+			if !slices.Equal(lines, guarded.lines) {
+				test.Errorf("bareAnalyzes named lines %v, want %v", lines, guarded.lines)
+			}
+		})
+	}
 }
