@@ -19,8 +19,8 @@ type factReachPresence struct {
 	markers map[string][]string
 }
 
-// readBodies reads read's bodies, and its marker interfaces, while its syntax and type information are whole, and keeps an entry even where none
-// holds anything, so a package read apart from one never read.
+// readBodies reads read's bodies, and its marker interfaces, while its syntax and type information are whole, and
+// keeps an entry even where none holds anything, so a package read apart from one never read.
 func (presence *factReachPresence) readBodies(read *packages.Package) {
 	bodies := standing_presence.ReadBodies(read.Fset, read.Syntax, read.TypesInfo, read.Types)
 	markers := standing_presence.ReadMarkers(read.Syntax, read.TypesInfo)

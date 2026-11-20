@@ -56,7 +56,8 @@ func Present(
 		emptyFunctionNamed(used, find, markers),
 	)
 	// The bodies the record and the markers take out by themselves come first, since noany reads their flows.
-	present := slices.Concat(recordedLeaving(records, standing), markerMethodsLeaving(syntaxOf(pass), markers, standing))
+	present := slices.Concat(recordedLeaving(records, standing),
+		markerMethodsLeaving(syntaxOf(pass), markers, standing))
 	noAnyNamed, leaving := noAnyBound(pass, host, used, find, standing, named, present)
 	named = append(named, noAnyNamed...)
 	leaving = append(leaving, present...)
