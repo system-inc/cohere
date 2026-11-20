@@ -179,3 +179,14 @@ func ExampleLoud() {
 // A word said twice is two findings, one at each.
 
 // NEVER, and I mean NEVER // want `^"NEVER" in a comment` `^"NEVER" in a comment`
+
+// The group is asked comment by comment before it is joined, and a comment set aside is passed over, not an end to
+// the asking, so a shout after a directive is still read.
+//go:generate echo NEVER EVER
+// and the line after the directive is LOUD // want `^"LOUD" in a comment`
+
+// A delimiter is no word character, so a shout touching one is read whole, in a comment's text as in its body.
+
+//NEVER after the slashes // want `^"NEVER" in a comment`
+
+/* and before the closer ALWAYS*/ // want `^"ALWAYS" in a comment`
