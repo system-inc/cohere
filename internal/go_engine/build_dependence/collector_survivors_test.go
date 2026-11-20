@@ -347,3 +347,53 @@ func KeptPointer() *Kept { return nil }
 		"value Width":      true,
 	})
 }
+
+// An interface method's bit reads its results as a member's own type, as its line observes them
+// (collectInterfaceMethods, #mtfdb1m): Give gives an unnamed struct holding a Pad, whose layout alone moves, in an
+// unexported field the line writes by its properties, so Give's name bit is set, and Giver's bits through it, the
+// interface's own walk reading Pad by its name alone. Gives, which calls Give, and IsGiver, which asserts to Giver, are
+// dependent. Keeper, the same over a fixed layout, keeps both bits unset, and neither Keeps nor IsKeeper is dependent.
+// Read a method's parameters in place of its results and Give's name bit is unset, and Giver's with it.
+func TestAnInterfaceMethodReadsWhatItsResultsObserve(test *testing.T) {
+	test.Parallel()
+
+	host, dependence := besideAHostOnlyWidth(test, `type Pad struct{ _ [Width]byte }
+
+type Giver interface{ Give() struct{ _ Pad } }
+
+func Gives(giver Giver) any { return giver.Give() }
+
+func IsGiver(value any) bool {
+	_, isGiver := value.(Giver)
+	return isGiver
+}
+
+type Fixed struct{ _ [1]byte }
+
+type Keeper interface{ Keep() struct{ _ Fixed } }
+
+func Keeps(keeper Keeper) any { return keeper.Keep() }
+
+func IsKeeper(value any) bool {
+	_, isKeeper := value.(Keeper)
+	return isKeeper
+}
+`)
+	expectNameBits(test, dependence, map[string]Bits{
+		"Pad":    {Underlying: true},
+		"Giver":  {Name: true, Underlying: true},
+		"Fixed":  {},
+		"Keeper": {},
+	})
+	expectVerdicts(test, verdicts(test, host, dependence), map[string]bool{
+		"type Pad":      true,
+		"type Giver":    true,
+		"func Gives":    true,
+		"func IsGiver":  true,
+		"type Fixed":    false,
+		"type Keeper":   false,
+		"func Keeps":    false,
+		"func IsKeeper": false,
+		"value Width":   true,
+	})
+}
