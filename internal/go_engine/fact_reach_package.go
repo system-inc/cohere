@@ -66,6 +66,18 @@ type factReachPackage struct {
 	users      map[fact_reach.Object][]fact_reach.Place
 	everything []fact_reach.Place
 
+	// usedObjects are the objects the bodies' records use, each once, with its identity, in the order of their keys:
+	// each key of users, and each object a body of everything uses that an identity names.
+	usedObjects []fact_reach.UsedObject
+
+	// presence is, by a body's place, what the body holds that the presence rows read and no use records
+	// (fact_reach.Host.Presence), and no entry for a body that holds none of it.
+	presence map[fact_reach.Place]fact_reach.PresenceRecord
+
+	// markers are the method names of the marker interfaces the host's syntax of the package declares, sorted
+	// (fact_reach.Host.Markers).
+	markers []string
+
 	// functions are the functions a no-return fact is compared on, each once, in the order the record first names
 	// them: a function declared with a body where it is declared, then each function its body uses.
 	functions []fact_reach.Function
@@ -101,9 +113,11 @@ type factReachPackage struct {
 	// unplaced counts what the package's side could not name, each a comparison a build would never make. An answer
 	// no body could take: one about the package, a function no declaration of the record declares or one no identity
 	// names. A body the file set places in no file, whose answers and uses have nowhere to rest. An order-bound
-	// object no identity names. A package that has any is linted whole in every build (factReachHost.Standing),
-	// since what cannot be placed cannot be compared. An answer about a variable that is no declared function's
-	// parameter is none of these, and is left out uncounted (factReachBuilder.answer).
+	// object no identity names. A function a body starts that no identity names, and a package whose bodies' presence
+	// the host never read (factReachBuilder.readPresence). A package that has any is linted whole in every build
+	// (factReachHost.Standing), since what cannot be placed cannot be compared. An answer about a variable that is no
+	// declared function's parameter is none of these, nor is one its kind marks as its types' alone about a function
+	// no declaration declares, and each is left out uncounted (factReachBuilder.answer).
 	unplaced int
 }
 
@@ -114,6 +128,21 @@ func (hosted *factReachPackage) Users(object fact_reach.Object) []fact_reach.Pla
 		return hosted.users[object]
 	}
 	return slices.Concat(hosted.users[object], hosted.everything)
+}
+
+// Used are the objects the package's bodies use, each once, with its identity, in the order of their keys.
+func (hosted *factReachPackage) Used() []fact_reach.UsedObject {
+	return hosted.usedObjects
+}
+
+// Presence is what the body at place holds that the presence rows read, the zero record for none.
+func (hosted *factReachPackage) Presence(place fact_reach.Place) fact_reach.PresenceRecord {
+	return hosted.presence[place]
+}
+
+// Markers are the method names of the marker interfaces the package declares, sorted.
+func (hosted *factReachPackage) Markers() []string {
+	return hosted.markers
 }
 
 // Recorded are the questions the host's answers about the function at place, and about its parameters, make.

@@ -1,6 +1,11 @@
 package standing_facts
 
-import "github.com/system-inc/cohere/internal/go_engine/fact_reach"
+import (
+	"slices"
+
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+)
 
 // Result is one package's standing bodies in one build, settled, and what settling them took, for the build's census.
 // A nil Result, and the empty one a package with no host's side or one linted whole has, hold nothing standing.
@@ -31,6 +36,37 @@ type Result struct {
 	// BuildOrderNamed is how many functions were named as members of a cycle of calls in the build that touches a
 	// body the build lints (buildOrderNamed).
 	BuildOrderNamed int
+
+	// PresenceNamed is how many objects each presence row named, whose users leave so the row's rule reads them in
+	// the build (standing_presence), and PresenceRemoved how many bodies left the standing set for each row: the users
+	// the settlement took out with the row's reason, and each body that left by itself. Both are empty, never nil, in
+	// a partial result.
+	PresenceNamed   map[standing_presence.Row]int
+	PresenceRemoved map[standing_presence.Row]int
+
+	// PresenceLeft are the bodies that left the standing set by themselves for a presence row, each with its row's
+	// reason, which the settlement, taking out only an object's users, never records.
+	PresenceLeft []standing_presence.Leaving
+}
+
+// keepLeaving keeps on result each body of leaving that standing holds, once, counting it by its row, and is the
+// places it kept, in leaving's order, for the caller to take out of standing.
+func (result *Result) keepLeaving(
+	standing map[fact_reach.Place]bool,
+	leaving []standing_presence.Leaving,
+) []fact_reach.Place {
+	var kept []fact_reach.Place
+	for _, left := range leaving {
+		if !standing[left.Place] || slices.Contains(kept, left.Place) {
+			continue
+		}
+		kept = append(kept, left.Place)
+		result.PresenceLeft = append(result.PresenceLeft, left)
+		if row, isRow := standing_presence.RowOf(left.Reason); isRow {
+			result.PresenceRemoved[row]++
+		}
+	}
+	return kept
 }
 
 // Stands is whether the function body declared in the file parsed from filename, its `func` at offset, is left to the

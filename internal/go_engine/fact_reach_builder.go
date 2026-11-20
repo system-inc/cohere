@@ -10,6 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
 
 // factReachInputs are what one package's side is made from (newFactReachPackage), each the host's own:
@@ -22,15 +23,21 @@ import (
 //   - pushed are the host's other pushed facts of each object, by the analyzer that learns them, in their words
 //     (check.FactReachPackage.Pushed).
 //   - orderBound are the objects whose answers hang on the order the host walked the package in.
+//   - presence is what each body holds that the presence rows read, by its place, read off the package's syntax while
+//     the host's run held it (check.FactReachPackage.Presence), presenceRead whether it was read at all, and markers
+//     the method names of the marker interfaces the package declares (check.FactReachPackage.Markers).
 type factReachInputs struct {
-	fileSet    *token.FileSet
-	record     *build_reads.FunctionUses
-	renderer   *build_reads.IdentityRenderer
-	answers    []check.ExportedFact
-	imported   []check.ExportedFact
-	noReturn   func(function *types.Func) bool
-	pushed     map[string]map[types.Object]string
-	orderBound []types.Object
+	fileSet      *token.FileSet
+	record       *build_reads.FunctionUses
+	renderer     *build_reads.IdentityRenderer
+	answers      []check.ExportedFact
+	imported     []check.ExportedFact
+	noReturn     func(function *types.Func) bool
+	pushed       map[string]map[types.Object]string
+	orderBound   []types.Object
+	presence     map[fact_reach.Place]standing_presence.BodyRecord
+	presenceRead bool
+	markers      []string
 }
 
 // factReachRendered is an object as a package's side names it: its identity, and its key, known false for an object
@@ -59,7 +66,7 @@ type factReachParameter struct {
 // identity and key, rendered once however many bodies use it. functions are the functions the record's declarations
 // declare, which the package's own answers are placed by, used the functions its bodies use, which another package's
 // answers are kept by, and parameters each parameter of either. met are the functions a no-return fact is compared
-// on already, by key.
+// on already, by key, and usedKeys the objects of any kind the bodies use, by key.
 type factReachBuilder struct {
 	inputs     factReachInputs
 	hosted     *factReachPackage
@@ -68,6 +75,7 @@ type factReachBuilder struct {
 	used       map[*types.Func]bool
 	parameters map[*types.Var]factReachParameter
 	met        map[fact_reach.Object]bool
+	usedKeys   map[fact_reach.Object]bool
 }
 
 // newFactReachPackage is the host's side of the package inputs are of (factReachPackage).
@@ -76,10 +84,11 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		inputs: inputs,
 		hosted: &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{},
 			recorded: map[fact_reach.Place][]fact_reach.Question{}, askings: map[string]fact_reach.Asking{},
-			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{}},
+			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{},
+			presence: map[fact_reach.Place]fact_reach.PresenceRecord{}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
-		met: map[fact_reach.Object]bool{},
+		met: map[fact_reach.Object]bool{}, usedKeys: map[fact_reach.Object]bool{},
 	}
 	// The parsed files placing a body in each name a reader sees, so a name two of them share, by their //line
 	// directives, is known (factReachPackage.shared).
@@ -115,6 +124,8 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			builder.use(place, declared)
 		}
 	}
+	builder.readPresence()
+	builder.hosted.markers = inputs.markers
 	for name, parsed := range parsedFiles {
 		if len(parsed) > 1 {
 			if builder.hosted.shared == nil {
@@ -146,6 +157,9 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		slices.SortFunc(questions, byKey)
 	}
 	slices.SortFunc(builder.hosted.imported, byKey)
+	slices.SortFunc(builder.hosted.usedObjects, func(first fact_reach.UsedObject, second fact_reach.UsedObject) int {
+		return cmp.Compare(first.Object, second.Object)
+	})
 	for _, object := range inputs.orderBound {
 		rendered := builder.render(object)
 		if !rendered.known {
@@ -156,6 +170,38 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			fact_reach.Named{Object: rendered.key, Reason: factReachOrderBound})
 	}
 	return builder.hosted
+}
+
+// readPresence keeps, by its place, what each body holds that the presence rows read, read off the host's own syntax
+// (fact_reach.Host.Presence), each function a body starts by its key. A function no identity names is counted
+// unplaced, as a body's use of one is, since no build could find which body it is. A package whose bodies were never
+// read is counted unplaced too, and so linted whole: no record would read as no body holding anything, and a standing
+// body that starts a goroutine or writes its own any would stand unproven.
+func (builder *factReachBuilder) readPresence() {
+	if !builder.inputs.presenceRead {
+		builder.hosted.unplaced++
+		return
+	}
+	for place, body := range builder.inputs.presence {
+		record := fact_reach.PresenceRecord{OwnAny: body.OwnAny, LocalMarkers: body.LocalMarkers}
+		record.GoStarts = builder.startedKeys(body.GoStarts)
+		record.RunStarts = builder.startedKeys(body.RunStarts)
+		builder.hosted.presence[place] = record
+	}
+}
+
+// startedKeys are the keys of functions, in their order, counting each no identity names unplaced.
+func (builder *factReachBuilder) startedKeys(functions []*types.Func) []fact_reach.Object {
+	var keys []fact_reach.Object
+	for _, function := range functions {
+		rendered := builder.render(function)
+		if !rendered.known {
+			builder.hosted.unplaced++
+			continue
+		}
+		keys = append(keys, rendered.key)
+	}
+	return keys
 }
 
 // render is object's identity and key, rendered once.
@@ -229,11 +275,12 @@ func (builder *factReachBuilder) keepParameters(function *types.Func) {
 }
 
 // use makes the body at place, declared's, a user of each object its body uses, the object selected for a selection,
-// and meets each function among them, kept as used with its parameters. Its signature's uses are not its body's: a
-// rule reads a fact where a body names or selects its object. A body with a use no identity names is a user of every
-// object instead, as one the record marks unknown is. The recorder marks a body unknown wherever a use of it renders
-// unknown, by the renderer's own rule (build_reads.unplacedIdentity), so the second check finds nothing today, and
-// stands for a record made any other way.
+// meets each function among them, kept as used with its parameters, and keeps each object an identity names among the
+// package's used objects (fact_reach.Host.Used). Its signature's uses are not its body's: a rule reads a fact where a
+// body names or selects its object. A body with a use no identity names is a user of every object instead, as one the
+// record marks unknown is. The recorder marks a body unknown wherever a use of it renders unknown, by the renderer's
+// own rule (build_reads.unplacedIdentity), so the second check finds nothing today, and stands for a record made any
+// other way.
 func (builder *factReachBuilder) use(place fact_reach.Place, declared build_reads.DeclarationUses) {
 	isFollowed := !declared.BodyUnknown
 	keys := make([]fact_reach.Object, 0, len(declared.Body))
@@ -247,6 +294,13 @@ func (builder *factReachBuilder) use(place fact_reach.Place, declared build_read
 		rendered := builder.render(object)
 		isFollowed = isFollowed && rendered.known
 		keys = append(keys, rendered.key)
+		// Kept for a body of everything too, which is a user of each object anyway, so an object only it uses is
+		// still one a build can judge.
+		if rendered.known && !builder.usedKeys[rendered.key] {
+			builder.usedKeys[rendered.key] = true
+			builder.hosted.usedObjects = append(builder.hosted.usedObjects,
+				fact_reach.UsedObject{Object: rendered.key, Identity: rendered.identity})
+		}
 	}
 	if !isFollowed {
 		builder.hosted.everything = append(builder.hosted.everything, place)
@@ -299,6 +353,14 @@ func (builder *factReachBuilder) ask(
 // of nothing the package declares at all, an instantiation's, is answered from its types alone, the same in every
 // build. Counting either would have one closure make its whole package lint whole.
 //
+// An answer about a function no declaration of the record declares is left out, uncounted, when its kind marks it as
+// its types' alone (check.ExportedFact.TypesAlone), as purity's about an `init` function is, which the package's
+// initializer calls and no identity names. It reads the same in every build that declares the function, whatever the
+// build makes of its body, so no build's answer differs from the host's, nothing compares it, and no finding turns on
+// it. Counting it would have one `init` make its whole package lint whole. A marked answer about a function a
+// declaration does declare is recorded and asked as any other, so its body, where a build lints it, holds its record
+// of the kind.
+//
 // Any other answer that finds no place is counted unplaced: one about neither a function nor a variable, about a
 // function no declaration of the record declares, or about one no identity names.
 func (builder *factReachBuilder) answer(answer check.ExportedFact) {
@@ -319,7 +381,9 @@ func (builder *factReachBuilder) answer(answer check.ExportedFact) {
 	}
 	declared, isDeclared := builder.functions[function]
 	if !isDeclared {
-		builder.hosted.unplaced++
+		if !answer.TypesAlone {
+			builder.hosted.unplaced++
+		}
 		return
 	}
 	if !declared.placed {

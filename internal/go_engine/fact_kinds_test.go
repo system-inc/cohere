@@ -94,11 +94,11 @@ func (settled *factKindsSettled) requireRemovedBy(
 // where size is pure, which it is on windows alone, since size returns helper's and helper platformSize's, which counts
 // its calls everywhere else. Warm names only size and size only helper, whose signatures are the same in every build,
 // so the reach leaves both unreached; standing on the host's findings Warm would lose windows's. The build lints
-// helper, but no body asked helper's purity, which size's judgment read from the kind's own state, so the host holds
-// no record of it: a body the build lints with no record of a kind reads unknown for it, and takes size out. size's own
-// purity, recorded where Warm asked it, then differs and takes Warm out, so Warm's finding is the build's own; Warm's
-// own purity, which Warmer asks, then differs in turn and takes Warmer out. Nothing stands that the second leg
-// (#adq5ahd) could find differing.
+// helper, and no body asked helper's purity, which size's judgment judged inside its own walk. The walk handed the
+// resolver helper's verdict all the same (#z9fze0t), so the host holds a record of it, which the build compares: it
+// differs on windows, and takes size out. size's own purity, recorded where Warm asked it, then differs and takes Warm
+// out, so Warm's finding is the build's own; Warm's own purity, which Warmer asks, then differs in turn and takes
+// Warmer out. Nothing stands that the second leg (#adq5ahd) could find differing.
 func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 	test.Parallel()
 
@@ -109,7 +109,7 @@ func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 				settled.bodies[name].reason)
 		}
 	}
-	settled.requireRemovedBy(test, "size", "helper", fact_reach.UnrecordedReason("function_purity"))
+	settled.requireRemovedBy(test, "size", "helper", fact_reach.DiffersReason("function_purity"))
 	settled.requireRemovedBy(test, "Warm", "size", fact_reach.DiffersReason("function_purity"))
 	settled.requireRemovedBy(test, "Warmer", "Warm", fact_reach.DiffersReason("function_purity"))
 
@@ -139,12 +139,13 @@ func TestTheFactsReachTakesOutWarmWhoseCalleesPurityDiffers(test *testing.T) {
 // type each platform's file declares.
 //
 // The user of a callee whose answer is the same leaves too, never for that kind: a body the build lints with no
-// record of a kind reads unknown for it (#5vbs1np, must 1), and each equal callee lacks a record of some kind the host
-// answered about the package, the first by the kinds' names after those it holds. Triviality and the stopping calls
-// are not registered with the resolver (fact_resolver.Register), so the build cannot ask either again and reads every
-// answer of theirs as unknown, and their equal callees, which hold a record of their kind, take their users out for
-// that. The day each kind records what its judgments read, and the build can ask every kind, the equal callees' users
-// stand, and this test says so.
+// record of a kind reads unknown for it (#5vbs1np, must 1), unless the kind records every judgment, as purity, odd
+// slice and nil-ness do (#z9fze0t), and none is named for those. Each equal callee of theirs and of the no-return
+// fact lacks a record of triviality, which the host answered about the package and which makes no such claim, so its
+// user leaves for that. Triviality and the stopping calls are not registered with the resolver
+// (fact_resolver.Register), so the build cannot ask either again and reads every answer of theirs as unknown, and
+// their equal callees, which hold a record of their kind, take their users out for that. The day those two record
+// what their judgments read, and the build can ask every kind, the equal callees' users stand, and this test says so.
 func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndAnEqualOnesForNoRecord(test *testing.T) {
 	test.Parallel()
 
@@ -162,7 +163,7 @@ func TestEachFactKindTakesOutTheUserOfADifferingCalleeAndAnEqualOnesForNoRecord(
 		{"no-return", "NoReturnUser", "halt", "no-return", "NoReturnStable", "haltAlways",
 			fact_reach.UnrecordedReason("function_triviality")},
 		{"nil-ness", "NilnessUser", "wrapped", fact_reach.DiffersReason("return_nil_ness"), "NilnessStable", "stable",
-			fact_reach.UnrecordedReason("function_purity")},
+			fact_reach.UnrecordedReason("function_triviality")},
 		{"purity", "Warm", "size", fact_reach.DiffersReason("function_purity"), "PurityStable", "width",
 			fact_reach.UnrecordedReason("function_triviality")},
 		{"odd slice", "OddUser", "pairs", fact_reach.DiffersReason("odd_slice_argument"), "OddStable", "pairsAlways",
@@ -204,8 +205,8 @@ func TestTheOrderRuleNamesEachShapeSoItsUsersNeverStand(test *testing.T) {
 // The first leg reads the facts' reach's settlement: a body it took out is the build's to lint, so its findings are
 // the build's own and never compared with the host's, only counted, on a line of their own. Five of the twenty-one it
 // took out differ by their findings, Warm, Warmer, OddUser, TrivialUser and StoppingUser, each a finding that turns on
-// a callee's answer, and none of them is a failure or a difference owed to a later stage. Seven of the twenty-one left
-// only for a callee the build lints with no record of a kind (#5vbs1np, must 1): size, the four stable users of the
+// a callee's answer, and none of them is a failure or a difference owed to a later stage. Six of the twenty-one left
+// only for a callee the build lints with no record of a kind (#5vbs1np, must 1): the four stable users of the
 // registered kinds, InstanceUser and WrapperUser.
 func TestTheFirstLegLeavesTheBodiesTheFactsReachTookOutToTheBuild(test *testing.T) {
 	test.Parallel()

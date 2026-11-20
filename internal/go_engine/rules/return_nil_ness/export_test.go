@@ -35,3 +35,23 @@ func Judged(resolver *fact_resolver.Resolver, home *fact_resolver.Package, funct
 func Ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, function *types.Func) ([]ValueNilness, bool) {
 	return ask(resolver, reader, function)
 }
+
+// HeldVerdicts is every verdict nilness's own state holds in home of a function with a result that may be nil, by its
+// function, each as the answer fact_resolver.Ask would give of it: its results when they say more than the defaults,
+// and nil, no fact, when they do not. Read under home's lock. A function none of whose results may be nil is left
+// out: its verdict is the defaults of its signature, read from no body and handed to no resolver (keepAnswer).
+func HeldVerdicts(home *fact_resolver.Package) map[*types.Func][]ValueNilness {
+	home.Lock()
+	defer home.Unlock()
+	held := map[*types.Func][]ValueNilness{}
+	for function, results := range stateIn(home).results {
+		if !anyPointers(function.Signature()) {
+			continue
+		}
+		held[function] = nil
+		if interesting(function.Signature(), results) {
+			held[function] = results
+		}
+	}
+	return held
+}

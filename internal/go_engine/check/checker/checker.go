@@ -447,6 +447,14 @@ type Options struct {
 	FactHosts func(packageId string) fact_reach.Host
 	FactHost  *analysis.Analyzer
 
+	// cohere: BodiesRead, when set, is handed each package Analyze was
+	// given once, as the last action on it finishes, while its syntax and
+	// type information are still whole: the one point every analyzed
+	// package passes before they are let go (releaseSyntax). It is called
+	// on that action's goroutine, so it must be safe to call from several
+	// at once.
+	BodiesRead func(read *packages.Package)
+
 	// cohere: Beside, when set, is rooted on each package Analyze is
 	// given that Restored does not name, beside the analyzers, and its
 	// actions are Graph.Beside's rather than Graph.Roots'. It must be
@@ -504,6 +512,19 @@ type Options struct {
 	// for: a reader of the reads waits on Walks. Unset, the walk runs
 	// inline, as the last action on the package finishes.
 	Walks *build_reads.Walks
+
+	// cohere: Declarations, when set, is called with each package Analyze
+	// runs on that has type information, while its syntax and type
+	// information are whole, in the package's walk on Walks and before
+	// they are let go of, whether or not its type reads are walked: a
+	// package whose reads are marked never, one with cgo files say, is
+	// walked for it alone (see declareThenWalk). It may be called for one
+	// package more than once, and from two walks at once (check's
+	// recordUnreachedTypes), so it adds each package once and returns only
+	// once that package is added, the syntax whole until then. Unset, as
+	// in every run but the must-check census's (#anfjtr3), releaseSyntax
+	// is as it was.
+	Declarations func(*packages.Package)
 
 	// cohere: Pool, when set, is the run's one set of slots, which every
 	// load and check of the run shares (#ckm0hsp): a worker holds one of
@@ -1250,6 +1271,11 @@ func (act *Action) releaseSyntax() {
 		return
 	}
 	keeps := act.syntax.given && act.syntax.finished == nil
+	// Only a given package's bodies are read: a dependency is analyzed for its facts alone, and no build is handed its
+	// side.
+	if act.opts.BodiesRead != nil && act.syntax.given && act.Package.TypesInfo != nil {
+		act.opts.BodiesRead(act.Package)
+	}
 	if act.syntax.given && !keeps {
 		act.syntax.finished(act.Package)
 	}
@@ -1263,6 +1289,10 @@ func (act *Action) releaseSyntax() {
 		}
 	}
 	reads := act.opts.Reads[act.Package]
+	if act.opts.Declarations != nil && act.Package.TypesInfo != nil {
+		act.declareThenWalk(reads, letGo)
+		return
+	}
 	if reads == nil || act.Package.TypesInfo == nil || !reads.Claim() {
 		letGo()
 		return
@@ -1276,6 +1306,29 @@ func (act *Action) releaseSyntax() {
 		reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
 		letGo()
 	})
+}
+
+// cohere: declareThenWalk is releaseSyntax under Options.Declarations,
+// for a package with type information: in one walk on Walks, or inline
+// without them, the package is handed to Declarations, then its type
+// reads are walked when reads, nil for a package whose reads are not
+// recorded, can claim them, then letGo lets its syntax go. A package
+// whose reads are marked never fails the claim, and is walked for its
+// declarations alone.
+func (act *Action) declareThenWalk(reads *build_reads.Reads, letGo func()) {
+	walksReads := reads != nil && reads.Claim()
+	walk := func() {
+		act.opts.Declarations(act.Package)
+		if walksReads {
+			reads.Record(act.Package.Types, act.Package.TypesInfo, act.Package.Syntax)
+		}
+		letGo()
+	}
+	if act.opts.Walks == nil {
+		walk()
+		return
+	}
+	act.opts.Walks.Go(act.Package, nil, walk)
 }
 
 // cohere: letGoOfSyntax clears act's package's syntax and type

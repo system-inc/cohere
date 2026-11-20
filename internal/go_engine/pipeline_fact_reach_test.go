@@ -51,7 +51,8 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	line := "fact reach: packages given a side 1; none, uncaptured 0, unrecorded 0, order unknown 0"
+	line := "fact reach: packages given a side 1; none, uncaptured 0, answered from the store 0, unrecorded 0, order " +
+		"unknown 0"
 	if !slices.Contains(strings.Split(string(written), "\n"), line) {
 		test.Errorf("the census file has no line %q:\n%s", line, written)
 	}

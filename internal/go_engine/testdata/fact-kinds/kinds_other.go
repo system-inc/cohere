@@ -35,7 +35,7 @@ func platformError() error {
 }
 
 // platformPairs needs its values even.
-func platformPairs(values []any) {
+func platformPairs(values []anything) {
 	if len(values)%2 != 0 {
 		panic("odd")
 	}

@@ -71,6 +71,8 @@ func (scratch *workerScratch) release() {
 	clear(scratch.walker.seen)
 	scratch.walker.collected = emptied(scratch.walker.collected)
 	scratch.walker.entering = false
+	scratch.walker.member = false
+	scratch.walker.within = emptied(scratch.walker.within)
 
 	scratch.bodies.typesInformation = nil
 	clear(scratch.bodies.typeReferences)
@@ -83,6 +85,8 @@ func (scratch *workerScratch) release() {
 	scratch.collecting.fromCgo = false
 	scratch.collecting.withheld = nil
 	scratch.collecting.units = emptied(scratch.collecting.units)
+	scratch.collecting.spans = emptied(scratch.collecting.spans)
+	scratch.collecting.repeats = emptied(scratch.collecting.repeats)
 	scratch.collecting.edges = emptied(scratch.collecting.edges)
 	clear(scratch.collecting.edgeSeen)
 	clear(scratch.collecting.calleeSeen)

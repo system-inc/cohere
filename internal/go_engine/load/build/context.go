@@ -7,8 +7,10 @@
 // and the files that declare no copy are ours: the Context the copy hangs off, the run's table of reads (Headers), and
 // ImportDirectory, which finds the package through go/build itself and reads its files through the copy.
 //
-// Each build still matches every file by its own context, by name (goodOSArchFile), by build constraint
-// (shouldBuild), cgo on or off, and assembles its own Package; only readGoInfo's result is shared.
+// Each build still selects every file by its own context, by name (goodOSArchFile), by build constraint
+// (shouldBuild), cgo on or off. It assembles its own Package for a directory but where it would select every file as
+// a build that read the directory before it did, which it knows from the tags that read asked (PackageReads), and
+// there takes that read.
 package build
 
 import (
@@ -99,12 +101,26 @@ func ImportDirectory(
 	if findError != nil {
 		return found, findError
 	}
+	built, _, importError := importFound(context, found, directory, held, headers)
+	return built, importError
+}
+
+// importFound is ImportDirectory once go/build has found the package at directory, as found, which the read fills in,
+// and whether a file the build selects imports "C", so go/build read the directory whole (errorCgoFile).
+func importFound(
+	context build.Context,
+	found *build.Package,
+	directory string,
+	held func(path string) ([]byte, bool),
+	headers *Headers,
+) (*build.Package, bool, error) {
 	copied := &Context{Context: context, held: held, headers: headers}
 	built, importError := copied.importFiles(found, 0)
 	if errors.Is(importError, errorCgoFile) {
-		return context.ImportDir(directory, 0)
+		built, importError = context.ImportDir(directory, 0)
+		return built, true, importError
 	}
-	return built, importError
+	return built, false, importError
 }
 
 // readGoInfoOnce is what readGoInfo reads of the file at name into fileSet, read once for the run, with the error

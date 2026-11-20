@@ -8,13 +8,39 @@ import (
 )
 
 // Kind keys purity's verdicts in each package the resolver holds, and its counts.
-var Kind = &fact_resolver.Kind{Name: "function_purity", OrderBound: orderFree}
+//
+// It records every judgment (fact_resolver.Kind.RecordsEveryJudgment). A verdict is made in one place, demandWalk's
+// verdict, which hands it to the resolver as it stores it, and another package's function is asked through
+// fact_resolver.Ask, which holds the answer. And judge reads only the instructions of the function it judges: of a
+// function that one calls it asks its callees, whose answer is a verdict, the resolver's answer, or not pure for a
+// function with no object, an anonymous one, read no further. TestEveryVerdictPurityHoldsIsAnAnswerTheResolverHolds
+// pins the first, and check's TestNoAnswerOfARecordingKindRestsOnABodyWithNoAnswer the second.
+var Kind = &fact_resolver.Kind{
+	Name:                 "function_purity",
+	OrderBound:           orderFree,
+	TypesAlone:           typesAlone,
+	RecordsEveryJudgment: true,
+}
 
 // orderFree is purity's order bound (fact_resolver.Kind.OrderBound): none, and known. Purity is the least set closed
 // under its rules, a cycle of calls never pure, which is one set whatever order a walk finds it in (see demandWalk), so
 // no answer about any function of home hangs on the order its walks took.
 func orderFree(*fact_resolver.Package, []*types.Func) ([]*types.Func, bool) {
 	return nil, true
+}
+
+// typesAlone is whether purity's answer about object is its types' alone (fact_resolver.Kind.TypesAlone): a function
+// with no results that pureStandardLibrary does not list, an `init` function among them, which the package's
+// initializer calls. judge answers not pure for one before it reads a block of its body, a stub is not pure either,
+// and nor is a function declared without a body (bodilessPurity), so the answer is not pure in every build that
+// declares the function with no results, whatever the build makes of its body.
+func typesAlone(object types.Object) bool {
+	function, isFunction := object.(*types.Func)
+	if !isFunction || function.Signature().Results().Len() != 0 {
+		return false
+	}
+	_, listed := pureStandardLibrary[function.FullName()]
+	return !listed
 }
 
 func init() {

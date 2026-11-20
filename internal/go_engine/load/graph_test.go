@@ -138,3 +138,67 @@ func TestAModulesTestsImportItsVendoredPackage(test *testing.T) {
 		}
 	}
 }
+
+// A root's tests reach a package through another: p's external tests import r, r imports q, and q imports p, so go
+// test builds q and r again for p's tests, "r [p.test]" against "q [p.test]" and that against "p [p.test]". What the
+// tests reach that does not depend on p (s), and what depends on p that the tests do not reach (t), is built once.
+// And in-package tests that import what depends on their own package are a cycle, which the variant says.
+func TestARootsTestsBuildAgainWhatTheyReachThroughAnother(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	newListed := func(path string, imports []string, dependencies []string) *listedPackage {
+		return &listedPackage{
+			ImportPath: path, Name: path, Directory: filepath.Join(directory, path), GoFiles: []string{path + ".go"},
+			Imports: imports, Deps: dependencies,
+		}
+	}
+	root := newListed("p", nil, nil)
+	root.TestGoFiles, root.TestImports = []string{"p_test.go"}, []string{"testing"}
+	root.XTestGoFiles, root.XTestImports = []string{"external_test.go"}, []string{"p", "r", "s"}
+	cyclic := newListed("cyclic", nil, nil)
+	cyclic.TestGoFiles, cyclic.TestImports = []string{"cyclic_test.go"}, []string{"user"}
+	listed := &listing{
+		packages: []*listedPackage{
+			root, newListed("q", []string{"p"}, []string{"p"}), newListed("r", []string{"q"}, []string{"p", "q"}),
+			newListed("s", nil, nil), newListed("t", []string{"p"}, []string{"p"}),
+			cyclic, newListed("user", []string{"cyclic"}, []string{"cyclic"}),
+		},
+		byPath:   map[string]*listedPackage{},
+		roots:    map[string]bool{"p": true, "cyclic": true},
+		testOnly: map[string]bool{},
+	}
+	for _, each := range listed.packages {
+		listed.byPath[each.ImportPath] = each
+	}
+	built := newGraph(listed, directory, nil)
+	for identifier, imports := range map[string]map[string]string{
+		"p_test [p.test]": {"p": "p [p.test]", "r": "r [p.test]", "s": "s"},
+		"r [p.test]":      {"q": "q [p.test]"},
+		"q [p.test]":      {"p": "p [p.test]"},
+	} {
+		variant := built.nodes[identifier]
+		if variant == nil {
+			test.Errorf("want %s in the graph, got none", identifier)
+			continue
+		}
+		for written, want := range imports {
+			if got := variant.imports[written]; got != want {
+				test.Errorf("want %s to import %s as %s, got %q", identifier, written, want, got)
+			}
+		}
+	}
+	for _, identifier := range []string{"s [p.test]", "t [p.test]"} {
+		if built.nodes[identifier] != nil {
+			test.Errorf("%s is in the graph, which p's tests never build again", identifier)
+		}
+	}
+	if errors := built.nodes["p [p.test]"].loaded.Errors; len(errors) > 0 {
+		test.Errorf("p [p.test] has %+v, and its tests import nothing that depends on p", errors)
+	}
+	inPackage := built.nodes["cyclic [cyclic.test]"]
+	if inPackage == nil || len(inPackage.loaded.Errors) != 1 ||
+		inPackage.loaded.Errors[0].Msg != "import cycle not allowed in test" {
+		test.Errorf("want cyclic [cyclic.test] to say its tests' import is a cycle, got %+v", inPackage)
+	}
+}

@@ -5,6 +5,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
@@ -33,9 +34,17 @@ type describedProject struct {
 	children *load.Children
 
 	// started is the go commands describeProject started beside its census and its reads that may still run (see
-	// earlyStart), which the pipeline joins before its first load (awaitStarted). Nil, as a test's hand-made project
+	// earlyStart), which the pipeline waits for before its first load (awaitForked) and joins before it returns
+	// (awaitStarted). Nil, as a test's hand-made project
 	// has it, started none.
 	started *earlyStart
+
+	// systemCache is the run's system cache, opened before the go commands describeProject starts, which keep each
+	// build's build context in it, and handed to the pipeline (newPipeline), with shardStamps, the run's stamps of its
+	// stores' shard directories, which its store holds. Nil, as a test's hand-made project has it, for the pipeline to
+	// open its own.
+	systemCache *systemCache
+	shardStamps *cache.ShardStamps
 
 	// builds are what a run of every build checks, the host's first, read from the census before the first record
 	// (readBuilds), so the project record names a file only another build compiles as checked by it, and the lint
@@ -75,11 +84,30 @@ type describedProject struct {
 	unreadable []contract.UnreadableRecord
 }
 
-// awaitStarted joins every go command describeProject started beside its census and its reads (#q9ezwvw), so none of
-// them starts after the run's first load begins, and none outlives the run.
+// awaitStarted joins every go command describeProject started beside its census and its reads (#q9ezwvw), each to its
+// end, so none outlives the run (pipeline.joinChildren).
 func (described *describedProject) awaitStarted() {
 	if described.started != nil {
 		described.started.wait()
+	}
+}
+
+// openedSystemCache is the run's system cache and the shard stamps its store holds: the ones describeProject opened,
+// or new ones for a test's project, nil or made by hand, which opened none.
+func (described *describedProject) openedSystemCache(request invocation) (*systemCache, *cache.ShardStamps) {
+	if described != nil && described.systemCache != nil {
+		return described.systemCache, described.shardStamps
+	}
+	shardStamps := cache.NewShardStamps(nil)
+	return openSystemCache(request, shardStamps), shardStamps
+}
+
+// awaitForked returns once every go command describeProject started that the run's first load waits for has ended,
+// and every extra build predicted to fork nothing after its go env has started that, whose go env may run on beside
+// the host's listing (earlyStart.awaitForked, #sfjj2rh). awaitStarted joins them all.
+func (described *describedProject) awaitForked() {
+	if described.started != nil {
+		described.started.awaitForked()
 	}
 }
 

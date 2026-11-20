@@ -47,3 +47,6 @@ type Titled struct {
 
 // Key is comparable.
 type Key struct{ Name string }
+
+// Streamed is of a fixed size.
+type Streamed struct{ Count int32 }

@@ -38,11 +38,12 @@ type objectBuild struct {
 	environment []string
 }
 
-// objectLoad is every package one load reaches, by package ID, and the IDs of those it loaded with errors, which the
-// differential leaves out, as their types are not the build's.
+// objectLoad is every package one load reaches, by package ID, the IDs of those it loaded with errors, which the
+// differential cannot compare, as their types are not the build's, and the first error of each, by its ID.
 type objectLoad struct {
-	packages map[string]*packages.Package
-	broken   []string
+	packages    map[string]*packages.Package
+	broken      []string
+	firstErrors map[string]string
 }
 
 // objectEnvironment is the process's environment with goos and tags, on the host's `GOARCH` as every extra build is
@@ -80,11 +81,12 @@ func loadObjects(test *testing.T, directory string, environment []string, patter
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
-	loaded := objectLoad{packages: map[string]*packages.Package{}}
+	loaded := objectLoad{packages: map[string]*packages.Package{}, firstErrors: map[string]string{}}
 	packages.Visit(roots, nil, func(visited *packages.Package) {
 		loaded.packages[visited.ID] = visited
 		if len(visited.Errors) > 0 {
 			loaded.broken = append(loaded.broken, visited.ID)
+			loaded.firstErrors[visited.ID] = visited.Errors[0].Error()
 		}
 	})
 	slices.Sort(loaded.broken)
@@ -247,14 +249,36 @@ func objectsByName(declaring *types.Package) map[string][]types.Object {
 }
 
 // objectTally is what one build's object differential found: the objects compared, those with no counterpart in the
-// build, by kind (objectKind), each kind of line that differed and was covered by a bit, and every failure, naming the
-// object, which line differs and which bit is unset.
+// build, by kind (objectKind), each kind of line that differed and was covered by a bit, every failure, naming the
+// object, which line differs and which bit is unset, and every package it left out for its errors (leftOutOf).
 type objectTally struct {
 	compared            int
 	noCounterpart       int
 	noCounterpartByKind map[string]int
 	differedCovered     int
 	failures            []string
+	leftOut             []string
+}
+
+// leftOutOf are the packages either load holds with errors, each once, the host's by ID and then those only the build
+// has errors in: its ID, which load it has errors in, the host, the build or both, and its first error, the host's
+// where both have one. The differential compares none of them, whether or not the other load holds it, and a load
+// with one is not the tree whole, so each fails the build's report (reportObjectDifferences).
+func leftOutOf(host objectLoad, build objectLoad) []string {
+	var leftOut []string
+	for _, identifier := range host.broken {
+		where := " on the host: "
+		if slices.Contains(build.broken, identifier) {
+			where = " on the host and in the build: "
+		}
+		leftOut = append(leftOut, identifier+where+host.firstErrors[identifier])
+	}
+	for _, identifier := range build.broken {
+		if !slices.Contains(host.broken, identifier) {
+			leftOut = append(leftOut, identifier+" in the build: "+build.firstErrors[identifier])
+		}
+	}
+	return leftOut
 }
 
 // closureWholeReads are the objects a whole read of object reads, as dependenceReach.closure follows its closure digest
@@ -299,6 +323,10 @@ func closureWholeReads(memo *ReadsBuild, object types.Object) map[types.Object]b
 // Each object's bits are bitsOf's, block 1's Dependence.ObjectBits, or a test's that blanks some of them to show a
 // leg failing (TestTheClosureDigestLegFailsWhereNoNameItReachesHasABit). Each memo is measured by its own load's
 // sizes, as the host's renderings and a build's are (measureBy).
+//
+// A package either load holds with errors is compared by no leg, its types not being the build's, and is never left
+// out in silence (#3096be2): the tally lists each (leftOutOf), and the report fails on them, so a tree judged in part
+// never reads as one judged whole.
 func objectDifferences(
 	host objectLoad,
 	build objectLoad,
@@ -313,7 +341,7 @@ func objectDifferences(
 		buildMemo.measureBy(loaded.TypesSizes)
 		break
 	}
-	tally := objectTally{noCounterpartByKind: map[string]int{}}
+	tally := objectTally{noCounterpartByKind: map[string]int{}, leftOut: leftOutOf(host, build)}
 	for _, identifier := range slices.Sorted(maps.Keys(host.packages)) {
 		hosted, built := host.packages[identifier], build.packages[identifier]
 		if built == nil || hosted.Types == nil || built.Types == nil || slices.Contains(host.broken, identifier) ||
@@ -393,19 +421,50 @@ func objectDifferences(
 	return tally
 }
 
-// reportObjectDifferences logs what tally compared under the build named name and fails naming each failure.
-func reportObjectDifferences(test *testing.T, name string, tally objectTally, started time.Time) {
+// objectReporter is what reportObjectDifferences reports to: a test, or a record of its words for a test of the
+// report itself (recordedReport).
+type objectReporter interface {
+	Helper()
+	Logf(format string, arguments ...any)
+	Errorf(format string, arguments ...any)
+}
+
+// leftOutNamed is how many of the packages left out for their errors a report names, each with its first error: a
+// tree that does not type-check can hold hundreds, and the first few say what is wrong with the load.
+const leftOutNamed = 5
+
+// reportObjectDifferences logs what tally compared under the build named name and fails naming each failure, and
+// fails once more where a package was left out for its errors, saying how many were and naming the first few
+// (leftOutNamed), each with the load it has errors in and its first error there: what the differential still compared
+// is no judgment of the tree, whatever its failures count (#3096be2). It fails too where it compared no object, as a
+// load that found nothing, a pattern matching no package, returns no error and leaves nothing out, and a report of
+// nothing compared is no judgment either, under any caller.
+func reportObjectDifferences(test objectReporter, name string, tally objectTally, started time.Time) {
 	test.Helper()
 	var byKind []string
 	for _, kind := range slices.Sorted(maps.Keys(tally.noCounterpartByKind)) {
 		byKind = append(byKind, fmt.Sprintf("%d %s", tally.noCounterpartByKind[kind], kind))
 	}
 	test.Logf("%s: %d objects compared, %d with no counterpart (%s), %d differing lines covered by a bit, %d "+
-		"failures, in %s", name, tally.compared, tally.noCounterpart, strings.Join(byKind, ", "),
-		tally.differedCovered, len(tally.failures), time.Since(started).Round(time.Millisecond))
+		"failures, packages with errors left out: %d, in %s", name, tally.compared, tally.noCounterpart,
+		strings.Join(byKind, ", "), tally.differedCovered, len(tally.failures), len(tally.leftOut),
+		time.Since(started).Round(time.Millisecond))
 	for _, failure := range tally.failures {
 		test.Errorf("%s: %s", name, failure)
 	}
+	if tally.compared == 0 {
+		test.Errorf("%s: compared no object, so the load found nothing", name)
+	}
+	if len(tally.leftOut) == 0 {
+		return
+	}
+	counted, pronoun := "1 package", "it"
+	if len(tally.leftOut) > 1 {
+		counted, pronoun = fmt.Sprintf("%d packages", len(tally.leftOut)), "them"
+	}
+	named := tally.leftOut[:min(len(tally.leftOut), leftOutNamed)]
+	test.Errorf("%s: %s loaded with errors, so the differential compared nothing of %s and what it compared is the "+
+		"tree in part; the first %d: %s", name, counted, pronoun, len(named), strings.Join(named, "; "))
 }
 
 // objectFixtureBuilds are the builds every fixture of block 1 is judged under against the darwin host, as its own
@@ -422,12 +481,36 @@ func objectFixtureWorkspace(loaded *packages.Package) bool {
 	return !strings.HasSuffix(loaded.PkgPath, "/dependency")
 }
 
+// judgeFixture judges the fixture in directory as TestEveryObjectWhoseLinesDifferHasItsBitSet judges each of block
+// 1's: loaded from source on the darwin host, which must type-check, and under each of objectFixtureBuilds, every
+// object of every package both hold compared, each build's differential reported to report, a test or a record of
+// its words (objectReporter). It returns the names of the builds it judged, each once it is reported.
+func judgeFixture(test *testing.T, report objectReporter, directory string) []string {
+	test.Helper()
+	host := loadObjects(test, directory, objectEnvironment("darwin", ""), "./...", true)
+	if len(host.broken) > 0 {
+		test.Fatalf("the fixture does not type-check on the darwin host: %q", host.broken)
+	}
+	var judged []string
+	for _, build := range objectFixtureBuilds {
+		started := time.Now()
+		built := loadObjects(test, directory, build.environment, "./...", true)
+		dependence := objectDependence(host, built, objectFixtureWorkspace)
+		tally := objectDifferences(host, built, dependence.ObjectBits)
+		reportObjectDifferences(report, build.name, tally, started)
+		judged = append(judged, build.name)
+	}
+	return judged
+}
+
 // Block 1's bits are a cheaper proof of TypesHold's lines, one level below a reader: every object block 1 calls
 // unchanged must render alike, so wherever a line TypesHold writes of an object differs between two builds, the bit
 // its verdict gates that read by must be set (objectDifferences). Over every fixture of block 1's testdata, loaded
 // from source on the darwin host and under each of objectFixtureBuilds, every object of every package both hold is
-// compared. A build a fixture does not type-check under is left out and logged, as the engine analyzes nothing of a
-// build with a type error, and a fixture compared under no build fails.
+// compared (judgeFixture). Every fixture type-checks under every one of those builds, and one that does not fails
+// there as any tree does, by the report (reportObjectDifferences): no build is left out for its errors (#3096be2),
+// and once every fixture's subtest is done, each build must have judged every fixture whose subtest ran, those -run
+// selects, so a fixture skipped under a build fails here whatever the reason it was skipped for.
 func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	test.Parallel()
 
@@ -436,6 +519,18 @@ func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
+	var counting sync.Mutex
+	ran := 0
+	judgedUnder := map[string]int{}
+	// Cleanup runs once every parallel subtest below is done, so the counts are whole when it reads them.
+	test.Cleanup(func() {
+		for _, build := range objectFixtureBuilds {
+			if judgedUnder[build.name] != ran {
+				test.Errorf("%s: judged %d of the %d fixtures run, so the loop skipped some", build.name,
+					judgedUnder[build.name], ran)
+			}
+		}
+	})
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -443,26 +538,14 @@ func TestEveryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 		test.Run(entry.Name(), func(test *testing.T) {
 			test.Parallel()
 
-			directory := filepath.Join(fixtures, entry.Name())
-			host := loadObjects(test, directory, objectEnvironment("darwin", ""), "./...", true)
-			if len(host.broken) > 0 {
-				test.Fatalf("the fixture does not type-check on the darwin host: %q", host.broken)
-			}
-			judgedUnder := 0
-			for _, build := range objectFixtureBuilds {
-				started := time.Now()
-				built := loadObjects(test, directory, build.environment, "./...", true)
-				if len(built.broken) > 0 {
-					test.Logf("%s: not judged, the fixture does not type-check there: %q", build.name, built.broken)
-					continue
-				}
-				judgedUnder++
-				dependence := objectDependence(host, built, objectFixtureWorkspace)
-				tally := objectDifferences(host, built, dependence.ObjectBits)
-				reportObjectDifferences(test, build.name, tally, started)
-			}
-			if judgedUnder == 0 {
-				test.Error("the fixture type-checks under no build, so nothing of it is judged")
+			counting.Lock()
+			ran++
+			counting.Unlock()
+			judged := judgeFixture(test, test, filepath.Join(fixtures, entry.Name()))
+			counting.Lock()
+			defer counting.Unlock()
+			for _, name := range judged {
+				judgedUnder[name]++
 			}
 		})
 	}
@@ -521,14 +604,20 @@ func TestTheClosureDigestLegFailsWhereNoNameItReachesHasABit(test *testing.T) {
 
 // The same rule over the standard library, loaded from source with cgo off on the host's `GOOS` and under every other
 // `GOOS` a release ships, on the host's `GOARCH` as every extra build is (project.BuildsFor), one build at a time, each
-// against the host's graph with no package of it the workspace's, as the engine's side load judges it. It runs in
-// the ordinary run: on the Mac, the host's load took 2.5 s and each build's load and comparison 1.4 s to 3 s, the test
-// 6.9 s.
+// against the host's graph with no package of it the workspace's, as the engine's side load judges it. A package the
+// host's load or a build's holds with errors fails that build (reportObjectDifferences). It runs in the ordinary run:
+// on the Mac, the host's load took 2.5 s and each build's load and comparison 1.4 s to 3 s, the test 6.9 s.
 //
-// Red under linux and windows on runtime.mPadded._, a field whose spelled type is an array of
+// One build more is the host's `GOOS` on another architecture, the other of amd64 and arm64, since a target the
+// settings list is built on its own architecture (project's listedBuilds) and no build above differs from the host by
+// one (#mtfdb1m): there internal/cpu's CacheLinePad is 64 bytes on amd64 and 128 on arm64, and the feature variables
+// that hold one in an unnamed struct, X86 and ARM64 among them, and runtime's trace, which holds one three named types
+// down, have lines that move with it. The leg added 1.9 s on the Mac.
+//
+// It was red under linux and windows on runtime.mPadded._, a field whose spelled type is an array of
 // `2048 - mallocHeaderSize - mRedZoneSize - unsafe.Sizeof(m{})` bytes, so its own line moves with m's layout, which
-// mOS gives each platform, while block 1 reads the type names a field's spelled type uses by their structure alone,
-// never in full as a constant's value reads them, so the field's bit stays unset.
+// mOS gives each platform, until block 1 read an array's length in a spelled type in full, as a constant's value is
+// read (build_dependence's usesVisitor): the field's bit is set there now, and both read 0 failures.
 func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	test.Parallel()
 
@@ -542,25 +631,30 @@ func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T)
 	test.Logf("host %s: %d packages loaded in %s", runtime.GOOS, len(host.packages),
 		time.Since(started).Round(time.Millisecond))
 	notWorkspace := func(*packages.Package) bool { return false }
+	var builds []objectBuild
 	judged := map[string]bool{runtime.GOOS: true}
 	for _, target := range release.Targets {
 		if judged[target.GoOperatingSystem] {
 			continue
 		}
 		judged[target.GoOperatingSystem] = true
+		builds = append(builds, objectBuild{name: target.GoOperatingSystem,
+			environment: objectEnvironment(target.GoOperatingSystem, "")})
+	}
+	otherArchitecture := "amd64"
+	if runtime.GOARCH == "amd64" {
+		otherArchitecture = "arm64"
+	}
+	builds = append(builds, objectBuild{name: runtime.GOOS + "/" + otherArchitecture,
+		environment: architectureEnvironment(runtime.GOOS, otherArchitecture)})
+	for _, build := range builds {
 		// Not parallel: one build's std at a time holds one load's memory beside the host's, and each stays its own
 		// subtest so a red names its build.
-		test.Run(target.GoOperatingSystem, func(test *testing.T) {
+		test.Run(build.name, func(test *testing.T) {
 			started := time.Now()
-			built := loadObjects(test, module, objectEnvironment(target.GoOperatingSystem, ""), "std", false)
-			if len(built.broken) > 0 {
-				test.Logf("%d packages with errors left out: %q", len(built.broken), built.broken)
-			}
+			built := loadObjects(test, module, build.environment, "std", false)
 			tally := objectDifferences(host, built, objectDependence(host, built, notWorkspace).ObjectBits)
-			reportObjectDifferences(test, target.GoOperatingSystem, tally, started)
-			if tally.compared == 0 {
-				test.Error("compared no object, so the load found nothing")
-			}
+			reportObjectDifferences(test, build.name, tally, started)
 		})
 	}
 }
@@ -681,7 +775,9 @@ func TestTheObjectDifferentialChecksTheTargetsASettingsFileNames(test *testing.T
 // The same rule over the tree verdictDifferentialRootVariable names, skipped when it is unset: the builds the engine
 // checks of it (objectTreeBuilds), the host's and every extra build, the targets its settings file names among them,
 // each loaded with tests under the workspace's environment and the build's own, the packages of the tree's modules
-// the workspace. It logs each build's counts and fails on any object whose bit the rule wants set and finds unset.
+// the workspace. It logs each build's counts and fails on any object whose bit the rule wants set and finds unset,
+// and on any package the host's load or a build's holds with errors, which no leg compares (reportObjectDifferences):
+// a tree that does not type-check is not judged, and never reads as one that passed.
 func TestEveryObjectOfARealTreeWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	test.Parallel()
 
@@ -702,12 +798,12 @@ func TestEveryObjectOfARealTreeWhoseLinesDifferHasItsBitSet(test *testing.T) {
 	inWorkspace := func(loaded *packages.Package) bool { return loaded.Module != nil && loaded.Module.Main }
 	started := time.Now()
 	host := loadObjects(test, workspace.Root, environmentOf(builds[0]), "./...", true)
-	test.Logf("host %s: %d packages loaded, %d with errors left out, in %s", builds[0], len(host.packages),
+	test.Logf("host %s: %d packages loaded, %d with errors, in %s", builds[0], len(host.packages),
 		len(host.broken), time.Since(started).Round(time.Second))
 	for _, build := range builds[1:] {
 		started := time.Now()
 		built := loadObjects(test, workspace.Root, environmentOf(build), "./...", true)
-		test.Logf("%s: %d packages loaded, %d with errors left out", build, len(built.packages), len(built.broken))
+		test.Logf("%s: %d packages loaded, %d with errors", build, len(built.packages), len(built.broken))
 		tally := objectDifferences(host, built, objectDependence(host, built, inWorkspace).ObjectBits)
 		reportObjectDifferences(test, build.String(), tally, started)
 	}

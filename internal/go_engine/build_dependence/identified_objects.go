@@ -42,8 +42,7 @@ func (identified *IdentifiedObjects) Bits(object types.Object) Bits {
 		underlying, _, _ := identified.bit(declared, true)
 		return Bits{Name: set, Underlying: underlying}
 	}
-	_, isConstant := declared.(*types.Const)
-	for _, through := range identified.walker.references(declared.Type(), isConstant) {
+	for _, through := range identified.walker.borrowedThroughReferences(declared) {
 		set, _, isKnown := identified.bit(through.object, through.touchesUnderlying)
 		if set || !isKnown {
 			return Bits{Name: true, Underlying: true}

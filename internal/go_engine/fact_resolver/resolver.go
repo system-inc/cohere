@@ -119,6 +119,49 @@ type Kind struct {
 	// about home's objects, never as order-free: saying a kind is order-free takes an argument of its own (#aswfm7a).
 	// A kind whose answers hang on no order at all says so with a hook answering no functions, known.
 	OrderBound func(home *Package, held []*types.Func) (bound []*types.Func, known bool)
+
+	// TypesAlone, when set, is the kind's word that its answer about object is the same in every build that declares
+	// object with those types, whatever its body: nothing of a body decides it, so no two builds' answers can differ
+	// and no finding turns on one build's rather than another's. Nil says no answer of the kind is, as a hook
+	// answering false says of one object, which is what a reader takes wherever nobody has argued otherwise: saying
+	// an answer is its types' alone takes an argument of its own, as an order bound does.
+	//
+	// Neither a cgo package nor a test variant hands a reader that leaves out a marked answer with no declaration
+	// (go_engine's factReachBuilder.answer) one an ordinary package would not. A function the cgo tool generates is
+	// declared by its object in a file of the package, as any function is, and a package the tool translated holds no
+	// record of its declarations at all, its outputs naming symbols by go:linkname, so no side is made of it. A test
+	// variant is a package of its own, with its own answers and record, whose `init` functions declare no object, as
+	// any package's.
+	TypesAlone func(object types.Object) bool
+
+	// RecordsEveryJudgment is the kind's word that the answers the resolver holds are a complete record of what its
+	// judgments read, in every package the run computed in. It claims two things, and a kind sets it only where both
+	// are argued, as an order bound is:
+	//
+	//   - the kind hands every verdict its judgments reach to the resolver once it is final, through Ask or Keep, a
+	//     callee's it judged inside its caller's judgment among them;
+	//   - a judgment of the kind reads another function's body only by way of a verdict about that function, never by
+	//     looking into the body itself with no verdict made of it.
+	//
+	// Together they say that a function the resolver holds no answer of the kind about is one the kind never judged
+	// in the run, so no answer the run holds rests on its body. A reader comparing two builds' answers has nothing to
+	// compare there, where for a kind without the flag it must take such a function as one a judgment may have read
+	// and left no record of (fact_reach.Settle's unrecorded rule, which that kind keeps whole). The first claim alone
+	// would not do: a judgment that looked into a callee's body and made no verdict of it would leave a record as
+	// complete, and rest on a body with none. A package handed an unsure answer keeps nothing (Keep, answerOf), and
+	// the claim is not about it: a reader holds no answers of such a package at all. Nor is it about a package the run
+	// learned that the store answered a question about, as one loaded from source to answer a question is answered from
+	// its entry (Package.AnsweredFromStore): that answer was judged in another run, and nothing of what it rests on was
+	// judged in this one, so a function there with no answer may be one it rests on. A reader takes no kind's record of
+	// such a package as complete, and the facts' reach gives it no side (check.FactReachCapture.StoreAnswered). Nor is
+	// the claim about ctrlflow's no-return of a callee, which cuts the blocks a judgment reads after a call: that is a
+	// fact the checker pushes, which a reader compares on its own.
+	//
+	// The flag is read only of a kind registered with the resolver (Register, RecordingNames). Set on a kind that never
+	// registers, as triviality and the stopping calls do not, it is inert: the kind keeps the unrecorded rule whole.
+	// A kind that registers with it set joins the stub differential's kinds too (check's recordingKinds), whose guard
+	// fails while the two lists differ.
+	RecordsEveryJudgment bool
 }
 
 // Counts is what a resolver computed of one kind over its run.

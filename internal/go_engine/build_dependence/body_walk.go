@@ -215,8 +215,10 @@ func (walk *bodyWalk) addFieldPath(selection *types.Selection) {
 }
 
 // addObject collects a use of object on its own: its own bit, as its generic declares it. A local is read through its
-// type, a local constant's in full, since no unit declares a local. A package name, a label, a builtin, nil and an
-// object of the universe are the same in every build.
+// type as every reader of an object no unit declares reads it (throughKey), a local constant's in full and any other's
+// as a member's own type, since no unit declares a local: `var local struct{ _ []Guard }` is read as a package-level
+// var of the type is (#mtfdb1m). A package name, a label, a builtin, nil and an object of the universe are the same in
+// every build.
 func (walk *bodyWalk) addObject(object types.Object) {
 	switch object.(type) {
 	case *types.PkgName, *types.Label, *types.Builtin, *types.Nil:
@@ -226,8 +228,7 @@ func (walk *bodyWalk) addObject(object types.Object) {
 	switch {
 	case universal(declared):
 	case local(declared):
-		_, isConstant := declared.(*types.Const)
-		walk.addType(declared.Type(), isConstant)
+		walk.addWalked(throughKey(declared))
 	default:
 		walk.collected[reference{object: declared}] = true
 	}
@@ -235,14 +236,19 @@ func (walk *bodyWalk) addObject(object types.Object) {
 
 // addType collects the bits walked reaches, read in full or as a name.
 func (walk *bodyWalk) addType(walked types.Type, full bool) {
-	if walked == nil {
+	walk.addWalked(walkKey{walked: walked, full: full})
+}
+
+// addWalked collects the bits key's type reaches in key's mode (bitWalker.borrowedKeyReferences), walked once for the
+// package.
+func (walk *bodyWalk) addWalked(key walkKey) {
+	if key.walked == nil {
 		return
 	}
-	key := walkKey{walked: walked, full: full}
 	referenced, isWalked := walk.typeReferences[key]
 	if !isWalked {
 		start := len(walk.typeReferenceStore)
-		walk.typeReferenceStore = append(walk.typeReferenceStore, walk.walker.borrowedReferences(walked, full)...)
+		walk.typeReferenceStore = append(walk.typeReferenceStore, walk.walker.borrowedKeyReferences(key)...)
 		// The slice's capacity ends with it, so nothing appended to it could write over the next type's bits.
 		referenced = walk.typeReferenceStore[start:len(walk.typeReferenceStore):len(walk.typeReferenceStore)]
 		walk.typeReferences[key] = referenced

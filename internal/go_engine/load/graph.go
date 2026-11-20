@@ -62,10 +62,12 @@ func newGraph(listed *listing, workspace string, compiled map[string]*compiledPa
 			built.roots = append(built.roots, added)
 		}
 	}
+	dependencies := newListedDependencies(listed)
 	for _, listedPackage := range listed.packages {
 		hasTests := len(listedPackage.TestGoFiles)+len(listedPackage.XTestGoFiles) > 0
 		if listed.roots[listedPackage.ImportPath] && hasTests {
-			built.roots = append(built.roots, built.addTestVariants(listed, listedPackage, workspace)...)
+			built.roots = append(built.roots,
+				built.addTestVariants(listed, listedPackage, dependencies, workspace)...)
 		}
 	}
 	return built
@@ -216,8 +218,13 @@ func resolvedImports(listedPackage *listedPackage, imported []string) map[string
 // outputs when p is translated. Every package the tests reach that imports p is built again against it,
 // "q [p.test]", so the tests see one p, from q's own compiled files; one the in-package tests import is a cycle,
 // which go test refuses. "p_test [p.test]" is the external tests, against "p [p.test]" when there is one, and has
-// no cgo, since go refuses import "C" in a test file.
-func (graph *graph) addTestVariants(listed *listing, root *listedPackage, workspace string) []*node {
+// no cgo, since go refuses import "C" in a test file. dependencies are the listing's (see newListedDependencies).
+func (graph *graph) addTestVariants(
+	listed *listing,
+	root *listedPackage,
+	dependencies *listedDependencies,
+	workspace string,
+) []*node {
 	path := root.ImportPath
 	suffix := " [" + path + ".test]"
 	variantOf := map[string]string{}
@@ -238,19 +245,18 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 	}
 
 	// What the tests reach is everything their imports are built from; a package among it whose own imports reach
-	// p is built again, dependencies first, as the listing's order has them.
-	reached := map[string]bool{}
+	// p is built again, dependencies first, as the listing's order has them. An import the listing does not hold
+	// reaches nothing that could be built again.
+	reached := make(packageSet, dependencies.words)
 	reach := func(imported []string) {
 		for _, each := range imported {
 			each = canonical(root, each)
 			if each == path || each == "C" {
 				continue
 			}
-			reached[each] = true
-			if listedImport := listed.byPath[each]; listedImport != nil {
-				for _, dependency := range listedImport.Deps {
-					reached[dependency] = true
-				}
+			if place, found := dependencies.place[each]; found {
+				reached.add(place)
+				reached.addAll(dependencies.dependsOn[place])
 			}
 		}
 	}
@@ -259,7 +265,7 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 		reach(root.XTestImports)
 		cycle := false
 		for written, resolved := range inPackage.imports {
-			if written != path && resolved != path && slices.Contains(listedDeps(listed, resolved), path) {
+			if written != path && resolved != path && dependencies.depends(resolved, path) {
 				cycle = true
 			}
 		}
@@ -269,8 +275,9 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 				{Msg: "import cycle not allowed in test", Kind: packages.ListError},
 			}
 		}
-		for _, between := range listed.packages {
-			if between.ImportPath == path || !reached[between.ImportPath] || !slices.Contains(between.Deps, path) {
+		rootPlace := dependencies.place[path]
+		for place, between := range listed.packages {
+			if place == rootPlace || !reached.has(place) || !dependencies.dependsOn[place].has(rootPlace) {
 				continue
 			}
 			rebuilt := newNode(between, between.ImportPath+suffix, workspace, graph.compiled[between.ImportPath])
@@ -311,14 +318,6 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 		analyzed = append(analyzed, externalNode)
 	}
 	return analyzed
-}
-
-// listedDeps is what go list says path depends on, nothing when it did not list it.
-func listedDeps(listed *listing, path string) []string {
-	if listedPackage := listed.byPath[path]; listedPackage != nil {
-		return listedPackage.Deps
-	}
-	return nil
 }
 
 // absolute is the names in each list, in order, joined to directory.

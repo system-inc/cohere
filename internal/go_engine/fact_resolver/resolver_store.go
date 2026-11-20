@@ -122,6 +122,11 @@ func answerOf[Value any](
 		if stored, held := resolver.stored(kind, object.Pkg(), path); held {
 			answer := decodeAnswer[Value](kind, object, stored, "stored")
 			resolver.storeHits.Add(1)
+			if home != nil {
+				// A learned package's answer, judged in another run: nothing of what it rests on was judged in this
+				// one (Package.AnsweredFromStore).
+				home.storeAnswered.Store(true)
+			}
 			memoize(resolver, key, answer)
 			return answer, false
 		}

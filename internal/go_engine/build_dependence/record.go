@@ -19,6 +19,28 @@ import (
 // packageOf), since a package and its test variants share a path and a test binary's closure holds one package per
 // path.
 
+// Record is a package's record decoded from its bytes, for a caller that decodes it apart from adding it to a graph
+// (Graph.AddDecoded): the findings cache decodes each record it reads beside the entries, so one that does not decode
+// is its own to say and to write again (#6a3kjvz).
+type Record struct {
+	record *packageRecord
+}
+
+// DeclarationsOnly reports whether the record is a declarations-only graph's (declarationsRecordFormat), which holds no
+// unit's reads or callees, so only a declarations-only graph takes it (Graph.add).
+func (decoded *Record) DeclarationsOnly() bool {
+	return decoded.record.declarationsOnly
+}
+
+// DecodeRecord is the record encoded holds (EncodedRecord), or why it holds none.
+func DecodeRecord(encoded []byte) (*Record, error) {
+	record, decodeError := decodeRecord(encoded)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	return &Record{record: record}, nil
+}
+
 // recordedObject is an object as a record names it: its package's path and its local name, and object, the object
 // itself in a record collected from a live package, nil in one decoded.
 type recordedObject struct {

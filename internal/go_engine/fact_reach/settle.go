@@ -10,13 +10,14 @@
 // answer the host recorded about its function is asked in the build and compared: equal, and nothing above it moves;
 // different, or one the build cannot answer, and the function's users leave in turn. That is sound only while every
 // answer a standing body's rules read was built from answers that each have a record of their own. A kind's judgment
-// can read a callee's answer from the kind's own state, which leaves no record, as purity and odd slice read a callee
-// of their package's and triviality walks into one: a body that left with no record of a kind may have served
-// another's answer of that kind all the same. So such a body reads unknown for every kind it holds no record of, and
-// its function's users leave (#5vbs1np, must 1), until each kind records what its judgments read. A record is read by
-// the kind's own unit: a kind that answers about each of a function's parameters, as odd slice does, is recorded for
-// a parameter only by an answer about that one (round 2's N1). And a place two functions share, as a cgo package may
-// declare, holds no record of any kind for either, whatever is recorded there.
+// can read a callee from the kind's own state and leave no record of it, as triviality walks into one: a body that left
+// with no record of a kind may have served another's answer of that kind all the same. So such a body reads unknown
+// for every kind Settle is handed that it holds no record of, and its function's users leave (#5vbs1np, must 1). A
+// kind that records every judgment, as purity, odd slice and nil-ness do (fact_resolver.Kind.RecordsEveryJudgment,
+// #z9fze0t), leaves a record wherever one of its answers rests on a body, so its caller hands Settle no such kind. A
+// record is read by the kind's own unit: a kind that answers about each of a function's parameters, as odd slice does,
+// is recorded for a parameter only by an answer about that one (round 2's N1). And a place two functions share, as a
+// cgo package may declare, holds no record of any kind for either, whatever is recorded there.
 //
 // This package is the fixed point alone, over places, objects and questions it knows nothing more of. Who fills them,
 // from stage 1's record of what each declaration uses and from the host's facts, is the engine's pipeline.

@@ -136,9 +136,14 @@ func TestEachRulesMethodLookupIsItsOwnRead(test *testing.T) {
 // build's decide on deeafbf4 (#p1s9gdk). Sorting two hundred selections through a struct of two hundred fields, and two
 // hundred objects each used in two kinds, allocates the result's slice and nothing per comparison.
 //
+// Each call sorts reads nothing has asked yet, one Reads for each call testing.AllocsPerRun makes, its runs and the
+// one that warms it up: a Reads keeps the list it sorted (#f7qsmdf), so one asked on every run would sort once and
+// hand the kept list back for nothing after, and the average would pass with the rendering back.
+//
 // Not parallel: testing.AllocsPerRun counts the whole process's allocations, so another test running beside it would
 // be counted too.
 func TestSortingReadsOfOneObjectWritesNothing(test *testing.T) {
+	const runs = 5
 	other := types.NewPackage("example.com/other", "other")
 	fields := make([]*types.Var, 0, 200)
 	for index := range 200 {
@@ -147,22 +152,222 @@ func TestSortingReadsOfOneObjectWritesNothing(test *testing.T) {
 	}
 	receiver := types.NewTypeName(token.NoPos, other, "Wide", nil)
 	types.NewNamed(receiver, types.NewStruct(fields, nil), nil)
-	reads := &Reads{}
-	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
-	for index, field := range fields {
-		selection := Selection{Receiver: receiver, Name: field.Name(), Index: []int{index}, Selected: field}
-		collected.selections[selectionKey(selection)] = selection
-		collected.uses[ObjectUse{Object: field, Kind: UseMember}] = true
-		collected.uses[ObjectUse{Object: field, Kind: UseWhole}] = true
+	unasked := make([]*Reads, 0, runs+1)
+	for range runs + 1 {
+		reads := &Reads{}
+		collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
+		for index, field := range fields {
+			selection := Selection{Receiver: receiver, Name: field.Name(), Index: []int{index}, Selected: field}
+			collected.selections[selectionKey(selection)] = selection
+			collected.uses[ObjectUse{Object: field, Kind: UseMember}] = true
+			collected.uses[ObjectUse{Object: field, Kind: UseWhole}] = true
+		}
+		reads.publishTypes(collected)
+		unasked = append(unasked, reads)
 	}
-	reads.publishTypes(collected)
 
-	if allocations := testing.AllocsPerRun(5, func() { reads.Selections() }); allocations > 1 {
+	nextSelections := 0
+	if allocations := testing.AllocsPerRun(runs, func() {
+		unasked[nextSelections].Selections()
+		nextSelections++
+	}); allocations > 1 {
 		test.Errorf("sorting %d selections through one receiver allocated %.0f times, want the result's slice alone",
 			len(fields), allocations)
 	}
-	if allocations := testing.AllocsPerRun(5, func() { reads.Uses() }); allocations > 1 {
+	nextUses := 0
+	if allocations := testing.AllocsPerRun(runs, func() {
+		unasked[nextUses].Uses()
+		nextUses++
+	}); allocations > 1 {
 		test.Errorf("sorting %d objects each used in two kinds allocated %.0f times, want the result's slice alone",
 			len(fields), allocations)
+	}
+}
+
+// everyKindOfRead is reads holding two of each kind, a use, a selection, a fact read and a lookup of each of two
+// fields of another package's struct, with the first field's use, fact read and lookup, as an adder is handed them
+// again.
+type everyKindOfRead struct {
+	reads  *Reads
+	use    ObjectUse
+	fact   Fact
+	lookup Lookup
+}
+
+// readsOfEveryKind records two reads of each kind, the uses and selections published as a walk publishes them, the
+// fact reads and lookups added as the actions add them.
+func readsOfEveryKind() everyKindOfRead {
+	other := types.NewPackage("example.com/other", "other")
+	fields := []*types.Var{
+		types.NewField(token.NoPos, other, "Bravo", types.Typ[types.Int], false),
+		types.NewField(token.NoPos, other, "Delta", types.Typ[types.Int], false),
+	}
+	receiver := types.NewTypeName(token.NoPos, other, "Wide", nil)
+	types.NewNamed(receiver, types.NewStruct(fields, nil), nil)
+	factType := reflect.TypeFor[*readFact]()
+	every := everyKindOfRead{reads: &Reads{}}
+	collected := typeReads{uses: map[ObjectUse]bool{}, selections: map[selectionIdentity]Selection{}}
+	for index, field := range fields {
+		use := ObjectUse{Object: field, Kind: UseMember}
+		fact := Fact{Object: field, Package: other, FactType: factType, Found: true}
+		lookup := Lookup{Query: QueryScope, Path: other.Path(), Name: field.Name()}
+		selection := Selection{Receiver: receiver, Name: field.Name(), Index: []int{index}, Selected: field}
+		collected.uses[use] = true
+		collected.selections[selectionKey(selection)] = selection
+		every.reads.AddFact(fact)
+		every.reads.AddLookup(lookup)
+		if index == 0 {
+			every.use, every.fact, every.lookup = use, fact, lookup
+		}
+	}
+	every.reads.publishTypes(collected)
+	return every
+}
+
+// sameList reports whether two lists are one slice, the same elements at the same place and as many of them. Two
+// empty lists are never told to be one: they have no element to be at a place.
+func sameList[Read any](left []Read, right []Read) bool {
+	return len(left) > 0 && len(left) == len(right) && &left[0] == &right[0]
+}
+
+// The reads keep each sorted list the first time it is asked and hand every later ask the same slice, so asking again
+// allocates nothing: each extra build's verdicts ask the host's reads for the lists the build before it asked
+// (#f7qsmdf).
+//
+// Not parallel: testing.AllocsPerRun counts the whole process's allocations, so another test running beside it would
+// be counted too.
+func TestASecondAskOfAListAllocatesNothingAndIsTheSameSlice(test *testing.T) {
+	every := readsOfEveryKind()
+	requireKept(test, "uses", every.reads.Uses)
+	requireKept(test, "selections", every.reads.Selections)
+	requireKept(test, "facts", every.reads.Facts)
+	requireKept(test, "lookups", every.reads.Lookups)
+}
+
+// requireKept asks list, the reads' list of kind, and requires that asking it again allocates nothing and gives the
+// slice the first ask gave.
+func requireKept[Read any](test *testing.T, kind string, list func() []Read) {
+	test.Helper()
+
+	first := list()
+	if len(first) != 2 {
+		test.Fatalf("the reads hold %d %s, want two, so the list tells nothing", len(first), kind)
+	}
+	if allocations := testing.AllocsPerRun(5, func() { list() }); allocations != 0 {
+		test.Errorf("asking the %s again allocated %.0f times, want none", kind, allocations)
+	}
+	if !sameList(first, list()) {
+		test.Errorf("asking the %s again gave another slice, want the one kept", kind)
+	}
+}
+
+// A read added after a list was kept is in the next list asked, in its sorted place, whichever way it came: a use the
+// type check added or the walk published, a selection the walk published, a fact read or a lookup. Reads with none of
+// a kind keep an empty list, which the first read of the kind must drop as it would a full one.
+func TestAReadAddedAfterAListWasKeptIsInTheNextList(test *testing.T) {
+	test.Parallel()
+
+	other := types.NewPackage("example.com/other", "other")
+	receiver := types.NewTypeName(token.NoPos, other, "Wide", nil)
+	factType := reflect.TypeFor[*readFact]()
+	field := func(name string) *types.Var {
+		return types.NewField(token.NoPos, other, name, types.Typ[types.Int], false)
+	}
+	useName := func(use ObjectUse) string { return use.Object.Name() }
+	test.Run("a use added", func(test *testing.T) {
+		test.Parallel()
+
+		reads := &Reads{}
+		requireAddedLater(test, reads.Uses, useName, func(name string) { reads.AddUse(field(name), UseMember) })
+	})
+	test.Run("a use published", func(test *testing.T) {
+		test.Parallel()
+
+		reads := &Reads{}
+		requireAddedLater(test, reads.Uses, useName, func(name string) {
+			reads.publishTypes(typeReads{uses: map[ObjectUse]bool{{Object: field(name), Kind: UseMember}: true}})
+		})
+	})
+	test.Run("a selection published", func(test *testing.T) {
+		test.Parallel()
+
+		reads := &Reads{}
+		requireAddedLater(test, reads.Selections, func(selection Selection) string { return selection.Name },
+			func(name string) {
+				selection := Selection{Receiver: receiver, Name: name, Index: []int{0}, Selected: field(name)}
+				reads.publishTypes(typeReads{
+					selections: map[selectionIdentity]Selection{selectionKey(selection): selection},
+				})
+			})
+	})
+	test.Run("a fact read added", func(test *testing.T) {
+		test.Parallel()
+
+		reads := &Reads{}
+		requireAddedLater(test, reads.Facts, func(fact Fact) string { return fact.Object.Name() },
+			func(name string) {
+				reads.AddFacts([]Fact{{Object: field(name), Package: other, FactType: factType, Found: true}})
+			})
+	})
+	test.Run("a lookup added", func(test *testing.T) {
+		test.Parallel()
+
+		reads := &Reads{}
+		requireAddedLater(test, reads.Lookups, func(lookup Lookup) string { return lookup.Name },
+			func(name string) { reads.AddLookup(Lookup{Query: QueryScope, Path: other.Path(), Name: name}) })
+	})
+}
+
+// requireAddedLater asks list of reads that hold none of its kind, then after add has added reads named Bravo and
+// Delta, then after it has added one named Charlie, and requires each ask to give every read added by then, sorted,
+// each named by name: the first an empty list that is not nil, the last with Charlie between the two.
+func requireAddedLater[Read any](test *testing.T, list func() []Read, name func(Read) string, add func(name string)) {
+	test.Helper()
+
+	if none := list(); none == nil || len(none) != 0 {
+		test.Fatalf("want an empty list that is not nil of reads that hold none, got %v", none)
+	}
+	for _, step := range []struct {
+		added []string
+		want  []string
+	}{
+		{[]string{"Delta", "Bravo"}, []string{"Bravo", "Delta"}},
+		{[]string{"Charlie"}, []string{"Bravo", "Charlie", "Delta"}},
+	} {
+		for _, added := range step.added {
+			add(added)
+		}
+		var names []string
+		for _, read := range list() {
+			names = append(names, name(read))
+		}
+		if !slices.Equal(names, step.want) {
+			test.Fatalf("after %q were added, want the list %q, got %q", step.added, step.want, names)
+		}
+	}
+}
+
+// An adder that adds nothing new keeps the list: a use, a fact read or a lookup the reads hold already changes no
+// list, so the next ask gives the slice kept, and a caller ranging over it reads what it would have.
+func TestAnAdderThatAddsNothingNewKeepsTheList(test *testing.T) {
+	test.Parallel()
+
+	every := readsOfEveryKind()
+	uses, selections := every.reads.Uses(), every.reads.Selections()
+	facts, lookups := every.reads.Facts(), every.reads.Lookups()
+	every.reads.AddUse(every.use.Object, every.use.Kind)
+	every.reads.AddFacts([]Fact{every.fact})
+	every.reads.AddLookup(every.lookup)
+	if !sameList(uses, every.reads.Uses()) {
+		test.Error("AddUse of a use the reads hold dropped the kept uses, want the same slice")
+	}
+	if !sameList(selections, every.reads.Selections()) {
+		test.Error("adding reads the reads hold dropped the kept selections, want the same slice")
+	}
+	if !sameList(facts, every.reads.Facts()) {
+		test.Error("AddFacts of a fact read the reads hold dropped the kept facts, want the same slice")
+	}
+	if !sameList(lookups, every.reads.Lookups()) {
+		test.Error("AddLookup of a question the reads hold dropped the kept lookups, want the same slice")
 	}
 }

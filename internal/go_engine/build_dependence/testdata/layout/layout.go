@@ -37,7 +37,7 @@ func PassesHolder() int {
 	return holder.Capacity()
 }
 
-// Shell embeds a pointer to Holder, which promotes Holder's fields.
+// Shell embeds a pointer to Holder, which promotes Holder's fields, so its underlying reads Holder in full: dependent.
 type Shell struct {
 	*Holder
 }
