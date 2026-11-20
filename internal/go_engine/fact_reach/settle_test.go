@@ -147,6 +147,31 @@ func TestANamedObjectTakesItsUsersOut(test *testing.T) {
 	}
 }
 
+// The settlement carries every object the walk named, with its reason, in the order it was named: one handed in, then
+// one a question about it read differing for. An object whose question read equal is not among them, and nor is one
+// nobody asked about, so an asker that never stands leaves only for an object truly named.
+func TestTheSettlementCarriesTheObjectsItNamed(test *testing.T) {
+	test.Parallel()
+	source := warmFixture()
+	source.users["os.Exit"] = []fact_reach.Place{outer}
+	compare, _ := answering(
+		map[string]fact_reach.Comparison{purityOfSize.Key: fact_reach.Differs, purityOfWarm.Key: fact_reach.Equal})
+	settlement := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, []fact_reach.Place{size},
+		[]fact_reach.Named{{Object: "os.Exit", Reason: "no-return"}}, nil, source, compare)
+	wantNamed := []fact_reach.Named{
+		{Object: "os.Exit", Reason: "no-return"},
+		{Object: "size", Reason: "answer function_purity"},
+	}
+	if !reflect.DeepEqual(settlement.Named, wantNamed) {
+		test.Errorf("named %v, want %v: Warm's answer read equal, and nothing was asked about Outer", settlement.Named,
+			wantNamed)
+	}
+	none := fact_reach.Settle(map[fact_reach.Place]bool{warm: true, outer: true}, nil, nil, nil, warmFixture(), compare)
+	if len(none.Named) != 0 {
+		test.Errorf("with nothing reached and nothing handed in, named %v, want nothing", none.Named)
+	}
+}
+
 // A question recorded under two bodies is asked once, and a user the build lints already is not counted as removed.
 func TestAQuestionIsAskedOnceAndAReachedUserIsNotRemoved(test *testing.T) {
 	test.Parallel()

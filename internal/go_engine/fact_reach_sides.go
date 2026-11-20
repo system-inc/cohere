@@ -83,9 +83,11 @@ func newFactReachSides(
 // inBuild is, by package ID, the side the build whose body reach census is reach hands its passes on each package that
 // has one and that the census judged: the package's bodies the reach leaves unreached are its standing set, and the
 // build lints it in part when any stands, whole when none does (factReachPackage.inBuild). Only the side's own places
-// stand, its function bodies, never a value's initializer, which the census judges too and no fact's reach follows;
-// two bodies at one place, as a cgo package may hold, stand once. Any other package has no side here, and the build
-// lints it whole. It only reads the sides, on the build's own goroutine, so every build may call it at once.
+// stand, its function bodies, never a value's initializer, which the census judges too: the facts' reach follows a
+// package's variable initializers as one asker that is no place and never stands (factReachInitializers), so a
+// package with initializers alone unreached is linted whole. Two bodies at one place, as a cgo package may hold, stand
+// once. Any other package has no side here, and the build lints it whole. It only reads the sides, on the build's own
+// goroutine, so every build may call it at once.
 func (sides *factReachSides) inBuild(reach *buildBodyReach) map[string]fact_reach.Host {
 	unreached := map[string]map[fact_reach.Place]bool{}
 	for _, body := range reach.bodies {

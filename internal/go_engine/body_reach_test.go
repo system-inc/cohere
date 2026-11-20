@@ -709,7 +709,7 @@ func TestABodyIsClassedOnlyWhereOneStageOwnsEveryDifference(test *testing.T) {
 		}
 	}
 	differential.compareFindings(hostFindings, builtFindings, stages,
-		&findingCauses{filesDiffer: map[string]bool{"example.com/mixed": true}}, nil)
+		&findingCauses{filesDiffer: map[string]bool{"example.com/mixed": true}}, nil, nil)
 	for _, each := range cases {
 		got := findingStage("")
 		for stage, lines := range differential.classed {

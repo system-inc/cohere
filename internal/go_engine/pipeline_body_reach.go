@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_facts"
 )
 
@@ -69,13 +70,19 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 			}
 			continue
 		}
-		writeBuildBodyReach(&written, "build "+run.build.String(), run.bodyReach)
+		// What the facts' reach took out of each package, which a census, made before any rule ran, could not count
+		// when it listed the packages that need their declarations alone. A run handed no result settled nothing.
+		var takenOut map[string]map[fact_reach.Place]bool
+		if run.result != nil {
+			takenOut = takenOutByFacts(engine.factReachSides, run.result.FactReachSettled)
+		}
+		writeBuildBodyReach(&written, "build "+run.build.String(), run.bodyReach, takenOut)
 		if run.factReach != nil {
 			writeBuildFactReach(&written, run.factReach)
 		}
 		if run.bodyReachFromSource != nil {
 			writeBuildBodyReach(&written, "build "+run.build.String()+", within the packages a plain run checks from "+
-				"source", run.bodyReachFromSource)
+				"source", run.bodyReachFromSource, takenOut)
 		}
 		if run.bodyDifferential == nil {
 			continue
@@ -112,8 +119,16 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 	}
 }
 
-// writeBuildBodyReach writes one build's census to written under heading.
-func writeBuildBodyReach(written *strings.Builder, heading string, census *buildBodyReach) {
+// writeBuildBodyReach writes one build's census to written under heading. takenOut are the bodies the facts' reach
+// took out of each package once the build's rules ran (takenOutByFacts): a package it took a body or the variable
+// initializers out of is one the build lints something of, so it is left out of the list of those that need their
+// declarations alone, though no difference in types reaches a body of it.
+func writeBuildBodyReach(
+	written *strings.Builder,
+	heading string,
+	census *buildBodyReach,
+	takenOut map[string]map[fact_reach.Place]bool,
+) {
 	fmt.Fprintf(written, "%s\n", heading)
 	fmt.Fprintf(written, "  packages checked from source: %d, recorded %d, unrecorded %d, only the build's %d\n",
 		census.checkedFromSource, census.recorded,
@@ -127,8 +142,12 @@ func writeBuildBodyReach(written *strings.Builder, heading string, census *build
 	fmt.Fprintf(written, "  reached by reason: %s\n", strings.Join(reasons, ", "))
 	writeLoadModeCost(written, census)
 	writeBodyReachDrivers(written, census)
-	fmt.Fprintf(written, "  declarations only: %d packages\n", len(census.declarationsOnly))
-	for _, identifier := range census.declarationsOnly {
+	// A copy, since the list is the census's own, the reach's judgment before any fact was compared, and stays so.
+	declarationsOnly := slices.DeleteFunc(slices.Clone(census.declarationsOnly), func(identifier string) bool {
+		return len(takenOut[identifier]) > 0
+	})
+	fmt.Fprintf(written, "  declarations only: %d packages\n", len(declarationsOnly))
+	for _, identifier := range declarationsOnly {
 		fmt.Fprintf(written, "    %s\n", identifier)
 	}
 	fmt.Fprintf(written, "  bodies judged not the build's count, each package reached whole: %d packages\n",

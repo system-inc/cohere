@@ -114,9 +114,16 @@ type Removal struct {
 // Settlement is what Settle found: the bodies that still stand, those that left the standing set, in the order they
 // left, how many questions the build was asked, how many of them read different or unknown, by kind, and how many
 // functions of a body that left held no record of a kind, by kind, each read unknown for it.
+//
+// Named are the objects the walk named, each with its reason: those handed in, then each as a question about it read
+// different or unknown or as its body held no record of a kind, in the order the walk read them, an object once for
+// each reason it was named. An asker that is no body and so never stands, as a package's variable initializers taken
+// together, is in no set for the walk to take it out of, and whoever holds one reads here whether an object it uses
+// was named.
 type Settlement struct {
 	Standing   map[Place]bool
 	Removed    []Removal
+	Named      []Named
 	Asked      int
 	Differing  map[string]int
 	Unknown    map[string]int
@@ -208,6 +215,7 @@ func Settle(
 			}
 		}
 	}
+	settlement.Named = differing
 	return settlement
 }
 

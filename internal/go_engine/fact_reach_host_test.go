@@ -221,6 +221,53 @@ func TestAnObjectsUsersAreTheBodiesThatNameOrSelectIt(test *testing.T) {
 	}
 }
 
+// A package's variable initializers are one asker of the side's (#bed0mnk): started, whose initializer calls size, is
+// its one place, in no object's users and no place of the package's, so it never stands, and it leaves for a
+// settlement that named size, for whatever reason, and for none that named only what no initializer uses, or nothing.
+func TestAPackagesVariableInitializersAreOneAskerThatIsNoPlace(test *testing.T) {
+	test.Parallel()
+
+	fixture, _ := checkedFactsFixture(test)
+	hosted := newFactReachPackage(fixture.inputs())
+	size, warm := fixture.key(test, fixture.function(test, "size")), fixture.key(test, fixture.function(test, "Warm"))
+	if len(hosted.initializers.places) != 1 || hosted.initializers.everything || !hosted.initializers.uses[size] ||
+		len(hosted.initializers.uses) != 1 {
+		test.Fatalf("the initializers are %+v, want started's one place and its one use, size", hosted.initializers)
+	}
+	started := hosted.initializers.places[0]
+	// started's name is at byte 1066 of facts.go, where the census places a value spec.
+	want := fact_reach.Place{File: filepath.Join("testdata", "fact-reach", "facts.go"), Offset: 1066}
+	if started != want {
+		test.Errorf("started is placed at %v, want %v", started, want)
+	}
+	if slices.Contains(hosted.Places(), started) || slices.Contains(hosted.Users(size), started) {
+		test.Errorf("started's place is among the package's places %t and size's users %t, want neither",
+			slices.Contains(hosted.Places(), started), slices.Contains(hosted.Users(size), started))
+	}
+	for _, each := range []struct {
+		name  string
+		named []fact_reach.Named
+		want  bool
+	}{
+		{"size named", []fact_reach.Named{{Object: warm, Reason: "order"}, {Object: size, Reason: "no-return"}}, true},
+		{"Warm alone named", []fact_reach.Named{{Object: warm, Reason: "no-return"}}, false},
+		{"nothing named", nil, false},
+	} {
+		if got := hosted.initializers.leaveFor(each.named); got != each.want {
+			test.Errorf("with %s the initializers leave %t, want %t", each.name, got, each.want)
+		}
+	}
+	// An initializer with a use no identity names, as the unfollowed fixture's initial reads a field of a struct
+	// type with no name, uses every object, and leaves for anything named.
+	unfollowed := newFactReachPackage(
+		checkedFactReachFixture(test, "unfollowed", "example.com/facts/unfollowed").inputs()).initializers
+	if !unfollowed.everything || len(unfollowed.places) != 1 ||
+		!unfollowed.leaveFor([]fact_reach.Named{{Object: warm, Reason: "no-return"}}) || unfollowed.leaveFor(nil) {
+		test.Errorf("the unfollowed fixture's initializers are %+v, want its one place, a user of every object, "+
+			"which leaves for anything named and for nothing else", unfollowed)
+	}
+}
+
 // A package's places are its function bodies in the order its files declare them, a function declared without a body
 // not among them.
 func TestAPackagesPlacesAreItsFunctionBodiesInTheOrderDeclared(test *testing.T) {

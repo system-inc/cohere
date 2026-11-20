@@ -57,9 +57,9 @@ type factReachParameter struct {
 
 // factReachBuilder makes one package's side from inputs, and is let go once it has. rendered keeps each object's
 // identity and key, rendered once however many bodies use it. functions are the functions the record's declarations
-// declare, which the package's own answers are placed by, used the functions its bodies use, which another package's
-// answers are kept by, and parameters each parameter of either. met are the functions a no-return fact is compared
-// on already, by key.
+// declare, which the package's own answers are placed by, used the functions its bodies and its variables'
+// initializers use, which another package's answers are kept by, and parameters each parameter of either. met are the
+// functions a no-return fact is compared on already, by key.
 type factReachBuilder struct {
 	inputs     factReachInputs
 	hosted     *factReachPackage
@@ -76,7 +76,8 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		inputs: inputs,
 		hosted: &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{},
 			recorded: map[fact_reach.Place][]fact_reach.Question{}, askings: map[string]fact_reach.Asking{},
-			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{}},
+			declared: map[fact_reach.Place][]fact_reach.Object{}, parameters: map[fact_reach.Object]int{},
+			initializers: factReachInitializers{uses: map[fact_reach.Object]bool{}}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
 		met: map[fact_reach.Object]bool{},
@@ -85,7 +86,12 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 	// directives, is known (factReachPackage.shared).
 	parsedFiles := map[string]map[string]bool{}
 	for declared := range inputs.record.Declarations() {
-		// A type has no body, and a value's initializer is no function's: neither is a place.
+		// A variable's initializer is no function's body and so no place: the package's are one asker (initialize).
+		if declared.HasBody && isVariableInitializer(declared.Declaration) {
+			builder.initialize(declared)
+			continue
+		}
+		// A type has no body, and a const's value runs in no function: neither is a place.
 		if declared.Declaration.Kind != build_reads.DeclaredFunction {
 			continue
 		}
@@ -228,13 +234,13 @@ func (builder *factReachBuilder) keepParameters(function *types.Func) {
 	}
 }
 
-// use makes the body at place, declared's, a user of each object its body uses, the object selected for a selection,
-// and meets each function among them, kept as used with its parameters. Its signature's uses are not its body's: a
-// rule reads a fact where a body names or selects its object. A body with a use no identity names is a user of every
-// object instead, as one the record marks unknown is. The recorder marks a body unknown wherever a use of it renders
-// unknown, by the renderer's own rule (build_reads.unplacedIdentity), so the second check finds nothing today, and
-// stands for a record made any other way.
-func (builder *factReachBuilder) use(place fact_reach.Place, declared build_reads.DeclarationUses) {
+// usedKeys are the keys of the objects declared's body uses, a function's or a variable's initializer, the object
+// selected for a selection, and whether every one of them could be followed. It meets each function among them, kept
+// as used with its parameters. The signature's uses are not the body's: a rule reads a fact where a body names or
+// selects its object. A body with a use no identity names is not followed, as one the record marks unknown is not.
+// The recorder marks a body unknown wherever a use of it renders unknown, by the renderer's own rule
+// (build_reads.unplacedIdentity), so the second check finds nothing today, and stands for a record made any other way.
+func (builder *factReachBuilder) usedKeys(declared build_reads.DeclarationUses) ([]fact_reach.Object, bool) {
 	isFollowed := !declared.BodyUnknown
 	keys := make([]fact_reach.Object, 0, len(declared.Body))
 	for _, use := range declared.Body {
@@ -248,6 +254,39 @@ func (builder *factReachBuilder) use(place fact_reach.Place, declared build_read
 		isFollowed = isFollowed && rendered.known
 		keys = append(keys, rendered.key)
 	}
+	return keys, isFollowed
+}
+
+// initialize joins declared, a variable's initializer, to the package's one asker of them
+// (factReachPackage.initializers): its place, as the census places it, and the objects its values use, so a function
+// only an initializer uses is met, its facts compared, and the host's answers about it asked (importedAnswer). One
+// that could not be followed makes the asker a user of every object. An initializer the file set places in no file
+// has no place to leave by, and is counted unplaced, as a body is.
+func (builder *factReachBuilder) initialize(declared build_reads.DeclarationUses) {
+	tokenFile := builder.inputs.fileSet.File(declared.Declaration.File)
+	if tokenFile == nil {
+		builder.hosted.unplaced++
+		return
+	}
+	// The same rule as a body's place: the file a reader sees, at the offset in the file as parsed.
+	builder.hosted.initializers.places = append(builder.hosted.initializers.places, fact_reach.Place{
+		File:   tokenFile.Position(tokenFile.Pos(declared.Declaration.Offset)).Filename,
+		Offset: declared.Declaration.Offset,
+	})
+	keys, isFollowed := builder.usedKeys(declared)
+	if !isFollowed {
+		builder.hosted.initializers.everything = true
+		return
+	}
+	for _, key := range keys {
+		builder.hosted.initializers.uses[key] = true
+	}
+}
+
+// use makes the body at place, declared's, a user of each object its body uses (usedKeys). A body that could not be
+// followed is a user of every object instead.
+func (builder *factReachBuilder) use(place fact_reach.Place, declared build_reads.DeclarationUses) {
+	keys, isFollowed := builder.usedKeys(declared)
 	if !isFollowed {
 		builder.hosted.everything = append(builder.hosted.everything, place)
 		return
@@ -331,10 +370,10 @@ func (builder *factReachBuilder) answer(answer check.ExportedFact) {
 }
 
 // importedAnswer records answer, one the host holds about another package's object, as a question asked before any
-// body leaves, when it is about a function a body of the package uses or about a parameter of one. The host hands
-// every answer it holds, most of them about functions the package never touches, so any other is left out and counted
-// nowhere: no body's findings turn on it. So is one about a function the record declares, which is the package's own
-// and is asked as its body leaves.
+// body leaves, when it is about a function a body or a variable's initializer of the package uses or about a
+// parameter of one. The host hands every answer it holds, most of them about functions the package never touches, so
+// any other is left out and counted nowhere: no body's findings turn on it. So is one about a function the record
+// declares, which is the package's own and is asked as its body leaves.
 func (builder *factReachBuilder) importedAnswer(answer check.ExportedFact) {
 	var function *types.Func
 	parameter := -1

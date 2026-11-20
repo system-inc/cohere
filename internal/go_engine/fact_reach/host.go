@@ -19,7 +19,8 @@ type Host interface {
 	Places() []Place
 
 	// Functions are the functions whose no-return fact a body's findings can turn on: each the package declares with
-	// a body and each function a body uses, its own package's or another's, once, with the host's fact.
+	// a body and each function a body or a variable's initializer uses, its own package's or another's, once, with the
+	// host's fact.
 	Functions() []Function
 
 	// Imported are the answers the host's analysis of the package read from other packages, each asked of the build
