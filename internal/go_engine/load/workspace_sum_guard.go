@@ -77,6 +77,7 @@ func (guard *workspaceSumGuard) output(command *exec.Cmd) ([]byte, []byte, error
 		return runCommand(command)
 	}
 	guard.children.started(command.Args[1:])
+	defer guard.children.ended()
 	if guard.readsNoWorkFile {
 		return runCommand(command)
 	}

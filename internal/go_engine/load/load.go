@@ -361,6 +361,8 @@ func loadWorkspace(
 	}
 	goEnvironment := caching.GoEnvironment
 	if !goEnvironment.answers(workspace, environment) {
+		// An answer read here runs its own build list, never the host's (ShareModulesOf): only the run's early reads
+		// of each build's go env share it, and a load lands here only when it was handed none of those.
 		var environmentError error
 		measureListingCommand(caching.Timing, func() {
 			goEnvironment, environmentError = ReadGoEnvironment(workspace, environment, caching.Held, caching.Children)

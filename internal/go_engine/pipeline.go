@@ -76,7 +76,8 @@ type pipeline struct {
 	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
 
-	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache).
+	// systemCache is the run's system cache, found once before any build reads it (openSystemCache, #syscache): the
+	// description's, which its early start kept each build's build context in.
 	systemCache *systemCache
 
 	// shardStamps are the run's stamps of its stores' shard directories, which every extra build's packs read, each
@@ -178,11 +179,11 @@ type pipeline struct {
 	// collection, which each build's holdings are measured beyond (extraBuildRun), 0 in any other run.
 	timedHostLiveBytes uint64
 
-	// buildGoEnvironments are each extra build's go env, by the build's name (project.Build.String), read with its
+	// buildGoEnvironments are each extra build's go env, by the build's name (project.Build.String), started with its
 	// lister state before the host's first load (startChildrenFirst), which the build's run reads in place of asking
-	// again (extraBuildRun), nil in a run that checks no extra build. Written before any build starts and only read
-	// after.
-	buildGoEnvironments map[string]*load.GoEnvironment
+	// again, waiting there for one whose go env runs on (extraBuildRun), nil in a run that checks no extra build.
+	// Written before any build starts and only read after.
+	buildGoEnvironments map[string]*buildGoEnvironment
 
 	// pool is the run's one set of slots, every load and check of the run sharing it, the host's and every extra
 	// build's (#ckm0hsp), made on first use (workPool). poolSizeForced, set only by a test, is its size in place of one
@@ -332,6 +333,10 @@ type pipeline struct {
 	// does it (see pipeline_load_beside_fix.go).
 	watchPrelude func(step preludeStep)
 
+	// watchJoin is a test's look at the run's join of the go commands it started before its first load, nil outside a
+	// test: told as the join begins (joinChildren).
+	watchJoin func()
+
 	// unguardedSums are the go.work.sum files a load's go list ran beside with no side copy of the go.work, so go may
 	// have rewritten them (load.Loaded.UnguardedWorkspaceSum), under unguardedSumsLock, since extra builds load at
 	// once. The summary names them.
@@ -348,8 +353,9 @@ func newPipeline(
 	standardError io.Writer,
 	memory *engineMemory,
 ) *pipeline {
-	// Made before the system cache's store, which holds them, as every store the run opens does (cache.Open).
-	shardStamps := cache.NewShardStamps(nil)
+	// The description's, opened before the go commands it started, with the shard stamps its store holds, as every
+	// store the run opens holds them (cache.Open).
+	systemCache, shardStamps := described.openedSystemCache(request)
 	return &pipeline{
 		request:       request,
 		described:     described,
@@ -363,7 +369,7 @@ func newPipeline(
 		// The facts census reads each build's own facts, which a restore from the host's run would replace.
 		censusKeepsHostRestoreOff: request.judgesDependence(),
 		timing:                    newTiming(request),
-		systemCache:               openSystemCache(request, shardStamps),
+		systemCache:               systemCache,
 		shardStamps:               shardStamps,
 		reads:                     load.NewSharedReads(),
 		fingerprints:              load.NewFingerprints(),
@@ -453,7 +459,9 @@ func (engine *pipeline) run() int {
 			}
 		}
 	}
-	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8).
+	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8), and is joined
+	// on every way out, a return or a panic, so none outlives the run.
+	defer engine.joinChildren()
 	engine.startChildrenFirst()
 	var loaded *load.Loaded
 	var loadError error
