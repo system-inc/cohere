@@ -23,7 +23,8 @@ import (
 // declares otherwise where its bodies could see one, for the same reason. presence-caller and presence-owning take
 // their bodies out by the host's presence record: Start starts helper, which the tagged build reaches, and Loose
 // writes interface{} of its own. The two presence-marker modules take out the empty method a marker's name declares,
-// whose finding hangs on a selection only one build compiles: windows's alone in -win, the host's alone in -host.
+// whose finding hangs on a selection only one build compiles: windows's alone in -win, the host's alone in -host;
+// and presence-marker-decl the one whose marker only the host declares.
 type standingPresence struct {
 	module  string
 	row     standing_presence.Row
@@ -59,6 +60,8 @@ var standingPresences = []standingPresence{
 		stands: "Port"},
 	{module: "presence-marker-host", row: standing_presence.EmptyFunction, file: "shared.go",
 		leaves: "Circle.isShape", stands: "Port", named: 1},
+	{module: "presence-marker-decl", row: standing_presence.EmptyFunction, file: "shared.go",
+		leaves: "Circle.isShape", stands: "Port"},
 }
 
 // leftFor are the reasons the facts' settlement of run took the declaration named name, in file, out of the standing
