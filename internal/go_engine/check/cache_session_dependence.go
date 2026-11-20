@@ -3,6 +3,7 @@ package check
 import (
 	"crypto/sha256"
 	"fmt"
+	"sync"
 
 	"golang.org/x/tools/go/packages"
 
@@ -47,22 +48,51 @@ import (
 // unit carries whether it hangs on the C side, one in a cgo tool's output or in any file of a package checked as
 // written that has a cgo file (build_dependence's cgo_files.go), which a build seeds wherever the package differs, and
 // whether the host's load withheld its body or initial value, which every build seeds, so a record of 4 holds neither
-// mark, and is encoded otherwise. At 6, a member whose own type spells an unnamed struct reads what its own line
-// observes of each unexported field of it that is not embedded (build_dependence's bitWalker), so a record of 5 holds
-// a looser bit. At 7, a named type's underlying bit reads in full the element behind each pointer at its top and
-// behind each embedded pointer field (build_dependence's borrowedUnderlyingReferences), a member's bit observes what a
-// constraint's struct and a method's receiver's constraints show, reads an observed field's type with the member's walk
-// off, and a body reads its local as a member's own type, so a record of 6 holds other bits. At 8, an alias's
-// underlying bit reads what the pointer rule reads of the type it names, an alias in an observation gives its name
-// bit alone, and an observation enters a local the walk is already in by another way, so a record of 7 holds other
-// bits. TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey names the version's text.
-const DependenceRecordVersion = "dependence-record-8"
+// mark, and is encoded otherwise. At 6, a const spec that repeats the spec before it carries that spec's universe
+// names, so a record of 5 leaves it unseeded in a build that declares one of them. At 9, a member whose own type
+// spells an unnamed struct reads what its own line observes of each unexported field of it that is not embedded, as
+// far as an observation reads it, a named type's underlying bit reads in full the element behind each pointer at its
+// top and behind each embedded pointer field, an alias's what the type it names hides, a member's bit observes what a
+// constraint's struct and a method's receiver's constraints show, and a body reads its local as a member's own type
+// (build_dependence's bitWalker, #mtfdb1m), so a record of 6 holds looser bits. 7 and 8 are skipped: that unit's
+// branch wrote records at each before it met 6, and none of them must be read.
+// TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey names the version's text.
+const DependenceRecordVersion = "dependence-record-9"
 
 // DependenceRecordKey is where the store keeps the dependence record of the package whose first key is key: apart from
 // every entry, export data and alias, and derived from the entry's key alone, so a record is read only by a run that
 // keyed its package exactly as the one that wrote it.
 func DependenceRecordKey(key cache.Key) cache.Key {
 	return sha256.Sum256(append([]byte("dependence record "+DependenceRecordVersion+" "), key[:]...))
+}
+
+// The declarations-only records of a plain run asked for the must-check census (#anfjtr3). A run with no
+// `--build-dependence` builds a declarations-only graph instead (build_dependence.NewDeclarationsGraph), and keeps each
+// package's declarations-only record beside its entry, as the switch keeps a whole one, under a key of its own derived
+// from the entry's first key (DeclarationsRecordKey), so neither kind of run ever reads the other's. They are read,
+// backfilled and counted as the whole records are (readDependenceRecords), but written apart: the graph is built in
+// the host's type-read walks, which run past the save, so each record is written once the walks have ended, beside
+// the builds (WriteDeclarationsRecords), never beside its entry in the save.
+
+// DeclarationsRecordVersion is the format of a declarations-only record as the store keeps it, hashed into its key
+// (DeclarationsRecordKey) beside the whole records' version, DependenceRecordVersion: it changes whenever the record's
+// encoding does, or what a declarations-only graph alone collects into it, and a change to what the collector records,
+// which moves the whole records' version, moves the key too, so neither leaves a stale record readable. At 2, a const
+// spec that repeats the spec before it carries that spec's universe names, as a whole record does at its 6.
+const DeclarationsRecordVersion = "declarations-record-2"
+
+// DeclarationsRecordKey is where the store keeps the declarations-only record of the package whose first key is key:
+// apart from every entry, export data, alias and whole record, and derived from the entry's key alone, as
+// DependenceRecordKey is.
+func DeclarationsRecordKey(key cache.Key) cache.Key {
+	return declarationsRecordKeyAt(DependenceRecordVersion, key)
+}
+
+// declarationsRecordKeyAt is DeclarationsRecordKey with dependenceVersion as the whole records' version, which a test
+// names apart from DependenceRecordVersion to see the key move with it.
+func declarationsRecordKeyAt(dependenceVersion string, key cache.Key) cache.Key {
+	return sha256.Sum256(append([]byte("declarations record "+DeclarationsRecordVersion+" "+dependenceVersion+" "),
+		key[:]...))
 }
 
 // DependenceRecordCounts are what the session did with dependence records over its last load: the records read, each
@@ -97,8 +127,12 @@ type DependenceRecordCounts struct {
 // dependenceRecords is a session's dependence records over its last load: decode, the host graph's decoding of a
 // record's bytes; found, each record the store holds of a package the load keyed that decodes, by package, decoded;
 // throughAlias, the packages of found whose record is their alias target's; recordOf, the host graph's record of a
-// package its syntax built, for the write, nil until the graph is built; and the counts.
+// package its syntax built, for the write, nil until the graph is built; and the counts. declarationsOnly says the
+// records are a plain run's declarations-only ones (KeepDeclarationsRecords), kept under their own key and written
+// apart from the save, with recordOf nil.
 type dependenceRecords struct {
+	declarationsOnly bool
+
 	decode       func(encoded []byte) (*build_dependence.Record, error)
 	found        map[*packages.Package]*build_dependence.Record
 	throughAlias map[*packages.Package]bool
@@ -112,11 +146,22 @@ type dependenceRecords struct {
 
 // KeepDependenceRecords has the session read and write the dependence records of its host's load: under
 // `--build-dependence` alone, on a session with a store. decode is the host graph's decoding of a record's bytes
-// (build_dependence.DecodeRecord), which the session runs as it reads each record, so a record that does not decode is
-// its own to say and to write again.
+// (build_dependence.DecodeRecord), refusing a declarations-only record, which the session runs as it reads each
+// record, so a record that does not decode is its own to say and to write again.
 func (session *CacheSession) KeepDependenceRecords(decode func(encoded []byte) (*build_dependence.Record, error)) {
 	if session.caching.Store != nil {
 		session.dependence = &dependenceRecords{decode: decode}
+	}
+}
+
+// KeepDeclarationsRecords has the session read the declarations-only records of its host's load, and backfill a hit
+// with none, as KeepDependenceRecords has it read whole ones: on a plain run asked for the must-check census, on a
+// session with a store or a system cache (#anfjtr3), the system cache's for the standard library it restores
+// (readStandardLibraryDeclarations), under `--no-cache` too. decode is the declarations-only graph's decoding of a
+// record's bytes, refusing a whole record. Their writes are WriteDeclarationsRecords', once the graph is whole.
+func (session *CacheSession) KeepDeclarationsRecords(decode func(encoded []byte) (*build_dependence.Record, error)) {
+	if session.caching.Store != nil || session.caching.StandardLibrary != nil {
+		session.dependence = &dependenceRecords{declarationsOnly: true, decode: decode}
 	}
 }
 
@@ -158,7 +203,8 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	records.counts = DependenceRecordCounts{}
 	var keyed []*packages.Package
 	for _, each := range reachable {
-		if _, hasKey := session.keys[each]; hasKey {
+		// A session with no store of its own, a plain run's under `--no-cache`, keeps only the system cache's records.
+		if _, hasKey := session.keys[each]; hasKey && session.caching.Store != nil {
 			keyed = append(keyed, each)
 		}
 	}
@@ -166,7 +212,11 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	unreadable := make([]error, len(keyed))
 	session.fanOut(len(keyed), func(index int) {
 		recordKey, _ := session.recordKeyOf(keyed[index])
-		if record, isStored := session.caching.Store.Get(DependenceRecordKey(recordKey)); isStored {
+		storedKey := DependenceRecordKey(recordKey)
+		if records.declarationsOnly {
+			storedKey = DeclarationsRecordKey(recordKey)
+		}
+		if record, isStored := session.caching.Store.Get(storedKey); isStored {
 			read[index], unreadable[index] = records.decode(record)
 		}
 	})
@@ -199,7 +249,13 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 		delete(session.stored, each)
 		records.counts.Backfilled++
 	}
-	session.readStandardLibraryRecords(reachable)
+	// The standard library's declarations-only records are in the system cache's store, beside its entries, and its
+	// whole records in the project's.
+	if records.declarationsOnly {
+		session.readStandardLibraryDeclarations(reachable)
+	} else {
+		session.readStandardLibraryRecords(reachable)
+	}
 }
 
 // recordKeyOf is the key keyed's record is kept beside, and whether it is an alias's target: a hit by an alias that
@@ -226,4 +282,83 @@ func (session *CacheSession) dependenceRecordToWrite(saved *packages.Package) ([
 		return nil, false
 	}
 	return records.recordOf(saved)
+}
+
+// WriteDeclarationsRecords writes, beside the entry of each package the project's store holds under the package's first
+// key, its declarations-only record as recordOf gives it, unless the store already holds that record beside the entry
+// (#anfjtr3): a package whose record was read under its own first key has it, and one whose record was its alias
+// target's is written its own, as dependenceRecordToWrite does for whole records. An entry is under the first key when
+// the last save wrote it, or when the package hit by that key: a hit backfilled for want of a record is checked from
+// source by the load, but a later wave can restore it by the same key again, its entry never written, and recordOf
+// holds it all the same. It writes too, into the system cache's store, the record of each standard-library package the
+// system cache keeps (standardLibraryDeclarationsKey) with none there: one the last save wrote to that store, and one
+// it restored from there, which the caller's graph holds once its side load has run. recordOf answers false for a
+// package its graph holds no live record of, one restored with no type information or a side load that failed, which
+// is then written none.
+//
+// recordOf is the plain run's declarations-only graph's, and the caller calls this once the host's type-read walks
+// have ended, so the graph holds every package it will: a record asked before its package's walk ended would be
+// missing, and its package restored with no record by the next run. Each record is encoded on the run's pool and
+// written with no slot held (fanOutWriting), and counted written; it returns how many writes failed and the first
+// one's reason, since the session's counts were handed on with the host's result before it runs.
+func (session *CacheSession) WriteDeclarationsRecords(recordOf func(*packages.Package) ([]byte, bool)) (int, error) {
+	records := session.dependence
+	if records == nil || !records.declarationsOnly {
+		return 0, nil
+	}
+	var writing []*packages.Package
+	var stores []*cache.Store
+	var keys []cache.Key
+	for saved, key := range session.keys {
+		_, hit := session.hits[saved]
+		if !session.written[saved] && !(hit && session.stored[saved] == key) ||
+			session.storeFor(saved) != session.caching.Store {
+			continue
+		}
+		if _, isFound := records.found[saved]; isFound && !records.throughAlias[saved] {
+			continue
+		}
+		writing, stores, keys = append(writing, saved), append(stores, session.caching.Store),
+			append(keys, DeclarationsRecordKey(key))
+	}
+	standardLibraryFrom := len(writing)
+	for keyed := range session.standardLibraryKeys {
+		key, isKeyed := session.standardLibraryDeclarationsKey(keyed)
+		if !isKeyed || !session.written[keyed] && !session.restoredFromSystemCache(keyed) {
+			continue
+		}
+		if _, isFound := records.standardLibrary[keyed]; isFound {
+			continue
+		}
+		writing, stores, keys = append(writing, keyed), append(stores, session.caching.StandardLibrary.System),
+			append(keys, key)
+	}
+	failed := 0
+	var firstFailure error
+	var countsLock sync.Mutex
+	session.fanOutWriting(len(writing), func(index int) func() {
+		saved := writing[index]
+		record, isHeld := recordOf(saved)
+		if !isHeld {
+			return nil
+		}
+		// The write and its counting run with no slot held: the counting is a counter's, under a lock.
+		return func() {
+			putError := stores[index].Put(keys[index], record)
+			countsLock.Lock()
+			defer countsLock.Unlock()
+			switch {
+			case putError != nil:
+				if failed == 0 {
+					firstFailure = fmt.Errorf("writing the declarations record of %s: %w", saved.ID, putError)
+				}
+				failed++
+			case index >= standardLibraryFrom:
+				records.counts.StandardLibraryWritten++
+			default:
+				records.counts.Written++
+			}
+		}
+	})
+	return failed, firstFailure
 }

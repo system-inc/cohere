@@ -53,3 +53,6 @@ type Titled struct {
 
 // Key holds a slice, so it is not comparable.
 type Key struct{ Names []string }
+
+// Streamed is of no fixed size.
+type Streamed struct{ Count int }

@@ -73,6 +73,26 @@ func (dependence *Dependence) DependentObjects() map[types.Object]Bits {
 	return dependent
 }
 
+// DependentPackages are the IDs of the packages a unit of which declares an object the build makes dependent, either
+// of its bits set (#anfjtr3): the packages a build must check for their declarations, beside those whose files differ.
+// A package the graph holds by a record read back from the store is named as one it collected live is, though its
+// objects are names with no live object, which DependentObjects leaves out. It answers alike on a whole graph and a
+// declarations-only one, whose bits are the same.
+func (dependence *Dependence) DependentPackages() map[string]bool {
+	resolved := dependence.resolved
+	dependent := map[string]bool{}
+	for node, declaring := range resolved.declaringUnit {
+		// Every node is made for an object a unit declares (resolveUnits), so each has its declaring unit.
+		if declaring < 0 {
+			continue
+		}
+		if dependence.bits[bit(int32(node), false)] || dependence.bits[bit(int32(node), true)] {
+			dependent[resolved.packages[resolved.unitPackage[declaring]].identifier] = true
+		}
+	}
+	return dependent
+}
+
 // ObjectBits are object's bits in the build, read as the graph reads a unit's reference to it (resolveReference), so
 // another graph can ask for an object of a package it does not hold (Counterparts): an object a unit declares has its
 // own bits; one of a package the graph holds that no unit declares is read through its type, both bits set when any

@@ -9,11 +9,11 @@ import (
 
 // Each kind of dependence record is kept under a key its version's text is hashed into, the one place a version is
 // read (#mtfdb1m), so a record the previous version wrote is under another key and never read: the host's records at
-// dependence-record-8 and the standard library's at standard-library-dependence-record-8, each named here as its text
+// dependence-record-9 and the standard library's at standard-library-dependence-record-9, each named here as its text
 // is, so a version moved back fails the first check, and the second with it. Each key is derived as the store's reader
 // derives it (DependenceRecordKey, StandardLibraryDependenceRecordKey) and must be the one the named text is hashed
-// into, so a version left out of its key fails the second alone. Those two are the whole pin: a record of 7 was kept
-// under the key 7's text is hashed into, which is not 8's, so a third check against it could fail only where the
+// into, so a version left out of its key fails the second alone. Those two are the whole pin: a record of 6 was kept
+// under the key 6's text is hashed into, which is not 9's, so a third check against it could fail only where the
 // second does.
 func TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey(test *testing.T) {
 	test.Parallel()
@@ -33,8 +33,8 @@ func TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey(test *testing.T) {
 		derived cache.Key
 		at      func(string) cache.Key
 	}{
-		{"the host's", DependenceRecordVersion, "dependence-record-8", DependenceRecordKey(key), hostKey},
-		{"the standard library's", StandardLibraryDependenceRecordVersion, "standard-library-dependence-record-8",
+		{"the host's", DependenceRecordVersion, "dependence-record-9", DependenceRecordKey(key), hostKey},
+		{"the standard library's", StandardLibraryDependenceRecordVersion, "standard-library-dependence-record-9",
 			StandardLibraryDependenceRecordKey(key, "engine", "toolchain"), standardLibraryKey},
 	} {
 		if each.version != each.want {

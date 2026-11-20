@@ -24,7 +24,8 @@ import (
 // listingFormatVersion is hashed into every listing's key, so a listing kept in another shape is never read.
 const listingFormatVersion = "go-engine-listing-1"
 
-// ListingStore is where the load keeps go list's answer between runs, the findings cache's store, by a sha256 key.
+// ListingStore is where the load keeps go list's answer between runs, by a sha256 key: the findings cache's store for
+// a listing, and the system cache's for a build context (KeepContext).
 type ListingStore interface {
 	Kept(key [sha256.Size]byte) ([]byte, bool)
 	Keep(key [sha256.Size]byte, listing []byte) error
@@ -56,7 +57,7 @@ type keptListing struct {
 // is the one the kept answer was read from, the answer is go list's own; any difference, or anything that cannot be
 // read, asks go list. It reports whether the answer was kept. Every file held holds is read from its held bytes, by
 // the fingerprint and the lister alike. The kept answer's steady fingerprint is read through fingerprints, and each
-// pattern's walk through walks, once for the run's extra builds, when each is set (Fingerprints, PackageWalks), and
+// pattern's walk through walks, once for the run's loads, when each is set (Fingerprints, PackageWalks), and
 // every module file a go command of the run can rewrite is read again at each ask (listingFingerprint). The listing
 // adds its CPU to collector; a kept answer's fingerprint adds nothing but what the caller measures on its own
 // goroutine, since a run under `--timing` keeps no listing.
