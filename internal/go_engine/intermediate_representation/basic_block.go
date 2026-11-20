@@ -41,7 +41,6 @@ type BasicBlock struct {
 	parent                   *Function      // parent function
 	Instructions             []Instruction  // instructions in order
 	Predecessors, Successors []*BasicBlock  // predecessors and successors
-	Scc                      *Scc           // strongly connected component
 	successorsSpace          [2]*BasicBlock // initial space for Successors
 	dom                      domInfo        // dominator tree info
 	gaps                     int            // number of nil Instructions (transient)
@@ -83,13 +82,6 @@ func (block *BasicBlock) Control() Instruction {
 
 // Parent returns the function that contains block b.
 func (block *BasicBlock) Parent() *Function { return block.parent }
-
-// Reaches reports whether control can pass from block to basicBlock. go/ir answers from a reachability set it
-// builds for every strongly connected component of every function, and nothing in the engine asks, so ours walks
-// when asked instead (Reachable), which answers the same for every block the entry reaches (#z844663).
-func (block *BasicBlock) Reaches(basicBlock *BasicBlock) bool {
-	return Reachable(block, basicBlock)
-}
 
 // String returns a human-readable label of this block.
 // It is not guaranteed unique within the function.
