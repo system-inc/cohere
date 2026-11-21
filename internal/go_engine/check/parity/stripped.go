@@ -72,6 +72,15 @@ func StrippedFindings(
 	return plainFindings, strippedFindings
 }
 
+// Messages is each of findings' messages, in order, for a test that holds a stripped run to what a rule reports.
+func Messages(findings []Finding) []string {
+	messages := []string{}
+	for _, finding := range findings {
+		messages = append(messages, finding.Message)
+	}
+	return messages
+}
+
 // strippedPackage is root with its types and TypesInfo from a type check of shallow copies of its files, strip's
 // functions copied without their bodies, and its syntax the original files unless the strip is BodilessSyntax. Each
 // function it strips is marked in stripped.

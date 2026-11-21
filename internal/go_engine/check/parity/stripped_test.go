@@ -82,10 +82,10 @@ func TestStrippedFindingsStripOnlyWhatTheStripSays(test *testing.T) {
 			subtest.Parallel()
 			plainFindings, strippedFindings := StrippedFindings(subtest, probing, analysistest.TestData(),
 				stripCase.strip, "stripped")
-			if messages := messagesOf(plainFindings); !reflect.DeepEqual(messages, plain) {
+			if messages := Messages(plainFindings); !reflect.DeepEqual(messages, plain) {
 				subtest.Errorf("the plain run found %q, want %q", messages, plain)
 			}
-			if messages := messagesOf(strippedFindings); !reflect.DeepEqual(messages, stripCase.stripped) {
+			if messages := Messages(strippedFindings); !reflect.DeepEqual(messages, stripCase.stripped) {
 				subtest.Errorf("the stripped run found %q, want %q", messages, stripCase.stripped)
 			}
 		})
@@ -99,13 +99,4 @@ func TestStrippedFindingsRefuseAStripOfNothing(test *testing.T) {
 		StrippedFindings(recording, probing, analysistest.TestData(), Strip{Functions: []string{"absent"}},
 			"stripped")
 	}), "the strip names absent, and no function of that name has a body")
-}
-
-// messagesOf is each finding's message, in order.
-func messagesOf(findings []Finding) []string {
-	messages := []string{}
-	for _, finding := range findings {
-		messages = append(messages, finding.Message)
-	}
-	return messages
 }
