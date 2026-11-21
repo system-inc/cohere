@@ -135,6 +135,19 @@ func TestAStandingBodyNamingAScannerLeavesForPresence(test *testing.T) {
 		"Remembered": standing_presence.ScannerError, "ReadsIn": standing_presence.ScannerError}, nil)
 }
 
+// scannererr's row over scanner_error's stripped fixture (#8pxhe8j): read, present, loops on input's Scan, and check,
+// standing, calls its Err. Stripping check's body would leave the rule a false finding at input
+// (scanner_error's TestAStrippedErrCheckChangesTheScannersFinding), so the row names input, and check leaves.
+func TestAStandingBodyCheckingAPresentScannersErrorLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "errorchecked")
+	host := presenceHost(test, found, []string{"read"},
+		presenceUse{key: "errorchecked.input", identity: found.identity("input"), users: []string{"read", "check"}})
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"check": standing_presence.ScannerError}, nil)
+}
+
 // sqlrowserr's row (#xeafx79): Next names Rows, the first name a query's rows are assigned to, and leaves, and so does
 // IterReads, which names Iter, rows a package-level specification gives a variable of no *sql.Rows type, which only
 // the syntax walk names. Statement names Prepared, a prepared statement, and Count names nothing, so both stand.
