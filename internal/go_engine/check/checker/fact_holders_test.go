@@ -13,12 +13,12 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// markable is every object pkg declares that a fact can be on, in a fixed order: each package-level object, and
-// every field of a struct type and every method of a named type among them.
-func markable(pkg *types.Package) []types.Object {
+// markable is every object declaringPackage declares that a fact can be on, in a fixed order: each package-level
+// object, and every field of a struct type and every method of a named type among them.
+func markable(declaringPackage *types.Package) []types.Object {
 	var objects []types.Object
-	for _, name := range pkg.Scope().Names() {
-		object := pkg.Scope().Lookup(name)
+	for _, name := range declaringPackage.Scope().Names() {
+		object := declaringPackage.Scope().Lookup(name)
 		objects = append(objects, object)
 		typeName, isTypeName := object.(*types.TypeName)
 		if !isTypeName {
@@ -40,8 +40,8 @@ func markable(pkg *types.Package) []types.Object {
 	return objects
 }
 
-// importClosure is every package pkg imports, directly or not, sorted by path.
-func importClosure(pkg *types.Package) []*types.Package {
+// importClosure is every package importingPackage imports, directly or not, sorted by path.
+func importClosure(importingPackage *types.Package) []*types.Package {
 	seen := map[*types.Package]bool{}
 	var closure []*types.Package
 	var visit func(imports []*types.Package)
@@ -54,7 +54,7 @@ func importClosure(pkg *types.Package) []*types.Package {
 			}
 		}
 	}
-	visit(pkg.Imports())
+	visit(importingPackage.Imports())
 	sort.Slice(closure, func(left, right int) bool { return closure[left].Path() < closure[right].Path() })
 	return closure
 }
@@ -120,7 +120,8 @@ var marksModule = map[string]string{
 	"middle/middle.go": "package middle\n\nimport \"example.com/marks/bottom\"\n\n" +
 		"type Frame struct{ Inner bottom.Shape }\n\nfunc Paint() { bottom.Draw() }\n",
 	"top/top.go": "package top\n\nimport \"example.com/marks/middle\"\n\nfunc Hang() { middle.Paint() }\n",
-	"beside/beside.go": "package beside\n\nimport (\n\t\"example.com/marks/bottom\"\n\t\"example.com/marks/top\"\n)\n\n" +
+	"beside/beside.go": "package beside\n\n" +
+		"import (\n\t\"example.com/marks/bottom\"\n\t\"example.com/marks/top\"\n)\n\n" +
 		"func Look() { top.Hang(); bottom.Draw() }\n",
 }
 
@@ -177,7 +178,8 @@ func heldMark(action *Action, object types.Object) string {
 	if action.ObjectFact(object, &found) {
 		read = found.Of
 	}
-	var listed, exported []string
+	var listed []string
+	var exported []string
 	for _, fact := range action.AllObjectFacts() {
 		listed = append(listed, fmt.Sprint(fact.Fact))
 	}
@@ -202,10 +204,11 @@ func TestOfSeveralHoldersTheFactTheCopyWouldHaveKeptWins(test *testing.T) {
 	marking := &analysis.Analyzer{Name: "marking", FactTypes: []analysis.Fact{new(markFact)}}
 	for _, sanityCheck := range []bool{false, true} {
 		options := &Options{SanityCheck: sanityCheck}
-		// inherited is an action on pkg that has inherited from deps in order, as execOnce has it inherit.
-		inherited := func(pkg *types.Package, deps ...*Action) *Action {
-			action := &Action{Analyzer: marking, Package: &packages.Package{ID: pkg.Path(), Types: pkg},
-				Deps: deps, opts: options, objectFacts: map[objectFactKey]analysis.Fact{}}
+		// inherited is an action on actionPackage that has inherited from deps in order, as execOnce has it inherit.
+		inherited := func(actionPackage *types.Package, deps ...*Action) *Action {
+			actionOn := &packages.Package{ID: actionPackage.Path(), Types: actionPackage}
+			action := &Action{Analyzer: marking, Package: actionOn, Deps: deps, opts: options,
+				objectFacts: map[objectFactKey]analysis.Fact{}}
 			for _, dep := range deps {
 				inheritFacts(action, dep)
 			}

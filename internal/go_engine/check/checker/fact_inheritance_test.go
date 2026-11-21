@@ -42,7 +42,8 @@ func loadBroadStandardLibrary(benchmark *testing.B, directory string) []*package
 	benchmark.Helper()
 	module := filepath.Join(directory, "go.mod")
 	if _, statError := os.Stat(module); os.IsNotExist(statError) {
-		if writeError := os.WriteFile(module, []byte("module example.com/broad\n\ngo 1.21\n"), 0o644); writeError != nil {
+		goModule := []byte("module example.com/broad\n\ngo 1.21\n")
+		if writeError := os.WriteFile(module, goModule, 0o644); writeError != nil {
 			benchmark.Fatalf("writing go.mod: %v", writeError)
 		}
 		source := filepath.Join(directory, "broad.go")
