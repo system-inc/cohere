@@ -38,25 +38,32 @@ func shapesVerdict(test *testing.T, buildSource string) verdict {
 
 // A read of an object the build cannot find, its package gone or the object gone from it, is declined: with no
 // counterpart there is nothing to compare, and a read that held would reuse the host's results for a package whose
-// import lost what it read.
+// import lost what it read. An object with no objectpath, which no build can be asked for, is declined as well, never
+// compared against itself.
 func TestAVerdictDeclinesAnObjectTheBuildLacks(test *testing.T) {
 	test.Parallel()
 
-	shape := checkedInMemory(test, pinnedShapesPath, pinnedShapes, nil).Scope().Lookup("Shape")
+	hostShapes := checkedInMemory(test, pinnedShapesPath, pinnedShapes, nil)
+	shape := hostShapes.Scope().Lookup("Shape")
+	// Loose is of shapes but in no scope of it, so it has no objectpath.
+	loose := types.NewVar(token.NoPos, hostShapes, "Loose", types.Typ[types.Int])
 	for _, step := range []struct {
 		name  string
+		read  types.Object
 		build string
 		want  string
 	}{
-		{"the same shapes", pinnedShapes, ""},
-		{"no shapes", "", "object " + pinnedShapesPath + ".Shape: the build has no package " + pinnedShapesPath},
-		{"shapes without Shape", "package shapes\n\nfunc Count() int { return 1 }\n",
+		{"the same shapes", shape, pinnedShapes, ""},
+		{"no shapes", shape, "", "object " + pinnedShapesPath + ".Shape: the build has no package " + pinnedShapesPath},
+		{"shapes without Shape", shape, "package shapes\n\nfunc Count() int { return 1 }\n",
 			"object " + pinnedShapesPath + ".Shape: the build's " + pinnedShapesPath + " has no Shape"},
+		{"an object with no objectpath", loose, pinnedShapes,
+			"object " + pinnedShapesPath + ".Loose: object " + pinnedShapesPath + ".Loose has no objectpath"},
 	} {
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()
 
-			holds, why := shapesVerdict(test, step.build).objectHolds(shape)
+			holds, why := shapesVerdict(test, step.build).objectHolds(step.read)
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
 			}
@@ -66,7 +73,9 @@ func TestAVerdictDeclinesAnObjectTheBuildLacks(test *testing.T) {
 
 // A selection through another package's type holds only where the build finds the receiver, finds a member of the
 // name on it, and that member's own line is the host's: a receiver gone, a field renamed away, or a field of another
-// type each decline it, and judged precisely, no closure digest of the receiver stands behind those checks.
+// type each decline it, and judged precisely, no closure digest of the receiver stands behind those checks. Judged by
+// closure alone, as a package with assembly is, a receiver that renders differently declines it even where the member
+// it selects is the same.
 func TestAVerdictSelectionDeclinesAReceiverOrMemberTheBuildLacksOrChanged(test *testing.T) {
 	test.Parallel()
 
@@ -81,23 +90,68 @@ func TestAVerdictSelectionDeclinesAReceiverOrMemberTheBuildLacksOrChanged(test *
 	}
 	selection := build_reads.Selection{Receiver: shape, Name: "Sides", Index: []int{0}, Selected: shapeStruct.Field(0)}
 	named := "selection " + pinnedShapesPath + ".Shape.Sides: "
+	gainsCorners := "package shapes\n\ntype Shape struct {\n\tSides   int\n\tCorners int\n}\n"
 	for _, step := range []struct {
-		name  string
-		build string
-		want  string
+		name        string
+		build       string
+		closureOnly bool
+		want        string
 	}{
-		{"the same shapes", pinnedShapes, ""},
-		{"no Shape", "package shapes\n\nfunc Count() int { return 1 }\n",
+		{"the same shapes", pinnedShapes, false, ""},
+		{"no Shape", "package shapes\n\nfunc Count() int { return 1 }\n", false,
 			named + "the build's " + pinnedShapesPath + " has no Shape"},
-		{"Sides renamed", "package shapes\n\ntype Shape struct{ Corners int }\n",
+		{"Sides renamed", "package shapes\n\ntype Shape struct{ Corners int }\n", false,
 			named + "the build finds no one member of the name"},
-		{"Sides of another type", "package shapes\n\ntype Shape struct{ Sides string }\n",
+		{"Sides of another type", "package shapes\n\ntype Shape struct{ Sides string }\n", false,
 			named + "the member it selects differs"},
+		{"Shape gains a field after Sides", gainsCorners, false, ""},
+		{"Shape gains a field after Sides, judged by closure", gainsCorners, true,
+			"object " + pinnedShapesPath + ".Shape renders differently"},
 	} {
 		test.Run(step.name, func(test *testing.T) {
 			test.Parallel()
 
-			holds, why := shapesVerdict(test, step.build).selectionHolds(selection, false)
+			holds, why := shapesVerdict(test, step.build).selectionHolds(selection, step.closureOnly)
+			if holds != (step.want == "") || why != step.want {
+				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
+			}
+		})
+	}
+}
+
+// A lookup the build cannot be asked is declined: where the build lacks one of the package's imports, the closure the
+// lookup asks of is not the host's, and where it lacks the package a Scope lookup asks of, there is no scope to ask.
+// Held, either would carry the host's answer to a build that was never asked it.
+func TestALookupIsDeclinedWhereTheBuildLacksThePackageItAsks(test *testing.T) {
+	test.Parallel()
+
+	const gonePath = "example.com/pinned/gone"
+	hostShapes := checkedInMemory(test, pinnedShapesPath, pinnedShapes, nil)
+	shapeLookup := build_reads.Lookup{Query: build_reads.QueryScope, Path: pinnedShapesPath, Name: "Shape", Found: true,
+		Answer: hostShapes.Scope().Lookup("Shape")}
+	for _, step := range []struct {
+		name    string
+		imports []string
+		lookup  build_reads.Lookup
+		want    string
+	}{
+		{"every import in the build", []string{pinnedShapesPath}, shapeLookup, ""},
+		{"an import the build lacks", []string{pinnedShapesPath, gonePath}, shapeLookup,
+			"L lookup Scope " + pinnedShapesPath + ".Shape: the build has no package " + gonePath},
+		{"a scope the build lacks", []string{pinnedShapesPath},
+			build_reads.Lookup{Query: build_reads.QueryScope, Path: gonePath, Name: "Thing"},
+			"L lookup Scope " + gonePath + ".Thing: the build has no package " + gonePath},
+	} {
+		test.Run(step.name, func(test *testing.T) {
+			test.Parallel()
+
+			reads := &build_reads.Reads{}
+			reads.RecordTypes(types.NewPackage(pinnedUserPath, "user"), &types.Info{}, nil)
+			reads.AddLookup(step.lookup)
+			restoring := Restoring{Path: pinnedUserPath, Imports: step.imports, Reads: reads}
+			closure := map[string]*types.Package{
+				pinnedShapesPath: checkedInMemory(test, pinnedShapesPath, pinnedShapes, nil)}
+			holds, why := TypesHold(restoring, closure, nil, NewReadsBuild(), NewReadsBuild())
 			if holds != (step.want == "") || why != step.want {
 				test.Errorf("want %t, %q, got %t, %q", step.want == "", step.want, holds, why)
 			}
