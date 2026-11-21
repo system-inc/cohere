@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -336,6 +337,41 @@ func Wrap() {
 		quiet:   []string{},
 		flagged: "Wrap",
 	},
+	{
+		// The directive is all that makes target's method and field used, through the type branch of the ignore step,
+		// which reads the local alias's type from go/types and which a record's rooted locals do not feed.
+		name: "an ignored local alias of a package-level type",
+		sources: []recordedSource{{"shape.go", `package shape
+
+type target struct{ field int }
+
+func (target) method() {}
+
+func IgnoredAlias() {
+	//lint:ignore U1000 kept for the test
+	type kept = target
+}
+`}},
+		unused:  []string{},
+		quiet:   []string{},
+		flagged: "IgnoredAlias",
+	},
+	{
+		// The first variable's field is a node only through ReadFirst's selection, and its place finds the second's,
+		// so a record that names it by its place makes the graph one node short.
+		name: "a selection of a field its place does not find",
+		sources: []recordedSource{{"shape.go", `package shape
+
+var first, second struct{ value int }
+
+func ReadFirst() int { return first.value }
+
+func ReadSecond() int { return second.value }
+`}},
+		unused:  []string{},
+		quiet:   []string{},
+		flagged: "ReadFirst",
+	},
 }
 
 // TestSpliceCasesFindWhatTheyAreWrittenFor holds each splice case's plain verdict to what the case says it finds
@@ -422,7 +458,7 @@ func Count() int {
 `
 
 // TestSpliceRefusesWhatItCannotTake holds the splice to failing by name (#xeafx79), never dropping an edge and never
-// panicking: a record a flag keeps present, two of one key, one a graph that records is handed, one keyed where no
+// panicking: a record each flag keeps present, two of one key, one a graph that records is handed, one keyed where no
 // body is, an end it cannot resolve and a local the root owns, each an error naming the body, and the place where it
 // has one.
 func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
@@ -445,17 +481,13 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 		return []bodyRecord{changed}
 	}
 	unplaced := recordedPlace{File: "shape.go", Offset: strings.Index(refusedSource, "counter +")}
-	cases := []struct {
+	type refusal struct {
 		name    string
 		taken   []bodyRecord
 		records bool
 		names   []string
-	}{
-		{
-			name:  "a record a flag keeps present",
-			taken: withRecord(func(record *bodyRecord) { record.Present.UnexportedInterfaceMethod = true }),
-			names: []string{placeText(count.Body)},
-		},
+	}
+	cases := []refusal{
 		{
 			name:  "two records of one key",
 			taken: []bodyRecord{count, count},
@@ -499,6 +531,18 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 			}),
 			names: []string{placeText(count.Body)},
 		},
+	}
+	// Each flag alone, read from the type, so a refusal that reads some of the flags and not the rest is red for
+	// each it leaves out, and a flag added later is refused here without a case written for it.
+	presence := reflect.TypeFor[recordedPresence]()
+	for field := range presence.NumField() {
+		cases = append(cases, refusal{
+			name: "a record " + presence.Field(field).Name + " keeps present",
+			taken: withRecord(func(record *bodyRecord) {
+				reflect.ValueOf(&record.Present).Elem().Field(field).SetBool(true)
+			}),
+			names: []string{placeText(count.Body), presence.Field(field).Name + ":true"},
+		})
 	}
 	for _, each := range cases {
 		test.Run(each.name, func(test *testing.T) {
