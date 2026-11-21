@@ -4,11 +4,12 @@
 //
 // cohere: readGoInfo is the header read the copy of build.go shares across a
 // run's builds, and readComments the read of a non-Go file's leading
-// comments it still makes in each build. The code is unchanged but for three
+// comments it still makes in each build. The code is unchanged but for four
 // changes: the linkname dropped, which needs package unsafe imported, and
 // nothing links to this copy; a directive's literal keyed, since Directive
-// is go/build's here, which vet holds to keyed fields; and an import's
-// literal keyed, since fileImport holds one more field in build.go's copy.
+// is go/build's here, which vet holds to keyed fields; an import's literal
+// keyed, since fileImport holds one more field in build.go's copy; and the
+// imports made at the length the parse counted, since the run keeps them.
 
 // Copyright 2012 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -326,6 +327,12 @@ func readGoInfo(f io.Reader, info *fileInfo) error {
 	info.parsed, info.parseErr = parser.ParseFile(info.fset, info.name, info.header, parser.ImportsOnly|parser.ParseComments|parser.SkipObjectResolution)
 	if info.parseErr != nil {
 		return nil
+	}
+
+	// cohere: made at the length the parse counted, so the run keeps each
+	// file's imports at that length (compacted) with no append regrowing them.
+	if count := len(info.parsed.Imports); count > 0 {
+		info.imports = make([]fileImport, 0, count)
 	}
 
 	hasEmbed := false
