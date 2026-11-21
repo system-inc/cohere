@@ -103,7 +103,9 @@ type recordedPresence struct {
 	// embedded field in the local declaration.
 	LocalMethodSet bool `json:"localMethodSet"`
 	// InterfaceInstance is whether the body writes an instantiation of a generic interface type of the package,
-	// which entry reads from the package's instances whole.
+	// which entry reads from the package's instances whole. The generic interface does not always stand in for its
+	// instance: with `holder[T any, P interface{ *T }]` implements binds P and then finds it outside a constraint that
+	// names an unbound T, so only the instance holder[int, *int] makes a type's method used.
 	InterfaceInstance bool `json:"interfaceInstance"`
 	// IgnoredType is whether a directive ignores a type name the body declares, one on its line or one on its whole
 	// file. useIgnored then uses that type's methods and fields from go/types, which for a local alias of a

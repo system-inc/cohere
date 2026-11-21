@@ -92,9 +92,13 @@ func fixturePackages(test *testing.T) []checkedPackage {
 }
 
 // build is a graph of the package, entered, recording its bodies when records says to, and taking each of taken in
-// place of walking its body.
+// place of walking its body, over the package's types without the instances those bodies write.
 func (checked checkedPackage) build(records bool, taken []bodyRecord) (*graph, error) {
-	built := newGraph(checked.fileSet, checked.files, checked.typesPackage, checked.typesInfo,
+	typesInfo := checked.typesInfo
+	if taken != nil {
+		typesInfo = checked.withoutInstancesOf(taken)
+	}
+	built := newGraph(checked.fileSet, checked.files, checked.typesPackage, typesInfo,
 		parseDirectives(checked.files, checked.fileSet), checked.generatedFiles)
 	if records {
 		built.recordBodies()
@@ -108,6 +112,45 @@ func (checked checkedPackage) build(records bool, taken []bodyRecord) (*graph, e
 		return nil, entryError
 	}
 	return built, nil
+}
+
+// withoutInstancesOf is the package's types with no instance written inside a body one of taken is keyed by, as a
+// build that leaves those bodies to the host and strips them has its types (#xeafx79). Entry reads the instances
+// whole, so a graph taking a record over the host's own types would still find each instance the body wrote, and the
+// flag that keeps such a body present (InterfaceInstance) would guard nothing a test could see. A body is found by its
+// key as the recorder keys it (keyOf), read here from the syntax.
+func (checked checkedPackage) withoutInstancesOf(taken []bodyRecord) *types.Info {
+	keys := map[recordedPlace]struct{}{}
+	for _, record := range taken {
+		keys[record.Body] = struct{}{}
+	}
+	bodies := []*ast.BlockStmt{}
+	for _, file := range checked.files {
+		tokenFile := checked.fileSet.File(file.FileStart)
+		for _, declaration := range file.Decls {
+			function, isFunction := declaration.(*ast.FuncDecl)
+			if !isFunction || function.Body == nil {
+				continue
+			}
+			key := recordedPlace{
+				File:   tokenFile.Position(function.Pos()).Filename,
+				Offset: tokenFile.Offset(function.Pos()),
+			}
+			if _, isTaken := keys[key]; isTaken {
+				bodies = append(bodies, function.Body)
+			}
+		}
+	}
+	stripped := *checked.typesInfo
+	stripped.Instances = make(map[*ast.Ident]types.Instance, len(checked.typesInfo.Instances))
+	for identifier, instance := range checked.typesInfo.Instances {
+		if !slices.ContainsFunc(bodies, func(body *ast.BlockStmt) bool {
+			return body.Lbrace < identifier.Pos() && identifier.Pos() < body.Rbrace
+		}) {
+			stripped.Instances[identifier] = instance
+		}
+	}
+	return &stripped
 }
 
 // selfSpliced is one package built three ways (#xeafx79): plain, as the rule builds it; recording each body; and
@@ -371,6 +414,30 @@ func ReadSecond() int { return second.value }
 		unused:  []string{},
 		quiet:   []string{},
 		flagged: "ReadFirst",
+	},
+	{
+		// The instance Check writes is all that makes box's method used. The generic interface does not stand in for
+		// it: implements binds P to *int and then finds *int outside P's constraint, `*T` with T bound to nothing, so
+		// only holder[int, *int] is an interface box implements, and a build that strips Check has no such instance.
+		name: "an instance of a generic interface the generic one does not stand in for",
+		sources: []recordedSource{{"shape.go", `package shape
+
+type holder[T any, P interface{ *T }] interface{ hold() P }
+
+type box struct{}
+
+func (box) hold() *int { return nil }
+
+var Value box
+
+func Check(value any) bool {
+	_, held := value.(holder[int, *int])
+	return held
+}
+`}},
+		unused:  []string{},
+		quiet:   []string{},
+		flagged: "Check",
 	},
 }
 
