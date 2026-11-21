@@ -560,6 +560,33 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 	}
 }
 
+// TestSpliceRefusesARecordTwoBodiesAreKeyedBy holds the splice to taking a record for one body alone (#xeafx79):
+// handed the walk's record of First, whose key Second shares through a `//line` directive, the graph meets two bodies
+// at that key and fails by it rather than splice the record in for either. The host keeps no record of such a body
+// (bodyRecords), but a build's files are its own, and a key the host's package held one body at can hold two there.
+func TestSpliceRefusesARecordTwoBodiesAreKeyedBy(test *testing.T) {
+	test.Parallel()
+	checked := checkShapes(test, "shared key", sharedKeySources, nil)
+	recording, recordError := checked.build(true, nil)
+	if recordError != nil {
+		test.Fatal(recordError)
+	}
+	if len(recording.recorder.records) != 3 ||
+		recording.recorder.records[0].Body != recording.recorder.records[1].Body {
+		test.Fatalf("the walk recorded %+v, not First and Second at one key and Third", recording.recorder.records)
+	}
+	first := recording.recorder.records[0]
+	taken, takeError := checked.build(false, []bodyRecord{first})
+	if takeError == nil {
+		test.Fatalf("the graph took First's record at a key two bodies share, and holds %d nodes", len(taken.nodes))
+	}
+	for _, name := range []string{placeText(first.Body), "declares 2 function bodies"} {
+		if !strings.Contains(takeError.Error(), name) {
+			test.Errorf("the error %q does not name %s", takeError, name)
+		}
+	}
+}
+
 // minimumSpliced is how many bodies TestSelfSpliceGivesThePlainVerdict spliced when it was written, of 290 it
 // recorded over 89 packages, 18 flagged.
 const minimumSpliced = 272
