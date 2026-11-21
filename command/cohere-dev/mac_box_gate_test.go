@@ -23,11 +23,11 @@ import (
 type macBoxFixture struct {
 	*landFixture
 	// replies holds what the stand-in ahra answers: `push.fails` makes the push fail, `<box>.held` makes the box's
-	// claim read held, `<box>.run` is what her gap prints, with `COMMIT` the commit the remote names, and `<box>.exit`
-	// its exit. `<box>.unlaid` is what her gap prints in place of `<box>.run` until a gap carrying corpora has laid
-	// them, which copies its carry to `<box>.carry` and its remote to `<box>.lay`, or prints `<box>.lay.fails` and
-	// exits 1 when that is there. The stand-in writes each call it took to `calls`, one line each, and each box's
-	// remote command whole to `<box>.remote`.
+	// claim read held, in its words when it holds any, `<box>.run` is what her gap prints, with `COMMIT` the commit the
+	// remote names, and `<box>.exit` its exit. `<box>.unlaid` is what her gap prints in place of `<box>.run` until a
+	// gap carrying corpora has laid them, which copies its carry to `<box>.carry` and its remote to `<box>.lay`, or
+	// prints `<box>.lay.fails` and exits 1 when that is there. The stand-in writes each call it took to `calls`, one
+	// line each, and each box's remote command whole to `<box>.remote`.
 	replies string
 	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
@@ -46,6 +46,7 @@ push)
 gap)
   box="$4"
   if [ "$#" -eq 4 ]; then
+    if [ -s "$replies/$box.held" ]; then cat "$replies/$box.held"; exit 1; fi
     if [ -e "$replies/$box.held" ]; then echo "gap $box closed · $box is held by system_loom until 18:00Z"; exit 1; fi
     echo "gap $box open"; exit 0
   fi
@@ -457,7 +458,7 @@ func TestTheGatesBoxesAndItsWaitAreSettings(test *testing.T) {
 	}
 	for setting, want := range map[string]time.Duration{"": 2 * time.Hour, "90m": 90 * time.Minute, "2s": 2 *
 		time.Second, "never": 0, "0s": 0, "-1m": 0} {
-		wait, waitError := gateWait(setting)
+		wait, waitError := waitSetting(gateWaitVariable, setting, gateWaitDefault)
 		if wait != want || (want == 0) != (waitError != nil) {
 			test.Errorf("%s=%q read as %s, %v; want %s", gateWaitVariable, setting, wait, waitError, want)
 		}

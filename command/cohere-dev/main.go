@@ -70,6 +70,8 @@ func runCommandLine() int {
 		return quiet(os.Args[2:])
 	case "worktree":
 		return namedWorktree(os.Args[2:])
+	case "measure":
+		return measure(os.Args[2:])
 	case "test", "build", "vet", "exec", "land":
 		return run(os.Args[1], os.Args[2:])
 	}
@@ -85,6 +87,7 @@ func usage() int {
 		"         bounded: --bounded, --bounded-margin <processes> (512), --bounded-deadline <duration> (15m)\n"+
 		"       cohere-dev land [--task <id>] [--message <what landed>]\n"+
 		"       cohere-dev land --train <head> <head> [<head> [<head>]] --task <id> [--message <what landed>]\n"+
+		"       cohere-dev measure [<commit>]   the landing's measurement on Shackler alone, landing nothing\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [--through <name>] [why] | off | wait]\n"+
 		"         every job but status, quiet and worktree takes --through <name>, for the run a window lets through\n"+
