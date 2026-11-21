@@ -154,16 +154,19 @@ const (
 	SkippedByUnrestorable SkippedJudgment = "Unrestorable"
 )
 
-// JudgeSkipped has the session's restore from the host's run also judge each package the build skips without judging,
-// today each the walk leaves untouched (untouchedOf), as the plain path judges a visited one (#wcwx8vf): one whose
-// reads no verdict can judge is told at once, by unrestorableReads's why; every other by TypesHold against the build's
-// types once its imports are done. judged is told each, by ID, by which judgment and with why it declines, empty where
-// it holds, from the load's goroutines. A skip must be a cheaper proof of what the plain path would conclude, so a test
-// sets it to fail on a why. The package stays untouched whatever the judgment says, and nothing else of the run
-// changes but that the load reads the types of what the package reaches, as it does for a visited one, which a
-// hookless run leaves unread where nothing checked imports it. skipped is told each such package, by ID, as a load
-// skips it, before it is judged, once in each load that skips it, so a test counts the skips of every load and not
-// the last load's alone (HostRestoreCounts.Untouched). Only a test calls it, after RestoreFromHost; a run never does.
+// JudgeSkipped has the session's restore from the host's run also judge each package the build restores unchecked
+// (#wcwx8vf, #mtrjfyn): each the walk leaves untouched (untouchedOf), as the plain path judges a visited one, and each
+// visited package its late decision lets through (judgedThrough), judged apart from that decision. One whose reads no
+// verdict can judge is told at once, by unrestorableReads's why; every other by TypesHold against the build's types
+// once its imports are done. judged is told each, by ID, by which judgment and with why it declines, empty where it
+// holds, from the load's goroutines. A skip must be a cheaper proof of what the plain path would conclude, and a
+// decision that let a package through one TypesHold declines restored it wrongly, so a test sets it to fail on a why.
+// The package stays untouched or restored whatever the judgment says, and nothing else of the run changes but that the
+// load reads the types of what an untouched package reaches, as it does for a visited one, which a hookless run
+// leaves unread where nothing checked imports it. skipped is told each such package, by ID, as a load skips it or lets
+// it through, before it is judged, once in each load, so a test counts the skips of every load and not the last
+// load's alone (HostRestoreCounts.Untouched and Restored). Only a test calls it, after RestoreFromHost; a run never
+// does.
 func (session *CacheSession) JudgeSkipped(
 	skipped func(identifier string),
 	judged func(identifier string, judgment SkippedJudgment, why string),
@@ -370,6 +373,11 @@ func (session *CacheSession) restoreFromHost(
 			continue
 		}
 		restored.types.Holds = session.typesHoldFunction(candidate, hosted)
+		// The package differential's judgment, under its test's hook alone (JudgeSkipped): a package the decision lets
+		// through is restored unchecked, and judged by TypesHold apart from the decision.
+		if state.judgesSkipped != nil {
+			restored.types.Holds = session.judgedThrough(candidate, hosted, restored.types.Holds)
+		}
 		restored.types.Declined = func() { session.declineAtLoad(candidate, hosted) }
 		session.hits[candidate] = restored
 		session.trusted[candidate] = true
@@ -473,6 +481,29 @@ func (session *CacheSession) judgeSkipped(candidate *packages.Package, hosted *h
 	}
 	hosted.restored.types.Holds = func(closure map[string]*types.Package) bool {
 		session.host.renderings.measureBy(candidate.TypesSizes)
+		_, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
+			session.host.host.renderings, session.host.renderings)
+		session.host.judgesSkipped(candidate.ID, SkippedByTypes, why)
+		return true
+	}
+}
+
+// judgedThrough is decide, the load's late decision of candidate, hosted's package, which tells a test's JudgeSkipped,
+// each time decide lets the package through, that the load restored it unchecked and how TypesHold judges it apart
+// from the decision, as the package differential judges every package a build restores unchecked, untouched or let
+// through (#mtrjfyn). The decision is decide's alone, so the hook changes nothing of the run.
+func (session *CacheSession) judgedThrough(
+	candidate *packages.Package,
+	hosted *hostRestore,
+	decide func(map[string]*types.Package) bool,
+) func(map[string]*types.Package) bool {
+	return func(closure map[string]*types.Package) bool {
+		if !decide(closure) {
+			return false
+		}
+		if session.host.skipsTold != nil {
+			session.host.skipsTold(candidate.ID)
+		}
 		_, why := TypesHold(hosted.kept.restoring, closure, session.restoredBelow(candidate, closure),
 			session.host.host.renderings, session.host.renderings)
 		session.host.judgesSkipped(candidate.ID, SkippedByTypes, why)
