@@ -203,7 +203,8 @@ func (ctxt *Context) openAndReadGoInfo(name string, fileSet *token.FileSet) (fil
 //
 // The syntax tree's root and the imports are cut in place: both are the read's own, made by this read's readGoInfo
 // and held by nothing else until the read is shared (readGoInfoOnce), and readGoInfo made the imports at the length
-// the parse counted, so cutting them in place keeps no more of them than a copy would.
+// the parse counted, so cutting them in place keeps no more of them than a copy would. The caller gives up read: it
+// reads only what compacted returns, since the tree and the imports it passed are the ones cut.
 func compacted(read fileInfo) fileInfo {
 	read.header = bytes.Clone(read.header)
 	if read.parsed != nil {
@@ -220,7 +221,8 @@ func compacted(read fileInfo) fileInfo {
 // resolved is read with each import's position resolved in the file set read was read into, the one position the
 // copied Import reads through a file set (fileImport's position): the embeds' and the directives' readGoInfo resolves
 // itself. Resolved once by the read, no build reads a position through another's file set, whose file locks to answer.
-// Each is resolved in place, since the imports are the read's own, as compacted's are.
+// Each is resolved in place, since the imports are the read's own, as compacted's are, so the caller gives up read
+// as it does to compacted.
 func resolved(read fileInfo) fileInfo {
 	for index := range read.imports {
 		read.imports[index].position = read.fset.Position(read.imports[index].pos)
