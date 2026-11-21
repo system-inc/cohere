@@ -34,20 +34,48 @@ func Isolate() (func(), error) {
 	}, nil
 }
 
-// ExpectIsolated fails the test unless Variable names an absolute directory outside usersCache, the person's user
-// cache directory as it was before the tests moved anything, empty when the machine has none.
+// PersonsSystemCache is the system cache a run on this machine reads when `COHERE_SYSTEM_CACHE` is unset, from
+// usersCache, the person's user cache directory: usersCache joined with `cohere`, as the engine's
+// cache.SystemCacheRoot spells it, which a test of the cache package holds this to. Empty when usersCache is.
+func PersonsSystemCache(usersCache string) string {
+	if usersCache == "" {
+		return ""
+	}
+	return filepath.Join(usersCache, "cohere")
+}
+
+// ExpectIsolated fails the test unless Variable names an absolute directory that is neither the person's system
+// cache (PersonsSystemCache of usersCache, the person's user cache directory as it was before the tests moved
+// anything, empty when the machine has none) nor inside it, nor holds it.
 func ExpectIsolated(test *testing.T, usersCache string) {
 	test.Helper()
-	systemCache := os.Getenv(Variable)
+	if problem := isolationProblem(os.Getenv(Variable), usersCache); problem != "" {
+		test.Fatal(problem)
+	}
+}
+
+// isolationProblem is why systemCache, the tests' system cache as Variable names it, is not isolated from the
+// person's, or empty when it is. Only the person's own system cache is guarded, never the whole user cache directory:
+// a machine whose temporary directory sits under it, as Loom's keeper puts a job's under `~/.cache` (#rnw5f6h), makes
+// the tests' cache there, apart from the person's.
+func isolationProblem(systemCache string, usersCache string) string {
 	if systemCache == "" || !filepath.IsAbs(systemCache) {
-		test.Fatalf("want %s set to an absolute directory of the tests' own, got %q, so the tests read the "+
+		return fmt.Sprintf("want %s set to an absolute directory of the tests' own, got %q, so the tests read the "+
 			"person's system cache: call system_cache_testing.Isolate from TestMain", Variable, systemCache)
 	}
-	if usersCache == "" {
-		return
+	persons := PersonsSystemCache(usersCache)
+	if persons == "" {
+		return ""
 	}
-	relative, relativeError := filepath.Rel(usersCache, systemCache)
-	if relativeError == nil && (relative == "." || !strings.HasPrefix(relative, "..")) {
-		test.Errorf("%s %s is in the user cache directory %s", Variable, systemCache, usersCache)
+	if within(persons, systemCache) || within(systemCache, persons) {
+		return fmt.Sprintf("%s %s is the person's system cache %s, inside it or holding it", Variable, systemCache,
+			persons)
 	}
+	return ""
+}
+
+// within reports whether path is directory or inside it.
+func within(directory string, path string) bool {
+	relative, relativeError := filepath.Rel(directory, path)
+	return relativeError == nil && (relative == "." || !strings.HasPrefix(relative, ".."))
 }
