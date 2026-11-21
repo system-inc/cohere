@@ -331,6 +331,15 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 			want: "L lookup Scope " + verdictPlatform + ".OnlyDarwin: found true on the host, false in the build",
 		},
 		{
+			// Found in both builds, its answer is still compared: Handle reaches state, laid out by target.
+			name: "a scope lookup the build answers with an object that renders differently",
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
+				return build_reads.Lookup{Query: build_reads.QueryScope, Path: verdictPlatform, Name: "Handle",
+					Found: true, Answer: host.platform.Scope().Lookup("Handle")}
+			},
+			want: "L lookup Scope " + verdictPlatform + ".Handle: the answer differs",
+		},
+		{
 			name: "a scope miss the build answers",
 			lookup: func(*testing.T, verdictWorld) build_reads.Lookup {
 				return build_reads.Lookup{Query: build_reads.QueryScope, Path: verdictPlatform, Name: "Flusher"}
@@ -391,6 +400,25 @@ func TestEachLookupKindIsAskedAgainOfTheBuild(test *testing.T) {
 			},
 			facts: deprecatedOf("use Another"),
 			want:  "D lookup Deprecated " + verdictPlatform + " of " + verdictPlatform + ".Stable: its message differs",
+		},
+		{
+			name: "a deprecation the build alone has",
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
+				return build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: verdictPlatform,
+					Subject: host.platform.Scope().Lookup("Stable")}
+			},
+			facts: deprecatedOf("use Other"),
+			want: "D lookup Deprecated " + verdictPlatform + " of " + verdictPlatform +
+				".Stable: found false on the host, true in the build",
+		},
+		{
+			name: "a deprecation the build lost",
+			lookup: func(_ *testing.T, host verdictWorld) build_reads.Lookup {
+				return build_reads.Lookup{Query: build_reads.QueryDeprecated, Path: verdictPlatform,
+					Subject: host.platform.Scope().Lookup("Stable"), Found: true, Text: "use Other"}
+			},
+			want: "D lookup Deprecated " + verdictPlatform + " of " + verdictPlatform +
+				".Stable: found true on the host, false in the build",
 		},
 		{
 			name: "no deprecation of an instance's field, which has no objectpath",

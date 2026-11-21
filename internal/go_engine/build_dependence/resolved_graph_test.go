@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"go/types"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -332,6 +333,305 @@ func TestUnitsAreFoundAsByMapsWhereverLineDirectivesPlaceThem(test *testing.T) {
 			"start order %t", resolved.files.unitOrder, resolved.files.inStartOrder)
 	}
 	expectUnitsFoundAsByMaps(test, "layout", layout)
+}
+
+// Units that nest or start one byte apart are found as the resolution's maps found them: in nested.go Outer holds
+// Inner, as the cgo tool's export wrapper holds the unit its //line names, so a place past Inner's end is Outer's,
+// which only a row marked overlapping reads; and in adjacent.go Second starts one byte after First, so the unit
+// starting at First's start is First, and no unit is read from the place after it.
+func TestUnitsAreFoundAsByMapsWhereTheyNestOrStartOneByteApart(test *testing.T) {
+	test.Parallel()
+
+	path := "example.com/places"
+	graph := NewGraph()
+	graph.add(&packageRecord{identifier: "places", path: path, imports: map[string]string{},
+		units: []recordedUnit{
+			{file: "nested.go", start: 0, end: 40, nodes: 3, declares: []recordedObject{{path: path, local: "Outer"}}},
+			{file: "nested.go", start: 10, end: 20, nodes: 3, declares: []recordedObject{{path: path, local: "Inner"}}},
+			{file: "adjacent.go", start: 50, end: 51, nodes: 1,
+				declares: []recordedObject{{path: path, local: "First"}}},
+			{file: "adjacent.go", start: 51, end: 60, nodes: 3,
+				declares: []recordedObject{{path: path, local: "Second"}}},
+		}})
+	expectUnitsFoundAsByMaps(test, "places", graph)
+}
+
+// declaringUnit is a decoded unit of file at start, five bytes long, that declares local of path and reads reads.
+func declaringUnit(path string, file string, start int, local string, reads ...recordedRead) recordedUnit {
+	return recordedUnit{file: file, start: start, end: start + 5, nodes: 3,
+		declares: []recordedObject{{path: path, local: local}}, reads: reads}
+}
+
+// changingRecord is a decoded record of a package of path that declares Stable in stable.go and Changing in
+// changing.go, so a difference naming changing.go host-only (changingFiles) seeds Changing alone.
+func changingRecord(identifier string, path string) *packageRecord {
+	return &packageRecord{identifier: identifier, path: path, imports: map[string]string{},
+		units: []recordedUnit{declaringUnit(path, "stable.go", 10, "Stable"),
+			declaringUnit(path, "changing.go", 10, "Changing")}}
+}
+
+// changingFiles are a changingRecord's files as a build that does not compile changing.go differs from the host.
+var changingFiles = PackageDifference{HostOnlyFiles: []string{"changing.go"}, SharedFiles: []string{"stable.go"}}
+
+// expectDependent fails for each start of want, a unit of the package packageId in file, whose verdict is not want's.
+func expectDependent(test *testing.T, dependence *Dependence, packageId string, file string, want map[int]bool) {
+	test.Helper()
+	for start, wantDependent := range want {
+		if got := dependence.UnitDependent(packageId, file, start); got != wantDependent {
+			test.Errorf("%s %s:%d: want dependent %t, got %t", packageId, file, start, wantDependent, got)
+		}
+	}
+}
+
+// A reader names two objects of one package, the first package by ID, and resolution walks the reader's closure for
+// the path once, the second object's lookup reading what the first resolved (resolvedPaths): that index, 0, is a
+// package the graph holds like any other. Judged with no DependentObject, as a host that restored nothing judges, an
+// object read as of a package the graph does not hold is answered independent, so the reader of Changing, the second
+// object, must be dependent, and the reader of Stable not.
+func TestALaterLookupOfThePathOfTheFirstPackageStillFindsIt(test *testing.T) {
+	test.Parallel()
+
+	dependencyPath := "example.com/dependency"
+	readerPath := "example.com/reader"
+	graph := NewGraph()
+	graph.add(changingRecord("dependency", dependencyPath))
+	graph.add(&packageRecord{identifier: "reader", path: readerPath,
+		imports: map[string]string{dependencyPath: "dependency"},
+		objects: []recordedObject{{path: dependencyPath, local: "Stable"}, {path: dependencyPath, local: "Changing"}},
+		units: []recordedUnit{declaringUnit(readerPath, "reader.go", 10, "ReadsStable", recordedRead{target: 0}),
+			declaringUnit(readerPath, "reader.go", 20, "ReadsChanging", recordedRead{target: 1})}})
+	dependence := graph.Against(Difference{Packages: map[string]PackageDifference{"dependency": changingFiles}})
+	expectDependent(test, dependence, "reader", "reader.go", map[int]bool{10: false, 20: true})
+}
+
+// A path the graph holds one package of is that package when the reader's import walk cannot reach it, cut short by
+// a package the graph does not hold, whose imports no record tells: reader imports middle, which the graph does not
+// hold, and which imports dependency. Judged with no DependentObject, a read bound to any package but dependency, none
+// of which declares Changing, is dropped, so the reader of Changing must be dependent.
+func TestAPathPastAPackageTheGraphDoesNotHoldIsItsOnePackage(test *testing.T) {
+	test.Parallel()
+
+	dependencyPath := "example.com/dependency"
+	readerPath := "example.com/reader"
+	graph := NewGraph()
+	graph.add(changingRecord("dependency", dependencyPath))
+	graph.add(&packageRecord{identifier: "reader", path: readerPath,
+		imports: map[string]string{"example.com/middle": "middle"},
+		objects: []recordedObject{{path: dependencyPath, local: "Changing"}},
+		units:   []recordedUnit{declaringUnit(readerPath, "reader.go", 10, "ReadsChanging", recordedRead{target: 0})}})
+	dependence := graph.Against(Difference{Packages: map[string]PackageDifference{"dependency": changingFiles}})
+	expectDependent(test, dependence, "reader", "reader.go", map[int]bool{10: true})
+}
+
+// A package and its test variant share a path, and a test binary's closure holds one package of each path, so a read
+// of the path is of the package the reader's import closure holds (packageOf), found by walking the records' import
+// maps. The external test dependency_test imports first and second, each of which imports shared, which imports the
+// test variant of dependency, so the walk must go past the first import it meets, which imports no dependency itself;
+// consumer, outside the test binary, imports middle, which imports dependency itself. Only the variant differs, every
+// unit of it seeded, as a test file of it the build does not compile holding a //line directive marks it. The graph
+// holds the path twice, so the path alone names no package, and judged with no DependentObject, as a host that
+// restored nothing judges, a read the walk misses is answered independent: the test's reader of Changing must be
+// dependent, and the consumer's not.
+func TestATestBinarysReaderReadsTheTestVariantItsClosureHolds(test *testing.T) {
+	test.Parallel()
+
+	dependencyPath := "example.com/dependency"
+	variant := "dependency [dependency.test]"
+	reading := func(identifier string, path string, imports map[string]string) *packageRecord {
+		return &packageRecord{identifier: identifier, path: path, imports: imports,
+			objects: []recordedObject{{path: dependencyPath, local: "Changing"}},
+			units:   []recordedUnit{declaringUnit(path, "reader.go", 10, "ReadsChanging", recordedRead{target: 0})}}
+	}
+	importing := func(identifier string, path string, imports map[string]string) *packageRecord {
+		return &packageRecord{identifier: identifier, path: path, imports: imports}
+	}
+	graph := NewGraph()
+	graph.add(changingRecord("dependency", dependencyPath))
+	graph.add(changingRecord(variant, dependencyPath))
+	graph.add(importing("middle", "example.com/middle", map[string]string{dependencyPath: "dependency"}))
+	graph.add(reading("consumer", "example.com/consumer", map[string]string{"example.com/middle": "middle"}))
+	graph.add(importing("shared [dependency.test]", "example.com/shared", map[string]string{dependencyPath: variant}))
+	for _, identifier := range []string{"first", "second"} {
+		graph.add(importing(identifier+" [dependency.test]", "example.com/"+identifier,
+			map[string]string{"example.com/shared": "shared [dependency.test]"}))
+	}
+	graph.add(reading("dependency_test [dependency.test]", "example.com/dependency_test", map[string]string{
+		"example.com/first": "first [dependency.test]", "example.com/second": "second [dependency.test]"}))
+	dependence := graph.Against(Difference{Packages: map[string]PackageDifference{
+		variant: {EveryUnitDependent: true}}})
+	expectDependent(test, dependence, "dependency_test [dependency.test]", "reader.go", map[int]bool{10: true})
+	expectDependent(test, dependence, "consumer", "reader.go", map[int]bool{10: false})
+}
+
+// UnitDeclaringName finds no unit for a path the graph holds no package of, nor for one it holds several of, which
+// no path alone can choose between, and finds the unit of a path it holds once: dependency and its test variant share
+// a path, dependency is the first package by ID, and reader's path is its own.
+func TestNoUnitDeclaresANameOfAPathTheGraphHoldsNoneOrSeveralOf(test *testing.T) {
+	test.Parallel()
+
+	dependencyPath := "example.com/dependency"
+	graph := NewGraph()
+	graph.add(changingRecord("dependency", dependencyPath))
+	graph.add(changingRecord("dependency [dependency.test]", dependencyPath))
+	graph.add(&packageRecord{identifier: "reader", path: "example.com/reader", imports: map[string]string{},
+		units: []recordedUnit{declaringUnit("example.com/reader", "reader.go", 10, "Reader")}})
+	dependence := graph.Against(Difference{})
+	for _, path := range []string{"example.com/absent", dependencyPath} {
+		if index, isDeclared := dependence.UnitDeclaringName(path, "Stable"); isDeclared {
+			test.Errorf("%s Stable: want no declaring unit, got unit %d", path, index)
+		}
+	}
+	if index, isDeclared := dependence.UnitDeclaringName("example.com/reader", "Reader"); !isDeclared || index != 4 {
+		test.Errorf("example.com/reader Reader: want unit 4, got unit %d (%t)", index, isDeclared)
+	}
+}
+
+// A read of a member of a held package that no unit declares, a field of an anonymous struct, is read through its
+// type, each bit it reaches its own (resolveRead): holder's Layout has its underlying bit set, by a kind edge to the
+// layout of Inner, which a host-only file declares, and its name bit unset. Reader reads Field through Layout's
+// underlying bit, dependent, and through its name bit, not; and reads Member, which a unit declares, by its own bit
+// alone, unset, though its record holds a reach through Layout's layout. Judged with no DependentObject, as a host
+// that restored nothing judges, a held object read as another graph's is answered independent. Wrapper's kind edge to
+// Field, which no unit declares, is dropped, as the counter dropped every edge to an object without a node, and asks
+// nothing of another graph.
+func TestAnUndeclaredMemberOfAHeldPackageReadsThroughEachBitOfItsType(test *testing.T) {
+	test.Parallel()
+
+	holderPath := "example.com/holder"
+	readerPath := "example.com/reader"
+	graph := NewGraph()
+	graph.add(&packageRecord{identifier: "holder", path: holderPath, imports: map[string]string{},
+		objects: []recordedObject{{path: holderPath, local: "Inner"}},
+		units: []recordedUnit{declaringUnit(holderPath, "inner.go", 10, "Inner"),
+			declaringUnit(holderPath, "holder.go", 10, "Layout"), declaringUnit(holderPath, "holder.go", 20, "Member")},
+		edges: []recordedEdge{{from: "Layout", fromUnderlying: true, to: 0, toUnderlying: true}}})
+	layoutBit := []recordedBit{{object: 1, underlying: true}}
+	graph.add(&packageRecord{identifier: "reader", path: readerPath, imports: map[string]string{holderPath: "holder"},
+		objects: []recordedObject{{path: holderPath, local: "Field"}, {path: holderPath, local: "Layout"},
+			{path: holderPath, local: "Member"}},
+		units: []recordedUnit{
+			declaringUnit(readerPath, "reader.go", 10, "ThroughLayout", recordedRead{target: 0, through: layoutBit}),
+			declaringUnit(readerPath, "reader.go", 20, "ThroughName",
+				recordedRead{target: 0, through: []recordedBit{{object: 1}}}),
+			declaringUnit(readerPath, "reader.go", 30, "ReadsMember", recordedRead{target: 2, through: layoutBit}),
+			declaringUnit(readerPath, "reader.go", 40, "Wrapper"),
+		},
+		edges: []recordedEdge{{from: "Wrapper", fromUnderlying: true, to: 0}}})
+	if external := len(graph.resolve().externalObjects); external != 0 {
+		test.Errorf("want no external object, every object being holder's, got %d", external)
+	}
+	dependence := graph.Against(Difference{Packages: map[string]PackageDifference{
+		"holder": {HostOnlyFiles: []string{"inner.go"}, SharedFiles: []string{"holder.go"}}}})
+	expectDependent(test, dependence, "reader", "reader.go", map[int]bool{10: true, 20: false, 30: false, 40: false})
+}
+
+// An edge from a declaration to an object of a package the graph does not hold seeds the bit it leaves from when the
+// bit it reaches is set in the build: Size's name bit hangs on the layout of elsewhere's Layout, which the build
+// changes, and Count's on the layout of Stable, whose name alone the build changes. The reader of Size is dependent,
+// and the reader of Count is not.
+func TestAnExternalEdgeSeedsTheBitItLeavesWhenTheBitItReachesIsSet(test *testing.T) {
+	test.Parallel()
+
+	path := "example.com/sizes"
+	graph := NewGraph()
+	graph.add(&packageRecord{identifier: "sizes", path: path, imports: map[string]string{},
+		objects: []recordedObject{{path: "example.com/elsewhere", local: "Layout"},
+			{path: "example.com/elsewhere", local: "Stable"}, {path: path, local: "Size"},
+			{path: path, local: "Count"}},
+		units: []recordedUnit{declaringUnit(path, "sizes.go", 10, "Size"), declaringUnit(path, "sizes.go", 20, "Count"),
+			declaringUnit(path, "sizes.go", 30, "ReadsSize", recordedRead{target: 2}),
+			declaringUnit(path, "sizes.go", 40, "ReadsCount", recordedRead{target: 3})},
+		edges: []recordedEdge{{from: "Size", to: 0, toUnderlying: true}, {from: "Count", to: 1, toUnderlying: true}}})
+	dependence := graph.Against(Difference{
+		DependentObject: func(object types.Object) (bool, bool) { return false, false },
+		DependentName: func(path string, local string) (bool, bool, bool) {
+			return local == "Stable", local == "Layout", true
+		},
+	})
+	expectDependent(test, dependence, "sizes", "sizes.go", map[int]bool{30: true, 40: false})
+}
+
+// A read that reaches an object of a package the graph does not hold through its type asks that object's own bit,
+// the one it reaches: ThroughLayout reads an object of its own package no unit declares through the layout of
+// elsewhere's Layout, which the build changes, and ThroughNamed through the layout of Named, whose name alone the build
+// changes. ReadsMember reads Member, which the answering graph declares, unchanged, so it is judged by Member's own
+// bits, whatever its record holds of Member's reach through Layout. Only ThroughLayout is dependent.
+func TestAReadThroughAnotherGraphsObjectAsksTheBitItReaches(test *testing.T) {
+	test.Parallel()
+
+	path := "example.com/reaching"
+	graph := NewGraph()
+	graph.add(&packageRecord{identifier: "reaching", path: path, imports: map[string]string{},
+		objects: []recordedObject{{path: "example.com/elsewhere", local: "Layout"},
+			{path: "example.com/elsewhere", local: "Named"}, {path: "example.com/elsewhere", local: "Member"}},
+		units: []recordedUnit{
+			declaringUnit(path, "reaching.go", 10, "ThroughLayout",
+				recordedRead{target: -1, through: []recordedBit{{object: 0, underlying: true}}}),
+			declaringUnit(path, "reaching.go", 20, "ThroughNamed",
+				recordedRead{target: -1, through: []recordedBit{{object: 1, underlying: true}}}),
+			declaringUnit(path, "reaching.go", 30, "ReadsMember",
+				recordedRead{target: 2, through: []recordedBit{{object: 0, underlying: true}}}),
+		}})
+	dependence := graph.Against(Difference{
+		DependentObject: func(object types.Object) (bool, bool) { return false, false },
+		DependentName: func(path string, local string) (bool, bool, bool) {
+			return local == "Named", local == "Layout", true
+		},
+	})
+	expectDependent(test, dependence, "reaching", "reaching.go", map[int]bool{10: true, 20: false, 30: false})
+}
+
+// A build-only file's method on a type the host defines moves that type's method set and no other: Receiver is a
+// host method's receiver, so it is defined, no alias, and seedAliasTargets follows nothing through it, though its
+// name bit hangs on Embedded's, as a type's method set hangs on what it embeds. The reader of Receiver is dependent,
+// and the reader of Embedded is not.
+func TestABuildOnlyMethodOnAHostReceiverSeedsNothingItEmbeds(test *testing.T) {
+	test.Parallel()
+
+	path := "example.com/methods"
+	method := declaringUnit(path, "methods.go", 30, "Receiver.Method")
+	method.receiver = "Receiver"
+	graph := NewGraph()
+	graph.add(&packageRecord{identifier: "methods", path: path, imports: map[string]string{},
+		typeNames: []string{"Embedded", "Receiver"},
+		objects:   []recordedObject{{path: path, local: "Embedded"}, {path: path, local: "Receiver"}},
+		units: []recordedUnit{declaringUnit(path, "methods.go", 10, "Embedded"),
+			declaringUnit(path, "methods.go", 20, "Receiver"), method,
+			declaringUnit(path, "methods.go", 40, "ReadsEmbedded", recordedRead{target: 0}),
+			declaringUnit(path, "methods.go", 50, "ReadsReceiver", recordedRead{target: 1})},
+		edges: []recordedEdge{{from: "Receiver", to: 0}}})
+	buildOnly, parseError := parser.ParseFile(token.NewFileSet(), "extra_linux.go",
+		"package methods\n\nfunc (Receiver) Extra() {}\n", 0)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	dependence := graph.Against(Difference{Packages: map[string]PackageDifference{
+		"methods": {BuildOnlyFiles: []*ast.File{buildOnly}}}})
+	expectDependent(test, dependence, "methods", "methods.go", map[int]bool{40: false, 50: true})
+}
+
+// Units come in package ID order, and each unit's calls are the units declaring its callees, never itself: alpha's one
+// unit, the graph's unit 0, calls itself and beta's one unit, unit 1, the first unit of the next package.
+func TestUnitsComeInPackageOrderAndACallReachesTheNextPackagesFirstUnit(test *testing.T) {
+	test.Parallel()
+
+	alphaPath := "example.com/alpha"
+	betaPath := "example.com/beta"
+	caller := declaringUnit(alphaPath, "alpha.go", 10, "Alpha")
+	caller.callees = []int32{0, 1}
+	graph := NewGraph()
+	graph.add(&packageRecord{identifier: "beta", path: betaPath, imports: map[string]string{},
+		units: []recordedUnit{declaringUnit(betaPath, "beta.go", 10, "Beta")}})
+	graph.add(&packageRecord{identifier: "alpha", path: alphaPath, imports: map[string]string{betaPath: "beta"},
+		objects: []recordedObject{{path: alphaPath, local: "Alpha"}, {path: betaPath, local: "Beta"}},
+		units:   []recordedUnit{caller}})
+	units := graph.Against(Difference{}).Units()
+	if len(units) != 2 || units[0].PackageId != "alpha" || units[1].PackageId != "beta" {
+		test.Fatalf("want alpha's unit and then beta's, got %+v", units)
+	}
+	if !slices.Equal(units[0].Calls, []int{1}) {
+		test.Errorf("alpha's unit calls %v, want [1]", units[0].Calls)
+	}
 }
 
 // chainLoadUnder is the build-facts-chain fixture of the engine's testdata, its own module, loaded whole under build

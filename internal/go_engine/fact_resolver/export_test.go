@@ -11,3 +11,8 @@ import (
 func (resolver *Resolver) ObjectPath(object types.Object) (objectpath.Path, error) {
 	return resolver.objectPath(object)
 }
+
+// MeasureBuild is measureBuild, build run as Build bills a build, for the tests outside this package.
+func (resolver *Resolver) MeasureBuild(build func()) {
+	resolver.measureBuild(build)
+}
