@@ -13,12 +13,3 @@ func (platformPart) Spin() { /* Windows's part spins by being called, as a gadge
 func platformName() string {
 	return "windows"
 }
-
-// len counts values on windows in place of the universe's.
-func len(values []int) int {
-	count := 0
-	for range values {
-		count++
-	}
-	return count
-}
