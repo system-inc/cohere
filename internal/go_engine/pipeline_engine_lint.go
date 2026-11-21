@@ -19,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
@@ -321,6 +322,9 @@ func (engine *pipeline) lintPackages(
 	// What the host's run held of its facts, read while its resolver is alive, which each package's host's side for the
 	// facts' reach is made of, only in a run whose extra builds start with the body reach's host side (#aswfm7a).
 	options.FactReach = engine.keepsForBuilds() && engine.takesBodyReach()
+	// And what its bodies hold that the presence rows read, by standing_presence's reader, which check takes and never
+	// imports (#f5g7ym6). A run without FactReach never calls it.
+	options.FactReachPresence = standing_presence.ReadPackage
 	options.Counted = engine.described.countedAsWalked
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
