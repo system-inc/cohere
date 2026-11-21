@@ -34,7 +34,8 @@ func TestAnImportOnlyAStrippedBodyUsesStillServesTheFix(test *testing.T) {
 	_, droppingFindings := parity.StrippedFindings(test, Analyzer, analysistest.TestData(),
 		parity.Strip{Functions: []string{"greet"}, DroppingImports: true}, "stripped")
 	if len(droppingFindings) != 1 || len(droppingFindings[0].Fixes) == 0 ||
-		len(droppingFindings[0].Fixes[0].Edits) == 0 || !strings.Contains(droppingFindings[0].Fixes[0].Edits[0].NewText, `import "fmt"`) {
+		len(droppingFindings[0].Fixes[0].Edits) == 0 ||
+		!strings.Contains(droppingFindings[0].Fixes[0].Edits[0].NewText, `import "fmt"`) {
 		test.Errorf("a strip that drops fmt's import found %v, want the fix importing fmt again", droppingFindings)
 	}
 }

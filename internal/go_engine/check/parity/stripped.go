@@ -57,7 +57,11 @@ func StrippedFindings(
 	for _, fixtures := range loadFixtures(test, Target{}, testdata, patterns, nil) {
 		strippedRoots := []*packages.Package{}
 		for _, root := range fixtures.roots {
-			strippedRoots = append(strippedRoots, strippedPackage(test, root, strip, stripped))
+			strippedRoot, strippedNames := strippedPackage(test, root, strip)
+			strippedRoots = append(strippedRoots, strippedRoot)
+			for _, name := range strippedNames {
+				stripped[name] = true
+			}
 		}
 		plainFindings = append(plainFindings, findingsOf(test, analyzer, fixtures.roots, fixtures.fileName)...)
 		strippedFindings = append(strippedFindings, findingsOf(test, analyzer, strippedRoots, fixtures.fileName)...)
@@ -82,15 +86,15 @@ func Messages(findings []Finding) []string {
 }
 
 // strippedPackage is root with its types and TypesInfo from a type check of shallow copies of its files, strip's
-// functions copied without their bodies, and its syntax the original files unless the strip is BodilessSyntax. Each
-// function it strips is marked in stripped.
+// functions copied without their bodies, and its syntax the original files unless the strip is BodilessSyntax, with the
+// name of each function it stripped.
 func strippedPackage(
 	test testing.TB,
 	root *packages.Package,
 	strip Strip,
-	stripped map[string]bool,
-) *packages.Package {
+) (strippedRoot *packages.Package, strippedNames []string) {
 	test.Helper()
+	strippedNames = []string{}
 	dropped := map[ast.Spec]bool{}
 	if strip.DroppingImports {
 		dropped = importsOnlyStrippedBodiesUse(root, strip.Functions)
@@ -109,7 +113,7 @@ func strippedPackage(
 					bodiless := *declared
 					bodiless.Body = nil
 					copied.Decls = append(copied.Decls, &bodiless)
-					stripped[declared.Name.Name] = true
+					strippedNames = append(strippedNames, declared.Name.Name)
 					continue
 				}
 			case *ast.GenDecl:
@@ -163,7 +167,7 @@ func strippedPackage(
 		GoVersion:   root.Types.GoVersion(),
 		FakeImportC: true,
 	}
-	// Every error went to Error, which has judged it.
+	// Ignored: every error already went to the configuration's Error function, which judged it.
 	_ = types.NewChecker(configuration, root.Fset, checked, information).Files(copies)
 
 	// A file's scope and version are recorded by its node, and a copy is a node of its own, so each is moved to the
@@ -177,11 +181,11 @@ func strippedPackage(
 		information.FileVersions[syntax[index]] = information.FileVersions[copied]
 	}
 
-	strippedRoot := *root
-	strippedRoot.Types = checked
-	strippedRoot.TypesInfo = information
-	strippedRoot.Syntax = syntax
-	return &strippedRoot
+	copiedRoot := *root
+	copiedRoot.Types = checked
+	copiedRoot.TypesInfo = information
+	copiedRoot.Syntax = syntax
+	return &copiedRoot, strippedNames
 }
 
 // importsOnlyStrippedBodiesUse is each import spec of root whose package name, by the plain type check's record, is
@@ -244,12 +248,4 @@ func findingsOf(
 		}
 	}
 	return found
-}
-
-// importerFunction is a function as a types.Importer.
-type importerFunction func(path string) (*types.Package, error)
-
-// Import is the package at path.
-func (function importerFunction) Import(path string) (*types.Package, error) {
-	return function(path)
 }
