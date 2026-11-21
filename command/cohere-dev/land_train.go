@@ -343,8 +343,19 @@ func sayTrainUnitsDirectories(worktree string, mainCommit string, units []trainU
 
 // closeTrainTasks closes each unit's task with the train's landing through ahra, one line said per unit. A close that
 // fails is said with the command to run by hand, and never fails the land: the landing is on main already.
+//
+// A unit that landed on its own while the train waited in line is on the main the landing joined, its first parent,
+// so its task was closed by its own landing: it is named as landed alone and never closed again (#d0kx76j).
 func closeTrainTasks(worktree string, landing string, trainTask string, units []trainUnit) {
 	for index, unit := range units {
+		// Ignored: a unit that isn't the joined main's ancestor makes merge-base exit 1, which is every unit the train
+		// itself brought, and one it can't read is closed as the train's, which a close by hand can undo.
+		if _, aloneError := gitOutput(worktree, "merge-base", "--is-ancestor", unit.Commit,
+			landing+"^1"); aloneError == nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: #%s landed on its own while the train waited, so the train "+
+				"doesn't close it again\n", unit.Task)
+			continue
+		}
 		others := []string{}
 		for otherIndex, other := range units {
 			if otherIndex != index {

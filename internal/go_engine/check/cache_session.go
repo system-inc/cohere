@@ -630,7 +630,7 @@ func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key,
 	if !whole {
 		return storeHit{}
 	}
-	restored, decodeError := decodeEntry(session.known, restoring, body, record, nil)
+	restored, decodeError := decodeEntry(session.known, restoring, body, record, nil, false)
 	if decodeError != nil {
 		return storeHit{}
 	}
