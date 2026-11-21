@@ -238,7 +238,7 @@ func TestAPackageStoredWithoutFactsMissesOnceARootImportsIt(test *testing.T) {
 		return nil
 	}
 	restored, decodeError := decodedStoredEntry(test, caching.Store, first.session.known, plainBase(first.session),
-		first.session.keys[plainBase(first.session)])
+		first.session.keys[plainBase(first.session)], false)
 	if decodeError != nil || covers(restored, first.session.known.facts) {
 		test.Fatalf("want plain base stored without facts, got %v", decodeError)
 	}

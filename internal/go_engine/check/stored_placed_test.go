@@ -364,7 +364,8 @@ func TestAColdEntryReadsBackThePlacedAnswersItsRunHeld(test *testing.T) {
 }
 
 // An entry whose placed answers do not read back is a miss as a whole, as one gob refuses is: restoredOf, which every
-// read of an entry goes through, refuses it, and reads one whose answers do read with them.
+// read of an entry goes through, refuses it, whether or not the read holds them, and reads one whose answers do read
+// with them.
 func TestAnEntryWhosePlacedAnswersDoNotReadIsAMiss(test *testing.T) {
 	test.Parallel()
 	answers := []fact_resolver.PlacedAnswer{
@@ -373,14 +374,14 @@ func TestAnEntryWhosePlacedAnswersDoNotReadIsAMiss(test *testing.T) {
 	}
 	restoring := &packages.Package{ID: "example.com/placed/bottom"}
 	whole := cacheEntry{Version: CacheFormatVersion, Placed: storedPlacedOf(answers)}
-	restored, restoreError := restoredOf(&cacheAnalyzers{}, restoring, whole, nil)
+	restored, restoreError := restoredOf(&cacheAnalyzers{}, restoring, whole, nil, true)
 	if restoreError != nil || !reflect.DeepEqual(restored.placed, answers) {
 		test.Fatalf("want the entry read with its placed answers, got %v (%v)", restored, restoreError)
 	}
 	broken := whole
 	broken.Placed = storedPlacedOf(answers)
 	broken.Placed.Values = nil
-	if _, brokenError := restoredOf(&cacheAnalyzers{}, restoring, broken, nil); brokenError == nil {
+	if _, brokenError := restoredOf(&cacheAnalyzers{}, restoring, broken, nil, false); brokenError == nil {
 		test.Error("want an entry whose placed answers' columns differ in length refused, read without an error")
 	}
 }
