@@ -163,6 +163,19 @@ func TestAStandingBodyNamingQueriedRowsLeavesForPresence(test *testing.T) {
 		"Next": standing_presence.SqlRowsError, "IterReads": standing_presence.SqlRowsError}, nil)
 }
 
+// sqlrowserr's row over sql_rows_err's stripped fixture (#8pxhe8j): next, present, loops on rows' Next, and check,
+// standing, calls their Err. Stripping check's body would leave the rule a false finding at the query
+// (sql_rows_err's TestAStrippedErrCheckChangesTheRowsFinding), so the row names rows, and check leaves.
+func TestAStandingBodyCheckingPresentRowsErrorLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "rowschecked")
+	host := presenceHost(test, found, []string{"next"},
+		presenceUse{key: "rowschecked.rows", identity: found.identity("rows"), users: []string{"next", "check"}})
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"check": standing_presence.SqlRowsError}, nil)
+}
+
 // screaming's row (#xeafx79): Reads compares with O_RDONLY, an underscored constant of a file importing syscall, and
 // leaves. Plain compares with ReadOnly, which has no underscore, and Writes names nothing, so both stand.
 func TestAStandingBodyNamingASystemConstantLeavesForPresence(test *testing.T) {
