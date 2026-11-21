@@ -77,17 +77,23 @@ const sharedBoxTestTimeout = "30m"
 // account's to change, so it trusts nothing the box kept any more than /usr/bin does.
 const sharedBoxSystemPath = "/usr/bin:/bin:/usr/sbin:/sbin"
 
+// sharedBoxToolchainCheck refuses, through the refuse its script defines first, a Go toolchain at goroot that isn't the
+// one digest pins: none there, one holding a link, or one whose files digest to another. It runs before anything of the
+// toolchain does, in the gate (sharedBoxGate) and in the landing's measurement on Shackler (land_performance.go), which
+// builds the binary it times with it.
+const sharedBoxToolchainCheck = `[ -x "$goroot/bin/go" ] || refuse "there is no go at $goroot"
+link=$(find -P "$goroot" -type l | head -n 1)
+[ -z "$link" ] || refuse "the Go toolchain at $goroot holds a link, $link, which its digest can't vouch for"
+found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+[ "$found" = "$digest" ] || refuse "the Go toolchain at $goroot digests to $found, not the pinned $digest"
+`
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
 // goroot, digest, node, nodeDigest and races (the raceGated packages, comma-separated) as variables, and the
 // module's test patterns as its arguments. It prints boxMarker before the tests, boxRaceMarker before the -race
 // run once the module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box.
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
-[ -x "$goroot/bin/go" ] || refuse "there is no go at $goroot"
-link=$(find -P "$goroot" -type l | head -n 1)
-[ -z "$link" ] || refuse "the Go toolchain at $goroot holds a link, $link, which its digest can't vouch for"
-found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
-[ "$found" = "$digest" ] || refuse "the Go toolchain at $goroot digests to $found, not the pinned $digest"
-nodePath=""
+` + sharedBoxToolchainCheck + `nodePath=""
 if [ -e "$node/bin/node" ]; then
   nodeFound=$(sha256sum "$node/bin/node" | cut -d' ' -f1)
   [ "$nodeFound" = "$nodeDigest" ] || refuse "the node at $node/bin/node digests to $nodeFound, not the pinned $nodeDigest"
