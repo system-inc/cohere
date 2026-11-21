@@ -279,6 +279,20 @@ func TestABodyAPresentCallerStartsLeavesForPresence(test *testing.T) {
 	}, map[string]fact_reach.Reason{"Faulty": "no-return"})
 }
 
+// testinggoroutine's edge row over testing_goroutine's stripped fixture (#8pxhe8j): TestStarts, present, starts
+// helper with go, and helper, standing, calls t.Fatal. Stripping helper's body would lose the rule's finding at
+// TestStarts' go statement (testing_goroutine's TestAStrippedHelperLosesTheGoStatementsFinding), so helper leaves by
+// the callee direction.
+func TestAStandingBodyAPresentTestStartsLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "started")
+	host := presenceHost(test, found, []string{"TestStarts"})
+	host.recordPresence(found)
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"helper": standing_presence.TestingGoroutine}, nil)
+}
+
 // A body that writes a candidate of consistency-no-any's of its own, or declares a marker interface, leaves for the
 // host's record of it (#xeafx79): Loose writes interface{} in a local variable's type, which no use records, and
 // Literal writes any in a function literal's parameter, so both leave for noany; Sealed declares a marker of its own,
