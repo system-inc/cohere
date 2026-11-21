@@ -134,6 +134,30 @@ func TestATrainOfTwoUnitsLandsUnderOneGate(test *testing.T) {
 	}
 }
 
+// A unit that lands on its own while the train waits in line is in the main the train joins: the train still lands what
+// remains, says that unit landed alone, and closes only the other unit's task.
+func TestATrainLeavesAUnitThatLandedAloneClosedOnce(test *testing.T) {
+	test.Parallel()
+	fixture, ahraLog := trainFixture(test, "", "")
+	alone := fixture.land("a")
+	fixture.waitForGate("start " + filepath.Base(fixture.worktree("a")))
+	output, code := landTrainFrom(fixture, "--train", "a", "b", "--task", trainTask, "--message", "two units")
+	if waitError := alone.Wait(); waitError != nil {
+		test.Fatalf("a's own landing failed: %v", waitError)
+	}
+	if code != 0 {
+		test.Fatalf("the train exited %d:\n%s", code, output)
+	}
+	if !strings.Contains(output, "#trnunta landed on its own while the train waited, so the train doesn't close it "+
+		"again") {
+		test.Errorf("the train never said a landed alone:\n%s", output)
+	}
+	closed := strings.TrimSpace(string(readMaybeMissing(test, ahraLog)))
+	if strings.Contains(closed, "tasks done trnunta") || !strings.Contains(closed, "tasks done trnuntb") {
+		test.Errorf("ahra was told\n%s\nwant b's task closed alone", closed)
+	}
+}
+
 // A unit that clashes with the units before it is refused while the train is composed, before any gate, naming the
 // unit, the units it clashes with, and the paths, and main doesn't move.
 func TestATrainRefusesAUnitThatClashesBeforeTheGate(test *testing.T) {
