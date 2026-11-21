@@ -1,0 +1,43 @@
+// Performance.jsonc: main's performance at this commit, rewritten by cohere-dev land in every landing commit (#6wnsnq2).
+// Git history is the series. Never edit it by hand. Times are integer milliseconds, the median of the rounds with their min and max.
+{
+    "schema": 1,
+    "commit": "ce505c1be2e9e38b13203cd562ce0d9c2c7598ff",
+    "measuredAt": "2026-11-21T04:39:54Z",
+    "machine": {
+        "name": "Shackler",
+        "cpu": "Apple M3 Max",
+        "cores": 16,
+        "loadBefore": [2.24, 2.02, 2.02],
+        "loadAfter": [6.8, 3.22, 2.46],
+        "heldQuiet": true
+    },
+    "tools": {
+        "cohere": "ce505c1b CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
+        "go": "go1.27.1"
+    },
+    "note": "the first measurement, so nothing to compare",
+    "engine": {
+        "rounds": { "cold": 3, "deeafbf4": 2, "warm": 3 },
+        "cold": {
+            "root": {
+                "wall": { "median": 3450, "min": 3440, "max": 3470 },
+                "user": { "median": 40110, "min": 40000, "max": 40160 },
+                "sys": { "median": 5520, "min": 5410, "max": 5580 }
+            },
+            "deeafbf4": {
+                "wall": { "median": 1495, "min": 1490, "max": 1500 },
+                "user": { "median": 8385, "min": 8350, "max": 8420 },
+                "sys": { "median": 2550, "min": 2540, "max": 2560 }
+            }
+        },
+        "warm": {
+            "root": {
+                "wall": { "median": 720, "min": 720, "max": 730 },
+                "user": { "median": 1980, "min": 1970, "max": 1990 },
+                "sys": { "median": 4170, "min": 4020, "max": 4180 }
+            }
+        },
+        "timeline": { "root": { "listing": 283, "handover": 1865, "builds": 3341, "run": 3404 } }
+    }
+}
