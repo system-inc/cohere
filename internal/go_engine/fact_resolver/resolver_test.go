@@ -23,14 +23,22 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
-// passHolding is a pass on a package of its own whose ResultOf holds resolved under rule.Resolved and, when collector
-// is not nil, collector under rule.Timed, as the checker hands a rule both.
-func passHolding(resolved any, collector *timing.Collector) *analysis.Pass {
-	results := map[*analysis.Analyzer]any{rule.Resolved: resolved}
+// passHolding is a pass on a package of its own whose ResultOf holds resolver under rule.Resolved, a typed nil for a
+// nil resolver, and, when collector is not nil, collector under rule.Timed, as the checker hands a rule both.
+func passHolding(resolver *fact_resolver.Resolver, collector *timing.Collector) *analysis.Pass {
+	pass := passHoldingNothing()
+	pass.ResultOf[rule.Resolved] = resolver
 	if collector != nil {
-		results[rule.Timed] = collector
+		pass.ResultOf[rule.Timed] = collector
 	}
-	return &analysis.Pass{Pkg: types.NewPackage("example.com/asking", "asking"), ResultOf: results}
+	return pass
+}
+
+// passHoldingNothing is a pass on a package of its own whose ResultOf holds nothing, as a driver that set no
+// checker.Options.Resolver hands one.
+func passHoldingNothing() *analysis.Pass {
+	return &analysis.Pass{Pkg: types.NewPackage("example.com/asking", "asking"),
+		ResultOf: map[*analysis.Analyzer]any{}}
 }
 
 // sharedRowNames is the name of every shared row of collector's record, in order, every row being shared here since no
@@ -49,11 +57,11 @@ func sharedRowNames(collector *timing.Collector) []string {
 // never reads one the checker did not hand it.
 func TestAPassWithoutAResolverIsRefused(test *testing.T) {
 	test.Parallel()
-	for name, resolved := range map[string]any{
-		"nothing":     nil,
-		"a typed nil": (*fact_resolver.Resolver)(nil),
+	for name, pass := range map[string]*analysis.Pass{
+		"nothing":     passHoldingNothing(),
+		"a typed nil": passHolding(nil, nil),
 	} {
-		resolver, resolverError := fact_resolver.Of(passHolding(resolved, nil))
+		resolver, resolverError := fact_resolver.Of(pass)
 		if resolver != nil || resolverError == nil {
 			test.Errorf("with %s the pass returned %p and %v, want an error alone", name, resolver, resolverError)
 		}
@@ -89,7 +97,9 @@ func TestATimedQuestionIsBilledToTheResolversRows(test *testing.T) {
 	if _, resolverError := fact_resolver.Of(passHolding(resolver, collector)); resolverError != nil {
 		test.Fatal(resolverError)
 	}
-	resolver.Question("asking", func() { resolver.MeasureBuild(func() {}) })
+	resolver.Question("asking", func() {
+		resolver.MeasureBuild(func() { /* A build of nothing: only the row it is billed to is read. */ })
+	})
 	want := []string{fact_resolver.BuildRow, fact_resolver.JudgeRow}
 	if rows := sharedRowNames(collector); !reflect.DeepEqual(rows, want) {
 		test.Errorf("the record's shared rows are %v, want %v", rows, want)
