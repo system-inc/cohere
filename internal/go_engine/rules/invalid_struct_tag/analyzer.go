@@ -9,9 +9,10 @@
 // escaped, holds no key the parser can find, and the port leaves it alone as the original does. Duplicate `choice`,
 // `optional-value` and `default` keys are left alone in a package any of whose files imports
 // github.com/jessevdk/go-flags, which accepts them; whether it does is read once per package, on its first struct
-// type, kept in the context's state, and handed to each struct's check. The `json` grammar is not judged in
-// encoding/json, encoding/json/v2 or their external tests, which test themselves; no fixture proves it, since a
-// module's package of that path is ambiguous with the standard library's and never loads.
+// type, kept in the context's state, and handed to each struct's check. The port reads each import's path unquoted,
+// where the original compares the literal's raw text, so an import of go-flags spelled with an escape counts. The
+// `json` grammar is not judged in encoding/json, encoding/json/v2 or their external tests, which test themselves; no
+// fixture proves it, since a module's package of that path is ambiguous with the standard library's and never loads.
 //
 // The `xml` value is judged by staticcheck's fakexml, a fork of encoding/xml's field reading over go/types, and the
 // field it reads is built by staticcheck's fakereflect, both borrowed in this wave as data, since wave 5 ports them,
@@ -21,13 +22,15 @@
 // missed ones the port keeps for parity, the original's, shown by parity's `severalNames` and `severalNamesMissed`.
 // It reports with no option, so a generated file is judged like any other. The registry runs the port in the
 // original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
-// both over the same packages, and the two differ nowhere they hold.
+// both over the same packages, and the two differ only at an escaped go-flags import, where the original is wrong,
+// adjudicated by parity's `escaped` fixture.
 package invalid_struct_tag
 
 import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"strconv"
 	"strings"
 
 	"honnef.co/go/tools/staticcheck/fakereflect"
@@ -80,14 +83,20 @@ type packageFlags struct {
 // goFlagsPath is the import path of the command-line package whose tags repeat keys on purpose.
 const goFlagsPath = "github.com/jessevdk/go-flags"
 
-// importsGoFlags is whether any file of the package imports go-flags. It reads the import's text, not the package's
-// imports, as the original does, so a package vendored under `GOPATH`, whose path carries the vendor tree before it,
-// still counts.
+// importsGoFlags is whether any file of the package imports go-flags. It reads the import's path as written, not the
+// package's imports, as the original does, so a package vendored under `GOPATH`, whose resolved path carries the
+// vendor tree before it, still counts.
 func importsGoFlags(context *rule.Context) bool {
 	for _, file := range context.Files {
 		for _, imported := range file.Imports {
-			// The text between the literal's quotes, read as the original reads it, escapes and all.
-			if imported.Path.Value[1:len(imported.Path.Value)-1] == goFlagsPath {
+			// The literal unquoted, where the original compares its raw text, so go-flags spelled with an escape,
+			// `go\x2dflags`, counts as the same import it is (#dp67trx). The raw text read it false while the go
+			// command imported go-flags, which made the gate read otherwise than the body reach's imports reason, the
+			// one input that lets the rule be PerUnit: one build's escaped import beside another's plain one leaves the
+			// imports equal and a body standing, and the build took the host's finding its own gate refused.
+			path, unquoteError := strconv.Unquote(imported.Path.Value)
+			// A literal that does not unquote is a parse error, and the package never reaches a rule.
+			if unquoteError == nil && path == goFlagsPath {
 				return true
 			}
 		}

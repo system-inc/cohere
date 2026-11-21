@@ -41,8 +41,12 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 
 // The differences fixture holds the tags whose reading the two could part on, several keys at once, several names to
 // a line and a nested struct. It records no difference, since there is none, so the two must agree there finding for
-// finding.
+// finding. The escaped fixture holds the one place they part: a package importing go-flags spelled with an escape,
+// `go\x2dflags`, whose repeated `default` key the original reports, comparing the import's raw text, and the port
+// rightly leaves alone, reading its path (#dp67trx). Its one record is that drop, and a key go-flags does not repeat
+// is found by both.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	vendored.RequireIdentical(test, sa5008.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	vendored.RequireOnlyAdjudicated(test, sa5008.Analyzer, Analyzer, analysistest.TestData(), "escaped")
 }
