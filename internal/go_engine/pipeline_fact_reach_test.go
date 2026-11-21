@@ -39,9 +39,9 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 		test.Fatal("under the census the run made no sides for the facts' reach")
 	}
 	hosted := on.factReachSides.packages["example.com/reach"]
-	// Seven bodies in reach.go, and platformName in the host's own reach_other.go.
-	if len(on.factReachSides.packages) != 1 || hosted == nil || len(hosted.Places()) != 8 {
-		test.Errorf("under the census the run made the sides %v, want example.com/reach's alone, with its 8 bodies",
+	// Six bodies in reach.go, and platformName in the host's own reach_other.go.
+	if len(on.factReachSides.packages) != 1 || hosted == nil || len(hosted.Places()) != 7 {
+		test.Errorf("under the census the run made the sides %v, want example.com/reach's alone, with its 7 bodies",
 			on.factReachSides.packages)
 	}
 	if on.buildRuns[0].result.FactReach != nil {
@@ -105,7 +105,7 @@ func TestEachBuildHandsItsPassesTheHostsSideWithItsUnreachedBodiesStanding(test 
 
 // Under the body reach census windows's build settles the standing bodies of the fact-reach-sides fixture's one package
 // by standing_facts, which reads the side its passes were handed, and the census writes what that took (#aswfm7a): the
-// side used, its 8 functions' no-return facts compared, platformName's named, since windows declares its own in a file
+// side used, its 7 functions' no-return facts compared, platformName's named, since windows declares its own in a file
 // of its own, and nothing taken out, since PlatformName, platformName's one user, is reached already. No fact kind
 // answered about the package, so nothing is asked. A build without the census settles nothing.
 func TestEachBuildSettlesItsStandingBodiesAndTheCensusCountsThem(test *testing.T) {
@@ -131,7 +131,7 @@ func TestEachBuildSettlesItsStandingBodiesAndTheCensusCountsThem(test *testing.T
 	}
 	for _, line := range []string{
 		"  fact reach: sides 1, settled 1, crashed 0",
-		"    functions compared 8, named 1; imported asked 0, named 0; order bound named 0",
+		"    functions compared 7, named 1; imported asked 0, named 0; order bound named 0",
 		"    answers asked 0, differing none, unknown none; bodies taken out 0",
 	} {
 		if !slices.Contains(strings.Split(string(written), "\n"), line) {

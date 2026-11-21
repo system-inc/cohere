@@ -1,7 +1,6 @@
 package string_int_conv
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -64,14 +63,18 @@ func addImport(
 }
 
 // freshName is preferred, or where something at position already holds that name, the first of preferred followed by
-// 0, 1, 2 and on that nothing holds. x/tools' refactor.FreshName.
+// 0, 1, 2 and on that nothing holds. x/tools' refactor.FreshName, whose `fmt.Sprintf("%s%d", preferred, index)` writes
+// each candidate as `preferred + strconv.Itoa(index)` does here. Each question spells what it asks in place, preferred
+// or preferred followed by a decimal integer, so the scope guard reads its name
+// (TestEveryScopeQuestionOfARuleIsDeclared).
 func freshName(scope *types.Scope, position token.Pos, preferred string) string {
-	candidate := preferred
+	if _, declared := scope.LookupParent(preferred, position); declared == nil {
+		return preferred
+	}
 	for index := 0; ; index++ {
-		if _, declared := scope.LookupParent(candidate, position); declared == nil {
-			return candidate
+		if _, declared := scope.LookupParent(preferred+strconv.Itoa(index), position); declared == nil {
+			return preferred + strconv.Itoa(index)
 		}
-		candidate = fmt.Sprintf("%s%d", preferred, index)
 	}
 }
 

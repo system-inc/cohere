@@ -50,7 +50,10 @@ import (
 // build, to a package of another ID than on the host, another package under the same path, as go test builds a package
 // again against a test variant: the objects its bodies read there are not the ones the host's record names
 // (differingImports). And so is a package whose rules asked its import closure for a package, io or hash, and get
-// another answer asked again in the build, where only a dependency's imports differ (differingClosureLookups). A body
+// another answer asked again in the build, where only a dependency's imports differ (differingClosureLookups). And so
+// is a package one side of which alone declares at package level a universe name, or a name a rule declares it asks
+// its scope about, ScopeName (#b255cfy): S1018 offers copy() only while copy is the builtin, at the body's place,
+// whatever the body names (bodyReacher.scopeAskedName). A body
 // whose positions a //line directive moves onto a file the builds do not share is reached, LineClaim (#d2mqgfj): a
 // rule may judge a finding by the file its position claims, as staticcheck's generated-file filter does
 // (unsharedLineClaims). A build whose word size or maximum alignment differs from the host's
@@ -91,13 +94,16 @@ const (
 	reachedLoadMode     bodyReachReason = "LoadMode"
 	reachedInitializers bodyReachReason = "Initializers"
 	reachedImports      bodyReachReason = "Imports"
+	reachedScopeName    bodyReachReason = "ScopeName"
 	reachedLineClaim    bodyReachReason = "LineClaim"
 )
 
-// bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by.
+// bodyReachReasons are the reasons in the order the census writes them, the order a body is judged by. ScopeName comes
+// beside Imports, after every reason of a body's own, since it too reaches a package whole and takes only the bodies
+// nothing else reached, and before Initializers, which it reaches with every other body.
 var bodyReachReasons = []bodyReachReason{reachedSizes, reachedUnrecorded, reachedMiscounted, reachedUnknown,
 	reachedSignature, reachedNamed, reachedConstant, reachedLoadMode, reachedSelected, reachedValueType,
-	reachedTypeArgument, reachedShadowed, reachedLineClaim, reachedImports, reachedInitializers}
+	reachedTypeArgument, reachedShadowed, reachedLineClaim, reachedImports, reachedScopeName, reachedInitializers}
 
 // bodyReachHost is the host's side of the census, shared by every build and read only: each package the host checked,
 // by its ID, with its reads, whose function uses stage 1 recorded and, under the body differential, its bodies as its

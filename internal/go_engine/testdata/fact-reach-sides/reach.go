@@ -1,6 +1,5 @@
 // Package reach holds a body for each way windows's difference reaches one of the host's bodies, and two it never
-// reaches, for the body reach census (#w72zxtq): platformName, platformInteger and platformPart are each build's own,
-// and windows declares a package-level len.
+// reaches, for the body reach census (#w72zxtq): platformName, platformInteger and platformPart are each build's own.
 package reach
 
 // Gadget spins in every build.
@@ -41,11 +40,6 @@ func Positive(value int) bool {
 // Spinner takes the method value Spin from holder, whose type gains it on windows through platformPart.
 func Spinner() func() {
 	return holder.Spin
-}
-
-// Size reads the universe's len, which windows's file declares at package level.
-func Size(values []int) int {
-	return len(values)
 }
 
 // Joined uses nothing any build changes.
