@@ -13,9 +13,9 @@ import (
 // index into the graph, none of which another build's graph shares.
 //
 // A run holds one record a body of every package it records, so the record is kept small: a place names its file by
-// an index into the record's own PlaceFiles, an end of an edge is a few words, the own edges are one list and not a
-// list a local, and each list is made at its length once the body is walked. encoded is its canonical form, which
-// spells every place and kind out.
+// an index into the record's own PlaceFiles, the locals' names are one string, an end of an edge is a few words, the
+// own edges are one list and not a list a local, and each list is made at its length once the body is walked.
+// encoded is its canonical form, which spells every place, name and kind out.
 type bodyRecord struct {
 	// Body is the function declaration the body is of, as a standing body is keyed (rule.StandingBodies.Stands): the
 	// file a reader sees its `func` in, past any `//line` directive, and the offset of that `func` in the file as
@@ -26,6 +26,10 @@ type bodyRecord struct {
 	// order the walk first placed something in it. Each name is the one the file set holds, so the record shares its
 	// bytes. A place the walk found in no file is in the empty name's, as an unplaced place always was.
 	PlaceFiles []string
+	// Names is every local's name as a finding words it (objectOf), one after another in the order of the locals,
+	// each ending where its local's NameEnd says: one string a record where a string a local would be a word and a
+	// half more each, and as many more allocations. A method of an interface under a local named type reads `L.m`.
+	Names string
 	// Locals is every node the body's walk makes, in the order the walk met them. A local is its index here and never
 	// a position: a type switch makes one variable a clause, all at one offset, and an unnamed parameter of a function
 	// literal has no declaring identifier.
@@ -72,9 +76,9 @@ type recordedLocal struct {
 	// Place is where the local is declared. Several locals may share one, and a local without a declaring identifier
 	// is placed where go/types places its object.
 	Place indexedPlace
-	// Name is the local's name as a finding words it (objectOf): a method of an interface under a local named type
-	// reads `L.m`.
-	Name string
+	// NameEnd is where the local's name ends in the record's Names. It begins where the local before it ends, or at
+	// the start for the first (nameOf).
+	NameEnd uint32
 	// Kind is the kind a finding names the local's kind with (kindOf).
 	Kind objectKind
 }
@@ -171,6 +175,21 @@ func (record bodyRecord) placeOf(place indexedPlace) (recordedPlace, error) {
 	return recordedPlace{File: record.PlaceFiles[place.File], Offset: int(place.Offset)}, nil
 }
 
+// nameOf is the name of the local at index among the record's, and an error for a name that ends before it begins
+// or past the record's Names, which no recorder writes.
+func (record bodyRecord) nameOf(index int) (string, error) {
+	start := uint32(0)
+	if index > 0 {
+		start = record.Locals[index-1].NameEnd
+	}
+	end := record.Locals[index].NameEnd
+	if end < start || uint64(end) > uint64(len(record.Names)) {
+		return "", fmt.Errorf("local %d's name runs from %d to %d of the record's %d bytes of names", index, start,
+			end, len(record.Names))
+	}
+	return record.Names[start:end], nil
+}
+
 // encodedRecord is a record in its canonical form, every place with its file named, every kind as its word, and each
 // local with its owners, so the form reads alone and does not change with how a run holds a record.
 type encodedRecord struct {
@@ -205,7 +224,7 @@ type encodedEnd struct {
 
 // canonical is record in its canonical form. Every list is made empty and never nil, so a record with none of
 // something encodes as it does on any run. It fails for what no recorder writes: a place past the record's files, a
-// kind no word names, or an owner of a local past the record's locals.
+// kind no word names, a name past the record's names, or an owner of a local past the record's locals.
 func (record bodyRecord) canonical() (encodedRecord, error) {
 	canonical := encodedRecord{
 		Body:    record.Body,
@@ -223,10 +242,14 @@ func (record bodyRecord) canonical() (encodedRecord, error) {
 		if uint64(local.Kind) >= uint64(len(kindWords)) {
 			return encodedRecord{}, fmt.Errorf("local %d is of kind %d, which no word names", index, local.Kind)
 		}
+		name, nameError := record.nameOf(index)
+		if nameError != nil {
+			return encodedRecord{}, nameError
+		}
 		canonical.Locals = append(canonical.Locals, encodedLocal{
 			Place:  place,
 			Kind:   local.Kind.word(),
-			Name:   local.Name,
+			Name:   name,
 			Owners: []encodedEnd{},
 		})
 	}

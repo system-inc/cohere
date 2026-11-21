@@ -802,6 +802,14 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 			names: []string{placeText(count.Body), "local 0", pastFiles},
 		},
 		{
+			name: "a local whose name runs past the record's names",
+			taken: withRecord(func(record *bodyRecord) {
+				record.Locals[0].NameEnd = uint32(len(record.Names) + 1)
+			}),
+			names: []string{placeText(count.Body), fmt.Sprintf("local 0's name runs from 0 to %d of the record's %d",
+				len(count.Names)+1, len(count.Names))},
+		},
+		{
 			name:  "a local of a kind no word names",
 			taken: withRecord(func(record *bodyRecord) { record.Locals[0].Kind = objectKind(len(kindWords)) }),
 			names: []string{placeText(count.Body), fmt.Sprintf("kind %d, which no word names", len(kindWords))},

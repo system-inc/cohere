@@ -110,6 +110,10 @@ func (graph *graph) spliceBody(record *bodyRecord, function nodeIndex) error {
 			return fmt.Errorf("splicing the body at %s: local %d is of kind %d, which no word names",
 				placeText(record.Body), index, local.Kind)
 		}
+		name, nameError := record.nameOf(index)
+		if nameError != nil {
+			return fmt.Errorf("splicing the body at %s: %w", placeText(record.Body), nameError)
+		}
 		if uint64(len(graph.nodes)) > math.MaxUint32 {
 			return fmt.Errorf("splicing the body at %s: a package of more than %d objects", placeText(record.Body),
 				uint64(math.MaxUint32))
@@ -118,8 +122,8 @@ func (graph *graph) spliceBody(record *bodyRecord, function nodeIndex) error {
 		graph.nodes = append(graph.nodes, node{})
 		graph.firstOwners = append(graph.firstOwners, 0)
 		graph.splice.locals[locals[index]] = object{
-			name:      local.Name,
-			shortName: shortNameOf(local.Name),
+			name:      name,
+			shortName: shortNameOf(name),
 			kind:      local.Kind.word(),
 			position:  position,
 		}

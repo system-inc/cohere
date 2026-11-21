@@ -1013,9 +1013,9 @@ func TestRecordsHoldNoRoomPastTheirLists(test *testing.T) {
 }
 
 // TestCanonicalFormRefusesWhatNoRecorderWrites holds encoded to failing by name (#xeafx79) where a record names what
-// it does not hold: a place in a file past its files, a local of a kind no word names, an owner of a local past its
-// locals, and an end of a kind no word names. No recorder writes one, and a canonical form read past what the record
-// holds would stop the run instead.
+// it does not hold: a place in a file past its files, a name past its names, a local of a kind no word names, an
+// owner of a local past its locals, and an end of a kind no word names. No recorder writes one, and a canonical form
+// read past what the record holds would stop the run instead.
 func TestCanonicalFormRefusesWhatNoRecorderWrites(test *testing.T) {
 	test.Parallel()
 	recorded := recordPackage(test, []recordedSource{{"shape.go", refusedSource}}, nil)
@@ -1042,6 +1042,12 @@ func TestCanonicalFormRefusesWhatNoRecorderWrites(test *testing.T) {
 				record.Uses[declared].Used.Place.File = uint32(len(record.PlaceFiles))
 			},
 			names: []string{pastFiles},
+		},
+		{
+			name:   "a local whose name runs past the record's names",
+			change: func(record *bodyRecord) { record.Locals[0].NameEnd = uint32(len(record.Names) + 1) },
+			names: []string{fmt.Sprintf("local 0's name runs from 0 to %d of the record's %d", len(count.Names)+1,
+				len(count.Names))},
 		},
 		{
 			name:   "a local of a kind no word names",

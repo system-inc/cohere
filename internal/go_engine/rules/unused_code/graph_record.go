@@ -42,11 +42,12 @@ type bodyRecorder struct {
 	uses  map[uint64]struct{}
 	owned map[uint64]struct{}
 	files map[string]struct{}
-	// openLocals, openOwned, openUses and openPlaceFiles are the open body's record as the walk writes it, and
-	// placeFileIndexes each file's index among openPlaceFiles. closeBody copies each list into the record at its
+	// openLocals, openNames, openOwned, openUses and openPlaceFiles are the open body's record as the walk writes it,
+	// and placeFileIndexes each file's index among openPlaceFiles. closeBody copies each into the record at its
 	// length, since a run holds every record to its end and room an append left over would be held with it. They
 	// belong to the cursor too, and one set serves every body.
 	openLocals       []recordedLocal
+	openNames        []byte
 	openOwned        []recordedOwner
 	openUses         []recordedUse
 	openPlaceFiles   []string
@@ -160,6 +161,7 @@ func (graph *graph) closeBody() {
 	record := &recorder.records[recorder.cursor.record]
 	record.PlaceFiles = exactly(recorder.openPlaceFiles)
 	record.Locals = exactly(recorder.openLocals)
+	record.Names = string(recorder.openNames)
 	record.Owned = exactly(recorder.openOwned)
 	record.Uses = exactly(recorder.openUses)
 	if len(recorder.files) > 0 {
@@ -180,6 +182,7 @@ func (graph *graph) closeBody() {
 	clear(recorder.owned)
 	clear(recorder.files)
 	recorder.openLocals = recorder.openLocals[:0]
+	recorder.openNames = recorder.openNames[:0]
 	recorder.openOwned = recorder.openOwned[:0]
 	recorder.openUses = recorder.openUses[:0]
 	recorder.openPlaceFiles = recorder.openPlaceFiles[:0]
@@ -270,10 +273,12 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 		placed := localOfRecord{record: recorder.cursor.record, local: uint32(len(recorder.openLocals))}
 		place, isInFile := graph.placeOf(worded.position)
 		indexed, isIndexed := graph.indexedPlaceOf(place)
+		recorder.openNames = append(recorder.openNames, worded.name...)
 		recorder.openLocals = append(recorder.openLocals, recordedLocal{
 			Place: indexed,
-			Name:  worded.name,
-			Kind:  kindOf(typesObject),
+			// One body's locals' names come to far fewer bytes than the four billion a 32-bit offset counts.
+			NameEnd: uint32(len(recorder.openNames)),
+			Kind:    kindOf(typesObject),
 		})
 		// A build places a spliced local in its own file set by the name its file was parsed under, which must be one
 		// file's alone there (positionAt): flagged here, as an end its place does not find is, rather than failing
