@@ -734,6 +734,34 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 			}),
 			names: []string{placeText(count.Body)},
 		},
+		{
+			// Rooted is bounded on its own, so this is the bound an end of an edge is read by (endNode).
+			name: "an end past the record's locals",
+			taken: withRecord(func(record *bodyRecord) {
+				for index := range record.Uses {
+					if record.Uses[index].Used.Kind == endLocal {
+						record.Uses[index].Used.Local = len(record.Locals)
+					}
+				}
+			}),
+			names: []string{placeText(count.Body), fmt.Sprintf("local %d of its %d", len(count.Locals),
+				len(count.Locals))},
+		},
+		{
+			name: "a local placed past the end of its file",
+			taken: withRecord(func(record *bodyRecord) {
+				record.Locals[0].Place.Offset = len(refusedSource) + 1
+			}),
+			names: []string{placeText(count.Body), placeText(recordedPlace{
+				File:   "shape.go",
+				Offset: len(refusedSource) + 1,
+			})},
+		},
+		{
+			name:  "a local placed before the start of its file",
+			taken: withRecord(func(record *bodyRecord) { record.Locals[0].Place.Offset = -1 }),
+			names: []string{placeText(count.Body), placeText(recordedPlace{File: "shape.go", Offset: -1})},
+		},
 	}
 	// Each flag alone, read from the type, so a refusal that reads some of the flags and not the rest is red for
 	// each it leaves out, and a flag added later is refused here without a case written for it.
@@ -753,6 +781,96 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 			taken, takeError := checked.build(each.records, each.taken)
 			if takeError == nil {
 				test.Fatalf("the graph took the records, and holds %d nodes", len(taken.nodes))
+			}
+			for _, name := range each.names {
+				if !strings.Contains(takeError.Error(), name) {
+					test.Errorf("the error %q does not name %s", takeError, name)
+				}
+			}
+		})
+	}
+}
+
+// sharedNameSources are two files parsed under one name, each declaring a variable at the same offset, so a place in
+// either names no one file and no one object. Read, in the first, has a local and uses the variable.
+var sharedNameSources = []recordedSource{
+	{"same.go", `package shape
+
+var value int
+
+func Read() int {
+	const step = 1
+	return value + step
+}
+`},
+	{"same.go", `package shape
+
+var other int
+
+// The second file runs past the first's end, so a place in the first is inside it too, and only the name, not the
+// offset, keeps a splice from placing the first file's local here.
+`},
+}
+
+// TestSpliceRefusesAPlaceTwoFilesOfOneNameShare holds the splice to placing by one file and one object (#xeafx79):
+// a record with its flags cleared whose local is in a file whose parsed name another file shares, and one whose
+// declared end is at a place two variables of two such files are declared at, each fail by the place. The recorder
+// flags both bodies, so this is a build's own files sharing a name the host's did not.
+func TestSpliceRefusesAPlaceTwoFilesOfOneNameShare(test *testing.T) {
+	test.Parallel()
+	if strings.Index(sharedNameSources[0].source, "value") != strings.Index(sharedNameSources[1].source, "other") {
+		test.Fatal("the two variables are declared at two offsets, so their place is no one's")
+	}
+	checked := checkShapes(test, "shared name", sharedNameSources, nil)
+	recording, recordError := checked.build(true, nil)
+	if recordError != nil {
+		test.Fatal(recordError)
+	}
+	records := recording.bodyRecords()
+	if len(records) != 1 || len(records[0].Locals) != 1 {
+		test.Fatalf("the package records %+v, not Read's one record of a local", records)
+	}
+	read := records[0]
+	read.Present = recordedPresence{}
+	declared := recordedPlace{File: "same.go", Offset: strings.Index(sharedNameSources[0].source, "value")}
+	cases := []struct {
+		name  string
+		keeps func(use recordedUse) bool
+		names []string
+	}{
+		{
+			// Only the uses between locals and the function, so placing the local is all that can fail.
+			name: "a local in a file whose parsed name two files share",
+			keeps: func(use recordedUse) bool {
+				return use.By.Kind != endDeclared && use.Used.Kind != endDeclared
+			},
+			names: []string{placeText(read.Body), placeText(read.Locals[0].Place), "in no one parsed file"},
+		},
+		{
+			// No local, so resolving the declared end is all that can fail.
+			name: "a declared end two files of one name declare an object at",
+			keeps: func(use recordedUse) bool {
+				return use.By.Kind != endLocal && use.Used.Kind != endLocal
+			},
+			names: []string{placeText(read.Body), placeText(declared), "declares none or more than one"},
+		},
+	}
+	for _, each := range cases {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			changed := read
+			changed.Uses = slices.DeleteFunc(slices.Clone(read.Uses), func(use recordedUse) bool {
+				return !each.keeps(use)
+			})
+			if len(changed.Uses) == 0 {
+				test.Fatalf("Read's record keeps no use of %+v, so the case proves nothing", read.Uses)
+			}
+			if !slices.ContainsFunc(changed.Uses, func(use recordedUse) bool { return use.Used.Kind == endLocal }) {
+				changed.Locals = []recordedLocal{}
+			}
+			taken, takeError := checked.build(false, []bodyRecord{changed})
+			if takeError == nil {
+				test.Fatalf("the graph took the record, and holds %d nodes", len(taken.nodes))
 			}
 			for _, name := range each.names {
 				if !strings.Contains(takeError.Error(), name) {
