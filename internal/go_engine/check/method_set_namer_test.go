@@ -421,6 +421,153 @@ type PointerTo = *Inner
 			}
 		},
 	},
+	{
+		// A type reached after a duplicate at one depth is walked too: depth 2 is Shared, Shared, Only, so folding
+		// Shared's second entry into its first moves Only into the second slot, and Only's M is kept (#2br8dpa).
+		name: "a type after a duplicate at one depth",
+		source: `package fixture
+
+type Shared struct{}
+
+func (Shared) Twice() {}
+
+type Only struct{}
+
+func (Only) M() {}
+
+type First struct{ Shared }
+
+type Second struct{ Shared }
+
+type Third struct{ Only }
+
+type Holder struct {
+	First
+	Second
+	Third
+}
+`,
+		sets: []methodSetNamesQuery{
+			{object: "Holder", names: []string{"M"}},
+			{object: "Holder", pointer: true, names: []string{"M"}},
+		},
+	},
+	{
+		// The duplicate marked is the type it duplicates, not the first at the depth: depth 2 is Unique, Shared,
+		// Shared, so Shared's M collides and Unique's A is kept (#2br8dpa).
+		name: "a duplicate after a unique type at one depth",
+		source: `package fixture
+
+type Unique struct{}
+
+func (Unique) A() {}
+
+type Shared struct{}
+
+func (Shared) M() {}
+
+type Near struct{ Unique }
+
+type First struct{ Shared }
+
+type Second struct{ Shared }
+
+type Holder struct {
+	Near
+	First
+	Second
+}
+`,
+		sets: []methodSetNamesQuery{
+			{object: "Holder", names: []string{"A"}},
+			{object: "Holder", pointer: true, names: []string{"A"}},
+		},
+	},
+	{
+		// A depth folded of a duplicate is walked without the entries past its unique ones: depth 2 is Shared, Shared
+		// and Contract, an alias of an interface literal, which no named type's seen check skips, so walking it twice
+		// would collide its M away (#2br8dpa).
+		name: "an unnamed type after a duplicate at one depth",
+		source: `package fixture
+
+type Shared struct{}
+
+func (Shared) Twice() {}
+
+type Contract = interface{ M() }
+
+type First struct{ Shared }
+
+type Second struct{ Shared }
+
+type Third struct{ Contract }
+
+type Holder struct {
+	First
+	Second
+	Third
+}
+`,
+		sets: []methodSetNamesQuery{
+			{object: "Holder", names: []string{"M"}},
+			{object: "Holder", pointer: true, names: []string{"M"}},
+		},
+		holds: func(test *testing.T, checked *types.Package) {
+			if _, isAlias := methodSetNamesDeclared(test, checked, "Contract").(*types.Alias); !isAlias {
+				test.Fatal("Contract is no *types.Alias, so the fixture proves nothing of an unnamed type")
+			}
+		},
+	},
+	{
+		// An interface embedded twice at one depth, by a struct diamond, collides its methods as a struct does
+		// (#2br8dpa).
+		name: "an interface embedded twice at one depth",
+		source: `package fixture
+
+type Shaper interface{ Shape() }
+
+type First struct{ Shaper }
+
+type Second struct{ Shaper }
+
+type Diamond struct {
+	First
+	Second
+}
+`,
+		sets: []methodSetNamesQuery{
+			{object: "Diamond", names: nil},
+			{object: "Diamond", pointer: true, names: nil},
+		},
+	},
+	{
+		// A method whose receiver is an alias of a pointer is a pointer receiver's, so Base's value set lacks it.
+		// indexPackage asks only of a pointer or an interface, so no production call reads a receiver; this holds the
+		// namer to NewMethodSet, which the namer promises to match (#2br8dpa).
+		name: "a receiver that is an alias of a pointer",
+		source: `package fixture
+
+type Base struct{}
+
+type Pointer = *Base
+
+func (Pointer) M() {}
+`,
+		sets: []methodSetNamesQuery{
+			{object: "Base", names: nil},
+			{object: "Base", pointer: true, names: []string{"M"}},
+		},
+		holds: func(test *testing.T, checked *types.Package) {
+			base, isNamed := methodSetNamesDeclared(test, checked, "Base").(*types.Named)
+			if !isNamed || base.NumMethods() != 1 {
+				test.Fatal("Base declares no one method, so the fixture proves nothing of its receiver")
+			}
+			if _, isAlias := base.Method(0).Signature().Recv().Type().(*types.Alias); !isAlias {
+				test.Fatalf("M's receiver is %s, no *types.Alias, so the fixture proves nothing of an alias of a "+
+					"pointer", base.Method(0).Signature().Recv().Type())
+			}
+		},
+	},
 }
 
 // TestMethodSetNamesFixtures holds the namer, on each rule's fixture, to the names written out and to NewMethodSet's.

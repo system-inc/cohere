@@ -363,7 +363,9 @@ func outsideThePool(environment []string) []string {
 			!strings.HasPrefix(variable, gateVariable+"=") &&
 			!strings.HasPrefix(variable, gateBoxesVariable+"=") &&
 			!strings.HasPrefix(variable, gateWaitVariable+"=") &&
-			!strings.HasPrefix(variable, loomStandInVariable+"=") {
+			!strings.HasPrefix(variable, performanceWaitVariable+"=") &&
+			!strings.HasPrefix(variable, loomStandInVariable+"=") &&
+			!strings.HasPrefix(variable, trainPreCheckVariable+"=") {
 			kept = append(kept, variable)
 		}
 	}

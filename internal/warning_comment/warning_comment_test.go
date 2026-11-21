@@ -64,23 +64,52 @@ func TestWordsInFindsEachWordWhereverItStands(test *testing.T) {
 			"/* in the " + word + " middle */",
 			"/* at the end\n   " + word + " */",
 		} {
-			for _, texts := range [][]string{{text}, {"// nothing here", text}} {
-				words := WordsIn(texts)
+			// The word alone, after a comment without one, and before one, so a gate that reads any one comment of
+			// the group, the first or the last, turns away a group it should keep.
+			for _, group := range []struct {
+				texts []string
+				at    int
+			}{
+				{texts: []string{text}, at: 0},
+				{texts: []string{"// nothing here", text}, at: 1},
+				{texts: []string{text, "//", "// nothing here"}, at: 0},
+			} {
+				words := WordsIn(group.texts)
 				if len(words) != 1 {
-					test.Errorf("WordsIn(%q) = %v, want one word", texts, words)
+					test.Errorf("WordsIn(%q) = %v, want one word", group.texts, words)
 					continue
 				}
-				got := texts[words[0].Comment][words[0].Start:words[0].End]
-				if words[0].Comment != len(texts)-1 || got != word {
+				got := group.texts[words[0].Comment][words[0].Start:words[0].End]
+				if words[0].Comment != group.at || got != word {
 					test.Errorf("WordsIn(%q) found %q in comment %d, want %q in comment %d",
-						texts, got, words[0].Comment, word, len(texts)-1)
+						group.texts, got, words[0].Comment, word, group.at)
 				}
 			}
 		}
 	}
 }
 
-// holdsWarningWord says yes wherever the regexp would match and no wherever it would not, so it turns away exactly the
+// A group with none of the words is turned away before its bodies are joined, so it allocates nothing, and nearly
+// every group an engine hands over is that. The group has capitals in a row, the words in lowercase, and a word cut
+// in two across a pair of comments, which the joined text holds only with a newline inside it, so it is no word
+// either way.
+//
+// Not parallel: testing.AllocsPerRun reads the process's allocation counters, which a test running beside it would
+// add to.
+func TestWordsInAllocatesNothingForAGroupWithoutTheWords(test *testing.T) {
+	texts := []string{"// HTTP and JSON, a todo list and a fixme branch, then FIX", "// ME and TO", "/* DO */"}
+	var words []Word
+	allocations := testing.AllocsPerRun(10, func() { words = WordsIn(texts) })
+	if len(words) != 0 {
+		test.Errorf("WordsIn(%q) = %v, want none", texts, words)
+	}
+	if allocations != 0 {
+		test.Errorf("WordsIn allocated %.0f times over a group with none of the words: it joined the group before "+
+			"asking whether any comment holds one", allocations)
+	}
+}
+
+// HoldsWarningWord says yes wherever the regexp would match and no wherever it would not, so it turns away exactly the
 // texts the regexp would and no other: lowercase and mixed case, a word cut short, and an empty text are turned away,
 // and a word inside a longer one passes on to the whole-word test.
 func TestHoldsWarningWordAgreesWithTheRegexp(test *testing.T) {
@@ -91,8 +120,8 @@ func TestHoldsWarningWordAgreesWithTheRegexp(test *testing.T) {
 		"TODO", "FIXME", "XXX", "TODOS", "TODO_LIST", "XXXX", "0xXXX", "ÜTODO", "a\nFIXME", "ends in XXX",
 	} {
 		want := warningWord.MatchString(text)
-		if got := holdsWarningWord(text); got != want {
-			test.Errorf("holdsWarningWord(%q) = %t, want %t as the regexp says", text, got, want)
+		if got := HoldsWarningWord(text); got != want {
+			test.Errorf("HoldsWarningWord(%q) = %t, want %t as the regexp says", text, got, want)
 		}
 	}
 }

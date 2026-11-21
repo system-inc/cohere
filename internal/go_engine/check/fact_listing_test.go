@@ -63,10 +63,11 @@ func TestAFactListingReadsTheWholeClosure(test *testing.T) {
 }
 
 // The deprecated facts analyzer is the one registered analyzer whose listing is read, one recorded question at a time
-// by deprecated_use, the one rule that reads its result (listingsRead): every registered rule run over the fixture
-// marks no package by a listing, and no rule's source but deprecated_use's imports the deprecated facts, where a rule
-// would take their result. The rules are dispatched, so every one of them requires every listener's requirements, and
-// only their source tells which reads the result.
+// by the two that read its result (listingsRead): deprecated_use, the one rule, and standing_facts, which compares the
+// deprecation of each function the host's side holds and records the same Deprecated lookup for each of another
+// package's (#7v2bzvd). Every registered rule run over the fixture marks no package by a listing, and no source under
+// rules but theirs imports the deprecated facts, where it would take their result. The rules are dispatched, so every
+// one of them requires every listener's requirements, and only their source tells which reads the result.
 func TestOnlyTheDeprecatedFactsAreListed(test *testing.T) {
 	test.Parallel()
 
@@ -101,7 +102,10 @@ func TestOnlyTheDeprecatedFactsAreListed(test *testing.T) {
 	if walkError != nil {
 		test.Fatal(walkError)
 	}
-	if !slices.Equal(readers, []string{"../rules/deprecated_use/analyzer.go"}) {
-		test.Errorf("the rules importing the deprecated facts are %v, want deprecated_use's alone", readers)
+	want := []string{"../rules/deprecated_use/analyzer.go", "../rules/standing_facts/analyzer.go",
+		"../rules/standing_facts/pushed_facts.go"}
+	if !slices.Equal(readers, want) {
+		test.Errorf("the sources importing the deprecated facts are %v, want deprecated_use's and standing_facts', "+
+			"each recording a Deprecated lookup for every question it asks of the result: %v", readers, want)
 	}
 }

@@ -75,6 +75,9 @@ func run(pass *analysis.Pass) (any, error) {
 // finds them. Go's directives are set aside first, since go/doc leaves a directive out of the comment's text, so it
 // is neither read nor a line between its neighbours.
 func judgeGroup(pass *analysis.Pass, table *positions.Table, tokenFile *token.File, group *ast.CommentGroup) {
+	if !anyCommentHoldsWarningWord(group) {
+		return
+	}
 	read := []*ast.Comment{}
 	texts := []string{}
 	for _, comment := range group.List {
@@ -94,6 +97,20 @@ func judgeGroup(pass *analysis.Pass, table *positions.Table, tokenFile *token.Fi
 			Message:  warningCommentMessage.Render(map[string]string{"word": comment.Text[word.Start:word.End]}),
 		})
 	}
+}
+
+// anyCommentHoldsWarningWord is the gate asked of each comment's own text before judgeGroup gathers the group, so a
+// group that spells none of the words, nearly every group in a tree, allocates nothing. It cannot skip a finding: a
+// finding's word is comment.Text[word.Start:word.End], one of the words spelled in that comment's text, which is the
+// substring warning_comment.HoldsWarningWord looks for. A directive's text is asked too, so a word there only costs
+// the gathering it would have cost anyway.
+func anyCommentHoldsWarningWord(group *ast.CommentGroup) bool {
+	for _, comment := range group.List {
+		if warning_comment.HoldsWarningWord(comment.Text) {
+			return true
+		}
+	}
+	return false
 }
 
 // positionOf is the position of the byte at offset in comment.Text. The scanner drops each carriage return from a

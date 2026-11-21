@@ -143,6 +143,18 @@ func pointerArrayLiteralInIterator(sequence func(func(int) bool)) {
 	}
 }
 
+// In a function literal that is a loop's iterator function, which the walk of the function around the loop passes
+// over, since the literal is judged as a function of its own, so its element is found once. The port names the
+// element's index by its value, 0, since the source gives it by position and writes none, where the original prints
+// value and type, 0:int.
+func pointerArrayLiteralInIteratorFunction() {
+	for range func(yield func(int) bool) {
+		values := &[1]int{7} // port renames: unused write to array index 0:int => unused write to array index 0
+		yield(len(values))
+	} {
+	}
+}
+
 // Beside a pointer to a struct literal given to a variable and never read, in one statement, so the one walk of the
 // function's syntax gathers both literals from the one node: both find the struct literal's field. The port names the
 // element's index by its value, 0, since the source gives it by position and writes none, where the original prints

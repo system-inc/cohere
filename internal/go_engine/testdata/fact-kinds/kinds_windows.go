@@ -1,6 +1,9 @@
 package kinds
 
 import (
+	// The other platforms' file imports os, so both builds import the same paths, and the reach judges the package
+	// by its bodies rather than whole (#bed0mnk).
+	_ "os"
 	"runtime"
 	"testing"
 )

@@ -87,6 +87,11 @@ func (walk *demandWalk) begin(function *intermediate_representation.Function) {
 // reach reads function, a function of home whose marks are not final and that the walk has not reached, and every
 // such function its passes lead to, each once.
 func (walk *demandWalk) reach(function *intermediate_representation.Function) {
+	if walk.byFunction == nil {
+		// Invariant: a walk settles once and is dropped (see settle), so a reach after it is a caller reusing a spent
+		// walk, and the dispatcher's recover makes it this rule's crash on the package.
+		panic("odd_slice_argument: a walk reached a function after it settled; make a new walk with marks.walk")
+	}
 	walk.resolver.Build(function)
 	reached := &reachedFunction{function: function, marked: map[types.Object]bool{}}
 	walk.byFunction[function] = reached
@@ -165,8 +170,13 @@ func (walk *demandWalk) holder(
 }
 
 // settle passes the definition over the reached functions until a pass adds no mark and keeps each one's marks, final,
-// leaving the walk with none reached. Each function's marks are handed to the resolver there too (keepMarks), and only
-// there: until the last pass has added nothing a reached function's marks may still grow, so none is final before.
+// spending the walk. Each function's marks are handed to the resolver there too (keepMarks), and only there: until the
+// last pass has added nothing a reached function's marks may still grow, so none is final before.
+//
+// A walk settles once. Both its makers, whole and judgeIn, read the marks from home's state once it settles and drop
+// the walk, so it lets go of what it reached rather than clearing it for a reach that never comes: clearing byFunction
+// swept a table sized to every function reached, in whole every source function of the package, on every settle. A
+// walk reached again after settling would panic in reach, rather than keep its old functions' marks a second time.
 func (walk *demandWalk) settle() {
 	for added := true; added; {
 		added = false
@@ -189,9 +199,7 @@ func (walk *demandWalk) settle() {
 		walk.keepMarks(reached)
 		walk.resolver.Counts(Kind).Computed.Add(1)
 	}
-	walk.reached = nil
-	walk.cyclic = false
-	clear(walk.byFunction)
+	walk.reached, walk.byFunction = nil, nil
 }
 
 // keepMarks hands the resolver the mark of each parameter settled's function declares, as the answer fact_resolver.Ask

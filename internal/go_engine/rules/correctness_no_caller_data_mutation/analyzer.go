@@ -66,15 +66,13 @@ func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
 	}
 	// io.Reader's contract is that Read fills its buffer, so a Read that implements it fills the caller's buffer by
 	// contract, as a Mutates tag would say.
-	if buffer := rule.State[ioReader](context).bufferOf(context, function); buffer != nil {
-		outParameters[buffer] = true
-	}
+	buffer := rule.State[ioReader](context).bufferOf(context, function)
 	// Both walks read the body through the inspector's cursor, already built for the file, rather than through
 	// ast.Inspect, which calls back on every node. The cursor's Preorder visits the nodes ast.Inspect would, in the
 	// same order, handing over only the kinds a walk's switch reads and skipping a subtree that holds none of them, so
 	// the walks see the same statements and report in the same order.
 	body := context.Cursor().Child(function.Body)
-	parameters := judgedParameters(context, function, body, outParameters)
+	parameters := judgedParameters(context, function, body, outParameters, buffer)
 	if len(parameters) == 0 {
 		return
 	}
@@ -93,20 +91,21 @@ func findIoReader(analyzed *types.Package, reads *build_reads.Reads) *types.Inte
 }
 
 // judgedParameters is every named parameter of function the rule judges: not the receiver, which is the type's API,
-// not one a Mutates tag exempts, and not one the function reassigns or exposes to reassignment, since a write after
-// that may land in a copy the function made rather than in the caller's data, and telling which needs the flow
-// analysis this rule does not do.
+// not one a Mutates tag exempts, not buffer, the buffer of a Read that implements io.Reader or nil, and not one the
+// function reassigns or exposes to reassignment, since a write after that may land in a copy the function made rather
+// than in the caller's data, and telling which needs the flow analysis this rule does not do.
 func judgedParameters(
 	context *rule.Context,
 	function *ast.FuncDecl,
 	body inspector.Cursor,
 	outParameters map[*types.Var]bool,
+	buffer *types.Var,
 ) map[*types.Var]bool {
 	parameters := map[*types.Var]bool{}
 	for _, field := range function.Type.Params.List {
 		for _, name := range field.Names {
 			parameter, isVariable := context.TypesInfo.Defs[name].(*types.Var)
-			if isVariable && !outParameters[parameter] {
+			if isVariable && !outParameters[parameter] && parameter != buffer {
 				parameters[parameter] = true
 			}
 		}
@@ -373,13 +372,18 @@ func isPointer(underlying types.Type) bool {
 // readMutatesTags is the parameters function's doc comment makes out-parameters by contract, one per Mutates line
 // that names a parameter of function and gives a reason. A line that names no parameter, or gives no reason, is
 // reported where it is written and exempts nothing, so a tag can never hide a write without saying why.
+//
+// The map is nil until a tag exempts a parameter, and stays nil for nearly every function, which has no tag; a nil map
+// reads as one holding nothing, so judgedParameters asks it the same either way. It is written only here, so the
+// first write is the one place that has to make it. Each line is read off the comment as the split finds it, with no
+// slice of them made.
 func readMutatesTags(context *rule.Context, function *ast.FuncDecl) map[*types.Var]bool {
-	outParameters := map[*types.Var]bool{}
+	var outParameters map[*types.Var]bool
 	if function.Doc == nil {
 		return outParameters
 	}
 	for _, comment := range function.Doc.List {
-		for _, line := range strings.Split(comment.Text, "\n") {
+		for line := range strings.SplitSeq(comment.Text, "\n") {
 			// The marker counts where it opens a line, after the comment's slashes, stars and spaces, read as the
 			// marker package reads a reasoned marker, so a sentence that mentions it exempts nothing.
 			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
@@ -400,6 +404,9 @@ func readMutatesTags(context *rule.Context, function *ast.FuncDecl) map[*types.V
 			case strings.TrimSpace(reason) == "":
 				report(context, comment, mutatesWithoutReasonMessage)
 			default:
+				if outParameters == nil {
+					outParameters = map[*types.Var]bool{}
+				}
 				outParameters[parameter] = true
 			}
 		}

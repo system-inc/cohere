@@ -90,7 +90,8 @@ type Loaded struct {
 
 	// ListedInProcess is set when the listing was read in this process rather than by go list, and GoListReason, when
 	// go list read it, says what the in-process lister could not answer exactly (see listInProcess). A kept listing
-	// is neither: nothing was listed.
+	// is neither: nothing was listed. A listing an earlier load of the run made, answered again (cachedList), says all
+	// three as that load's did.
 	ListedInProcess bool
 	GoListReason    string
 

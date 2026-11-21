@@ -542,11 +542,12 @@ const noReads = "noReads: it holds no reads"
 // listingsRead are the analyzers whose listings of every inherited fact are read one recorded question at a time
 // (checker.Options.ListingsRead). It is no carve-out from the listing's rule but the rule's own soundness argument,
 // met: the deprecated facts analyzer lists every deprecation of the import closure into its result (honnef.co/go/tools
-// v0.8.1, analysis/facts/deprecated/deprecated.go:146-151), and the one rule that reads the result, deprecated_use,
-// records a Deprecated lookup for every question it asks of it, found or not (its deprecationOf and
-// packageDeprecationOf), so every read the listing could give is a recorded read. It cannot rot silently:
-// TestOnlyTheDeprecatedFactsAreListed fails as soon as a second rule's source imports the deprecated facts, where it
-// would take the result, and as soon as any other registered analyzer lists.
+// v0.8.1, analysis/facts/deprecated/deprecated.go:146-151), and the two that read the result, the rule deprecated_use
+// and standing_facts, which compares deprecations (#7v2bzvd), record a Deprecated lookup for every question they ask of
+// it of another package, found or not (deprecated_use's deprecationOf and packageDeprecationOf, standing_facts'
+// pushedFacts.deprecation), so every read the listing could give is a recorded read. It cannot rot silently:
+// TestOnlyTheDeprecatedFactsAreListed fails as soon as another source under rules imports the deprecated facts, where
+// it would take the result, and as soon as any other registered analyzer lists.
 var listingsRead = map[*analysis.Analyzer]bool{deprecated.Analyzer: true}
 
 // deprecatedFactType is the deprecated analyzer's fact, which its result gathers for SA1019 from every fact of the

@@ -5,6 +5,8 @@ package intermediate_representation
 
 import (
 	"sync"
+
+	"github.com/system-inc/cohere/static_single_assignment"
 )
 
 // liftingScratchPool holds the scratch of functions done lifting, for the next function any goroutine lifts.
@@ -54,6 +56,10 @@ type liftingScratch struct {
 	placed          []int32
 	visited         []bool
 	order           []*liftingBlock
+
+	// predecessors are every block's predecessors by id, end to end, each block's view carved from them. They hold
+	// no pointer, so release leaves them, and each round starts them again at zero length.
+	predecessors []static_single_assignment.BlockId
 
 	// definitions are the resolve's table, by identifier. definitionsUsed is the longest a resolve has made it since
 	// the pool last took the scratch back, which release reads.

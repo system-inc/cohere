@@ -14,9 +14,10 @@ type ignoredKey struct {
 	line int
 }
 
-// entry builds the graph from the package's entry points: the go:linkname comments, every declaration, the generated
-// files, the methods that make a named type implement an interface, and the objects a directive ignores.
-func (graph *graph) entry() {
+// entry builds the graph from the package's entry points: the go:linkname comments, every declaration, the records
+// of the bodies the graph takes in place of walking them, the generated files, the methods that make a named type
+// implement an interface, and the objects a directive ignores. It fails only where a record cannot be spliced.
+func (graph *graph) entry() error {
 	for _, file := range graph.files {
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
@@ -44,6 +45,14 @@ func (graph *graph) entry() {
 		}
 	}
 
+	// Every declaration is walked, so every object a record names outside its body can be resolved, and the step over
+	// the generated files, which ranges over the nodes as they stand when it starts, comes after.
+	if graph.splice != nil {
+		if spliceError := graph.spliceBodies(); spliceError != nil {
+			return spliceError
+		}
+	}
+
 	// (1.9) packages use objects in generated files: DefaultOptions' GeneratedIsUsed. The original ranges over its map
 	// of objects, whose keys are the nodes' objects; the port's map is keyed by pointer, so it ranges over the nodes,
 	// past the root, whose order only orders the root's uses. A package with no generated file has no object in one,
@@ -51,6 +60,11 @@ func (graph *graph) entry() {
 	// last file the shared file set keeps for every core.
 	if len(graph.generated) > 0 {
 		for _, each := range graph.nodes[1:] {
+			if isSpliced(each) {
+				// A spliced local holds no object to place, and its record's rooted locals are this step's answer for
+				// its file, which the host gave.
+				continue
+			}
 			path := graph.fileSet.PositionFor(each.typesObject.Pos(), false).Filename
 			if _, isGenerated := graph.generated[path]; isGenerated {
 				graph.use(each.typesObject, nil)
@@ -131,6 +145,7 @@ func (graph *graph) entry() {
 	if len(ignores) > 0 {
 		graph.useIgnored(ignores)
 	}
+	return nil
 }
 
 // useIgnored uses every object annotated with a //lint:ignore U1000, and the methods and fields of an ignored type.
@@ -142,6 +157,11 @@ func (graph *graph) entry() {
 // the original's map allows.
 func (graph *graph) useIgnored(ignores map[ignoredKey]struct{}) {
 	for index := 1; index < len(graph.nodes); index++ {
+		if isSpliced(graph.nodes[index]) {
+			// A spliced local holds no object to place, and its record's rooted locals are this step's answer for it.
+			// A record whose local this step would read the type branch of is never spliced (IgnoredType).
+			continue
+		}
 		typesObject := graph.nodes[index].typesObject
 		position := graph.fileSet.PositionFor(typesObject.Pos(), false)
 		_, isIgnored := ignores[ignoredKey{position.Filename, position.Line}]
@@ -157,6 +177,9 @@ func (graph *graph) useIgnored(ignores map[ignoredKey]struct{}) {
 		typeName, isTypeName := typesObject.(*types.TypeName)
 		if !isTypeName {
 			continue
+		}
+		if graph.recorder != nil {
+			graph.recordIgnoredType(nodeIndex(index))
 		}
 		if typeName.IsAlias() {
 			// DefaultOptions' ExportedIsUsed.

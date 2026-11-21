@@ -6,9 +6,11 @@ import (
 )
 
 // mayNameHomeDirectory sets a literal aside without unquoting it only when unquoting could not make it name a home
-// directory: every literal here whose unquoted value homeDirectory matches is one it keeps, escapes and a raw string's
-// carriage return included, and the literals naming none and holding no escape are ones it sets aside, which is
-// what makes it cheaper than unquoting every literal.
+// directory: every literal here whose unquoted value homeDirectory matches is one it keeps, a raw string's carriage
+// return included and a slash or a letter spelled by each numeric escape, octal, \x, \u and \U, among them one just
+// after an escaped backslash. The literals naming none and holding no numeric escape are ones it sets aside, a
+// one-character escape beside or inside the words, an escaped backslash before what reads as \x, a backslash ending
+// the text and a raw string's backslashes included, which is what makes it cheaper than unquoting every literal.
 func TestMayNameHomeDirectoryKeepsEveryLiteralThatNamesOne(test *testing.T) {
 	test.Parallel()
 	// Not a machine path: planted literals, the inputs the check is held to, never read from disk.
@@ -21,12 +23,24 @@ func TestMayNameHomeDirectoryKeepsEveryLiteralThatNamesOne(test *testing.T) {
 		{source: `"\x2fUsers\x2fsomeone\x2fx"`},
 		{source: `"\057home\057someone\057x"`},
 		{source: `"\u002fUsers/someone/"`},
+		{source: `"\U0000002fhome/someone/"`},
+		{source: `"/\x55sers/someone/"`},
+		{source: `"/\150ome/someone/"`},
+		{source: `"/Us\u0065rs/someone/"`},
+		{source: `"\\\x2fUsers/someone/"`},
+		{source: `"\t/home/someone/"`},
 		{source: "`/Us\rers/someone/x`"},
 		{source: `"/Users/"`},
 		{source: `"/tmp/scratch/file"`, setAside: true},
 		{source: "`plain text`", setAside: true},
 		{source: `"/AllUsers"`, setAside: true},
 		{source: `""`, setAside: true},
+		{source: `"%s\n"`, setAside: true},
+		{source: `"\"quoted\""`, setAside: true},
+		{source: `"/Us\ters/someone/"`, setAside: true},
+		{source: `"\\x2fUsers\\x2fsomeone\\x2f"`, setAside: true},
+		{source: `"ends in a backslash\\"`, setAside: true},
+		{source: "`raw \\x2fUsers\\x2fsomeone\\x2f`", setAside: true},
 	} {
 		value, unquoteError := strconv.Unquote(literal.source)
 		if unquoteError != nil {
@@ -37,7 +51,8 @@ func TestMayNameHomeDirectoryKeepsEveryLiteralThatNamesOne(test *testing.T) {
 			test.Errorf("%q names a home directory once unquoted, %q, and was set aside unread", literal.source, value)
 		}
 		if literal.setAside && kept {
-			test.Errorf("%q names no home directory and holds no escape, and was kept for unquoting", literal.source)
+			test.Errorf("%q names no home directory and holds no escape that could spell one, and was kept for "+
+				"unquoting", literal.source)
 		}
 	}
 }

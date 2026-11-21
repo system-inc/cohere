@@ -13,7 +13,7 @@
 //
 // code.Matches walks a package only when code.CouldMatchAny finds one of the three in staticcheck's type index of it,
 // which holds sort only when the package imports it or uses a method or field it declares, so a package reaching
-// sort.IntSlice only through another package's alias is not walked, and staticcheck_code.IndexedObject asks the
+// sort.IntSlice only through another package's alias is not walked, and staticcheck_code.IndexedPackage asks the
 // same once a package, before the port judges any assignment of it. The generated-file judgment filters nothing,
 // since the original asks none. The message renders the conversion through staticcheck_report.Render, and the fix, a
 // call of sort.Ints, sort.Float64s or sort.Strings spelled sort whatever the file names the package, is printed by
@@ -89,10 +89,16 @@ var sliceTypes = []struct {
 }
 
 // couldMatch is code.CouldMatchAny of the pattern: whether staticcheck's type index of the package holds any of the
-// symbols it names.
+// symbols it names. All three are sort's, so sort is found in the index once, and each name looked up in it, as
+// staticcheck_code.IndexedObject would for each: in a package that never imports sort, finding it walks every use the
+// package's types record, which asking three times walked three times.
 func couldMatch(context *rule.Context) bool {
+	sortPackage := staticcheck_code.IndexedPackage(context, "sort")
+	if sortPackage == nil {
+		return false
+	}
 	for _, sliceType := range sliceTypes {
-		if staticcheck_code.IndexedObject(context, "sort", sliceType.name) != nil {
+		if context.LookupIn(sortPackage, sliceType.name) != nil {
 			return true
 		}
 	}
