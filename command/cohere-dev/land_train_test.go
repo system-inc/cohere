@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/system-inc/cohere/internal/executable_testing"
 )
@@ -136,17 +137,53 @@ func TestATrainOfTwoUnitsLandsUnderOneGate(test *testing.T) {
 
 // A unit that lands on its own while the train waits in line is in the main the train joins: the train still lands what
 // remains, says that unit landed alone, and closes only the other unit's task.
+//
+// a's gate holds until the train is waiting in line, so a lands while the train waits: a gate that ends on its own
+// clock let a land before the train read main, and the train rightly refused a as held (Sun2, Nov 21).
 func TestATrainLeavesAUnitThatLandedAloneClosedOnce(test *testing.T) {
 	test.Parallel()
 	fixture, ahraLog := trainFixture(test, "", "")
+	release := filepath.Join(test.TempDir(), "release")
+	stand := "#!/bin/sh\n[ \"$1\" = vet ] && exit 0\n" +
+		"echo \"start $(basename \"$PWD\")\" >> '" + fixture.log + "'\n" +
+		"while [ ! -e '" + release + "' ]; do sleep 0.05; done\n" +
+		"echo \"end $(basename \"$PWD\")\" >> '" + fixture.log + "'\n"
+	if writeError := executable_testing.WriteFile(filepath.Join(filepath.Dir(fixture.log), "go"), []byte(stand),
+		0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
 	alone := fixture.land("a")
 	fixture.waitForGate("start " + filepath.Base(fixture.worktree("a")))
-	output, code := landTrainFrom(fixture, "--train", "a", "b", "--task", trainTask, "--message", "two units")
+	said := filepath.Join(test.TempDir(), "train")
+	file, createError := os.Create(said)
+	if createError != nil {
+		test.Fatal(createError)
+	}
+	train := exec.Command(fixture.wrapper, "land", "--train", "a", "b", "--task", trainTask, "--message", "two units")
+	train.Dir, train.Env, train.Stdout, train.Stderr = fixture.worktree("c"), fixture.environment, file, file
+	if startError := train.Start(); startError != nil {
+		test.Fatal(startError)
+	}
+	// The child writes through its own copy of the descriptor, so this one closes once the child has it.
+	if closeError := file.Close(); closeError != nil {
+		test.Fatal(closeError)
+	}
+	for deadline := time.Now().Add(waiterBound); !strings.Contains(string(readMaybeMissing(test, said)),
+		"waiting to land"); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			test.Fatalf("the train never waited in line behind a:\n%s", readMaybeMissing(test, said))
+		}
+	}
+	if writeError := os.WriteFile(release, nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
 	if waitError := alone.Wait(); waitError != nil {
 		test.Fatalf("a's own landing failed: %v", waitError)
 	}
-	if code != 0 {
-		test.Fatalf("the train exited %d:\n%s", code, output)
+	trainError := train.Wait()
+	output := string(readMaybeMissing(test, said))
+	if trainError != nil {
+		test.Fatalf("the train failed: %v\n%s", trainError, output)
 	}
 	if !strings.Contains(output, "#trnunta landed on its own while the train waited, so the train doesn't close it "+
 		"again") {
