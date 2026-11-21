@@ -19,6 +19,12 @@ type dependencyMerge struct {
 // deps is current's Deps, from the Deps of the packages it walks to, which must already be set: order puts each
 // package after everything it walks to, and a package an earlier order put has its Deps from that pass. It is nil when
 // current walks to nothing, as go list omits an empty Deps.
+//
+// A package current walks to that is already in another's Deps is not merged: everything it reaches, that other
+// reaches too, so its Deps are inside the other's, which is merged. The other is the one with the most Deps, which
+// holds the most of current's walks, and it is never itself passed over, since order refuses a cycle, so no Deps
+// holds its own package. The answer is the union either way; a package passed over costs a search of the most Deps
+// in place of a merge through all of them.
 func (merging *dependencyMerge) deps(current *inProcessPackage, byPath map[string]*inProcessPackage) []string {
 	if len(current.walked) == 0 {
 		return nil
@@ -26,9 +32,19 @@ func (merging *dependencyMerge) deps(current *inProcessPackage, byPath map[strin
 	merging.ordered = append(merging.ordered[:0], current.walked...)
 	slices.Sort(merging.ordered)
 	merging.merged = append(merging.merged[:0], slices.Compact(merging.ordered)...)
+	var mostDeps []string
+	for _, walked := range current.walked {
+		if below := byPath[walked].listed.Deps; len(below) > len(mostDeps) {
+			mostDeps = below
+		}
+	}
 	for _, walked := range current.walked {
 		below := byPath[walked].listed.Deps
 		if len(below) == 0 {
+			continue
+		}
+		// Every Deps is sorted, as this merge makes it, so the search is a binary one.
+		if _, covered := slices.BinarySearch(mostDeps, walked); covered {
 			continue
 		}
 		merging.spare = mergeSorted(merging.spare[:0], merging.merged, below)

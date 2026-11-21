@@ -354,30 +354,8 @@ func (graph *graph) objectOf(typesObject types.Object) object {
 	return object{
 		name:      name,
 		shortName: typesObject.Name(),
-		kind:      kindOf(typesObject),
+		kind:      kindOf(typesObject).word(),
 		position:  typesObject.Pos(),
-	}
-}
-
-// kindOf is the word a finding names typesObject's kind with, the original's typString.
-func kindOf(typesObject types.Object) string {
-	switch typesObject := typesObject.(type) {
-	case *types.Func:
-		return "func"
-	case *types.Var:
-		if typesObject.IsField() {
-			return "field"
-		}
-		return "var"
-	case *types.Const:
-		return "const"
-	case *types.TypeName:
-		if _, isParameter := typesObject.Type().(*types.TypeParam); isParameter {
-			return "type param"
-		}
-		return "type"
-	default:
-		return "identifier"
 	}
 }
 

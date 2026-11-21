@@ -609,3 +609,51 @@ func TestATypeArgumentReachesItsBodyByEitherBit(test *testing.T) {
 			"underlying bit", reason, object, bits)
 	}
 }
+
+// A name one side alone declares at package level that a rule asks its package's scope about reaches every body of
+// the package, ScopeName (#b255cfy), Plain among them though it names nothing: a universe name, copy, in a file the
+// build alone compiles; fmt, which S1028 declares it asks, and fmt7, which stringintconv's fresh import names match,
+// each in a file the build does not compile, a var with no value, so no body is absent. Other, a name no rule asks,
+// reaches nothing.
+func TestANameARuleAsksTheScopeAboutReachesItsPackageWhole(test *testing.T) {
+	test.Parallel()
+
+	for _, each := range []struct {
+		name      string
+		declared  string
+		buildOnly bool
+		want      string
+	}{
+		{"a universe name the build alone declares", "copy", true,
+			"ScopeName the package's scope, by copy, a universe name, declared by a file the build alone compiles"},
+		{"a name a rule declares, the host's alone", "fmt", false, "ScopeName the package's scope, by fmt, which " +
+			"cohere-go/S1028 asks of the scope, declared by a file the build does not compile"},
+		{"a prefix's match, the host's alone", "fmt7", false, "ScopeName the package's scope, by fmt7, which " +
+			"cohere-go/stringintconv asks of the scope, declared by a file the build does not compile"},
+		{"a name no rule asks, the host's alone", "Other", false, "unreached "},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+
+			files := map[string]string{"/q/q.go": "package q\n\nfunc Plain() int { return 1 }\n"}
+			if !each.buildOnly {
+				files["/q/host.go"] = "package q\n\nvar " + each.declared + " int\n"
+			}
+			checked, reads := recordedPackages(test, []recordedSource{{path: "example.com/q", files: files}})
+			census := reachRecorded(test, checked, reads, func(read *reachBuiltPackage) {
+				if each.buildOnly {
+					read.buildOnlyNames[each.declared] = true
+				} else {
+					delete(read.files, "/q/host.go")
+				}
+			})
+			got := map[string]string{}
+			for _, body := range census.bodies {
+				got[body.name] = cmp.Or(string(body.reason), "unreached") + " " + body.driver
+			}
+			if want := map[string]string{"Plain": each.want}; !maps.Equal(got, want) {
+				test.Errorf("the census judges\n%v\nwant\n%v", got, want)
+			}
+		})
+	}
+}
