@@ -185,17 +185,22 @@ func (checked checkedPackage) selfSplice() (selfSpliced, error) {
 	return built, nil
 }
 
-// spliceDifferences is how built's spliced graph differs from its plain one, each worded as a finding is: its nodes
-// and edges counted, and the verdict's used, unused and quiet, each compared as a multiset of kind, name, parsed file
-// and offset, and the unused, the rule's findings, in order too.
+// spliceDifferences is how built's spliced graph differs from its plain one, each worded as a finding is: its nodes,
+// its uses and its ownerships, an edge as its two ends, and the verdict's used, unused and quiet, each compared as a
+// multiset of kind, name, parsed file and offset, and the unused, the rule's findings, in order too. Edges are
+// compared end for end and not counted, so a record that names the wrong end of an edge differs even where the
+// counts and the verdict agree.
 func spliceDifferences(built selfSpliced) []string {
 	found := []string{}
-	if len(built.plain.nodes) != len(built.spliced.nodes) || len(built.plain.uses) != len(built.spliced.uses) ||
-		len(built.plain.owns) != len(built.spliced.owns) {
-		found = append(found, fmt.Sprintf("the plain graph has %d nodes, %d uses and %d ownerships, the spliced %d, "+
-			"%d and %d", len(built.plain.nodes), len(built.plain.uses), len(built.plain.owns),
-			len(built.spliced.nodes), len(built.spliced.uses), len(built.spliced.owns)))
-	}
+	plainNodes, splicedNodes := wordedNodes(built.plain), wordedNodes(built.spliced)
+	found = append(found, multisetDifferences("node", plainNodes, splicedNodes)...)
+	firstUse := func(each node) linkIndex { return each.firstUse }
+	found = append(found, multisetDifferences("use", wordedEdges(built.plain, plainNodes, built.plain.uses, firstUse),
+		wordedEdges(built.spliced, splicedNodes, built.spliced.uses, firstUse))...)
+	firstOwned := func(each node) linkIndex { return each.firstOwned }
+	found = append(found, multisetDifferences("ownership",
+		wordedEdges(built.plain, plainNodes, built.plain.owns, firstOwned),
+		wordedEdges(built.spliced, splicedNodes, built.spliced.owns, firstOwned))...)
 	plain, spliced := built.plain.results(), built.spliced.results()
 	fileSet := built.plain.fileSet
 	plainUnused, splicedUnused := wordedObjects(fileSet, plain.unused), wordedObjects(fileSet, spliced.unused)
@@ -209,6 +214,32 @@ func spliceDifferences(built selfSpliced) []string {
 		found = append(found, fmt.Sprintf("the unused are %v plain and %v spliced", plainUnused, splicedUnused))
 	}
 	return found
+}
+
+// wordedNodes is each of built's nodes, by its index, as wordedObjects words its object, the one a spliced node's
+// record gave it for a spliced node, and the root as the root.
+func wordedNodes(built *graph) []string {
+	objects := make([]object, 0, len(built.nodes)-1)
+	for index, each := range built.nodes[1:] {
+		if isSpliced(each) {
+			objects = append(objects, built.splice.locals[nodeIndex(index+1)])
+		} else {
+			objects = append(objects, built.objectOf(each.typesObject))
+		}
+	}
+	return append([]string{"the root"}, wordedObjects(built.fileSet, objects)...)
+}
+
+// wordedEdges is each edge of links, built's uses or its ownerships, as its two ends worded as nodes words them,
+// first being where each node's chain of that kind starts.
+func wordedEdges(built *graph, nodes []string, links []edgeLink, first func(node) linkIndex) []string {
+	edges := []string{}
+	for index, each := range built.nodes {
+		for link := first(each); link != 0; link = links[link].next {
+			edges = append(edges, nodes[index]+" -> "+nodes[links[link].to])
+		}
+	}
+	return edges
 }
 
 // wordedObjects is each of objects as its kind, its name, its parsed file and its offset.
@@ -507,6 +538,111 @@ func TestSplicingAFlaggedBodyChangesTheVerdict(test *testing.T) {
 			if found := spliceDifferences(built); len(found) == 0 {
 				test.Errorf("taking %s with its flag cleared gives the plain verdict, so the flag keeps nothing",
 					each.flagged)
+			}
+		})
+	}
+}
+
+// corruptedSource is a package whose One has a record of every part: a local with an owner, a rooted local, and uses
+// of two objects declared outside it, one a field that Three uses too and that Two's second field stands beside.
+const corruptedSource = `package shape
+
+type pair struct{ first, second int }
+
+func One(value pair) int {
+	//lint:ignore U1000 kept for the test
+	const kept = 1
+	return value.first
+}
+
+func Two(value pair) int { return value.second }
+
+func Three(value pair) int { return value.first }
+`
+
+// TestSpliceDifferencesSeeEachCorruptedRecord holds the self-splice's comparator to its teeth (#xeafx79): a record
+// with a use dropped, an owner dropped, a rooted local dropped, or a declared end moved to another field, is a
+// difference from the walk, each in the lists it changes and no other. The moved end leaves every count and the
+// verdict as they were, so only a comparison of the edges end for end sees it.
+func TestSpliceDifferencesSeeEachCorruptedRecord(test *testing.T) {
+	test.Parallel()
+	checked := checkShapes(test, "corrupted", []recordedSource{{"shape.go", corruptedSource}}, nil)
+	built, buildError := checked.selfSplice()
+	if buildError != nil {
+		test.Fatal(buildError)
+	}
+	if found := spliceDifferences(built); len(found) != 0 {
+		test.Fatalf("the self-splice differs before any corruption: %v", found)
+	}
+	first := recordedPlace{File: "shape.go", Offset: strings.Index(corruptedSource, "first")}
+	second := recordedPlace{File: "shape.go", Offset: strings.Index(corruptedSource, "second")}
+	one := slices.IndexFunc(built.taken, func(record bodyRecord) bool { return len(record.Locals) == 1 })
+	if one < 0 || len(built.taken) != 3 || len(built.taken[one].Locals[0].Owners) != 1 ||
+		len(built.taken[one].Rooted) != 1 || !slices.ContainsFunc(built.taken[one].Uses, func(use recordedUse) bool {
+		return use.Used.Place == first
+	}) {
+		test.Fatalf("the package takes %+v, not One's record of an owned, rooted local and a use of first among "+
+			"three", built.taken)
+	}
+	cases := []struct {
+		name   string
+		change func(record *bodyRecord)
+		lists  []string
+	}{
+		{
+			name: "a use dropped",
+			change: func(record *bodyRecord) {
+				record.Uses = slices.DeleteFunc(record.Uses, func(use recordedUse) bool {
+					return use.Used.Place == first
+				})
+			},
+			lists: []string{"use"},
+		},
+		{
+			name:   "an owner dropped",
+			change: func(record *bodyRecord) { record.Locals[0].Owners = []recordedEnd{} },
+			lists:  []string{"ownership"},
+		},
+		{
+			name:   "a rooted local dropped",
+			change: func(record *bodyRecord) { record.Rooted = []int{} },
+			lists:  []string{"unused", "use", "used"},
+		},
+		{
+			name: "a declared end moved to another field",
+			change: func(record *bodyRecord) {
+				for index := range record.Uses {
+					if record.Uses[index].Used.Place == first {
+						record.Uses[index].Used.Place = second
+					}
+				}
+			},
+			lists: []string{"use"},
+		},
+	}
+	for _, each := range cases {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			taken := slices.Clone(built.taken)
+			taken[one].Locals = slices.Clone(taken[one].Locals)
+			taken[one].Uses = slices.Clone(taken[one].Uses)
+			each.change(&taken[one])
+			corrupted := built
+			var takeError error
+			if corrupted.spliced, takeError = checked.build(false, taken); takeError != nil {
+				test.Fatal(takeError)
+			}
+			found := spliceDifferences(corrupted)
+			lists := []string{}
+			for _, difference := range found {
+				list, _, _ := strings.Cut(difference, ":")
+				if !slices.Contains(lists, list) {
+					lists = append(lists, list)
+				}
+			}
+			slices.Sort(lists)
+			if !slices.Equal(lists, each.lists) {
+				test.Errorf("the corrupted record differs in %v, not %v: %v", lists, each.lists, found)
 			}
 		})
 	}
