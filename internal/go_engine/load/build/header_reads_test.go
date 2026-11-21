@@ -220,8 +220,10 @@ func TestACompactedReadIsNoReadACallerStillHolds(test *testing.T) {
 	if !slices.Equal(positions(first), wantPositions) {
 		test.Errorf("the shared read's imports sit at %q, want %q", positions(first), wantPositions)
 	}
-	if third, _, _ := context.readGoInfoOnce(file, token.NewFileSet()); third.parsed != first.parsed {
-		test.Errorf("a build after both read %s, not the shared read", holding(third))
+	third, thirdOpenError, thirdReadError := context.readGoInfoOnce(file, token.NewFileSet())
+	if thirdOpenError != nil || thirdReadError != nil || third.parsed != first.parsed {
+		test.Errorf("a build after both opened with %v, read with %v, and read %s, not the shared read",
+			thirdOpenError, thirdReadError, holding(third))
 	}
 	if held := holding(first); held != firstHeld {
 		test.Errorf("the shared read moved under the build holding it once a third build took it, to\n%s", held)
