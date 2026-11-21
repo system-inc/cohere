@@ -42,7 +42,10 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	graph := newGraph(pass.Fset, pass.Files, pass.Pkg, pass.TypesInfo, packageDirectives, generatedFiles)
-	graph.entry()
+	// The run takes no record, so entry has nothing it could fail at; the error is the splice's.
+	if entryError := graph.entry(); entryError != nil {
+		return nil, entryError
+	}
 	verdict := graph.results()
 
 	// Reported as the registry reported the original's, which the tests' originalReport still does: an unused object

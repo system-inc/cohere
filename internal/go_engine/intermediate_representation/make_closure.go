@@ -16,7 +16,10 @@ type MakeClosure struct {
 	register
 	Function Value   // always a *Function
 	Bindings []Value // values for each free variable in Function.FreeVariables
+	comment  string  // "yield" for a range-over-func body's closure
 }
+
+func (closure *MakeClosure) Comment() string { return closure.comment }
 
 func (closure *MakeClosure) Operands(rands []*Value) []*Value {
 	operands := append(rands, &closure.Function)

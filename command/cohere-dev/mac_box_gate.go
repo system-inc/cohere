@@ -64,27 +64,17 @@ const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 // to internal/corpus's list.
 const macBoxCorpusVariables = "COHERE_CORPUS_AHRA COHERE_CORPUS_STRUCTURE COHERE_CORPUS_CONNECTED COHERE_PRETTIER_FORK"
 
-// macBoxScript is what a gate box runs, from the land that runs it rather than from the tree it tests, so no branch can
-// change what tests it. Its arguments are the commit, its TypeScript pin, the raceGated packages comma-separated, the
-// corpora the landing pins (corporaArgument) and the module's test patterns. It sets each corpus's variable to the copy
-// laid under macBoxScratch/corpora, and when one isn't laid there it names what it lacks (corpusUnlaidMarker) and tests
-// nothing, for the lander to lay it (gate_corpus.go). It works only under macBoxScratch, in a bare repository and one
-// tree that last across landings, so the tree's path stays one path. It waits for the box's mirror to hold the commit,
-// refusing once it has waited 3 minutes, fetches the commit and the pin, checks them out, and runs sharedBoxGate
-// against the Mac's pinned toolchain and node.
+// macBoxMirrorReads is how a Mac's script reads her mirrors, given base, mirrors, tries, pause and refuse before it: it
+// writes the configuration file naming both mirrors safe, removed when the script ends unless it is removed sooner, and
+// defines held, which waits for a mirror to hold a commit. The gate's script (macBoxScript) and the landing's
+// measurement on Shackler (land_performance.go) read them the same way.
 //
 // The mirrors are root's, and git refuses another owner's repository as dubious unless safe.directory names it. Git
 // 2.43 reads that setting for a fetch's source only from global or system configuration, since `-c safe.directory`
 // reaches the fetch but not the upload-pack it starts in the source (@system_cohere_go_codebase's 3ddc75cb in
 // cohere-pairs, measured on Lunatic and Pupa). So the script writes a configuration file of its own naming both
-// mirrors, gives it to each git that reads them as GIT_CONFIG_GLOBAL, and removes it before any test runs.
-const macBoxScript = `set -euo pipefail
-commit="$1"; pin="$2"; races="$3"; corpora="$4"; shift 4
-` + macBoxMirrorLine + `
-base=` + macBoxScratch + `
-mkdir -p "$base"; cd "$base"
-refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
-safe="$base/` + macBoxSafeSettings + `"
+// mirrors, and gives it to each git that reads them as GIT_CONFIG_GLOBAL.
+const macBoxMirrorReads = `safe="$base/` + macBoxSafeSettings + `"
 printf '[safe]\n\tdirectory = "%s"\n\tdirectory = "%s"\n' "$mirrors/cohere.git" "$mirrors/TypeScript.git" > "$safe"
 trap 'rm -f "$safe"' EXIT
 # held waits for the mirror $1 to hold the commit $2, asking again while git says only that it lacks it, and refuses
@@ -102,7 +92,24 @@ held() {
     sleep "$pause"; try=$((try + 1))
   done
 }
-held cohere.git "$commit" || refuse "` + macBoxMirrorLacks + `$commit"
+`
+
+// macBoxScript is what a gate box runs, from the land that runs it rather than from the tree it tests, so no branch can
+// change what tests it. Its arguments are the commit, its TypeScript pin, the raceGated packages comma-separated, the
+// corpora the landing pins (corporaArgument) and the module's test patterns. It sets each corpus's variable to the copy
+// laid under macBoxScratch/corpora, and when one isn't laid there it names what it lacks (corpusUnlaidMarker) and tests
+// nothing, for the lander to lay it (gate_corpus.go). It works only under macBoxScratch, in a bare repository and one
+// tree that last across landings, so the tree's path stays one path. It waits for the box's mirror to hold the commit,
+// refusing once it has waited 3 minutes, fetches the commit and the pin, checks them out, and runs sharedBoxGate
+// against the Mac's pinned toolchain and node. It reads the mirrors through macBoxMirrorReads, and removes the
+// configuration file naming them safe before any test runs.
+const macBoxScript = `set -euo pipefail
+commit="$1"; pin="$2"; races="$3"; corpora="$4"; shift 4
+` + macBoxMirrorLine + `
+base=` + macBoxScratch + `
+mkdir -p "$base"; cd "$base"
+refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
+` + macBoxMirrorReads + `held cohere.git "$commit" || refuse "` + macBoxMirrorLacks + `$commit"
 [ -d cohere.git ] || git init -q --bare cohere.git
 GIT_CONFIG_GLOBAL="$safe" git -C cohere.git fetch -q "$mirrors/cohere.git" "$commit"
 [ -e tree/.git ] || git -C cohere.git worktree add -q --detach "$base/tree" "$commit"
@@ -162,14 +169,16 @@ func gateBoxes(setting string) ([]string, error) {
 	return boxes, nil
 }
 
-// gateWait reads gateWaitVariable's setting, gateWaitDefault when it is empty.
-func gateWait(setting string) (time.Duration, error) {
+// waitSetting reads the setting of a wait in line, variable's, as Go writes a duration: fallback when it is empty, and
+// refused, naming variable, when it is no wait. A landing waits so for a gate box (gateWaitVariable) and for Shackler's
+// measurement (performanceWaitVariable).
+func waitSetting(variable string, setting string, fallback time.Duration) (time.Duration, error) {
 	if strings.TrimSpace(setting) == "" {
-		return gateWaitDefault, nil
+		return fallback, nil
 	}
 	wait, parseError := time.ParseDuration(strings.TrimSpace(setting))
 	if parseError != nil || wait <= 0 {
-		return 0, fmt.Errorf("%s=%q is no wait, which Go writes as 2h or 90m", gateWaitVariable, setting)
+		return 0, fmt.Errorf("%s=%q is no wait, which Go writes as 2h or 90m", variable, setting)
 	}
 	return wait, nil
 }
@@ -190,14 +199,7 @@ func runOnGateBoxes(
 	boxes []string,
 	wait time.Duration,
 ) ([]byte, string, string, error) {
-	ahra := func(arguments ...string) ([]byte, error) {
-		command, loomError := loomCommand(worktree, arguments...)
-		if loomError != nil {
-			return nil, loomError
-		}
-		return command.CombinedOutput()
-	}
-	pushed, pushError := ahra("loom", "push", "--feed", commit, "--repository", "cohere")
+	pushed, pushError := loomCombined(worktree, "loom", "push", "--feed", commit, "--repository", "cohere")
 	if pushError != nil {
 		return nil, "", fmt.Sprintf("Loom's feed didn't take %s (%s)", shortCommit(commit),
 			lastWords(pushed, describeEnd(pushError))), nil
@@ -216,7 +218,7 @@ func runOnGateBoxes(
 		asked++
 		held := []string{}
 		for _, box := range boxes {
-			read, readError := ahra("loom", "gap", "--box", box)
+			read, readError := loomCombined(worktree, "loom", "gap", "--box", box)
 			if readError != nil {
 				words := box + " (" + lastWords(read, describeEnd(readError)) + ")"
 				fmt.Fprintf(streams.Errors, "cohere-dev: %s is held: %s\n", box, words)
@@ -226,7 +228,8 @@ func runOnGateBoxes(
 			fmt.Fprintf(streams.Errors, "cohere-dev: testing %s on %s in her gap; the land lock stays held while it "+
 				"runs\n", shortCommit(commit), box)
 			streams.Show(streams.Errors)
-			output, runError := ahra("loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh", box, remote)
+			output, runError := loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--",
+				"ssh", box, remote)
 			// A box that lacks a corpus the landing pins tests nothing and names it, so it is laid there, in a gap
 			// of its own, and the box is asked once more. Laid once, a corpus stays for every landing that pins it.
 			if places := unlaidIn(output); len(places) > 0 && !gapHeld(runError, output) {
@@ -236,8 +239,8 @@ func runOnGateBoxes(
 					return nil, "", fmt.Sprintf("%s lacks %s, and laying it failed: %v", box,
 						strings.Join(places, ", "), layError), nil
 				}
-				output, runError = ahra("loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh", box,
-					remote)
+				output, runError = loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--",
+					"ssh", box, remote)
 				if places := unlaidIn(output); len(places) > 0 {
 					return nil, "", fmt.Sprintf("%s still lacks %s after it was laid there", box,
 						strings.Join(places, ", ")), nil

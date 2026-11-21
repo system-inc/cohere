@@ -29,16 +29,29 @@ type landingOptions struct {
 	Task string
 	// Message says what landed, when the branch holds more than one commit or its one subject won't fit.
 	Message string
+	// Train says the landing is a train (land_train.go), of the units Heads names, in order, each a branch or a
+	// commit.
+	Train bool
+	Heads []string
 }
 
-// parseLandingOptions reads `--task <id>` and `--message <what landed>`, each also as `--name=value`.
+// parseLandingOptions reads `--task <id>` and `--message <what landed>`, each also as `--name=value`, and
+// `--train <head> <head>...`, whose heads run to the next argument that opens with `--`.
 func parseLandingOptions(arguments []string) (landingOptions, error) {
 	options := landingOptions{}
 	for index := 0; index < len(arguments); index++ {
+		if arguments[index] == "--train" {
+			options.Train = true
+			for index+1 < len(arguments) && !strings.HasPrefix(arguments[index+1], "--") {
+				index++
+				options.Heads = append(options.Heads, arguments[index])
+			}
+			continue
+		}
 		name, value, joined := strings.Cut(strings.TrimLeft(arguments[index], "-"), "=")
 		if !strings.HasPrefix(arguments[index], "--") || (name != "task" && name != "message") {
-			return landingOptions{}, fmt.Errorf("land takes --task <id> and --message <what landed>, and %q is neither",
-				arguments[index])
+			return landingOptions{}, fmt.Errorf("land takes --task <id>, --message <what landed> and --train <head> "+
+				"<head>..., and %q is none of them", arguments[index])
 		}
 		if !joined {
 			if index+1 == len(arguments) {

@@ -25,8 +25,9 @@ import (
 // system cache and a build misses its own there and checks it from source, goja's math.Sqrt2 / 2 type-checks to two
 // values. The Square ruled the rule general: every use of any object of such a package reaches, of any kind, and only
 // a package loaded alike reaches nothing. One the host does not hold has no mode to compare, and reaches, failing
-// wide, and so does one the host checked from source that the build's graph lacks: the direct rule reads a package by
-// its ID alone, whatever the carry makes of one the build lacks (#wzre5eg). The census still counts the narrower rule
+// wide, and so does one the build's graph lacks, whatever the host's mode (#bed0mnk): the direct rule reads a package
+// by its ID alone, whatever the carry makes of one the build lacks (#wzre5eg), since the package the build holds of
+// its path in its place, a test variant, may declare the object otherwise. The census still counts the narrower rule
 // it replaced, an untyped float or complex constant read by its value alone. A fixture loads a package two ways only
 // over a filled system cache, the whole standard library at once
 // (TestAPackageLoadedOtherwiseStillStartsTheCarryBesideALackedOne), so the rule's cases are pinned here.
@@ -78,6 +79,10 @@ func TestAUseReachesItsBodyWhereTheLoadModesDiffer(test *testing.T) {
 			true, true},
 		{"a function, source on the host and no package of its ID in the build", function, named, false, lacked, true,
 			false},
+		{"an untyped float, export data on the host and no package of its ID in the build", sqrt2, byValue, true,
+			lacked, true, true},
+		{"a function, export data on the host and no package of its ID in the build", function, named, true, lacked,
+			true, false},
 		{"a function, source on the host and export data in the build", function, named, false, builtRestored, true,
 			false},
 	}
@@ -183,7 +188,7 @@ func reachRecorded(
 ) *buildBodyReach {
 	test.Helper()
 	host := newBodyReachHost(&hostDependence{exportData: map[string]bool{"math": true},
-		decoded: map[*types.Package]bool{}}, reads, nil)
+		decoded: map[*types.Package]bool{}}, reads, nil, nil)
 	hostFiles := map[string][]string{}
 	for identifier, each := range checked {
 		hostFiles[identifier] = each.GoFiles
@@ -295,7 +300,7 @@ func Still(angle float64) float64 { return -angle }
 	graph := newReachBuiltGraph(&load.Loaded{Roots: slices.Collect(maps.Values(checked))})
 	for _, mathExportData := range []bool{false, true} {
 		reacher := &bodyReacher{host: newBodyReachHost(&hostDependence{
-			exportData: map[string]bool{"math": mathExportData}, decoded: map[*types.Package]bool{}}, reads, nil),
+			exportData: map[string]bool{"math": mathExportData}, decoded: map[*types.Package]bool{}}, reads, nil, nil),
 			graph: graph, carried: map[types.Object]bool{}}
 		reacher.carryUnrecorded(checked["example.com/q"].Types)
 		// TwoPi, q's one value, carried only where math loads otherwise.
@@ -437,7 +442,7 @@ func Around(angle int) int { return angle * q.Scale }
 			delete(checked["example.com/a"].Imports, "example.com/gone")
 		}
 		// The host holds gone either way, the build only as a's imports reach it.
-		host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil)
+		host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil, nil)
 		hostFiles := map[string][]string{}
 		for identifier, hosted := range checked {
 			hostFiles[identifier] = hosted.GoFiles
@@ -456,7 +461,8 @@ func Around(angle int) int { return angle * q.Scale }
 				census.lackedImported, each.around, each.byImport)
 		}
 		var written strings.Builder
-		writeBuildBodyReach(&written, "build fixture", census)
+		// No rule ran, so the facts' reach took nothing out.
+		writeBuildBodyReach(&written, "build fixture", census, nil)
 		lines := strings.Split(written.String(), "\n")
 		if !slices.Contains(lines, each.line) || each.lacked && !slices.Contains(lines, "    example.com/gone") {
 			test.Errorf("%s: the census has no line %q, or names no gone under it:\n%s", each.name, each.line,
@@ -566,7 +572,7 @@ func Plain() int { return 1 }
 	if !isRecorded {
 		test.Fatal("q's uses are unrecorded")
 	}
-	host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil)
+	host := newBodyReachHost(&hostDependence{decoded: map[*types.Package]bool{}}, reads, nil, nil)
 	reacher := &bodyReacher{host: host, dependence: unchangedDependence(), carried: map[types.Object]bool{}}
 	elsewhere := *hosted
 	elsewhere.Fset = token.NewFileSet()

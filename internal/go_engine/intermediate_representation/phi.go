@@ -14,8 +14,11 @@ package intermediate_representation
 //	t2 = phi [0: t0, 1: t1]
 type Phi struct {
 	register
-	Edges []Value // Edges[i] is value for Block().Predecessors[i]
+	Edges   []Value // Edges[i] is value for Block().Predecessors[i]
+	comment string  // the operator, variable or lifted Allocation it merges
 }
+
+func (phi *Phi) Comment() string { return phi.comment }
 
 func (phi *Phi) Operands(rands []*Value) []*Value {
 	operands := rands

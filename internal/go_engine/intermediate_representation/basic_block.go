@@ -41,7 +41,6 @@ type BasicBlock struct {
 	parent                   *Function      // parent function
 	Instructions             []Instruction  // instructions in order
 	Predecessors, Successors []*BasicBlock  // predecessors and successors
-	Scc                      *Scc           // strongly connected component
 	successorsSpace          [2]*BasicBlock // initial space for Successors
 	dom                      domInfo        // dominator tree info
 	gaps                     int            // number of nil Instructions (transient)
@@ -84,10 +83,6 @@ func (block *BasicBlock) Control() Instruction {
 // Parent returns the function that contains block b.
 func (block *BasicBlock) Parent() *Function { return block.parent }
 
-func (block *BasicBlock) Reaches(basicBlock *BasicBlock) bool {
-	return block.Scc.reachable.Bit(basicBlock.Scc.Index) != 0
-}
-
 // String returns a human-readable label of this block.
 // It is not guaranteed unique within the function.
 func (block *BasicBlock) String() string {
@@ -99,6 +94,16 @@ func (block *BasicBlock) String() string {
 func (block *BasicBlock) emit(instruction Instruction, source ast.Node) Value {
 	instruction.setSource(source)
 	instruction.setBlock(block)
+	if block.Instructions == nil {
+		// A block whose first instruction doesn't end it holds at least two, so it starts with room for four, one
+		// array where append from nothing would make arrays of one, two and four (#z844663). A block its first
+		// instruction ends keeps the one slot append makes.
+		switch instruction.(type) {
+		case *Jump, *If, *Return, *Panic, *Unreachable, *ConstantSwitch:
+		default:
+			block.Instructions = make([]Instruction, 0, 4)
+		}
+	}
 	block.Instructions = append(block.Instructions, instruction)
 	value, _ := instruction.(Value)
 	return value

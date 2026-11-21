@@ -31,8 +31,11 @@ import "go/types"
 //	t1 = new int
 type Allocation struct {
 	register
-	Heap bool
+	Heap    bool
+	comment string // the variable it holds, or what the builder or lifting made it for
 }
+
+func (allocation *Allocation) Comment() string { return allocation.comment }
 
 func (allocation *Allocation) Type() types.Type { return allocation.valueType }
 

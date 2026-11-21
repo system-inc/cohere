@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"cmp"
 	"go/token"
 	"go/types"
 	"maps"
@@ -50,7 +51,9 @@ type bodyReacher struct {
 // reachPackage judges every body of hosted's record that the build compiles, read saying how it compiles the package,
 // and counts those in files it does not, absent. Whether the build compiles a body's file is read by the file as
 // parsed, never as a //line directive renames it, which names no file the build lists (#w72zxtq, the review's must 8);
-// the renamed file is the one the census reports and the graph's units are placed in.
+// the renamed file is the one the census reports and the graph's units are placed in. A package whose imports differ
+// is then reached whole (differingImports), and the package's variable initializers are judged as one body, by every
+// body of the package and every name one side alone declares (reachInitializers).
 func (reacher *bodyReacher) reachPackage(
 	hosted *packages.Package,
 	record *build_reads.FunctionUses,
@@ -58,13 +61,31 @@ func (reacher *bodyReacher) reachPackage(
 ) ([]reachedBody, int) {
 	var bodies []reachedBody
 	absent := 0
+	// initializers are the indexes in bodies of the package's variable initializers, and unshared what one side alone
+	// holds of the package, which reaches every one of them whatever any uses (reachInitializers), the first of: a body
+	// in a host's file the build does not compile, then one in a build-only file, an initializer counted as a body in
+	// either, then a name either declares.
+	var initializers []int
+	unshared := ""
+	hostOnlyName := false
 	for declared := range record.Declarations() {
 		if !declared.HasBody {
+			// A type, a value with no initializer or a function declared without a body, in a file the build does
+			// not compile, is the host's side of a name one side alone declares, as buildOnlyNames is the build's. A
+			// record that places it in no file of the host's is a doubt, and taken as one.
+			if !hostOnlyName {
+				tokenFile := hosted.Fset.File(declared.Declaration.File)
+				hostOnlyName = tokenFile == nil || !read.files[tokenFile.Name()]
+			}
 			continue
 		}
 		name := declarationName(declared.Declaration)
+		isInitializer := isVariableInitializer(declared.Declaration)
 		tokenFile := hosted.Fset.File(declared.Declaration.File)
 		if tokenFile == nil {
+			if isInitializer {
+				initializers = append(initializers, len(bodies))
+			}
 			// A record always places its declarations in the host's files; one that does not is called reached, as
 			// a doubt is, and dependent, as the graph calls a place it knows no unit at.
 			bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, name: name, reason: reachedUnknown,
@@ -72,8 +93,13 @@ func (reacher *bodyReacher) reachPackage(
 			continue
 		}
 		if !read.files[tokenFile.Name()] {
+			// An absent initializer is no body of the build's, only a cause, as any absent body is, that reaches every
+			// one it shares.
 			absent++
 			continue
+		}
+		if isInitializer {
+			initializers = append(initializers, len(bodies))
 		}
 		position := tokenFile.Position(declared.Declaration.File + token.Pos(declared.Declaration.Offset))
 		if reacher.sizesDiffer {
@@ -100,13 +126,204 @@ func (reacher *bodyReacher) reachPackage(
 				read.dotImports[tokenFile.Name()])
 			reacher.constantsOnly = false
 		}
+		// A body a //line directive moves onto a file the builds do not share is judged by that file, whatever it uses
+		// (unsharedLineClaims).
+		if claimed, isClaimed := read.lineClaims[tokenFile.Name()][declared.Declaration.Offset]; isClaimed {
+			if reason == "" {
+				reason, driver = reachedLineClaim, claimed+" claimed by a //line directive"
+			}
+			constantsOnlyReason = cmp.Or(constantsOnlyReason, reachedLineClaim)
+		}
 		bodies = append(bodies, reachedBody{packageIdentifier: hosted.ID, file: position.Filename,
 			line: position.Line, offset: declared.Declaration.Offset, name: name, reason: reason,
 			partReason: partReason, driver: driver, constantsOnlyReason: constantsOnlyReason,
 			unitDependent: reacher.dependence.UnitDependent(hosted.ID, position.Filename,
 				declared.Declaration.Offset)})
 	}
+	differing := differingImports(hosted.Imports, read.imports)
+	// A package's reads hold its lookups, as its function uses (bodyReachHost.judge).
+	if reads := reacher.host.reads[hosted]; reads != nil {
+		differing = append(differing, differingClosureLookups(reads.Lookups(), hosted, read)...)
+	}
+	if len(differing) > 0 {
+		driver := "the package's imports differing, by " + strings.Join(differing, ", ")
+		for index := range bodies {
+			if bodies[index].reason == "" {
+				bodies[index].reason, bodies[index].driver = reachedImports, driver
+			}
+			// The constants-only rule's count reads the general one's beside it, and this reason is either's alike.
+			bodies[index].constantsOnlyReason = cmp.Or(bodies[index].constantsOnlyReason, reachedImports)
+		}
+	}
+	switch {
+	case absent > 0:
+		unshared = "a body of the package in a file the build does not compile"
+	case read.buildOnlyBodies > 0:
+		unshared = "a body of the package in a file the build alone compiles"
+	case len(read.buildOnlyNames) > 0:
+		unshared = "a name declared by a file the build alone compiles"
+	case hostOnlyName:
+		unshared = "a name declared by a file the build does not compile"
+	}
+	reachInitializers(bodies, initializers, unshared)
 	return bodies, absent
+}
+
+// differingImports are the imports of a package that differ between the builds, sorted by path, hosted the host's
+// import graph of it and built the build's, blank imports among them, `unsafe` too, which the graph holds as any other
+// import: the paths its files import in one build and not the other, and the paths both import that resolve in the
+// build to a package of another ID than on the host, each of those written with both IDs.
+//
+// A rule may judge every body by the paths, whatever the body uses (#bed0mnk): unusedwrite stands down in a package
+// that imports `unsafe`, SA1015 in one that imports cobra, a command's, and SA5008 accepts a repeated struct tag key
+// in one that imports go-flags.
+//
+// A path that resolves to another ID is another package under the same name (#bed0mnk, the reader's must 2 on
+// #wzre5eg). go test builds a package again against a test variant, `via [audit.test]` against `audit [audit.test]`,
+// and a test file may declare a universe name the package's own files use, so the variant's constants are not the
+// package's, nor are those of a package built against it. A body that reads one type-checks to other values where
+// only the build holds the variant, though no file of its package differs and every ID the host holds the build
+// holds, loaded alike: the reach reads an object by the host's ID of its package, and here the build's body reads
+// another package's.
+func differingImports(hosted map[string]*packages.Package, built map[string]*packages.Package) []string {
+	var differing []string
+	for path, hostImported := range hosted {
+		builtImported, isBuilt := built[path]
+		switch {
+		case !isBuilt:
+			differing = append(differing, path)
+		case builtImported.ID != hostImported.ID:
+			differing = append(differing, path+" resolving to "+hostImported.ID+" on the host and to "+
+				builtImported.ID+" in the build")
+		}
+	}
+	for path := range built {
+		if _, isHosted := hosted[path]; !isHosted {
+			differing = append(differing, path)
+		}
+	}
+	slices.Sort(differing)
+	return differing
+}
+
+// differingClosureLookups are the Closure lookups among lookups, the questions the host's rules asked of hosted's
+// import closure (build_reads.QueryClosure), that the build answers otherwise, asked again of read's types of the
+// package of hosted's ID, each written with what either side found (#bed0mnk, the Square's must on the three-piece
+// head). correctness-no-caller-data-mutation exempts a Read's buffer only where io is in the closure, and
+// correctness-require-handled-error a dropped Write of a digest only where hash is, gates no use of a body reads, and
+// a dependency that imports io on one platform alone flips them where the package's own imports are the same.
+//
+// The question is the rule's own (build_reads.ClosureInterface), asked of the closure from the package itself, which
+// holds the closure from its imports that correctness-no-caller-data-mutation asks: the two differ only at the
+// package's own path, which is skipped, being the package itself in both builds, its declarations judged by the
+// bodies and names of each side's files. A lookup differs where it is found on one side alone, either way round, or
+// where both find it in a package of other IDs, read by the path in each side's import graph, which holds one package
+// of a path. The host's answer is its recorded one, never asked again.
+//
+// The package grain's comparison (check's lookupHolds) reads more than these: the answer's object by its objectpath
+// and its closure's digest, from a memo the census does not hold. The answer here is an interface of the standard
+// library that no platform declares otherwise, so its package's ID stands for it. Only the two lookups are compared,
+// never the whole closures, which differ for nearly every package: `os` alone imports a platform's own packages.
+func differingClosureLookups(
+	lookups []build_reads.Lookup,
+	hosted *packages.Package,
+	read *reachBuiltPackage,
+) []string {
+	var differing []string
+	for _, lookup := range lookups {
+		if lookup.Query != build_reads.QueryClosure || lookup.Path == hosted.PkgPath {
+			continue
+		}
+		asked := lookup.Path + "." + lookup.Name + " in the import closure, "
+		_, declared := build_reads.ClosureInterface([]*types.Package{read.types}, lookup.Path, lookup.Name)
+		switch {
+		case lookup.Found && declared == nil:
+			differing = append(differing, asked+"found on the host and not in the build")
+		case !lookup.Found && declared != nil:
+			differing = append(differing, asked+"found in the build and not on the host")
+		case lookup.Found && declared != nil:
+			hostIdentifier, builtIdentifier := closureIdentifier(hosted.Imports, lookup.Path),
+				closureIdentifier(read.imports, lookup.Path)
+			if hostIdentifier != builtIdentifier {
+				differing = append(differing, asked+"found in "+hostIdentifier+" on the host and in "+builtIdentifier+
+					" in the build")
+			}
+		}
+	}
+	return differing
+}
+
+// closureIdentifier is the ID of the package of path in the import graph from imports, a package's imports by path,
+// empty where the graph holds none.
+func closureIdentifier(imports map[string]*packages.Package, path string) string {
+	identifier := ""
+	packages.Visit(slices.Collect(maps.Values(imports)), func(each *packages.Package) bool {
+		if each.PkgPath == path {
+			identifier = each.ID
+		}
+		// Past the package found, or once one is, nothing more is asked.
+		return identifier == ""
+	}, nil)
+	return identifier
+}
+
+// reachInitializers judges a package's variable initializers, the bodies at initializers's indexes, as one body
+// (#bed0mnk): Go lowers them into one synthetic function, in the order `types.Info.InitOrder` gives, dependencies
+// first, declaration order among the independent and files in the load's order, so one that never returns leaves
+// every one after it unreachable, and a rule reading the representation reports nothing on them, though nothing they
+// use differs. Every one is reached, Initializers, where the package holds anything one side alone does, unshared
+// saying what, empty for nothing, or any body of the package is reached, an initializer's or a function's.
+//
+// Why that is enough inside one package (the Square's musts 1 and 2): the order is computed in the package alone,
+// from the order its files declare its variables in and from what its own initializers and functions refer to. So it
+// changes only where one of those bodies is other, missing or new, which is a body reached, absent or build-only, or
+// where a name one refers to resolves otherwise, which takes a declaration only one side holds. And the cut moves
+// with a function of the package that stops returning on one side, which is such a body too, itself or one it calls.
+// Across packages the order cannot change, and the cut can, by a callee's no-return fact: that is the facts' reach's.
+//
+// The constants-only load mode rule is judged by the same rule from its own reasons, so the census's count of what
+// the general rule costs stays its own (loadModeReaches).
+//
+// No initializer stands in a real run today (the Square's should 3 on the three-piece head): rule.StandingSpans passes
+// over every declaration but a function declaration with a body before it asks whether one stands, so a value spec's
+// initializer is never spanned and always the build's own to lint, as rule.StandingBodies says, and reaching one
+// changes what the differential compares and the census counts, never what a build lints.
+//
+// Mutates: bodies gains the reason at each initializer left unreached
+func reachInitializers(bodies []reachedBody, initializers []int, unshared string) {
+	driver := ""
+	if unshared != "" {
+		driver = "the package's variable initializers, " + unshared
+	}
+	constantsOnlyReached := unshared != ""
+	for _, body := range bodies {
+		if driver == "" && body.reason != "" {
+			driver = "the package's variable initializers, " + body.name + " reached"
+		}
+		constantsOnlyReached = constantsOnlyReached || body.constantsOnlyReason != ""
+	}
+	for _, index := range initializers {
+		if driver != "" && bodies[index].reason == "" {
+			bodies[index].reason, bodies[index].driver = reachedInitializers, driver
+		}
+		if constantsOnlyReached && bodies[index].constantsOnlyReason == "" {
+			bodies[index].constantsOnlyReason = reachedInitializers
+		}
+	}
+}
+
+// isVariableInitializer reports whether declaration is a value spec the package's synthetic initializing function
+// runs: a var's with a value. A spec of blank names alone declares no object to tell a var from a const by, so it is
+// taken as one, which costs a re-check at most and never leaves an initializer unreached.
+func isVariableInitializer(declaration build_reads.Declaration) bool {
+	if declaration.Kind != build_reads.DeclaredValue {
+		return false
+	}
+	if len(declaration.Objects) == 0 {
+		return true
+	}
+	_, isVariable := declaration.Objects[0].(*types.Var)
+	return isVariable
 }
 
 // sizesReason is Sizes when the build's sizes are not the host's, which reaches every body, and empty when they are.
@@ -341,15 +558,15 @@ func (reacher *bodyReacher) readCarryStarts() {
 // `const true = false` does, so a constant of the variant need not be p's, nor one of any package go test builds again
 // against the variant: a package built again for another's tests can differ from its plain self, with no load mode
 // differing. The second case answers for the load mode alone, and nothing of the carry covers a body that reads a
-// stand-in, the carry being of an unrecorded package's values. What reaches such a body today is the direct rule's
-// wide answer (loadModeDiffers), which calls a package the host checked from source and the build lacks by its ID
-// loaded otherwise, under a label that names the wrong cause. Two holes are left open, both engine's (#bed0mnk):
-//   - The host restored p, from its findings store say, and the build holds only its variant: the direct rule, which
-//     reads by p's ID, finds export data on the host and nothing checked from source in the build, calls the two
-//     loaded alike, and leaves a body that names an object of p unreached, whatever the variant's test files declare.
+// stand-in, the carry being of an unrecorded package's values. What reaches such a body is the direct rule's wide
+// answer (loadModeDiffers), which calls a package the build lacks by its ID loaded otherwise, under a label that names
+// the wrong cause, and the imports (differingImports). Two holes the reader left open are closed so (#bed0mnk):
+//   - The host restored p, from its findings store say, and the build holds only its variant: read by the mode alone,
+//     export data on the host and nothing checked from source in the build were loaded alike, and a body that names an
+//     object of p went unreached. The direct rule now calls p lacked by its ID differing whatever the host's mode.
 //   - The build holds every ID the host does, loaded alike, and a body's import resolves there to a package of another
-//     ID, one built again for a test ("q [p.test]" for q): no rule asks which package of a path a body's package
-//     imports, so nothing reaches it.
+//     ID, one built again for a test ("q [p.test]" for q): no rule asked which package of a path a body's package
+//     imports. Its package's imports now differ, and reach its bodies.
 func (reacher *bodyReacher) startsCarry(identifier string, path string) (starts bool, byImport bool) {
 	if reacher.graph.holds(identifier) {
 		return reacher.identifiedLoadModeDiffers(identifier), false
@@ -377,9 +594,9 @@ func (reacher *bodyReacher) startsCarry(identifier string, path string) (starts 
 // every use of any object of such a package reaches. With constantsOnly, the census's count of the narrower rule it
 // replaced, only an untyped float or complex constant read by its value does, since an integer, string or boolean
 // constant is written exactly in both and a typed float is rounded to its type in both. A package the host does not
-// hold differs. An object a value spec declared from what the load mode reaches reaches it as well, under either rule
-// (carryLoadMode): the constants-only rule reads the general rule's carried objects, of them the untyped float and
-// complex constants alone.
+// hold differs, and so does one the build holds nothing of by its ID (loadModeDiffers). An object a value spec
+// declared from what the load mode reaches reaches it as well, under either rule (carryLoadMode): the constants-only
+// rule reads the general rule's carried objects, of them the untyped float and complex constants alone.
 func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_reads.UseKinds) bool {
 	if reacher.constantsOnly {
 		constant, isConstant := object.(*types.Const)
@@ -392,14 +609,21 @@ func (reacher *bodyReacher) loadModeReaches(object types.Object, kinds build_rea
 
 // loadModeDiffers reports whether the host and the build load own in different modes. A package the host does not
 // hold has no mode to compare, and so differs, failing wide (#w72zxtq). This is the direct rule, of a body that names
-// an object of own, and it reads a package by its ID alone: one the host checked from source and the build's graph
-// lacks differs here, though it starts no carry (startsCarry).
+// an object of own, and it reads a package by its ID alone: one the build's graph lacks by that ID differs here
+// whatever the host's mode (#bed0mnk, the reader's must 1 on #wzre5eg), though it starts no carry (startsCarry).
+//
+// The two differ on purpose. The carry asks whether a value may have been computed from a package loaded in two
+// modes, so it reads the path and lets the package of another ID the build holds of it stand in, a command's test
+// variant holding every file of the command. The direct rule asks whether the object the body names is the one the
+// host recorded, and a stand-in's need not be: a test variant's own files may declare a universe name the package's
+// files use, so the variant's constant is another value where nothing was loaded otherwise. Read by the mode alone, a
+// package the host restored and the build lacks agreed, export data on one side and no check from source on the other.
 func (reacher *bodyReacher) loadModeDiffers(own *types.Package) bool {
 	identifier, isHeld := reacher.host.identifiers[own]
 	if !isHeld {
 		return true
 	}
-	return reacher.identifiedLoadModeDiffers(identifier)
+	return !reacher.graph.holds(identifier) || reacher.identifiedLoadModeDiffers(identifier)
 }
 
 // identifiedLoadModeDiffers reports whether the host and the build load the package the host holds by identifier in

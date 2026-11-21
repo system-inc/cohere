@@ -23,11 +23,13 @@
 package unused_code
 
 import (
+	"cmp"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
 	"math"
+	"slices"
 	"unsafe"
 
 	"honnef.co/go/tools/analysis/facts/generated"
@@ -145,12 +147,19 @@ type graph struct {
 	// generated is each generated file of the package, by its name, which staticcheck's generated analyzer read.
 	generated map[string]generated.Generator
 
-	// usedEdges and ownedEdges are every use and every ownership between nodes, each keyed by edgeKey. This data is
-	// also present in the nodes' chains, but there it can't be accessed in constant time; these deduplicate edges. The
-	// original keeps one map keyed by a struct of both nodes and the kind; a map per kind keyed by one word keeps a
-	// third of the bytes per key, hashes it on the runtime's path for 64-bit keys, and holds the same edges.
-	usedEdges  map[uint64]struct{}
-	ownedEdges map[uint64]struct{}
+	// usedEdges is every use between nodes, keyed by edgeKey. This data is also present in the nodes' chains, but
+	// there it can't be accessed in constant time; it deduplicates uses. The original keeps one map keyed by a struct
+	// of both nodes and the kind; a map keyed by one word keeps a third of the bytes per key, hashes it on the
+	// runtime's path for 64-bit keys, and holds the same edges.
+	usedEdges map[uint64]struct{}
+	// firstOwners and laterOwners deduplicate ownerships in place of a map of them all. Nearly every node has one
+	// owner at most, which the walk often sees twice, so firstOwners holds each node's first owner by the owned node's
+	// index, 4 bytes a node and no hash, 0 while it has none: the root owns nothing (addOwned). laterOwners is each
+	// ownership by an owner other than the first, keyed by edgeKey, and nil until a node has a second owner, as the
+	// field of `var a, b struct{ x int }` does. firstOwners is as long as nodes, so each place a node is made adds a
+	// slot to both.
+	firstOwners []nodeIndex
+	laterOwners map[uint64]struct{}
 	// nodes is every node, by its index, the root first.
 	nodes []node
 	// uses and owns are every use and every ownership as a link of its node's chain, which node.firstUse and
@@ -174,6 +183,21 @@ type graph struct {
 	namedTypes []*types.TypeName
 	// interfaceTypes is every interface type the walk read that declares at least one method or embeds a type.
 	interfaceTypes []*types.Interface
+
+	// recorder writes a record of what each function body adds to the graph, and is nil unless recordBodies asked for
+	// one, as it is on every run that reports. The walk tells it of each use, each object seen and the few other
+	// things a record holds, each behind one check that it is there.
+	recorder *bodyRecorder
+	// splice is the records the graph takes in place of walking their bodies, and is nil unless takeRecords handed it
+	// some, as it is on every run that reports.
+	splice *bodySplice
+	// skippedBody is the body of the function whose type the walk is reading when the graph takes that body from a
+	// record, and nil otherwise: seeScope sees none of the locals declared between its braces.
+	skippedBody *ast.BlockStmt
+	// defined is the object each declaring identifier of the package declares, by the identifier's place, which a
+	// recorder and a splice both ask to name an object declared outside a body (definedAt). It is nil until one of
+	// them first asks.
+	defined map[recordedPlace]types.Object
 }
 
 // nodeIndex is a node's place in graph.nodes, the original's NodeID. The root is 0. The original's is 64 bits; 32 are
@@ -193,9 +217,10 @@ type edgeLink struct {
 // too, for the merge and the Graphviz output; the port leaves both out, and a node's index is its place in
 // graph.nodes.
 type node struct {
-	// typesObject is the object the node stands for, the generic one of an instance. The root's is nil. The original
-	// words what a finding says of it, its object, when it makes the node; the port words it in results, from this same
-	// object, so a node is 24 bytes rather than 104 while the walk appends and copies the list.
+	// typesObject is the object the node stands for, the generic one of an instance. The root's is nil, and so is a
+	// spliced node's (isSpliced). The original words what a finding says of it, its object, when it makes the node; the
+	// port words it in results, from this same object, so a node is 24 bytes rather than 104 while the walk appends and
+	// copies the list.
 	typesObject types.Object
 
 	// firstUse is the first link of this node's chain in graph.uses, each node this one uses, the latest the walk
@@ -205,6 +230,13 @@ type node struct {
 	// firstOwned is the first link of this node's chain in graph.owns, each node this one owns, which is quiet when
 	// this one goes unused.
 	firstOwned linkIndex
+}
+
+// isSpliced is whether each was made from a record and not by the walk, a body's local that a splice made
+// (spliceBody), and so holds no object: what a finding says of it is graph.splice.locals'. The root holds no object
+// either, and every step that asks ranges past it.
+func isSpliced(each node) bool {
+	return each.typesObject == nil
 }
 
 // object is what a finding says of an object: its kind, its name and its position. The original's also carries an
@@ -222,7 +254,8 @@ type object struct {
 }
 
 // result is the graph's verdict on each object it holds: used, unused and reported, or quiet, unused but not reported
-// because what owns it is unused too. Each is in the order of the graph's nodes.
+// because what owns it is unused too. The used and the quiet are in the order of the graph's nodes, and the unused,
+// which are the rule's findings, in the order of their positions.
 type result struct {
 	used   []object
 	unused []object
@@ -230,7 +263,7 @@ type result struct {
 }
 
 // edgeKey is the edge from one node to another as one word, from in the high half and to in the low, which
-// graph.usedEdges and graph.ownedEdges are keyed by. It is exact, two edges sharing a key only when they share both
+// graph.usedEdges and graph.laterOwners are keyed by. It is exact, two edges sharing a key only when they share both
 // nodes, because a node's index is 32 bits.
 func edgeKey(from nodeIndex, to nodeIndex) uint64 {
 	return uint64(from)<<32 | uint64(to)
@@ -247,10 +280,10 @@ func newGraph(
 ) *graph {
 	// Almost every node is an object a declaration in the package names, each in typesInfo.Defs. Over cohere's own
 	// packages the nodes and the ownerships come to a little under one per declaration, and the uses to about one and
-	// a half, under two in nearly every package. Sized so up front, the node list and the maps seldom grow while the
-	// walk fills them. The lists of links grow by append, where room left over is a copy, not a rehash, so they take
-	// what nine packages in ten need: the uses one and a half a declaration, the ownerships one. A size is only room:
-	// it changes no node, no order and no edge, so no finding.
+	// a half, under two in nearly every package. Sized so up front, the node list, its first owners and the maps
+	// seldom grow while the walk fills them. The lists of links grow by append, where room left over is a copy, not a
+	// rehash, so they take what nine packages in ten need: the uses one and a half a declaration, the ownerships one. A
+	// size is only room: it changes no node, no order and no edge, so no finding.
 	declared := len(typesInfo.Defs)
 	return &graph{
 		typesPackage: typesPackage,
@@ -260,10 +293,10 @@ func newGraph(
 		generated:    generatedFiles,
 		fileSet:      fileSet,
 		nodes:        make([]node, 1, declared+1),
+		firstOwners:  make([]nodeIndex, 1, declared+1),
 		uses:         make([]edgeLink, 1, declared+declared/2+1),
 		owns:         make([]edgeLink, 1, declared+1),
 		usedEdges:    make(map[uint64]struct{}, 2*declared),
-		ownedEdges:   make(map[uint64]struct{}, declared),
 		objects:      make(map[unsafe.Pointer]nodeIndex, declared),
 	}
 }
@@ -368,6 +401,7 @@ func (graph *graph) node(typesObject types.Object) nodeIndex {
 	}
 	index := nodeIndex(len(graph.nodes))
 	graph.nodes = append(graph.nodes, node{typesObject: generic})
+	graph.firstOwners = append(graph.firstOwners, 0)
 	graph.objects[key] = index
 	return index
 }
@@ -384,13 +418,32 @@ func origin(typesObject types.Object) types.Object {
 	}
 }
 
-// addOwned records that owner owns owned. Like addUse, it stores the edge's key and reads whether the map grew, one
-// hash where a lookup and then a store would be two.
+// addOwned records that owner owns owned, linking the pair once however often it is asked. The pair is new exactly
+// when owned has no first owner yet, or has another and laterOwners lacks the pair: each pair is linked only as the
+// first owner or as a key of laterOwners, and neither is ever taken back.
 func (graph *graph) addOwned(owner nodeIndex, owned nodeIndex) {
-	before := len(graph.ownedEdges)
-	graph.ownedEdges[edgeKey(owner, owned)] = struct{}{}
-	if len(graph.ownedEdges) == before {
+	if owner == 0 {
+		// Invariant: see makes an owner's node only from an object, which node never gives the root's index, and a
+		// splice refuses a record whose local the root owns. Were the root an owner, firstOwners' 0 would read as no
+		// owner and a repeat of the pair would be linked again.
+		panic("the root owns a node")
+	}
+	switch graph.firstOwners[owned] {
+	case owner:
 		return
+	case 0:
+		graph.firstOwners[owned] = owner
+	default:
+		if graph.laterOwners == nil {
+			graph.laterOwners = map[uint64]struct{}{}
+		}
+		// Like addUse, it stores the key and reads whether the map grew, one hash where a lookup and then a store
+		// would be two.
+		before := len(graph.laterOwners)
+		graph.laterOwners[edgeKey(owner, owned)] = struct{}{}
+		if len(graph.laterOwners) == before {
+			return
+		}
 	}
 	graph.owns = append(graph.owns, edgeLink{to: owned, next: graph.nodes[owner].firstOwned})
 	graph.nodes[owner].firstOwned = newestLink(graph.owns)
@@ -431,6 +484,11 @@ func (graph *graph) see(seen types.Object, owner types.Object) {
 	}
 
 	seenNode := graph.node(seen)
+	if graph.recorder != nil {
+		// node gives no object the root's index, so the root here is no owner. The owner's node is asked for after
+		// the seen one's, as below, so the nodes are made in the order they are without a recorder.
+		graph.recordSeen(seenNode, graph.node(owner))
+	}
 	if owner != nil {
 		graph.addOwned(graph.node(owner), seenNode)
 	}
@@ -463,6 +521,11 @@ func (graph *graph) use(used types.Object, by types.Object) {
 	if by != graph.lastBy {
 		graph.lastBy = by
 		graph.lastByNode = graph.node(by)
+	}
+	if graph.recorder != nil {
+		// Told above addUse's dedupe, which keeps an edge from the first walk that adds it alone: a body's record
+		// holds every edge its own walk adds.
+		graph.recordUse(graph.lastByNode, usedNode)
 	}
 	graph.addUse(graph.lastByNode, usedNode)
 }
@@ -507,8 +570,11 @@ func (graph *graph) colorAndQuieten() []nodeState {
 	return states
 }
 
-// results is the graph's verdict on every node but the root, in the order of the nodes, each node's object worded
-// here from the object the node stands for, as the original words it when it makes the node.
+// results is the graph's verdict on every node but the root, each node's object worded here from the object the node
+// stands for, as the original words it when it makes the node, or for a spliced node from the record that made it,
+// which is all it holds. The used and the quiet are in the order of the nodes.
+// The unused are sorted by position (#xeafx79): the order of the nodes is the order the walk met them, which a build
+// that takes a body's nodes from the host's record does not share, and the findings must not depend on it.
 func (graph *graph) results() result {
 	states := graph.colorAndQuieten()
 
@@ -528,13 +594,25 @@ func (graph *graph) results() result {
 	}
 	for index, each := range graph.nodes[1:] {
 		state := states[index+1]
-		if state.seen() {
-			verdict.used = append(verdict.used, graph.objectOf(each.typesObject))
-		} else if state.quiet() {
-			verdict.quiet = append(verdict.quiet, graph.objectOf(each.typesObject))
+		var worded object
+		if isSpliced(each) {
+			worded = graph.splice.locals[nodeIndex(index+1)]
 		} else {
-			verdict.unused = append(verdict.unused, graph.objectOf(each.typesObject))
+			worded = graph.objectOf(each.typesObject)
+		}
+		if state.seen() {
+			verdict.used = append(verdict.used, worded)
+		} else if state.quiet() {
+			verdict.quiet = append(verdict.quiet, worded)
+		} else {
+			verdict.unused = append(verdict.unused, worded)
 		}
 	}
+	// By position, then by name, so no order the walk met the nodes in shows: two objects at one position are one
+	// identifier's, as the two fields of `var a, b struct{ x int }` are, so they share a name too and either of them
+	// first words the same findings.
+	slices.SortFunc(verdict.unused, func(one object, other object) int {
+		return cmp.Or(cmp.Compare(one.position, other.position), cmp.Compare(one.name, other.name))
+	})
 	return verdict
 }

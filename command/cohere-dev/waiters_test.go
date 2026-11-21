@@ -21,6 +21,12 @@ import (
 // looks once a second, and a two-second hold at load 20 to 30 let a look fall outside it, so the third took
 // the token without ever having seen the second hold it (swift's land, 2026-11-06 12:53). A waiter that
 // never names the second is still caught, at the deadline.
+// waiterBound only keeps a waiter that never names its holder from hanging the test: each wait ends at the event it
+// watches for, a run joining the line or the third naming the second, so a fast machine never reaches it. It is long
+// because a minute was outrun on Kirk's Mac under a full gate's load (#den6hfe, Nov 19), and the second run holds its
+// token until the test lets it go, so the third names it however long its looks take.
+const waiterBound = 10 * time.Minute
+
 func TestAWaiterNamesEachNewHolder(test *testing.T) {
 	test.Parallel()
 	if runtime.GOOS == "windows" {
@@ -73,7 +79,7 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 		if startError := command.Start(); startError != nil {
 			test.Fatal(startError)
 		}
-		for deadline := time.Now().Add(time.Minute); tickets() < want; time.Sleep(20 * time.Millisecond) {
+		for deadline := time.Now().Add(waiterBound); tickets() < want; time.Sleep(20 * time.Millisecond) {
 			if time.Now().After(deadline) {
 				test.Fatalf("%s never joined the line", marker)
 			}
@@ -96,7 +102,7 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 		return strings.Contains(output, "the first holder") && changed >= 0 &&
 			strings.Contains(output[changed:], "the second run")
 	}
-	for deadline := time.Now().Add(time.Minute); !named(); time.Sleep(50 * time.Millisecond) {
+	for deadline := time.Now().Add(waiterBound); !named(); time.Sleep(50 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			break
 		}

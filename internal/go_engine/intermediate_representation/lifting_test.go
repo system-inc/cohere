@@ -364,3 +364,33 @@ func placedViewBuild(test *testing.T, unit differentialUnit, dropStores bool) (p
 	program.CreatePackage(unit.types, unit.files, unit.typeInfo, false).Build()
 	return problems, rounds, places
 }
+
+// TestLiftableDecidesEachAllocationAfresh lifts two variables whose addresses escape in the same block, so liftable
+// walks the same blocks for each and stores into the same predecessor for each, against go/ir lifted. liftable keeps
+// what it marks on the blocks in descriptions it reuses from one Allocation to the next (#z844663): a mark left from
+// the first would leave the second's join liftable, or its split without the store that fills it.
+func TestLiftableDecidesEachAllocationAfresh(test *testing.T) {
+	test.Parallel()
+	unit := differentialCheck(test, "twosplits", `package twosplits
+
+func escape(*int)
+
+func Split(condition bool) int {
+	first := 1
+	second := 2
+	println(first, second)
+	if condition {
+		escape(&first)
+		escape(&second)
+	}
+	return first + second
+}
+`)
+	tally := differentialCompareLiftedUnit(test, unit, "None")
+	if tally.identical == 0 {
+		test.Fatal("no function was compared")
+	}
+	for _, difference := range tally.differences {
+		test.Errorf("the lifted differential: %s", differentialDescribe(difference))
+	}
+}

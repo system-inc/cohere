@@ -1,6 +1,9 @@
 package program
 
 import (
+	"math"
+	"runtime"
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -146,6 +149,30 @@ func within(got time.Duration, want time.Duration) bool {
 	return got >= want-slack && got <= want+slack
 }
 
+// quietTheCollector runs a collection to its end and turns the collector off until the test ends, so no garbage
+// collection runs on the meter's thread while a frame is open.
+//
+// The meter bills whatever CPU the thread spends inside a frame, and a goroutine that allocates while a cycle is
+// marking is drafted into mark assist on its own thread. A frame that allocates, as a cache fill does, could then be
+// billed milliseconds of another test's garbage: the package's parallel tests build whole programs, and Sun2's gate
+// read 3.38ms billed for a 2.00ms spin (#x1fnzvy). A probe of 400 shared-fill calls beside a large heap measured it:
+// with siblings making garbage, 5 of 800 calls over 0.2ms past the spin, the worst 3.3ms; with none, 0 of 1,200,
+// the worst 32us, at a load of 15 to 18, plainly and under -race alike.
+//
+// The collector's settings are the process's, so a test that calls this is not parallel: it runs before any of the
+// package's parallel tests resume, and nothing else in the process allocates beside it. The memory limit is lifted
+// too, since a limit near the heap starts a collection whatever the percentage says.
+func quietTheCollector(test *testing.T) {
+	test.Helper()
+	runtime.GC()
+	percent := debug.SetGCPercent(-1)
+	limit := debug.SetMemoryLimit(math.MaxInt64)
+	test.Cleanup(func() {
+		debug.SetMemoryLimit(limit)
+		debug.SetGCPercent(percent)
+	})
+}
+
 // startTestMeter starts a meter on the test's goroutine and finishes it when the test ends.
 func startTestMeter(test *testing.T) (*workerMeter, *Timings) {
 	test.Helper()
@@ -162,8 +189,10 @@ func startTestMeter(test *testing.T) (*workerMeter, *Timings) {
 
 // TestAMeteredCallIsBilledItsCpu covers the wrapper the whole table rests on. Five calls each spinning 2ms
 // of CPU are billed 10ms, and each call is counted as a node offered.
+//
+// Not parallel: it turns the process's collector off while it bills a spin (quietTheCollector).
 func TestAMeteredCallIsBilledItsCpu(test *testing.T) {
-	test.Parallel()
+	quietTheCollector(test)
 	meter, _ := startTestMeter(test)
 	timing := &RuleTiming{Name: "spins"}
 	var spent time.Duration
@@ -183,8 +212,10 @@ func TestAMeteredCallIsBilledItsCpu(test *testing.T) {
 
 // TestAWaitingCallCostsNothing is the property the wall clock lacked (#8qyzmxw). Five calls each sleeping
 // 5ms spend 25ms of wall time and almost no CPU, and they are billed the CPU.
+//
+// Not parallel: it turns the process's collector off while it bills a spin (quietTheCollector).
 func TestAWaitingCallCostsNothing(test *testing.T) {
-	test.Parallel()
+	quietTheCollector(test)
 	meter, _ := startTestMeter(test)
 	timing := &RuleTiming{Name: "sleeps"}
 	sleeps := func(node *ast.Node) { time.Sleep(5 * time.Millisecond) }
@@ -206,8 +237,10 @@ func TestAWaitingCallCostsNothing(test *testing.T) {
 }
 
 // TestSetupIsBilledApartFromListeners keeps the distinction that decides which fix a slow rule needs.
+//
+// Not parallel: it turns the process's collector off while it bills a spin (quietTheCollector).
 func TestSetupIsBilledApartFromListeners(test *testing.T) {
-	test.Parallel()
+	quietTheCollector(test)
 	meter, _ := startTestMeter(test)
 	timing := &RuleTiming{Name: "decides"}
 	var spent time.Duration
@@ -229,8 +262,10 @@ func TestSetupIsBilledApartFromListeners(test *testing.T) {
 // less the fill: the rule that asked, or an outer fill when one derivation fills another. The family is
 // the key up to its first colon, because the `HIR` cache keys per function node and once reported 11,150
 // rows of 0.00ms.
+//
+// Not parallel: it turns the process's collector off while it bills a spin (quietTheCollector).
 func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(test *testing.T) {
-	test.Parallel()
+	quietTheCollector(test)
 	meter, timings := startTestMeter(test)
 	cache := rule.NewFileCache()
 	meter.watchFills(cache)

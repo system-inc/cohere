@@ -186,8 +186,14 @@ func TestAnObjectNoGraphAnswersForIsDependent(test *testing.T) {
 
 // parsedPackage is the package identifier of files, each a name and its source, parsed and checked here with no loader,
 // as AddPackage takes a loaded package: what a //line directive makes of a file is the parser's, which a fixture
-// module's load would give alike. A file may import package unsafe, which needs no export data, and nothing else.
-func parsedPackage(test *testing.T, identifier string, files [][2]string) *packages.Package {
+// module's load would give alike. A file may import package unsafe, which needs no export data, and each of imported,
+// another package parsed here, by its path, and nothing else.
+func parsedPackage(
+	test *testing.T,
+	identifier string,
+	files [][2]string,
+	imported ...*packages.Package,
+) *packages.Package {
 	test.Helper()
 	fileSet := token.NewFileSet()
 	var syntax []*ast.File
@@ -201,18 +207,26 @@ func parsedPackage(test *testing.T, identifier string, files [][2]string) *packa
 	information := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{},
 		Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{},
 		Instances: map[*ast.Ident]types.Instance{}, Implicits: map[ast.Node]types.Object{}}
+	imports := map[string]*packages.Package{}
+	for _, each := range imported {
+		imports[each.PkgPath] = each
+	}
 	configuration := types.Config{Importer: importerFunction(func(path string) (*types.Package, error) {
 		if path == "unsafe" {
 			return types.Unsafe, nil
 		}
-		return nil, fmt.Errorf("%s imports %s, and a package parsed here imports only unsafe", identifier, path)
+		if each, isImported := imports[path]; isImported {
+			return each.Types, nil
+		}
+		return nil, fmt.Errorf("%s imports %s, and a package parsed here imports only unsafe and the packages it is "+
+			"handed", identifier, path)
 	})}
 	checked, checkError := configuration.Check("example.com/"+identifier, fileSet, syntax, information)
 	if checkError != nil {
 		test.Fatal(checkError)
 	}
 	return &packages.Package{ID: identifier, PkgPath: "example.com/" + identifier, Fset: fileSet, Syntax: syntax,
-		Types: checked, TypesInfo: information}
+		Types: checked, TypesInfo: information, Imports: imports}
 }
 
 // expectUnitsFoundAsByMaps fails for every place in graph's units, each one's start, the offsets just inside and

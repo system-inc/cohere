@@ -7,6 +7,7 @@
 //	go run ./command/cohere-dev exec -- <command>     any other heavy command: a bench, a cohere run, clang
 //	go run ./command/cohere-dev test --bounded <pkg>  under a process limit and a deadline, for a mutant (bound.go)
 //	go run ./command/cohere-dev land                  one merge commit onto main, gated, one landing at a time
+//	go run ./command/cohere-dev land --train <heads>  two to four accepted units landed under one gate
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //	go run ./command/cohere-dev quiet on|off|wait     a quiet window: no job starts but the one it is for (quiet.go)
 //	go run ./command/cohere-dev worktree <name>       a hand's worktree, made or moved to main by git (worktree.go)
@@ -69,6 +70,8 @@ func runCommandLine() int {
 		return quiet(os.Args[2:])
 	case "worktree":
 		return namedWorktree(os.Args[2:])
+	case "measure":
+		return measure(os.Args[2:])
 	case "test", "build", "vet", "exec", "land":
 		return run(os.Args[1], os.Args[2:])
 	}
@@ -83,6 +86,8 @@ func usage() int {
 		"       cohere-dev exec [--full-priority] [bounded] -- <command> [arguments]\n"+
 		"         bounded: --bounded, --bounded-margin <processes> (512), --bounded-deadline <duration> (15m)\n"+
 		"       cohere-dev land [--task <id>] [--message <what landed>]\n"+
+		"       cohere-dev land --train <head> <head> [<head> [<head>]] --task <id> [--message <what landed>]\n"+
+		"       cohere-dev measure [<commit>]   the landing's measurement on Shackler alone, landing nothing\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [--through <name>] [why] | off | wait]\n"+
 		"         every job but status, quiet and worktree takes --through <name>, for the run a window lets through\n"+
@@ -188,12 +193,12 @@ func run(verb string, arguments []string) int {
 			return usage()
 		}
 		return withToken(strings.Join(commandLine, " "), func(environment []string) int {
-			return bounded(func() int { return runAttached(limit, environment, commandLine[0], commandLine[1:]) })
+			return bounded(func() int { return runAttached(limit, "", environment, commandLine[0], commandLine[1:]) })
 		})
 	case "build":
 		return withToken("go build "+strings.Join(commandArguments, " "), func(environment []string) int {
 			return bounded(func() int {
-				return runAttached(limit, environment, "go", append([]string{"build"}, commandArguments...))
+				return runAttached(limit, "", environment, "go", append([]string{"build"}, commandArguments...))
 			})
 		})
 	case "vet":
@@ -201,6 +206,7 @@ func run(verb string, arguments []string) int {
 			return bounded(func() int {
 				return runAttached(
 					limit,
+					"",
 					withoutVcsStamping(environment),
 					"go",
 					append([]string{"vet"}, commandArguments...),
@@ -223,7 +229,7 @@ func run(verb string, arguments []string) int {
 			return 2
 		}
 		return withToken("go test --fast "+strings.Join(testArguments, " "), func(environment []string) int {
-			return bounded(func() int { return fastTest(withoutVcsStamping(environment), testArguments, limit) })
+			return bounded(func() int { return fastTest("", withoutVcsStamping(environment), testArguments, limit) })
 		})
 	}
 	if wholeModule(testArguments) && countsOnce(testArguments) {
@@ -396,7 +402,7 @@ func goTest(base []string, arguments []string, limit *bound) int {
 		return 2
 	}
 	defer printUncovered(streams.Errors, uncovered)
-	return runAttached(limit, environment, "go", append([]string{"test"}, arguments...))
+	return runAttached(limit, "", environment, "go", append([]string{"test"}, arguments...))
 }
 
 // holderLine describes the run holding a token: who, where, since when and what it runs.

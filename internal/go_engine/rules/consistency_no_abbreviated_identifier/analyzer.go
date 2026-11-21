@@ -38,7 +38,7 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-abbreviated-identifier"
 
-// listener reads what the package reaches as the syntax dispatcher's walk enters its first file, and hears every
+// listener sets up the package's reads as the syntax dispatcher's walk enters its first file, and hears every
 // identifier and type switch of the walk.
 var listener = rule.Listener{
 	FileEnter: enterFile,
@@ -153,20 +153,25 @@ func methodsNamed(reachable reach, name string) iter.Seq[foreignMethod] {
 
 // packageState is what the rule reads once for its package, held in its context's state.
 type packageState struct {
-	// reachable is what the rule knows of the packages this one reaches, read as the walk enters its first file.
-	reachable reach
+	// reachable is what the rule knows of the packages this one reaches, read only once a name the vocabulary finds
+	// abbreviated asks, so a package with none, nearly every package of a clean tree, never walks its import closure.
+	// The walk records nothing in the package's reads, it only keeps them for isTakenInGo, so reading it later or not
+	// at all records the same lookups.
+	reachable func() reach
 	// writes counts the package's writes of every variable, only once a finding asks, so a package with no
 	// abbreviated error pays no second walk.
 	writes func() map[*types.Var]*variableWrites
 }
 
-// enterFile reads what the package reaches, the first time.
+// enterFile sets up the package's reads, the first time, each to be read when a finding first asks.
 func enterFile(context *rule.Context, _ *ast.File) {
 	state := rule.State[packageState](context)
 	if state.writes != nil {
 		return
 	}
-	state.reachable = reachOf(declarationsByLoad.Load(context.FileSet), context.Package, context.Reads())
+	state.reachable = sync.OnceValue(func() reach {
+		return reachOf(declarationsByLoad.Load(context.FileSet), context.Package, context.Reads())
+	})
 	state.writes = sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(context) })
 }
 
@@ -183,7 +188,7 @@ func judgeNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 		if identifier, isIdentifier := assignment.Lhs[0].(*ast.Ident); isIdentifier {
 			if finding, found := abbreviatedName(identifier); found {
 				state := rule.State[packageState](context)
-				judge(context, state.reachable, state.writes, identifier, finding)
+				judge(context, state.reachable(), state.writes, identifier, finding)
 			}
 		}
 	case *ast.Ident:
@@ -201,8 +206,8 @@ func judgeNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 			return
 		}
 		state := rule.State[packageState](context)
-		if isOurs(context, state.reachable, object) {
-			judge(context, state.reachable, state.writes, typed, finding)
+		if isOurs(context, state.reachable(), object) {
+			judge(context, state.reachable(), state.writes, typed, finding)
 		}
 	}
 }

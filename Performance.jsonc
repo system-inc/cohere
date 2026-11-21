@@ -1,0 +1,43 @@
+// Performance.jsonc: main's performance at this commit, rewritten by cohere-dev land in every landing commit (#6wnsnq2).
+// Git history is the series. Never edit it by hand. Times are integer milliseconds, the median of the rounds with their min and max.
+{
+    "schema": 1,
+    "commit": "4481065dfc95a33385e8fbdcf3a7e384cb040925",
+    "measuredAt": "2026-11-21T05:18:30Z",
+    "machine": {
+        "name": "Shackler",
+        "cpu": "Apple M3 Max",
+        "cores": 16,
+        "loadBefore": [3.23, 2.19, 2.24],
+        "loadAfter": [7.96, 3.5, 2.71],
+        "heldQuiet": true
+    },
+    "tools": {
+        "cohere": "4481065d CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
+        "go": "go1.27.1"
+    },
+    "note": "against ce505c1b: cold root wall level (3460 ms, was 3450), user level (40140 ms, was 40110); cold deeafbf4 wall level (1495 ms, was 1495), user level (8400 ms, was 8385); warm root wall slower by 20 ms, 3%, ranges apart (740 ms, was 720), user level (1980 ms, was 1980)",
+    "engine": {
+        "rounds": { "cold": 3, "deeafbf4": 2, "warm": 3 },
+        "cold": {
+            "root": {
+                "wall": { "median": 3460, "min": 3430, "max": 3480 },
+                "user": { "median": 40140, "min": 39850, "max": 40290 },
+                "sys": { "median": 5420, "min": 5380, "max": 5570 }
+            },
+            "deeafbf4": {
+                "wall": { "median": 1495, "min": 1490, "max": 1500 },
+                "user": { "median": 8400, "min": 8370, "max": 8430 },
+                "sys": { "median": 2550, "min": 2550, "max": 2550 }
+            }
+        },
+        "warm": {
+            "root": {
+                "wall": { "median": 740, "min": 740, "max": 750 },
+                "user": { "median": 1980, "min": 1960, "max": 1980 },
+                "sys": { "median": 4070, "min": 4030, "max": 4160 }
+            }
+        },
+        "timeline": { "root": { "listing": 287, "handover": 1881, "builds": 3348, "run": 3406 } }
+    }
+}

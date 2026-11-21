@@ -156,7 +156,8 @@ func Bounded(values [platformLimit]int) int {
 		test.Fatal(readError)
 	}
 	want := "  reached by Signature, by the reason its signature gave: Sizes 0, Unrecorded 0, Miscounted 0, Unknown " +
-		"0, Signature 0, Named 2, Constant 1, LoadMode 0, Selected 0, ValueType 0, TypeArgument 0, Shadowed 0"
+		"0, Signature 0, Named 2, Constant 1, LoadMode 0, Selected 0, ValueType 0, TypeArgument 0, Shadowed 0, " +
+		"LineClaim 0, Imports 0, Initializers 0"
 	if !slices.Contains(strings.Split(string(written), "\n"), want) {
 		test.Errorf("the census file has no line %q:\n%s", want, written)
 	}

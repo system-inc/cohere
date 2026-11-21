@@ -45,8 +45,8 @@ const passDoc = "check for shifts that equal or exceed the width of the integer"
 const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/shift"
 
 // Listener is what the port hears of each package from the dispatcher: every if and switch, whose dead branches it
-// marks, and every assignment and binary expression, among which the shifts are, gathered in preorder and judged
-// once the package is walked.
+// marks, and every assignment and binary expression, whose shifts it gathers in preorder and judges once the package
+// is walked.
 var Listener = rule.Listener{
 	Nodes: []ast.Node{
 		(*ast.IfStmt)(nil),
@@ -74,16 +74,17 @@ func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 type packageState struct {
 	// dead is every node of a branch a constant rules out, marked as the walk meets each if and switch.
 	dead map[ast.Node]bool
-	// candidates is every assignment and binary expression of the package, in preorder, the nodes the original's
-	// second walk reads.
+	// candidates is every shift expression and shift assignment of the package, in preorder, the nodes of the
+	// original's second walk that it goes on to judge. Gathering only those keeps the list to the few shifts a package
+	// writes, not every assignment and binary expression in it.
 	candidates []ast.Node
 }
 
-// hearNode marks the dead branches of node, an if or a switch, or gathers node, an assignment or a binary expression,
-// to be judged once the walk is done.
+// hearNode marks the dead branches of node, an if or a switch, or gathers node when it shifts, as a binary
+// expression or an assignment, to be judged once the walk is done.
 func hearNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 	state := rule.State[packageState](context)
-	switch node.(type) {
+	switch shifting := node.(type) {
 	case *ast.IfStmt, *ast.SwitchStmt:
 		if state.dead == nil {
 			state.dead = map[ast.Node]bool{}
@@ -91,8 +92,16 @@ func hearNode(context *rule.Context, node ast.Node, _ []ast.Node) {
 		// The ifs and switches are met in the preorder the original's first walk reads them, so each marks what it
 		// marked there: markDead passes over a statement an earlier one already marked.
 		markDead(context.TypesInfo, state.dead, node)
-	case *ast.AssignStmt, *ast.BinaryExpr:
-		state.candidates = append(state.candidates, node)
+	case *ast.BinaryExpr:
+		if shifting.Op == token.SHL || shifting.Op == token.SHR {
+			state.candidates = append(state.candidates, node)
+		}
+	case *ast.AssignStmt:
+		// A shift assignment takes one operand on each side, so the parser never builds another shape of one.
+		if (shifting.Tok == token.SHL_ASSIGN || shifting.Tok == token.SHR_ASSIGN) &&
+			len(shifting.Lhs) == 1 && len(shifting.Rhs) == 1 {
+			state.candidates = append(state.candidates, node)
+		}
 	}
 }
 
@@ -104,19 +113,12 @@ func judgeShifts(context *rule.Context) {
 		if state.dead[node] {
 			continue
 		}
+		// hearNode gathered only shifts, so each node here is one, and an assignment has one operand on each side.
 		switch shifting := node.(type) {
 		case *ast.BinaryExpr:
-			if shifting.Op == token.SHL || shifting.Op == token.SHR {
-				checkLongShift(context, shifting, shifting.X, shifting.Y)
-			}
+			checkLongShift(context, shifting, shifting.X, shifting.Y)
 		case *ast.AssignStmt:
-			// A shift assignment takes one operand on each side, so the parser never builds another shape of one.
-			if len(shifting.Lhs) != 1 || len(shifting.Rhs) != 1 {
-				continue
-			}
-			if shifting.Tok == token.SHL_ASSIGN || shifting.Tok == token.SHR_ASSIGN {
-				checkLongShift(context, shifting, shifting.Lhs[0], shifting.Rhs[0])
-			}
+			checkLongShift(context, shifting, shifting.Lhs[0], shifting.Rhs[0])
 		}
 	}
 }

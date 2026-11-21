@@ -178,6 +178,54 @@ func TestTwoLandingsBothLandInOrderWithoutOverlap(test *testing.T) {
 	}
 }
 
+// A head main already holds is refused with no gate (#mk56rcq): one main took while it waited in the line, named by
+// the landing that carried it, and one whose merge onto main changes nothing, since its change landed by another road.
+func TestLandRefusesAHeadMainAlreadyHolds(test *testing.T) {
+	test.Parallel()
+	test.Run("landed while it waited", func(test *testing.T) {
+		test.Parallel()
+		fixture := newLandFixture(test)
+		// b is a's very head, so a's landing lands b's work while b waits for the lock.
+		fixture.git(fixture.worktree("b"), "switch", "-q", "--detach", "a")
+		first := fixture.land("a")
+		fixture.waitForGate("start " + filepath.Base(fixture.worktree("a")))
+		second := exec.Command(fixture.wrapper, "land")
+		second.Dir, second.Env = fixture.worktree("b"), fixture.environment
+		said, secondError := second.CombinedOutput()
+		if waitError := first.Wait(); waitError != nil {
+			test.Fatalf("a's landing failed: %v", waitError)
+		}
+		landing := fixture.git(fixture.repository, "log", "-1", "--format=%h %s", "main")
+		if secondError == nil || !strings.Contains(string(said), "nothing to land, and no gate runs: main already "+
+			"holds") || !strings.Contains(string(said), "landed by "+landing) {
+			test.Errorf("b's landing wasn't refused naming %q (%v):\n%s", landing, secondError, said)
+		}
+		if gates := fixture.gates(); len(gates) != 2 {
+			test.Errorf("the gates ran %q, want a's alone", gates)
+		}
+	})
+	test.Run("a merge that changes nothing", func(test *testing.T) {
+		test.Parallel()
+		fixture := newLandFixture(test)
+		if landError := fixture.land("a").Wait(); landError != nil {
+			test.Fatalf("a's landing failed: %v", landError)
+		}
+		// b carries a's change as a commit of its own, so main lacks b's head but already holds its change.
+		fixture.git(fixture.worktree("b"), "switch", "-q", "--detach", "a~1")
+		fixture.git(fixture.worktree("b"), "cherry-pick", "a")
+		landing := exec.Command(fixture.wrapper, "land")
+		landing.Dir, landing.Env = fixture.worktree("b"), fixture.environment
+		said, landError := landing.CombinedOutput()
+		if landError == nil || !strings.Contains(string(said), "changes nothing: main already holds every change it "+
+			"makes") {
+			test.Errorf("b's empty landing wasn't refused (%v):\n%s", landError, said)
+		}
+		if gates := fixture.gates(); len(gates) != 2 {
+			test.Errorf("the gates ran %q, want a's alone", gates)
+		}
+	})
+}
+
 // A main moved outside land during the gate is not landed over: git refuses the fast-forward, and land merges
 // the moved main and gates again before it lands.
 func TestALandingAfterMainMovedOutsideLandGatesAgain(test *testing.T) {
