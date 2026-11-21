@@ -63,7 +63,12 @@ func (graph *graph) takeRecords(records []bodyRecord) error {
 // meetTaken is whether the graph takes declaration's body from a record, noting function as the node of the
 // function the body is of when it does.
 func (graph *graph) meetTaken(declaration *ast.FuncDecl, function nodeIndex) bool {
-	index, isTaken := graph.splice.byKey[graph.keyOf(declaration)]
+	key, isKeyed := graph.keyOf(declaration)
+	if !isKeyed {
+		// A declaration in no file of the file set has no key, and so no record.
+		return false
+	}
+	index, isTaken := graph.splice.byKey[key]
 	if !isTaken {
 		return false
 	}
@@ -74,7 +79,8 @@ func (graph *graph) meetTaken(declaration *ast.FuncDecl, function nodeIndex) boo
 
 // spliceBodies splices every record the graph took, in the order it took them.
 func (graph *graph) spliceBodies() error {
-	for index, record := range graph.splice.records {
+	for index := range graph.splice.records {
+		record := &graph.splice.records[index]
 		if graph.splice.met[index] != 1 {
 			return fmt.Errorf("the record of the body at %s is keyed where the package declares %d function bodies, "+
 				"not one", placeText(record.Body), graph.splice.met[index])
@@ -89,12 +95,24 @@ func (graph *graph) spliceBodies() error {
 // spliceBody makes what the walk of record's body made, function being the node of the function the body is of: a
 // node for each local, each own edge and each use edge, and the root's use of each rooted local. An end it cannot
 // resolve fails the splice by the body and the place, since a dropped edge would change the verdict unseen.
-func (graph *graph) spliceBody(record bodyRecord, function nodeIndex) error {
+func (graph *graph) spliceBody(record *bodyRecord, function nodeIndex) error {
 	locals := make([]nodeIndex, len(record.Locals))
 	for index, local := range record.Locals {
-		position, placeError := graph.positionAt(local.Place)
+		place, indexError := record.placeOf(local.Place)
+		if indexError != nil {
+			return fmt.Errorf("splicing the body at %s, local %d: %w", placeText(record.Body), index, indexError)
+		}
+		position, placeError := graph.positionAt(place)
 		if placeError != nil {
 			return fmt.Errorf("splicing the body at %s, local %d: %w", placeText(record.Body), index, placeError)
+		}
+		if uint64(local.Kind) >= uint64(len(kindWords)) {
+			return fmt.Errorf("splicing the body at %s: local %d is of kind %d, which no word names",
+				placeText(record.Body), index, local.Kind)
+		}
+		name, nameError := record.nameOf(index)
+		if nameError != nil {
+			return fmt.Errorf("splicing the body at %s: %w", placeText(record.Body), nameError)
 		}
 		if uint64(len(graph.nodes)) > math.MaxUint32 {
 			return fmt.Errorf("splicing the body at %s: a package of more than %d objects", placeText(record.Body),
@@ -104,40 +122,42 @@ func (graph *graph) spliceBody(record bodyRecord, function nodeIndex) error {
 		graph.nodes = append(graph.nodes, node{})
 		graph.firstOwners = append(graph.firstOwners, 0)
 		graph.splice.locals[locals[index]] = object{
-			name:      local.Name,
-			shortName: shortNameOf(local.Name),
-			kind:      local.Kind,
+			name:      name,
+			shortName: shortNameOf(name),
+			kind:      local.Kind.word(),
 			position:  position,
 		}
 	}
-	for index, local := range record.Locals {
-		for _, owner := range local.Owners {
-			ownerNode, resolveError := graph.endNode(owner, function, locals)
-			if resolveError != nil {
-				return fmt.Errorf("splicing the body at %s, an owner of local %d: %w", placeText(record.Body), index,
-					resolveError)
-			}
-			if ownerNode == 0 {
-				// The recorder records no owner of the root's (recordSeen), and the graph has no place for one
-				// (addOwned).
-				return fmt.Errorf("splicing the body at %s: the root owns local %d", placeText(record.Body), index)
-			}
-			graph.addOwned(ownerNode, locals[index])
+	for _, owned := range record.Owned {
+		if uint64(owned.Local) >= uint64(len(locals)) {
+			return fmt.Errorf("splicing the body at %s: it owns local %d of its %d", placeText(record.Body),
+				owned.Local, len(locals))
 		}
+		ownerNode, resolveError := graph.endNode(record, owned.Owner, function, locals)
+		if resolveError != nil {
+			return fmt.Errorf("splicing the body at %s, an owner of local %d: %w", placeText(record.Body), owned.Local,
+				resolveError)
+		}
+		if ownerNode == 0 {
+			// The recorder records no owner of the root's (recordSeen), and the graph has no place for one
+			// (addOwned).
+			return fmt.Errorf("splicing the body at %s: the root owns local %d", placeText(record.Body), owned.Local)
+		}
+		graph.addOwned(ownerNode, locals[owned.Local])
 	}
 	for index, use := range record.Uses {
-		byNode, byError := graph.endNode(use.By, function, locals)
+		byNode, byError := graph.endNode(record, use.By, function, locals)
 		if byError != nil {
 			return fmt.Errorf("splicing the body at %s, the user of use %d: %w", placeText(record.Body), index, byError)
 		}
-		usedNode, usedError := graph.endNode(use.Used, function, locals)
+		usedNode, usedError := graph.endNode(record, use.Used, function, locals)
 		if usedError != nil {
 			return fmt.Errorf("splicing the body at %s, what use %d uses: %w", placeText(record.Body), index, usedError)
 		}
 		graph.addUse(byNode, usedNode)
 	}
 	for _, local := range record.Rooted {
-		if local < 0 || local >= len(locals) {
+		if uint64(local) >= uint64(len(locals)) {
 			return fmt.Errorf("splicing the body at %s: it roots local %d of its %d", placeText(record.Body), local,
 				len(locals))
 		}
@@ -146,39 +166,53 @@ func (graph *graph) spliceBody(record bodyRecord, function nodeIndex) error {
 	return nil
 }
 
-// endNode is the node end names: the function, a local by its index among locals, the nodes the record's locals
-// were made as, the root, or an object declared outside the body, which the package's own definitions are asked for
-// by its place, as the recorder asked them (definedAt), and whose node is then the one the walk gives that object.
-func (graph *graph) endNode(end recordedEnd, function nodeIndex, locals []nodeIndex) (nodeIndex, error) {
+// endNode is the node end, an end of record's, names: the function, a local by its index among locals, the nodes the
+// record's locals were made as, the root, or an object declared outside the body, which the package's own
+// definitions are asked for by its place, as the recorder asked them (definedAt), and whose node is then the one the
+// walk gives that object.
+func (graph *graph) endNode(
+	record *bodyRecord,
+	end recordedEnd,
+	function nodeIndex,
+	locals []nodeIndex,
+) (nodeIndex, error) {
 	switch end.Kind {
 	case endFunction:
 		return function, nil
 	case endRoot:
 		return 0, nil
 	case endLocal:
-		if end.Local < 0 || end.Local >= len(locals) {
+		if uint64(end.Local) >= uint64(len(locals)) {
 			return 0, fmt.Errorf("local %d of its %d", end.Local, len(locals))
 		}
 		return locals[end.Local], nil
 	case endDeclared:
-		declared := graph.definedAt(end.Place)
+		place, placeError := record.placeOf(end.Place)
+		if placeError != nil {
+			return 0, placeError
+		}
+		declared := graph.definedAt(place)
 		if declared == nil {
 			return 0, fmt.Errorf("an object declared at %s, where the package declares none or more than one",
-				placeText(end.Place))
+				placeText(place))
 		}
 		return graph.node(declared), nil
 	default:
-		return 0, fmt.Errorf("an end of kind %q", end.Kind)
+		return 0, fmt.Errorf("an end of kind %d", end.Kind)
 	}
 }
 
 // positionAt is place in the build's own file set: its file found by the name it was parsed under, and the offset
-// in it.
+// in it. A record's offset is never negative (indexedPlace), so only its end is bounded.
 func (graph *graph) positionAt(place recordedPlace) (token.Pos, error) {
 	if graph.splice.parsedFiles == nil {
 		graph.splice.parsedFiles = make(map[string]*token.File, len(graph.files))
 		for _, file := range graph.files {
-			tokenFile := graph.tokenFileOf(file.FileStart)
+			tokenFile := graph.fileSet.File(file.FileStart)
+			if tokenFile == nil {
+				// A file the file set does not hold has no name a place could find it by.
+				continue
+			}
 			if _, isNamed := graph.splice.parsedFiles[tokenFile.Name()]; isNamed {
 				// Two parsed files of one name: the place tells them apart for no build, so it finds neither.
 				graph.splice.parsedFiles[tokenFile.Name()] = nil
@@ -191,7 +225,7 @@ func (graph *graph) positionAt(place recordedPlace) (token.Pos, error) {
 	if tokenFile == nil {
 		return token.NoPos, fmt.Errorf("a place at %s, in no one parsed file of the package", placeText(place))
 	}
-	if place.Offset < 0 || place.Offset > tokenFile.Size() {
+	if place.Offset > tokenFile.Size() {
 		return token.NoPos, fmt.Errorf("a place at %s, past the end of its file", placeText(place))
 	}
 	return tokenFile.Pos(place.Offset), nil
