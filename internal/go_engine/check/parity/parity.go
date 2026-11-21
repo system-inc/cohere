@@ -33,6 +33,10 @@
 // sets them there apart from the load, for a file the load hands over whose architecture the check must not be able to
 // name. The census command, command/cohere-parity, runs Analyze over a real tree.
 //
+// Apart from the pairs, StrippedFindings holds a rule to the build stage 3 strips (#9fbrnra): it runs one analyzer over
+// fixture packages plain and again with named functions' bodies stripped from the type check, for its test to compare
+// the two, and with a deliberately wrong strip for the red (see Strip).
+//
 // The originals, staticcheck's checks and x/tools' passes, stay in the tests as live oracles, never frozen into
 // recorded findings: a frozen oracle can't tell us when a staticcheck or x/tools release moves away from a port, and
 // the live comparison is the only check that holds a port to upstream across releases. It costs the binary nothing,
