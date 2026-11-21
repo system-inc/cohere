@@ -73,14 +73,20 @@ func (fixture *performanceFixture) landing(environment ...string) (bool, string,
 // shacklerSays is everything the stand-in Shackler prints for a measurement, `COMMIT` the commit the remote names:
 // a gap's own quiet line among the script's, her machine, the cold rounds at the root with walls coldWalls, deeafbf4's,
 // which find 7 things there and exit 1, as an older tree may, and the warm and timeline rows, each with its fills.
-// Each run's user is four times its wall and its system time a tenth of it.
+// Each run's user is four times its wall and its system time a tenth of it, and each walks 120 files at the root and
+// 95 at deeafbf4, its summary counting the findings it printed.
 func shacklerSays(coldWalls []int64) string {
 	var said strings.Builder
 	say := func(format string, arguments ...any) {
 		fmt.Fprintf(&said, performanceMarker+format+"\n", arguments...)
 	}
 	run := func(mode string, tree string, round string, wall int64, exit int, findings int) {
-		say("run %s %s %s %d %d %d %d %d", mode, tree, round, wall, 4*wall, wall/10, exit, findings)
+		filesWalked := 120
+		if tree == performanceReferenceTree {
+			filesWalked = 95
+		}
+		say("run %s %s %s %d %d %d %d %d %d %d", mode, tree, round, wall, 4*wall, wall/10, exit, findings,
+			filesWalked, findings)
 	}
 	said.WriteString("quiet: load 0.89 0.89 1.28\n")
 	say("phase mirror 312")
@@ -151,15 +157,34 @@ func previousPerformance(test *testing.T, commit string, machine string, wall pe
 	return contents
 }
 
+// uncountedPerformance is a previous file's contents as main's files read before each row recorded what it checked.
+func uncountedPerformance(test *testing.T, contents []byte) []byte {
+	test.Helper()
+	file := performanceFile{}
+	if decodeError := json.Unmarshal([]byte(performanceBody(string(contents))), &file); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	file.Engine.Cold.Root.Checked, file.Engine.Cold.Deeafbf4.Checked, file.Engine.Warm.Root.Checked = nil, nil, nil
+	uncounted, renderError := renderPerformance(file)
+	if renderError != nil {
+		test.Fatal(renderError)
+	}
+	if strings.Contains(string(uncounted), `"checked"`) {
+		test.Fatalf("a file with no checked counts still records some:\n%s", uncounted)
+	}
+	return uncounted
+}
+
 // performancePreviousCommit is the commit a previous file names, as main's file before the landing.
 const performancePreviousCommit = "1111111111111111111111111111111111111111"
 
 // A landing measured (#6wnsnq2): the push puts the gated commit in Loom's feed, Shackler's gap runs the script on it,
 // and the landing commit's tree is the gated tree with Performance.jsonc and nothing else changed. The file opens with
 // its header, names the gated commit, and holds the stand-in's numbers as medians with their ranges, her load before
-// and after, that she was held quiet, the build and the timeline's areas. Its note reads against main's file before it:
-// none is the first measurement, overlapping ranges read level, disjoint ones moved, and another machine is a line of
-// its own, never compared. The land line and the landing's body say the note.
+// and after, that she was held quiet, the build, the timeline's areas and what each row checked. Its note reads against
+// main's file before it: none is the first measurement, overlapping ranges read level, disjoint ones moved, another
+// machine is a line of its own, never compared, and a file with no checked counts says so and compares its times. The
+// land line and the landing's body say the note.
 func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 	test.Parallel()
 	for _, testCase := range []struct {
@@ -189,6 +214,13 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 				performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000)),
 			note: "measured on Shackler (Apple M2 Max, 12 cores), and main's at 11111111 on Marin (Apple M1, " +
 				"8 cores): another machine, so not compared",
+		},
+		{
+			name: "a file with no checked counts says so and compares",
+			previous: uncountedPerformance(test, previousPerformance(test, performancePreviousCommit,
+				performanceBox, performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000))),
+			note: "against 11111111: main's file records no checked counts; cold root wall level (9800 ms, was " +
+				"9850), user level (39200 ms, was 39000); cold deeafbf4 wall level",
 		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -232,6 +264,9 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 				{"cold root sys", cold.Root.System, performanceSpreadOf(980, 970, 990)},
 				{"cold deeafbf4 wall", cold.Deeafbf4.Wall, performanceSpreadOf(4100, 4000, 4200)},
 				{"warm root wall", warm.Root.Wall, performanceSpreadOf(800, 800, 800)},
+				{"cold root checked", cold.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
+				{"cold deeafbf4 checked", cold.Deeafbf4.Checked, &performanceChecked{Files: 95, Findings: 7}},
+				{"warm root checked", warm.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
 				{"rounds", measured.Engine.Rounds, performanceRounds{Cold: performanceColdRounds,
 					Deeafbf4: performanceReferenceRounds, Warm: performanceWarmRounds}},
 				{"timeline", measured.Engine.Timeline.Root,
@@ -337,8 +372,9 @@ func TestALandingWaitsForShacklerAndRefusesOnceTheWaitPasses(test *testing.T) {
 }
 
 // A measurement that fails refuses the landing in the box's words, and main doesn't move: the script's own refusal, a
-// run at the root that found something the gate never did, a run at deeafbf4 that crashed, and a gap that ended badly
-// with no refusal said.
+// run at the root that found something the gate never did, a run at deeafbf4 that crashed, a gap that ended badly
+// with no refusal said, a row whose rounds checked different files or findings, a run whose summary counts other
+// findings than it printed, and a run line that doesn't say what it checked.
 func TestAMeasurementThatFailsRefusesTheLanding(test *testing.T) {
 	test.Parallel()
 	passing := shacklerSays([]int64{9900, 9700, 9800})
@@ -356,15 +392,41 @@ func TestAMeasurementThatFailsRefusesTheLanding(test *testing.T) {
 		},
 		{
 			name: "a finding at the root",
-			run: strings.Replace(passing, "run cold root 2 9700 38800 970 0 0",
-				"run cold root 2 9700 38800 970 1 3", 1),
+			run: strings.Replace(passing, "run cold root 2 9700 38800 970 0 0 120 0\n",
+				"run cold root 2 9700 38800 970 1 3 120 3\n", 1),
 			said: "Shackler's cold run at root, round 2, exited 1 with 3 findings",
 		},
 		{
 			name: "deeafbf4 crashed",
-			run: strings.Replace(passing, "run cold deeafbf4 1 4200 16800 420 1 7",
-				"run cold deeafbf4 1 4200 16800 420 3 0", 1),
+			run: strings.Replace(passing, "run cold deeafbf4 1 4200 16800 420 1 7 95 7\n",
+				"run cold deeafbf4 1 4200 16800 420 3 0 95 0\n", 1),
 			said: "Shackler's cold run at deeafbf4, round 1, exited 3 with 0 findings",
+		},
+		{
+			name: "rounds that walked different files",
+			run: strings.Replace(passing, "run cold root 2 9700 38800 970 0 0 120 0\n",
+				"run cold root 2 9700 38800 970 0 0 118 0\n", 1),
+			said: "Shackler's cold row at root checked 120 files and 0 findings in round 1, and 118 files and 0 " +
+				"findings in round 2, so its rounds measured different things",
+		},
+		{
+			name: "rounds that found different things",
+			run: strings.Replace(passing, "run cold deeafbf4 2 4000 16000 400 1 7 95 7\n",
+				"run cold deeafbf4 2 4000 16000 400 1 6 95 6\n", 1),
+			said: "Shackler's cold row at deeafbf4 checked 95 files and 7 findings in round 1, and 95 files and 6 " +
+				"findings in round 2, so its rounds measured different things",
+		},
+		{
+			name: "a summary that counts other findings",
+			run: strings.Replace(passing, "run warm root 1 800 3200 80 0 0 120 0\n",
+				"run warm root 1 800 3200 80 0 0 120 2\n", 1),
+			said: "Shackler's warm run at root, round 1, printed 0 findings and its summary counts 2",
+		},
+		{
+			name: "a run line that doesn't say what it checked",
+			run: strings.Replace(passing, "run cold root 2 9700 38800 970 0 0 120 0\n",
+				"run cold root 2 9700 38800 970 0 0\n", 1),
+			said: `Shackler's run line "cold root 2 9700 38800 970 0 0" doesn't read as a row`,
 		},
 		{
 			name: "a gap that ended badly",
@@ -426,9 +488,10 @@ func TestALandingWithNoEngineLandsSayingThereIsNothingToMeasure(test *testing.T)
 	}
 }
 
-// The note's other lines: another build and another shape of measurement are each a line of their own, and a file main
-// holds that doesn't read is named, never compared. A level range touching the old one at its edge is level, and moved
-// says by how much of the old median.
+// The note's other lines: another build and another shape of measurement are each a line of their own, a row that
+// checked other files or findings than main's same row is a line of its own while the rows that checked the same
+// compare, and a file main holds that doesn't read is named, never compared. A level range touching the old one at its
+// edge is level, and moved says by how much of the old median.
 func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 	test.Parallel()
 	measurement, problem := readPerformance([]byte(strings.ReplaceAll(shacklerSays([]int64{9700, 9800, 9900}),
@@ -437,9 +500,10 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 		test.Fatal(problem)
 	}
 	current := performanceFileOf(measurement, performancePreviousCommit, time.Unix(0, 0))
-	otherBuild, otherShape := current, current
+	otherBuild, otherShape, otherChecked := current, current, current
 	otherBuild.Tools.Go = "go1.27.2"
 	otherShape.Engine.Rounds.Cold = 5
+	otherChecked.Engine.Cold.Deeafbf4.Checked = &performanceChecked{Files: 2210, Findings: 1100}
 	for _, row := range []struct {
 		name     string
 		previous performanceFile
@@ -454,6 +518,9 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 			"rounds 5/2/%d), so not compared", performanceWarmRounds)},
 		{"a file that doesn't read", current, "unexpected end of JSON input", "main's Performance.jsonc didn't " +
 			"read (unexpected end of JSON input), so nothing is compared"},
+		{"a row that checked otherwise", otherChecked, "", "against 11111111: cold root wall level (9800 ms, was " +
+			"9800), user level (39200 ms, was 39200); cold deeafbf4 checked 95 files and 7 findings, and main's 2210 " +
+			"and 1100, so not compared; warm root wall level (800 ms, was 800), user level (3200 ms, was 3200)"},
 	} {
 		if note := performanceNote(current, row.previous, true, row.unread); note != row.want {
 			test.Errorf("%s: the note reads\n%s\nwant\n%s", row.name, note, row.want)
@@ -480,8 +547,9 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 // ~/scratch/system_cohere_tools/performance, checks the toolchain by its digest, builds the binary on the Go cache it
 // keeps there, and runs the engine 2 fills and 3 rounds cold at the root, 2 and 2 at deeafbf4, 1 and 1 warm and one
 // timeline run, each over the binary's own system store under /usr/bin/time -l, saying each in lines readPerformance
-// reads as a whole measurement. Run again, it keeps deeafbf4 as laid, and clears what the runs before left in either
-// tree. Both runs leave no configuration file behind.
+// reads as a whole measurement, with the files walked and findings the engine's own records say. Run again, it keeps
+// deeafbf4 as laid, and clears what the runs before left in either tree. Both runs leave no configuration file behind.
+// A run whose engine printed no lint record or no summary refuses, naming its row and the engine's last words.
 func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	test.Parallel()
 	needs.Platform(test, "darwin", "the script reads a Mac's sysctl and /usr/bin/time -l, and Shackler is one")
@@ -525,7 +593,9 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 
 	// A toolchain whose go answers what the script asks, records each build, and builds a stand-in for the engine that
-	// records each run and finds 1 thing at deeafbf4, exiting 1 there as the engine does.
+	// records each run, walks 2 files at the root and finds 1 thing in 1 file at deeafbf4, exiting 1 there as the
+	// engine does, its lint and summary records saying so. With PERFORMANCE_ENGINE_UNLINTED set it prints no lint
+	// record, and with PERFORMANCE_ENGINE_UNSUMMARIZED no summary.
 	builds := filepath.Join(directory, "builds")
 	runs := filepath.Join(directory, "runs")
 	engine := filepath.Join(directory, "engine")
@@ -536,8 +606,16 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		"[ -z \"$timeline\" ] || echo '{\"kind\":\"timeline\",\"stamps\":[{\"label\":\"host.listing.end\"," +
 		"\"wallMicroseconds\":1500,\"userMicroseconds\":0,\"systemMicroseconds\":0},{\"label\":\"run.end\"," +
 		"\"wallMicroseconds\":4000,\"userMicroseconds\":0,\"systemMicroseconds\":0}]}'\n" +
-		"case \"$root\" in */deeafbf4) echo '{\"kind\":\"finding\"}'; echo '{\"kind\":\"summary\"}'; exit 1 ;; esac\n" +
-		"echo '{\"kind\":\"summary\"}'\n"
+		"[ -z \"$PERFORMANCE_ENGINE_UNLINTED\" ] || { echo 'the lint phase never ran' >&2; " +
+		"echo '{\"kind\":\"summary\",\"findings\":0,\"complete\":false,\"exitCode\":0}'; exit 0; }\n" +
+		"[ -z \"$PERFORMANCE_ENGINE_UNSUMMARIZED\" ] || { echo 'the engine was killed' >&2; " +
+		"echo '{\"kind\":\"lint\",\"findings\":0,\"rulesRun\":237,\"filesWalked\":2,\"nodesVisited\":80}'; " +
+		"exit 0; }\n" +
+		"case \"$root\" in */deeafbf4) echo '{\"kind\":\"finding\"}'; " +
+		"echo '{\"kind\":\"lint\",\"findings\":1,\"rulesRun\":237,\"filesWalked\":1,\"nodesVisited\":40}'; " +
+		"echo '{\"kind\":\"summary\",\"findings\":1,\"complete\":true,\"exitCode\":1}'; exit 1 ;; esac\n" +
+		"echo '{\"kind\":\"lint\",\"findings\":0,\"rulesRun\":237,\"filesWalked\":2,\"nodesVisited\":80}'\n" +
+		"echo '{\"kind\":\"summary\",\"findings\":0,\"complete\":true,\"exitCode\":0}'\n"
 	writeFixtureFile(test, engine, engineScript)
 	goroot := filepath.Join(directory, "go")
 	goScript := "#!/bin/sh\ncase \"$1\" in\nmod) exit 0 ;;\n" +
@@ -561,13 +639,19 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 	home := filepath.Join(directory, "home")
 	scratch := filepath.Join(home, "scratch", "system_cohere_tools", "performance")
-	measure := func() performanceMeasurement {
+	// read runs the script once, with extra in its environment, and reads what it said.
+	read := func(extra ...string) ([]byte, performanceMeasurement, string) {
 		test.Helper()
 		bash := exec.Command("bash", "-s", "--", commit, reference, "2", "3", "2", fmt.Sprint(performanceWarmRounds))
 		bash.Dir, bash.Stdin = test.TempDir(), strings.NewReader(script)
-		bash.Env = append(environment, "HOME="+home)
+		bash.Env = slices.Concat(environment, []string{"HOME=" + home}, extra)
 		output, bashError := bash.CombinedOutput()
 		measurement, problem := readPerformance(output, commit, bashError)
+		return output, measurement, problem
+	}
+	measure := func() performanceMeasurement {
+		test.Helper()
+		output, measurement, problem := read()
 		if problem != "" {
 			test.Fatalf("the script's measurement didn't read: %s\n%s", problem, output)
 		}
@@ -602,6 +686,17 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 			test.Errorf("a run was not the engine over the binary's own system store: %s", line)
 		}
 	}
+	for _, run := range measurement.runs {
+		filesWalked, findings := 2, 0
+		if run.tree == performanceReferenceTree {
+			filesWalked, findings = 1, 1
+		}
+		if run.filesWalked != filesWalked || run.findingsPrinted != findings || run.findingsSummarized != findings {
+			test.Errorf("the %s run at %s, round %s, said %d files walked and %d findings, %d by its summary, want "+
+				"%d and %d", run.mode, run.tree, run.round, run.filesWalked, run.findingsPrinted,
+				run.findingsSummarized, filesWalked, findings)
+		}
+	}
 	if fmt.Sprintf("%s %d", measurement.timeline.Stamps[0].Label, len(measurement.phases)) != "host.listing.end 9" ||
 		measurement.cores <= 0 || measurement.cpu == "" {
 		test.Errorf("the measurement read %d phases, cpu %q with %d cores and stamps %+v", len(measurement.phases),
@@ -620,6 +715,17 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 	if _, statError := os.Stat(filepath.Join(scratch, "deeafbf4", "kept")); statError != nil {
 		test.Errorf("deeafbf4 was laid again rather than kept: %v", statError)
+	}
+
+	for _, unrecorded := range []struct{ variable, want string }{
+		{"PERFORMANCE_ENGINE_UNLINTED", "no lint record: the lint phase never ran"},
+		{"PERFORMANCE_ENGINE_UNSUMMARIZED", "no summary record: the engine was killed"},
+	} {
+		output, _, problem := read(unrecorded.variable + "=1")
+		if want := "Shackler refused to measure it: the cold run at root, round fill, printed " +
+			unrecorded.want; problem != want {
+			test.Errorf("a run with %s read as %q, want %q:\n%s", unrecorded.variable, problem, want, output)
+		}
 	}
 }
 

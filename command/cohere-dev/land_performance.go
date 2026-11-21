@@ -116,8 +116,9 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 //     what changed.
 //   - It makes an empty system store for this binary, says her load before, and runs the engine each time with the
 //     kit's clean environment under /usr/bin/time -l: at the root two untimed fills and the cold rounds, at deeafbf4
-//     two fills and its rounds, at the root one untimed warm run and the warm rounds, and one timeline run. Then it
-//     says the timeline's record and her load after.
+//     two fills and its rounds, at the root one untimed warm run and the warm rounds, and one timeline run. Each run
+//     says what it checked in the engine's own words, its lint record's files walked and its summary's findings, and
+//     refuses without them. Then it says the timeline's record and her load after.
 //
 // Each phase says its milliseconds, so what costs what can be read.
 const performanceScript = `set -euo pipefail
@@ -197,8 +198,19 @@ say "top before $(LC_ALL=C ps -Ao pid,user,pcpu,comm -r 2>/dev/null </dev/null |
 rm -rf system deeafbf4/.cache; mkdir system
 clean=(env -u GOFLAGS -u PWD -u GOGC -u GOMEMLIMIT -u COHERE_SCRATCH_BUILDS_WIDTH -u COHERE_SYSTEM_CACHE -u GOARM64
   GOPROXY=off GOSUMDB=sum.golang.org GONOSUMDB='*')
+# recorded is the number the field $2 holds in run.jsonl's first record of the kind $1, the first it names, or nothing
+# when there is no such record: this bash has no jq, and python3 may not be there.
+recorded() {
+  grep -m 1 "\"kind\":\"$1\"" run.jsonl | grep -o "\"$2\":[0-9]*" | head -n 1 | cut -d : -f 2 || true
+}
+# engineSaid is the engine's own last line in run.err, the one before /usr/bin/time's report, which run.err ends with.
+engineSaid() {
+  awk '/ real +[0-9.]+ user +[0-9.]+ sys/ { exit } { last = $0 } END { print last }' run.err
+}
 # run runs the engine once at the tree $2 for the row $1, round $3 ("fill" for an untimed one), with the flags after,
-# and says its wall, user and system milliseconds from /usr/bin/time, its exit and how many findings it printed.
+# and says its wall, user and system milliseconds from /usr/bin/time, its exit, how many findings it printed, and what
+# the engine's own records say it checked: the lint record's files walked and the summary's findings. A run that
+# checked less reads faster, so a run with no record of what it checked measures nothing and refuses.
 run() {
   runMode=$1; runTree=$2; runRound=$3; shift 3
   where="$base/$runTree"
@@ -214,7 +226,13 @@ run() {
     awk '{ printf "%d %d %d", $1 * 1000 + 0.5, $3 * 1000 + 0.5, $5 * 1000 + 0.5 }' || true)
   [ -n "$times" ] || refuse "the $runMode run at $runTree printed no times: $(tail -n 1 run.err)"
   findings=$(grep -c '"kind":"finding"' run.jsonl || true)
-  say "run $runMode $runTree $runRound $times $runCode $findings"
+  walked=$(recorded lint filesWalked)
+  [ -n "$walked" ] ||
+    refuse "the $runMode run at $runTree, round $runRound, printed no lint record: $(engineSaid)"
+  summarized=$(recorded summary findings)
+  [ -n "$summarized" ] ||
+    refuse "the $runMode run at $runTree, round $runRound, printed no summary record: $(engineSaid)"
+  say "run $runMode $runTree $runRound $times $runCode $findings $walked $summarized"
 }
 # rounds runs the row $1 at the tree $2, $3 untimed fills and then $4 timed rounds, with the flags after.
 rounds() {
@@ -240,11 +258,20 @@ type performanceSpread struct {
 	Maximum int64 `json:"max"`
 }
 
-// performanceTimes is a row's wall, user and system times.
-type performanceTimes struct {
-	Wall   performanceSpread `json:"wall"`
-	User   performanceSpread `json:"user"`
-	System performanceSpread `json:"sys"`
+// performanceChecked is what a row's rounds checked, each the same: the files the engine walked and the findings it
+// printed. A row that checked less reads faster, so the note compares only rows that checked the same.
+type performanceChecked struct {
+	Files    int `json:"files"`
+	Findings int `json:"findings"`
+}
+
+// performanceRow is a row's wall, user and system times, and what its rounds checked. Checked is a pointer since a file
+// written before rows recorded it holds none, which the note says rather than reading it as nothing checked.
+type performanceRow struct {
+	Wall    performanceSpread   `json:"wall"`
+	User    performanceSpread   `json:"user"`
+	System  performanceSpread   `json:"sys"`
+	Checked *performanceChecked `json:"checked,omitempty"`
 }
 
 // performanceTimeline is the timeline run's level 1 wall areas, each the milliseconds from the engine's start to the
@@ -270,13 +297,13 @@ type performanceRounds struct {
 
 // performanceColdRows are the cold rows: every build's run with no project store, over a warm system store.
 type performanceColdRows struct {
-	Root     performanceTimes `json:"root"`
-	Deeafbf4 performanceTimes `json:"deeafbf4"`
+	Root     performanceRow `json:"root"`
+	Deeafbf4 performanceRow `json:"deeafbf4"`
 }
 
 // performanceWarmRows is the warm row: a run over the project store the run before it filled.
 type performanceWarmRows struct {
-	Root performanceTimes `json:"root"`
+	Root performanceRow `json:"root"`
 }
 
 // performanceTimelineRows is the timeline run's areas, at the root.
@@ -321,11 +348,13 @@ type performanceFile struct {
 }
 
 // performanceRun is one engine run the script said: its row's mode and tree, its round, "fill" for an untimed one, its
-// times in milliseconds, its exit and how many findings it printed.
+// times in milliseconds, its exit, how many findings it printed, and the files its lint record walked and the findings
+// its summary counted.
 type performanceRun struct {
-	mode, tree, round     string
-	wall, user, system    int64
-	exit, findingsPrinted int
+	mode, tree, round               string
+	wall, user, system              int64
+	exit, findingsPrinted           int
+	filesWalked, findingsSummarized int
 }
 
 // performanceMeasurement is everything the script said.
@@ -341,12 +370,12 @@ type performanceMeasurement struct {
 
 // performanceRows are the rows the note compares, by the name it says each by.
 var performanceRows = []struct {
-	name  string
-	times func(file performanceFile) performanceTimes
+	name string
+	row  func(file performanceFile) performanceRow
 }{
-	{"cold root", func(file performanceFile) performanceTimes { return file.Engine.Cold.Root }},
-	{"cold deeafbf4", func(file performanceFile) performanceTimes { return file.Engine.Cold.Deeafbf4 }},
-	{"warm root", func(file performanceFile) performanceTimes { return file.Engine.Warm.Root }},
+	{"cold root", func(file performanceFile) performanceRow { return file.Engine.Cold.Root }},
+	{"cold deeafbf4", func(file performanceFile) performanceRow { return file.Engine.Cold.Deeafbf4 }},
+	{"warm root", func(file performanceFile) performanceRow { return file.Engine.Warm.Root }},
 }
 
 // measurePerformance measures gating, the commit the gate ran on, whose tree is tree, on Shackler, against main's
@@ -588,6 +617,13 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 		return performanceMeasurement{}, performanceBox + "'s timeline run printed no timeline record"
 	}
 	for _, run := range measurement.runs {
+		// The engine's summary counts the finding records it wrote, so a count of the lines that differs means the
+		// stream was cut or read wrong, and what the run checked can't be said.
+		if run.findingsPrinted != run.findingsSummarized {
+			return performanceMeasurement{}, fmt.Sprintf("%s's %s run at %s, round %s, printed %d findings and its "+
+				"summary counts %d", performanceBox, run.mode, run.tree, run.round, run.findingsPrinted,
+				run.findingsSummarized)
+		}
 		clean := run.exit == 0 && run.findingsPrinted == 0
 		// deeafbf4 is an older tree, in which today's rules may find something: the engine then exits 1 with what it
 		// found printed, which is that tree's honest run. Any other end there, and anything found at the root, where
@@ -610,16 +646,27 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 		{"warm", "root", performanceWarmRounds},
 		{"timeline", "root", 1},
 	} {
-		if timed := len(timedRuns(measurement.runs, row.mode, row.tree)); timed != row.rounds {
+		timed := timedRuns(measurement.runs, row.mode, row.tree)
+		if len(timed) != row.rounds {
 			return performanceMeasurement{}, fmt.Sprintf("%s's measurement timed the %s row at %s %d times, not %d",
-				performanceBox, row.mode, row.tree, timed, row.rounds)
+				performanceBox, row.mode, row.tree, len(timed), row.rounds)
+		}
+		// The gate decides what is correct, but a row whose rounds checked different things measures nothing: its
+		// median is of runs that did different work.
+		for _, run := range timed[min(1, len(timed)):] {
+			if run.filesWalked != timed[0].filesWalked || run.findingsPrinted != timed[0].findingsPrinted {
+				return performanceMeasurement{}, fmt.Sprintf("%s's %s row at %s checked %d files and %d findings in "+
+					"round %s, and %d files and %d findings in round %s, so its rounds measured different things",
+					performanceBox, row.mode, row.tree, timed[0].filesWalked, timed[0].findingsPrinted, timed[0].round,
+					run.filesWalked, run.findingsPrinted, run.round)
+			}
 		}
 	}
 	return measurement, ""
 }
 
-// performanceRunOf reads a run's line after its kind, `<mode> <tree> <round> <wall> <user> <sys> <exit> <findings>`,
-// or says why it doesn't read.
+// performanceRunOf reads a run's line after its kind, `<mode> <tree> <round> <wall> <user> <sys> <exit> <findings>
+// <filesWalked> <summaryFindings>`, or says why it doesn't read.
 func performanceRunOf(rest string) (performanceRun, string) {
 	fields := strings.Fields(rest)
 	numbers := []int64{}
@@ -630,12 +677,13 @@ func performanceRunOf(rest string) (performanceRun, string) {
 		}
 		numbers = append(numbers, number)
 	}
-	if len(fields) != 8 || len(numbers) != 5 {
-		return performanceRun{}, fmt.Sprintf("%s's run line %q doesn't read as a row, a round, three times, an exit "+
-			"and a count of findings", performanceBox, rest)
+	if len(fields) != 10 || len(numbers) != 7 {
+		return performanceRun{}, fmt.Sprintf("%s's run line %q doesn't read as a row, a round, three times, an exit, "+
+			"a count of findings, the files walked and the summary's findings", performanceBox, rest)
 	}
 	return performanceRun{mode: fields[0], tree: fields[1], round: fields[2], wall: numbers[0], user: numbers[1],
-		system: numbers[2], exit: int(numbers[3]), findingsPrinted: int(numbers[4])}, ""
+		system: numbers[2], exit: int(numbers[3]), findingsPrinted: int(numbers[4]), filesWalked: int(numbers[5]),
+		findingsSummarized: int(numbers[6])}, ""
 }
 
 // loadOf reads a load line's three figures, or says why they don't read.
@@ -666,9 +714,14 @@ func timedRuns(runs []performanceRun, mode string, tree string) []performanceRun
 	return timed
 }
 
-// timesOf is a row's times, each the median, least and most of its timed runs.
-func timesOf(runs []performanceRun, mode string, tree string) performanceTimes {
+// rowOf is a row's times, each the median, least and most of its timed runs, and what they checked, which
+// readPerformance has held the same in every round.
+func rowOf(runs []performanceRun, mode string, tree string) performanceRow {
 	timed := timedRuns(runs, mode, tree)
+	checked := &performanceChecked{}
+	if len(timed) > 0 {
+		checked = &performanceChecked{Files: timed[0].filesWalked, Findings: timed[0].findingsPrinted}
+	}
 	of := func(measure func(run performanceRun) int64) performanceSpread {
 		values := []int64{}
 		for _, run := range timed {
@@ -676,10 +729,11 @@ func timesOf(runs []performanceRun, mode string, tree string) performanceTimes {
 		}
 		return spreadOf(values)
 	}
-	return performanceTimes{
-		Wall:   of(func(run performanceRun) int64 { return run.wall }),
-		User:   of(func(run performanceRun) int64 { return run.user }),
-		System: of(func(run performanceRun) int64 { return run.system }),
+	return performanceRow{
+		Wall:    of(func(run performanceRun) int64 { return run.wall }),
+		User:    of(func(run performanceRun) int64 { return run.user }),
+		System:  of(func(run performanceRun) int64 { return run.system }),
+		Checked: checked,
 	}
 }
 
@@ -733,10 +787,10 @@ func performanceFileOf(measurement performanceMeasurement, commit string, measur
 				Warm:     performanceWarmRounds,
 			},
 			Cold: performanceColdRows{
-				Root:     timesOf(measurement.runs, "cold", "root"),
-				Deeafbf4: timesOf(measurement.runs, "cold", performanceReferenceTree),
+				Root:     rowOf(measurement.runs, "cold", "root"),
+				Deeafbf4: rowOf(measurement.runs, "cold", performanceReferenceTree),
 			},
-			Warm: performanceWarmRows{Root: timesOf(measurement.runs, "warm", "root")},
+			Warm: performanceWarmRows{Root: rowOf(measurement.runs, "warm", "root")},
 			Timeline: performanceTimelineRows{Root: performanceTimeline{
 				Listing:  areas["host.listing.end"],
 				Handover: areas["handover.end"],
@@ -780,7 +834,9 @@ func performanceBody(contents string) string {
 // performanceNote is the file's one line on how current compares with previous, main's file before it: level or moved
 // per row, by wall and by user time. With no previous it says so, and when previous didn't read, it names why. When
 // previous was measured on another machine, by another build or in another shape, that is its line, never a
-// comparison.
+// comparison. A row whose files or findings checked differ from previous's same row is its own line, never compared,
+// since a row that checked less would read faster. A previous file that records no checked counts, as those written
+// before rows recorded them, is said once, and its times compared as they always were.
 func performanceNote(current performanceFile, previous performanceFile, found bool, unread string) string {
 	switch {
 	case !found:
@@ -803,10 +859,22 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 			previous.Engine.Rounds.Warm)
 	}
 	rows := []string{}
+	uncounted := false
 	for _, row := range performanceRows {
-		now, before := row.times(current), row.times(previous)
+		now, before := row.row(current), row.row(previous)
+		if before.Checked == nil {
+			uncounted = true
+		} else if now.Checked != nil && *now.Checked != *before.Checked {
+			rows = append(rows, fmt.Sprintf("%s checked %d files and %d findings, and main's %d and %d, so not "+
+				"compared", row.name, now.Checked.Files, now.Checked.Findings, before.Checked.Files,
+				before.Checked.Findings))
+			continue
+		}
 		rows = append(rows, row.name+" wall "+spreadCompared(now.Wall, before.Wall)+", user "+
 			spreadCompared(now.User, before.User))
+	}
+	if uncounted {
+		rows = append([]string{"main's file records no checked counts"}, rows...)
 	}
 	return "against " + against + ": " + strings.Join(rows, "; ")
 }
