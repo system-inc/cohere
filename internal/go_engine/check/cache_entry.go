@@ -191,6 +191,11 @@ type restoredPackage struct {
 	// answers are the entry's Answers, placed its Placed, reads and readsIncomplete its Reads and ReadsIncomplete,
 	// bodiless and bodiesRecorded its Bodiless and BodiesRecorded, exportDigest its record's ExportData, bodyDigest the
 	// digest its body is kept under, and slots the slots its body holds, every one, known to this run or not.
+	//
+	// placed is held only by a decode that asks for it (decodeEntry's holdsPlaced), the first wave's of what it just
+	// saved, whose rewrite merges them (rewriteEarlier). Every other decode, a hit's and the host's shared one for its
+	// builds, reads them only to refuse an entry whose columns do not read, and holds none: nothing reads them there,
+	// and held they were about a third of a warm run's live heap over check's closure (#ycnvyvd).
 	answers         []kindAnswers
 	placed          []fact_resolver.PlacedAnswer
 	reads           []storedRead
@@ -531,19 +536,21 @@ func encodeFactAndValue(fact analysis.Fact) (storedFact, factDigest, error) {
 // decodeEntry is a package's entry decoded whole from its body and its record, or an error, which is a miss: an entry
 // in another format, a fact of a type its analyzer does not learn, or bytes gob refuses. Which analyzers the entry
 // must hold is the session's to judge (see covers), since it depends on what else misses. Its export data is read by
-// readExportData, only when the load asks for it.
+// readExportData, only when the load asks for it. holdsPlaced is whether the decode holds the entry's placed answers
+// (restoredPackage.placed), which only a reader of them asks.
 func decodeEntry(
 	known *cacheAnalyzers,
 	restoring *packages.Package,
 	body []byte,
 	record entryRecord,
 	readExportData func() ([]byte, error),
+	holdsPlaced bool,
 ) (*restoredPackage, error) {
 	entry, decodeError := entryOf(body, record)
 	if decodeError != nil {
 		return nil, fmt.Errorf("decoding the entry of %s: %w", restoring.ID, decodeError)
 	}
-	restored, restoreError := restoredOf(known, restoring, entry, readExportData)
+	restored, restoreError := restoredOf(known, restoring, entry, readExportData, holdsPlaced)
 	if restoreError != nil {
 		return nil, restoreError
 	}
@@ -568,12 +575,14 @@ func entryOf(body []byte, record entryRecord) (cacheEntry, error) {
 	return entry, nil
 }
 
-// restoredOf is entry, a body and its record as entryOf joined them, read whole for decodeEntry.
+// restoredOf is entry, a body and its record as entryOf joined them, read whole for decodeEntry, its placed answers
+// held when holdsPlaced asks for them and read either way.
 func restoredOf(
 	known *cacheAnalyzers,
 	restoring *packages.Package,
 	entry cacheEntry,
 	readExportData func() ([]byte, error),
+	holdsPlaced bool,
 ) (*restoredPackage, error) {
 	if entry.Version != CacheFormatVersion {
 		return nil, fmt.Errorf("reading the entry of %s: it is in format %q, not %q", restoring.ID, entry.Version,
@@ -582,6 +591,9 @@ func restoredOf(
 	placed, placedError := entry.Placed.placed()
 	if placedError != nil {
 		return nil, fmt.Errorf("reading the entry of %s: %w", restoring.ID, placedError)
+	}
+	if !holdsPlaced {
+		placed = nil
 	}
 	restored := &restoredPackage{
 		analyses: map[*analysis.Analyzer]restoredAnalysis{},

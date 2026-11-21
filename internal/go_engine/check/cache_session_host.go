@@ -322,7 +322,8 @@ func (session *CacheSession) restoreFromHost(
 		}
 		body, record, readExportData, readError := readingKept[index].contents()
 		if readError == nil {
-			read[index], readError = decodeEntry(session.known, reading[index], body, record, readExportData)
+			read[index], readError = decodeEntry(session.known, reading[index], body, record, readExportData,
+				false)
 		}
 		readErrors[index] = readError
 	})

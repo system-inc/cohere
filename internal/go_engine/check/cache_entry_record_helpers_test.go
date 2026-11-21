@@ -22,13 +22,15 @@ func storedRecordAt(test *testing.T, store *cache.Store, key cache.Key) entryRec
 	return record
 }
 
-// decodedStoredEntry is restoring's entry the store keeps under key, decoded as a hit decodes it.
+// decodedStoredEntry is restoring's entry the store keeps under key, decoded as a hit decodes it, or, when holdsPlaced
+// asks, with the placed answers a hit drops held too, for a test to compare.
 func decodedStoredEntry(
 	test *testing.T,
 	store *cache.Store,
 	known *cacheAnalyzers,
 	restoring *packages.Package,
 	key cache.Key,
+	holdsPlaced bool,
 ) (*restoredPackage, error) {
 	test.Helper()
 	contents, stored := store.Get(key)
@@ -39,7 +41,7 @@ func decodedStoredEntry(
 	if !whole {
 		test.Fatalf("the store holds no body of %s, which its record holds or names", restoring.ID)
 	}
-	return decodeEntry(known, restoring, body, record, nil)
+	return decodeEntry(known, restoring, body, record, nil, holdsPlaced)
 }
 
 // rewriteStoredEntry changes the entry the store keeps under key, as change leaves it, and writes it back: its record
