@@ -115,6 +115,19 @@ func (found fixture) fieldIdentity(test *testing.T, typeName string, field strin
 	return build_reads.Identity{}
 }
 
+// hostport's row over host_port's stripped fixture (#8pxhe8j): connect, standing, dials address, a package-level
+// Sprintf of a host and a port. Stripping connect's body would lose the rule's finding at address
+// (host_port's TestAStrippedDialLosesTheAddressFinding), so the row names address, and connect leaves.
+func TestAStandingBodyDialingAnAddressLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "dialed")
+	host := presenceHost(test, found, nil,
+		presenceUse{key: "dialed.address", identity: found.identity("address"), users: []string{"connect"}})
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"connect": standing_presence.HostPort}, nil)
+}
+
 // scannererr's row (#xeafx79): Lines names Input, a scanner over the process's input, and Open names Assigned, which
 // its own `=` makes a candidate, so both leave, and so does Remembered, which names Memory, whose reader is in memory,
 // since the row names every *bufio.Scanner whatever made it. ReadsIn names In, a lineReader a package-level
