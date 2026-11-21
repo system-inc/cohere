@@ -81,7 +81,7 @@ func noBody() bool {
 // as Ask reads a store only for such an object: home's whole kind answers about home's Own and about other's Shared,
 // and the entry holds Own's answer alone, never Shared's under a path home's own Shared would have.
 //
-// The registry is the process's, which this test swaps, so it does not run in parallel.
+// Not parallel: it swaps the process's registry of kinds, which a parallel test's Whole or Probe would read.
 func TestWholeKeepsOnlyObjectsOfItsPackage(test *testing.T) {
 	home, other := declaredPackage("example.com/home", "Own"), declaredPackage("example.com/other", "Shared")
 	kind := &Kind{Name: "whole_probe"}
@@ -102,7 +102,7 @@ func TestWholeKeepsOnlyObjectsOfItsPackage(test *testing.T) {
 // reloaded: WholeIfComplete answers that it has no whole, schedules no reload and leaves home sure. Once it is done,
 // an ordinary question reaching that package is a reload again, answered a placeholder, as a probe's never is.
 //
-// The registry is the process's, which this test swaps, so it does not run in parallel.
+// Not parallel: it swaps the process's registry of kinds, which a parallel test's Whole or Probe would read.
 func TestAnAbandonedWholeProbeNeverSchedulesAReload(test *testing.T) {
 	home, restored := declaredPackage("example.com/home", "Asks"), declaredPackage("example.com/restored", "Below")
 	kind := &Kind{Name: "abandoned_probe"}
@@ -141,7 +141,7 @@ func TestAnAbandonedWholeProbeNeverSchedulesAReload(test *testing.T) {
 // A whole that fails for any reason but a probe's abandonment fails WholeIfComplete as it would anything, so the
 // failure is seen rather than read as a whole the run could not have.
 //
-// The registry is the process's, which this test swaps, so it does not run in parallel.
+// Not parallel: it swaps the process's registry of kinds, which a parallel test's Whole or Probe would read.
 func TestAWholeThatFailsOtherwiseIsNotSwallowed(test *testing.T) {
 	home := declaredPackage("example.com/home", "Fails")
 	holdRegistered(test, registeredKind{kind: &Kind{Name: "failing_whole"},
@@ -150,7 +150,8 @@ func TestAWholeThatFailsOtherwiseIsNotSwallowed(test *testing.T) {
 		}})
 	resolver := New(nil)
 	learned := learnedPackage(resolver, home)
-	if recovered := recoveredFrom(func() { resolver.WholeIfComplete(learned) }); recovered != "the kind's whole failed" {
+	recovered := recoveredFrom(func() { resolver.WholeIfComplete(learned) })
+	if recovered != "the kind's whole failed" {
 		test.Errorf("a whole that failed otherwise recovered %v from WholeIfComplete, want its own failure", recovered)
 	}
 }
