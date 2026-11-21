@@ -180,8 +180,8 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 			name: "disjoint ranges read moved",
 			previous: previousPerformance(test, performancePreviousCommit, performanceBox,
 				performanceSpreadOf(12000, 11900, 12100), performanceSpreadOf(48000, 47600, 48400)),
-			note: "against 11111111: cold root wall moved down 18% (9800 ms, was 12000), user moved down 18% " +
-				"(39200 ms, was 48000); cold deeafbf4 wall level",
+			note: "against 11111111: cold root wall faster by 2200 ms, 18%, ranges apart (9800 ms, was 12000), " +
+				"user faster by 8800 ms, 18%, ranges apart (39200 ms, was 48000); cold deeafbf4 wall level",
 		},
 		{
 			name: "another machine reads as its own line",
@@ -232,7 +232,8 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 				{"cold root sys", cold.Root.System, performanceSpreadOf(980, 970, 990)},
 				{"cold deeafbf4 wall", cold.Deeafbf4.Wall, performanceSpreadOf(4100, 4000, 4200)},
 				{"warm root wall", warm.Root.Wall, performanceSpreadOf(800, 800, 800)},
-				{"rounds", measured.Engine.Rounds, performanceRounds{Cold: 3, Deeafbf4: 2, Warm: 1}},
+				{"rounds", measured.Engine.Rounds, performanceRounds{Cold: performanceColdRounds,
+					Deeafbf4: performanceReferenceRounds, Warm: performanceWarmRounds}},
 				{"timeline", measured.Engine.Timeline.Root,
 					performanceTimeline{Listing: 812, Handover: 5100, Builds: 6201, Run: 9700}},
 				{"machine", fmt.Sprint(measured.Machine), fmt.Sprint(performanceMachine{Name: "Shackler",
@@ -283,8 +284,9 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 			if decodeError != nil {
 				test.Fatal(decodeError)
 			}
-			if string(script) != performanceScript || string(found[2]) != measured.Commit+" "+performanceReference+
-				" 2 3 2 1" {
+			if string(script) != performanceScript || string(found[2]) != fmt.Sprintf("%s %s %d %d %d %d",
+				measured.Commit, performanceReference, performanceFills, performanceColdRounds,
+				performanceReferenceRounds, performanceWarmRounds) {
 				test.Errorf("the gap ran another script, or handed it %q", found[2])
 			}
 		})
@@ -462,8 +464,10 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 		want        string
 	}{
 		{performanceSpreadOf(100, 90, 110), performanceSpreadOf(120, 110, 130), "level (100 ms, was 120)"},
-		{performanceSpreadOf(100, 90, 109), performanceSpreadOf(120, 110, 130), "moved down 17% (100 ms, was 120)"},
-		{performanceSpreadOf(150, 140, 160), performanceSpreadOf(120, 110, 130), "moved up 25% (150 ms, was 120)"},
+		{performanceSpreadOf(100, 90, 109), performanceSpreadOf(120, 110, 130),
+			"faster by 20 ms, 17%, ranges apart (100 ms, was 120)"},
+		{performanceSpreadOf(150, 140, 160), performanceSpreadOf(120, 110, 130),
+			"slower by 30 ms, 25%, ranges apart (150 ms, was 120)"},
 	} {
 		if said := spreadCompared(row.now, row.before); said != row.want {
 			test.Errorf("%+v against %+v reads %q, want %q", row.now, row.before, said, row.want)

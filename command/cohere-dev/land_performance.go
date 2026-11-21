@@ -813,23 +813,28 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 
 // spreadCompared says how now compares with before: level while their ranges overlap, and moved, up or down by how
 // much of before's median, once they don't.
+//
+// The file is awareness, never a gate on speed (Kirk, Nov 21: "It's ok if we need to add cool shit and slow down total
+// time, we are just aware of the change"), so a change reads as a plain fact, slower or faster by so much with the
+// ranges apart, and nothing refuses or holds a landing for it.
 func spreadCompared(now performanceSpread, before performanceSpread) string {
 	figures := fmt.Sprintf("%d ms, was %d", now.Median, before.Median)
 	if now.Minimum <= before.Maximum && before.Minimum <= now.Maximum {
 		return "level (" + figures + ")"
 	}
-	direction := "up"
+	direction := "slower"
 	if now.Median < before.Median {
-		direction = "down"
-	}
-	if before.Median <= 0 {
-		return "moved " + direction + " (" + figures + ")"
+		direction = "faster"
 	}
 	change := now.Median - before.Median
 	if change < 0 {
 		change = -change
 	}
-	return fmt.Sprintf("moved %s %d%% (%s)", direction, (change*100+before.Median/2)/before.Median, figures)
+	if before.Median <= 0 {
+		return fmt.Sprintf("%s by %d ms, ranges apart (%s)", direction, change, figures)
+	}
+	return fmt.Sprintf("%s by %d ms, %d%%, ranges apart (%s)", direction, change,
+		(change*100+before.Median/2)/before.Median, figures)
 }
 
 // machineNamed is a machine as the note names it: her name, her cpu and her cores.

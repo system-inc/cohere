@@ -174,8 +174,10 @@ that binary it runs the Go engine with a clean environment under `/usr/bin/time 
 and 3 rounds, deeafbf4's, 2 and 2, a warm run after one that fills the project store, and one `--timeline` run. It
 writes `Performance.jsonc` at the root of the tree that lands: medians and ranges in milliseconds, her cpu, cores and
 load before and after, that she was held quiet, the build, the timeline's wall areas, and a note against main's file
-before it. A row is "moved" only when its range doesn't overlap the old one, otherwise "level", and another machine
-or build is a line of its own, never compared. The file is land's alone: never write or edit it, and nothing that
+before it. A row reads "slower by" or "faster by" so much only when its range clears the old one, otherwise "level",
+and another machine or build is a line of its own, never compared. The file is awareness, never a gate on speed: a
+landing that makes cohere slower lands with its note saying so (Kirk, Nov 21). `cohere-dev measure [<commit>]` runs
+the measurement alone, landing nothing. The file is land's alone: never write or edit it, and nothing that
 builds or tests may read it, which `internal/guard` holds, since it is written after the gate. While another holds
 Shackler, land waits holding the lock, saying whose claim and since when, and after `COHERE_DEV_PERFORMANCE_WAIT`
 (2h unless it says) refuses, naming the holder; a measurement that fails refuses the landing in her words. A tree
