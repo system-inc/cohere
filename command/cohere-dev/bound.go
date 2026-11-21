@@ -174,15 +174,15 @@ func (limit *bound) begin() error {
 	return nil
 }
 
-// runAttached runs a command with the caller's terminal in the environment given, under the bound when there
-// is one, and returns its exit code.
-func runAttached(limit *bound, environment []string, name string, arguments []string) int {
+// runAttached runs a command with the caller's terminal in the environment given, in directory, the working
+// directory when it is empty, under the bound when there is one, and returns its exit code.
+func runAttached(limit *bound, directory string, environment []string, name string, arguments []string) int {
 	what := name
 	if name == "go" && len(arguments) > 0 {
 		what = "go " + arguments[0]
 	}
 	command := exec.Command(name, arguments...)
-	command.Env = environment
+	command.Dir, command.Env = directory, environment
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 	// The command writes to the terminal itself, so what this run said first is delivered first.
 	streams.Show(streams.Output)
