@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -92,10 +93,15 @@ func (recorded recordedPackage) recordAt(test *testing.T, place recordedPlace) b
 }
 
 // described is record as a test states one, a line for each local, each use, and one each for the rooted locals, the
-// files and the flags. It says everything the record holds: a place reads as its file, line and column, which are its
-// offset in the file the test parsed, and an object declared outside the body reads with the identifier written
-// there, so an expectation can be checked against the source by eye.
-func (recorded recordedPackage) described(record bodyRecord) string {
+// files and the flags. It says everything the record holds, read through its canonical form, which is what a record
+// says: a place reads as its file, line and column, which are its offset in the file the test parsed, and an object
+// declared outside the body reads with the identifier written there, so an expectation can be checked against the
+// source by eye.
+func (recorded recordedPackage) described(compact bodyRecord) string {
+	record, canonicalError := compact.canonical()
+	if canonicalError != nil {
+		return fmt.Sprintf("no canonical form: %v\n", canonicalError)
+	}
 	var text strings.Builder
 	for index, local := range record.Locals {
 		owners := []string{}
@@ -150,13 +156,13 @@ func joinedOrNone(words []string) string {
 }
 
 // describedEnd is end as described states it.
-func (recorded recordedPackage) describedEnd(end recordedEnd) string {
+func (recorded recordedPackage) describedEnd(end encodedEnd) string {
 	switch end.Kind {
-	case endFunction, endRoot:
-		return string(end.Kind)
-	case endLocal:
+	case endWords[endFunction], endWords[endRoot]:
+		return end.Kind
+	case endWords[endLocal]:
 		return fmt.Sprintf("local %d", end.Local)
-	case endDeclared:
+	case endWords[endDeclared]:
 		source := recorded.sources[end.Place.File]
 		length := 0
 		for end.Place.Offset+length < len(source) && isIdentifierByte(source[end.Place.Offset+length]) {
@@ -932,8 +938,9 @@ func TestRecorderRecordsEachShapeOfBody(test *testing.T) {
 
 // TestRecorderGivesOneBodyTheSameBytesTwice holds a record to one encoding (#xeafx79): each case is parsed, checked
 // and walked twice, each time into a file set, a type-checker and a graph of its own, and each body's two records
-// must encode to the same bytes. A build compares its record of a body with the host's end for end, so a record that
-// took its order from a map, a pointer or a node's index would differ between two runs that agree.
+// must encode to the same bytes, and be the same record as a run holds it, its files indexed in the same order. A
+// build compares its record of a body with the host's end for end, so a record that took its order from a map, a
+// pointer or a node's index would differ between two runs that agree.
 func TestRecorderGivesOneBodyTheSameBytesTwice(test *testing.T) {
 	test.Parallel()
 	compared := 0
@@ -941,8 +948,9 @@ func TestRecorderGivesOneBodyTheSameBytesTwice(test *testing.T) {
 		first := recordPackage(test, each.sources, each.generated)
 		second := recordPackage(test, each.sources, each.generated)
 		for name, place := range first.bodies(test) {
-			firstBytes, firstError := first.recordAt(test, place).encoded()
-			secondBytes, secondError := second.recordAt(test, place).encoded()
+			firstRecord, secondRecord := first.recordAt(test, place), second.recordAt(test, place)
+			firstBytes, firstError := firstRecord.encoded()
+			secondBytes, secondError := secondRecord.encoded()
 			if firstError != nil || secondError != nil {
 				test.Fatalf("encoding the records of %s in %q: %v, %v", name, each.name, firstError, secondError)
 			}
@@ -950,11 +958,131 @@ func TestRecorderGivesOneBodyTheSameBytesTwice(test *testing.T) {
 				test.Errorf("the body of %s in %q recorded twice gives\n%s\nand\n%s", name, each.name, firstBytes,
 					secondBytes)
 			}
+			if !reflect.DeepEqual(firstRecord, secondRecord) {
+				test.Errorf("the body of %s in %q recorded twice is held as\n%+v\nand\n%+v", name, each.name,
+					firstRecord, secondRecord)
+			}
 			compared++
 		}
 	}
 	if compared == 0 {
 		test.Fatal("no body was recorded twice, so the comparison proves nothing")
+	}
+}
+
+// heldPastLength is each list of record whose capacity is past its length, by its field's name. A run holds every
+// record to its end, so room an append left over in one is held as long.
+func heldPastLength(record bodyRecord) []string {
+	held := []string{}
+	for name, lengths := range map[string][2]int{
+		"PlaceFiles": {len(record.PlaceFiles), cap(record.PlaceFiles)},
+		"Locals":     {len(record.Locals), cap(record.Locals)},
+		"Owned":      {len(record.Owned), cap(record.Owned)},
+		"Uses":       {len(record.Uses), cap(record.Uses)},
+		"Rooted":     {len(record.Rooted), cap(record.Rooted)},
+		"Files":      {len(record.Files), cap(record.Files)},
+	} {
+		if lengths[0] != lengths[1] {
+			held = append(held, name)
+		}
+	}
+	slices.Sort(held)
+	return held
+}
+
+// TestRecordsHoldNoRoomPastTheirLists holds a record to the size a run holds it at (#xeafx79): over every recorder
+// case, each list of every record is exactly as long as what it holds, the rooted locals, which the steps after the
+// walk append to, among them.
+func TestRecordsHoldNoRoomPastTheirLists(test *testing.T) {
+	test.Parallel()
+	checked, rooted := 0, 0
+	for _, each := range recordCases {
+		recorded := recordPackage(test, each.sources, each.generated)
+		for _, record := range recorded.graph.bodyRecords() {
+			if held := heldPastLength(record); len(held) > 0 {
+				test.Errorf("%q: the body at %+v holds room past the length of its %v", each.name, record.Body, held)
+			}
+			checked += len(record.Locals) + len(record.Owned) + len(record.Uses)
+			rooted += len(record.Rooted)
+		}
+	}
+	if checked == 0 || rooted == 0 {
+		test.Fatalf("the cases recorded %d locals, owners and uses and %d rooted locals, so their lengths prove "+
+			"nothing", checked, rooted)
+	}
+}
+
+// TestCanonicalFormRefusesWhatNoRecorderWrites holds encoded to failing by name (#xeafx79) where a record names what
+// it does not hold: a place in a file past its files, a local of a kind no word names, an owner of a local past its
+// locals, and an end of a kind no word names. No recorder writes one, and a canonical form read past what the record
+// holds would stop the run instead.
+func TestCanonicalFormRefusesWhatNoRecorderWrites(test *testing.T) {
+	test.Parallel()
+	recorded := recordPackage(test, []recordedSource{{"shape.go", refusedSource}}, nil)
+	count := recorded.recordAt(test, recorded.bodies(test)["Count"])
+	declared := slices.IndexFunc(count.Uses, func(use recordedUse) bool { return use.Used.Kind == endDeclared })
+	if len(count.Locals) != 1 || len(count.Owned) == 0 || declared < 0 {
+		test.Fatalf("Count's record is %+v, not one of a local, its owner and a use of what it does not declare",
+			count)
+	}
+	pastFiles := fmt.Sprintf("a place in file %d of the record's %d", len(count.PlaceFiles), len(count.PlaceFiles))
+	cases := []struct {
+		name   string
+		change func(record *bodyRecord)
+		names  []string
+	}{
+		{
+			name:   "a local placed in a file past the record's files",
+			change: func(record *bodyRecord) { record.Locals[0].Place.File = uint32(len(record.PlaceFiles)) },
+			names:  []string{"local 0", pastFiles},
+		},
+		{
+			name: "a declared end in a file past the record's files",
+			change: func(record *bodyRecord) {
+				record.Uses[declared].Used.Place.File = uint32(len(record.PlaceFiles))
+			},
+			names: []string{pastFiles},
+		},
+		{
+			name:   "a local of a kind no word names",
+			change: func(record *bodyRecord) { record.Locals[0].Kind = objectKind(len(kindWords)) },
+			names:  []string{fmt.Sprintf("local 0 is of kind %d, which no word names", len(kindWords))},
+		},
+		{
+			name: "an owner of a local past the record's locals",
+			change: func(record *bodyRecord) {
+				record.Owned = append(record.Owned, recordedOwner{
+					Local: uint32(len(record.Locals)),
+					Owner: recordedEnd{Kind: endFunction},
+				})
+			},
+			names: []string{fmt.Sprintf("an owner of local %d of its %d", len(count.Locals), len(count.Locals))},
+		},
+		{
+			name:   "an end of a kind no word names",
+			change: func(record *bodyRecord) { record.Uses[declared].By.Kind = endKind(len(endWords)) },
+			names:  []string{fmt.Sprintf("an end of kind %d", len(endWords))},
+		},
+	}
+	for _, each := range cases {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			changed := count
+			changed.PlaceFiles = slices.Clone(count.PlaceFiles)
+			changed.Locals = slices.Clone(count.Locals)
+			changed.Owned = slices.Clone(count.Owned)
+			changed.Uses = slices.Clone(count.Uses)
+			each.change(&changed)
+			encoded, encodeError := changed.encoded()
+			if encodeError == nil {
+				test.Fatalf("the record encoded, as %s", encoded)
+			}
+			for _, name := range append([]string{placeText(count.Body)}, each.names...) {
+				if !strings.Contains(encodeError.Error(), name) {
+					test.Errorf("the error %q does not name %s", encodeError, name)
+				}
+			}
+		})
 	}
 }
 
@@ -982,27 +1110,34 @@ func TestRecorderKeysByTheLineDirectivesFileAndPlacesByTheParsedOne(test *testin
 		File:   "named.go",
 		Offset: strings.Index(lineDirectiveSource, "func After"),
 	})
-	expectedLocals := []recordedLocal{{
+	canonical, canonicalError := record.canonical()
+	if canonicalError != nil {
+		test.Fatal(canonicalError)
+	}
+	expectedLocals := []encodedLocal{{
 		Place:  recordedPlace{File: "parsed.go", Offset: strings.Index(lineDirectiveSource, "kept")},
 		Kind:   "const",
 		Name:   "kept",
-		Owners: []recordedEnd{{Kind: endFunction}},
+		Owners: []encodedEnd{{Kind: "function"}},
 	}}
-	if !reflect.DeepEqual(record.Locals, expectedLocals) {
-		test.Errorf("the body's locals are %+v, not %+v", record.Locals, expectedLocals)
+	if !reflect.DeepEqual(canonical.Locals, expectedLocals) {
+		test.Errorf("the body's locals are %+v, not %+v", canonical.Locals, expectedLocals)
 	}
-	expectedUses := []recordedUse{{
-		By: recordedEnd{Kind: endFunction},
-		Used: recordedEnd{Kind: endDeclared, Place: recordedPlace{
+	expectedUses := []encodedUse{{
+		By: encodedEnd{Kind: "function"},
+		Used: encodedEnd{Kind: "declared", Place: recordedPlace{
 			File:   "parsed.go",
 			Offset: strings.Index(lineDirectiveSource, "func below") + len("func "),
 		}},
 	}}
-	if !reflect.DeepEqual(record.Uses, expectedUses) {
-		test.Errorf("the body's uses are %+v, not %+v", record.Uses, expectedUses)
+	if !reflect.DeepEqual(canonical.Uses, expectedUses) {
+		test.Errorf("the body's uses are %+v, not %+v", canonical.Uses, expectedUses)
 	}
-	if !reflect.DeepEqual(record.Files, []string{"parsed.go"}) {
-		test.Errorf("the body's files are %v, not the one parsed file", record.Files)
+	if !reflect.DeepEqual(canonical.Files, []string{"parsed.go"}) {
+		test.Errorf("the body's files are %v, not the one parsed file", canonical.Files)
+	}
+	if !reflect.DeepEqual(record.PlaceFiles, []string{"parsed.go"}) {
+		test.Errorf("the body's places are in %v, not the one parsed file", record.PlaceFiles)
 	}
 }
 
@@ -1281,6 +1416,9 @@ func TestRecorderChangesNothingTheRuleFinds(test *testing.T) {
 			if !bytes.Equal(firstBytes, secondBytes) {
 				test.Errorf("%s: the body at %+v recorded twice gives\n%s\nand\n%s", loaded, record.Body, firstBytes,
 					secondBytes)
+			}
+			if held := heldPastLength(record); len(held) > 0 {
+				test.Errorf("%s: the body at %+v holds room past the length of its %v", loaded, record.Body, held)
 			}
 			bodies++
 			locals += len(record.Locals)

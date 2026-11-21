@@ -345,7 +345,7 @@ func functionBodyKey(test *testing.T, checked checkedPackage, function string) r
 // its locals in the function type's scope, as it does for any record it takes, and then splices nothing. That is a
 // body stripped with nothing in its place, which needs no seam of its own in the graph.
 func withheldRecord(key recordedPlace) bodyRecord {
-	return bodyRecord{Body: key, Locals: []recordedLocal{}, Uses: []recordedUse{}, Rooted: []int{}, Files: []string{}}
+	return bodyRecord{Body: key}
 }
 
 // recordKeyedBy is the one record of records keyed by key, and whether there is exactly one.

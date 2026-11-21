@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"math"
 	"slices"
 )
 
@@ -41,6 +42,15 @@ type bodyRecorder struct {
 	uses  map[uint64]struct{}
 	owned map[uint64]struct{}
 	files map[string]struct{}
+	// openLocals, openOwned, openUses and openPlaceFiles are the open body's record as the walk writes it, and
+	// placeFileIndexes each file's index among openPlaceFiles. closeBody copies each list into the record at its
+	// length, since a run holds every record to its end and room an append left over would be held with it. They
+	// belong to the cursor too, and one set serves every body.
+	openLocals       []recordedLocal
+	openOwned        []recordedOwner
+	openUses         []recordedUse
+	openPlaceFiles   []string
+	placeFileIndexes map[string]uint32
 }
 
 // bodyCursor is the function body the walk is in.
@@ -71,7 +81,7 @@ type declaredEnd struct {
 // localOfRecord is a local's record, by its index in bodyRecorder.records, and its index among that record's locals.
 type localOfRecord struct {
 	record int
-	local  int
+	local  uint32
 }
 
 // recordBodies makes the graph record each function declaration's body as entry walks it. It is asked before entry,
@@ -84,6 +94,8 @@ func (graph *graph) recordBodies() {
 		uses:     map[uint64]struct{}{},
 		owned:    map[uint64]struct{}{},
 		files:    map[string]struct{}{},
+
+		placeFileIndexes: map[string]uint32{},
 	}
 	// The same test entry puts to each instance, so a body is flagged for exactly the instances entry would read.
 	for identifier, instance := range graph.typesInfo.Instances {
@@ -112,6 +124,9 @@ func (graph *graph) bodyRecords() []bodyRecord {
 	kept := make([]bodyRecord, 0, len(graph.recorder.records))
 	for _, record := range graph.recorder.records {
 		if keyed[record.Body] == 1 {
+			// The rooted locals are appended after the walk, a body's at a time, so they are the one list closeBody
+			// could not make at its length.
+			record.Rooted = exactly(record.Rooted)
 			kept = append(kept, record)
 		}
 	}
@@ -131,14 +146,7 @@ func (graph *graph) openBody(declaration *ast.FuncDecl, function nodeIndex) {
 	}
 	recorder.isOpen = true
 	key, isKeyed := graph.keyOf(declaration)
-	// Each list is made empty and never nil, so a record with none of something encodes as it does on any run.
-	recorder.records = append(recorder.records, bodyRecord{
-		Body:   key,
-		Locals: []recordedLocal{},
-		Uses:   []recordedUse{},
-		Rooted: []int{},
-		Files:  []string{},
-	})
+	recorder.records = append(recorder.records, bodyRecord{Body: key})
 	if !isKeyed {
 		// A body in no file of the file set has no key a build could ask for it by, so it is keyed by no place, and
 		// kept present.
@@ -150,10 +158,17 @@ func (graph *graph) openBody(declaration *ast.FuncDecl, function nodeIndex) {
 func (graph *graph) closeBody() {
 	recorder := graph.recorder
 	record := &recorder.records[recorder.cursor.record]
-	for file := range recorder.files {
-		record.Files = append(record.Files, file)
+	record.PlaceFiles = exactly(recorder.openPlaceFiles)
+	record.Locals = exactly(recorder.openLocals)
+	record.Owned = exactly(recorder.openOwned)
+	record.Uses = exactly(recorder.openUses)
+	if len(recorder.files) > 0 {
+		record.Files = make([]string, 0, len(recorder.files))
+		for file := range recorder.files {
+			record.Files = append(record.Files, file)
+		}
+		slices.Sort(record.Files)
 	}
-	slices.Sort(record.Files)
 
 	first, _ := slices.BinarySearch(recorder.interfaceInstances, recorder.cursor.opening)
 	if first < len(recorder.interfaceInstances) && recorder.interfaceInstances[first] < recorder.cursor.closing {
@@ -164,6 +179,39 @@ func (graph *graph) closeBody() {
 	clear(recorder.uses)
 	clear(recorder.owned)
 	clear(recorder.files)
+	recorder.openLocals = recorder.openLocals[:0]
+	recorder.openOwned = recorder.openOwned[:0]
+	recorder.openUses = recorder.openUses[:0]
+	recorder.openPlaceFiles = recorder.openPlaceFiles[:0]
+	clear(recorder.placeFileIndexes)
+}
+
+// exactly is a copy of list as long as it and no longer, nil for an empty one.
+func exactly[Element any](list []Element) []Element {
+	if len(list) == 0 {
+		return nil
+	}
+	copied := make([]Element, len(list))
+	copy(copied, list)
+	return copied
+}
+
+// indexedPlaceOf is place as the open body's record holds it, its file named by its index among the record's
+// PlaceFiles, which it joins the first time a place of the body is in it. It is false for an offset past what an
+// indexedPlace counts, in a file of four billion bytes, which no build could take a place in either.
+func (graph *graph) indexedPlaceOf(place recordedPlace) (indexedPlace, bool) {
+	if place.Offset < 0 || uint64(place.Offset) > math.MaxUint32 {
+		return indexedPlace{}, false
+	}
+	recorder := graph.recorder
+	file, isIndexed := recorder.placeFileIndexes[place.File]
+	if !isIndexed {
+		// A body places nothing in more files than its package has, so the index is far inside 32 bits.
+		file = uint32(len(recorder.openPlaceFiles))
+		recorder.openPlaceFiles = append(recorder.openPlaceFiles, place.File)
+		recorder.placeFileIndexes[place.File] = file
+	}
+	return indexedPlace{File: file, Offset: uint32(place.Offset)}, true
 }
 
 // keyOf is the key of declaration's body, as a standing body is keyed: the file a `//line` directive names at its
@@ -216,21 +264,22 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 		return recordedEnd{Kind: endLocal, Local: placed.local}
 	}
 	if graph.isLocalOfOpenBody(index) {
-		record := &recorder.records[recorder.cursor.record]
-		worded := graph.objectOf(graph.nodes[index].typesObject)
-		placed := localOfRecord{record: recorder.cursor.record, local: len(record.Locals)}
+		typesObject := graph.nodes[index].typesObject
+		worded := graph.objectOf(typesObject)
+		// A local is a node, and a node's index is 32 bits, so a body has no more locals than the index counts.
+		placed := localOfRecord{record: recorder.cursor.record, local: uint32(len(recorder.openLocals))}
 		place, isInFile := graph.placeOf(worded.position)
-		record.Locals = append(record.Locals, recordedLocal{
-			Place:  place,
-			Kind:   worded.kind,
-			Name:   worded.name,
-			Owners: []recordedEnd{},
+		indexed, isIndexed := graph.indexedPlaceOf(place)
+		recorder.openLocals = append(recorder.openLocals, recordedLocal{
+			Place: indexed,
+			Name:  worded.name,
+			Kind:  kindOf(typesObject),
 		})
 		// A build places a spliced local in its own file set by the name its file was parsed under, which must be one
 		// file's alone there (positionAt): flagged here, as an end its place does not find is, rather than failing
 		// the build's splice.
-		if !isInFile || graph.sharesParsedName(place.File) {
-			record.Present.UnplacedEnd = true
+		if !isInFile || !isIndexed || graph.sharesParsedName(place.File) {
+			recorder.records[recorder.cursor.record].Present.UnplacedEnd = true
 		}
 		recorder.locals[index] = placed
 		return recordedEnd{Kind: endLocal, Local: placed.local}
@@ -245,12 +294,13 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 	if declared.isPlaced {
 		recorder.files[declared.place.File] = struct{}{}
 	}
-	if !declared.isDefined {
+	indexed, isIndexed := graph.indexedPlaceOf(declared.place)
+	if !declared.isDefined || !isIndexed {
 		// The record still names the end by its place, so it says what the walk found. The flag is what keeps a
 		// build from resolving it.
 		recorder.records[recorder.cursor.record].Present.UnplacedEnd = true
 	}
-	return recordedEnd{Kind: endDeclared, Place: declared.place}
+	return recordedEnd{Kind: endDeclared, Place: indexed}
 }
 
 // sharesParsedName is whether two of the package's files were parsed under name, so no place in either can say
@@ -360,8 +410,7 @@ func (graph *graph) recordUse(by nodeIndex, used nodeIndex) {
 	// order the graph numbers them.
 	usedEnd := graph.endOf(used)
 	byEnd := graph.endOf(by)
-	record := &recorder.records[recorder.cursor.record]
-	record.Uses = append(record.Uses, recordedUse{By: byEnd, Used: usedEnd})
+	recorder.openUses = append(recorder.openUses, recordedUse{By: byEnd, Used: usedEnd})
 }
 
 // recordSeen records that the walk saw seen's node, owned by owner's, the root's when nothing owns it, which see is
@@ -393,8 +442,7 @@ func (graph *graph) recordSeen(seen nodeIndex, owner nodeIndex) {
 	}
 	recorder.owned[key] = struct{}{}
 	ownerEnd := graph.endOf(owner)
-	local := &recorder.records[recorder.cursor.record].Locals[seenEnd.Local]
-	local.Owners = append(local.Owners, ownerEnd)
+	recorder.openOwned = append(recorder.openOwned, recordedOwner{Local: seenEnd.Local, Owner: ownerEnd})
 }
 
 // recordWritten records the file written is declared in, a package-level variable whose file's name write read to
