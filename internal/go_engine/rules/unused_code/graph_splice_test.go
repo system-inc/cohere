@@ -127,6 +127,10 @@ func (checked checkedPackage) withoutInstancesOf(taken []bodyRecord) *types.Info
 	bodies := []*ast.BlockStmt{}
 	for _, file := range checked.files {
 		tokenFile := checked.fileSet.File(file.FileStart)
+		if tokenFile == nil {
+			// A file the file set does not hold has no body a key finds (keyOf).
+			continue
+		}
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
 			if !isFunction || function.Body == nil {

@@ -63,7 +63,12 @@ func (graph *graph) takeRecords(records []bodyRecord) error {
 // meetTaken is whether the graph takes declaration's body from a record, noting function as the node of the
 // function the body is of when it does.
 func (graph *graph) meetTaken(declaration *ast.FuncDecl, function nodeIndex) bool {
-	index, isTaken := graph.splice.byKey[graph.keyOf(declaration)]
+	key, isKeyed := graph.keyOf(declaration)
+	if !isKeyed {
+		// A declaration in no file of the file set has no key, and so no record.
+		return false
+	}
+	index, isTaken := graph.splice.byKey[key]
 	if !isTaken {
 		return false
 	}
@@ -178,7 +183,11 @@ func (graph *graph) positionAt(place recordedPlace) (token.Pos, error) {
 	if graph.splice.parsedFiles == nil {
 		graph.splice.parsedFiles = make(map[string]*token.File, len(graph.files))
 		for _, file := range graph.files {
-			tokenFile := graph.tokenFileOf(file.FileStart)
+			tokenFile := graph.fileSet.File(file.FileStart)
+			if tokenFile == nil {
+				// A file the file set does not hold has no name a place could find it by.
+				continue
+			}
 			if _, isNamed := graph.splice.parsedFiles[tokenFile.Name()]; isNamed {
 				// Two parsed files of one name: the place tells them apart for no build, so it finds neither.
 				graph.splice.parsedFiles[tokenFile.Name()] = nil

@@ -121,7 +121,10 @@ type recordedPresence struct {
 	// and offset, and the host's definitions, asked the same, hand back another object or none. go/types checks
 	// the type of `var a, b struct{ x int }` once a variable and so makes x twice at one offset, keeping one for the
 	// identifier, and a selection of the other's x would resolve to the wrong field. It is set too for a local of the
-	// body declared in a file whose name another file of the package was parsed under, which a build cannot place.
+	// body declared in a file whose name another file of the package was parsed under, which a build cannot place,
+	// and for what no record has a place for at all, which no package's syntax should hold but which keeps the body
+	// present rather than stop the host's run: the body, a local or a written variable in no file of the file set, and
+	// an object the body's walk sees, an own edge onto it, that the body does not declare.
 	UnplacedEnd bool `json:"unplacedEnd"`
 }
 

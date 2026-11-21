@@ -2,7 +2,6 @@ package unused_code
 
 import (
 	"cmp"
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -61,10 +60,11 @@ type bodyCursor struct {
 	inSignature bool
 }
 
-// declaredEnd is an object declared outside the bodies that name it: its place, and whether the package's
-// definitions, asked for what is declared at that place, hand back this object.
+// declaredEnd is an object declared outside the bodies that name it: its place, whether it has one, in a file of the
+// file set, and whether the package's definitions, asked for what is declared at that place, hand back this object.
 type declaredEnd struct {
 	place     recordedPlace
+	isPlaced  bool
 	isDefined bool
 }
 
@@ -130,14 +130,20 @@ func (graph *graph) openBody(declaration *ast.FuncDecl, function nodeIndex) {
 		inSignature: true,
 	}
 	recorder.isOpen = true
+	key, isKeyed := graph.keyOf(declaration)
 	// Each list is made empty and never nil, so a record with none of something encodes as it does on any run.
 	recorder.records = append(recorder.records, bodyRecord{
-		Body:   graph.keyOf(declaration),
+		Body:   key,
 		Locals: []recordedLocal{},
 		Uses:   []recordedUse{},
 		Rooted: []int{},
 		Files:  []string{},
 	})
+	if !isKeyed {
+		// A body in no file of the file set has no key a build could ask for it by, so it is keyed by no place, and
+		// kept present.
+		recorder.records[recorder.cursor.record].Present.UnplacedEnd = true
+	}
 }
 
 // closeBody closes the cursor, the body walked, and settles what of its record the walk alone decides.
@@ -161,31 +167,29 @@ func (graph *graph) closeBody() {
 }
 
 // keyOf is the key of declaration's body, as a standing body is keyed: the file a `//line` directive names at its
-// `func`, or else the file's own name, and the offset of that `func` in the file as parsed.
-func (graph *graph) keyOf(declaration *ast.FuncDecl) recordedPlace {
-	tokenFile := graph.tokenFileOf(declaration.Pos())
+// `func`, or else the file's own name, and the offset of that `func` in the file as parsed. It is false for a
+// declaration in no file of the file set, which has no key.
+func (graph *graph) keyOf(declaration *ast.FuncDecl) (recordedPlace, bool) {
+	tokenFile := graph.fileSet.File(declaration.Pos())
+	if tokenFile == nil {
+		return recordedPlace{}, false
+	}
 	return recordedPlace{
 		File:   tokenFile.Position(declaration.Pos()).Filename,
 		Offset: tokenFile.Offset(declaration.Pos()),
-	}
+	}, true
 }
 
 // placeOf is position as a record places an object: by its file's name as parsed, which no `//line` directive
-// changes, and by the offset in that file.
-func (graph *graph) placeOf(position token.Pos) recordedPlace {
-	tokenFile := graph.tokenFileOf(position)
-	return recordedPlace{File: tokenFile.Name(), Offset: tokenFile.Offset(position)}
-}
-
-// tokenFileOf is the file of the file set that position is in.
-func (graph *graph) tokenFileOf(position token.Pos) *token.File {
+// changes, and by the offset in that file. It is false for a position in no file of the file set, which no place
+// names. The package's syntax and every object the walk makes a node are in its files, so none should be, but a
+// record flags such a body rather than stop the host's run (UnplacedEnd).
+func (graph *graph) placeOf(position token.Pos) (recordedPlace, bool) {
 	tokenFile := graph.fileSet.File(position)
 	if tokenFile == nil {
-		// Invariant: a record places only a function declaration of the package's syntax and an object the walk made
-		// a node, each declared in a file of the file set.
-		panic(fmt.Sprintf("a recorded position, %d, is in no file of the file set", position))
+		return recordedPlace{}, false
 	}
-	return tokenFile
+	return recordedPlace{File: tokenFile.Name(), Offset: tokenFile.Offset(position)}, true
 }
 
 // isLocalOfOpenBody is whether index's node is an object declared inside the open body's braces.
@@ -215,7 +219,7 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 		record := &recorder.records[recorder.cursor.record]
 		worded := graph.objectOf(graph.nodes[index].typesObject)
 		placed := localOfRecord{record: recorder.cursor.record, local: len(record.Locals)}
-		place := graph.placeOf(worded.position)
+		place, isInFile := graph.placeOf(worded.position)
 		record.Locals = append(record.Locals, recordedLocal{
 			Place:  place,
 			Kind:   worded.kind,
@@ -225,20 +229,22 @@ func (graph *graph) endOf(index nodeIndex) recordedEnd {
 		// A build places a spliced local in its own file set by the name its file was parsed under, which must be one
 		// file's alone there (positionAt): flagged here, as an end its place does not find is, rather than failing
 		// the build's splice.
-		if graph.sharesParsedName(place.File) {
+		if !isInFile || graph.sharesParsedName(place.File) {
 			record.Present.UnplacedEnd = true
 		}
 		recorder.locals[index] = placed
 		return recordedEnd{Kind: endLocal, Local: placed.local}
 	}
-	declared, isPlaced := recorder.declared[index]
-	if !isPlaced {
+	declared, isAsked := recorder.declared[index]
+	if !isAsked {
 		typesObject := graph.nodes[index].typesObject
-		declared.place = graph.placeOf(typesObject.Pos())
-		declared.isDefined = graph.definedAt(declared.place) == typesObject
+		declared.place, declared.isPlaced = graph.placeOf(typesObject.Pos())
+		declared.isDefined = declared.isPlaced && graph.definedAt(declared.place) == typesObject
 		recorder.declared[index] = declared
 	}
-	recorder.files[declared.place.File] = struct{}{}
+	if declared.isPlaced {
+		recorder.files[declared.place.File] = struct{}{}
+	}
 	if !declared.isDefined {
 		// The record still names the end by its place, so it says what the walk found. The flag is what keeps a
 		// build from resolving it.
@@ -254,7 +260,10 @@ func (graph *graph) sharesParsedName(name string) bool {
 	if recorder.parsedNames == nil {
 		recorder.parsedNames = make(map[string]int, len(graph.files))
 		for _, file := range graph.files {
-			recorder.parsedNames[graph.tokenFileOf(file.FileStart).Name()]++
+			// A file the file set does not hold places nothing (placeOf), so it shares no name.
+			if tokenFile := graph.fileSet.File(file.FileStart); tokenFile != nil {
+				recorder.parsedNames[tokenFile.Name()]++
+			}
 		}
 	}
 	return recorder.parsedNames[name] > 1
@@ -270,16 +279,20 @@ func (graph *graph) definedAt(place recordedPlace) types.Object {
 		// Each identifier is placed from its own file's start, which the syntax holds, so indexing asks the shared
 		// file set once a file and not once an identifier. The files are sorted by where they start, so an
 		// identifier's is the last that starts at or before it.
+		// A file the file set does not hold keeps its start, so its identifiers are found to be its own, and is
+		// unnamed, so they are placed nowhere, as placeOf places nothing in it.
 		type parsedFile struct {
-			start token.Pos
-			name  string
+			start   token.Pos
+			name    string
+			isNamed bool
 		}
 		parsedFiles := make([]parsedFile, 0, len(graph.files))
 		for _, file := range graph.files {
-			parsedFiles = append(parsedFiles, parsedFile{
-				start: file.FileStart,
-				name:  graph.tokenFileOf(file.FileStart).Name(),
-			})
+			parsed := parsedFile{start: file.FileStart}
+			if tokenFile := graph.fileSet.File(file.FileStart); tokenFile != nil {
+				parsed.name, parsed.isNamed = tokenFile.Name(), true
+			}
+			parsedFiles = append(parsedFiles, parsed)
 		}
 		slices.SortFunc(parsedFiles, func(one parsedFile, other parsedFile) int {
 			return cmp.Compare(one.start, other.start)
@@ -299,6 +312,9 @@ func (graph *graph) definedAt(place recordedPlace) types.Object {
 				continue
 			}
 			parsed := parsedFiles[after-1]
+			if !parsed.isNamed {
+				continue
+			}
 			identifierPlace := recordedPlace{File: parsed.name, Offset: int(identifier.Pos() - parsed.start)}
 			if _, isTaken := graph.defined[identifierPlace]; isTaken {
 				// Two parsed files of one name: the place tells their identifiers apart for no build, so it finds
@@ -360,11 +376,12 @@ func (graph *graph) recordSeen(seen nodeIndex, owner nodeIndex) {
 			// A parameter, a result or a type parameter: the signature's own.
 			return
 		}
-		// Invariant: a body's walk sees only what the body's own syntax declares, a name of one of its scopes, a
-		// field, a method of an interface literal or a parameter of a function literal. A record has no place for an
-		// own edge onto anything else, and a build would lose that edge, so the walk stops rather than drop it.
-		panic(fmt.Sprintf("the body at %v saw %v, which it does not declare",
-			recorder.records[recorder.cursor.record].Body, graph.nodes[seen].typesObject))
+		// A body's walk sees only what the body's own syntax declares, a name of one of its scopes, a field, a method
+		// of an interface literal or a parameter of a function literal, so this should not be reached. A record has
+		// no place for an own edge onto anything else, and a build would lose that edge, so the body is kept present
+		// rather than recorded without it, and the host's run goes on.
+		recorder.records[recorder.cursor.record].Present.UnplacedEnd = true
+		return
 	}
 	seenEnd := graph.endOf(seen)
 	if owner == 0 {
@@ -388,7 +405,13 @@ func (graph *graph) recordWritten(written types.Object) {
 	if !graph.recorder.isOpen || written.Pkg() != graph.typesPackage {
 		return
 	}
-	graph.recorder.files[graph.placeOf(written.Pos()).File] = struct{}{}
+	place, isInFile := graph.placeOf(written.Pos())
+	if !isInFile {
+		// The record cannot name the file that decided the edge, so a build could not check it.
+		graph.recorder.records[graph.recorder.cursor.record].Present.UnplacedEnd = true
+		return
+	}
+	graph.recorder.files[place.File] = struct{}{}
 }
 
 // recordInterface records an interface type literal the walk read, interfaceType, which keeps the open body present

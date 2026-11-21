@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"reflect"
 	"strings"
@@ -1088,12 +1089,131 @@ func Third() int {
 	}
 }
 
+// recordFlags is whether each body checked's recording graph walked is flagged UnplacedEnd, by its function's name and
+// in the order the walk read them, each record found by its position among the records, which are in that order.
+func recordFlags(test *testing.T, checked checkedPackage, built *graph) map[string]bool {
+	test.Helper()
+	names := []string{}
+	for _, file := range checked.files {
+		for _, declaration := range file.Decls {
+			if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Body != nil {
+				names = append(names, function.Name.Name)
+			}
+		}
+	}
+	if len(built.recorder.records) != len(names) {
+		test.Fatalf("the walk recorded %d bodies of the package's %d", len(built.recorder.records), len(names))
+	}
+	flagged := map[string]bool{}
+	for index, name := range names {
+		flagged[name] = built.recorder.records[index].Present.UnplacedEnd
+	}
+	return flagged
+}
+
+// TestRecorderFlagsABodyWhoseWalkSeesWhatItDoesNotDeclare holds the recorder to flagging and not stopping
+// (#xeafx79): a body's walk that sees an object outside the body's braces, past its signature, makes an own edge no
+// record has a place for. No syntax go/types checks does that, so Shrunk's closing brace is moved to just past its
+// opening one, which leaves the variable of its `if` outside. The body is kept present and the host's run goes on,
+// and Kept, whose braces are its own, is not flagged.
+func TestRecorderFlagsABodyWhoseWalkSeesWhatItDoesNotDeclare(test *testing.T) {
+	test.Parallel()
+	checked := checkShapes(test, "shrunk", []recordedSource{{"shape.go", `package shape
+
+func Shrunk() int {
+	if limit := 1; limit > 0 {
+		return limit
+	}
+	return 0
+}
+
+func Kept() int {
+	if limit := 2; limit > 0 {
+		return limit
+	}
+	return 0
+}
+`}}, nil)
+	for _, declaration := range checked.files[0].Decls {
+		if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Name.Name == "Shrunk" {
+			function.Body.Rbrace = function.Body.Lbrace + 1
+		}
+	}
+	built, buildError := checked.build(true, nil)
+	if buildError != nil {
+		test.Fatal(buildError)
+	}
+	if flagged := recordFlags(test, checked, built); !reflect.DeepEqual(flagged,
+		map[string]bool{"Shrunk": true, "Kept": false}) {
+		test.Errorf("the bodies are flagged %v, not Shrunk alone", flagged)
+	}
+}
+
+// unheldSources are a package whose second file a test leaves out of the file set its graph is handed: Read uses a
+// variable declared there, Other's body is there with a local, and Kept is wholly in the first file.
+var unheldSources = []recordedSource{
+	{"one.go", `package shape
+
+func Read() int { return value }
+
+func Kept() int {
+	const step = 1
+	return step
+}
+`},
+	{"two.go", `package shape
+
+var value int
+
+func Other() {
+	const step = 1
+}
+`},
+}
+
+// TestRecorderFlagsWhatItsFileSetDoesNotHold holds the recorder to flagging and not stopping (#xeafx79): a graph
+// handed a file set that holds the package's first file alone, at the place it was parsed at, has no file for what is
+// declared in the second. Read's end there and Other's key and local have no place, so both bodies are kept present
+// and the host's run goes on; Kept is recorded as ever, and a graph over the same file set takes its record.
+func TestRecorderFlagsWhatItsFileSetDoesNotHold(test *testing.T) {
+	test.Parallel()
+	checked := checkShapes(test, "unheld", unheldSources, nil)
+	partial := checked
+	partial.fileSet = token.NewFileSet()
+	if _, parseError := parser.ParseFile(partial.fileSet, unheldSources[0].name, unheldSources[0].source,
+		parser.ParseComments); parseError != nil {
+		test.Fatalf("parsing %s: %v", unheldSources[0].name, parseError)
+	}
+	if partial.fileSet.File(checked.files[0].FileStart) == nil ||
+		partial.fileSet.File(checked.files[1].FileStart) != nil {
+		test.Fatal("the file set does not hold the first file alone, at its place, so the case proves nothing")
+	}
+	recording, recordError := partial.build(true, nil)
+	if recordError != nil {
+		test.Fatal(recordError)
+	}
+	flagged := recordFlags(test, partial, recording)
+	if !reflect.DeepEqual(flagged, map[string]bool{"Read": true, "Kept": false, "Other": true}) {
+		test.Errorf("the bodies are flagged %v, not Read and Other", flagged)
+	}
+	if other := recording.recorder.records[2]; other.Body != (recordedPlace{}) || len(other.Locals) != 1 {
+		test.Errorf("Other's record is keyed %+v with %d locals, not by no place with its one", other.Body,
+			len(other.Locals))
+	}
+	if taken, takeError := partial.build(false, []bodyRecord{recording.recorder.records[1]}); takeError != nil {
+		test.Errorf("a graph over the same file set did not take Kept's record: %v", takeError)
+	} else if len(taken.splice.locals) != 1 {
+		test.Errorf("taking Kept's record spliced %d locals, not its one", len(taken.splice.locals))
+	}
+}
+
 // TestRecorderChangesNothingTheRuleFinds holds a graph that records to the graph that does not, over every package of
 // the copy of the original's testdata, test variants included (#xeafx79): the same nodes and edges, and the same
 // verdict on every object, which is also the verdict the analyzer itself returned. Every function declaration with a
 // body there has its one record, and recorded twice it gives the same bytes. The fixtures hold many shapes no case
-// above writes, so this is also where the recorder's one invariant, that a body's walk sees only its own locals,
-// meets them.
+// above writes, so this is also where the recorder meets them. A body whose walk sees what it does not declare is
+// kept present (UnplacedEnd) rather than stopping the run, so a shape that did so would show here only among the
+// present, which the self-splice counts by flag.
 func TestRecorderChangesNothingTheRuleFinds(test *testing.T) {
 	test.Parallel()
 	actions, runError := fixtureRun()
