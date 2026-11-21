@@ -173,9 +173,17 @@ export PATH="$goroot/bin:` + sharedBoxSystemPath + `"
 unset GOINSECURE GOSUMDB
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off
 phase toolchain
+# The runs read modules from a cache of the measurement's own, kept under the scratch: loom's account names a cache of
+# its own (GOMODCACHE=~/cache/go-mod on Shackler), and the default held only what this script had downloaded, so
+# deeafbf4's modules were missing and its runs stopped at type errors, which read as a fast row (Nov 21). Every module
+# of both trees' workspaces is downloaded and verified here, before any run, and the runs then go offline.
+export GOMODCACHE="$base/gomodcache"
+for tree in root deeafbf4; do
+  downloaded=$(cd "$tree" && go mod download 2>&1) ||
+    refuse "go mod download failed at $tree: $(echo "$downloaded" | tail -n 1)"
+  verified=$(cd "$tree" && go mod verify 2>&1) || refuse "go mod verify failed at $tree: $(echo "$verified" | tail -n 1)"
+done
 cd root
-downloaded=$(go mod download 2>&1) || refuse "go mod download failed: $(echo "$downloaded" | tail -n 1)"
-verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verified" | tail -n 1)"
 phase modules
 # The build's Go cache is kept under the scratch across landings, so a landing compiles only what it changed: the binary
 # is built on a cache the box kept, as the file's tools say. A -trimpath build's bytes are the same on any cache.
