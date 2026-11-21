@@ -78,30 +78,16 @@ func storedPlacedOf(answers []fact_resolver.PlacedAnswer) storedPlaced {
 	return stored
 }
 
-// placed is the answers stored holds, in PlacedIn's order, an empty digest read as none, or an error, which is a miss,
-// for columns of different lengths, an index past its table, or an empty answer, which only bytes no storedPlacedOf
-// wrote have: Ask encodes every answer, no fact too, as JSON of some bytes, and empty bytes would decode as the zero
-// value, an answer the run never held.
+// placed is the answers stored holds, in PlacedIn's order, an empty digest read as none, or readError's error, which is
+// a miss.
 func (stored storedPlaced) placed() ([]fact_resolver.PlacedAnswer, error) {
-	rows := len(stored.KindIndexes)
-	if len(stored.FileIndexes) != rows || len(stored.OffsetSteps) != rows || len(stored.Parameters) != rows ||
-		len(stored.Values) != rows || len(stored.FileDigests) != len(stored.Files) {
-		return nil, fmt.Errorf("reading the placed answers: their columns hold %d kinds, %d files, %d offsets, %d "+
-			"parameters and %d values, and their table %d files and %d digests", rows, len(stored.FileIndexes),
-			len(stored.OffsetSteps), len(stored.Parameters), len(stored.Values), len(stored.Files),
-			len(stored.FileDigests))
+	if readError := stored.readError(); readError != nil {
+		return nil, readError
 	}
-	answers := make([]fact_resolver.PlacedAnswer, 0, rows)
+	answers := make([]fact_resolver.PlacedAnswer, 0, len(stored.KindIndexes))
 	previousFile, previousOffset := -1, 0
-	for row := range rows {
-		kind, file := stored.KindIndexes[row], stored.FileIndexes[row]
-		if kind < 0 || kind >= len(stored.Kinds) || file < 0 || file >= len(stored.Files) {
-			return nil, fmt.Errorf("reading the placed answers: row %d names kind %d of %d and file %d of %d", row,
-				kind, len(stored.Kinds), file, len(stored.Files))
-		}
-		if len(stored.Values[row]) == 0 {
-			return nil, fmt.Errorf("reading the placed answers: row %d holds an empty answer", row)
-		}
+	for row, kind := range stored.KindIndexes {
+		file := stored.FileIndexes[row]
 		answer := fact_resolver.PlacedAnswer{Kind: stored.Kinds[kind], File: stored.Files[file],
 			Offset: stored.OffsetSteps[row], Parameter: stored.Parameters[row], Encoded: stored.Values[row]}
 		if len(stored.FileDigests[file]) > 0 {
@@ -114,6 +100,35 @@ func (stored storedPlaced) placed() ([]fact_resolver.PlacedAnswer, error) {
 		previousFile, previousOffset = file, answer.Offset
 	}
 	return answers, nil
+}
+
+// readError is why stored's answers do not read back, nil when they do, read without building them, so a decode that
+// holds none refuses exactly what placed refuses and allocates nothing (#59560yx): columns of different lengths, a
+// table of files and digests of different lengths, a row naming a kind or a file outside its table, or an empty answer,
+// which only bytes no storedPlacedOf wrote have. Ask encodes every answer, no fact too, as JSON of some bytes, and
+// empty bytes would decode as the zero value, an answer the run never held. Each decode of a hit read the answers
+// whole to refuse a bad column, about 5% of a warm run's allocation at cohere's root, which with the collector off is
+// its peak.
+func (stored storedPlaced) readError() error {
+	rows := len(stored.KindIndexes)
+	if len(stored.FileIndexes) != rows || len(stored.OffsetSteps) != rows || len(stored.Parameters) != rows ||
+		len(stored.Values) != rows || len(stored.FileDigests) != len(stored.Files) {
+		return fmt.Errorf("reading the placed answers: their columns hold %d kinds, %d files, %d offsets, %d "+
+			"parameters and %d values, and their table %d files and %d digests", rows, len(stored.FileIndexes),
+			len(stored.OffsetSteps), len(stored.Parameters), len(stored.Values), len(stored.Files),
+			len(stored.FileDigests))
+	}
+	for row, kind := range stored.KindIndexes {
+		file := stored.FileIndexes[row]
+		if kind < 0 || kind >= len(stored.Kinds) || file < 0 || file >= len(stored.Files) {
+			return fmt.Errorf("reading the placed answers: row %d names kind %d of %d and file %d of %d", row, kind,
+				len(stored.Kinds), file, len(stored.Files))
+		}
+		if len(stored.Values[row]) == 0 {
+			return fmt.Errorf("reading the placed answers: row %d holds an empty answer", row)
+		}
+	}
+	return nil
 }
 
 // digestsOf is files' digests as PlacedIn and the placed hand read them, the sha256 of each file's bytes by the name

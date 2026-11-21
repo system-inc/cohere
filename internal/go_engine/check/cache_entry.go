@@ -576,7 +576,7 @@ func entryOf(body []byte, record entryRecord) (cacheEntry, error) {
 }
 
 // restoredOf is entry, a body and its record as entryOf joined them, read whole for decodeEntry, its placed answers
-// held when holdsPlaced asks for them and read either way.
+// held when holdsPlaced asks for them, and refused when they do not read either way.
 func restoredOf(
 	known *cacheAnalyzers,
 	restoring *packages.Package,
@@ -588,12 +588,17 @@ func restoredOf(
 		return nil, fmt.Errorf("reading the entry of %s: it is in format %q, not %q", restoring.ID, entry.Version,
 			CacheFormatVersion)
 	}
-	placed, placedError := entry.Placed.placed()
+	// A decode that holds no placed answers refuses a column that does not read without building the answers
+	// (storedPlaced.readError).
+	var placed []fact_resolver.PlacedAnswer
+	var placedError error
+	if holdsPlaced {
+		placed, placedError = entry.Placed.placed()
+	} else {
+		placedError = entry.Placed.readError()
+	}
 	if placedError != nil {
 		return nil, fmt.Errorf("reading the entry of %s: %w", restoring.ID, placedError)
-	}
-	if !holdsPlaced {
-		placed = nil
 	}
 	restored := &restoredPackage{
 		analyses: map[*analysis.Analyzer]restoredAnalysis{},
