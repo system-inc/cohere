@@ -201,7 +201,9 @@ func exactly[Element any](list []Element) []Element {
 
 // indexedPlaceOf is place as the open body's record holds it, its file named by its index among the record's
 // PlaceFiles, which it joins the first time a place of the body is in it. It is false for an offset past what an
-// indexedPlace counts, in a file of four billion bytes, which no build could take a place in either.
+// indexedPlace counts, in a file of four billion bytes, which no build could take a place in either. Such a body is
+// flagged and never taken, and its canonical form then names the zero place, not the true one: the one place where
+// encoded's bytes would differ from the form before the record was compact, and only for a file past 4 GiB.
 func (graph *graph) indexedPlaceOf(place recordedPlace) (indexedPlace, bool) {
 	if place.Offset < 0 || uint64(place.Offset) > math.MaxUint32 {
 		return indexedPlace{}, false

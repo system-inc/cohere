@@ -1309,13 +1309,16 @@ var value int
 func Other() {
 	const step = 1
 }
+
+func Empty() {}
 `},
 }
 
 // TestRecorderFlagsWhatItsFileSetDoesNotHold holds the recorder to flagging and not stopping (#xeafx79): a graph
 // handed a file set that holds the package's first file alone, at the place it was parsed at, has no file for what is
 // declared in the second. Read's end there and Other's key and local have no place, so both bodies are kept present
-// and the host's run goes on; Kept is recorded as ever, and a graph over the same file set takes its record.
+// and the host's run goes on; Kept is recorded as ever, and a graph over the same file set takes its record. Empty
+// holds no local and names nothing, so its key alone has no place, which openBody flags by itself.
 func TestRecorderFlagsWhatItsFileSetDoesNotHold(test *testing.T) {
 	test.Parallel()
 	checked := checkShapes(test, "unheld", unheldSources, nil)
@@ -1334,8 +1337,8 @@ func TestRecorderFlagsWhatItsFileSetDoesNotHold(test *testing.T) {
 		test.Fatal(recordError)
 	}
 	flagged := recordFlags(test, partial, recording)
-	if !reflect.DeepEqual(flagged, map[string]bool{"Read": true, "Kept": false, "Other": true}) {
-		test.Errorf("the bodies are flagged %v, not Read and Other", flagged)
+	if !reflect.DeepEqual(flagged, map[string]bool{"Read": true, "Kept": false, "Other": true, "Empty": true}) {
+		test.Errorf("the bodies are flagged %v, not Read, Other and Empty", flagged)
 	}
 	if other := recording.recorder.records[2]; other.Body != (recordedPlace{}) || len(other.Locals) != 1 {
 		test.Errorf("Other's record is keyed %+v with %d locals, not by no place with its one", other.Body,

@@ -484,7 +484,8 @@ func TestSpliceCasesFindWhatTheyAreWrittenFor(test *testing.T) {
 	for _, each := range spliceCases {
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
-			built, buildError := checkShapes(test, each.name, each.sources, nil).selfSplice()
+			checked := checkShapes(test, each.name, each.sources, nil)
+			built, buildError := checked.selfSplice()
 			if buildError != nil {
 				test.Fatal(buildError)
 			}
@@ -508,6 +509,16 @@ func TestSpliceCasesFindWhatTheyAreWrittenFor(test *testing.T) {
 			}
 			if each.flagged != "" && flagged != 1 {
 				test.Errorf("%d bodies are flagged, where the case flags %s alone", flagged, each.flagged)
+			}
+			// The one flagged body is the case's, so a flag set on the wrong body is red here and not only where the
+			// self-splice happens to take the body that needed it.
+			if each.flagged != "" {
+				key := functionBodyKey(test, checked, each.flagged)
+				if record, isRecorded := recordKeyedBy(built.records, key); !isRecorded {
+					test.Errorf("the recorder wrote no one record of %s's body", each.flagged)
+				} else if record.Present == (recordedPresence{}) {
+					test.Errorf("%s's body is not flagged, though the case flags it", each.flagged)
+				}
 			}
 		})
 	}
