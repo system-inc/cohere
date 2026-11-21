@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/system_cache_testing"
 )
 
 // assertOneLineNotKept fails the test unless notKept is a reason, said on one line after "system cache not kept: ",
@@ -83,6 +85,14 @@ func TestTheRootIsTheUserCacheDirectoryWhenTheVariableIsUnset(test *testing.T) {
 	}
 	if directory != want {
 		test.Errorf("want the root %s, got %s", want, directory)
+	}
+	// The tests' guard refuses exactly this directory as the person's (system_cache_testing.ExpectIsolated).
+	usersCache, userCacheError := os.UserCacheDir()
+	if userCacheError != nil {
+		test.Fatalf("want a user cache directory under the set environment, got %v", userCacheError)
+	}
+	if guarded := system_cache_testing.PersonsSystemCache(usersCache); guarded != directory {
+		test.Errorf("the tests' guard refuses %s as the person's system cache, want %s", guarded, directory)
 	}
 }
 

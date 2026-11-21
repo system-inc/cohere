@@ -183,8 +183,8 @@ type landingRun struct {
 }
 
 // landOntoMain takes the land lock and lands run's head onto main: merged onto main as it stands, asked again whether
-// main already holds it, gated once, and main fast-forwarded to the landing. It returns the exit code and the landing
-// commit, empty when nothing landed.
+// main already holds it, gated once, measured on Shackler (land_performance.go), and main fast-forwarded to the
+// landing. It returns the exit code and the landing commit, empty when nothing landed.
 func landOntoMain(run landingRun) (int, string) {
 	directory, landDirectoryError := landDirectory()
 	if landDirectoryError != nil {
@@ -298,10 +298,19 @@ func landOntoMain(run landingRun) (int, string) {
 			}
 			return code, ""
 		}
+		// Nothing lands unmeasured: the tree that lands is the gated tree with the performance file written from
+		// Shackler's measurement of the gated commit, and nothing else changed (land_performance.go).
+		measuredTree, measured, measureCode := measurePerformance(run.Worktree, gating, tree, mainCommit)
+		if measureCode != 0 {
+			restore()
+			fmt.Fprintf(streams.Errors, "cohere-dev: the landing was not measured, so nothing landed; %s is back "+
+				"where it was\n", run.Worktree)
+			return measureCode, ""
+		}
 		landing, commitTreeError := commitTree(
 			run.Worktree,
-			tree,
-			run.Message(mainCommit, gated, resolution),
+			measuredTree,
+			run.Message(mainCommit, gated+"\n\n"+measured, resolution),
 			mainCommit,
 			run.Head,
 		)
@@ -340,10 +349,11 @@ func landOntoMain(run landingRun) (int, string) {
 			restore()
 			return 1, ""
 		}
-		// The same tree as the commit it was gated at, so nothing on disk moves.
+		// The tree it was gated at with the performance file written, so nothing else on disk moves.
 		// Ignored: main holds the landing either way, and a worktree left at the gated commit says the same.
 		_, _ = gitCombined(run.Worktree, "switch", "--quiet", "--detach", landing)
-		fmt.Fprintf(streams.Errors, "cohere-dev: landed %s on main: %s\n", shortCommit(landing), run.Subject)
+		fmt.Fprintf(streams.Errors, "cohere-dev: landed %s on main: %s; %s\n", shortCommit(landing), run.Subject,
+			measured)
 		left := shortCommit(run.At)
 		if run.Branch != "" {
 			left = run.Branch + " stays at " + left
