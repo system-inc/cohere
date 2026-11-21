@@ -221,18 +221,30 @@ func (host *HostRun) holdersOf(filename string) []string {
 	return host.holders[filename]
 }
 
-// placedOf is the placed answers of the entry the host's run kept of the package identified so, decoded as every build
-// shares the decode, and whether it kept one that decodes.
+// placedOf is the placed answers of the entry the host's run kept of the package identified so, and whether it kept
+// one that decodes, as every build shares the decode. They are read from the entry's body when asked, since the shared
+// decode holds none (restoredPackage.placed): no build reads them.
 func (host *HostRun) placedOf(identifier string) ([]fact_resolver.PlacedAnswer, bool) {
 	kept := host.entries[identifier]
 	if kept == nil || kept.decoded == nil {
 		return nil, false
 	}
-	restored, decodeError := kept.decoded()
-	if decodeError != nil {
+	if _, decodeError := kept.decoded(); decodeError != nil {
 		return nil, false
 	}
-	return restored.placed, true
+	body, record, _, readError := kept.contents()
+	if readError != nil {
+		return nil, false
+	}
+	entry, entryError := entryOf(body, record)
+	if entryError != nil {
+		return nil, false
+	}
+	placed, placedError := entry.Placed.placed()
+	if placedError != nil {
+		return nil, false
+	}
+	return placed, true
 }
 
 // analysisOf is what analyzer left on the package the host kept under identifier, read from that entry's shared decode

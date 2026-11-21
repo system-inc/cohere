@@ -46,6 +46,15 @@ func tally(words []string, counts map[string]int) {
 	delete(counts, "")
 }
 
+// Two tags exempt two parameters, the first as much as the last.
+//
+// Mutates: first the caller hands in the slice to fill
+// Mutates: second the caller hands in the map to fill
+func twoTagged(first []int, second map[string]int) {
+	first[0] = 1
+	second["key"] = 2
+}
+
 /*
 Mutates: values a block comment tag reads the same as a line comment one
 */

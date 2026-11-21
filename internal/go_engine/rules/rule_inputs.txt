@@ -28,7 +28,10 @@
 #   - consistency-no-abbreviated-identifier suggests a name no file of the package declares; keeps free the name of
 #     every package its imports reach, its whole import closure, not only its own imports (isTakenInGo); and leaves a
 #     method alone where an interface of any package its imports reach fixes its name and signature, as sort's does
-#     for Len, the receiver's whole method set read across the package's files.
+#     for Len, and a method of an interface of ours where any named type of those packages, an interface or not,
+#     declares one of that name and signature, as bytes.Buffer's Len does (fixingMethod). The receiver's whole method
+#     set is no gate of these: a method's signature holds its receiver, so the reach reaches Len where another file
+#     gives its receiver Less and Swap.
 #   - S1018 offers copy() for a sliding loop, S1025 a conversion to string, and stringintconv an import of fmt under
 #     that name, only while no file of the package declares copy, string or fmt, a universe name or a free name looked
 #     up in the package's scope.

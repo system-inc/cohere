@@ -164,7 +164,7 @@ func TestTwoBuildsShareAnEntrysDecodeButNotItsTypes(test *testing.T) {
 		test.Fatalf("reading user's entry: %v", readError)
 	}
 	own, ownError := decodeEntry(buildSession.known, &packages.Package{ID: throughUserPath}, body, record,
-		readExportData)
+		readExportData, false)
 	if ownError != nil {
 		test.Fatalf("decoding user's entry by the build's analyzers: %v", ownError)
 	}

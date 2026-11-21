@@ -47,12 +47,18 @@ func literals(x int, b small, f flag, wide int64) {
 }
 
 func notReported(x int, b bool) {
-	// Found by neither: zero on the left, another value, other operators.
+	// Found by neither: zero on the left, another value, and other operators of integers with a zero on the
+	// right, which the port turns away before it reads a type.
 	_ = 0 | x
 	_ = x | 1
 	_ = x << 0
+	_ = x >> 0
 	_ = x &^ 0
 	_ = x + 0
+	_ = x - 0
+	_ = x * 0
+	_ = x == 0
+	_ = x != 0
 	_ = b && false
 	// Found by neither: an assignment operator is no binary expression.
 	x |= 0

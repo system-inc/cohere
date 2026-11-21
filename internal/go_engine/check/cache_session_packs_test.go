@@ -319,6 +319,34 @@ func keysApartFrom(shard byte, count int) []cache.Key {
 	return keys
 }
 
+// aliasedStore is a store at root holding an entry under target and, in the alias table of packedSession's context,
+// alias standing for it, with second a key of a shard of its own the store holds nothing under yet. Each key is in a
+// shard of its own and none in the table's, so a write to one moves no other's, and the alias's shard holds a file too,
+// so each of the three shards an entry read through the alias is read from has a stamp a pack can hold.
+func aliasedStore(test *testing.T, root string) (store *cache.Store, alias cache.Key, target cache.Key,
+	second cache.Key) {
+	test.Helper()
+	store = cache.Open(root, nil)
+	// The session's alias table is the one of its context, which packedSession leaves empty.
+	keys := keysApartFrom(cache.ShardOf(newAliasTable(store, cache.Context{}).key), 3)
+	alias, target, second = keys[0], keys[1], keys[2]
+	besideTheAlias := alias
+	besideTheAlias[1] = 0x01
+	for key, contents := range map[cache.Key]string{
+		target:         "the entry the alias stands for",
+		besideTheAlias: "another entry of the alias's shard",
+	} {
+		if putError := store.Put(key, []byte(contents)); putError != nil {
+			test.Fatal(putError)
+		}
+	}
+	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: target},
+		aliasTableFloor); addError != nil {
+		test.Fatal(addError)
+	}
+	return store, alias, target, second
+}
+
 // An entry read through an alias was read from the alias table's shard too, so a write to that shard alone, the table
 // rewritten with the alias standing for another key, moves what the pack was made of: the next run reads the alias
 // from the store, as a run with no pack does, and finds the entry it stands for now (#b2t9xmf).
@@ -326,28 +354,11 @@ func TestAnEntryReadThroughAnAliasIsReadAgainOnceItsTableIsRewritten(test *testi
 	test.Parallel()
 
 	root := test.TempDir()
-	store := cache.Open(root, nil)
-	// The session's alias table is the one of its context, which packedSession leaves empty.
-	tableShard := cache.ShardOf(newAliasTable(store, cache.Context{}).key)
-	keys := keysApartFrom(tableShard, 3)
-	alias, first, second := keys[0], keys[1], keys[2]
-	// The alias's shard holds a file too, so each of the three shards the entry was read from has a stamp to hold.
-	besideTheAlias := alias
-	besideTheAlias[1] = 0x01
-	for key, contents := range map[cache.Key]string{
-		first:          "the entry the alias stood for",
-		second:         "the entry it stands for now",
-		besideTheAlias: "another entry of the alias's shard",
-	} {
-		if putError := store.Put(key, []byte(contents)); putError != nil {
-			test.Fatal(putError)
-		}
+	store, alias, _, second := aliasedStore(test, root)
+	if putError := store.Put(second, []byte("the entry it stands for now")); putError != nil {
+		test.Fatal(putError)
 	}
-	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: first},
-		aliasTableFloor); addError != nil {
-		test.Fatal(addError)
-	}
-	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stood for")
+	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stands for")
 	// Only the table's shard is written.
 	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: second},
 		aliasTableFloor); addError != nil {
@@ -358,6 +369,74 @@ func TestAnEntryReadThroughAnAliasIsReadAgainOnceItsTableIsRewritten(test *testi
 	if !found || string(contents) != "the entry it stands for now" || storedKey != second {
 		test.Errorf("want the entry the alias stands for now, got %q under %x (found %v)", contents, storedKey[:1],
 			found)
+	}
+	if served := session.packs.served.Load(); served != 0 {
+		test.Errorf("want nothing served from the pack, got %d", served)
+	}
+}
+
+// An entry the pack serves through an alias is served under the key it is stored under, its target's, as the store
+// reads it: a hit stored under its own key is trusted with no look at its reads (holdAliasHits), and its dependence
+// record is beside the key it is stored under (recordKeyOf), so the pack's hit is judged as the store's would be.
+func TestAnEntryThePackServesThroughAnAliasIsStoredUnderItsTarget(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	_, alias, target, _ := aliasedStore(test, root)
+	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stands for")
+	session := packedSession(runStore(root, laterClock))
+	contents, storedKey, found := session.entryAt(session.caching.Store, alias)
+	if !found || string(contents) != "the entry the alias stands for" || storedKey != target {
+		test.Errorf("want the entry stored under the alias's target, got %q under %x (found %v)", contents,
+			storedKey[:1], found)
+	}
+	if served := session.packs.served.Load(); served != 1 {
+		test.Errorf("want the entry served from the pack, got %d served", served)
+	}
+}
+
+// An entry read through an alias was read from its target's shard too, so another run's write of the target alone,
+// other bytes under the key the alias stands for, moves what the pack was made of: the next run reads the alias from
+// the store, as a run with no pack does, and finds the target as the store holds it now (#b2t9xmf).
+func TestAnEntryReadThroughAnAliasIsReadAgainOnceItsTargetIsWrittenAgain(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store, alias, target, _ := aliasedStore(test, root)
+	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stands for")
+	// Only the target's shard is written.
+	if putError := store.Put(target, []byte("the target another run wrote again")); putError != nil {
+		test.Fatal(putError)
+	}
+	session := packedSession(runStore(root, laterClock))
+	contents, storedKey, found := session.entryAt(session.caching.Store, alias)
+	if !found || string(contents) != "the target another run wrote again" || storedKey != target {
+		test.Errorf("want the target as the store holds it now, got %q under %x (found %v)", contents,
+			storedKey[:1], found)
+	}
+	if served := session.packs.served.Load(); served != 0 {
+		test.Errorf("want nothing served from the pack, got %d", served)
+	}
+}
+
+// An entry read through an alias was read from the alias's own shard too, where the store looks first, so another
+// run's record under the alias itself, which a run with no pack reads before it looks at the alias table, moves what
+// the pack was made of: the next run reads the record under the alias, stored under the alias (#b2t9xmf).
+func TestAnEntryReadThroughAnAliasIsReadAgainOnceARecordIsWrittenUnderTheAlias(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store, alias, _, _ := aliasedStore(test, root)
+	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stands for")
+	// Only the alias's shard is written.
+	if putError := store.Put(alias, []byte("a record another run wrote under the alias")); putError != nil {
+		test.Fatal(putError)
+	}
+	session := packedSession(runStore(root, laterClock))
+	contents, storedKey, found := session.entryAt(session.caching.Store, alias)
+	if !found || string(contents) != "a record another run wrote under the alias" || storedKey != alias {
+		test.Errorf("want the record under the alias, stored under it, got %q under %x (found %v)", contents,
+			storedKey[:1], found)
 	}
 	if served := session.packs.served.Load(); served != 0 {
 		test.Errorf("want nothing served from the pack, got %d", served)
@@ -392,6 +471,59 @@ func TestAWriteBetweenAReadAndTheSaveIsReadFromTheStoreNextRun(test *testing.T) 
 	}
 }
 
+// An alias's target's shard is stamped before the session reads the target through it, so another run's write of the
+// target between the read and the save is after the stamp the pack records, and the next run reads the alias from the
+// store rather than serve the target as this one read it (#b2t9xmf).
+func TestATargetWrittenBetweenAReadThroughItsAliasAndTheSaveIsReadFromTheStoreNextRun(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store, alias, target, _ := aliasedStore(test, root)
+	session := packedSession(runStore(root, laterClock))
+	if contents, _, found := session.entryAt(session.caching.Store, alias); !found ||
+		string(contents) != "the entry the alias stands for" {
+		test.Fatalf("the run read %q (found %v)", contents, found)
+	}
+	if putError := store.Put(target, []byte("the target another run wrote meanwhile")); putError != nil {
+		test.Fatal(putError)
+	}
+	session.writePacks()
+	next := packedSession(runStore(root, laterClock))
+	if contents, _, found := next.entryAt(next.caching.Store, alias); !found ||
+		string(contents) != "the target another run wrote meanwhile" {
+		test.Errorf("want the target as the store holds it now, got %q (found %v)", contents, found)
+	}
+}
+
+// The alias table's shard is stamped before the session resolves an alias by it, so another run's rewrite of the
+// table between the resolution and the save, the alias standing for another key, is after the stamp the pack records,
+// and the next run resolves the alias again and finds the entry it stands for now (#b2t9xmf).
+func TestATableRewrittenBetweenAResolutionAndTheSaveIsReadFromTheStoreNextRun(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store, alias, _, second := aliasedStore(test, root)
+	if putError := store.Put(second, []byte("the entry it stands for now")); putError != nil {
+		test.Fatal(putError)
+	}
+	session := packedSession(runStore(root, laterClock))
+	if contents, _, found := session.entryAt(session.caching.Store, alias); !found ||
+		string(contents) != "the entry the alias stands for" {
+		test.Fatalf("the run read %q (found %v)", contents, found)
+	}
+	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: second},
+		aliasTableFloor); addError != nil {
+		test.Fatal(addError)
+	}
+	session.writePacks()
+	next := packedSession(runStore(root, laterClock))
+	if contents, storedKey, found := next.entryAt(next.caching.Store, alias); !found ||
+		string(contents) != "the entry it stands for now" || storedKey != second {
+		test.Errorf("want the entry the alias stands for now, got %q under %x (found %v)", contents, storedKey[:1],
+			found)
+	}
+}
+
 // A key the run writes without asking it first has its shard stamped before the write (putRecord), so the write marks
 // it moved and the pack records no stamp of it: a stamp taken after the write would hold whatever landed there since,
 // another run's write of the same key here, and the next run would serve the record this run wrote over the store's
@@ -413,6 +545,51 @@ func TestAKeyTheRunWritesIsNeverStampedAfterItsWrite(test *testing.T) {
 	session.writePacks()
 	if read, _ := store.ReadPack(session.packs.byStore[0].place); len(read.Stamps) != 0 {
 		test.Errorf("want no stamp of the shard the run wrote, got %v", read.Stamps)
+	}
+	next := packedSession(runStore(root, laterClock))
+	if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
+		string(contents) != "the record another run wrote" {
+		test.Errorf("want the record the store holds now, got %q (found %v)", contents, found)
+	}
+}
+
+// A shard the run writes after reading its stamp, one the store already held, is recorded as none too: the write
+// marked it moved, and the stamp read before it is of what the store held then, not of what the pack holds. Were it
+// recorded, a shard's time that comes back to it, as a clock stepped back leaves one, would have the next run serve
+// the record this run wrote over another run's write since (#b2t9xmf). The time is set back by the test.
+func TestAShardTheRunWroteAfterReadingItsStampIsNeverRecorded(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x11}
+	if putError := store.Put(key, []byte("the record the run read")); putError != nil {
+		test.Fatal(putError)
+	}
+	session := packedSession(runStore(root, laterClock))
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
+		string(contents) != "the record the run read" {
+		test.Fatalf("the run read %q (found %v)", contents, found)
+	}
+	reading := session.packs.stamp(session.caching.Store, cache.ShardOf(key))
+	if !reading.Trusted {
+		test.Fatalf("want the shard's stamp trusted as the run read it, got %+v", reading)
+	}
+	if putError := session.putRecord(session.caching.Store, key,
+		encodedEntry{record: entryRecord{Version: "the record this run wrote"}}); putError != nil {
+		test.Fatal(putError)
+	}
+	if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
+		test.Fatal(putError)
+	}
+	session.writePacks()
+	if read, _ := store.ReadPack(session.packs.byStore[0].place); len(read.Stamps) != 0 {
+		test.Errorf("want no stamp of the shard the run wrote, got %v", read.Stamps)
+	}
+	stamped := time.Unix(0, reading.Stamp)
+	shardDirectory := filepath.Join(root, ".cache", "cohere", "go", key.String()[:2])
+	if timesError := os.Chtimes(shardDirectory, stamped, stamped); timesError != nil {
+		test.Fatal(timesError)
 	}
 	next := packedSession(runStore(root, laterClock))
 	if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
@@ -462,6 +639,42 @@ func TestARecordTheRunWroteAgainIsNeverServedOldOnAReload(test *testing.T) {
 	stored, _ := store.Get(key)
 	if contents, _, found := session.entryAt(session.caching.Store, key); !found || !bytes.Equal(contents, stored) {
 		test.Errorf("want the reload to read the record the run wrote, got %q (found %v)", contents, found)
+	}
+}
+
+// A save that writes the pack has a reload's Restore serve what it wrote, the entries with their stamps together: a
+// key the pack held stale when the run opened it, written again by another run since, which the run read from the
+// store, is served on a reload as the store holds it, never as the pack held it when opened, whose stamp the save
+// replaced with the one the run read (#b2t9xmf).
+func TestAKeyThePackHeldStaleIsServedOnAReloadAsTheRunReadIt(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x12}
+	if putError := store.Put(key, []byte("the record the pack was made of")); putError != nil {
+		test.Fatal(putError)
+	}
+	packedOnce(test, runStore(root, laterClock), key, "the record the pack was made of")
+	if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
+		test.Fatal(putError)
+	}
+	session := packedSession(runStore(root, laterClock))
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
+		string(contents) != "the record another run wrote" || session.packs.stale.Load() != 1 {
+		test.Fatalf("want the record read from the store as stale, got %q (found %v, %d stale)", contents, found,
+			session.packs.stale.Load())
+	}
+	session.writePacks()
+	if counts := session.counts.Packs; counts == nil || counts.Written != 1 {
+		test.Fatalf("want the save's pack written, got %+v", counts)
+	}
+	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
+		string(contents) != "the record another run wrote" {
+		test.Errorf("want the reload to read the record the run read, got %q (found %v)", contents, found)
+	}
+	if served := session.packs.served.Load(); served != 1 {
+		test.Errorf("want the reload served from the pack the save wrote, got %d served", served)
 	}
 }
 

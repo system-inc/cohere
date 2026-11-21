@@ -138,6 +138,29 @@ func genericFloats[T ~int | ~float64, U comparable](value T, other U) {
 	_ = other == other
 }
 
+// Found by neither: a type declared in a function as a float, and a type parameter that is one, each under the name
+// the two below give a type that is not, which the check keeps apart by type, not by name.
+func localFloat(value float64) {
+	type reading float64
+	measured := reading(value)
+	_ = measured == measured
+}
+
+func genericLocalFloat[T ~float64](value T) {
+	_ = value == value
+}
+
+// Found by both: a type declared in a function, and a type parameter, of the names above, neither a float.
+func localInteger(value int) {
+	type reading int
+	counted := reading(value)
+	_ = counted == counted
+}
+
+func genericLocalInteger[T ~int](value T) {
+	_ = value == value
+}
+
 // Found by neither: a blank variable given two empty literals compared, a compile-time assertion of comparability.
 var _ = point{} == point{}
 
@@ -200,4 +223,31 @@ func selectorsOfOneSel(value pair, other pair) {
 func parenthesizedNames(count int, value pair) {
 	_ = (count) == (count)
 	_ = (value.left) != (value.left)
+}
+
+// Found by both: literals spelled alike. Spellings the printer alone makes one, 0X1F and 0x1F, are held by
+// TestLiteralSpellingsSettleAsThePrinterPrints, since gofmt over this file would rewrite them to one spelling.
+func literalsSpelledAlike() {
+	_ = 'a' == 'a'
+	_ = `a` == `a`
+	_ = 0x1F == 0x1F
+	_ = 1i != 1i
+	var _ int = 1e3 - 1e3
+}
+
+// Found by neither: literals of one value spelled apart in ways the printer keeps, which the check tells apart by
+// their spellings without printing: another base, an underscore, a float's form, a raw string beside an interpreted
+// one, and a rune escaped. A hexadecimal digit's case, an imaginary number's form and two kinds are printed.
+func literalsSpelledApart() {
+	_ = 0x1 == 1
+	_ = 07 == 0o7
+	_ = 1_000 == 1000
+	_ = 0xa == 0xA
+	_ = 1i == 1.0i
+	var _ int = 1.0 - 1.
+	var _ int = 1e3 - 1000.
+	_ = "a" == `a`
+	_ = 'a' == '\x61'
+	_ = 'a' == '\u0061'
+	_ = 'a' == 97
 }

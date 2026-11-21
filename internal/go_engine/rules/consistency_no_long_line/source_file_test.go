@@ -73,3 +73,63 @@ func TestFileWithoutALongLineSkipsTheWalk(test *testing.T) {
 			longToken.LineCount())
 	}
 }
+
+// TestLongLinesAgreeWithTheMeasureAtTheBound holds that the bound gatherLongLines skips a line on, its bytes with each
+// tab's extra columns added, never skips a line the rune by rune measure finds past the limit. Each line sits at the
+// limit or one past it, where the bound and the measure meet, with tabs, multi-byte letters, a byte that is no rune and
+// a carriage return, and each is checked against both columnsOf and the width a reader counts by hand.
+func TestLongLinesAgreeWithTheMeasureAtTheBound(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		text   string
+		length int
+	}{
+		{text: "", length: 0},
+		{text: strings.Repeat("a", 120), length: 120},
+		{text: strings.Repeat("a", 121), length: 121},
+		{text: strings.Repeat("\t", 30), length: 120},
+		{text: strings.Repeat("\t", 30) + "a", length: 121},
+		{text: strings.Repeat("\t", 29) + "abcd", length: 120},
+		{text: strings.Repeat("\t", 29) + "abcde", length: 121},
+		{text: "\t" + strings.Repeat("a", 116), length: 120},
+		{text: "\t" + strings.Repeat("a", 117), length: 121},
+		// Past the limit in bytes and at it in runes, so the bound cannot skip it and the measure must clear it.
+		{text: strings.Repeat("é", 120), length: 120},
+		{text: strings.Repeat("é", 121), length: 121},
+		{text: "\t" + strings.Repeat("語", 116), length: 120},
+		{text: "\t" + strings.Repeat("語", 117), length: 121},
+		// A byte that is no rune decodes as one column.
+		{text: strings.Repeat("\xff", 120), length: 120},
+		{text: strings.Repeat("\xff", 121), length: 121},
+		// The carriage return of a line ending is no part of the line.
+		{text: strings.Repeat("a", 120) + "\r", length: 120},
+	}
+	var content []byte
+	for _, testCase := range cases {
+		content = append(append(content, testCase.text...), '\n')
+	}
+	tokenFile := token.NewFileSet().AddFile("bound.go", -1, len(content))
+	tokenFile.SetLinesForContent(content)
+	source := &sourceFile{tokenFile: tokenFile, content: content, lines: tokenFile.Lines()}
+	gathered := map[int]longLine{}
+	for _, long := range source.gatherLongLines() {
+		gathered[long.line] = long
+	}
+	for index, testCase := range cases {
+		line := index + 1
+		measured := columnsOf(source.content[source.lineStart(line):source.lineEnd(line)])
+		if measured != testCase.length {
+			test.Errorf("line %d, %q, measures %d columns, where a reader counts %d", line, testCase.text, measured,
+				testCase.length)
+		}
+		long, found := gathered[line]
+		if found != (testCase.length > Limit) {
+			test.Errorf("line %d, %q, of %d columns, gathered as long: %t", line, testCase.text, testCase.length, found)
+			continue
+		}
+		if found && long.length != testCase.length {
+			test.Errorf("line %d, %q, gathered at %d columns, where it is %d", line, testCase.text, long.length,
+				testCase.length)
+		}
+	}
+}

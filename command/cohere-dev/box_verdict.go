@@ -304,7 +304,7 @@ func runBoxGate(
 		if boxesError != nil {
 			return boxVerdict{}, boxesError.Error()
 		}
-		wait, waitError := gateWait(os.Getenv(gateWaitVariable))
+		wait, waitError := waitSetting(gateWaitVariable, os.Getenv(gateWaitVariable), gateWaitDefault)
 		if waitError != nil {
 			return boxVerdict{}, waitError.Error()
 		}

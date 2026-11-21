@@ -20,11 +20,15 @@ type BodyRenderings struct {
 	bodies map[BodyPlace]RenderedBody
 }
 
-// RenderedBody is one body rendered: its facts, sorted, and the line its body ends on, which with its declaration's
-// first line bounds the findings compared with it.
+// RenderedBody is one body rendered: its facts, sorted, and where a finding in it is placed, as check places one
+// (check's newFinding, #99saas4): ParsedFile, the file as parsed, and FirstLine and LastLine, its declaration's first
+// line and its body's last as written, whatever a //line directive moves its positions to, which bound the findings
+// compared with it.
 type RenderedBody struct {
-	Facts    []RenderedFact
-	LastLine int
+	Facts      []RenderedFact
+	ParsedFile string
+	FirstLine  int
+	LastLine   int
 }
 
 // BodyPlace is where a body's declaration starts: the file a reader sees, past any //line directive, and its offset

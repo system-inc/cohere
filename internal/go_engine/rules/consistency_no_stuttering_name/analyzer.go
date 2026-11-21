@@ -148,7 +148,15 @@ func baseName(expression ast.Expr) *ast.Ident {
 
 // lowerFirst is name with its first letter lowered, so an exported member, result.Result, matches its variable as an
 // unexported one, result.result, does.
+//
+// The walk lowers the base of every selector it hears, and nearly every base, a variable or an imported package,
+// already opens lowercase. unicode.ToLower changes an ASCII rune only when it is one of A to Z, so a name opening with
+// any other ASCII byte is its own lowered form and is handed back as it is, with no new string built. The empty name
+// takes the long way, where the decode's replacement rune is what it has always lowered to.
 func lowerFirst(name string) string {
+	if name != "" && name[0] < utf8.RuneSelf && (name[0] < 'A' || 'Z' < name[0]) {
+		return name
+	}
 	first, size := utf8.DecodeRuneInString(name)
 	return string(unicode.ToLower(first)) + name[size:]
 }

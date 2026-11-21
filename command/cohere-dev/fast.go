@@ -103,14 +103,15 @@ var landingGateOnly = []landingGateEntry{
 	},
 }
 
-// fastTest runs the fast tier in the environment given, under the bound when there is one, and returns go
-// test's exit code.
-func fastTest(base []string, arguments []string, limit *bound) int {
+// fastTest runs the fast tier of the module at root, the working directory's when it is empty, in the environment
+// given, under the bound when there is one, and returns go test's exit code. A train's pre-check runs it in the
+// worktree being landed (land_train.go).
+func fastTest(root string, base []string, arguments []string, limit *bound) int {
 	fmt.Fprintf(streams.Errors, "cohere-dev: fast tier, at load %s\n", machineLoad())
 	// Listing the module's packages takes a moment, and a person watches for the run to begin.
 	streams.Show(streams.Errors)
 
-	packages, modulePackagesError := modulePackages(base)
+	packages, modulePackagesError := modulePackagesIn(root, base)
 	if modulePackagesError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", modulePackagesError)
 		return 1
@@ -146,6 +147,7 @@ func fastTest(base []string, arguments []string, limit *bound) int {
 	}
 	code := runAttached(
 		limit,
+		root,
 		append(environment, fastTierVariable+"=1"),
 		"go",
 		append(append([]string{"test"}, arguments...), selected...),
@@ -167,16 +169,13 @@ func fastTest(base []string, arguments []string, limit *bound) int {
 	return code
 }
 
-// modulePackages is every package of the module, named as `go test` names it from the module root.
+// modulePackagesIn is every package of the module at root, or the working directory's when it is empty, named as
+// `go test` names it from the module root.
 //
 // The root module's only: the fast tier is not the landing gate, so it leaves the other modules go.work
 // names (the shims, static_single_assignment) to the gate and to `cohere-dev test ./...` (workspace.go).
-func modulePackages(environment []string) (map[string]bool, error) {
-	return modulePackagesIn("", environment)
-}
-
-// modulePackagesIn is modulePackages for the module at root, or the working directory's when it is empty,
-// listed in the environment the run's tests get. It once listed in the caller's own, so in a worktree with
+//
+// It is listed in the environment the run's tests get. It once listed in the caller's own, so in a worktree with
 // TypeScript a symlink, from a shell with no go flags, go list failed on VCS stamping and the fast tier
 // stopped there (2026-11-05). go's stderr goes in the error, which said only "exit status 1" without it.
 func modulePackagesIn(root string, environment []string) (map[string]bool, error) {
