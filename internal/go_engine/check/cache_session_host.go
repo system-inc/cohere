@@ -99,6 +99,10 @@ type hostState struct {
 	// whatever TypesHold says, the planted miss the package differential must report, empty in every run.
 	forcedThrough string
 
+	// declinesTold, set only by a test (TellDeclinesAtLoad), is told each package a load declines, with why, from the
+	// load's goroutines; nil in every run.
+	declinesTold func(identifier string, why string)
+
 	// writtenThrough are this load's packages written through to the build's own store (writeThrough), each once: an
 	// untouched package is settled from the start, so the first wave's save would write it, and every later one again.
 	writtenThrough map[*packages.Package]bool
@@ -189,6 +193,16 @@ func (session *CacheSession) JudgeSkipped(
 func (session *CacheSession) ForceThrough(identifier string) {
 	if session.host != nil && session.host.judgesSkipped != nil {
 		session.host.forcedThrough = identifier
+	}
+}
+
+// TellDeclinesAtLoad has the session's restore from the host's run tell told each package a load declines
+// (declineAtLoad), by ID and with why, as it declines it, from the load's goroutines, so a test reads every load's
+// declines and not the last load's alone (HostRestoreCounts.Declined, #78tynz4). Nothing of the run changes. Only a
+// test calls it, after RestoreFromHost; a run never does.
+func (session *CacheSession) TellDeclinesAtLoad(told func(identifier string, why string)) {
+	if session.host != nil {
+		session.host.declinesTold = told
 	}
 }
 
@@ -584,6 +598,9 @@ func (session *CacheSession) declineAtLoad(candidate *packages.Package, hosted *
 		why = "export data that did not read"
 	}
 	state := session.host
+	if state.declinesTold != nil {
+		state.declinesTold(candidate.ID, why)
+	}
 	state.lock.Lock()
 	defer state.lock.Unlock()
 	delete(session.hits, candidate)
