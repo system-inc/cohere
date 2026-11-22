@@ -18,60 +18,94 @@ import (
 // took 428s of wall and 1,055 CPU-seconds at a load of 8 to 42 (Nov 12).
 //
 // Every package holding a test whose name or file says it runs code at once is here, which
-// TestEveryConcurrencyTestIsRaceGated holds, and a package may be here for a reason its test names don't show.
+// TestEveryConcurrencyTestIsRaceGated holds, and a package may be here for a reason its test names don't show. An
+// entry runs its whole package unless it names a run, which TestEveryRaceRunSelectsItsPackagesConcurrencyTests holds
+// to every test of its package the guard calls concurrent.
 var raceGated = []raceEntry{
-	{"command/cohere", "TestFormatInParallelLeavesTheRulesToTheSerialPath formats files at once " +
+	{directory: "command/cohere", reason: "TestFormatInParallelLeavesTheRulesToTheSerialPath formats files at once " +
 		"(fix_parallel_test.go)"},
-	{"command/cohere-dev", "the pool's tokens, its line, borrowing and the bounded run's watchdog run side by side, " +
-		"and its tests call code that writes the package-wide streams, which raced on Home (#bnabymg)"},
-	{"internal/edit", "TestConcurrentReadersNeverSeeAPartialFile reads while a write replaces the file"},
-	{"internal/executable_testing", "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs scripts while " +
-		"other goroutines fork (#g93ts58)"},
-	{"internal/go_engine/bounded", "its worker pool runs a function on every index at once, as many as there " +
-		"are cores"},
-	{"internal/go_engine/build_dependence", "TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild adds packages " +
-		"from many goroutines, each through a scratch of the shared pool (scratch_test.go, #86qvr6b)"},
-	{"internal/go_engine/build_reads", "TestOneRecordReadByManyAtOnceIsJudgedOnce reads one package's record of " +
-		"function uses from several goroutines, each asking first for the judgment it makes once " +
-		"(function_uses_judgment_test.go, #kr1m304)"},
-	{"internal/go_engine/cache", "TestConcurrentPutsOfOneKeyLeaveAWholeEntry writes one key from several goroutines"},
-	{"internal/go_engine/check", "dependence sets and type graph digests are computed at once over one host " +
-		"(dependence_concurrency_test.go, type_graph_concurrency_test.go), and a run beside the load saves and " +
-		"keeps only what the load has made final (cache_session_beside_load_test.go: " +
+	{directory: "command/cohere-dev", reason: "the pool's tokens, its line, borrowing and the bounded run's watchdog " +
+		"run side by side, and its tests call code that writes the package-wide streams, which raced on Home " +
+		"(#bnabymg)"},
+	{directory: "internal/edit", reason: "TestConcurrentReadersNeverSeeAPartialFile reads while a write replaces " +
+		"the file"},
+	{directory: "internal/executable_testing", reason: "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs " +
+		"scripts while other goroutines fork (#g93ts58)"},
+	{
+		directory: "internal/go_engine",
+		// The guard's own words (concurrencyTestName), so the run selects every test whose name says it runs code at
+		// once, and none of the package's others.
+		run: "Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad",
+		reason: "the early start writes the host's go env while a load it was handed reads it (early_start_test.go: " +
+			"TestTheHostsGoEnvironmentIsWholeWhenALoadReadsItAtOnceWithTheEarlyStart, #e8w514b), extra builds run " +
+			"side by side (pipeline_builds_beside_test.go), and the lint runs beside the load " +
+			"(engine_overlap_test.go, #2xddz1z). It runs only those tests, the ones whose names say they run code " +
+			"at once: the whole package under -race takes about 28 minutes on 2 to 3 threads, past the box's " +
+			"30-minute timeout (sharedBoxTestTimeout)",
+	},
+	{directory: "internal/go_engine/bounded", reason: "its worker pool runs a function on every index at once, as " +
+		"many as there are cores"},
+	{directory: "internal/go_engine/build_dependence", reason: "TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild " +
+		"adds packages from many goroutines, each through a scratch of the shared pool (scratch_test.go, #86qvr6b)"},
+	{directory: "internal/go_engine/build_reads", reason: "TestOneRecordReadByManyAtOnceIsJudgedOnce reads one " +
+		"package's record of function uses from several goroutines, each asking first for the judgment it makes " +
+		"once (function_uses_judgment_test.go, #kr1m304)"},
+	{directory: "internal/go_engine/cache", reason: "TestConcurrentPutsOfOneKeyLeaveAWholeEntry writes one key from " +
+		"several goroutines"},
+	{directory: "internal/go_engine/check", reason: "dependence sets and type graph digests are computed at once " +
+		"over one host (dependence_concurrency_test.go, type_graph_concurrency_test.go), and a run beside the load " +
+		"saves and keeps only what the load has made final (cache_session_beside_load_test.go: " +
 		"TestARunBesideTheLoadSavesAPackageOnlyOnceTheLoadHasMadeItFinal, " +
 		"TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal, #641hyrh)"},
-	{"internal/go_engine/check/checker", "the scheduler runs groups and actions at once, up to its slots and workers"},
-	{"internal/go_engine/fact_resolver", "TestObjectsAskedAtOnceAreNamedAsObjectpathNamesThem asks the resolver's " +
-		"objectpath encoders from several goroutines while each indexes its package (object_path_test.go, #8d9r2rh)"},
-	{"internal/go_engine/intermediate_representation", "the intermediate representation is built in parallel " +
-		"(parallel_build_test.go)"},
-	{"internal/go_engine/load", "the loader lists and type-checks packages side by side"},
-	{"internal/go_engine/rules/marker", "TestAnIndexAskedAtOnceAnswersAsOneBuiltUpFront asks one file's lazily " +
-		"built comment index from several goroutines, as rules and a package's shards do (#fex6s0v)"},
-	{"internal/go_engine/suppression", "TestBuildConcurrently builds suppression tables from several goroutines"},
-	{"internal/lint/rules/typescript", "TestNoDupeClassMembersAndACheckerReadTheClassAtOnce runs the rule beside " +
-		"a checker's read of the class it lints (no_dupe_class_members_concurrency_test.go, #72kn826)"},
-	{"internal/release/dispatch", "TestInstallingTheEngineConcurrentlyLeavesOneBinary installs from two runs at once"},
-	{"internal/types/program", "programs check, parse libraries and record their run cache at once, and every " +
-		"rule walks a file while a checker and a reader read its tree (checker_concurrency_test.go, " +
+	{directory: "internal/go_engine/check/checker", reason: "the scheduler runs groups and actions at once, up to " +
+		"its slots and workers"},
+	{directory: "internal/go_engine/fact_resolver", reason: "TestObjectsAskedAtOnceAreNamedAsObjectpathNamesThem " +
+		"asks the resolver's objectpath encoders from several goroutines while each indexes its package " +
+		"(object_path_test.go, #8d9r2rh)"},
+	{directory: "internal/go_engine/intermediate_representation", reason: "the intermediate representation is built " +
+		"in parallel (parallel_build_test.go)"},
+	{directory: "internal/go_engine/load", reason: "the loader lists and type-checks packages side by side"},
+	{directory: "internal/go_engine/rules/marker", reason: "TestAnIndexAskedAtOnceAnswersAsOneBuiltUpFront asks one " +
+		"file's lazily built comment index from several goroutines, as rules and a package's shards do (#fex6s0v)"},
+	{directory: "internal/go_engine/suppression", reason: "TestBuildConcurrently builds suppression tables from " +
+		"several goroutines"},
+	{directory: "internal/lint/rules/typescript", reason: "TestNoDupeClassMembersAndACheckerReadTheClassAtOnce runs " +
+		"the rule beside a checker's read of the class it lints (no_dupe_class_members_concurrency_test.go, " +
+		"#72kn826)"},
+	{directory: "internal/release/dispatch", reason: "TestInstallingTheEngineConcurrentlyLeavesOneBinary installs " +
+		"from two runs at once"},
+	{directory: "internal/types/program", reason: "programs check, parse libraries and record their run cache at " +
+		"once, and every rule walks a file while a checker and a reader read its tree (checker_concurrency_test.go, " +
 		"library_parses_test.go, run_cache_test.go, rule_walk_concurrency_test.go, #qb5xxj1)"},
-	{"internal/write_root", "TestCopiesAskedAtOnceAgree asks for one copy from several goroutines"},
+	{directory: "internal/write_root", reason: "TestCopiesAskedAtOnceAgree asks for one copy from several goroutines"},
 }
 
-// raceEntry is one package the gate runs under -race, by its directory under the module root, and why.
+// raceEntry is one package the gate runs under -race, by its directory under the module root, and why. Its run is a
+// go test -run pattern selecting the tests of the package the -race run runs, empty for all of them.
 type raceEntry struct {
 	directory string
+	run       string
 	reason    string
 }
 
-// racePatterns is the go test patterns of the raceGated packages that exist in the tree at root, so a tree that
-// holds none of them, a fixture's, runs no -race at all.
+// raceRunSeparator divides a race token's directory from its run, as racePatterns writes it and the gate's scripts
+// read it.
+const raceRunSeparator = "@"
+
+// racePatterns is the race tokens of the raceGated packages that exist in the tree at root, so a tree that holds none
+// of them, a fixture's, runs no -race at all. A token is `./<directory>`, a package whose tests all run, or
+// `./<directory>@<run>`, one whose -race run is only the tests its run selects. The gate's scripts take them
+// comma-separated and run the plain ones in one go test, and each with a run in a go test of its own after it.
 func racePatterns(root string) []string {
 	patterns := []string{}
 	for _, entry := range raceGated {
 		if information, statError := os.Stat(filepath.Join(root, entry.directory)); statError == nil &&
 			information.IsDir() {
-			patterns = append(patterns, "./"+entry.directory)
+			token := "./" + entry.directory
+			if entry.run != "" {
+				token += raceRunSeparator + entry.run
+			}
+			patterns = append(patterns, token)
 		}
 	}
 	return patterns

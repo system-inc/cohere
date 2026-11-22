@@ -303,11 +303,20 @@ var macBoxRemote = regexp.MustCompile(
 // The push puts the commit being landed in Loom's feed for cohere, the gap runs on Sun2 within its bound over ssh to
 // her, and the script it carries, decoded from the recorded call, works under the scratch directory alone, fetches
 // from the Macs' mirrors, and runs sharedBoxGate against go1.27.1 darwin/arm64 and node v24.19.0 darwin-arm64 as the
-// Macs hold them, by their digests read on Sun2 and Marin.
+// Macs hold them, by their digests read on Sun2 and Marin. The races reach the script as one quoted argument, a
+// package whose entry names a run carrying it whole after an at sign.
 func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	test.Parallel()
 	fixture := newMacBoxFixture(test, false)
-	fixture.reply("Sun2.run", macBoxPassing)
+	// A package at the -race list's entry that names a run, so the races the script is handed carry it.
+	engine := raceGatedEntry(test, "internal/go_engine")
+	worktree := fixture.worktree("a")
+	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_engine", "engine_test.go"),
+		"package go_engine\n\nimport \"testing\"\n\nfunc TestEngine(test *testing.T) {}\n")
+	fixture.git(worktree, "add", ".")
+	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("an engine"))
+	fixture.reply("Sun2.run", macBoxPassing+boxRaceMarker+"\n"+
+		`{"Action":"pass","Package":"example.com/fixture/internal/go_engine"}`+"\n")
 	landed, output, calls, _ := fixture.landing()
 	if !landed {
 		test.Fatalf("the landing did not land:\n%s", output)
@@ -323,8 +332,8 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	commit, pin, races, corpora, patterns := string(found[2]), string(found[3]), string(found[4]), string(found[5]),
 		string(found[6])
 	if fixture.git(fixture.repository, "rev-parse", commit+"^{tree}") !=
-		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" || races != "" || corpora != "-" ||
-		patterns != "./..." {
+		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" ||
+		races != "./internal/go_engine@"+engine.run || corpora != "-" || patterns != "./..." {
 		test.Errorf("the script was handed commit %s, pin %q, races %q, corpora %q and patterns %q", commit, pin,
 			races, corpora, patterns)
 	}

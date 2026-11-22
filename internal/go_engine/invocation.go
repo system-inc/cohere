@@ -55,6 +55,11 @@ type invocation struct {
 	// readFromDisk is how read reads a file from disk, os.ReadFile unless a test watches the run's reads, never read
 	// from the command line.
 	readFromDisk func(file string) ([]byte, error)
+
+	// hostFetchHeld is a test's hold on the early start's own fetch of the host's lister state, called once the host's
+	// go env is handed out and before that fetch (startEarly), so the test's fetch is the first, nil in every run but a
+	// test's, never read from the command line.
+	hostFetchHeld func()
 }
 
 // timelineRefusals are the runs that refuse `--timeline`, by mode, each with what it does in place of a check: only a

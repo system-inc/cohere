@@ -82,7 +82,8 @@ func describeProject(request invocation) (described *describedProject, describeE
 	// and handed to the pipeline, so the run has one system cache, one store and one set of shard stamps (newPipeline).
 	shardStamps := cache.NewShardStamps(nil)
 	system := openSystemCache(request, shardStamps)
-	early := startEarly(workspace, held, children, system.contexts(), !timed && loads, readsBuilds)
+	early := startEarly(workspace, held, children, system.contexts(), !timed && loads, readsBuilds,
+		request.hostFetchHeld)
 	defer func() {
 		// A refusal leaves no go command running.
 		if describeError != nil {
