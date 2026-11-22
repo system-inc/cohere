@@ -677,8 +677,12 @@ func (differential *buildBodyDifferential) compareStandingPackage(
 // empty, as the host's capture writes one. A difference fails at the first standing user, in the order the host
 // declares them, under the analyzer's name.
 //
-// A variable or a field of another package (fact_reach.PushedObject.Local) has a kind in the package no capture holds,
-// which the facts' reach takes every user out for, so one that stands fails whatever its facts read.
+// Two of the build's objects can name one identity only where two packages of one path are in its closure, which
+// standing_facts' finder reads as no package (packageAt), so the object unknown and its users gone. Then no one of
+// them is the host's more than another, whichever a map's order meets first, so such a match reads as neither's fact,
+// and a user that still stands fails. And a variable or a field of another package (fact_reach.PushedObject.Local) has
+// a kind in the package no capture holds, which the facts' reach takes every user out for, so one that stands fails
+// whatever its facts read.
 func (differential *buildBodyDifferential) compareStandingPushed(
 	hosted *factReachPackage,
 	standing map[fact_reach.Place]bool,
@@ -714,12 +718,15 @@ func (differential *buildBodyDifferential) compareStandingPushed(
 				builtWords[analyzer] = rendered
 			}
 			differential.standingCompared[analyzer]++
-			built := ""
+			built, matched := "", 0
 			for _, each := range builtWords[analyzer] {
 				if sameStandingObject(each.identity, object.Identity, builtPackage.PkgPath) {
 					built = each.words
-					break
+					matched++
 				}
+			}
+			if matched > 1 {
+				built = fmt.Sprintf("one of %d objects of the identity", matched)
 			}
 			if built != object.Pushed[analyzer] {
 				fail(users[0], object.Identity.String(), analyzer, strconv.Quote(object.Pushed[analyzer]),

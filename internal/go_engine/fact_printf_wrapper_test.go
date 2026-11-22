@@ -1,12 +1,19 @@
 package go_engine
 
 import (
+	"go/token"
+	"go/types"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
 // Two printf wrapper facts that are no function's, each shown on a pair of modules as #7v2bzvd's deprecation was
@@ -286,5 +293,47 @@ func TestAPrintfWrapperFoundForAnImportedVariableTakesItsUserOut(test *testing.T
 			requireNoDifferentialFailure(test, settled)
 			requireOwnFindingsAlike(test, each.fixture)
 		})
+	}
+}
+
+// Two of the build's objects render one identity of another package only where two packages of one path are in the
+// build's closure (seats' review-1's question). The second leg once took whichever of them a map's order met first, so
+// a standing user of the identity passed or failed by chance; it reads such a match as neither object's fact now, and
+// fails each time. It is asked many times, since each call ranges its map anew.
+func TestTheSecondLegReadsAnIdentityTwoObjectsShareAsNeithers(test *testing.T) {
+	test.Parallel()
+
+	// variable is a package-level variable Logf of a package of its own, every one at the path example.com/api.
+	variable := func() *types.Var {
+		api := types.NewPackage("example.com/api", "api")
+		logf := types.NewVar(token.NoPos, api, "Logf", types.Typ[types.Int])
+		api.Scope().Insert(logf)
+		return logf
+	}
+	first, second := variable(), variable()
+	renderer := build_reads.NewIdentityRenderer(token.NewFileSet(), nil)
+	identity := renderer.Object(first)
+	key, isKnown := factReachObject(identity)
+	if !isKnown {
+		test.Fatalf("want Logf's identity known, got %s", identity)
+	}
+	place := fact_reach.Place{File: "reader.go", Offset: 10}
+	hosted := &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{key: {place}},
+		pushedObjects: []fact_reach.PushedObject{{Object: key, Identity: identity,
+			Pushed: map[string]string{printf.Analyzer.Name: "printfWrapper"}}}}
+	captured := &check.FactReachPackage{Pushed: map[string]map[types.Object]string{
+		printf.Analyzer.Name: {first: "printfWrapper", second: ""},
+	}}
+	for range 32 {
+		differential := &buildBodyDifferential{standingCompared: map[string]int{}, standingFailed: map[string]int{}}
+		var failures []string
+		differential.compareStandingPushed(hosted, map[fact_reach.Place]bool{place: true}, captured,
+			&packages.Package{PkgPath: "example.com/reader"}, renderer,
+			func(_ fact_reach.Place, name string, kind string, host string, built string) {
+				failures = append(failures, name+" "+kind+": host "+host+", build "+built)
+			})
+		if len(failures) != 1 || !strings.Contains(failures[0], "one of 2 objects") {
+			test.Fatalf("the second leg failed %q, want one failure reading the identity as neither object's", failures)
+		}
 	}
 }
