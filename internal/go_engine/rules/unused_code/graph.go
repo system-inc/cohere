@@ -255,11 +255,15 @@ type object struct {
 
 // result is the graph's verdict on each object it holds: used, unused and reported, or quiet, unused but not reported
 // because what owns it is unused too. The used and the quiet are in the order of the graph's nodes, and the unused,
-// which are the rule's findings, in the order of their positions.
+// which are the rule's findings, in the order of their positions. A host's run asked to record its bodies hands the
+// records on in it too.
 type result struct {
 	used   []object
 	unused []object
 	quiet  []object
+	// recorded is what the run recorded of the package's bodies under the host's ask (RecordedOf), and nil for a run
+	// that was not asked, as every plain run is.
+	recorded *BodyRecords
 }
 
 // edgeKey is the edge from one node to another as one word, from in the high half and to in the low, which

@@ -132,6 +132,13 @@ type Options struct {
 	// builds sets it; the findings are the same either way.
 	FactReach bool
 
+	// RecordBodies has U1000's run on each analyzed package record what each function body adds to its graph
+	// (#xeafx79), handed back with FactReach's capture of the package (FactReachPackage.Bodies), for an extra build
+	// that leaves a body standing to splice the host's record in place of walking it. It needs FactReach, and only a
+	// host's run whose extra builds leave bodies standing sets it, so no other run pays for a record. The findings are
+	// the same either way.
+	RecordBodies bool
+
 	// Inheritance, when not nil, is an extra build's take of the host's run for its syntax-only rules (#y6q1x2j): each
 	// such rule skips each file it inherits and reports the host's findings there as its own (rule.InheritedFiles),
 	// handed every pass under rule.Inherited (see checker.Options.Inheritance). Only an extra build restoring from the
@@ -405,6 +412,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, wrapError
 	}
 	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
+	if options.RecordBodies && !options.FactReach {
+		return nil, errors.New("recording the bodies U1000 walks: the run captures no facts' reach, the one thing " +
+			"that hands the records back, so every record would be made and let go")
+	}
 	if options.Declarations != nil && options.Reads == nil {
 		return nil, errors.New("handing on the packages' declarations: the run records no reads, whose packages are " +
 			"every one a walk reaches, so a package no action reached would be handed on by none")
@@ -422,6 +433,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Declarations = options.Declarations
 	checkerOptions.Inheritance = options.Inheritance
 	checkerOptions.FactHosts = options.FactHosts
+	checkerOptions.RecordBodies = options.RecordBodies
 	// The standing bodies follow StandingAfter, on the census path the analyzer the facts' reach settles by, so a run
 	// that roots that nowhere (settlingIn) hands none: following it there would run it, and the answers it learns would
 	// reach the entries.
@@ -873,7 +885,8 @@ func abandoned(abandon <-chan struct{}) bool {
 // store, which Run gives the resolver of a run with the findings cache. Recorded hands each rule its package's reads,
 // to record its lookups of other packages in, once Run sets Reads (#b2t9xmf). Inherited hands each syntax-only rule the
 // host's findings it inherits, once Run sets Inheritance (#y6q1x2j). FactHost hands each pass on a package the host's
-// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np). Standing hands each pass on a package what
+// side of it for the facts' reach, once Run sets FactHosts (#5vbs1np). BodyRecords hands each pass the host's ask that
+// U1000 record its bodies, once Run sets RecordBodies (#xeafx79). Standing hands each pass on a package what
 // stands there, once Run sets StandingBodies (#e4rd5dw), and FollowsStanding names the actions that follow
 // StandingAfter's there: each dispatcher's, and the representation's build, which then leaves unbuilt what stands for
 // every rule its dispatcher starts (followsStanding).
@@ -888,6 +901,7 @@ func DispatchOptions() *checker.Options {
 		Recorded:        rule.Recorded,
 		Inherited:       rule.Inherited,
 		FactHost:        rule.FactHost,
+		BodyRecords:     rule.BodyRecords,
 		Standing:        rule.Standing,
 		FollowsStanding: followsStanding,
 	}

@@ -41,12 +41,15 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("reading staticcheck's generated files: they are %T", pass.ResultOf[generated.Analyzer])
 	}
 
-	graph := newGraph(pass.Fset, pass.Files, pass.Pkg, pass.TypesInfo, packageDirectives, generatedFiles)
+	graph := passGraph(pass, packageDirectives, generatedFiles)
 	// The run takes no record, so entry has nothing it could fail at; the error is the splice's.
 	if entryError := graph.entry(); entryError != nil {
 		return nil, entryError
 	}
 	verdict := graph.results()
+	if graph.recorder != nil {
+		verdict.recorded = recordedBodies(pass, graph)
+	}
 
 	// Reported as the registry reported the original's, which the tests' originalReport still does: an unused object
 	// names its file by the path its own position gives, never one a //line directive gives, so each path maps back to

@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are seventeen.
+// The changes are eighteen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -249,6 +249,13 @@
 // such follower's action would then wait on one that waits on it. With
 // StandingBodies unset, the graph and every pass are as they were.
 //
+// The eighteenth is Options.RecordBodies, the seam a host's run asks
+// U1000 through to record what each function body adds to its graph
+// (#xeafx79), for an extra build that leaves the body standing to splice
+// in place of walking it. Options.BodyRecords keys the ask in the
+// ResultOf of every pass, as Options.Resolved keys the resolver. The
+// checker never reads it. Unset, ResultOf holds no ask.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -446,6 +453,13 @@ type Options struct {
 	// side.
 	FactHosts func(packageId string) fact_reach.Host
 	FactHost  *analysis.Analyzer
+
+	// cohere: RecordBodies, when set, is a host's ask that U1000 record
+	// what each function body adds to its graph. BodyRecords, when
+	// RecordBodies is set too, keys it, true, in every pass's ResultOf, a
+	// key never run, as Dependents is. Unset, ResultOf holds no ask.
+	RecordBodies bool
+	BodyRecords  *analysis.Analyzer
 
 	// cohere: BodiesRead, when set, is handed each package Analyze was
 	// given once, as the last action on it finishes, while its syntax and
@@ -1110,6 +1124,10 @@ func (act *Action) execOnce() {
 		if host := act.opts.FactHosts(act.Package.ID); host != nil {
 			inputs[act.opts.FactHost] = host
 		}
+	}
+	// cohere: Options.BodyRecords, the ask under Options.RecordBodies.
+	if act.opts.BodyRecords != nil && act.opts.RecordBodies {
+		inputs[act.opts.BodyRecords] = true
 	}
 
 	// cohere: a restored package's own facts come from the cache, in

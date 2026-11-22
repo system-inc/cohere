@@ -321,6 +321,9 @@ func (engine *pipeline) lintPackages(
 	// What the host's run held of its facts, read while its resolver is alive, which each package's host's side for the
 	// facts' reach is made of, only in a run whose extra builds start with the body reach's host side (#aswfm7a).
 	options.FactReach = engine.keepsForBuilds() && engine.takesBodyReach()
+	// And U1000's record of each body it walks, which an extra build's U1000 splices in place of walking a body it
+	// leaves standing (#xeafx79), only in a run whose builds leave any: no other run records a body.
+	options.RecordBodies = options.FactReach && engine.leavesBodiesStanding()
 	options.Counted = engine.described.countedAsWalked
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer

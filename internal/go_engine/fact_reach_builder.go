@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
 // factReachInputs are what one package's side is made from (newFactReachPackage), each the host's own:
@@ -26,6 +27,8 @@ import (
 //   - presence is what each body holds that the presence rows read, by its place, read off the package's syntax while
 //     the host's run held it (check.FactReachPackage.Presence), presenceRead whether it was read at all, and markers
 //     the method names of the marker interfaces the package declares (check.FactReachPackage.Markers).
+//   - identifier is the package's ID, and bodies what the host's U1000 recorded of its bodies
+//     (check.FactReachPackage.Bodies).
 type factReachInputs struct {
 	fileSet      *token.FileSet
 	record       *build_reads.FunctionUses
@@ -38,6 +41,8 @@ type factReachInputs struct {
 	presence     map[fact_reach.Place]standing_presence.BodyRecord
 	presenceRead bool
 	markers      []string
+	identifier   string
+	bodies       unused_code.BodyRecords
 }
 
 // factReachRendered is an object as a package's side names it: its identity, and its key, known false for an object
@@ -176,6 +181,8 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 		builder.hosted.orderBound = append(builder.hosted.orderBound,
 			fact_reach.Named{Object: rendered.key, Reason: factReachOrderBound})
 	}
+	builder.hosted.identifier = inputs.identifier
+	builder.hosted.holdBodies(inputs.bodies)
 	return builder.hosted
 }
 

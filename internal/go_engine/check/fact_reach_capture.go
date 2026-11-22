@@ -12,6 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
 // FactReachCapture is what a host's run held of its facts for the facts' reach (#aswfm7a), read from the run's resolver
@@ -85,6 +86,13 @@ type FactReachPackage struct {
 	// Markers are the method names of every marker interface the package's syntax declares, read with its bodies
 	// (standing_presence.ReadMarkers), sorted.
 	Markers []string
+
+	// Bodies are what U1000's action on the package recorded of each function body it walked, under
+	// Options.RecordBodies (#xeafx79), with the digest of each file it parsed them from (unused_code.RecordedOf), a
+	// later wave's counting: what an extra build's U1000 splices in place of walking a body it leaves standing. They
+	// are empty where nothing asked, where U1000 did not run on the package, or where it failed, and then the
+	// package's side answers no body's record, and a build walks every body of it.
+	Bodies unused_code.BodyRecords
 }
 
 // factReachKinds is what one captured package's answers are, by kind: each kind that answered about its objects, in the
@@ -132,6 +140,7 @@ func captureFactReach(
 		kinds[analyzedPackage.Types] = &factReachKinds{functions: map[*fact_resolver.Kind][]*types.Func{}}
 	}
 	capturePushed(captured, graphs)
+	captureBodies(captured, graphs)
 	answered := resolver.Answered()
 	if len(answered) == 0 {
 		return capture
@@ -208,6 +217,26 @@ func capturePushed(captured map[*types.Package]*FactReachPackage, graphs []*chec
 				hosted.Pushed = map[string]map[types.Object]string{}
 			}
 			hosted.Pushed[action.Analyzer.Name] = facts
+		}
+	}
+}
+
+// captureBodies holds, on each package of captured, what U1000's action on it in graphs recorded of its bodies, an
+// action that failed holding none a build could trust. A run not asked to record has U1000's results hold none, and
+// the packages none (unused_code.RecordedOf).
+func captureBodies(captured map[*types.Package]*FactReachPackage, graphs []*checker.Graph) {
+	for _, graph := range graphs {
+		for action := range graph.All() {
+			if action.Analyzer != unused_code.Analyzer || action.Err != nil {
+				continue
+			}
+			hosted := captured[action.Package.Types]
+			if hosted == nil {
+				continue
+			}
+			if recorded, isRecorded := unused_code.RecordedOf(action.Result); isRecorded {
+				hosted.Bodies = recorded
+			}
 		}
 	}
 }
