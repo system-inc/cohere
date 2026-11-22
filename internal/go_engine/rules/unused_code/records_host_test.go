@@ -32,6 +32,12 @@ func (host recordsHost) BodyRecord(packageId string, filename string, offset int
 	return RecordedBody{}, [sha256.Size]byte{}, false
 }
 
+// RecordsHeld is whether packageId is the package the side holds records of, as a host's side answers for its own
+// package alone.
+func (host recordsHost) RecordsHeld(packageId string) bool {
+	return packageId == host.identifier
+}
+
 // FileDigest is the digest of the file parsed under filename, as a side that digests every file of its package
 // answers it: here those the host's run digested, each file a recorded body was parsed from.
 func (host recordsHost) FileDigest(packageId string, filename string) ([sha256.Size]byte, bool) {

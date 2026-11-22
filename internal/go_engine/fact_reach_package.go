@@ -140,8 +140,12 @@ type factReachPackage struct {
 	recordsHeld bool
 }
 
-// The compiler holds a build's side to what its U1000 asks of a standing body's record.
-var _ unused_code.BodyRecordHost = factReachHost{}
+// The compiler holds a build's side to what its U1000 asks of a standing body's record, and of the digest of each file
+// that record names.
+var (
+	_ unused_code.BodyRecordHost = factReachHost{}
+	_ unused_code.FileDigestHost = factReachHost{}
+)
 
 // Users are the bodies whose own uses hold object, in the order the package's files declare them, then the bodies
 // that use every object.

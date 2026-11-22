@@ -16,3 +16,8 @@ func (host bodiesOnlyHost) BodyRecord(packageId string, filename string, offset 
 ) {
 	return host.sides.BodyRecord(packageId, filename, offset)
 }
+
+// RecordsHeld is what sides answers.
+func (host bodiesOnlyHost) RecordsHeld(packageId string) bool {
+	return host.sides.RecordsHeld(packageId)
+}

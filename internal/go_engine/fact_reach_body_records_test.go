@@ -71,10 +71,8 @@ func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 		test.Errorf("the side holds its package's records %t and the test variant's %t, want only its own",
 			side.RecordsHeld(identifier), side.RecordsHeld(identifier+" [example.com/records.test]"))
 	}
-	// The method as rules' unused_code.FileDigestHost declares it, which the side is held to once that is on main.
-	digests, isDigests := side.(interface {
-		FileDigest(packageId string, filename string) ([sha256.Size]byte, bool)
-	})
+	// The method rules' U1000 asks through unused_code.FileDigestHost.
+	digests, isDigests := side.(unused_code.FileDigestHost)
 	if !isDigests {
 		test.Fatal("the side answers no file's digest")
 	}

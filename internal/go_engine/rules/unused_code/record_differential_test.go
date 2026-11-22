@@ -67,6 +67,11 @@ func (host lyingHost) BodyRecord(packageId string, filename string, offset int) 
 	return host.sides.BodyRecord(packageId, filename, offset)
 }
 
+// RecordsHeld is what sides answers.
+func (host lyingHost) RecordsHeld(packageId string) bool {
+	return host.sides.RecordsHeld(packageId)
+}
+
 // FileDigest is the sha256 of the build's own bytes of filename.
 func (host lyingHost) FileDigest(packageId string, filename string) ([sha256.Size]byte, bool) {
 	if packageId != host.sides.identifier {
