@@ -13,8 +13,10 @@ import (
 	"testing"
 )
 
-// concurrencyTestName is a test whose name says it runs code at once.
-var concurrencyTestName = regexp.MustCompile(`^Test\w*(Concurrent|AtOnce|InParallel|Simultaneous)`)
+// concurrencyTestName is a test whose name says it runs code at once: side by side, as extra builds and graphs run, and
+// beside the load, as the lint and a run's passes do, are the engine's words for it (#2xddz1z).
+var concurrencyTestName = regexp.MustCompile(
+	`^Test\w*(Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad)`)
 
 // concurrencyTestFile is a test file whose name says its tests run code at once.
 var concurrencyTestFile = regexp.MustCompile(`(_concurrency_test\.go|^parallel_\w*_test\.go|_parallel_test\.go)$`)
@@ -104,13 +106,16 @@ func concurrencyTestDirectories(test *testing.T, root string) map[string]string 
 func TestConcurrencyTestsAreFoundByNameAndFile(test *testing.T) {
 	test.Parallel()
 	for name, want := range map[string]bool{
-		"TestConcurrentReadersNeverSeeAPartialFile":        true,
-		"TestDependenceSetsComputedAtOnceOverOneHostAgree": true,
-		"TestRunCacheRecordsInParallelInTheSerialOrder":    true,
-		"TestBuildConcurrently":                            true,
-		"TestNoUnclearedRaceTimeout":                       false,
-		"TestRequireParallelFlagsASerialTest":              false,
-		"TestTheParallelRuleNamesItsCategory":              false,
+		"TestConcurrentReadersNeverSeeAPartialFile":                             true,
+		"TestDependenceSetsComputedAtOnceOverOneHostAgree":                      true,
+		"TestRunCacheRecordsInParallelInTheSerialOrder":                         true,
+		"TestBuildConcurrently":                                                 true,
+		"TestExtraBuildsSideBySideWriteWhatOneAtATimeWrites":                    true,
+		"TestTheLintBesideTheLoadLeavesNoTraceWhenALatePackageDoesNotTypeCheck": true,
+		"TestNoUnclearedRaceTimeout":                                            false,
+		"TestRequireParallelFlagsASerialTest":                                   false,
+		"TestTheParallelRuleNamesItsCategory":                                   false,
+		"TestTheBuildsWidthIsReadFromTheMachine":                                false,
 	} {
 		if got := concurrencyTestName.MatchString(name); got != want {
 			test.Errorf("%s reads as a concurrency test: %t, want %t", name, got, want)
@@ -128,10 +133,15 @@ func TestConcurrencyTestsAreFoundByNameAndFile(test *testing.T) {
 			test.Errorf("%s reads as a concurrency test file: %t, want %t", name, got, want)
 		}
 	}
-	checkGated := slices.ContainsFunc(raceGated, func(entry raceEntry) bool {
-		return entry.directory == "internal/go_engine/check"
-	})
-	if !checkGated {
-		test.Error("internal/go_engine/check, home of the test #bnabymg was written for, is not on the -race list")
+	for directory, home := range map[string]string{
+		"internal/go_engine/check": "the test #bnabymg was written for",
+		// Its test of the early start's handoff can fail only under -race, and its name says nothing of running at
+		// once, so the list holds the package for it by name.
+		"internal/go_engine": "TestTheHostsGoEnvironmentIsWholeOnceTheDescriptionHandsItOut (#e8w514b)",
+	} {
+		gated := slices.ContainsFunc(raceGated, func(entry raceEntry) bool { return entry.directory == directory })
+		if !gated {
+			test.Errorf("%s, home of %s, is not on the -race list", directory, home)
+		}
 	}
 }

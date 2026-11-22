@@ -27,6 +27,10 @@ var raceGated = []raceEntry{
 	{"internal/edit", "TestConcurrentReadersNeverSeeAPartialFile reads while a write replaces the file"},
 	{"internal/executable_testing", "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs scripts while " +
 		"other goroutines fork (#g93ts58)"},
+	{"internal/go_engine", "the early start writes the host's go env while a load it was handed reads it " +
+		"(early_start_test.go: TestTheHostsGoEnvironmentIsWholeOnceTheDescriptionHandsItOut, #e8w514b), extra " +
+		"builds run side by side (pipeline_builds_beside_test.go), and the lint runs beside the load " +
+		"(engine_overlap_test.go, #2xddz1z)"},
 	{"internal/go_engine/bounded", "its worker pool runs a function on every index at once, as many as there " +
 		"are cores"},
 	{"internal/go_engine/build_dependence", "TestPackagesAddedAtOnceWriteTheRecordsOfASerialBuild adds packages " +
