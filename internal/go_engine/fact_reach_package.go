@@ -1,12 +1,15 @@
 package go_engine
 
 import (
+	"crypto/sha256"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
 // The host's side of the facts' fixed point, stage 4 of #9paaen9 (#5vbs1np): for one package the host checked from
@@ -129,7 +132,25 @@ type factReachPackage struct {
 	// kind marks as its types' alone about a function no declaration declares, and each is left out uncounted
 	// (factReachBuilder.answer).
 	unplaced int
+
+	// identifier is the package's ID, the one alone a build's pass is answered a body's record for (BodyRecord).
+	identifier string
+
+	// bodyRecords are what the host's U1000 recorded of the package's bodies (check.FactReachPackage.Bodies), and
+	// recordedAt each record's index among bodyRecords.Bodies, by its body's key, so a build's U1000 is answered one
+	// body's record without a search (BodyRecord). Both are empty where the host recorded none. recordsHeld is whether
+	// the host recorded at all (check.FactReachPackage.RecordsHeld), true for a package with no body too (RecordsHeld).
+	bodyRecords unused_code.BodyRecords
+	recordedAt  map[fact_reach.Place]int
+	recordsHeld bool
 }
+
+// The compiler holds a build's side to what its U1000 asks of a standing body's record, and of the digest of each file
+// that record names.
+var (
+	_ unused_code.BodyRecordHost = factReachHost{}
+	_ unused_code.FileDigestHost = factReachHost{}
+)
 
 // Users are the bodies whose own uses hold object, in the order the package's files declare them, then the bodies
 // that use every object.
@@ -210,6 +231,82 @@ func (hosted *factReachPackage) Parameters(key fact_reach.Object) int {
 // Declared are the keys of the functions declared at place.
 func (hosted *factReachPackage) Declared(place fact_reach.Place) []fact_reach.Object {
 	return hosted.declared[place]
+}
+
+// unusedBodyRecorder is U1000's, the analyzer and reader the host's run captures each package's records of its bodies
+// by (check.Options.BodyRecorder), which the engine hands check, so the engine's core names no rule package (#f5g7ym6).
+var unusedBodyRecorder = check.BodyRecorder{Analyzer: unused_code.Analyzer,
+	RecordedOf: func(analyzerResult any) (any, bool) { return unused_code.RecordedOf(analyzerResult) }}
+
+// capturedBodyRecords are what the host's U1000 recorded of captured's bodies, which the capture holds as
+// unusedBodyRecorder read them (check.FactReachPackage.Bodies), and whether it recorded them at all
+// (check.FactReachPackage.RecordsHeld). Records of any other type are none a side could answer a body from, so they
+// read as never recorded, and a build walks every body of the package.
+func capturedBodyRecords(captured *check.FactReachPackage) (unused_code.BodyRecords, bool) {
+	recorded, isRecords := captured.Bodies.(unused_code.BodyRecords)
+	return recorded, isRecords && captured.RecordsHeld
+}
+
+// holdBodies keeps recorded, what the host's U1000 recorded of the package's bodies, indexed by each body's key, which
+// U1000 keeps no two records of (unused_code.BodyRecords.Bodies), and held, whether it recorded them at all.
+func (hosted *factReachPackage) holdBodies(recorded unused_code.BodyRecords, held bool) {
+	hosted.bodyRecords, hosted.recordsHeld = recorded, held
+	if len(recorded.Bodies) == 0 {
+		return
+	}
+	hosted.recordedAt = make(map[fact_reach.Place]int, len(recorded.Bodies))
+	for index, body := range recorded.Bodies {
+		filename, offset := body.Key()
+		hosted.recordedAt[fact_reach.Place{File: filename, Offset: offset}] = index
+	}
+}
+
+// BodyRecord is what the host's U1000 recorded of the body declared at offset in filename, keyed as a standing body is
+// keyed (rule.StandingBodies.Stands), and the sha256 of the file the host parsed that body from, of the bytes its
+// rules read, which a build's U1000 checks its own file of the body against before it splices the record in place of
+// walking the body. It is false for packageId other than the package's own, since a side is the host's of one
+// package, never of another variant of it, for a body the host recorded nothing of, as where it did not run U1000
+// with its records asked or restored the package, and for one whose file it could not read again for a digest.
+func (hosted *factReachPackage) BodyRecord(
+	packageId string,
+	filename string,
+	offset int,
+) (unused_code.RecordedBody, [sha256.Size]byte, bool) {
+	if packageId != hosted.identifier {
+		return unused_code.RecordedBody{}, [sha256.Size]byte{}, false
+	}
+	index, isRecorded := hosted.recordedAt[fact_reach.Place{File: filename, Offset: offset}]
+	if !isRecorded {
+		return unused_code.RecordedBody{}, [sha256.Size]byte{}, false
+	}
+	recorded := hosted.bodyRecords.Bodies[index]
+	digest, isDigested := hosted.bodyRecords.Digests[recorded.ParsedFile]
+	if !isDigested {
+		return unused_code.RecordedBody{}, [sha256.Size]byte{}, false
+	}
+	return recorded, digest, true
+}
+
+// RecordsHeld is whether the side holds the host's records of packageId, the package's own ID alone: true where the
+// host's U1000 ran on the package with its records asked and did not fail, a package with no body among them, and
+// false where the gate kept the records unasked, where U1000 was not enabled, where its action failed, and for another
+// package's ID. Where it is true, a body BodyRecord answers no record of is one the host could not record, or whose
+// file it could not read again.
+func (hosted *factReachPackage) RecordsHeld(packageId string) bool {
+	return packageId == hosted.identifier && hosted.recordsHeld
+}
+
+// FileDigest is the sha256 of the package's file parsed under filename, of the bytes the host's rules read
+// (unused_code.BodyRecords.Digests), whether or not the file holds a body: what a build checks its own copy of each
+// file a record rests on against (unused_code.RecordedBody.Files) before it takes the record. It is false for packageId
+// other than the package's own, and for a file the side holds no digest of, one the host did not record or could not
+// read again.
+func (hosted *factReachPackage) FileDigest(packageId string, filename string) ([sha256.Size]byte, bool) {
+	if packageId != hosted.identifier {
+		return [sha256.Size]byte{}, false
+	}
+	digest, isDigested := hosted.bodyRecords.Digests[filename]
+	return digest, isDigested
 }
 
 // inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build settles

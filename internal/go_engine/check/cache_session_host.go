@@ -99,6 +99,10 @@ type hostState struct {
 	// whatever TypesHold says, the planted miss the package differential must report, empty in every run.
 	forcedThrough string
 
+	// declinesTold, set only by a test (TellDeclinesAtLoad), is told each package a load declines, with why, from the
+	// load's goroutines; nil in every run.
+	declinesTold func(identifier string, why string)
+
 	// writtenThrough are this load's packages written through to the build's own store (writeThrough), each once: an
 	// untouched package is settled from the start, so the first wave's save would write it, and every later one again.
 	writtenThrough map[*packages.Package]bool
@@ -192,6 +196,16 @@ func (session *CacheSession) ForceThrough(identifier string) {
 	}
 }
 
+// TellDeclinesAtLoad has the session's restore from the host's run tell told each package a load declines
+// (declineAtLoad), by ID and with why, as it declines it, from the load's goroutines, so a test reads every load's
+// declines and not the last load's alone (HostRestoreCounts.Declined, #78tynz4). Nothing of the run changes. Only a
+// test calls it, after RestoreFromHost; a run never does.
+func (session *CacheSession) TellDeclinesAtLoad(told func(identifier string, why string)) {
+	if session.host != nil {
+		session.host.declinesTold = told
+	}
+}
+
 // declineKeys spell out, for the record people read, the first word of each reason a package was not restored from the
 // host: a reason starts with a short tag so a test can match it, but a reader of the record took `T` for a leaked type
 // parameter.
@@ -237,9 +251,12 @@ func (session *CacheSession) restoreFromHost(
 	keyed *cache.Keyed,
 ) {
 	state := session.host
-	if state == nil || state.off || session.known == nil {
+	if state == nil {
 		return
 	}
+	// Cleared before a load that restores nothing returns (#78tynz4): what the session counts is this load's, so a
+	// third load with the restore off reports none of the second's visits or load declines as its own, and holds none
+	// of its packages or types through it.
 	state.restoring = map[*packages.Package]*hostRestore{}
 	state.untouched = map[*packages.Package]*hostRestore{}
 	state.visited = 0
@@ -247,6 +264,9 @@ func (session *CacheSession) restoreFromHost(
 	state.renderings = NewReadsBuild()
 	state.loadDeclines = map[string]int{}
 	state.loadReasons = map[string]string{}
+	if state.off || session.known == nil {
+		return
+	}
 	if why := hostSizesDiffer(state.host, sizes); why != "" {
 		// Every package the host kept and the build's own store does not hold would have been a candidate, so each is
 		// counted, as one with no entry is.
@@ -578,6 +598,9 @@ func (session *CacheSession) declineAtLoad(candidate *packages.Package, hosted *
 		why = "export data that did not read"
 	}
 	state := session.host
+	if state.declinesTold != nil {
+		state.declinesTold(candidate.ID, why)
+	}
 	state.lock.Lock()
 	defer state.lock.Unlock()
 	delete(session.hits, candidate)

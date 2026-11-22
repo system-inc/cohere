@@ -5,6 +5,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
 // Result is one package's standing bodies in one build, settled, and what settling them took, for the build's census.
@@ -54,6 +55,13 @@ type Result struct {
 	// PresenceLeft are the bodies that left the standing set by themselves for a presence row, each with its row's
 	// reason, which the settlement, taking out only an object's users, never records.
 	PresenceLeft []standing_presence.Leaving
+
+	// RecordRemoved is how many bodies left the standing set by themselves because U1000 could not take the host's
+	// record of them, by why (unused_code.RecordUse), and RecordLeft are those bodies, each with its reason
+	// (unusableRecords). RecordRemoved is empty, never nil, in a partial result, and both hold nothing where the
+	// host's side holds no records of the package.
+	RecordRemoved map[unused_code.RecordUse]int
+	RecordLeft    []RecordLeaving
 }
 
 // keepLeaving keeps on result each body of leaving that standing holds, once, counting it by its row, and is the
@@ -72,6 +80,24 @@ func (result *Result) keepLeaving(
 		if row, isRow := standing_presence.RowOf(left.Reason); isRow {
 			result.PresenceRemoved[row]++
 		}
+	}
+	return kept
+}
+
+// keepRecordLeaving keeps on result each body of leaving that standing holds, once, counting it by its use, and is
+// the places it kept, in leaving's order, for the caller to take out of standing.
+func (result *Result) keepRecordLeaving(
+	standing map[fact_reach.Place]bool,
+	leaving []RecordLeaving,
+) []fact_reach.Place {
+	var kept []fact_reach.Place
+	for _, left := range leaving {
+		if !standing[left.Place] || slices.Contains(kept, left.Place) {
+			continue
+		}
+		kept = append(kept, left.Place)
+		result.RecordLeft = append(result.RecordLeft, left)
+		result.RecordRemoved[left.Use]++
 	}
 	return kept
 }
