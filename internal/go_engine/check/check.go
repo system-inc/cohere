@@ -29,6 +29,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -908,11 +909,13 @@ func DispatchOptions() *checker.Options {
 }
 
 // followsStanding is whether analyzer's action on a package follows checker.Options.StandingAfter's there (#e4rd5dw):
-// a dispatcher's, whose confined rules hear no standing body, and build_intermediate_representation's, so the
-// representation is built less what stands for every rule its dispatcher starts rather than whole. Neither is required
-// by standing_facts, the analyzer the census path follows, so no follower waits on itself.
+// a dispatcher's, whose confined rules hear no standing body, build_intermediate_representation's, so the
+// representation is built less what stands for every rule its dispatcher starts rather than whole, and U1000's, which
+// splices the host's record of a standing body in place of walking it (#xeafx79). None is required by standing_facts,
+// the analyzer the census path follows, so no follower waits on itself.
 func followsStanding(analyzer *analysis.Analyzer) bool {
-	return dispatch.IsDispatcher(analyzer) || analyzer == build_intermediate_representation.Analyzer
+	return dispatch.IsDispatcher(analyzer) || analyzer == build_intermediate_representation.Analyzer ||
+		analyzer == unused_code.Analyzer
 }
 
 // actionFindings is what action found, as newFinding makes it.
