@@ -102,11 +102,33 @@ func answerKey(test *testing.T, pass *analysis.Pass) recordedPlace {
 	return recordedPlace{}
 }
 
+// ignoredSource is a file of the package a build constraint leaves out of every build: one a pass reads, as
+// go/analysis lets it read an ignored file, but never parses.
+var ignoredSource = recordedSource{name: "other.go", source: "//go:build ignore\n\npackage shape\n"}
+
 // splicedRun is U1000's run over sources as an extra build's, in which Answer stands and the host's side is host, its
-// verdict worded, and what it says it did with Answer's body.
-func splicedRun(test *testing.T, sources []recordedSource, host BodyRecordHost) ([]string, SplicedBodies) {
+// verdict worded, and what it says it did with Answer's body. Each of ignored is a file the pass reads and does not
+// compile, as a package's IgnoredFiles are.
+func splicedRun(
+	test *testing.T,
+	sources []recordedSource,
+	host BodyRecordHost,
+	ignored ...recordedSource,
+) ([]string, SplicedBodies) {
 	test.Helper()
 	pass := recordedPass(test, sources, nil)
+	compiledRead := pass.ReadFile
+	pass.ReadFile = func(filename string) ([]byte, error) {
+		for _, each := range ignored {
+			if each.name == filename {
+				return []byte(each.source), nil
+			}
+		}
+		return compiledRead(filename)
+	}
+	for _, each := range ignored {
+		pass.IgnoredFiles = append(pass.IgnoredFiles, each.name)
+	}
 	pass.ResultOf[rule.Standing] = standingAt{place: answerKey(test, pass)}
 	pass.ResultOf[rule.FactHost] = host
 	verdict, runError := run(pass)
@@ -142,8 +164,8 @@ func wordedVerdict(fileSet *token.FileSet, verdict result) []string {
 // A build in which Answer stands splices the host's record of its body where the record is usable, and walks the body
 // where it is not, by why (#xeafx79): the side answers no record, the record holds a flag, the build reads Answer's
 // own file otherwise than the host did, or a file the record names is one the build reads otherwise, one the side
-// answers no digest of, one the build does not compile, or any past Answer's own file where the side is no
-// FileDigestHost. Each way, the verdict is the plain run's. A pass with no
+// answers no digest of, one the build does not compile though it reads it with the host's bytes, or any past Answer's
+// own file where the side is no FileDigestHost. Each way, the verdict is the plain run's. A pass with no
 // standing answer, or none with a side that answers records, says nothing of splicing, as the host's and every plain
 // run's say nothing.
 func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
@@ -192,9 +214,10 @@ func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
 			"it walked for its named file and the plain verdict\n%v", spliced, verdict, plain)
 	}
 	for _, each := range []struct {
-		name   string
-		change func(*recordsHost)
-		want   SplicedBodies
+		name    string
+		change  func(*recordsHost)
+		ignored []recordedSource
+		want    SplicedBodies
 	}{
 		{name: "usable", change: func(*recordsHost) {
 			// The host's records as the host's run handed them on.
@@ -218,20 +241,53 @@ func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
 		{name: "a named file undigested", change: func(host *recordsHost) {
 			delete(host.recorded.Digests, "types.go")
 		}, want: SplicedBodies{FilesDiffer: 1}},
+		// The side digests the named file and the build reads it with those bytes, so only its not being compiled
+		// keeps the record out.
 		{name: "a named file not compiled", change: func(host *recordsHost) {
 			index := answerParsed(host.recorded)
 			host.recorded.Bodies[index].record.Files = append(slices.Clone(host.recorded.Bodies[index].record.Files),
-				"other.go")
-		}, want: SplicedBodies{FilesDiffer: 1}},
+				ignoredSource.name)
+			host.recorded.Digests[ignoredSource.name] = sha256.Sum256([]byte(ignoredSource.source))
+		}, ignored: []recordedSource{ignoredSource}, want: SplicedBodies{FilesDiffer: 1}},
 	} {
 		host := &recordsHost{identifier: standingPackagePath, recorded: copiedRecords(recorded)}
 		each.change(host)
-		verdict, spliced := splicedRun(test, standingSources, *host)
+		verdict, spliced := splicedRun(test, standingSources, *host, each.ignored...)
 		if spliced != each.want {
 			test.Errorf("%s: the run did %+v with Answer's body, want %+v", each.name, spliced, each.want)
 		}
 		if !slices.Equal(verdict, plain) {
 			test.Errorf("%s: the verdict is\n%v\nwant the plain run's\n%v", each.name, verdict, plain)
+		}
+	}
+}
+
+// A build with no record of its own at a body's key differs from the host's record at `record` (#xeafx79, machine
+// 2), whatever own holds, even the host's record itself, so a recorder that wrote nothing never reads as agreement.
+// It is a unit test because no run reaches it: two bodies at one key are the one way the build's own recorder keeps
+// none (bodyRecords), and the files holding them share the key's name, so rule.StandingSpans stands neither.
+func TestABuildWithNoRecordOfItsOwnDiffersAtRecord(test *testing.T) {
+	test.Parallel()
+	recorded := hostRecords(test, standingSources)
+	var host bodyRecord
+	for _, body := range recorded.Bodies {
+		if body.ParsedFile == "shape.go" {
+			host = body.record
+		}
+	}
+	if host.Body.File != "shape.go" {
+		test.Fatal("the host recorded no body of shape.go")
+	}
+	for _, each := range []struct {
+		name string
+		own  bodyRecord
+	}{{"no record", bodyRecord{}}, {"the host's own record", host}} {
+		field, differError := recordDifference(host, each.own, false)
+		if differError != nil {
+			test.Fatalf("%s: %v", each.name, differError)
+		}
+		if field != "record" {
+			test.Errorf("%s: with no record of its own the build differs at %q, want record", each.name, field)
 		}
 	}
 }
