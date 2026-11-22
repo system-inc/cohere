@@ -398,7 +398,7 @@ type standingGate struct {
 //     an escape, `go\x2dflags`, opens it in its own build alone (import-goflags-escaped-win), and one build's escaped
 //     import beside the other's plain one, which leave the imports equal and Target standing, opens it in both, so
 //     neither finds it and the other build takes no finding of the host's that its own gate would refuse
-//     (import-goflags-escaped-both).
+//     (import-goflags-escaped-both). Each escaped file is written into the run's copy (standingGateWritten).
 //   - tests by the package's scope, `ExampleFoo` referring to an unknown identifier unless some file declares Foo
 //     (example-*), by its imports, `ExampleBuffer` unless some file imports bytes (example-import-*), and by the
 //     members of the type an example names, `ExampleFoo_Bar` referring to an unknown field or method unless some file
@@ -497,12 +497,39 @@ var standingGates = []standingGate{
 		fragment: `same receiver name (seen 1x "thing", 2x "t")`, finder: "host", standing: 1},
 }
 
-// runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
-// body reach census with `--no-cache --no-fix --build-dependence`, with the standing bodies' switch as switched, and
-// returns the pipeline, its stream, normalized, and the copy's root.
+// standingGateWritten are the files of standing gate modules that import go-flags spelled with an escape,
+// `go\x2dflags`, by module and then by name, which runStandingGate writes into its copy rather than testdata keeping
+// them: gofmt canonicalizes an import path, rewriting the escape to `go-flags`, and internal/guard holds every Go file
+// the module owns, testdata included, to gofmt, as the release's first step does, while the escape is what the
+// modules test.
+var standingGateWritten = map[string]map[string]string{
+	"import-goflags-escaped-win": {"part_windows.go": `package gate
+
+// The import spells go-flags with an escape, which names the same path.
+import _ "github.com/jessevdk/go\x2dflags"
+
+func Other() {}
+`},
+	"import-goflags-escaped-both": {"part_other.go": `//go:build !windows
+
+package gate
+
+// The import spells go-flags with an escape, which names the same path windows's file imports.
+import _ "github.com/jessevdk/go\x2dflags"
+
+func Other() {}
+`},
+}
+
+// runStandingGate runs the engine over a copy of the standing gate module named, its standingGateWritten files written
+// into it, with the registry's rules, under the body reach census with `--no-cache --no-fix --build-dependence`, with
+// the standing bodies' switch as switched, and returns the pipeline, its stream, normalized, and the copy's root.
 func runStandingGate(test *testing.T, module string, switched bool) (*pipeline, string, string) {
 	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", "standing-gates", module))
+	for name, contents := range standingGateWritten[module] {
+		writeTestFile(test, filepath.Join(root, name), contents)
+	}
 	engine, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(engine *pipeline) {
 		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 		engine.standingBodies = switched
