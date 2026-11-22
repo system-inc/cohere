@@ -27,6 +27,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
@@ -123,26 +124,39 @@ func run(pass *analysis.Pass) (any, error) {
 			named = append(named, fact_reach.Named{Object: function.Object, Reason: noReturnReason})
 			result.FunctionsNamed++
 		}
-		for _, analyzer := range slices.Sorted(maps.Keys(function.Pushed)) {
-			words, isSeen, isRead := pushed.words(analyzer, own)
-			if !isRead {
-				continue
-			}
-			result.PushedCompared++
-			switch {
-			case !isSeen:
-				named = append(named, fact_reach.Named{Object: function.Object,
-					Reason: "unknown " + pushedReasons[analyzer]})
-			case words != function.Pushed[analyzer]:
-				named = append(named, fact_reach.Named{Object: function.Object, Reason: pushedReasons[analyzer]})
-			default:
-				continue
-			}
-			result.PushedNamed++
-			if analyzer == deprecated.Analyzer.Name && own.Pkg() == pass.Pkg {
+		compared, differing := pushed.differing(function.Object, function.Pushed, own, false)
+		result.PushedCompared += compared
+		result.PushedNamed += len(differing)
+		named = append(named, differing...)
+		for _, each := range differing {
+			if each.Reason == pushedReasons[deprecated.Analyzer.Name] && own.Pkg() == pass.Pkg {
 				ownDeprecations[function.Object] = true
 			}
 		}
+	}
+	// The wrapper fact of each interface method and variable a body uses whose shape lets it hold one, the host's
+	// beside the build's printf's, as a function's is compared above (#zqx7gke): printf finds an interface method a
+	// wrapper where an implementation assigned to it anywhere in the package is one, and a variable one where the
+	// function literal assigned to it forwards to one, so either's fact can differ with its text and file the same in
+	// both builds. Neither is a function, and neither has a no-return fact. One the build has no own object of reads
+	// unknown. A variable or a field of another package is named "local printf wrapper" instead, in every build, its
+	// facts unread: printf may hold a kind of it found here alone, which neither build's facts carry
+	// (fact_reach.PushedObject.Local).
+	for _, object := range host.PushedObjects() {
+		if object.Local {
+			result.PushedCompared++
+			result.PushedNamed++
+			named = append(named, fact_reach.Named{Object: object.Object, Reason: localWrapperReason})
+			continue
+		}
+		own, found := functions.pushedObject(object.Identity)
+		if !found {
+			own = nil
+		}
+		compared, differing := pushed.differing(object.Object, object.Pushed, own, true)
+		result.PushedCompared += compared
+		result.PushedNamed += len(differing)
+		named = append(named, differing...)
 	}
 	// Each function of the package named for its own deprecation is a user of it at the place that declares it
 	// (ownDeprecationUsers).
@@ -189,6 +203,12 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 	for _, left := range result.keepLeaving(standing, leaving) {
+		delete(standing, left)
+	}
+	// And each body that still stands whose record U1000 could not take, here for the same reasons: a build will strip
+	// what stands from its type check, so a body U1000 would have to walk leaves before then (unusableRecords).
+	result.RecordRemoved = map[unused_code.RecordUse]int{}
+	for _, left := range result.keepRecordLeaving(standing, unusableRecords(pass, host, standing)) {
 		delete(standing, left)
 	}
 

@@ -72,7 +72,9 @@ func newFactReachSides(
 				imported = append(imported, answer)
 			}
 		}
+		bodies, recordsHeld := capturedBodyRecords(captured)
 		sides.packages[analyzedPackage.ID] = newFactReachPackage(factReachInputs{
+			own:          hosted.Types,
 			fileSet:      hosted.Fset,
 			record:       record,
 			renderer:     build_reads.NewIdentityRenderer(hosted.Fset, nil),
@@ -84,6 +86,9 @@ func newFactReachSides(
 			presence:     captured.Presence,
 			presenceRead: captured.PresenceRead,
 			markers:      captured.Markers,
+			identifier:   analyzedPackage.ID,
+			bodies:       bodies,
+			recordsHeld:  recordsHeld,
 		})
 	}
 	return sides

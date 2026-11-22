@@ -479,7 +479,7 @@ func TestAnUnsurePackageHasNoCapture(test *testing.T) {
 		test.Fatalf("high is unsure %t and learned %t, want both", resolver.Unsure(high.Types),
 			resolver.Package(high.Types) != nil)
 	}
-	capture := captureFactReach(resolver, []*packages.Package{low, high}, nil, nil)
+	capture := captureFactReach(resolver, []*packages.Package{low, high}, nil, nil, BodyRecorder{})
 	if len(capture.Packages) != 0 {
 		test.Errorf("the capture holds %d packages, want none: low restored and high unsure", len(capture.Packages))
 	}
@@ -589,7 +589,7 @@ func TestAPackageWhoseBodiesWereNeverReadIsCapturedUnread(test *testing.T) {
 	}
 	presence := &factReachPresence{read: map[string]map[fact_reach.Place]fact_reach.BodyRecord{reach.ID: {}},
 		markers: map[string][]string{}}
-	capture := captureFactReach(resolver, analyzed, nil, presence)
+	capture := captureFactReach(resolver, analyzed, nil, presence, BodyRecorder{})
 	read, unread := capture.Packages[reach.ID], capture.Packages[floored.ID]
 	if read == nil || unread == nil {
 		test.Fatalf("the capture holds reach %v and floored %v, want both", read, unread)

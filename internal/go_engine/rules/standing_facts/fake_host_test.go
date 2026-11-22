@@ -15,6 +15,7 @@ type fakeHost struct {
 	standing   map[fact_reach.Place]bool
 	places     []fact_reach.Place
 	functions  []fact_reach.Function
+	pushed     []fact_reach.PushedObject
 	imported   []fact_reach.Question
 	asking     map[string]fact_reach.Asking
 	orderBound []fact_reach.Named
@@ -54,6 +55,11 @@ func (host *fakeHost) Places() []fact_reach.Place {
 func (host *fakeHost) Functions() []fact_reach.Function {
 	host.count("Functions")
 	return host.functions
+}
+
+func (host *fakeHost) PushedObjects() []fact_reach.PushedObject {
+	host.count("PushedObjects")
+	return host.pushed
 }
 
 func (host *fakeHost) Imported() []fact_reach.Question {
