@@ -3,11 +3,15 @@ package fact_resolver_test
 import (
 	"bytes"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -183,5 +187,86 @@ func TestComparePlacedOrdersByParameterBeforeKind(test *testing.T) {
 	want := []fact_resolver.PlacedAnswer{function, parameter, other}
 	if !reflect.DeepEqual(sorted, want) {
 		test.Errorf("want %+v, got %+v", want, sorted)
+	}
+}
+
+// ComparePlaced decides each pair by the first field they differ in, whatever the fields after it say, so two answers
+// that differ anywhere never compare equal and PlacedIn's order, which an entry stores, is the same on every run. Each
+// case's left comes first by the deciding field and last by the one after it: a file's name before its digest, two
+// kinds holding one answer at one place, which would tie without their kinds, and the answer's bytes, ascending, last.
+func TestComparePlacedDecidesByTheFirstFieldThatDiffers(test *testing.T) {
+	test.Parallel()
+	place := fact_resolver.PlacedAnswer{Kind: "function_purity", File: "a.go", FileDigest: []byte("1"), Offset: 9,
+		Parameter: -1, Encoded: []byte("true")}
+	for _, comparison := range []struct {
+		name  string
+		left  fact_resolver.PlacedAnswer
+		right fact_resolver.PlacedAnswer
+	}{
+		{name: "file before digest",
+			left:  fact_resolver.PlacedAnswer{File: "a.go", FileDigest: []byte("2"), Encoded: []byte("true")},
+			right: fact_resolver.PlacedAnswer{File: "b.go", FileDigest: []byte("1"), Encoded: []byte("true")}},
+		{name: "two kinds with one answer at one place",
+			left: place, right: fact_resolver.PlacedAnswer{Kind: "return_nil_ness", File: place.File,
+				FileDigest: place.FileDigest, Offset: place.Offset, Parameter: place.Parameter,
+				Encoded: place.Encoded}},
+		{name: "the answer last and ascending",
+			left: fact_resolver.PlacedAnswer{Kind: place.Kind, File: place.File, FileDigest: place.FileDigest,
+				Offset: place.Offset, Parameter: place.Parameter, Encoded: []byte("false")},
+			right: place},
+	} {
+		test.Run(comparison.name, func(test *testing.T) {
+			test.Parallel()
+			described := func(answer fact_resolver.PlacedAnswer) string {
+				return fmt.Sprintf("%s in %s (digest %s) at %d, parameter %d, answering %s", answer.Kind, answer.File,
+					answer.FileDigest, answer.Offset, answer.Parameter, answer.Encoded)
+			}
+			if order := fact_resolver.ComparePlaced(comparison.left, comparison.right); order >= 0 {
+				test.Errorf("want %s before %s, got comparison %d", described(comparison.left),
+					described(comparison.right), order)
+			}
+			if order := fact_resolver.ComparePlaced(comparison.right, comparison.left); order <= 0 {
+				test.Errorf("want %s after %s, got comparison %d", described(comparison.right),
+					described(comparison.left), order)
+			}
+		})
+	}
+}
+
+// go/types records no object for the second declaration of a name, which it reports and leaves out of Defs, so a
+// package loaded despite its errors hands DeclarationPlaces a function with none. It is left out, never read as a
+// function it is not, and the rest are placed as before: the first twice with its parameter, at its own `func`.
+func TestDeclarationPlacesLeavesOutAFunctionWithNoObject(test *testing.T) {
+	test.Parallel()
+	source := "package redeclared\n\nfunc twice(first int) {}\n\nfunc twice(second string) {}\n"
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "redeclared.go", source, parser.SkipObjectResolution)
+	if parseError != nil {
+		test.Fatalf("parsing the fixture: %v", parseError)
+	}
+	info := &types.Info{Defs: map[*ast.Ident]types.Object{}}
+	configuration := types.Config{Error: func(error) {
+		// Here to keep go/types checking past the redeclaration, as a load that reports errors does; Check still
+		// returns the first error, which the test reads below.
+	}}
+	if _, checkError := configuration.Check("redeclared", fileSet, []*ast.File{file}, info); checkError == nil {
+		test.Fatal("want go/types to report twice declared twice")
+	}
+	second, isFunction := file.Decls[len(file.Decls)-1].(*ast.FuncDecl)
+	if !isFunction {
+		test.Fatal("the fixture's last declaration is no function")
+	}
+	if _, isDeclared := info.Defs[second.Name].(*types.Func); isDeclared {
+		test.Fatal("go/types recorded the second twice, so the fixture no longer reaches a function with no object")
+	}
+	var named []string
+	for object, place := range fact_resolver.DeclarationPlaces(fileSet, []*ast.File{file}, info) {
+		named = append(named, fmt.Sprintf("%s %s %d %d", object.Name(), place.File, place.Offset, place.Parameter))
+	}
+	slices.Sort(named)
+	offset := strings.Index(source, "func twice(first")
+	want := []string{fmt.Sprintf("first redeclared.go %d 0", offset), fmt.Sprintf("twice redeclared.go %d -1", offset)}
+	if !slices.Equal(named, want) {
+		test.Errorf("want placed\n%q\ngot\n%q", want, named)
 	}
 }
