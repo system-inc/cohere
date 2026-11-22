@@ -1,7 +1,6 @@
 package unused_code
 
 import (
-	"crypto/sha256"
 	"go/ast"
 	"go/token"
 
@@ -29,7 +28,8 @@ type SplicedBodies struct {
 	// again, or read with bytes whose digest is not the host's.
 	OwnFileDiffers int
 	// FilesDiffer are those whose record names a file the build does not compile, one whose host digest the side
-	// does not answer, or one the build reads otherwise than the host did.
+	// does not answer, as a side that is no FileDigestHost answers none past the body's own file, or one the build
+	// reads otherwise than the host did.
 	FilesDiffer int
 }
 
@@ -48,9 +48,9 @@ func SplicedOf(analyzerResult any) (SplicedBodies, bool) {
 // is usable, and is what it did with each, nil when pass holds no standing answer or no host's side that answers a
 // record. A record is usable when the side answers it for the package, it holds no flag, the build reads the file the
 // body is in with the host's digest, under the name the host parsed it under, and reads every file the record names
-// with the host's digest of it. Any other standing body is walked, as every body is without a standing answer. A
-// graph that records takes nothing: no run both records and stands, and a spliced local holds no object a recorder
-// could place.
+// with the host's digest of it, which the side answers as a FileDigestHost for any file but the body's own. Any other
+// standing body is walked, as every body is without a standing answer. A graph that records takes nothing: no run
+// both records and stands, and a spliced local holds no object a recorder could place.
 func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, error) {
 	_, stands := pass.ResultOf[rule.Standing].(rule.StandingBodies)
 	host, hosts := pass.ResultOf[rule.FactHost].(BodyRecordHost)
@@ -62,11 +62,14 @@ func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, error) {
 	if len(spans) == 0 {
 		return spliced, nil
 	}
-	// An analysis pass carries no package ID. The side a pass holds is its own package's, by its ID, so the path is
-	// the ID for a package that is no test variant, and a test variant's side, keyed `p [p.test]`, answers no record
-	// for it: every body of a test variant is walked.
+	// An analysis pass carries no package ID, so it asks by its package's path, which is the ID of a package that is
+	// no test variant. The side a pass holds is its own package's, by its ID, so a test variant's, keyed
+	// `p [p.test]` or `p_test [p.test]`, answers no record for the path, and every body of a test variant is walked
+	// until the side or the checker hands a pass its ID.
 	packageIdentifier := pass.Pkg.Path()
-	digests := &spliceDigests{pass: pass, host: hostDigests(pass, built, host, packageIdentifier),
+	// A side that answers no file's digest leaves every record that names a file past its body's own walked.
+	fileDigests, _ := host.(FileDigestHost)
+	digests := &spliceDigests{pass: pass, host: fileDigests, packageIdentifier: packageIdentifier,
 		own: map[string]ownDigest{}, parsed: map[string]bool{}}
 	for _, file := range pass.Files {
 		if tokenFile := pass.Fset.File(file.FileStart); tokenFile != nil {
@@ -101,7 +104,7 @@ func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, error) {
 				spliced.Flagged++
 			case recorded.ParsedFile != tokenFile.Name() || !digests.ownMatches(tokenFile.Name(), digest):
 				spliced.OwnFileDiffers++
-			case !digests.allMatch(recorded.record.Files):
+			case !digests.allMatch(recorded.record.Files, recorded.ParsedFile, digest):
 				spliced.FilesDiffer++
 			default:
 				spliced.Spliced++
@@ -116,33 +119,4 @@ func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, error) {
 		return nil, takeError
 	}
 	return spliced, nil
-}
-
-// hostDigests is the host's digest of each file of the package its side answers one of, by the name the host parsed
-// it under. The side answers a file's digest with the record of a body parsed from it, so each function declaration
-// of the pass is asked for its record: a file whose bodies the host and the build key alike is answered, and any other
-// file the build would compare by is not, and fails the record that names it.
-func hostDigests(
-	pass *analysis.Pass,
-	built *graph,
-	host BodyRecordHost,
-	packageIdentifier string,
-) map[string][sha256.Size]byte {
-	digests := map[string][sha256.Size]byte{}
-	for _, file := range pass.Files {
-		for _, declaration := range file.Decls {
-			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction || function.Body == nil {
-				continue
-			}
-			key, isKeyed := built.keyOf(function)
-			if !isKeyed {
-				continue
-			}
-			if recorded, digest, isRecorded := host.BodyRecord(packageIdentifier, key.File, key.Offset); isRecorded {
-				digests[recorded.ParsedFile] = digest
-			}
-		}
-	}
-	return digests
 }

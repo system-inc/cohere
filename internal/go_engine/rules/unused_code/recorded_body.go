@@ -71,6 +71,15 @@ type BodyRecordHost interface {
 	RecordsHeld(packageId string) bool
 }
 
+// FileDigestHost is the host's side of a package as an extra build's U1000 asks it for the digest of any file of the
+// package a record names (bodyRecord.Files): the sha256 of the bytes the host's rules read of the file parsed under
+// filename, and false where the side holds none for packageId, the build's own package's ID. A record naming a file
+// past its body's own is spliced only where the side answers this and the build reads the file alike, so a side that
+// is no FileDigestHost has such a body walked.
+type FileDigestHost interface {
+	FileDigest(packageId string, filename string) ([sha256.Size]byte, bool)
+}
+
 // RecordedOf is the records analyzerResult holds, U1000's result on a package, and false for the result of a run
 // that asked for none, or for any other analyzer's result.
 func RecordedOf(analyzerResult any) (BodyRecords, bool) {

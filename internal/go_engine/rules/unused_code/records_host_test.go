@@ -31,3 +31,13 @@ func (host recordsHost) BodyRecord(packageId string, filename string, offset int
 	}
 	return RecordedBody{}, [sha256.Size]byte{}, false
 }
+
+// FileDigest is the digest of the file parsed under filename, as a side that digests every file of its package
+// answers it: here those the host's run digested, each file a recorded body was parsed from.
+func (host recordsHost) FileDigest(packageId string, filename string) ([sha256.Size]byte, bool) {
+	if packageId != host.identifier {
+		return [sha256.Size]byte{}, false
+	}
+	digest, isDigested := host.recorded.Digests[filename]
+	return digest, isDigested
+}

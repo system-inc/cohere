@@ -16,7 +16,8 @@ import (
 
 // standingSources are Adamic's shape split over two files: a type only Answer's body builds, whose field group
 // nothing reads, so the verdict hangs on that body. Answer's record names types.go, where the type and its fields are
-// declared, and Other gives types.go a body of its own, so the host's side answers a digest of that file too.
+// declared, past its own file, so it is spliced only where the side answers types.go's digest (FileDigestHost). Other
+// gives types.go a body of its own, so the host's run digests that file too.
 var standingSources = []recordedSource{
 	{name: "shape.go", source: `package shape
 
@@ -141,7 +142,8 @@ func wordedVerdict(fileSet *token.FileSet, verdict result) []string {
 // A build in which Answer stands splices the host's record of its body where the record is usable, and walks the body
 // where it is not, by why (#xeafx79): the side answers no record, the record holds a flag, the build reads Answer's
 // own file otherwise than the host did, or a file the record names is one the build reads otherwise, one the side
-// answers no digest of, or one the build does not compile. Each way, the verdict is the plain run's. A pass with no
+// answers no digest of, one the build does not compile, or any past Answer's own file where the side is no
+// FileDigestHost. Each way, the verdict is the plain run's. A pass with no
 // standing answer, or none with a side that answers records, says nothing of splicing, as the host's and every plain
 // run's say nothing.
 func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
@@ -182,6 +184,12 @@ func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
 		}
 		test.Fatal("the host recorded no body of shape.go")
 		return -1
+	}
+	bodiesOnly := bodiesOnlyHost{sides: recordsHost{identifier: standingPackagePath, recorded: recorded}}
+	if verdict, spliced := splicedRun(test, bodiesOnly); spliced != (SplicedBodies{FilesDiffer: 1}) ||
+		!slices.Equal(verdict, plain) {
+		test.Errorf("with a side that answers no file's digest the run did %+v with Answer's body and found\n%v\nwant "+
+			"it walked for its named file and the plain verdict\n%v", spliced, verdict, plain)
 	}
 	for _, each := range []struct {
 		name   string
