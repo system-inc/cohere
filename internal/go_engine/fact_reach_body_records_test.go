@@ -42,7 +42,8 @@ func capturedBodies(test *testing.T, recordBodies bool) (string, *check.FactReac
 	if len(running) != 2 {
 		test.Fatalf("the registry holds %d of U1000 and SA4017, want both", len(running))
 	}
-	result, runError := check.Run(loaded.Packages, running, check.Options{FactReach: true, RecordBodies: recordBodies})
+	result, runError := check.Run(loaded.Packages, running, check.Options{FactReach: true, RecordBodies: recordBodies,
+		BodyRecorder: unusedBodyRecorder})
 	if runError != nil {
 		test.Fatalf("running the rules: %v", runError)
 	}
@@ -65,7 +66,7 @@ func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 	test.Parallel()
 	identifier, captured, root := capturedBodies(test, true)
 	hosted := &factReachPackage{identifier: identifier}
-	hosted.holdBodies(captured.Bodies, captured.RecordsHeld)
+	hosted.holdBodies(capturedBodyRecords(captured))
 	var side unused_code.BodyRecordHost = factReachHost{factReachPackage: hosted}
 	if !side.RecordsHeld(identifier) || side.RecordsHeld(identifier+" [example.com/records.test]") {
 		test.Errorf("the side holds its package's records %t and the test variant's %t, want only its own",
@@ -121,14 +122,15 @@ func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 	}
 
 	undigested := &factReachPackage{identifier: identifier}
-	undigested.holdBodies(unused_code.BodyRecords{Bodies: captured.Bodies.Bodies}, true)
+	recorded, _ := capturedBodyRecords(captured)
+	undigested.holdBodies(unused_code.BodyRecords{Bodies: recorded.Bodies}, true)
 	if _, _, isRecorded := undigested.BodyRecord(identifier, filepath.Join(root, "plain.go"), 103); isRecorded {
 		test.Error("a side holding no digest of plain.go answers Plain's record")
 	}
 
 	unaskedIdentifier, unasked, unaskedRoot := capturedBodies(test, false)
 	unaskedSide := &factReachPackage{identifier: unaskedIdentifier}
-	unaskedSide.holdBodies(unasked.Bodies, unasked.RecordsHeld)
+	unaskedSide.holdBodies(capturedBodyRecords(unasked))
 	if _, _, isRecorded := unaskedSide.BodyRecord(unaskedIdentifier, filepath.Join(unaskedRoot, "plain.go"),
 		103); isRecorded {
 		test.Error("the side of a host not asked to record answers Plain's record")

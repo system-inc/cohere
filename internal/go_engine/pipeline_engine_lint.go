@@ -325,6 +325,8 @@ func (engine *pipeline) lintPackages(
 	// And U1000's record of each body it walks, which an extra build's U1000 splices in place of walking a body it
 	// leaves standing (#xeafx79), only in a run whose builds leave any: no other run records a body.
 	options.RecordBodies = options.FactReach && engine.leavesBodiesStanding()
+	// Read off U1000's action by U1000's own reader, which check takes and never imports (#f5g7ym6).
+	options.BodyRecorder = unusedBodyRecorder
 	// And what its bodies hold that the presence rows read, by standing_presence's reader, which check takes and never
 	// imports (#f5g7ym6). A run without FactReach never calls it.
 	options.FactReachPresence = standing_presence.ReadPackage

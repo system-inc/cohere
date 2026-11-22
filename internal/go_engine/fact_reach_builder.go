@@ -26,9 +26,8 @@ import (
 //   - presence is what each body holds that the presence rows read, by its place, read off the package's syntax while
 //     the host's run held it (check.FactReachPackage.Presence), presenceRead whether it was read at all, and markers
 //     the method names of the marker interfaces the package declares (check.FactReachPackage.Markers).
-//   - identifier is the package's ID, bodies what the host's U1000 recorded of its bodies
-//     (check.FactReachPackage.Bodies), and recordsHeld whether it recorded them at all
-//     (check.FactReachPackage.RecordsHeld).
+//   - identifier is the package's ID, bodies what the host's U1000 recorded of its bodies, and recordsHeld whether it
+//     recorded them at all, as the capture holds them (capturedBodyRecords).
 type factReachInputs struct {
 	fileSet      *token.FileSet
 	record       *build_reads.FunctionUses

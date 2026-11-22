@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/types"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 
@@ -11,8 +12,17 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
-	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
+
+// BodyRecorder is the analyzer that records what each function body adds to what it builds of a package under
+// Options.RecordBodies, U1000's (unused_code.Analyzer), and RecordedOf, its reader of those records off the analyzer's
+// result on a package (unused_code.RecordedOf), false for a result that holds none. Both are U1000's, handed in, so
+// this package names no rule package (#f5g7ym6), and the capture holds what RecordedOf reads as it is
+// (FactReachPackage.Bodies).
+type BodyRecorder struct {
+	Analyzer   *analysis.Analyzer
+	RecordedOf func(analyzerResult any) (any, bool)
+}
 
 // FactReachCapture is what a host's run held of its facts for the facts' reach (#aswfm7a), read from the run's resolver
 // while it was alive: what the engine makes each package's host's side of, for an extra build to leave a function body
@@ -87,11 +97,13 @@ type FactReachPackage struct {
 	Markers []string
 
 	// Bodies are what U1000's action on the package recorded of each function body it walked, under
-	// Options.RecordBodies (#xeafx79), with the digest of every file of the package (unused_code.RecordedOf), a
-	// later wave's counting: what an extra build's U1000 splices in place of walking a body it leaves standing. They
-	// are empty where nothing asked, where U1000 did not run on the package, or where it failed, and then the
-	// package's side answers no body's record, and a build walks every body of it.
-	Bodies unused_code.BodyRecords
+	// Options.RecordBodies (#xeafx79), with the digest of every file of the package, a later wave's counting, as
+	// Options.BodyRecorder read them (unused_code.BodyRecords, which only the engine and U1000 read): what an extra
+	// build's U1000 splices in place of walking a body it leaves standing. They are nil where nothing asked, where the
+	// run was handed no recorder, where U1000 did not run on the package, or where it failed, and then the package's
+	// side answers no body's record, and a build walks every body of it.
+	//cohere:ignore consistency-no-any the records are U1000's type, which check cannot name without linking the rule
+	Bodies any
 
 	// RecordsHeld is whether Bodies holds what U1000 recorded at all: whether its action on the package ran with its
 	// records asked, and did not fail, a package with no body among them. Where it is false, Bodies is empty because
@@ -108,17 +120,18 @@ type factReachKinds struct {
 
 // captureFactReach is what resolver, the run's, holds of its facts for the facts' reach of analyzed, read once the
 // run's passes are done, the pushed facts each action of graphs held, a later wave's on a package counting, as the
-// findings read it, and what presence read of each package's bodies. It reads every answer once
-// (fact_resolver.Answered), then calls each kind's bound once per package. A kind that answered nothing about a
-// package's objects is not called there: its state holds no judgment of the package, so its bound is empty, and known.
-// An answer about a parameter is no function the kind answered about, and the one kind with a bound, nil-ness, answers
-// only about functions. It asks each answer's kind once whether the object's types alone decide the answer, and marks
-// the answer where they do.
+// findings read it, what presence read of each package's bodies, and what recorder's actions recorded of them. It reads
+// every answer once (fact_resolver.Answered), then calls each kind's bound once per package. A kind that answered
+// nothing about a package's objects is not called there: its state holds no judgment of the package, so its bound is
+// empty, and known. An answer about a parameter is no function the kind answered about, and the one kind with a bound,
+// nil-ness, answers only about functions. It asks each answer's kind once whether the object's types alone decide the
+// answer, and marks the answer where they do.
 func captureFactReach(
 	resolver *fact_resolver.Resolver,
 	analyzed []*packages.Package,
 	graphs []*checker.Graph,
 	presence *factReachPresence,
+	recorder BodyRecorder,
 ) *FactReachCapture {
 	capture := &FactReachCapture{Packages: make(map[string]*FactReachPackage, len(analyzed)),
 		StoreAnswered: map[string]bool{}, Askers: resolver.Askers(), BodiesRead: presence.packages()}
@@ -144,7 +157,7 @@ func captureFactReach(
 		kinds[analyzedPackage.Types] = &factReachKinds{functions: map[*fact_resolver.Kind][]*types.Func{}}
 	}
 	capturePushed(captured, graphs)
-	captureBodies(captured, graphs)
+	captureBodies(captured, graphs, recorder)
 	answered := resolver.Answered()
 	if len(answered) == 0 {
 		return capture
@@ -225,20 +238,24 @@ func capturePushed(captured map[*types.Package]*FactReachPackage, graphs []*chec
 	}
 }
 
-// captureBodies holds, on each package of captured, what U1000's action on it in graphs recorded of its bodies, and
+// captureBodies holds, on each package of captured, what recorder's action on it in graphs recorded of its bodies, and
 // that it was recorded, an action that failed holding none a build could trust. A run not asked to record has U1000's
-// results hold none, and the packages none, as a run without U1000 does (unused_code.RecordedOf).
-func captureBodies(captured map[*types.Package]*FactReachPackage, graphs []*checker.Graph) {
+// results hold none, and the packages none, as a run without U1000 does (BodyRecorder.RecordedOf), and a run handed no
+// recorder holds none either, so a caller that forgets it has its builds walk every body.
+func captureBodies(captured map[*types.Package]*FactReachPackage, graphs []*checker.Graph, recorder BodyRecorder) {
+	if recorder.Analyzer == nil || recorder.RecordedOf == nil {
+		return
+	}
 	for _, graph := range graphs {
 		for action := range graph.All() {
-			if action.Analyzer != unused_code.Analyzer || action.Err != nil {
+			if action.Analyzer != recorder.Analyzer || action.Err != nil {
 				continue
 			}
 			hosted := captured[action.Package.Types]
 			if hosted == nil {
 				continue
 			}
-			if recorded, isRecorded := unused_code.RecordedOf(action.Result); isRecorded {
+			if recorded, isRecorded := recorder.RecordedOf(action.Result); isRecorded {
 				hosted.Bodies, hosted.RecordsHeld = recorded, true
 			}
 		}

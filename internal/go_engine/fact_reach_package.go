@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
@@ -220,6 +221,20 @@ func (hosted *factReachPackage) Parameters(key fact_reach.Object) int {
 // Declared are the keys of the functions declared at place.
 func (hosted *factReachPackage) Declared(place fact_reach.Place) []fact_reach.Object {
 	return hosted.declared[place]
+}
+
+// unusedBodyRecorder is U1000's, the analyzer and reader the host's run captures each package's records of its bodies
+// by (check.Options.BodyRecorder), which the engine hands check, so the engine's core names no rule package (#f5g7ym6).
+var unusedBodyRecorder = check.BodyRecorder{Analyzer: unused_code.Analyzer,
+	RecordedOf: func(analyzerResult any) (any, bool) { return unused_code.RecordedOf(analyzerResult) }}
+
+// capturedBodyRecords are what the host's U1000 recorded of captured's bodies, which the capture holds as
+// unusedBodyRecorder read them (check.FactReachPackage.Bodies), and whether it recorded them at all
+// (check.FactReachPackage.RecordsHeld). Records of any other type are none a side could answer a body from, so they
+// read as never recorded, and a build walks every body of the package.
+func capturedBodyRecords(captured *check.FactReachPackage) (unused_code.BodyRecords, bool) {
+	recorded, isRecords := captured.Bodies.(unused_code.BodyRecords)
+	return recorded, isRecords && captured.RecordsHeld
 }
 
 // holdBodies keeps recorded, what the host's U1000 recorded of the package's bodies, indexed by each body's key, which

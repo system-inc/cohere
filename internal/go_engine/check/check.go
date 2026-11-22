@@ -28,7 +28,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
-	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -147,6 +146,13 @@ type Options struct {
 	// (FactReachPackage.PresenceRead), and a build lints it whole.
 	FactReachPresence func(read *packages.Package) (map[fact_reach.Place]fact_reach.BodyRecord, []string)
 
+	// BodyRecorder is the analyzer whose action on each package RecordBodies' records are read off, and its reader,
+	// for FactReach's capture (FactReachPackage.Bodies): U1000's (unused_code.Analyzer and unused_code.RecordedOf),
+	// which this package never imports (#f5g7ym6, #xeafx79). Left unset, the run captures no package's records, as a
+	// run without RecordBodies, so every package's side answers no body's record and a build walks every body. Run
+	// refuses one with only its analyzer or only its reader set.
+	BodyRecorder BodyRecorder
+
 	// Inheritance, when not nil, is an extra build's take of the host's run for its syntax-only rules (#y6q1x2j): each
 	// such rule skips each file it inherits and reports the host's findings there as its own (rule.InheritedFiles),
 	// handed every pass under rule.Inherited (see checker.Options.Inheritance). Only an extra build restoring from the
@@ -179,13 +185,20 @@ type Options struct {
 	// StandingAfter's result there, what it answers is handed every pass on the package under rule.Standing (see
 	// checker.Options.StandingBodies), so a confined rule hears no standing body and reports the host's findings there
 	// as its own. StandingAfter, when StandingBodies is set too, is the analyzer every follower's action on a package
-	// follows, a dispatcher's and the representation's build (followsStanding), and whose result there StandingBodies
-	// is asked with, standing_facts' on the census path, which this package never imports. Where it is FactReachSettle
-	// and the run roots that nowhere (settlingIn), nothing stands. Both are called from several actions at once. Only
-	// an extra build sets them, and no package StandingBodies answers anything for is written to the findings cache
-	// (CacheSession.markStood).
+	// follows, a dispatcher's and the representation's build (followsStanding) and each of StandingFollowers, and whose
+	// result there StandingBodies is asked with, standing_facts' on the census path, which this package never imports.
+	// Where it is FactReachSettle and the run roots that nowhere (settlingIn), nothing stands. Both are called from
+	// several actions at once. Only an extra build sets them, and no package StandingBodies answers anything for is
+	// written to the findings cache (CacheSession.markStood).
 	StandingBodies func(packageId string, after any) rule.StandingBodies
 	StandingAfter  *analysis.Analyzer
+
+	// StandingFollowers are the analyzers beyond the dispatchers and the representation's build whose action on a
+	// package follows StandingAfter's there (followerOf): U1000's on the census path, which splices the host's record
+	// of a standing body in place of walking it (#xeafx79), and which this package never imports (#f5g7ym6). Left
+	// nil, no other analyzer follows, so U1000 walks every body, standing or not, as it does in a run with nothing
+	// standing.
+	StandingFollowers []*analysis.Analyzer
 
 	// holdWalk, nil outside tests, is called with each type-read walk's package before it runs (see
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
@@ -424,6 +437,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, errors.New("recording the bodies U1000 walks: the run captures no facts' reach, the one thing " +
 			"that hands the records back, so every record would be made and let go")
 	}
+	if (options.BodyRecorder.Analyzer == nil) != (options.BodyRecorder.RecordedOf == nil) {
+		return nil, errors.New("capturing the bodies' records: the body recorder names only its analyzer or only " +
+			"its reader, so no action's records could be read")
+	}
 	if options.Declarations != nil && options.Reads == nil {
 		return nil, errors.New("handing on the packages' declarations: the run records no reads, whose packages are " +
 			"every one a walk reaches, so a package no action reached would be handed on by none")
@@ -442,6 +459,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions.Inheritance = options.Inheritance
 	checkerOptions.FactHosts = options.FactHosts
 	checkerOptions.RecordBodies = options.RecordBodies
+	checkerOptions.FollowsStanding = followerOf(options.StandingFollowers)
 	// The standing bodies follow StandingAfter, on the census path the analyzer the facts' reach settles by, so a run
 	// that roots that nowhere (settlingIn) hands none: following it there would run it, and the answers it learns would
 	// reach the entries.
@@ -731,7 +749,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Read as the rules' passes left the resolver, before the save computes packages whole for the store: that replays
 	// walks no rule asked for and keeps an answer of every function they judge, which no body's rules read.
 	if options.FactReach {
-		result.FactReach = captureFactReach(resolver, analyzed, graphs, presence)
+		result.FactReach = captureFactReach(resolver, analyzed, graphs, presence, options.BodyRecorder)
 	}
 	if session != nil {
 		timeline.Tell(options.Timeline, "check.save.begin")
@@ -900,7 +918,7 @@ func abandoned(abandon <-chan struct{}) bool {
 // U1000 record its bodies, once Run sets RecordBodies (#xeafx79). Standing hands each pass on a package what
 // stands there, once Run sets StandingBodies (#e4rd5dw), and FollowsStanding names the actions that follow
 // StandingAfter's there: each dispatcher's, and the representation's build, which then leaves unbuilt what stands for
-// every rule its dispatcher starts (followsStanding).
+// every rule its dispatcher starts (followsStanding), and Run's adds its Options.StandingFollowers (followerOf).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:      rule.Dependents,
@@ -919,13 +937,23 @@ func DispatchOptions() *checker.Options {
 }
 
 // followsStanding is whether analyzer's action on a package follows checker.Options.StandingAfter's there (#e4rd5dw):
-// a dispatcher's, whose confined rules hear no standing body, build_intermediate_representation's, so the
-// representation is built less what stands for every rule its dispatcher starts rather than whole, and U1000's, which
-// splices the host's record of a standing body in place of walking it (#xeafx79). None is required by standing_facts,
-// the analyzer the census path follows, so no follower waits on itself.
+// a dispatcher's, whose confined rules hear no standing body, and build_intermediate_representation's, so the
+// representation is built less what stands for every rule its dispatcher starts rather than whole. Neither is
+// required by standing_facts, the analyzer the census path follows, so no follower waits on itself.
 func followsStanding(analyzer *analysis.Analyzer) bool {
-	return dispatch.IsDispatcher(analyzer) || analyzer == build_intermediate_representation.Analyzer ||
-		analyzer == unused_code.Analyzer
+	return dispatch.IsDispatcher(analyzer) || analyzer == build_intermediate_representation.Analyzer
+}
+
+// followerOf is what names the followers of a run whose Options.StandingFollowers are followers
+// (checker.Options.FollowsStanding): followsStanding's and each of followers, U1000's on the census path (#xeafx79).
+// With none it is followsStanding itself, so a run handed no followers follows as every run of DispatchOptions does.
+func followerOf(followers []*analysis.Analyzer) func(*analysis.Analyzer) bool {
+	if len(followers) == 0 {
+		return followsStanding
+	}
+	return func(analyzer *analysis.Analyzer) bool {
+		return followsStanding(analyzer) || slices.Contains(followers, analyzer)
+	}
 }
 
 // actionFindings is what action found, as newFinding makes it.

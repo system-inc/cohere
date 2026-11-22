@@ -15,6 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
@@ -25,6 +26,16 @@ var bodiesFiles = map[string]string{
 	"plain.go": "// Package bodies holds a body keyed by its own file and one keyed by a directive's.\n" +
 		"package bodies\n\nfunc Plain() int {\n\tvalue := 1\n\treturn value\n}\n",
 	"lined.go": "package bodies\n\n//line other.go:40\nfunc Lined() int {\n\treturn Plain()\n}\n",
+}
+
+// unusedRecorder is U1000's body recorder, as the engine hands it to a host's run (Options.BodyRecorder).
+var unusedRecorder = BodyRecorder{Analyzer: unused_code.Analyzer,
+	RecordedOf: func(analyzerResult any) (any, bool) { return unused_code.RecordedOf(analyzerResult) }}
+
+// heldRecords are U1000's records the capture holds of hosted, none where it holds no records of U1000's type.
+func heldRecords(hosted *FactReachPackage) unused_code.BodyRecords {
+	recorded, _ := hosted.Bodies.(unused_code.BodyRecords)
+	return recorded
 }
 
 // loadBodies writes the bodies workspace into a directory of the test's own, loads it, and returns its one package,
@@ -58,19 +69,21 @@ func TestTheCaptureTakesU1000sRecordsOnlyWhenAsked(test *testing.T) {
 	test.Parallel()
 	analyzed, root, unused := loadBodies(test)
 	running := []rule.Rule{unused, houseRule(reachNilnessAnalyzer)}
-	unasked, unaskedError := Run(analyzed, running, Options{FactReach: true})
+	unasked, unaskedError := Run(analyzed, running, Options{FactReach: true, BodyRecorder: unusedRecorder})
 	if unaskedError != nil {
 		test.Fatalf("running unasked: %v", unaskedError)
 	}
-	if hosted := unasked.FactReach.Packages[analyzed[0].ID]; hosted == nil || len(hosted.Bodies.Bodies) != 0 ||
-		len(hosted.Bodies.Digests) != 0 {
+	if hosted := unasked.FactReach.Packages[analyzed[0].ID]; hosted == nil || len(heldRecords(hosted).Bodies) != 0 ||
+		len(heldRecords(hosted).Digests) != 0 {
 		test.Errorf("unasked, the capture holds %+v, want the package with no body recorded", hosted)
 	}
-	if _, refusal := Run(analyzed, running, Options{RecordBodies: true}); refusal == nil {
+	if _, refusal := Run(analyzed, running, Options{RecordBodies: true,
+		BodyRecorder: unusedRecorder}); refusal == nil {
 		test.Error("a run asked to record with no facts' reach captured ran")
 	}
 
-	asked, askedError := Run(analyzed, running, Options{FactReach: true, RecordBodies: true})
+	asked, askedError := Run(analyzed, running, Options{FactReach: true, RecordBodies: true,
+		BodyRecorder: unusedRecorder})
 	if askedError != nil {
 		test.Fatalf("running asked: %v", askedError)
 	}
@@ -84,7 +97,7 @@ func TestTheCaptureTakesU1000sRecordsOnlyWhenAsked(test *testing.T) {
 		parsedFile string
 	}
 	var got []held
-	for _, body := range hosted.Bodies.Bodies {
+	for _, body := range heldRecords(hosted).Bodies {
 		file, offset := body.Key()
 		got = append(got, held{file: file, offset: offset, parsedFile: body.ParsedFile})
 	}
@@ -96,7 +109,7 @@ func TestTheCaptureTakesU1000sRecordsOnlyWhenAsked(test *testing.T) {
 		test.Errorf("asked, the capture holds the bodies %+v, want %+v", got, want)
 	}
 	for name, path := range map[string]string{"plain.go": plain, "lined.go": lined} {
-		if digest := hosted.Bodies.Digests[path]; digest != sha256.Sum256([]byte(bodiesFiles[name])) {
+		if digest := heldRecords(hosted).Digests[path]; digest != sha256.Sum256([]byte(bodiesFiles[name])) {
 			test.Errorf("asked, the digest of %s is %x, want the sha256 of its bytes", name, digest)
 		}
 	}
@@ -123,11 +136,12 @@ func TestTheCaptureHoldsRecordsExactlyWhereU1000RanAsked(test *testing.T) {
 		options Options
 		wants   bool
 	}{
-		{name: "unasked", running: []rule.Rule{unused, nilness}, options: Options{FactReach: true}},
+		{name: "unasked", running: []rule.Rule{unused, nilness},
+			options: Options{FactReach: true, BodyRecorder: unusedRecorder}},
 		{name: "asked without U1000", running: []rule.Rule{nilness},
-			options: Options{FactReach: true, RecordBodies: true}},
-		{name: "asked", running: []rule.Rule{unused, nilness}, options: Options{FactReach: true, RecordBodies: true},
-			wants: true},
+			options: Options{FactReach: true, RecordBodies: true, BodyRecorder: unusedRecorder}},
+		{name: "asked", running: []rule.Rule{unused, nilness},
+			options: Options{FactReach: true, RecordBodies: true, BodyRecorder: unusedRecorder}, wants: true},
 	} {
 		result, runError := Run(analyzed, each.running, each.options)
 		if runError != nil {
@@ -150,7 +164,7 @@ func TestTheCaptureHoldsRecordsExactlyWhereU1000RanAsked(test *testing.T) {
 		test.Fatalf("loading the bare workspace: %v %+v", loadError, bare)
 	}
 	bareResult, bareError := Run(bare.Packages, []rule.Rule{unused, nilness}, Options{FactReach: true,
-		RecordBodies: true})
+		RecordBodies: true, BodyRecorder: unusedRecorder})
 	if bareError != nil {
 		test.Fatalf("running over the bare workspace: %v", bareError)
 	}
@@ -158,12 +172,12 @@ func TestTheCaptureHoldsRecordsExactlyWhereU1000RanAsked(test *testing.T) {
 	if bareHosted == nil {
 		test.Fatal("the capture holds no side of the package with no body")
 	}
-	digest, isDigested := bareHosted.Bodies.Digests[filepath.Join(bareRoot, "bare.go")]
-	if !bareHosted.RecordsHeld || len(bareHosted.Bodies.Bodies) != 0 || !isDigested ||
+	digest, isDigested := heldRecords(bareHosted).Digests[filepath.Join(bareRoot, "bare.go")]
+	if !bareHosted.RecordsHeld || len(heldRecords(bareHosted).Bodies) != 0 || !isDigested ||
 		digest != sha256.Sum256([]byte(bareFiles["bare.go"])) {
 		test.Errorf("over a package with no body, the capture holds its records %t, %d bodies and bare.go's digest "+
 			"%t %x, want its records held, no body and bare.go's sha256", bareHosted.RecordsHeld,
-			len(bareHosted.Bodies.Bodies), isDigested, digest)
+			len(heldRecords(bareHosted).Bodies), isDigested, digest)
 	}
 
 	graph, analyzeError := analyzeWrapped([]*analysis.Analyzer{unused_code.Analyzer}, analyzed,
@@ -188,10 +202,55 @@ func TestTheCaptureHoldsRecordsExactlyWhereU1000RanAsked(test *testing.T) {
 		wants bool
 	}{{name: "ran", graph: graph, wants: true}, {name: "failed", graph: failed}} {
 		hosted := &FactReachPackage{}
-		captureBodies(map[*types.Package]*FactReachPackage{ran.Package.Types: hosted}, []*checker.Graph{each.graph})
-		if hosted.RecordsHeld != each.wants || (len(hosted.Bodies.Bodies) > 0) != each.wants {
+		captureBodies(map[*types.Package]*FactReachPackage{ran.Package.Types: hosted}, []*checker.Graph{each.graph},
+			unusedRecorder)
+		if hosted.RecordsHeld != each.wants || (len(heldRecords(hosted).Bodies) > 0) != each.wants {
 			test.Errorf("where U1000's action %s, the capture holds %d bodies, its records held %t, want %t",
-				each.name, len(hosted.Bodies.Bodies), hosted.RecordsHeld, each.wants)
+				each.name, len(heldRecords(hosted).Bodies), hosted.RecordsHeld, each.wants)
+		}
+	}
+}
+
+// A run handed neither U1000's recorder nor its follower fails closed (#f5g7ym6, #xeafx79): asked to record, with
+// U1000 among its rules, it captures no package's records, so every side answers no body's record and a build walks
+// every body, and no analyzer follows the standing answer but the dispatchers and the representation's build, so
+// U1000 walks every body, standing or not. Handed U1000 as a follower it follows, and a recorder with only its
+// analyzer or only its reader is refused.
+func TestARunWithoutU1000sOptionsCapturesAndFollowsNothingOfIt(test *testing.T) {
+	test.Parallel()
+	analyzed, _, unused := loadBodies(test)
+	running := []rule.Rule{unused, houseRule(reachNilnessAnalyzer)}
+	forgotten, forgottenError := Run(analyzed, running, Options{FactReach: true, RecordBodies: true})
+	if forgottenError != nil {
+		test.Fatalf("running with no recorder: %v", forgottenError)
+	}
+	hosted := forgotten.FactReach.Packages[analyzed[0].ID]
+	if hosted == nil {
+		test.Fatal("with no recorder, the capture holds no side of the package")
+	}
+	if hosted.RecordsHeld || hosted.Bodies != nil {
+		test.Errorf("with no recorder, the capture holds the package's records %t and %+v, want none",
+			hosted.RecordsHeld, hosted.Bodies)
+	}
+	for _, half := range []BodyRecorder{{Analyzer: unused_code.Analyzer}, {RecordedOf: unusedRecorder.RecordedOf}} {
+		if _, refusal := Run(analyzed, running, Options{FactReach: true, RecordBodies: true,
+			BodyRecorder: half}); refusal == nil {
+			test.Errorf("a run handed the half recorder %+v ran", half)
+		}
+	}
+
+	if followerOf(nil)(unused_code.Analyzer) {
+		test.Error("with no followers, U1000 follows the standing answer")
+	}
+	if !followerOf([]*analysis.Analyzer{unused_code.Analyzer})(unused_code.Analyzer) {
+		test.Error("handed U1000 as a follower, it does not follow the standing answer")
+	}
+	for _, followers := range [][]*analysis.Analyzer{nil, {unused_code.Analyzer}} {
+		follows := followerOf(followers)
+		if !follows(build_intermediate_representation.Analyzer) || follows(reachNilnessAnalyzer) {
+			test.Errorf("with the followers %v, the representation's build follows %t and a rule's analyzer %t, want "+
+				"only the build", followers, follows(build_intermediate_representation.Analyzer),
+				follows(reachNilnessAnalyzer))
 		}
 	}
 }
