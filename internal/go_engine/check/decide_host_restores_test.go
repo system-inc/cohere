@@ -81,8 +81,13 @@ func decideBuild(test *testing.T, root string, host *HostRun, slots int) HostRes
 		}
 		result, runError := Run(loaded.Packages, rules, Options{Cache: session, Withheld: loaded.Withheld,
 			Bodiless: loaded.Bodiless})
-		if runError != nil || len(result.Crashes) > 0 {
-			test.Fatalf("running windows's build on %d slots: %v %+v", slots, runError, result.Crashes)
+		if runError != nil {
+			test.Fatalf("running windows's build on %d slots: %v", slots, runError)
+		}
+		// A round that asks a reload is dropped, as the pipeline drops it, and its crashes with it: a package handed
+		// a placeholder for a missing answer is one (Run), which the reload's round answers from source.
+		if len(result.Reloads) == 0 && len(result.Crashes) > 0 {
+			test.Fatalf("running windows's build on %d slots: %+v", slots, result.Crashes)
 		}
 		if len(result.Reloads) == 0 || !session.Reload(result.Reloads) {
 			fromHost := result.FromHost
