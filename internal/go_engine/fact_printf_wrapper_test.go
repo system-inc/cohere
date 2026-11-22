@@ -198,3 +198,42 @@ func TestAPrintfWrapperHeldByAFieldTakesItsUserOut(test *testing.T) {
 		})
 	}
 }
+
+// A field of a generic type is a wrapper as an ordinary one is (seats' review-1, must 1): printf gathers the literal
+// assigned through GenericLogger[any].Logf by the literal's own signature, func(string, ...any), and exports its fact
+// on the generic field, whose declared type, func(string, ...T), has no printf function's shape until T is any. The
+// record names the generic field, so the host's side has to admit it by the shape any instance of it could take
+// (printf.PrintShaped), else it compares nothing and Target stands on the host's findings, inventing windows a printf
+// finding in the -host fixture and losing windows's in the -extra one.
+func TestAPrintfWrapperHeldByAGenericFieldTakesItsUserOut(test *testing.T) {
+	test.Parallel()
+	for _, each := range []struct {
+		fixture string
+		module  string
+		// onHost is whether the host's build holds the assignment, and windows's does not; else the reverse.
+		onHost bool
+	}{
+		{"fact-printf-generic-field-host", "example.com/printfgenericfieldhost", true},
+		{"fact-printf-generic-field-extra", "example.com/printfgenericfieldextra", false},
+	} {
+		test.Run(each.fixture, func(test *testing.T) {
+			test.Parallel()
+
+			settled := settleFactFixture(test, each.fixture, each.module+"/reader")
+			if reason := settled.bodies["Target"].reason; reason != "" {
+				test.Fatalf("the reach reached Target for %q, want it unreached, so that only the facts can take it "+
+					"out", reason)
+			}
+			// The field's key names it by its objectpath, GenericLogger's first field.
+			settled.requireRemovedBy(test, "Target", "GenericLogger.UF0", "printf wrapper")
+			if printfIn(settled.host.result.Findings, "reader.go") != each.onHost ||
+				printfIn(settled.run.result.Findings, "reader.go") == each.onHost {
+				test.Errorf("Target's call is a printf finding on the host %t and on windows %t, want the host's %t "+
+					"and windows's the other", printfIn(settled.host.result.Findings, "reader.go"),
+					printfIn(settled.run.result.Findings, "reader.go"), each.onHost)
+			}
+			requireNoDifferentialFailure(test, settled)
+			requireOwnFindingsAlike(test, each.fixture)
+		})
+	}
+}

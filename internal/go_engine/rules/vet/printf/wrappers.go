@@ -52,12 +52,35 @@ func (wrappers *Wrappers) ByName(object types.Object) bool {
 	return wrappers.byName[origin(object)]
 }
 
-// PrintShaped reports whether signature has the shape of a print or printf function, a final `args ...any` with or
-// without a format string before it. A candidate is admitted by that shape alone (wrapperSearch.add): a function's or
-// an interface method's declared signature, or a function literal's, which is the underlying type of the variable it
-// is assigned to, since only an identical one is assignable. So no object of another shape holds a wrapper fact in any
-// build.
-func PrintShaped(signature *types.Signature) bool {
-	_, arguments := formatArgumentsParameters(signature)
-	return arguments != nil
+// PrintShaped reports whether typed, an interface method's signature or a variable's or a field's type as its generic
+// declaration declares it, or any instance of it, has the shape of a print or printf function, a final `args ...any`
+// with or without a format string before it. A candidate is admitted by the shape of the signature it is gathered by
+// alone (wrapperSearch.add): an interface method's, an embedded instance's among them, or a function literal's, which
+// is the type of the variable or field it is assigned to, an instance's for a field of a generic type, since only an
+// identical one is assignable but to an interface, through which no call is made, so no fact of it is ever read. The
+// fact is on the generic declaration all the same (seats' review-1 on #zqx7gke, must 1), so a type parameter counts
+// as the shape any instance could give it: the whole type, which an instance can make a function, or the variadic
+// element, which an instance can make any. Anything else keeps its kind in every instance. So no object whose generic
+// declaration fails this holds a wrapper fact any call reads, in any build.
+func PrintShaped(typed types.Type) bool {
+	if _, isParameter := types.Unalias(typed).(*types.TypeParam); isParameter {
+		return true
+	}
+	signature, isSignature := typed.Underlying().(*types.Signature)
+	if !isSignature || !signature.Variadic() {
+		return false
+	}
+	// A variadic signature has a parameter, a slice.
+	parameters := signature.Params()
+	variadic, isSlice := parameters.At(parameters.Len() - 1).Type().(*types.Slice)
+	if !isSlice {
+		return false
+	}
+	switch element := types.Unalias(variadic.Elem()).(type) {
+	case *types.Interface:
+		return element.Empty()
+	case *types.TypeParam:
+		return true
+	}
+	return false
 }

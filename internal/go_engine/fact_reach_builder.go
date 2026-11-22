@@ -251,32 +251,36 @@ func (builder *factReachBuilder) meet(function *types.Func) {
 
 // meetPushed adds object to the objects only printf's wrapper fact is compared on (fact_reach.PushedObject), with the
 // host's fact of it, the first time its key is met, where the host ran printf on the package (#zqx7gke): a method of an
-// interface, which meet leaves out, or a package-level variable or a field, whose signature has a print or printf
-// function's shape. printf admits a candidate by that shape alone (printf.PrintShaped), so no other object holds a
-// wrapper fact in any build, and comparing only these keeps every other kind's comparison as it was. A local variable
-// is left out: a function literal assigned to one is called only in the body that declares the variable, whose own
-// uses of the literal's callees are compared, so that body leaves wherever the variable's fact could differ. So is an
-// object no identity names, which no build could find its own of.
+// interface, which meet leaves out, or a package-level variable or a field, whose type, or an instance's, has a print
+// or printf function's shape. The record names an instance's field or method by its generic declaration, whose type
+// may have that shape only once its type parameters are given, as a field of type func(string, ...T) does as
+// GenericLogger[any]'s, so the shape is any instance's (printf.PrintShaped). printf admits a candidate by that shape
+// alone, so no other object holds a wrapper fact a call reads in any build, and comparing only these keeps every other
+// kind's comparison as it was. A local variable is left out: a function literal assigned to one is called only in the
+// body that declares the variable, whose own uses of the literal's callees are compared, so that body leaves wherever
+// the variable's fact could differ. So is an object no identity names, which no build could find its own of.
 func (builder *factReachBuilder) meetPushed(object types.Object) {
 	facts, isRun := builder.inputs.pushed[printf.Analyzer.Name]
 	if !isRun {
 		return
 	}
-	var signature *types.Signature
+	var typed types.Type
 	switch declared := object.(type) {
 	case *types.Func:
 		if receiver := declared.Signature().Recv(); receiver == nil || !types.IsInterface(receiver.Type()) {
 			return
 		}
-		signature = declared.Signature()
+		typed = declared.Signature()
 	case *types.Var:
 		packageLevel := declared.Pkg() != nil && declared.Pkg().Scope().Lookup(declared.Name()) == declared
 		if !packageLevel && !declared.IsField() {
 			return
 		}
-		signature, _ = declared.Type().Underlying().(*types.Signature)
+		typed = declared.Type()
+	default:
+		return
 	}
-	if signature == nil || !printf.PrintShaped(signature) {
+	if !printf.PrintShaped(typed) {
 		return
 	}
 	rendered := builder.render(object)
