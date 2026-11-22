@@ -19,8 +19,9 @@ import (
 
 // plantedGo stands in for a shared box's go: it answers go env, and records every go mod download, go mod verify and
 // go test it is asked for in GATE_LOG, with the Go settings it ran under and whether its Go cache was empty, so a test
-// can read what the gate asked of it. GATE_VERIFY_FAILS makes go mod verify fail as a tampered module cache would, and
-// GATE_DOWNLOAD_FAILS makes go mod download fail as a box cut off from the module proxy would.
+// can read what the gate asked of it. GATE_VERIFY_FAILS makes go mod verify fail as a tampered module cache would,
+// GATE_DOWNLOAD_FAILS makes go mod download fail as a box cut off from the module proxy would, and GATE_RACE_FAILS
+// makes the -race run of the package it names fail as one that found a race would.
 const plantedGo = `#!/bin/sh
 case "$1" in
 env) [ "$2" = GOOS ] && echo linux; [ "$2" = GOARCH ] && echo amd64; exit 0 ;;
@@ -34,6 +35,8 @@ mod)
 test)
   empty=no; [ -z "$(ls -A "$GOCACHE")" ] && empty=yes
   echo "test $* | cache $GOCACHE empty $empty | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
+  if [ -n "$GATE_RACE_FAILS" ]; then case " $* " in *" -race"*" $GATE_RACE_FAILS "*)
+    echo '{"Action":"fail","Package":"example.com/module"}'; exit 1 ;; esac; fi
   echo '{"Action":"pass","Package":"example.com/module"}' ;;
 esac
 `
@@ -91,8 +94,26 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 		refusal string
 		// node is the box's node: "pinned" by the digest the gate is handed, "absent", or "swapped" after its pin.
 		node string
+		// raceFails is whether the gate fails for its -race runs alone, every one of them asked first.
+		raceFails bool
 	}{
 		{name: "a toolchain as pinned runs the tests", node: "pinned"},
+		{
+			name: "the plain tokens' -race run failing fails the gate, after the token with a run has run",
+			node: "pinned",
+			plant: func(test *testing.T, goroot string, environment []string) []string {
+				return append(environment, "GATE_RACE_FAILS=./internal/edit")
+			},
+			raceFails: true,
+		},
+		{
+			name: "the -race run of the token with a run failing fails the gate",
+			node: "pinned",
+			plant: func(test *testing.T, goroot string, environment []string) []string {
+				return append(environment, "GATE_RACE_FAILS=./internal/go_engine")
+			},
+			raceFails: true,
+		},
 		{name: "a box without node runs the tests with no node on the path", node: "absent"},
 		{
 			name:    "a node changed after its pin is refused before any test",
@@ -161,6 +182,8 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 					test.Fatalf("git %v: %v\n%s", arguments, gitError, output)
 				}
 			}
+			// A file the token's run names as a glob, which an unquoted run would expand to in the tree.
+			writeFixtureFile(test, filepath.Join(tree, "AtOnce|SideBy.planted"), "")
 			log := filepath.Join(test.TempDir(), "asked")
 			temporary := test.TempDir()
 			// The account's own Go settings, which the gate must not read: a cache, flags and a toolchain switch.
@@ -184,8 +207,10 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 				`goroot="$1"; digest="$2"; node="$3"; nodeDigest="$4"; races="$5"; shift 5` +
 				"\n" +
 				sharedBoxGate
-			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, node, nodeDigest, "./internal/edit",
-				"./...")
+			// A plain token and one with a run, which reaches go test whole: its `.*` is never globbed to the file
+			// planted above.
+			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, node, nodeDigest,
+				"./internal/edit,./internal/go_engine@AtOnce|SideBy.*", "./...")
 			gate.Dir, gate.Env = tree, environment
 			output, gateError := gate.CombinedOutput()
 			// Ignored: a gate that refused before any go ran asked nothing, and its log was never written.
@@ -201,15 +226,15 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 				}
 				return
 			}
-			if gateError != nil {
-				test.Fatalf("the gate failed: %v\n%s", gateError, output)
+			if (gateError != nil) != row.raceFails {
+				test.Fatalf("the gate failed: %v, want it failed %t\n%s", gateError, row.raceFails, output)
 			}
 			lines := strings.Split(strings.TrimSpace(string(asked)), "\n")
-			if len(lines) != 4 || lines[0] != "download" || lines[1] != "verify" {
+			if len(lines) != 5 || lines[0] != "download" || lines[1] != "verify" {
 				test.Fatalf("the gate asked for %q, want go mod download, go mod verify, then the module's tests and "+
-					"the -race run", lines)
+					"the -race run's two go tests", lines)
 			}
-			// Past the download, the log reads as the checks below index it: verify, the tests, the -race run.
+			// Past the download, the log reads as the checks below index it: verify, the tests, the -race runs.
 			lines = lines[1:]
 			for _, line := range lines[1:] {
 				for _, want := range []string{"-count=1", "-timeout " + sharedBoxTestTimeout,
@@ -220,8 +245,19 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 					}
 				}
 			}
-			if !strings.Contains(lines[2], "-race ./internal/edit") {
-				test.Errorf("the -race run is not of the race list: %s", lines[2])
+			// The log opens each go test's line with `test`, then its arguments whole, their own `test` first.
+			if !strings.HasPrefix(lines[2], "test test -count=1 -timeout "+sharedBoxTestTimeout+
+				" -json -race ./internal/edit |") {
+				test.Errorf("the -race run of the plain tokens is not of the race list: %s", lines[2])
+			}
+			// A token with a run is a go test of its own, its run whole, after the plain tokens' and through the same
+			// flags.
+			if !strings.HasPrefix(lines[3], "test test -count=1 -timeout "+sharedBoxTestTimeout+
+				" -json -race -run AtOnce|SideBy.* ./internal/go_engine |") {
+				test.Errorf("the -race run of the token with a run is not its own go test: %s", lines[3])
+			}
+			if !strings.Contains(string(output), boxRaceMarker+"\n") {
+				test.Errorf("the gate printed no %q before its -race run:\n%s", boxRaceMarker, output)
 			}
 			// A pinned node is on the tests' path, before the system's own; an absent one is nowhere on it.
 			// The path is the line's last field, so it is read whole, the system's sbin directories included.
@@ -244,7 +280,8 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 // Kirk's Mac's runs keep Go's test cache, which is keyed honestly there: the exception is for shared boxes alone, so no
 // go test Kirk's Mac runs carries -count. Shown through a landing with the gate off, module and -race run, whose go
 // records its arguments: since no box's skips run again on Kirk's Mac, the escape is the one road that runs tests
-// there.
+// there. Its -race run is the box's: the plain packages in one go test, and a package whose entry names a run in one
+// of its own, its run whole.
 func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 	test.Parallel()
 	fixture := newLandFixture(test)
@@ -258,6 +295,10 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 	writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
 	writeFixtureFile(test, filepath.Join(worktree, "internal", "edit", "edit_test.go"),
 		"package edit\n\nimport \"testing\"\n\nfunc TestEdit(test *testing.T) {}\n")
+	// A package at the -race list's entry that names a run, so the -race run asks for it with that run.
+	engine := raceGatedEntry(test, "internal/go_engine")
+	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_engine", "engine_test.go"),
+		"package go_engine\n\nimport \"testing\"\n\nfunc TestEngine(test *testing.T) {}\n")
 	fixture.git(worktree, "add", ".")
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a module"))
 	fixture.git(worktree, "merge", "-q", "--no-edit", "-m", "Merge main", "main")
@@ -271,17 +312,19 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	tests := 0
+	tests := []string{}
 	for _, line := range strings.Split(strings.TrimSpace(string(recorded)), "\n") {
 		if !strings.HasPrefix(line, "test") {
 			continue
 		}
-		tests++
+		tests = append(tests, line)
 		if strings.Contains(line, "-count") {
 			test.Errorf("Kirk's Mac ran a go test with -count, which throws its honest cache away: go %s", line)
 		}
 	}
-	if tests != 2 {
-		test.Fatalf("Kirk's Mac ran %d go tests, want the module's and its -race run:\n%s", tests, recorded)
+	if len(tests) != 3 || tests[1] != "test -race ./internal/edit" ||
+		tests[2] != "test -race -run "+engine.run+" ./internal/go_engine" {
+		test.Fatalf("Kirk's Mac ran go tests %q, want the module's, then its -race run of ./internal/edit, then "+
+			"./internal/go_engine's with -run %s:\n%s", tests, engine.run, recorded)
 	}
 }

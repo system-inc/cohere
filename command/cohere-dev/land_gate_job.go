@@ -166,7 +166,8 @@ func landGateEnd(job string, row landGateRow) (int, string) {
 
 // landGateCommand is the job's command: the lay kit, then sharedBoxGate through bash. The script is encoded, so no
 // shell reads it before the box's bash does, and goroot is in double quotes, so the box's own shell expands its
-// `$HOME`.
+// `$HOME`. The races are in single quotes, so a run's `|` reaches the script whole: no run holds a quote to close
+// them, which TestEveryRaceRunSelectsItsPackagesConcurrencyTests refuses.
 func landGateCommand(patterns []string, races []string) string {
 	return landGateLayKit + `bash -c "$(echo ` + base64.StdEncoding.EncodeToString([]byte(landGateScript)) +
 		` | base64 -d)" gate "` + sharedBoxGoroot + `" ` + sharedBoxToolchainDigest + ` '` + strings.Join(races, ",") +

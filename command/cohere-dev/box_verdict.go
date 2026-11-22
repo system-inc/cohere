@@ -57,8 +57,8 @@ const boxMarker = "cohere-dev-gate: tested "
 // reads apart from the module's run before it (#bnabymg).
 const boxRaceMarker = "cohere-dev-gate: race"
 
-// boxRaceVariable carries the raceGated packages, comma-separated, to a stand-in for the road, as the box's script gets
-// them as its third argument.
+// boxRaceVariable carries racePatterns' tokens, comma-separated, each `./<directory>` or `./<directory>@<run>`, to a
+// stand-in for the road, as the box's script gets them as its third argument.
 const boxRaceVariable = "COHERE_DEV_GATE_RACE"
 
 // standInBox names the box of a verdict a stand-in for the road gave, which is no box at all.
@@ -519,7 +519,9 @@ func runModuleTests(
 }
 
 // runModuleTestsHere runs the module's tests on Kirk's Mac, the escape gateOffSetting names, then the -race run once
-// the module passes, through the gate's token, and returns the exit code and where they ran.
+// the module passes, through the gate's token, and returns the exit code and where they ran. The -race run is
+// sharedBoxGate's: one go test of the plain race tokens, then one of each token's package with its run, every one run
+// and the first failure's code the run's.
 func runModuleTestsHere(worktree string, testing []string, patterns []string, races []string) (int, string) {
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s=%s, so the tests run here on Kirk's Mac\n", gateVariable,
 		gateOffSetting)
@@ -529,7 +531,26 @@ func runModuleTestsHere(worktree string, testing []string, patterns []string, ra
 		return code, where
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: the module passed, so its %d -race packages run here too\n", len(races))
-	if raceCode := runTestsHere(worktree, testing, append([]string{"test", "-race"}, races...)); raceCode != 0 {
+	plainPackages := []string{}
+	runs := [][]string{}
+	for _, race := range races {
+		if directory, run, hasRun := strings.Cut(race, raceRunSeparator); hasRun {
+			runs = append(runs, []string{"test", "-race", "-run", run, directory})
+			continue
+		}
+		plainPackages = append(plainPackages, race)
+	}
+	// Only when a plain token is there: go test with no package tests the worktree's root, which no token named.
+	if len(plainPackages) > 0 {
+		runs = slices.Insert(runs, 0, append([]string{"test", "-race"}, plainPackages...))
+	}
+	raceCode := 0
+	for _, arguments := range runs {
+		if runCode := runTestsHere(worktree, testing, arguments); runCode != 0 && raceCode == 0 {
+			raceCode = runCode
+		}
+	}
+	if raceCode != 0 {
 		fmt.Fprintf(streams.Errors, "cohere-dev: the -race run here failed, so nothing landed\n")
 		return raceCode, ""
 	}

@@ -89,9 +89,11 @@ found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha
 `
 
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
-// goroot, digest, node, nodeDigest and races (the raceGated packages, comma-separated) as variables, and the
-// module's test patterns as its arguments. It prints boxMarker before the tests, boxRaceMarker before the -race
-// run once the module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box.
+// goroot, digest, node, nodeDigest and races (racePatterns' tokens, comma-separated) as variables, and the module's
+// test patterns as its arguments. It prints boxMarker before the tests, boxRaceMarker before the -race run once the
+// module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box. The -race run is one go
+// test of the plain tokens, then one of each token's package with its run, every one through the same filter so the
+// run after the marker reads as one stream, and a failure of any is the run's, after the rest have run.
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 ` + sharedBoxToolchainCheck + `nodePath=""
 if [ -e "$node/bin/node" ]; then
@@ -112,7 +114,26 @@ verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verifie
 go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
 if [ -n "$races" ]; then
   echo "` + boxRaceMarker + `"
-  go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -race $(echo "$races" | tr , ' ') |
-    grep -vE '"Action":"(start|run|pause|cont)"'
+  # Split on commas alone, never on a run's characters, and each run quoted, so nothing of it globs.
+  IFS=, read -r -a raceTokens <<< "$races"
+  plainRaces=""
+  for race in "${raceTokens[@]}"; do
+    case "$race" in *` + raceRunSeparator + `*) ;; *) plainRaces="$plainRaces $race" ;; esac
+  done
+  # A failing go test is remembered rather than ending the script under set -e, so every token still runs.
+  raceFailed=0
+  # Unquoted, so each plain token is its own argument: a directory of the module, which holds no space or glob.
+  if [ -n "$plainRaces" ]; then
+    go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -race $plainRaces |
+      grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1
+  fi
+  for race in "${raceTokens[@]}"; do
+    case "$race" in
+    *` + raceRunSeparator + `*)
+      go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -race -run "${race#*` + raceRunSeparator + `}" \
+        "${race%%` + raceRunSeparator + `*}" | grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1 ;;
+    esac
+  done
+  [ "$raceFailed" = 0 ] || exit 1
 fi
 `

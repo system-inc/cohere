@@ -95,14 +95,14 @@ held() {
 `
 
 // macBoxScript is what a gate box runs, from the land that runs it rather than from the tree it tests, so no branch can
-// change what tests it. Its arguments are the commit, its TypeScript pin, the raceGated packages comma-separated, the
-// corpora the landing pins (corporaArgument) and the module's test patterns. It sets each corpus's variable to the copy
-// laid under macBoxScratch/corpora, and when one isn't laid there it names what it lacks (corpusUnlaidMarker) and tests
-// nothing, for the lander to lay it (gate_corpus.go). It works only under macBoxScratch, in a bare repository and one
-// tree that last across landings, so the tree's path stays one path. It waits for the box's mirror to hold the commit,
-// refusing once it has waited 3 minutes, fetches the commit and the pin, checks them out, and runs sharedBoxGate
-// against the Mac's pinned toolchain and node. It reads the mirrors through macBoxMirrorReads, and removes the
-// configuration file naming them safe before any test runs.
+// change what tests it. Its arguments are the commit, its TypeScript pin, racePatterns' tokens comma-separated, each
+// `./<directory>` or `./<directory>@<run>`, the corpora the landing pins (corporaArgument) and the module's test
+// patterns. It sets each corpus's variable to the copy laid under macBoxScratch/corpora, and when one isn't laid there
+// it names what it lacks (corpusUnlaidMarker) and tests nothing, for the lander to lay it (gate_corpus.go). It works
+// only under macBoxScratch, in a bare repository and one tree that last across landings, so the tree's path stays one
+// path. It waits for the box's mirror to hold the commit, refusing once it has waited 3 minutes, fetches the commit
+// and the pin, checks them out, and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the
+// mirrors through macBoxMirrorReads, and removes the configuration file naming them safe before any test runs.
 const macBoxScript = `set -euo pipefail
 commit="$1"; pin="$2"; races="$3"; corpora="$4"; shift 4
 ` + macBoxMirrorLine + `
