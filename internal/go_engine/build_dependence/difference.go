@@ -6,7 +6,6 @@ import (
 	"go/scanner"
 	"go/token"
 	"go/types"
-	"strconv"
 	"strings"
 )
 
@@ -78,14 +77,18 @@ var (
 	blockCommentDirective = []byte("/*line ")
 )
 
-// HoldsLineDirective reports whether file, as read reads it, holds a line directive as go/scanner applies one, the
-// scanner go/parser and so the load run (#mtrjfyn): a comment token, never text in a string or in a comment's prose,
-// either `//line ` at the very start of its line or `/*line ` anywhere, whose text after the spelling ends in `:N` or
-// `:N:M`, N above 0 (isLineDirective). read is the caller's, so its bytes are the ones the graph was built from, which
-// in the engine are the run's held bytes rather than the disk's again (pipeline.holdsLineDirective). A file read cannot
-// read is said to hold one, failing wide. It still over-approximates in one way, on purpose: a directive counts
-// whatever file it names, the file's own name and a file the builds share among them, since only the caller knows
-// which files a build compiles.
+// HoldsLineDirective reports whether file, as read reads it, holds a comment of a line directive's shape (#mtrjfyn): a
+// comment token, never text in a string or in a comment's prose, either `//line ` at the very start of its line or
+// `/*line ` anywhere (isLineDirective), the comments go/scanner, which go/parser and so the load run, reads as
+// directives. read is the caller's, so its bytes are the ones the graph was built from, which in the engine are the
+// run's held bytes rather than the disk's again (pipeline.holdsLineDirective). A file read cannot read is said to hold
+// one, failing wide.
+//
+// Where it and the scanner could disagree it errs wide, never narrower than the scanner: it reads no directive's text,
+// so it counts a comment of the shape the scanner rejects as malformed, one with no line number, line zero or a number
+// that is none, and an unterminated block comment, as it counts every one the scanner applies, a carriage return or a
+// number past any width included. And a directive counts whatever file it names, the file's own name and a file the
+// builds share among them, since only the caller knows which files a build compiles.
 func HoldsLineDirective(file string, read func(file string) ([]byte, error)) bool {
 	source, readError := read(file)
 	if readError != nil {
@@ -113,42 +116,9 @@ func HoldsLineDirective(file string, read func(file string) ([]byte, error)) boo
 	}
 }
 
-// isLineDirective reports whether comment, a comment token's text, is a line directive as go/scanner reads one
-// (go/scanner's scanComment and updateLineInfo): `/*line ` anywhere, or `//line ` when atLineStart, the comment
-// starting its line, whose text past the spelling, a block comment's closing `*/` taken off, ends in `:N`, or in
-// `:N:M` with M above 0, N above 0 either way. Text that ends otherwise the scanner ignores, or reports as an invalid
-// line or column, and moves no position.
+// isLineDirective reports whether comment, a comment token's text, has a line directive's shape as go/scanner reads one
+// (go/scanner's scanComment): `/*line ` anywhere, or `//line ` when atLineStart, the comment starting its line,
+// whatever its text after the spelling ends in (HoldsLineDirective says why).
 func isLineDirective(comment string, atLineStart bool) bool {
-	var text string
-	switch {
-	case strings.HasPrefix(comment, "/*line "):
-		text = strings.TrimSuffix(comment[len("/*line "):], "*/")
-	case strings.HasPrefix(comment, "//line ") && atLineStart:
-		text = comment[len("//line "):]
-	default:
-		return false
-	}
-	before, last, isNumber := trailingNumber(text)
-	if !isNumber {
-		return false
-	}
-	// The `:N:M` form, the line before the column.
-	if _, line, isLine := trailingNumber(before); isLine {
-		return last > 0 && line > 0
-	}
-	return last > 0
-}
-
-// trailingNumber is text cut at its last colon: what comes before it, and the decimal number after it, false where
-// text holds no colon or what follows the last one is no number.
-func trailingNumber(text string) (string, uint64, bool) {
-	colon := strings.LastIndexByte(text, ':')
-	if colon < 0 {
-		return "", 0, false
-	}
-	number, parseError := strconv.ParseUint(text[colon+1:], 10, 32)
-	if parseError != nil {
-		return "", 0, false
-	}
-	return text[:colon], number, true
+	return strings.HasPrefix(comment, "/*line ") || strings.HasPrefix(comment, "//line ") && atLineStart
 }
