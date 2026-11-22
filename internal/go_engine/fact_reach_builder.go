@@ -10,6 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
 // factReachInputs are what one package's side is made from (newFactReachPackage), each the host's own:
@@ -65,8 +66,8 @@ type factReachParameter struct {
 // identity and key, rendered once however many bodies use it. functions are the functions the record's declarations
 // declare, which the package's own answers are placed by, used the functions its bodies and its variables'
 // initializers use, which another package's answers are kept by, and parameters each parameter of either. met are the
-// functions a no-return fact is compared on already, by key, and usedKeys the objects of any kind the bodies and the
-// initializers use, by key.
+// functions a no-return fact is compared on already, by key, metPushed the objects only a wrapper fact is compared on
+// already (meetPushed), and usedKeys the objects of any kind the bodies and the initializers use, by key.
 type factReachBuilder struct {
 	inputs     factReachInputs
 	hosted     *factReachPackage
@@ -75,6 +76,7 @@ type factReachBuilder struct {
 	used       map[*types.Func]bool
 	parameters map[*types.Var]factReachParameter
 	met        map[fact_reach.Object]bool
+	metPushed  map[fact_reach.Object]bool
 	usedKeys   map[fact_reach.Object]bool
 }
 
@@ -89,7 +91,8 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			presence:     map[fact_reach.Place]fact_reach.PresenceRecord{}},
 		rendered: map[types.Object]factReachRendered{}, functions: map[*types.Func]factReachFunction{},
 		used: map[*types.Func]bool{}, parameters: map[*types.Var]factReachParameter{},
-		met: map[fact_reach.Object]bool{}, usedKeys: map[fact_reach.Object]bool{},
+		met: map[fact_reach.Object]bool{}, metPushed: map[fact_reach.Object]bool{},
+		usedKeys: map[fact_reach.Object]bool{},
 	}
 	// The parsed files placing a body in each name a reader sees, so a name two of them share, by their //line
 	// directives, is known (factReachPackage.shared).
@@ -246,6 +249,53 @@ func (builder *factReachBuilder) meet(function *types.Func) {
 		Identity: rendered.identity, NoReturn: builder.inputs.noReturn(function), Pushed: pushed})
 }
 
+// meetPushed adds object to the objects only printf's wrapper fact is compared on (fact_reach.PushedObject), with the
+// host's fact of it, the first time its key is met, where the host ran printf on the package (#zqx7gke): a method of an
+// interface, which meet leaves out, or a package-level variable or a field, whose signature has a print or printf
+// function's shape. printf admits a candidate by that shape alone (printf.PrintShaped), so no other object holds a
+// wrapper fact in any build, and comparing only these keeps every other kind's comparison as it was. A local variable
+// is left out: a function literal assigned to one is called only in the body that declares the variable, whose own
+// uses of the literal's callees are compared, so that body leaves wherever the variable's fact could differ. So is an
+// object no identity names, which no build could find its own of.
+func (builder *factReachBuilder) meetPushed(object types.Object) {
+	facts, isRun := builder.inputs.pushed[printf.Analyzer.Name]
+	if !isRun {
+		return
+	}
+	var signature *types.Signature
+	switch declared := object.(type) {
+	case *types.Func:
+		if receiver := declared.Signature().Recv(); receiver == nil || !types.IsInterface(receiver.Type()) {
+			return
+		}
+		signature = declared.Signature()
+	case *types.Var:
+		packageLevel := declared.Pkg() != nil && declared.Pkg().Scope().Lookup(declared.Name()) == declared
+		if !packageLevel && !declared.IsField() {
+			return
+		}
+		signature, _ = declared.Type().Underlying().(*types.Signature)
+	}
+	if signature == nil || !printf.PrintShaped(signature) {
+		return
+	}
+	rendered := builder.render(object)
+	if !rendered.known || builder.metPushed[rendered.key] {
+		return
+	}
+	builder.metPushed[rendered.key] = true
+	// A fact is about the generic declaration.
+	declared := object
+	switch generic := object.(type) {
+	case *types.Func:
+		declared = generic.Origin()
+	case *types.Var:
+		declared = generic.Origin()
+	}
+	builder.hosted.pushedObjects = append(builder.hosted.pushedObjects, fact_reach.PushedObject{Object: rendered.key,
+		Identity: rendered.identity, Pushed: map[string]string{printf.Analyzer.Name: facts[declared]}})
+}
+
 // declare keeps each function declared declares, by its object, with the place of its body, and its parameters,
 // meets each declared with a body, and keeps the key of each placed one under its place. An init function and one
 // named `_` declare no object, and no answer or fact is about either.
@@ -282,12 +332,13 @@ func (builder *factReachBuilder) keepParameters(function *types.Func) {
 
 // followUses are the keys of the objects declared's body uses, a function's or a variable's initializer, the object
 // selected for a selection, and whether every one of them could be followed. It meets each function among them, kept
-// as used with its parameters, and keeps each object an identity names among the package's used objects
-// (fact_reach.Host.Used), an initializer's too, so a build can judge an object only an initializer uses and the
-// initializers leave by it. The signature's uses are not the body's: a rule reads a fact where a body names or selects
-// its object. A body with a use no identity names is not followed, as one the record marks unknown is not. The
-// recorder marks a body unknown wherever a use of it renders unknown, by the renderer's own rule
-// (build_reads.unplacedIdentity), so the second check finds nothing today, and stands for a record made any other way.
+// as used with its parameters, and each object only a wrapper fact is compared on (meetPushed), and keeps each object
+// an identity names among the package's used objects (fact_reach.Host.Used), an initializer's too, so a build can judge
+// an object only an initializer uses and the initializers leave by it. The signature's uses are not the body's: a rule
+// reads a fact where a body names or selects its object. A body with a use no identity names is not followed, as one
+// the record marks unknown is not. The recorder marks a body unknown wherever a use of it renders unknown, by the
+// renderer's own rule (build_reads.unplacedIdentity), so the second check finds nothing today, and stands for a record
+// made any other way.
 func (builder *factReachBuilder) followUses(declared build_reads.DeclarationUses) ([]fact_reach.Object, bool) {
 	isFollowed := !declared.BodyUnknown
 	keys := make([]fact_reach.Object, 0, len(declared.Body))
@@ -298,6 +349,7 @@ func (builder *factReachBuilder) followUses(declared build_reads.DeclarationUses
 			builder.keepParameters(function)
 			builder.meet(function)
 		}
+		builder.meetPushed(object)
 		rendered := builder.render(object)
 		isFollowed = isFollowed && rendered.known
 		keys = append(keys, rendered.key)

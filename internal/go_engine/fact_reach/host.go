@@ -24,6 +24,10 @@ type Host interface {
 	// host's fact.
 	Functions() []Function
 
+	// PushedObjects are the objects no function a body declares or names is, whose printf wrapper fact a body's
+	// findings can turn on, each a body or a variable's initializer uses once, with the host's fact (PushedObject).
+	PushedObjects() []PushedObject
+
 	// Imported are the answers the host's analysis of the package read from other packages, each asked of the build
 	// before any body leaves: one that differs names the object it is about, whose users leave.
 	Imported() []Question
@@ -66,6 +70,18 @@ type Function struct {
 	Object   Object
 	Identity build_reads.Identity
 	NoReturn bool
+	Pushed   map[string]string
+}
+
+// PushedObject is one object the build compares a pushed fact of and nothing else (#zqx7gke): a method of an
+// interface, or a package-level variable or a field, whose type has the shape of a print or printf function. printf
+// finds an interface method a wrapper where a method implementing it is one, which an assignment anywhere in the
+// package shows, and a variable one where a function literal assigned to it forwards to one, its fact on the variable.
+// Neither has a body or a no-return fact of its own, so neither is a Function, and Pushed holds printf's fact alone,
+// in the fact's words, empty for no fact, and no entry where the host never ran printf on the package.
+type PushedObject struct {
+	Object   Object
+	Identity build_reads.Identity
 	Pushed   map[string]string
 }
 

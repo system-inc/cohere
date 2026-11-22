@@ -49,7 +49,9 @@ import (
 // Its second leg (#adq5ahd) checks what the facts' reach left standing (#aswfm7a), once the build's rules have run:
 // the build lints whole today, so every answer its own run holds is real, and of each body the facts' fixed point left
 // standing, every answer the build holds about the function declared there, or about one of its parameters, must be
-// the host's, byte for byte, and so must the function's no-return fact and its other pushed facts.
+// the host's, byte for byte, and so must the function's no-return fact and its other pushed facts. So must the wrapper
+// fact of each interface method and variable a standing body uses (fact_reach.PushedObject, #zqx7gke), which no body
+// declares, so no standing function's comparison meets it.
 //
 // An answer about a standing function the build holds and the host's side holds none of is judged by who asked it in
 // the build (#5vbs1np, must 5). A finding reads an answer only through a rule's question, whose asker, the body the
@@ -660,6 +662,80 @@ func (differential *buildBodyDifferential) compareStandingPackage(
 			}
 		}
 	}
+	differential.compareStandingPushed(hosted, standing, capturedPackage, builtPackage, renderer, fail)
+}
+
+// compareStandingPushed is the second leg over the objects only a wrapper fact is compared on that a body of the
+// package uses (fact_reach.Host.PushedObjects), an interface method or a variable no standing body declares: each with
+// a user that still stands, whose findings are the host's, must hold the host's fact in the build too, wherever both
+// runs held printf's facts of the package. The build's object is the one among those its capture holds a fact of that
+// the build renders an identity of naming the host's (sameStandingObject); an object the build holds no fact of reads
+// empty, as the host's capture writes one. A difference fails at the first standing user, in the order the host
+// declares them, under the analyzer's name.
+func (differential *buildBodyDifferential) compareStandingPushed(
+	hosted *factReachPackage,
+	standing map[fact_reach.Place]bool,
+	capturedPackage *check.FactReachPackage,
+	builtPackage *packages.Package,
+	renderer *build_reads.IdentityRenderer,
+	fail func(place fact_reach.Place, name string, kind string, host string, built string),
+) {
+	// The build's facts of each analyzer by the identity it renders each object by, rendered once, at the first
+	// object that needs them.
+	builtWords := map[string][]standingWords{}
+	for _, object := range hosted.PushedObjects() {
+		users := slices.DeleteFunc(slices.Clone(hosted.Users(object.Object)), func(place fact_reach.Place) bool {
+			return !standing[place]
+		})
+		if len(users) == 0 {
+			continue
+		}
+		for _, analyzer := range slices.Sorted(maps.Keys(object.Pushed)) {
+			builtFacts, isHeld := capturedPackage.Pushed[analyzer]
+			if !isHeld {
+				continue
+			}
+			if _, isRendered := builtWords[analyzer]; !isRendered {
+				rendered := make([]standingWords, 0, len(builtFacts))
+				for builtObject, words := range builtFacts {
+					rendered = append(rendered, standingWords{identity: renderer.Object(builtObject), words: words})
+				}
+				builtWords[analyzer] = rendered
+			}
+			differential.standingCompared[analyzer]++
+			built := ""
+			for _, each := range builtWords[analyzer] {
+				if sameStandingObject(each.identity, object.Identity, builtPackage.PkgPath) {
+					built = each.words
+					break
+				}
+			}
+			if built != object.Pushed[analyzer] {
+				fail(users[0], object.Identity.String(), analyzer, strconv.Quote(object.Pushed[analyzer]),
+					strconv.Quote(built))
+			}
+		}
+	}
+}
+
+// standingWords is one object's pushed fact in the build, in the fact's words, by the identity the build renders the
+// object by.
+type standingWords struct {
+	identity build_reads.Identity
+	words    string
+}
+
+// sameStandingObject reports whether built, an identity the build renders, names the object hosted does, the host's,
+// as standing_facts finds the build's own object of an identity: an object of home, the package the leg is over, by
+// every part, its file among them, since a platform's file that declares the same name declares another object; and
+// another package's by its kind, package, path and method alone, its positions being wherever the build loaded the
+// package from.
+func sameStandingObject(built build_reads.Identity, hosted build_reads.Identity, home string) bool {
+	if hosted.PackagePath == home {
+		return built.Equal(hosted)
+	}
+	return built.Kind != build_reads.IdentityUnknown && built.Kind == hosted.Kind &&
+		built.PackagePath == hosted.PackagePath && built.Path == hosted.Path && built.Method == hosted.Method
 }
 
 // standingName is how the second leg names function: its name, after its receiver's type's for a method.

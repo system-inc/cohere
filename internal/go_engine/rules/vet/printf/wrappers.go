@@ -39,14 +39,25 @@ func newWrappers(pass *analysis.Pass, kinds wrapperKinds) *Wrappers {
 	return wrappers
 }
 
-// Of is the words of the wrapper fact of function's generic declaration, empty for no fact, and false for a function
-// the pass never looked a fact up of: one known by name (ByName), or one no call of the package names.
-func (wrappers *Wrappers) Of(function *types.Func) (string, bool) {
-	words, isLooked := wrappers.byObject[function.Origin()]
+// Of is the words of the wrapper fact of object's generic declaration, a function's, an interface method's or a
+// variable's holding a function literal, empty for no fact, and false for an object the pass never looked a fact up
+// of: one known by name (ByName), or one no call of the package names.
+func (wrappers *Wrappers) Of(object types.Object) (string, bool) {
+	words, isLooked := wrappers.byObject[origin(object)]
 	return words, isLooked
 }
 
-// ByName is whether function is a print function known by name the pass met, whose kind is its name's, never a fact's.
-func (wrappers *Wrappers) ByName(function *types.Func) bool {
-	return wrappers.byName[function.Origin()]
+// ByName is whether object is a print function known by name the pass met, whose kind is its name's, never a fact's.
+func (wrappers *Wrappers) ByName(object types.Object) bool {
+	return wrappers.byName[origin(object)]
+}
+
+// PrintShaped reports whether signature has the shape of a print or printf function, a final `args ...any` with or
+// without a format string before it. A candidate is admitted by that shape alone (wrapperSearch.add): a function's or
+// an interface method's declared signature, or a function literal's, which is the underlying type of the variable it
+// is assigned to, since only an identical one is assignable. So no object of another shape holds a wrapper fact in any
+// build.
+func PrintShaped(signature *types.Signature) bool {
+	_, arguments := formatArgumentsParameters(signature)
+	return arguments != nil
 }
