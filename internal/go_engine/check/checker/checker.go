@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are seventeen.
+// The changes are eighteen.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -249,6 +249,30 @@
 // such follower's action would then wait on one that waits on it. With
 // StandingBodies unset, the graph and every pass are as they were.
 //
+// The eighteenth is facts read where they were exported (#tbsdekj).
+// Upstream's inheritFacts copies into every action each fact its vertical
+// dependencies hold that exportedFrom passes, and a fact on a method, a
+// field, a type or a constant passes every edge, so each action held a
+// copy of every such fact of its whole import closure. Here such a fact
+// is never copied: each action keeps, for every package below it whose
+// objects hold one, the actions that hold them in the order the copy
+// would have let win (Action.factHolders), and ObjectFact, AllObjectFacts
+// and ExportedFacts read the fact there. A holder is below the action that
+// reads it, so it finished before that action started, and no fact is
+// written to an action once it has finished (exportObjectFact refuses one
+// after Run, and Options.Restore restores inside the action), so every
+// read is of a map nothing writes again. Under Options.SanityCheck the
+// copy stays, since it is what exercises each fact's encoding. Measured on
+// cohere's own tree, every package a root, under ctrlflow, printf and
+// deprecated, the analyzers whose facts an engine run pushes, by
+// BenchmarkFactInheritance's measure pointed at the tree in place of its
+// standard-library package, three runs of two rounds each:
+//
+//	copied: 395,771 entries, 154.2 MB the graph holds once it returns,
+//	        1,799 MB and 4,247,000 objects allocated
+//	held:    13,805 entries, 114.1 MB the graph holds once it returns,
+//	        1,732 MB and 4,240,000 objects allocated
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -301,6 +325,8 @@ import (
 	"log"
 	"os"
 	"reflect"
+	// cohere: slices orders an action's fact holders (precedeHolders).
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -645,6 +671,14 @@ type Action struct {
 	pass         *analysis.Pass
 	objectFacts  map[objectFactKey]analysis.Fact
 	packageFacts map[packageFactKey]analysis.Fact
+
+	// cohere: factHolders is, for each package whose objects hold a fact
+	// that inheritedEverywhere leaves uncopied, this action among them when
+	// it exported or restored one, the actions holding such facts that this
+	// one inherits from, the holder whose fact the copy would have kept
+	// first. nil under Options.SanityCheck, which copies every fact, and for
+	// an action that inherits none.
+	factHolders map[*types.Package][]*Action
 
 	// cohere: resultReaders counts the actions still to finish that read
 	// this action's Result, its horizontal dependents. The last of them
@@ -1540,7 +1574,17 @@ func (act *Action) Dependents() (map[*analysis.Analyzer]bool, bool) {
 // inheritFacts populates act.facts with
 // those it obtains from its dependency, dep.
 func inheritFacts(act, dep *Action) {
+	// cohere: a fact exportedFrom passes along every edge is read where it
+	// was exported (factHolders) rather than copied, except under
+	// SanityCheck, whose copy is what exercises each fact's encoding.
+	if !act.opts.SanityCheck {
+		act.inheritHolders(dep)
+	}
 	for key, fact := range dep.objectFacts {
+		// cohere: left uncopied, its holder's (see inheritHolders above).
+		if !act.opts.SanityCheck && inheritedEverywhere(key.obj) {
+			continue
+		}
 		// Filter out facts related to objects
 		// that are irrelevant downstream
 		// (equivalently: not in the compiler export data).
@@ -1662,6 +1706,131 @@ func exportedFrom(obj types.Object, pkg *types.Package) bool {
 	return false // Nil, Builtin, Label, or PkgName
 }
 
+// cohere: inheritedEverywhere is whether exportedFrom passes a fact on obj
+// along every vertical edge, whichever package the edge leads to: a
+// method's, a field's, a type's and a constant's, which inheritFacts leaves
+// uncopied to be read from their holders (see Action.factHolders).
+func inheritedEverywhere(obj types.Object) bool {
+	switch obj := obj.(type) {
+	case *types.Func:
+		return obj.Signature().Recv() != nil
+	case *types.Var:
+		return obj.IsField()
+	case *types.TypeName, *types.Const:
+		return true
+	}
+	return false
+}
+
+// cohere: inheritHolders gives act every holder dep has, of every package,
+// ahead of those the dependencies inherited before it gave: inheritFacts
+// takes the dependencies in order, and the copy let the later one's fact win.
+func (act *Action) inheritHolders(dep *Action) {
+	for owner, holders := range dep.factHolders {
+		if act.factHolders == nil {
+			act.factHolders = make(map[*types.Package][]*Action, len(dep.factHolders))
+		}
+		act.factHolders[owner] = precedeHolders(holders, act.factHolders[owner])
+	}
+}
+
+// cohere: precedeHolders is first followed by every holder of then that first
+// does not hold. Neither is changed, and first itself is the answer when then
+// adds nothing to it, so an action shares the slices of those it inherits from.
+func precedeHolders(first, then []*Action) []*Action {
+	added := 0
+	for _, holder := range then {
+		if !slices.Contains(first, holder) {
+			added++
+		}
+	}
+	if added == 0 {
+		return first
+	}
+	preceded := make([]*Action, 0, len(first)+added)
+	preceded = append(preceded, first...)
+	for _, holder := range then {
+		if !slices.Contains(first, holder) {
+			preceded = append(preceded, holder)
+		}
+	}
+	return preceded
+}
+
+// cohere: storeObjectFact keeps a fact act exported or restored, and, when it
+// is one inheritFacts leaves uncopied, makes act the first holder of its
+// object's package, since its own fact wins over every inherited one.
+func (act *Action) storeObjectFact(key objectFactKey, fact analysis.Fact) {
+	act.objectFacts[key] = fact
+	if act.opts.SanityCheck || !inheritedEverywhere(key.obj) {
+		return
+	}
+	owner := key.obj.Pkg()
+	holders := act.factHolders[owner]
+	if len(holders) > 0 && holders[0] == act {
+		return
+	}
+	if act.factHolders == nil {
+		act.factHolders = make(map[*types.Package][]*Action)
+	}
+	act.factHolders[owner] = precedeHolders([]*Action{act}, holders)
+}
+
+// cohere: objectFact is the fact act holds under key, its own or one it
+// inherited, the copy's or, for one left uncopied, the first holder's of its
+// object's package that holds it, which is the one the copy would have kept.
+func (act *Action) objectFact(key objectFactKey) (analysis.Fact, bool) {
+	if fact, found := act.objectFacts[key]; found {
+		return fact, true
+	}
+	if !inheritedEverywhere(key.obj) {
+		return nil, false
+	}
+	for _, holder := range act.factHolders[key.obj.Pkg()] {
+		if fact, found := holder.objectFacts[key]; found {
+			return fact, true
+		}
+	}
+	return nil, false
+}
+
+// cohere: appendHeldFacts appends to facts each fact on an object of owner
+// that act inherited from holders, owner's holders, without a copy, every key
+// once and from the first holder that holds it, and none act holds itself,
+// as the copy would have held them.
+func (act *Action) appendHeldFacts(facts []analysis.ObjectFact, owner *types.Package,
+	holders []*Action) []analysis.ObjectFact {
+	// Two holders of one package hold the same keys only where two actions
+	// share a types.Package, so only then is a key's first holder looked for.
+	// No run has two: a load gives each of its packages, test variants too,
+	// its own types.Package (load's check and export_data.Read; unsafe's is
+	// types.Unsafe, but a load has one unsafe), holders pass only along one
+	// graph's edges, and a graph has one action of an analyzer on each
+	// package, so only tests reach this path.
+	var listed map[objectFactKey]bool
+	if len(holders) > 1 {
+		listed = make(map[objectFactKey]bool)
+	}
+	for _, holder := range holders {
+		if holder == act {
+			continue
+		}
+		for key, fact := range holder.objectFacts {
+			if key.obj.Pkg() != owner || !inheritedEverywhere(key.obj) {
+				continue
+			}
+			if _, own := act.objectFacts[key]; own || listed[key] {
+				continue
+			}
+			if listed != nil {
+				listed[key] = true
+			}
+			facts = append(facts, analysis.ObjectFact{Object: key.obj, Fact: fact})
+		}
+	}
+	return facts
+}
+
 // ObjectFact retrieves a fact associated with obj,
 // and returns true if one was found.
 // Given a value ptr of type *T, where *T satisfies Fact,
@@ -1673,7 +1842,8 @@ func (act *Action) ObjectFact(obj types.Object, ptr analysis.Fact) bool {
 		panic("nil object")
 	}
 	key := objectFactKey{obj, factType(ptr)}
-	if v, ok := act.objectFacts[key]; ok {
+	// cohere: copied or not, as the copy would have held it (objectFact).
+	if v, ok := act.objectFact(key); ok {
 		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v).Elem())
 		// cohere: a read of another package's fact (see Options.Reads).
 		act.readFact(obj, obj.Pkg(), key.typ, v)
@@ -1696,7 +1866,9 @@ func (act *Action) exportObjectFact(obj types.Object, fact analysis.Fact) {
 	}
 
 	key := objectFactKey{obj, factType(fact)}
-	act.objectFacts[key] = fact // clobber any existing entry
+	// cohere: clobber any existing entry, and hold it for importers that
+	// read it without a copy (storeObjectFact).
+	act.storeObjectFact(key, fact)
 	if log := act.opts.FactLog; log != nil {
 		objstr := types.ObjectString(obj, (*types.Package).Name)
 		fmt.Fprintf(log, "%s: object %s has fact %s\n",
@@ -1715,6 +1887,9 @@ func (act *Action) ExportedFacts() ([]analysis.ObjectFact, []analysis.PackageFac
 			objectFacts = append(objectFacts, analysis.ObjectFact{Object: key.obj, Fact: fact})
 		}
 	}
+	// Facts on act's own package's objects that it inherited uncopied, which
+	// only another action on the same types.Package can have exported.
+	objectFacts = act.appendHeldFacts(objectFacts, act.Package.Types, act.factHolders[act.Package.Types])
 	var packageFacts []analysis.PackageFact
 	for key, fact := range act.packageFacts {
 		if key.pkg == act.Package.Types {
@@ -1727,7 +1902,7 @@ func (act *Action) ExportedFacts() ([]analysis.ObjectFact, []analysis.PackageFac
 // cohere: RestoreObjectFact gives a restored action a fact its package
 // exported in the run the cache holds, obj being of act's own package.
 func (act *Action) RestoreObjectFact(obj types.Object, fact analysis.Fact) {
-	act.objectFacts[objectFactKey{obj, factType(fact)}] = fact
+	act.storeObjectFact(objectFactKey{obj, factType(fact)}, fact)
 }
 
 // cohere: RestorePackageFact gives a restored action a fact its package
@@ -1744,6 +1919,10 @@ func (act *Action) AllObjectFacts() []analysis.ObjectFact {
 	facts := make([]analysis.ObjectFact, 0, len(act.objectFacts))
 	for k, fact := range act.objectFacts {
 		facts = append(facts, analysis.ObjectFact{Object: k.obj, Fact: fact})
+	}
+	// cohere: and every fact act inherited uncopied, from its holders.
+	for owner, holders := range act.factHolders {
+		facts = act.appendHeldFacts(facts, owner, holders)
 	}
 	return facts
 }
