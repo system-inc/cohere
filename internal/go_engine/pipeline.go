@@ -122,6 +122,11 @@ type pipeline struct {
 	// skippedAtLoad never tells of (#tfvrsf3). It is called from the builds' own goroutines, side by side.
 	extraBuildLoads func(extra project.Build)
 
+	// declinedAtLoad, set only by a test and by no run, is told each package a load of an extra build declines, with
+	// why, as it declines it (check.CacheSession's TellDeclinesAtLoad), so the test reads every load's declines and not
+	// the last load's alone (#78tynz4). It is called from the builds' loads, side by side.
+	declinedAtLoad func(extra project.Build, identifier string, why string)
+
 	// keepsInheritanceOff, set only by a test, has every extra build run its syntax-only rules on every file it checks
 	// rather than take the host's findings on the files the host checked (#y6q1x2j), so the test can compare the two.
 	keepsInheritanceOff bool
