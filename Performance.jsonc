@@ -2,42 +2,42 @@
 // Git history is the series. Never edit it by hand. Times are integer milliseconds, the median of the rounds with their min and max.
 {
     "schema": 1,
-    "commit": "522abddea99c18f5a9097751f7c21cf4288a1c82",
-    "measuredAt": "2026-11-22T13:43:37Z",
+    "commit": "58d7b89d0b263d0d650d899a3195f83c1f2d24b3",
+    "measuredAt": "2026-11-22T15:32:26Z",
     "machine": {
         "name": "Shackler",
         "cpu": "Apple M3 Max",
         "cores": 16,
-        "loadBefore": [6.57, 7.09, 6.24],
-        "loadAfter": [9.83, 7.85, 6.55],
+        "loadBefore": [2.06, 2.05, 2.01],
+        "loadAfter": [6.78, 3.18, 2.41],
         "heldQuiet": true
     },
     "tools": {
-        "cohere": "522abdde CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
+        "cohere": "58d7b89d CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
         "go": "go1.27.1"
     },
-    "note": "against 8482d762: cold root wall level (3300 ms, was 3300), user level (37760 ms, was 37920); cold deeafbf4 wall level (1480 ms, was 1480), user faster by 50 ms, 1%, ranges apart (8345 ms, was 8395); warm root wall level (710 ms, was 710), user level (1910 ms, was 1900)",
+    "note": "against 522abdde: cold root wall level (3300 ms, was 3300), user faster by 180 ms, 0%, ranges apart (37580 ms, was 37760); cold deeafbf4 wall slower by 10 ms, 1%, ranges apart (1490 ms, was 1480), user level (8375 ms, was 8345); warm root wall level (710 ms, was 710), user level (1900 ms, was 1910)",
     "engine": {
         "rounds": { "cold": 3, "deeafbf4": 2, "warm": 3 },
         "cold": {
             "root": {
-                "wall": { "median": 3300, "min": 3290, "max": 3340 },
-                "user": { "median": 37760, "min": 37740, "max": 38520 },
-                "sys": { "median": 5270, "min": 5240, "max": 5340 }
+                "wall": { "median": 3300, "min": 3290, "max": 3300 },
+                "user": { "median": 37580, "min": 37460, "max": 37580 },
+                "sys": { "median": 5290, "min": 5280, "max": 5310 }
             },
             "deeafbf4": {
-                "wall": { "median": 1480, "min": 1480, "max": 1480 },
-                "user": { "median": 8345, "min": 8340, "max": 8350 },
-                "sys": { "median": 2555, "min": 2520, "max": 2590 }
+                "wall": { "median": 1490, "min": 1490, "max": 1490 },
+                "user": { "median": 8375, "min": 8350, "max": 8400 },
+                "sys": { "median": 2460, "min": 2400, "max": 2520 }
             }
         },
         "warm": {
             "root": {
-                "wall": { "median": 710, "min": 710, "max": 720 },
-                "user": { "median": 1910, "min": 1900, "max": 1910 },
-                "sys": { "median": 4140, "min": 4020, "max": 4140 }
+                "wall": { "median": 710, "min": 710, "max": 710 },
+                "user": { "median": 1900, "min": 1900, "max": 1900 },
+                "sys": { "median": 4130, "min": 4030, "max": 4190 }
             }
         },
-        "timeline": { "root": { "listing": 277, "handover": 1874, "builds": 3172, "run": 3235 } }
+        "timeline": { "root": { "listing": 295, "handover": 1865, "builds": 3221, "run": 3287 } }
     }
 }
