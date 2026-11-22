@@ -34,3 +34,9 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	parity.RequireOnlyAdjudicated(test, sigchanyzer.Analyzer, Analyzer, analysistest.TestData(), "differences")
 }
+
+// No fixture holds the port to a body stage 3's strip takes out of the type check (#9fbrnra), since no finding of its
+// outside that body can hang on it: a call is judged by what its own identifiers name through Uses (callsNotify, and
+// judgeCall's channel by declaredValues.valueOf), Go's scoping lets a call name only a variable declared at package
+// level or in its own body, never in another function's, and the gate, the package's import of os/signal (gather),
+// reads an import list the strip keeps whole.
