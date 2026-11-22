@@ -21,7 +21,10 @@ import (
 // of an interface and meets a *types.Func alone, so unit B once compared neither, and a body whose only printf callee
 // was one of these stood where the reach left it, its printf finding the host's while the build's differed. The host's
 // side meets them now (meetPushed), standing_facts compares each one's fact as a function's, and the second leg
-// compares each one a standing body uses (compareStandingPushed).
+// compares each one a standing body uses (compareStandingPushed). A variable or a field of another package than its
+// user's is named "local printf wrapper" instead, its facts unread (fact_reach.PushedObject.Local), since printf may
+// hold a kind of it no fact carries, so a fixture whose user is in another package takes it out for that, and the fact
+// comparison is pinned by a user in the variable's own package.
 //
 // The build's own findings with the standing bodies' switch on were those with it off all the same: printf is a
 // Composes rule (rules/rule_inputs.txt), never confined (standingConfinedRules), so it hears every body and keeps its
@@ -109,16 +112,19 @@ func TestAPrintfWrapperFoundThroughAnInterfaceMethodTakesItsUserOut(test *testin
 }
 
 // printf finds a function literal assigned to a variable a wrapper, its fact on the variable, where the literal
-// forwards to one (wrapper_search.go's gather and assignedVariable). In both fixtures api's shared file declares three
+// forwards to one (wrapper_search.go's gather and assignedVariable). In both fixtures api's shared file declares four
 // such variables, each handing its format and values to emit, which each platform's file declares, forwarding to
 // fmt.Printf in one build alone: the host's in the -host fixture, windows's in the -extra one.
 //
-// Logf declares no type, so the graph gives it what its initializer uses (build_dependence's collectValue), emit
-// among them, whose declaration differs: Logf's name bit is set, and the reach reaches Target, which names it, by
-// Named. Its findings are the build's own, and nothing more is owed. TypedLogf states its type, and AssignedLogf is
-// given its literal in init, so neither takes a bit from emit: the reach leaves TypedTarget and AssignedTarget
-// standing, and on the host's findings each would invent windows a printf finding in the first and lose windows's in
-// the second. Each variable's fact names it and takes its user out, and the differential fails nothing.
+// Logf declares no type, so the graph gives it what its initializer uses (build_dependence's collectValue), emit among
+// them, whose declaration differs: Logf's name bit is set, and the reach reaches Target, which names it, by Named. Its
+// findings are the build's own, and nothing more is owed. TypedLogf states its type, and AssignedLogf and OwnLogf are
+// given theirs in init, so none takes a bit from emit: the reach leaves TypedTarget and AssignedTarget, in stated,
+// and OwnUse, in api, standing, and on the host's findings each would invent windows a printf finding in the first and
+// lose windows's in the second. OwnLogf's fact names it and takes OwnUse out, api's own body, the fact comparison's
+// pin, its values spelled by another package's alias so no presence row takes it out first; in stated both variables
+// are another package's, named local whatever their facts read, which takes TypedTarget and AssignedTarget out. The
+// differential fails nothing.
 func TestAPrintfWrapperHeldByAVariableTakesItsUserOut(test *testing.T) {
 	test.Parallel()
 	for _, each := range []struct {
@@ -150,9 +156,16 @@ func TestAPrintfWrapperHeldByAVariableTakesItsUserOut(test *testing.T) {
 					test.Fatalf("the reach reached %s for %q, want it unreached, so that only the facts can take it "+
 						"out", user, reason)
 				}
-				settled.requireRemovedBy(test, user, callee, "printf wrapper")
+				settled.requireRemovedBy(test, user, callee, "local printf wrapper")
 			}
-			for _, file := range []string{"reader.go", "stated.go"} {
+			own := settleFactFixture(test, each.fixture, each.module+"/api")
+			if reason := own.bodies["OwnUse"].reason; reason != "" {
+				test.Fatalf("the reach reached OwnUse for %q, want it unreached, so that only the facts can take it "+
+					"out", reason)
+			}
+			own.requireRemovedBy(test, "OwnUse", "OwnLogf", "printf wrapper")
+			requireNoDifferentialFailure(test, own)
+			for _, file := range []string{"reader.go", "stated.go", "shared.go"} {
 				if printfIn(settled.host.result.Findings, file) != each.onHost ||
 					printfIn(settled.run.result.Findings, file) == each.onHost {
 					test.Errorf("%s's calls are printf findings on the host %t and on windows %t, want the host's %t "+
@@ -172,7 +185,8 @@ func TestAPrintfWrapperHeldByAVariableTakesItsUserOut(test *testing.T) {
 // literal forwarding to fmt.Printf to a Logger's Logf: the host's in the -host fixture, windows's in the -extra one. So
 // the field is a wrapper in exactly that build. Target calls Logf on a Logger it is handed and names nothing else, so
 // the reach leaves it standing, and on the host's findings it would invent windows a printf finding in the first and
-// lose windows's in the second. The field's fact names it and takes Target out, and the differential fails nothing.
+// lose windows's in the second. The field is another package's in reader, so it is named local whatever its fact
+// reads, which takes Target out, and the differential fails nothing.
 func TestAPrintfWrapperHeldByAFieldTakesItsUserOut(test *testing.T) {
 	test.Parallel()
 	for _, each := range []struct {
@@ -193,7 +207,7 @@ func TestAPrintfWrapperHeldByAFieldTakesItsUserOut(test *testing.T) {
 					"out", reason)
 			}
 			// The field's key names it by its objectpath, Logger's first field.
-			settled.requireRemovedBy(test, "Target", "Logger.UF0", "printf wrapper")
+			settled.requireRemovedBy(test, "Target", "Logger.UF0", "local printf wrapper")
 			if printfIn(settled.host.result.Findings, "reader.go") != each.onHost ||
 				printfIn(settled.run.result.Findings, "reader.go") == each.onHost {
 				test.Errorf("Target's call is a printf finding on the host %t and on windows %t, want the host's %t "+
@@ -210,8 +224,9 @@ func TestAPrintfWrapperHeldByAFieldTakesItsUserOut(test *testing.T) {
 // assigned through GenericLogger[any].Logf by the literal's own signature, func(string, ...any), and exports its fact
 // on the generic field, whose declared type, func(string, ...T), has no printf function's shape until T is any. The
 // record names the generic field, so the host's side has to admit it by the shape any instance of it could take
-// (printf.PrintShaped), else it compares nothing and Target stands on the host's findings, inventing windows a printf
-// finding in the -host fixture and losing windows's in the -extra one.
+// (printf.PrintShaped), else it meets nothing and Target stands on the host's findings, inventing windows a printf
+// finding in the -host fixture and losing windows's in the -extra one. Met, the field is another package's in reader,
+// so it is named local whatever its fact reads, which takes Target out.
 func TestAPrintfWrapperHeldByAGenericFieldTakesItsUserOut(test *testing.T) {
 	test.Parallel()
 	for _, each := range []struct {
@@ -232,7 +247,7 @@ func TestAPrintfWrapperHeldByAGenericFieldTakesItsUserOut(test *testing.T) {
 					"out", reason)
 			}
 			// The field's key names it by its objectpath, GenericLogger's first field.
-			settled.requireRemovedBy(test, "Target", "GenericLogger.UF0", "printf wrapper")
+			settled.requireRemovedBy(test, "Target", "GenericLogger.UF0", "local printf wrapper")
 			if printfIn(settled.host.result.Findings, "reader.go") != each.onHost ||
 				printfIn(settled.run.result.Findings, "reader.go") == each.onHost {
 				test.Errorf("Target's call is a printf finding on the host %t and on windows %t, want the host's %t "+
@@ -249,16 +264,17 @@ func TestAPrintfWrapperHeldByAGenericFieldTakesItsUserOut(test *testing.T) {
 // one assigned to its own package's (wrapper_search.go's gather and assignedVariable), and calls of the variable read
 // that kind in the assigning package. But it exports a fact only on its own package's objects (propagate), so the kind
 // is the package's alone, in no build's facts, and no comparison of facts can see it differ (seats' review-1, must 2).
-// A field of another package's type is the same (assignedVariable, through the field's selection). In both fixtures
-// reader gives api.Logf and an api.Logger's Logf field, in a shared file, a literal each forwarding to impl.Emit, which
-// forwards to fmt.Printf in one build alone, and gives api.Tracef, in a platform file of its own alone, a literal
-// forwarding to impl.Printf, a wrapper everywhere: the host's in the -host fixture, windows's in the -extra one.
-// Target, FieldTarget and TraceTarget call one each and name nothing else, so the reach leaves them standing, with
-// api's facts of all three empty in both builds, and on the host's findings each would invent windows a printf finding
-// in the first and lose windows's in the second, and neither leg of the differential failed. Each variable or field of
-// another package of a print shape a body uses is named for that kind now (fact_reach.PushedObject.Local), so each
-// target leaves, and the differential fails nothing; and the second leg fails a standing user of one, which it does
-// here where the naming is taken away.
+// A field of another package's type is the same (assignedVariable, through the field's selection), one promoted through
+// an embedded type of another package's too, whose selection is of the field itself. In both fixtures reader gives
+// api.Logf, an api.Logger's Logf field and api.Sink's Logf field promoted through its own Wrapped, in a shared file, a
+// literal each forwarding to impl.Emit, which forwards to fmt.Printf in one build alone, and gives api.Tracef, in a
+// platform file of its own alone, a literal forwarding to impl.Printf, a wrapper everywhere: the host's in the -host
+// fixture, windows's in the -extra one. Target, FieldTarget, PromotedTarget and TraceTarget call one each and name
+// nothing else, so the reach leaves them standing, with api's facts of all four empty in both builds, and on the host's
+// findings each would invent windows a printf finding in the first and lose windows's in the second, and neither leg of
+// the differential failed. Each variable or field of another package of a print shape a body uses is named for that
+// kind now (fact_reach.PushedObject.Local), so each target leaves, and the differential fails nothing; and the second
+// leg fails a standing user of one, which it does here where the naming is taken away.
 func TestAPrintfWrapperFoundForAnImportedVariableTakesItsUserOut(test *testing.T) {
 	test.Parallel()
 	for _, each := range []struct {
@@ -276,7 +292,7 @@ func TestAPrintfWrapperFoundForAnImportedVariableTakesItsUserOut(test *testing.T
 
 			settled := settleFactFixture(test, each.fixture, each.module+"/reader")
 			for user, callee := range map[string]string{
-				"Target": "Logf", "FieldTarget": "Logger.UF0", "TraceTarget": "Tracef",
+				"Target": "Logf", "FieldTarget": "Logger.UF0", "PromotedTarget": "Sink.UF0", "TraceTarget": "Tracef",
 			} {
 				if reason := settled.bodies[user].reason; reason != "" {
 					test.Fatalf("the reach reached %s for %q, want it unreached, so that only the facts can take it "+

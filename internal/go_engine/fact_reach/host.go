@@ -84,9 +84,20 @@ type Function struct {
 // review-1 on #zqx7gke, must 2). printf finds a function literal this package assigns to such a variable a wrapper as
 // it finds one assigned to its own, and its calls here read that kind, but it exports a fact only on its own
 // package's objects, so the kind is this package's alone and in no build's facts: two builds whose files assign it
-// differently, or whose literal forwards to callees of differing kinds, hold the same facts of it. No other object
-// holds a kind no fact carries (wrapper_search.go's propagate), so a build takes each such object's users out, its
-// facts unread.
+// differently, or whose literal forwards to callees of differing kinds, hold the same facts of it. So a build names
+// each such object "local printf wrapper", in every build and whatever its facts read, and takes its users out. That
+// covers every kind printf holds that no fact carries, by rules/vet/printf's code:
+//   - propagate (wrapper_search.go:229-237) is the one place a kind is set that is neither a fact's nor a name's
+//     (wrapper_kinds.go:28-52 keeps only those), and it exports a fact wherever the candidate is the package's own.
+//   - A candidate of another package comes only from gather's function literal branch, through assignedVariable
+//     (wrapper_search.go:139-167): an imported variable, `pkg.Logf = func...` (:162-164), or a field the selection
+//     reaches, `x.Logf = func...` (:156-160), a field of another package's type, one promoted through an embedded
+//     one among them, which the record names by the selected field itself.
+//   - A method of another package's interface, gathered from an interface of the package's own syntax that embeds
+//     it, is never given a kind: a candidate with no body is forwarded only from the implementations
+//     methodImplementations finds (wrapper_search.go:86-94), which it finds only for the package's own interface
+//     methods (:315).
+//   - A local variable is the package's own, and its fact is exported as any other.
 type PushedObject struct {
 	Object   Object
 	Identity build_reads.Identity

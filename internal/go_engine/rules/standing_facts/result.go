@@ -30,8 +30,8 @@ type Result struct {
 	// PushedCompared is how many of the functions' other pushed facts, a wrapper's and a deprecation, and of the
 	// wrapper facts of the interface methods and variables a body uses (fact_reach.Host.PushedObjects), were compared
 	// with the host's, and PushedNamed how many of them named their object: the fact differed, or the build could not
-	// read it. A variable or a field of another package counts once more in each, for the kind printf may hold of it
-	// that no fact carries (fact_reach.PushedObject.Local), which names it in every build.
+	// read it. A variable or a field of another package counts once in each, its facts unread, for the kind printf may
+	// hold of it that no fact carries (fact_reach.PushedObject.Local), which names it in every build.
 	PushedCompared int
 	PushedNamed    int
 
