@@ -357,17 +357,25 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 // (pipeline.standingConfined), as a dispatched rule declared Composes is and one declared PerUnit is not. That line
 // is what the imports reason will be rebuilt from, the rules' own table (version (b), #bed0mnk), and a standing body
 // shows it again then. The finding is still held to the build that opens the gate, with the switch on as off.
+//
+// scopeName is whether what opens or closes the gate is a universe name, or a name a rule declares it asks its scope
+// about, that one build's file alone declares at package level in the gated declaration's own package. The reach
+// reaches such a package whole, ScopeName (#b255cfy), so the rule is PerUnit in the table and confined, the opposite
+// of an imports row: the reason is what keeps a confined rule's fix right, and with it dropped stood stands with the
+// host's finding and its fix. The gate flips a fix alone in all three, which the body differential cannot see, since
+// it compares a finding's rule, place and message (findingsWithin), never its suggestions.
 type standingGate struct {
-	module   string
-	stood    string
-	file     string
-	rule     string
-	line     int
-	fragment string
-	fix      string
-	finder   string
-	standing int
-	imports  bool
+	module    string
+	stood     string
+	file      string
+	rule      string
+	line      int
+	fragment  string
+	fix       string
+	finder    string
+	standing  int
+	imports   bool
+	scopeName bool
 }
 
 // standingGates are the modules, two for each gate the table holds Composes for: the thing that opens or closes it in
@@ -392,11 +400,14 @@ type standingGate struct {
 //   - S1018, S1025 and stringintconv by a universe name the package may declare in any file: S1018 offers copy() for a
 //     sliding loop only while copy is the builtin (copy-scope-*), S1025 a conversion only while string is
 //     (sprintf-scope-*), and stringintconv imports fmt under its own name only while no file declares fmt
-//     (stringint-scope-*).
+//     (stringint-scope-*). The host's -host modules declare it in a file windows does not compile, the -win in
+//     windows's alone.
 //
 // Four of the pairs flip their gate by an import in a file of the gated declaration's own package, a bare one or one
-// a use takes: sort-import-*, import-goflags-*, example-import-* and abbreviated-sort-* (standingGate.imports). There
-// the reach leaves nothing of the package standing, and what stands is the quiet package's one body.
+// a use takes: sort-import-*, import-goflags-*, example-import-* and abbreviated-sort-* (standingGate.imports), and
+// three by a name one side alone declares there, copy-scope-*, sprintf-scope-* and stringint-scope-*
+// (standingGate.scopeName). There the reach leaves nothing of the package standing, and what stands is the quiet
+// package's one body.
 var standingGates = []standingGate{
 	{module: "sort-alias-win", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
 		fragment: "sort.IntSlice is a type, not a function", finder: "build", standing: 2},
@@ -439,19 +450,21 @@ var standingGates = []standingGate{
 		rule: "consistency-no-abbreviated-identifier", line: 9, fragment: `Use "context"`, finder: "build",
 		standing: 1},
 	{module: "copy-scope-win", stood: "target", file: "shared.go", rule: "S1018", line: 4,
-		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "host", standing: 1},
+		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "host", standing: 1,
+		scopeName: true},
 	{module: "copy-scope-host", stood: "target", file: "shared.go", rule: "S1018", line: 4,
-		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "build", standing: 1},
+		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "build", standing: 1,
+		scopeName: true},
 	{module: "sprintf-scope-win", stood: "target", file: "shared.go", rule: "S1025", line: 8,
 		fragment: "should use a simple conversion", fix: "Replace with conversion to string", finder: "host",
-		standing: 1},
+		standing: 1, scopeName: true},
 	{module: "sprintf-scope-host", stood: "target", file: "shared.go", rule: "S1025", line: 8,
 		fragment: "should use a simple conversion", fix: "Replace with conversion to string", finder: "build",
-		standing: 1},
+		standing: 1, scopeName: true},
 	{module: "stringint-scope-win", stood: "target", file: "shared.go", rule: "stringintconv", line: 4,
-		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "host", standing: 1},
+		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "host", standing: 1, scopeName: true},
 	{module: "stringint-scope-host", stood: "target", file: "shared.go", rule: "stringintconv", line: 4,
-		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "build", standing: 1},
+		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "build", standing: 1, scopeName: true},
 }
 
 // runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
@@ -500,15 +513,15 @@ func stoodIn(run buildRun, stood string, file string) bool {
 	return false
 }
 
-// reachedByImports is whether run's census holds the declaration named stood, in file, and reaches it by its package's
-// imports differing in every package of the build that holds it.
-func reachedByImports(run buildRun, stood string, file string) bool {
+// reachedBy is whether run's census holds the declaration named stood, in file, and reaches it by reason in every
+// package of the build that holds it.
+func reachedBy(run buildRun, stood string, file string, reason bodyReachReason) bool {
 	held := false
 	for _, body := range run.bodyReach.bodies {
 		if body.name != stood || filepath.Base(body.file) != file {
 			continue
 		}
-		if body.reason != reachedImports {
+		if body.reason != reason {
 			return false
 		}
 		held = true
@@ -538,8 +551,23 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 					len(on.buildRuns))
 			}
 			switch {
+			case gate.scopeName:
+				if !reachedBy(on.buildRuns[1], gate.stood, gate.file, reachedScopeName) {
+					test.Errorf("with the switch on %s is not reached by %s in the other build, a name one side alone "+
+						"declares at package level", gate.stood, reachedScopeName)
+				}
+				if !stoodIn(on.buildRuns[1], "Stable", "quiet.go") {
+					test.Error("with the switch on the quiet package's Stable did not stand in the other build, so " +
+						"the module's run leaves nothing standing")
+				}
+				// The rule is PerUnit now, confined, so the reason is all that keeps stood from standing with the
+				// host's finding and its fix.
+				if on.standingConfined == nil || !on.standingConfined[rule.Namespace+gate.rule] {
+					test.Errorf("with the switch on the run does not confine %s for the standing bodies, which the "+
+						"inputs table declares PerUnit", gate.rule)
+				}
 			case gate.imports:
-				if !reachedByImports(on.buildRuns[1], gate.stood, gate.file) {
+				if !reachedBy(on.buildRuns[1], gate.stood, gate.file, reachedImports) {
 					test.Errorf("with the switch on %s is not reached by %s in the other build, its package's "+
 						"imports differing", gate.stood, reachedImports)
 				}

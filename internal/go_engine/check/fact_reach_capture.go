@@ -11,7 +11,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
-	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
 
 // FactReachCapture is what a host's run held of its facts for the facts' reach (#aswfm7a), read from the run's resolver
@@ -73,17 +72,17 @@ type FactReachPackage struct {
 	Pushed map[string]map[types.Object]string
 
 	// Presence is, by its place, what each function body of the package holds that the presence rows read and no use
-	// of stage 1's record says (standing_presence.ReadBodies), read off the package's syntax while the run still holds
+	// of stage 1's record says (Options.FactReachPresence), read off the package's syntax while the run still holds
 	// it: the functions a body starts, whether it writes a candidate of consistency-no-any's of its own, and the
 	// marker interfaces it declares. A body that holds none of them has no entry.
-	Presence map[fact_reach.Place]standing_presence.BodyRecord
+	Presence map[fact_reach.Place]fact_reach.BodyRecord
 
 	// PresenceRead is whether the run read the package's bodies for Presence at all. One it never read holds nothing
 	// in Presence that says its bodies hold nothing, so its side counts it unplaced, and a build lints it whole.
 	PresenceRead bool
 
 	// Markers are the method names of every marker interface the package's syntax declares, read with its bodies
-	// (standing_presence.ReadMarkers), sorted.
+	// (Options.FactReachPresence), sorted.
 	Markers []string
 }
 

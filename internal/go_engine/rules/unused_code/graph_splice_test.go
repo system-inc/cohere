@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -91,9 +92,13 @@ func fixturePackages(test *testing.T) []checkedPackage {
 }
 
 // build is a graph of the package, entered, recording its bodies when records says to, and taking each of taken in
-// place of walking its body.
+// place of walking its body, over the package's types without the instances those bodies write.
 func (checked checkedPackage) build(records bool, taken []bodyRecord) (*graph, error) {
-	built := newGraph(checked.fileSet, checked.files, checked.typesPackage, checked.typesInfo,
+	typesInfo := checked.typesInfo
+	if taken != nil {
+		typesInfo = checked.withoutInstancesOf(taken)
+	}
+	built := newGraph(checked.fileSet, checked.files, checked.typesPackage, typesInfo,
 		parseDirectives(checked.files, checked.fileSet), checked.generatedFiles)
 	if records {
 		built.recordBodies()
@@ -107,6 +112,49 @@ func (checked checkedPackage) build(records bool, taken []bodyRecord) (*graph, e
 		return nil, entryError
 	}
 	return built, nil
+}
+
+// withoutInstancesOf is the package's types with no instance written inside a body one of taken is keyed by, as a
+// build that leaves those bodies to the host and strips them has its types (#xeafx79). Entry reads the instances
+// whole, so a graph taking a record over the host's own types would still find each instance the body wrote, and the
+// flag that keeps such a body present (InterfaceInstance) would guard nothing a test could see. A body is found by its
+// key as the recorder keys it (keyOf), read here from the syntax.
+func (checked checkedPackage) withoutInstancesOf(taken []bodyRecord) *types.Info {
+	keys := map[recordedPlace]struct{}{}
+	for _, record := range taken {
+		keys[record.Body] = struct{}{}
+	}
+	bodies := []*ast.BlockStmt{}
+	for _, file := range checked.files {
+		tokenFile := checked.fileSet.File(file.FileStart)
+		if tokenFile == nil {
+			// A file the file set does not hold has no body a key finds (keyOf).
+			continue
+		}
+		for _, declaration := range file.Decls {
+			function, isFunction := declaration.(*ast.FuncDecl)
+			if !isFunction || function.Body == nil {
+				continue
+			}
+			key := recordedPlace{
+				File:   tokenFile.Position(function.Pos()).Filename,
+				Offset: tokenFile.Offset(function.Pos()),
+			}
+			if _, isTaken := keys[key]; isTaken {
+				bodies = append(bodies, function.Body)
+			}
+		}
+	}
+	stripped := *checked.typesInfo
+	stripped.Instances = make(map[*ast.Ident]types.Instance, len(checked.typesInfo.Instances))
+	for identifier, instance := range checked.typesInfo.Instances {
+		if !slices.ContainsFunc(bodies, func(body *ast.BlockStmt) bool {
+			return body.Lbrace < identifier.Pos() && identifier.Pos() < body.Rbrace
+		}) {
+			stripped.Instances[identifier] = instance
+		}
+	}
+	return &stripped
 }
 
 // selfSpliced is one package built three ways (#xeafx79): plain, as the rule builds it; recording each body; and
@@ -141,17 +189,22 @@ func (checked checkedPackage) selfSplice() (selfSpliced, error) {
 	return built, nil
 }
 
-// spliceDifferences is how built's spliced graph differs from its plain one, each worded as a finding is: its nodes
-// and edges counted, and the verdict's used, unused and quiet, each compared as a multiset of kind, name, parsed file
-// and offset, and the unused, the rule's findings, in order too.
+// spliceDifferences is how built's spliced graph differs from its plain one, each worded as a finding is: its nodes,
+// its uses and its ownerships, an edge as its two ends, and the verdict's used, unused and quiet, each compared as a
+// multiset of kind, name, parsed file and offset, and the unused, the rule's findings, in order too. Edges are
+// compared end for end and not counted, so a record that names the wrong end of an edge differs even where the
+// counts and the verdict agree.
 func spliceDifferences(built selfSpliced) []string {
 	found := []string{}
-	if len(built.plain.nodes) != len(built.spliced.nodes) || len(built.plain.uses) != len(built.spliced.uses) ||
-		len(built.plain.owns) != len(built.spliced.owns) {
-		found = append(found, fmt.Sprintf("the plain graph has %d nodes, %d uses and %d ownerships, the spliced %d, "+
-			"%d and %d", len(built.plain.nodes), len(built.plain.uses), len(built.plain.owns),
-			len(built.spliced.nodes), len(built.spliced.uses), len(built.spliced.owns)))
-	}
+	plainNodes, splicedNodes := wordedNodes(built.plain), wordedNodes(built.spliced)
+	found = append(found, multisetDifferences("node", plainNodes, splicedNodes)...)
+	firstUse := func(each node) linkIndex { return each.firstUse }
+	found = append(found, multisetDifferences("use", wordedEdges(built.plain, plainNodes, built.plain.uses, firstUse),
+		wordedEdges(built.spliced, splicedNodes, built.spliced.uses, firstUse))...)
+	firstOwned := func(each node) linkIndex { return each.firstOwned }
+	found = append(found, multisetDifferences("ownership",
+		wordedEdges(built.plain, plainNodes, built.plain.owns, firstOwned),
+		wordedEdges(built.spliced, splicedNodes, built.spliced.owns, firstOwned))...)
 	plain, spliced := built.plain.results(), built.spliced.results()
 	fileSet := built.plain.fileSet
 	plainUnused, splicedUnused := wordedObjects(fileSet, plain.unused), wordedObjects(fileSet, spliced.unused)
@@ -165,6 +218,32 @@ func spliceDifferences(built selfSpliced) []string {
 		found = append(found, fmt.Sprintf("the unused are %v plain and %v spliced", plainUnused, splicedUnused))
 	}
 	return found
+}
+
+// wordedNodes is each of built's nodes, by its index, as wordedObjects words its object, the one a spliced node's
+// record gave it for a spliced node, and the root as the root.
+func wordedNodes(built *graph) []string {
+	objects := make([]object, 0, len(built.nodes)-1)
+	for index, each := range built.nodes[1:] {
+		if isSpliced(each) {
+			objects = append(objects, built.splice.locals[nodeIndex(index+1)])
+		} else {
+			objects = append(objects, built.objectOf(each.typesObject))
+		}
+	}
+	return append([]string{"the root"}, wordedObjects(built.fileSet, objects)...)
+}
+
+// wordedEdges is each edge of links, built's uses or its ownerships, as its two ends worded as nodes words them,
+// first being where each node's chain of that kind starts.
+func wordedEdges(built *graph, nodes []string, links []edgeLink, first func(node) linkIndex) []string {
+	edges := []string{}
+	for index, each := range built.nodes {
+		for link := first(each); link != 0; link = links[link].next {
+			edges = append(edges, nodes[index]+" -> "+nodes[links[link].to])
+		}
+	}
+	return edges
 }
 
 // wordedObjects is each of objects as its kind, its name, its parsed file and its offset.
@@ -336,6 +415,65 @@ func Wrap() {
 		quiet:   []string{},
 		flagged: "Wrap",
 	},
+	{
+		// The directive is all that makes target's method and field used, through the type branch of the ignore step,
+		// which reads the local alias's type from go/types and which a record's rooted locals do not feed.
+		name: "an ignored local alias of a package-level type",
+		sources: []recordedSource{{"shape.go", `package shape
+
+type target struct{ field int }
+
+func (target) method() {}
+
+func IgnoredAlias() {
+	//lint:ignore U1000 kept for the test
+	type kept = target
+}
+`}},
+		unused:  []string{},
+		quiet:   []string{},
+		flagged: "IgnoredAlias",
+	},
+	{
+		// The first variable's field is a node only through ReadFirst's selection, and its place finds the second's,
+		// so a record that names it by its place makes the graph one node short.
+		name: "a selection of a field its place does not find",
+		sources: []recordedSource{{"shape.go", `package shape
+
+var first, second struct{ value int }
+
+func ReadFirst() int { return first.value }
+
+func ReadSecond() int { return second.value }
+`}},
+		unused:  []string{},
+		quiet:   []string{},
+		flagged: "ReadFirst",
+	},
+	{
+		// The instance Check writes is all that makes box's method used. The generic interface does not stand in for
+		// it: implements binds P to *int and then finds *int outside P's constraint, `*T` with T bound to nothing, so
+		// only holder[int, *int] is an interface box implements, and a build that strips Check has no such instance.
+		name: "an instance of a generic interface the generic one does not stand in for",
+		sources: []recordedSource{{"shape.go", `package shape
+
+type holder[T any, P interface{ *T }] interface{ hold() P }
+
+type box struct{}
+
+func (box) hold() *int { return nil }
+
+var Value box
+
+func Check(value any) bool {
+	_, held := value.(holder[int, *int])
+	return held
+}
+`}},
+		unused:  []string{},
+		quiet:   []string{},
+		flagged: "Check",
+	},
 }
 
 // TestSpliceCasesFindWhatTheyAreWrittenFor holds each splice case's plain verdict to what the case says it finds
@@ -346,7 +484,8 @@ func TestSpliceCasesFindWhatTheyAreWrittenFor(test *testing.T) {
 	for _, each := range spliceCases {
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
-			built, buildError := checkShapes(test, each.name, each.sources, nil).selfSplice()
+			checked := checkShapes(test, each.name, each.sources, nil)
+			built, buildError := checked.selfSplice()
 			if buildError != nil {
 				test.Fatal(buildError)
 			}
@@ -370,6 +509,16 @@ func TestSpliceCasesFindWhatTheyAreWrittenFor(test *testing.T) {
 			}
 			if each.flagged != "" && flagged != 1 {
 				test.Errorf("%d bodies are flagged, where the case flags %s alone", flagged, each.flagged)
+			}
+			// The one flagged body is the case's, so a flag set on the wrong body is red here and not only where the
+			// self-splice happens to take the body that needed it.
+			if each.flagged != "" {
+				key := functionBodyKey(test, checked, each.flagged)
+				if record, isRecorded := recordKeyedBy(built.records, key); !isRecorded {
+					test.Errorf("the recorder wrote no one record of %s's body", each.flagged)
+				} else if record.Present == (recordedPresence{}) {
+					test.Errorf("%s's body is not flagged, though the case flags it", each.flagged)
+				}
 			}
 		})
 	}
@@ -409,6 +558,117 @@ func TestSplicingAFlaggedBodyChangesTheVerdict(test *testing.T) {
 	}
 }
 
+// corruptedSource is a package whose One has a record of every part: a local with an owner, a rooted local, and uses
+// of two objects declared outside it, one a field that Three uses too and that Two's second field stands beside.
+const corruptedSource = `package shape
+
+type pair struct{ first, second int }
+
+func One(value pair) int {
+	//lint:ignore U1000 kept for the test
+	const kept = 1
+	return value.first
+}
+
+func Two(value pair) int { return value.second }
+
+func Three(value pair) int { return value.first }
+`
+
+// TestSpliceDifferencesSeeEachCorruptedRecord holds the self-splice's comparator to its teeth (#xeafx79): a record
+// with a use dropped, an owner dropped, a rooted local dropped, or a declared end moved to another field, is a
+// difference from the walk, each in the lists it changes and no other. The moved end leaves every count and the
+// verdict as they were, so only a comparison of the edges end for end sees it.
+func TestSpliceDifferencesSeeEachCorruptedRecord(test *testing.T) {
+	test.Parallel()
+	checked := checkShapes(test, "corrupted", []recordedSource{{"shape.go", corruptedSource}}, nil)
+	built, buildError := checked.selfSplice()
+	if buildError != nil {
+		test.Fatal(buildError)
+	}
+	if found := spliceDifferences(built); len(found) != 0 {
+		test.Fatalf("the self-splice differs before any corruption: %v", found)
+	}
+	one := slices.IndexFunc(built.taken, func(record bodyRecord) bool { return len(record.Locals) == 1 })
+	if one < 0 || len(built.taken) != 3 {
+		test.Fatalf("the package takes %+v, not One's record of a local among three", built.taken)
+	}
+	first := indexedIn(test, built.taken[one],
+		recordedPlace{File: "shape.go", Offset: strings.Index(corruptedSource, "first")})
+	second := indexedIn(test, built.taken[one],
+		recordedPlace{File: "shape.go", Offset: strings.Index(corruptedSource, "second")})
+	if len(built.taken[one].Owned) != 1 || len(built.taken[one].Rooted) != 1 ||
+		!slices.ContainsFunc(built.taken[one].Uses, func(use recordedUse) bool {
+			return use.Used == recordedEnd{Kind: endDeclared, Place: first}
+		}) {
+		test.Fatalf("the package takes %+v, not One's record of an owned, rooted local and a use of first among "+
+			"three", built.taken)
+	}
+	cases := []struct {
+		name   string
+		change func(record *bodyRecord)
+		lists  []string
+	}{
+		{
+			name: "a use dropped",
+			change: func(record *bodyRecord) {
+				record.Uses = slices.DeleteFunc(record.Uses, func(use recordedUse) bool {
+					return use.Used == recordedEnd{Kind: endDeclared, Place: first}
+				})
+			},
+			lists: []string{"use"},
+		},
+		{
+			name:   "an owner dropped",
+			change: func(record *bodyRecord) { record.Owned = nil },
+			lists:  []string{"ownership"},
+		},
+		{
+			name:   "a rooted local dropped",
+			change: func(record *bodyRecord) { record.Rooted = nil },
+			lists:  []string{"unused", "use", "used"},
+		},
+		{
+			name: "a declared end moved to another field",
+			change: func(record *bodyRecord) {
+				for index := range record.Uses {
+					if record.Uses[index].Used == (recordedEnd{Kind: endDeclared, Place: first}) {
+						record.Uses[index].Used.Place = second
+					}
+				}
+			},
+			lists: []string{"use"},
+		},
+	}
+	for _, each := range cases {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			taken := slices.Clone(built.taken)
+			taken[one].Locals = slices.Clone(taken[one].Locals)
+			taken[one].Owned = slices.Clone(taken[one].Owned)
+			taken[one].Uses = slices.Clone(taken[one].Uses)
+			each.change(&taken[one])
+			corrupted := built
+			var takeError error
+			if corrupted.spliced, takeError = checked.build(false, taken); takeError != nil {
+				test.Fatal(takeError)
+			}
+			found := spliceDifferences(corrupted)
+			lists := []string{}
+			for _, difference := range found {
+				list, _, _ := strings.Cut(difference, ":")
+				if !slices.Contains(lists, list) {
+					lists = append(lists, list)
+				}
+			}
+			slices.Sort(lists)
+			if !slices.Equal(lists, each.lists) {
+				test.Errorf("the corrupted record differs in %v, not %v: %v", lists, each.lists, found)
+			}
+		})
+	}
+}
+
 // refusedSource is a package of one body whose record names a local, an object declared outside it and the
 // function, which TestSpliceRefusesWhatItCannotTake takes apart.
 const refusedSource = `package shape
@@ -422,7 +682,7 @@ func Count() int {
 `
 
 // TestSpliceRefusesWhatItCannotTake holds the splice to failing by name (#xeafx79), never dropping an edge and never
-// panicking: a record a flag keeps present, two of one key, one a graph that records is handed, one keyed where no
+// panicking: a record each flag keeps present, two of one key, one a graph that records is handed, one keyed where no
 // body is, an end it cannot resolve and a local the root owns, each an error naming the body, and the place where it
 // has one.
 func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
@@ -438,24 +698,23 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 	count := built.taken[0]
 	withRecord := func(change func(record *bodyRecord)) []bodyRecord {
 		changed := count
+		changed.PlaceFiles = slices.Clone(count.PlaceFiles)
 		changed.Locals = slices.Clone(count.Locals)
+		changed.Owned = slices.Clone(count.Owned)
 		changed.Uses = slices.Clone(count.Uses)
 		changed.Rooted = slices.Clone(count.Rooted)
 		change(&changed)
 		return []bodyRecord{changed}
 	}
 	unplaced := recordedPlace{File: "shape.go", Offset: strings.Index(refusedSource, "counter +")}
-	cases := []struct {
+	pastFiles := fmt.Sprintf("a place in file %d of the record's %d", len(count.PlaceFiles), len(count.PlaceFiles))
+	type refusal struct {
 		name    string
 		taken   []bodyRecord
 		records bool
 		names   []string
-	}{
-		{
-			name:  "a record a flag keeps present",
-			taken: withRecord(func(record *bodyRecord) { record.Present.UnexportedInterfaceMethod = true }),
-			names: []string{placeText(count.Body)},
-		},
+	}
+	cases := []refusal{
 		{
 			name:  "two records of one key",
 			taken: []bodyRecord{count, count},
@@ -478,27 +737,106 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 			taken: withRecord(func(record *bodyRecord) {
 				for index := range record.Uses {
 					if record.Uses[index].Used.Kind == endDeclared {
-						record.Uses[index].Used.Place = unplaced
+						record.Uses[index].Used.Place = indexedIn(test, *record, unplaced)
 					}
 				}
 			}),
 			names: []string{placeText(count.Body), placeText(unplaced)},
 		},
 		{
+			name: "a declared end in a file past the record's files",
+			taken: withRecord(func(record *bodyRecord) {
+				for index := range record.Uses {
+					if record.Uses[index].Used.Kind == endDeclared {
+						record.Uses[index].Used.Place.File = uint32(len(record.PlaceFiles))
+					}
+				}
+			}),
+			names: []string{placeText(count.Body), pastFiles},
+		},
+		{
 			// The recorder never writes it, and the graph's first owners read the root's index as no owner at all.
 			name: "a local the root owns",
 			taken: withRecord(func(record *bodyRecord) {
-				record.Locals[0].Owners = append(slices.Clone(record.Locals[0].Owners), recordedEnd{Kind: endRoot})
+				record.Owned = append(record.Owned, recordedOwner{Local: 0, Owner: recordedEnd{Kind: endRoot}})
 			}),
-			names: []string{placeText(count.Body)},
+			names: []string{placeText(count.Body), "the root owns local 0"},
+		},
+		{
+			// The owners are one list, so a local an owner names is bounded on its own.
+			name: "an owner of a local past the record's locals",
+			taken: withRecord(func(record *bodyRecord) {
+				record.Owned = append(record.Owned, recordedOwner{
+					Local: uint32(len(record.Locals)),
+					Owner: recordedEnd{Kind: endFunction},
+				})
+			}),
+			names: []string{placeText(count.Body), fmt.Sprintf("it owns local %d of its %d", len(count.Locals),
+				len(count.Locals))},
 		},
 		{
 			name: "a local past the record's locals",
 			taken: withRecord(func(record *bodyRecord) {
-				record.Rooted = append(record.Rooted, len(record.Locals))
+				record.Rooted = append(record.Rooted, uint32(len(record.Locals)))
 			}),
 			names: []string{placeText(count.Body)},
 		},
+		{
+			// Rooted is bounded on its own, so this is the bound an end of an edge is read by (endNode).
+			name: "an end past the record's locals",
+			taken: withRecord(func(record *bodyRecord) {
+				for index := range record.Uses {
+					if record.Uses[index].Used.Kind == endLocal {
+						record.Uses[index].Used.Local = uint32(len(record.Locals))
+					}
+				}
+			}),
+			names: []string{placeText(count.Body), fmt.Sprintf("local %d of its %d", len(count.Locals),
+				len(count.Locals))},
+		},
+		{
+			name: "a local placed past the end of its file",
+			taken: withRecord(func(record *bodyRecord) {
+				record.Locals[0].Place.Offset = uint32(len(refusedSource) + 1)
+			}),
+			names: []string{placeText(count.Body), placeText(recordedPlace{
+				File:   "shape.go",
+				Offset: len(refusedSource) + 1,
+			})},
+		},
+		{
+			// An offset is unsigned, so no place is before the start of its file, and its file is an index instead.
+			name: "a local placed in a file past the record's files",
+			taken: withRecord(func(record *bodyRecord) {
+				record.Locals[0].Place.File = uint32(len(record.PlaceFiles))
+			}),
+			names: []string{placeText(count.Body), "local 0", pastFiles},
+		},
+		{
+			name: "a local whose name runs past the record's names",
+			taken: withRecord(func(record *bodyRecord) {
+				record.Locals[0].NameEnd = uint32(len(record.Names) + 1)
+			}),
+			names: []string{placeText(count.Body), fmt.Sprintf("local 0's name runs from 0 to %d of the record's %d",
+				len(count.Names)+1, len(count.Names))},
+		},
+		{
+			name:  "a local of a kind no word names",
+			taken: withRecord(func(record *bodyRecord) { record.Locals[0].Kind = objectKind(len(kindWords)) }),
+			names: []string{placeText(count.Body), fmt.Sprintf("kind %d, which no word names", len(kindWords))},
+		},
+	}
+	// Each flag alone, read from the type, so a refusal that reads some of the flags and not the rest is red for
+	// each it leaves out, and a flag added later is refused here without a case written for it.
+	presence := reflect.TypeFor[recordedPresence]()
+	for field := range presence.NumField() {
+		cases = append(cases, refusal{
+			name: "a record " + presence.Field(field).Name + " keeps present",
+			taken: withRecord(func(record *bodyRecord) {
+				reflect.ValueOf(&record.Present).Elem().Field(field).SetBool(true)
+			}),
+			names: []string{placeText(count.Body), presence.Field(field).Name + ":true"},
+		})
 	}
 	for _, each := range cases {
 		test.Run(each.name, func(test *testing.T) {
@@ -513,6 +851,128 @@ func TestSpliceRefusesWhatItCannotTake(test *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// sharedNameSources are two files parsed under one name, each declaring a variable at the same offset, so a place in
+// either names no one file and no one object. Read, in the first, has a local and uses the variable.
+var sharedNameSources = []recordedSource{
+	{"same.go", `package shape
+
+var value int
+
+func Read() int {
+	const step = 1
+	return value + step
+}
+`},
+	{"same.go", `package shape
+
+var other int
+
+// The second file runs past the first's end, so a place in the first is inside it too, and only the name, not the
+// offset, keeps a splice from placing the first file's local here.
+`},
+}
+
+// TestSpliceRefusesAPlaceTwoFilesOfOneNameShare holds the splice to placing by one file and one object (#xeafx79):
+// a record with its flags cleared whose local is in a file whose parsed name another file shares, and one whose
+// declared end is at a place two variables of two such files are declared at, each fail by the place. The recorder
+// flags both bodies, so this is a build's own files sharing a name the host's did not.
+func TestSpliceRefusesAPlaceTwoFilesOfOneNameShare(test *testing.T) {
+	test.Parallel()
+	if strings.Index(sharedNameSources[0].source, "value") != strings.Index(sharedNameSources[1].source, "other") {
+		test.Fatal("the two variables are declared at two offsets, so their place is no one's")
+	}
+	checked := checkShapes(test, "shared name", sharedNameSources, nil)
+	recording, recordError := checked.build(true, nil)
+	if recordError != nil {
+		test.Fatal(recordError)
+	}
+	records := recording.bodyRecords()
+	if len(records) != 1 || len(records[0].Locals) != 1 {
+		test.Fatalf("the package records %+v, not Read's one record of a local", records)
+	}
+	read := records[0]
+	read.Present = recordedPresence{}
+	localPlace, placeError := read.placeOf(read.Locals[0].Place)
+	if placeError != nil {
+		test.Fatal(placeError)
+	}
+	declared := recordedPlace{File: "same.go", Offset: strings.Index(sharedNameSources[0].source, "value")}
+	cases := []struct {
+		name  string
+		keeps func(use recordedUse) bool
+		names []string
+	}{
+		{
+			// Only the uses between locals and the function, so placing the local is all that can fail.
+			name: "a local in a file whose parsed name two files share",
+			keeps: func(use recordedUse) bool {
+				return use.By.Kind != endDeclared && use.Used.Kind != endDeclared
+			},
+			names: []string{placeText(read.Body), placeText(localPlace), "in no one parsed file"},
+		},
+		{
+			// No local, so resolving the declared end is all that can fail.
+			name: "a declared end two files of one name declare an object at",
+			keeps: func(use recordedUse) bool {
+				return use.By.Kind != endLocal && use.Used.Kind != endLocal
+			},
+			names: []string{placeText(read.Body), placeText(declared), "declares none or more than one"},
+		},
+	}
+	for _, each := range cases {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+			changed := read
+			changed.Uses = slices.DeleteFunc(slices.Clone(read.Uses), func(use recordedUse) bool {
+				return !each.keeps(use)
+			})
+			if len(changed.Uses) == 0 {
+				test.Fatalf("Read's record keeps no use of %+v, so the case proves nothing", read.Uses)
+			}
+			if !slices.ContainsFunc(changed.Uses, func(use recordedUse) bool { return use.Used.Kind == endLocal }) {
+				changed.Locals = nil
+				changed.Owned = nil
+			}
+			taken, takeError := checked.build(false, []bodyRecord{changed})
+			if takeError == nil {
+				test.Fatalf("the graph took the record, and holds %d nodes", len(taken.nodes))
+			}
+			for _, name := range each.names {
+				if !strings.Contains(takeError.Error(), name) {
+					test.Errorf("the error %q does not name %s", takeError, name)
+				}
+			}
+		})
+	}
+}
+
+// TestSpliceRefusesARecordTwoBodiesAreKeyedBy holds the splice to taking a record for one body alone (#xeafx79):
+// handed the walk's record of First, whose key Second shares through a `//line` directive, the graph meets two bodies
+// at that key and fails by it rather than splice the record in for either. The host keeps no record of such a body
+// (bodyRecords), but a build's files are its own, and a key the host's package held one body at can hold two there.
+func TestSpliceRefusesARecordTwoBodiesAreKeyedBy(test *testing.T) {
+	test.Parallel()
+	checked := checkShapes(test, "shared key", sharedKeySources, nil)
+	recording, recordError := checked.build(true, nil)
+	if recordError != nil {
+		test.Fatal(recordError)
+	}
+	if len(recording.recorder.records) != 3 ||
+		recording.recorder.records[0].Body != recording.recorder.records[1].Body {
+		test.Fatalf("the walk recorded %+v, not First and Second at one key and Third", recording.recorder.records)
+	}
+	first := recording.recorder.records[0]
+	taken, takeError := checked.build(false, []bodyRecord{first})
+	if takeError == nil {
+		test.Fatalf("the graph took First's record at a key two bodies share, and holds %d nodes", len(taken.nodes))
+	}
+	for _, name := range []string{placeText(first.Body), "declares 2 function bodies"} {
+		if !strings.Contains(takeError.Error(), name) {
+			test.Errorf("the error %q does not name %s", takeError, name)
+		}
 	}
 }
 
@@ -603,12 +1063,20 @@ func spliceCounts(checked checkedPackage, built selfSpliced) map[string]int {
 			}
 		}
 	}
+	// The records were spliced, so every place among them is in its record's files, and nil is never handed back.
+	declaredAt := func(record bodyRecord, end recordedEnd) types.Object {
+		place, placeError := record.placeOf(end.Place)
+		if placeError != nil {
+			return nil
+		}
+		return built.spliced.definedAt(place)
+	}
 	isField := func(record bodyRecord, end recordedEnd) bool {
 		switch end.Kind {
 		case endLocal:
-			return record.Locals[end.Local].Kind == "field"
+			return record.Locals[end.Local].Kind == kindField
 		case endDeclared:
-			variable, isVariable := built.spliced.definedAt(end.Place).(*types.Var)
+			variable, isVariable := declaredAt(record, end).(*types.Var)
 			return isVariable && variable.IsField()
 		default:
 			return false
@@ -624,7 +1092,7 @@ func spliceCounts(checked checkedPackage, built selfSpliced) map[string]int {
 				if end.Kind != endDeclared || !isField(record, end) {
 					continue
 				}
-				position := built.spliced.definedAt(end.Place).Pos()
+				position := declaredAt(record, end).Pos()
 				if slices.ContainsFunc(signatures, func(each span) bool {
 					return each.start <= position && position < each.end
 				}) {
@@ -634,6 +1102,16 @@ func spliceCounts(checked checkedPackage, built selfSpliced) map[string]int {
 		}
 	}
 	return counted
+}
+
+// indexedIn is place as record holds it, its file by its index among the record's files, which must hold it.
+func indexedIn(test *testing.T, record bodyRecord, place recordedPlace) indexedPlace {
+	test.Helper()
+	file := slices.Index(record.PlaceFiles, place.File)
+	if file < 0 {
+		test.Fatalf("the record places nothing in %s, so no place of it is there", place.File)
+	}
+	return indexedPlace{File: uint32(file), Offset: uint32(place.Offset)}
 }
 
 // countOf is 1 for a flag that is set and 0 for one that is not.

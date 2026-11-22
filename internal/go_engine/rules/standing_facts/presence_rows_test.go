@@ -115,6 +115,19 @@ func (found fixture) fieldIdentity(test *testing.T, typeName string, field strin
 	return build_reads.Identity{}
 }
 
+// hostport's row over host_port's stripped fixture (#8pxhe8j): connect, standing, dials address, a package-level
+// Sprintf of a host and a port. Stripping connect's body would lose the rule's finding at address
+// (host_port's TestAStrippedDialLosesTheAddressFinding), so the row names address, and connect leaves.
+func TestAStandingBodyDialingAnAddressLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "dialed")
+	host := presenceHost(test, found, nil,
+		presenceUse{key: "dialed.address", identity: found.identity("address"), users: []string{"connect"}})
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"connect": standing_presence.HostPort}, nil)
+}
+
 // scannererr's row (#xeafx79): Lines names Input, a scanner over the process's input, and Open names Assigned, which
 // its own `=` makes a candidate, so both leave, and so does Remembered, which names Memory, whose reader is in memory,
 // since the row names every *bufio.Scanner whatever made it. ReadsIn names In, a lineReader a package-level
@@ -135,6 +148,19 @@ func TestAStandingBodyNamingAScannerLeavesForPresence(test *testing.T) {
 		"Remembered": standing_presence.ScannerError, "ReadsIn": standing_presence.ScannerError}, nil)
 }
 
+// scannererr's row over scanner_error's stripped fixture (#8pxhe8j): read, present, loops on input's Scan, and check,
+// standing, calls its Err. Stripping check's body would leave the rule a false finding at input
+// (scanner_error's TestAStrippedErrCheckChangesTheScannersFinding), so the row names input, and check leaves.
+func TestAStandingBodyCheckingAPresentScannersErrorLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "errorchecked")
+	host := presenceHost(test, found, []string{"read"},
+		presenceUse{key: "errorchecked.input", identity: found.identity("input"), users: []string{"read", "check"}})
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"check": standing_presence.ScannerError}, nil)
+}
+
 // sqlrowserr's row (#xeafx79): Next names Rows, the first name a query's rows are assigned to, and leaves, and so does
 // IterReads, which names Iter, rows a package-level specification gives a variable of no *sql.Rows type, which only
 // the syntax walk names. Statement names Prepared, a prepared statement, and Count names nothing, so both stand.
@@ -148,6 +174,19 @@ func TestAStandingBodyNamingQueriedRowsLeavesForPresence(test *testing.T) {
 	result, _ := settle(test, found, host)
 	requirePresence(test, found, host, result, map[string]standing_presence.Row{
 		"Next": standing_presence.SqlRowsError, "IterReads": standing_presence.SqlRowsError}, nil)
+}
+
+// sqlrowserr's row over sql_rows_err's stripped fixture (#8pxhe8j): next, present, loops on rows' Next, and check,
+// standing, calls their Err. Stripping check's body would leave the rule a false finding at the query
+// (sql_rows_err's TestAStrippedErrCheckChangesTheRowsFinding), so the row names rows, and check leaves.
+func TestAStandingBodyCheckingPresentRowsErrorLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "rowschecked")
+	host := presenceHost(test, found, []string{"next"},
+		presenceUse{key: "rowschecked.rows", identity: found.identity("rows"), users: []string{"next", "check"}})
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"check": standing_presence.SqlRowsError}, nil)
 }
 
 // screaming's row (#xeafx79): Reads compares with O_RDONLY, an underscored constant of a file importing syscall, and
@@ -238,6 +277,20 @@ func TestABodyAPresentCallerStartsLeavesForPresence(test *testing.T) {
 		"subtest": standing_presence.RequireParallel, "Late": standing_presence.TestingGoroutine,
 		"TestLate": standing_presence.RequireParallel, "afterFact": standing_presence.TestingGoroutine,
 	}, map[string]fact_reach.Reason{"Faulty": "no-return"})
+}
+
+// testinggoroutine's edge row over testing_goroutine's stripped fixture (#8pxhe8j): TestStarts, present, starts
+// helper with go, and helper, standing, calls t.Fatal. Stripping helper's body would lose the rule's finding at
+// TestStarts' go statement (testing_goroutine's TestAStrippedHelperLosesTheGoStatementsFinding), so helper leaves by
+// the callee direction.
+func TestAStandingBodyAPresentTestStartsLeavesForPresence(test *testing.T) {
+	test.Parallel()
+	found := loadFixture(test, "started")
+	host := presenceHost(test, found, []string{"TestStarts"})
+	host.recordPresence(found)
+	result, _ := settle(test, found, host)
+	requirePresence(test, found, host, result,
+		map[string]standing_presence.Row{"helper": standing_presence.TestingGoroutine}, nil)
 }
 
 // A body that writes a candidate of consistency-no-any's of its own, or declares a marker interface, leaves for the

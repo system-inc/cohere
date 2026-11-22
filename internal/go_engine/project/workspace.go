@@ -84,6 +84,11 @@ func ReadWorkspace(root string) (Workspace, error) {
 	}
 
 	covered := Workspace{Root: absoluteRoot, Submodules: links, FromWorkspace: true}
+	// goMods are each module's go.mod as its path was read from, by the module's index, so its replaces are read from
+	// the same bytes rather than the file again: nil for the root module, whose path is never read. Both reads were in
+	// this call, which runs no go command and writes nothing; a go.mod a run's go list rewrites under -mod=mod is
+	// rewritten by a load, after the workspace is read.
+	var goMods [][]byte
 	for _, use := range work.Use {
 		directory := filepath.ToSlash(filepath.Clean(use.Path))
 		if insideAny(directory, links) {
@@ -91,20 +96,23 @@ func ReadWorkspace(root string) (Workspace, error) {
 			continue
 		}
 		module := Module{Directory: directory}
+		var goMod []byte
 		if directory != "." {
-			goMod, goModError := os.ReadFile(filepath.Join(absoluteRoot, directory, "go.mod"))
+			read, goModError := os.ReadFile(filepath.Join(absoluteRoot, directory, "go.mod"))
 			if goModError != nil {
 				return Workspace{}, fmt.Errorf("go.work uses %s: %w", directory, goModError)
 			}
+			goMod = read
 			module.Path = modfile.ModulePath(goMod)
 			if module.Path == "" {
 				return Workspace{}, fmt.Errorf("go.work uses %s, whose go.mod names no module", directory)
 			}
 		}
 		covered.Modules = append(covered.Modules, module)
+		goMods = append(goMods, goMod)
 	}
-	for _, module := range covered.Modules {
-		replaced, replacedError := replacedDirectories(absoluteRoot, module.Directory)
+	for index, module := range covered.Modules {
+		replaced, replacedError := replacedDirectories(absoluteRoot, module.Directory, goMods[index])
 		if replacedError != nil {
 			return Workspace{}, replacedError
 		}
@@ -115,12 +123,17 @@ func ReadWorkspace(root string) (Workspace, error) {
 
 // replacedDirectories are the directories inside root that the go.mod in directory replaces a module with,
 // relative to root and slash separated. Only a replace by a directory counts: one by a module and version
-// names no directory of the tree, and one that resolves outside root is no module the walk would meet.
-func replacedDirectories(root string, directory string) ([]string, error) {
+// names no directory of the tree, and one that resolves outside root is no module the walk would meet. The go.mod is
+// read from goMod, the bytes the caller already read of it, or from the file when goMod is nil.
+func replacedDirectories(root string, directory string, goMod []byte) ([]string, error) {
 	path := filepath.Join(root, filepath.FromSlash(directory), "go.mod")
-	contents, readError := os.ReadFile(path)
-	if readError != nil {
-		return nil, fmt.Errorf("reading the replaces of %s: %w", path, readError)
+	contents := goMod
+	if contents == nil {
+		read, readError := os.ReadFile(path)
+		if readError != nil {
+			return nil, fmt.Errorf("reading the replaces of %s: %w", path, readError)
+		}
+		contents = read
 	}
 	parsed, parseError := modfile.Parse(path, contents, nil)
 	if parseError != nil {
