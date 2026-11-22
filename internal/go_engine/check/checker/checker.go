@@ -1767,6 +1767,11 @@ func (act *Action) appendHeldFacts(facts []analysis.ObjectFact, owner *types.Pac
 	holders []*Action) []analysis.ObjectFact {
 	// Two holders of one package hold the same keys only where two actions
 	// share a types.Package, so only then is a key's first holder looked for.
+	// No run has two: a load gives each of its packages, test variants too,
+	// its own types.Package (load's check and export_data.Read; unsafe's is
+	// types.Unsafe, but a load has one unsafe), holders pass only along one
+	// graph's edges, and a graph has one action of an analyzer on each
+	// package, so only tests reach this path.
 	var listed map[objectFactKey]bool
 	if len(holders) > 1 {
 		listed = make(map[objectFactKey]bool)

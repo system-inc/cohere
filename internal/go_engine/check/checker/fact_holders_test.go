@@ -240,6 +240,46 @@ func TestOfSeveralHoldersTheFactTheCopyWouldHaveKeptWins(test *testing.T) {
 			test.Errorf("SanityCheck %v: want the heir's own fact over what it inherited, %s, got %s", sanityCheck,
 				want, got)
 		}
+		// The heir held inherited facts on its own package before it restored its own, so only its going first among
+		// those holders gives an action above it the heir's fact rather than early's.
+		above := inherited(types.NewPackage("example.com/above", "above"), heir)
+		if got, want := heldMark(above, field), "reads own, lists [mark of own], exports []"; got != want {
+			test.Errorf("SanityCheck %v: want the action above the heir to read the heir's own fact, %s, got %s",
+				sanityCheck, want, got)
+		}
+	}
+}
+
+// A fact that passes every edge is held where it was exported, never copied: two edges above bottom, top's own map
+// holds no key of bottom's method, field, type or constant facts, which it reads all the same, while under SanityCheck
+// the copy puts every one of them there. So a change that copies them again fails here, whatever it reads.
+func TestAFactThatPassesEveryEdgeIsHeldNotCopied(test *testing.T) {
+	test.Parallel()
+
+	for _, sanityCheck := range []bool{false, true} {
+		graph := analyzeWithin(test, []*analysis.Analyzer{markingAnalyzer},
+			writeModule(test, "marks", marksModule, "./..."), &Options{SanityCheck: sanityCheck})
+		copied := -1
+		for action := range graph.All() {
+			if action.Package.PkgPath != "example.com/marks/top" {
+				continue
+			}
+			copied = 0
+			for key := range action.objectFacts {
+				if inheritedEverywhere(key.obj) && key.obj.Pkg() != action.Package.Types {
+					copied++
+				}
+			}
+		}
+		// bottom's Shape, its Side and Area, and Sides; middle's Frame and its Inner.
+		want := 0
+		if sanityCheck {
+			want = 6
+		}
+		if copied != want {
+			test.Errorf("SanityCheck %v: want %d facts of other packages' methods, fields, types and constants in "+
+				"top's own map, got %d", sanityCheck, want, copied)
+		}
 	}
 }
 
