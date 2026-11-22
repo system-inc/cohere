@@ -357,3 +357,63 @@ func TestAPrintShapedObjectOfItsOwnNoCallNamesLeavesItsUserStanding(test *testin
 	}
 	requireNoDifferentialFailure(test, settled)
 }
+
+// The second leg alone (seats' review-1, a should): every fixture above takes its target out before the differential
+// runs, so none reaches compareStandingPushed's failures, and once the facts' reach compares what the second leg
+// reads, no fixture can: a fact that differs names its object, and its users leave. So the leg is asked here of a
+// host's side and a build's capture made by hand, a user of api.Logf standing or not, each fact the host's or not.
+func TestTheSecondLegFailsAStandingUserOfAPushedObjectThatDiffers(test *testing.T) {
+	test.Parallel()
+
+	api := types.NewPackage("example.com/api", "api")
+	logf := types.NewVar(token.NoPos, api, "Logf", types.Typ[types.Int])
+	api.Scope().Insert(logf)
+	renderer := build_reads.NewIdentityRenderer(token.NewFileSet(), nil)
+	identity := renderer.Object(logf)
+	key, isKnown := factReachObject(identity)
+	if !isKnown {
+		test.Fatalf("want Logf's identity known, got %s", identity)
+	}
+	place := fact_reach.Place{File: "reader.go", Offset: 10}
+	for _, each := range []struct {
+		name     string
+		hosted   string
+		built    map[types.Object]string
+		local    bool
+		stands   bool
+		failures []string
+	}{
+		{"equal", "printfWrapper", map[types.Object]string{logf: "printfWrapper"}, false, true, nil},
+		{"lost", "printfWrapper", map[types.Object]string{}, false, true,
+			[]string{`example.com/api.Logf () printf: host "printfWrapper", build ""`}},
+		{"invented", "", map[types.Object]string{logf: "printfWrapper"}, false, true,
+			[]string{`example.com/api.Logf () printf: host "", build "printfWrapper"`}},
+		{"no standing user", "printfWrapper", map[types.Object]string{}, false, false, nil},
+		{"local", "", map[types.Object]string{}, true, true,
+			[]string{"example.com/api.Logf () local printf wrapper: host a kind in no fact, build unread"}},
+	} {
+		test.Run(each.name, func(test *testing.T) {
+			test.Parallel()
+
+			hosted := &factReachPackage{users: map[fact_reach.Object][]fact_reach.Place{key: {place}},
+				pushedObjects: []fact_reach.PushedObject{{Object: key, Identity: identity,
+					Pushed: map[string]string{printf.Analyzer.Name: each.hosted}, Local: each.local}}}
+			captured := &check.FactReachPackage{Pushed: map[string]map[types.Object]string{
+				printf.Analyzer.Name: each.built,
+			}}
+			differential := &buildBodyDifferential{standingCompared: map[string]int{}, standingFailed: map[string]int{}}
+			var failures []string
+			differential.compareStandingPushed(hosted, map[fact_reach.Place]bool{place: each.stands}, captured,
+				&packages.Package{PkgPath: "example.com/reader"}, renderer,
+				func(failed fact_reach.Place, name string, kind string, host string, built string) {
+					if failed != place {
+						test.Errorf("the second leg failed at %v, want the standing user %v", failed, place)
+					}
+					failures = append(failures, name+" "+kind+": host "+host+", build "+built)
+				})
+			if !slices.Equal(failures, each.failures) {
+				test.Errorf("the second leg failed %q, want %q", failures, each.failures)
+			}
+		})
+	}
+}
