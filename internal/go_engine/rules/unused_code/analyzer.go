@@ -42,11 +42,18 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	graph := passGraph(pass, packageDirectives, generatedFiles)
-	// The run takes no record, so entry has nothing it could fail at; the error is the splice's.
+	// An extra build splices the host's record of each body that stands there in place of walking it, where the
+	// record is usable, before entry walks the rest.
+	spliced, spliceError := standingSplice(pass, graph)
+	if spliceError != nil {
+		return nil, spliceError
+	}
+	// Entry fails only where a record it took cannot be spliced.
 	if entryError := graph.entry(); entryError != nil {
 		return nil, entryError
 	}
 	verdict := graph.results()
+	verdict.spliced = spliced
 	if graph.recorder != nil {
 		verdict.recorded = recordedBodies(pass, graph)
 	}
