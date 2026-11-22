@@ -27,6 +27,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 )
 
@@ -189,6 +190,12 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 	for _, left := range result.keepLeaving(standing, leaving) {
+		delete(standing, left)
+	}
+	// And each body that still stands whose record U1000 could not take, here for the same reasons: a build will strip
+	// what stands from its type check, so a body U1000 would have to walk leaves before then (unusableRecords).
+	result.RecordRemoved = map[unused_code.RecordUse]int{}
+	for _, left := range result.keepRecordLeaving(standing, unusableRecords(pass, host, standing)) {
 		delete(standing, left)
 	}
 

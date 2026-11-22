@@ -14,7 +14,8 @@ import (
 // the package and the key (#2br8dpa).
 func TestAKeyRefusesToRun(test *testing.T) {
 	test.Parallel()
-	keys := []*analysis.Analyzer{Dependents, FactHost, Failed, Inherited, Recorded, Resolved, Standing, Timed}
+	keys := []*analysis.Analyzer{BodyRecords, Dependents, FactHost, Failed, Inherited, Recorded, Resolved, Standing,
+		Timed}
 	for _, key := range keys {
 		test.Run(key.Name, func(test *testing.T) {
 			test.Parallel()

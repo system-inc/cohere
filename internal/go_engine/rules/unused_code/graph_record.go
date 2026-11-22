@@ -219,11 +219,17 @@ func (graph *graph) indexedPlaceOf(place recordedPlace) (indexedPlace, bool) {
 	return indexedPlace{File: file, Offset: uint32(place.Offset)}, true
 }
 
-// keyOf is the key of declaration's body, as a standing body is keyed: the file a `//line` directive names at its
-// `func`, or else the file's own name, and the offset of that `func` in the file as parsed. It is false for a
-// declaration in no file of the file set, which has no key.
+// keyOf is the key of declaration's body in the graph's file set (bodyKey).
 func (graph *graph) keyOf(declaration *ast.FuncDecl) (recordedPlace, bool) {
-	tokenFile := graph.fileSet.File(declaration.Pos())
+	return bodyKey(graph.fileSet, declaration)
+}
+
+// bodyKey is the key of declaration's body, as a standing body is keyed: the file a `//line` directive names at its
+// `func`, or else the file's own name, and the offset of that `func` in the file as parsed. It is false for a
+// declaration in no file of fileSet, which has no key. A pass keys a body as a graph of its package does, so the
+// judgment of a body's record (JudgeRecords), which has no graph, asks the host by the key the recorder wrote.
+func bodyKey(fileSet *token.FileSet, declaration *ast.FuncDecl) (recordedPlace, bool) {
+	tokenFile := fileSet.File(declaration.Pos())
 	if tokenFile == nil {
 		return recordedPlace{}, false
 	}

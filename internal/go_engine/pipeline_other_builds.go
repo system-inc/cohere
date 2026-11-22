@@ -23,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
 
@@ -831,6 +832,9 @@ func (engine *pipeline) extraBuildRun(
 			Timeline:       engine.buildTimeline(extra, len(run.checkedFromSourceRounds)-1),
 			StandingBodies: standingBodies,
 			StandingAfter:  standingAfter,
+			// U1000 follows standing_facts too, so it splices the host's record of a standing body in place of
+			// walking it (#xeafx79): check takes it and never imports it (#f5g7ym6).
+			StandingFollowers: []*analysis.Analyzer{unused_code.Analyzer},
 		})
 	}
 	// The rules and every reload run within one function whose one deferred return of the weight is the only one, so
