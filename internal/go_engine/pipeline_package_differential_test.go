@@ -14,23 +14,36 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
-// The package differential (#wcwx8vf): every package an extra build skips without judging is one the plain path's
-// judgment of a visited package, TypesHold against the build's types, would hold. A build skips a package two ways,
-// by TypesHold, which is the judgment itself, and by every other way of leaving it unjudged, which skippedOf names,
-// today the walk's untouched (check's untouchedOf). Under the test's hooks (pipeline.skippedAtLoad and judgedSkipped)
-// each load tells of each package it skips, each of those is judged beside the run as a visited one is
-// (check.CacheSession's JudgeSkipped), and the differential fails naming every one the judgment declines. Each load
+// The package differential (#wcwx8vf), the soundness contract's machine check pointed at what a build skips (#9paaen9,
+// #mtrjfyn): every package an extra build restores unchecked is one TypesHold against the build's types would hold.
+// A build restores a package unchecked two ways, which skippedOf names: the walk's untouched (check's untouchedOf),
+// judged by nothing, and a visited package its late decision lets through. Under the test's hooks
+// (pipeline.skippedAtLoad and judgedSkipped) each load tells of each package it restores so, each of those is judged
+// by TypesHold beside the run, apart from the decision (check.CacheSession's JudgeSkipped), and the differential fails
+// naming every one the judgment declines, but one the check declined for its facts or answers, which the build checked
+// from source after all. Each load
 // tells of itself too (pipeline.extraBuildLoads), so a build's loads are the test's own count, never one read from
 // the run's records (#tfvrsf3).
 
-// skippedOf is the seam: the packages run, an extra build's, skipped over its last load without judging them by
-// TypesHold, by ID, as the run records them, each of which some load must have told the hook of. A later stage that
+// skippedOf is the seam: the packages run, an extra build's, restored unchecked over its last load, untouched or let
+// through, by ID, as the run records them, each of which some load must have told the hook of. A later stage that
 // skips a package another way adds its own skip here, and tells the hook of it.
 func skippedOf(run buildRun) []string {
 	if run.result == nil {
 		return nil
 	}
-	return run.result.FromHost.Untouched
+	return slices.Concat(run.result.FromHost.Untouched, run.result.FromHost.Restored)
+}
+
+// declinedAtCheck reports whether run, an extra build's, declined the package of identifier at check, for its facts or
+// answers, so it checked it from source after all: such a package was let through at its load and asked at check, not
+// restored unchecked.
+func declinedAtCheck(run buildRun, identifier string) bool {
+	if run.result == nil {
+		return false
+	}
+	why := run.result.FromHost.Declined[identifier]
+	return strings.HasPrefix(why, "F ") || strings.HasPrefix(why, "A ") || strings.HasPrefix(why, "D ")
 }
 
 // skippedJudgment is one package an extra build skipped, as the plain path judged it under the test's hook
@@ -148,6 +161,10 @@ func judgeSkips(
 		tally.loads++
 		tallies[build] = tally
 	}
+	runs := map[string]buildRun{}
+	for _, run := range engine.buildRuns[1:] {
+		runs[run.build.String()] = run
+	}
 	skips, judgments := map[skippedPackage]int{}, map[skippedPackage]int{}
 	for _, skip := range skipped {
 		tally := tallies[skip.build]
@@ -162,7 +179,10 @@ func judgeSkips(
 			tally.byTypes++
 		}
 		judgments[skippedPackage{build: judgment.build, identifier: judgment.identifier}]++
-		if judgment.why != "" {
+		if judgment.why != "" && declinedAtCheck(runs[judgment.build], judgment.identifier) {
+			test.Logf("%s: TypesHold declines %s, which the check declined and the build checked from source: %s",
+				judgment.build, judgment.identifier, judgment.why)
+		} else if judgment.why != "" {
 			tally.declined++
 			test.Errorf("%s: skipped %s, which %s declines: %s", judgment.build, judgment.identifier,
 				judgment.judgment, judgment.why)
@@ -250,8 +270,8 @@ func logTallies(test *testing.T, label string, engine *pipeline, tallies map[str
 // extra builds loads, and, for a fixture whose builds skip nothing, why that is right, empty for one that must skip
 // and judge some package (the floor). A build loads once, and once more for each round of packages its check declines:
 // walk-reload's, walk-rejudge's and restore-from-host's decline one round, and walk-redecline's two, the second of
-// which turns its restore off, so its third load skips nothing. Of the builds that load again only walk-reload's
-// skips a package in a later load.
+// which turns its restore off, so its third load skips nothing. Every fixture's builds restore some package unchecked,
+// untouched or let through by its decision (#mtrjfyn), so every fixture must judge one.
 var packageDifferentialFixtures = []struct {
 	fixture      string
 	wantExit     int
@@ -261,10 +281,8 @@ var packageDifferentialFixtures = []struct {
 	{fixture: "walk-square", wantExit: exitFindings, wantLoads: 1},
 	{fixture: "walk-reload", wantExit: exitFindings, wantLoads: 2},
 	{fixture: "walk-rejudge", wantExit: exitFindings, wantLoads: 2},
-	{fixture: "walk-redecline", wantExit: exitFindings, wantLoads: 3,
-		skipsNothing: "windows visits every package it could restore, each reading platform or one visited for it"},
-	{fixture: "restore-from-host", wantExit: exitFindings, wantLoads: 2,
-		skipsNothing: "windows visits every package it could restore, each reading platform or one visited for it"},
+	{fixture: "walk-redecline", wantExit: exitFindings, wantLoads: 3},
+	{fixture: "restore-from-host", wantExit: exitFindings, wantLoads: 2},
 	{fixture: "restore-instance", wantExit: exitFindings, wantLoads: 1},
 	{fixture: "restore-bodiless", wantExit: exitClean, wantLoads: 1},
 	{fixture: "other-builds", wantExit: exitFindings, wantLoads: 1},
@@ -272,7 +290,7 @@ var packageDifferentialFixtures = []struct {
 }
 
 // Over every fixture of the walk and of block 1 with extra builds, under `--no-cache`, which checks every build, each
-// package an extra build skips without judging is judged as a visited one is, and the differential fails naming each
+// package an extra build restores unchecked is judged by TypesHold, and the differential fails naming each
 // the judgment declines, by build, package, judgment and why. Each package a build's last load skipped must have been
 // judged, and some build of the fixture must have judged one by TypesHold, the floor, so a fixture whose builds stop
 // skipping fails rather than pass judging nothing, unless it says why it skips nothing. Each extra build loads as many
@@ -352,5 +370,42 @@ func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
 	if judgedByTypes == 0 {
 		test.Errorf("no build of %s skipped a package TypesHold judged, so the differential proves nothing of it",
 			root)
+	}
+}
+
+// The package differential reports a package a build's decision restored though TypesHold declines it (#mtrjfyn). On
+// main no decision lets such a package through, so the miss is planted: under the differential's hook, walk-square's
+// windows build lets u through at its load whatever its reads say (pipeline.forcedThrough), and the differential
+// reports exactly one decline, u's, by TypesHold, for s2's Outer, whose Inner holds a lock on windows alone. A run
+// with the option and no hook forces nothing: its stream is the plain run's.
+func TestTheDifferentialReportsAPackageTheDecisionLetThroughWrongly(test *testing.T) {
+	test.Parallel()
+
+	fixture := filepath.Join("testdata", "walk-square")
+	recorder := &skippedRecorder{}
+	runOverConfigured(test, copyFixture(test, fixture), exitFindings, func(engine *pipeline) {
+		recorder.hook(engine)
+		engine.forcedThrough = walkU
+	}, "--no-cache")
+	var declined []skippedJudgment
+	for _, judgment := range recorder.judgments() {
+		if judgment.why != "" {
+			declined = append(declined, judgment)
+		}
+	}
+	if len(declined) != 1 || !strings.HasPrefix(declined[0].build, "windows/") || declined[0].identifier != walkU ||
+		declined[0].judgment != check.SkippedByTypes ||
+		!strings.HasPrefix(declined[0].why, "T object "+walkS2+".Outer") {
+		test.Errorf("the differential reported the declines %+v, want one, windows's of u by TypesHold, for s2's "+
+			"Outer", declined)
+	}
+
+	forcedRoot := copyFixture(test, fixture)
+	_, forced := runOverConfigured(test, forcedRoot, exitFindings,
+		func(engine *pipeline) { engine.forcedThrough = walkU }, "--no-cache")
+	_, plain := runOver(test, copyFixture(test, fixture), exitFindings)
+	if normalize(forced, forcedRoot) != plain {
+		test.Errorf("the option without the hook changed the run's stream:\nwith it\n%s\nwithout it\n%s",
+			normalize(forced, forcedRoot), plain)
 	}
 }
