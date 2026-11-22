@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"encoding/json"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -392,5 +393,35 @@ func TestARejudgedImporterOfAChangedAnswerDeclines(test *testing.T) {
 			test.Errorf("want the comparison in %s found by the host alone, got the host %t and windows %t", file,
 				foundIn(host, file), foundIn(windows, file))
 		}
+	}
+}
+
+// A load the restore from the host is off for reports its own counts, and none of the load before it (#78tynz4):
+// windows declines opener at its check, then user in the reload, which turns the restore off, so its third load
+// restores nothing from the host. That load visits, leaves untouched, restores and declines at its load nothing, and
+// what is declined is check's alone, opener and user by their answers, kept over every load. A load that returned
+// before clearing the last load's counts would report the second load's visits, and its load declines, as its own.
+func TestAThirdLoadReportsItsOwnHostRestoreCounts(test *testing.T) {
+	test.Parallel()
+
+	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-redecline")), exitFindings)
+	windows := buildRunOf(test, engine, "windows")
+	fromHost := windows.result.FromHost
+	if fromHost.ReloadRounds != 2 || windows.result.Cache.ReloadRoundsBy["hostDecline"] != 2 {
+		test.Fatalf("windows' check declines asked %d loads and the build loaded again %v, want two of each, or the "+
+			"third load never ran with the restore off and the case proves nothing", fromHost.ReloadRounds,
+			windows.result.Cache.ReloadRoundsBy)
+	}
+	if fromHost.Visited != 0 || len(fromHost.Untouched) != 0 || len(fromHost.Restored) != 0 ||
+		fromHost.DeclinedAtLoad != 0 {
+		test.Errorf("windows' third load visited %d, left %q untouched, restored %q and declined %d at its load, "+
+			"want nothing, the restore off", fromHost.Visited, fromHost.Untouched, fromHost.Restored,
+			fromHost.DeclinedAtLoad)
+	}
+	declined := slices.Sorted(maps.Keys(fromHost.Declined))
+	if want := []string{redeclineOpener, redeclineUser}; fromHost.DeclinedAtCheck != 2 ||
+		!slices.Equal(declined, want) || !maps.Equal(fromHost.DeclinedBy, map[string]int{"answers": 2}) {
+		test.Errorf("windows declined %d at check, %q in all, %v by reason, want %q by their answers alone",
+			fromHost.DeclinedAtCheck, declined, fromHost.DeclinedBy, want)
 	}
 }

@@ -237,9 +237,12 @@ func (session *CacheSession) restoreFromHost(
 	keyed *cache.Keyed,
 ) {
 	state := session.host
-	if state == nil || state.off || session.known == nil {
+	if state == nil {
 		return
 	}
+	// Cleared before a load that restores nothing returns (#78tynz4): what the session counts is this load's, so a
+	// third load with the restore off reports none of the second's visits or load declines as its own, and holds none
+	// of its packages or types through it.
 	state.restoring = map[*packages.Package]*hostRestore{}
 	state.untouched = map[*packages.Package]*hostRestore{}
 	state.visited = 0
@@ -247,6 +250,9 @@ func (session *CacheSession) restoreFromHost(
 	state.renderings = NewReadsBuild()
 	state.loadDeclines = map[string]int{}
 	state.loadReasons = map[string]string{}
+	if state.off || session.known == nil {
+		return
+	}
 	if why := hostSizesDiffer(state.host, sizes); why != "" {
 		// Every package the host kept and the build's own store does not hold would have been a candidate, so each is
 		// counted, as one with no entry is.
