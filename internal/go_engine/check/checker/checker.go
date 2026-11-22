@@ -464,9 +464,10 @@ type Options struct {
 
 	// cohere: FactHosts, when set, answers the host's side of the package
 	// whose ID is packageId for the facts' reach in an extra build, nil
-	// for a package with none. It is called for every action as the
-	// action starts, on the action's goroutine, so it must be safe to
-	// call from several at once. FactHost, when FactHosts is set too,
+	// for a package with none. It is called for every action that runs a
+	// pass, as the action starts, on the action's goroutine, so it must be
+	// safe to call from several at once; an action on a restored package
+	// runs none, so it never asks. FactHost, when FactHosts is set too,
 	// keys what it answers in the ResultOf of every pass on that package,
 	// a key never run, as Dependents is. Unset, ResultOf holds no host's
 	// side.
@@ -621,6 +622,12 @@ type Graph struct {
 	// factAnalyzersRequired, kept so a test reads that each analyzer's was
 	// computed once.
 	requiredFacts *factRequirements
+
+	// cohere: actions is how many actions Analyze made for this graph,
+	// every one All can reach and the roots beside too, so All's walk
+	// sizes its set of those seen once. A graph made elsewhere holds 0,
+	// a set grown from empty as upstream's is.
+	actions int
 }
 
 // All returns an iterator over the action graph in depth-first postorder.
@@ -632,7 +639,8 @@ type Graph struct {
 //	}
 func (g *Graph) All() iter.Seq[*Action] {
 	return func(yield func(*Action) bool) {
-		forEach(g.Roots, func(act *Action) error {
+		// cohere: sized by the graph's count of actions (see forEach).
+		forEach(g.Roots, g.actions, func(act *Action) error {
 			if !yield(act) {
 				return io.EOF // any error will do
 			}
@@ -829,13 +837,29 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	// cohere: each analyzer's required fact analyzers, computed once for the
 	// whole graph rather than once for each action that asks (factRequirements).
 	requiredFacts := &factRequirements{of: map[*analysis.Analyzer][]*analysis.Analyzer{}}
+	// cohere: actions are made actionsPerBlock at a time, one allocation for
+	// a block rather than one for each action, a graph holding thousands. A
+	// block lives while any action in it does, which costs nothing: actions
+	// holds every action until Analyze returns, and the graph every one it
+	// keeps after, through Roots, Beside and Deps, so none is collected
+	// before its block-mates. releaseInputs and releaseSyntax free what an
+	// action holds, never the action. The only actions that went sooner are
+	// those ForDependents drops, never run, which hold their Deps alone.
+	// Only mkAction takes from the block, on Analyze's own goroutine.
+	const actionsPerBlock = 32
+	var actionBlock []Action
 
 	var mkAction func(a *analysis.Analyzer, pkg *packages.Package) *Action
 	mkAction = func(a *analysis.Analyzer, pkg *packages.Package) *Action {
 		k := key{a, pkg}
 		act, ok := actions[k]
 		if !ok {
-			act = &Action{Analyzer: a, Package: pkg, opts: opts}
+			// cohere: the block's next action, a new block once it is spent.
+			if len(actionBlock) == 0 {
+				actionBlock = make([]Action, actionsPerBlock)
+			}
+			act, actionBlock = &actionBlock[0], actionBlock[1:]
+			act.Analyzer, act.Package, act.opts = a, pkg, opts
 
 			// Add a dependency on each required analyzers.
 			// cohere: unless the package is restored, since then nothing on it runs.
@@ -905,8 +929,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 		keepForDependents(all, opts.ForDependents)
 		reached := make(map[*Action]bool, len(actions))
-		// cohere: from every root, beside ones too.
-		forEach(allRoots, func(act *Action) error {
+		// cohere: from every root, beside ones too, sized by every action
+		// made, the most the walk can reach.
+		forEach(allRoots, len(actions), func(act *Action) error {
 			reached[act] = true
 			return nil
 		})
@@ -967,8 +992,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	}
 	readers := make(map[*packages.Package]*syntaxReaders)
 	var groups []*syntaxReaders
-	// cohere: from every root, beside ones too, so each is scheduled.
-	forEach(allRoots, func(act *Action) error {
+	// cohere: from every root, beside ones too, so each is scheduled, sized
+	// by every action kept, each of which the walk reaches.
+	forEach(allRoots, len(actions), func(act *Action) error {
 		shared, ok := readers[act.Package]
 		if !ok {
 			shared = &syntaxReaders{given: given[act.Package]}
@@ -1001,9 +1027,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 	}
 
-	// cohere: the graph keeps requiredFacts for a test to read, and the
-	// roots beside apart from Roots.
-	return &Graph{Roots: roots, Beside: beside, requiredFacts: requiredFacts}, nil
+	// cohere: the graph keeps requiredFacts for a test to read, the
+	// roots beside apart from Roots, and its count of actions for All.
+	return &Graph{Roots: roots, Beside: beside, requiredFacts: requiredFacts, actions: len(actions)}, nil
 }
 
 func init() {
@@ -1085,7 +1111,14 @@ func (act *Action) execOnce() {
 
 	// Plumb the output values of the dependencies
 	// into the inputs of this action.  Also facts.
-	inputs := make(map[*analysis.Analyzer]any)
+	// cohere: an action on a restored package runs no pass, so it makes no
+	// inputs, which only a pass reads, nil here and never written; it still
+	// inherits its prerequisites' facts below (see Options.Restored).
+	restored := act.opts.Restored != nil && act.opts.Restored(act.Package)
+	var inputs map[*analysis.Analyzer]any
+	if !restored {
+		inputs = make(map[*analysis.Analyzer]any)
+	}
 	act.objectFacts = make(map[objectFactKey]analysis.Fact)
 	act.packageFacts = make(map[packageFactKey]analysis.Fact)
 	for _, dep := range act.Deps {
@@ -1096,7 +1129,8 @@ func (act *Action) execOnce() {
 			// cohere: one that failed, which only a tolerant action reaches, is
 			// absent, its error under Options.Failed instead, and so is the
 			// edge Options.StandingAfter added, which the analyzer never asked for.
-			if dep.Err != nil || dep == act.standingEdge {
+			// A restored action holds no inputs, so every one is absent there.
+			if restored || dep.Err != nil || dep == act.standingEdge {
 				continue
 			}
 			inputs[dep.Analyzer] = dep.Result
@@ -1106,6 +1140,14 @@ func (act *Action) execOnce() {
 			// become available to this analysis pass.
 			inheritFacts(act, dep)
 		}
+	}
+	// cohere: a restored package's own facts come from the cache, in
+	// place of a pass, on top of those it inherited (see Options.Restored).
+	// It returns before the keys below, every one of them an input of the
+	// pass it never makes.
+	if restored {
+		act.Err = act.opts.Restore(act)
+		return
 	}
 	// cohere: Options.Dependents, the set Analyze gathered for this action.
 	// An action nothing on its package requires holds a nil map, an empty
@@ -1144,13 +1186,6 @@ func (act *Action) execOnce() {
 		if host := act.opts.FactHosts(act.Package.ID); host != nil {
 			inputs[act.opts.FactHost] = host
 		}
-	}
-
-	// cohere: a restored package's own facts come from the cache, in
-	// place of a pass, on top of those it inherited (see Options.Restored).
-	if act.opts.Restored != nil && act.opts.Restored(act.Package) {
-		act.Err = act.opts.Restore(act)
-		return
 	}
 
 	// Quick (nonexhaustive) check that the correct go/packages mode bits were used.
@@ -2016,8 +2051,12 @@ func (act *Action) AllPackageFacts() []analysis.PackageFact {
 // applies function f to each action in the graph reachable from
 // roots, in depth-first postorder. If any call to f returns an error,
 // the traversal is aborted and ForEach returns the error.
-func forEach(roots []*Action, f func(*Action) error) error {
-	seen := make(map[*Action]bool)
+//
+// cohere: actions is how many actions the walk can reach at most, which
+// sizes seen once, where a set grown from empty allocates its table again
+// at each doubling; 0 grows it as upstream's does.
+func forEach(roots []*Action, actions int, f func(*Action) error) error {
+	seen := make(map[*Action]bool, actions)
 	var visitAll func(actions []*Action) error
 	visitAll = func(actions []*Action) error {
 		for _, act := range actions {

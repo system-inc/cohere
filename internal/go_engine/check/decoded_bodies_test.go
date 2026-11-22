@@ -310,7 +310,7 @@ func TestTheHostsAnalysisWritesNothingOfASharedDecode(test *testing.T) {
 		func(session *CacheSession) {
 			for hit, restored := range session.hits {
 				decoded, decodeError := decodedStoredEntry(test, session.storeFor(hit), session.known, hit,
-					session.stored[hit])
+					session.stored[hit], false)
 				if decodeError != nil || !bytes.Equal(decoded.bodyDigest, restored.bodyDigest) {
 					test.Fatalf("%s: decoded afresh to body %x (%v), the hit's %x", hit.ID, decoded.bodyDigest,
 						decodeError, restored.bodyDigest)

@@ -215,7 +215,8 @@ func TestTheRunCapturesTheFactsReachUnderItsSwitch(test *testing.T) {
 	if off.FactReach != nil {
 		test.Errorf("without the switch the run captured %+v, want nothing", off.FactReach)
 	}
-	on, onError := Run(analyzed, reachRules, Options{FactReach: true})
+	on, onError := Run(analyzed, reachRules,
+		Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if onError != nil {
 		test.Fatalf("running with the switch: %v", onError)
 	}
@@ -354,7 +355,8 @@ func captureAlone(test *testing.T, beside ...rule.Rule) (*FactReachCapture, *Fac
 	if len(asking) != 1 {
 		test.Fatalf("the registry holds %d rules named SA4017, want 1", len(asking))
 	}
-	on, runError := Run(loaded.Packages, append(asking, beside...), Options{FactReach: true})
+	on, runError := Run(loaded.Packages, append(asking, beside...),
+		Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if runError != nil {
 		test.Fatalf("running with the switch: %v", runError)
 	}
@@ -428,7 +430,7 @@ func TestARestoredPackageHasNoCapture(test *testing.T) {
 		want int
 	}{{name: "cold", want: 3}, {name: "warm", want: 0}} {
 		result, runError := Run(analyzed, reachRules, Options{Cache: NewCacheSession(caching, reachRules),
-			FactReach: true})
+			FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 		if runError != nil {
 			test.Fatalf("running %s: %v", run.name, runError)
 		}
@@ -469,15 +471,7 @@ func TestAnUnsurePackageHasNoCapture(test *testing.T) {
 	options.Resolver = resolver
 	options.Restored = func(restoring *packages.Package) bool { return restoring == low }
 	options.Restore = func(*checker.Action) error { return nil }
-	// Wrapped first, as Run wraps every analyzer before it analyzes: wrapRuns sets an analyzer's Run in place, under
-	// its mutex, the first time any run meets it, and this package's tests share reachNilnessAnalyzer and everything
-	// it requires. Analyze reads each of those Runs with no lock, so a bare call beside another test's first wrap is
-	// a race (#msx89hq). Once wrapped here, none of them is written again.
-	asking := []*analysis.Analyzer{reachNilnessAnalyzer}
-	if wrapError := wrapRuns(asking); wrapError != nil {
-		test.Fatal(wrapError)
-	}
-	if _, analyzeError := checker.Analyze(asking, []*packages.Package{low, high},
+	if _, analyzeError := analyzeWrapped([]*analysis.Analyzer{reachNilnessAnalyzer}, []*packages.Package{low, high},
 		options); analyzeError != nil {
 		test.Fatalf("analyzing the unsure workspace: %v", analyzeError)
 	}
@@ -521,7 +515,7 @@ func TestTheCaptureHoldsNoPushedFactOfAFailedAction(test *testing.T) {
 	analyzed := loadReach(test)
 	failing := pushingAnalyzer("pushing_failed", true)
 	result, runError := Run(analyzed, []rule.Rule{houseRule(reachNilnessAnalyzer), houseRule(deprecated.Analyzer),
-		houseRule(failing)}, Options{FactReach: true})
+		houseRule(failing)}, Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if runError != nil {
 		test.Fatalf("running with the capture: %v", runError)
 	}
@@ -562,7 +556,8 @@ func TestTheRunReadsTheBodiesOfTheGivenPackagesAlone(test *testing.T) {
 	if len(given) != 1 {
 		test.Fatalf("the workspace loaded %d packages of user, want one", len(given))
 	}
-	result, runError := Run(given, reachRules, Options{FactReach: true})
+	result, runError := Run(given, reachRules,
+		Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if runError != nil || result.FactReach == nil {
 		test.Fatalf("running with the switch: %v", runError)
 	}
@@ -580,13 +575,8 @@ func TestAPackageWhoseBodiesWereNeverReadIsCapturedUnread(test *testing.T) {
 	options := DispatchOptions()
 	resolver := fact_resolver.New(nil)
 	options.Resolver = resolver
-	// Wrapped first, as TestAnUnsurePackageHasNoCapture is and for its reason: the package's parallel runs wrap
-	// reachNilnessAnalyzer and what it requires in place, and Analyze reads their Runs with no lock (#9jkrq6h).
-	asking := []*analysis.Analyzer{reachNilnessAnalyzer}
-	if wrapError := wrapRuns(asking); wrapError != nil {
-		test.Fatal(wrapError)
-	}
-	if _, analyzeError := checker.Analyze(asking, analyzed, options); analyzeError != nil {
+	if _, analyzeError := analyzeWrapped([]*analysis.Analyzer{reachNilnessAnalyzer}, analyzed,
+		options); analyzeError != nil {
 		test.Fatalf("analyzing the reach workspace: %v", analyzeError)
 	}
 	byPath := map[string]*packages.Package{}
@@ -597,7 +587,7 @@ func TestAPackageWhoseBodiesWereNeverReadIsCapturedUnread(test *testing.T) {
 	if reach == nil || floored == nil {
 		test.Fatalf("the load holds %v, want reach and floored", byPath)
 	}
-	presence := &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{reach.ID: {}},
+	presence := &factReachPresence{read: map[string]map[fact_reach.Place]fact_reach.BodyRecord{reach.ID: {}},
 		markers: map[string][]string{}}
 	capture := captureFactReach(resolver, analyzed, nil, presence)
 	read, unread := capture.Packages[reach.ID], capture.Packages[floored.ID]

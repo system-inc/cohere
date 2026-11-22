@@ -166,6 +166,23 @@ and laying a corpus anew removes the copy before it. To move a pin, change its
 constant and say why: the next landing on each box lays it. A corpus the corpora file doesn't name is said on
 the land line, and its tests run nowhere.
 
+Every landing measures itself, and nothing lands unmeasured (`land_performance.go`, #6wnsnq2). Once the gate passes,
+land pushes the gated commit to Loom's feed and, in Shackler's gap, under `~/scratch/system_cohere_tools/performance`,
+lays the root at that commit and deeafbf4 once, checks the pinned Go toolchain, and builds cohere as a release's Go
+build, `CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'`, on a Go cache she keeps. Over an empty system store for
+that binary it runs the Go engine with a clean environment under `/usr/bin/time -l`: the cold row at the root, 2 fills
+and 3 rounds, deeafbf4's, 2 and 2, a warm run after one that fills the project store, and one `--timeline` run. It
+writes `Performance.jsonc` at the root of the tree that lands: medians and ranges in milliseconds, her cpu, cores and
+load before and after, that she was held quiet, the build, the timeline's wall areas, and a note against main's file
+before it. A row reads "slower by" or "faster by" so much only when its range clears the old one, otherwise "level",
+and another machine or build is a line of its own, never compared. The file is awareness, never a gate on speed: a
+landing that makes cohere slower lands with its note saying so (Kirk, Nov 21). `cohere-dev measure [<commit>]` runs
+the measurement alone, landing nothing. The file is land's alone: never write or edit it, and nothing that
+builds or tests may read it, which `internal/guard` holds, since it is written after the gate. While another holds
+Shackler, land waits holding the lock, saying whose claim and since when, and after `COHERE_DEV_PERFORMANCE_WAIT`
+(2h unless it says) refuses, naming the holder; a measurement that fails refuses the landing in her words. A tree
+with no `command/cohere` has nothing to measure and lands saying so. Each phase's seconds are on the land line.
+
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
 body. The area is a folder in the tree, by its name or its path (`go_engine`, `release/dispatch`), or a
 top-level file's name lowercased (`contributing`). Land refuses a landing whose commits break that, naming

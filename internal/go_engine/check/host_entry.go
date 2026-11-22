@@ -64,7 +64,7 @@ func decodeOnce(kept *hostEntry, identifier string, known *cacheAnalyzers) func(
 		if readError != nil {
 			return nil, readError
 		}
-		return decodeEntry(known, named, body, record, readExportData)
+		return decodeEntry(known, named, body, record, readExportData, false)
 	})
 }
 

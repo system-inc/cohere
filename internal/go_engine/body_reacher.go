@@ -12,6 +12,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
 // bodyReacher judges one build's bodies on one goroutine, the build's own: dependence is the build's judgment, whose
@@ -52,8 +53,9 @@ type bodyReacher struct {
 // and counts those in files it does not, absent. Whether the build compiles a body's file is read by the file as
 // parsed, never as a //line directive renames it, which names no file the build lists (#w72zxtq, the review's must 8);
 // the renamed file is the one the census reports and the graph's units are placed in. A package whose imports differ
-// is then reached whole (differingImports), and the package's variable initializers are judged as one body, by every
-// body of the package and every name one side alone declares (reachInitializers).
+// is then reached whole (differingImports), and so is a package one side of which alone declares at package level a
+// name a rule asks its scope about (scopeAskedName), and the package's variable initializers are judged as one body,
+// by every body of the package and every name one side alone declares (reachInitializers).
 func (reacher *bodyReacher) reachPackage(
 	hosted *packages.Package,
 	record *build_reads.FunctionUses,
@@ -64,18 +66,19 @@ func (reacher *bodyReacher) reachPackage(
 	// initializers are the indexes in bodies of the package's variable initializers, and unshared what one side alone
 	// holds of the package, which reaches every one of them whatever any uses (reachInitializers), the first of: a body
 	// in a host's file the build does not compile, then one in a build-only file, an initializer counted as a body in
-	// either, then a name either declares.
+	// either, then a name either declares. hostOnlyNames are the host's side of the names one side alone declares, as
+	// read.buildOnlyNames is the build's: every name a host's file the build does not compile declares at package
+	// level, with a body or without (addPackageLevelNames).
 	var initializers []int
 	unshared := ""
-	hostOnlyName := false
+	hostOnlyNames := map[string]bool{}
 	for declared := range record.Declarations() {
 		if !declared.HasBody {
 			// A type, a value with no initializer or a function declared without a body, in a file the build does
-			// not compile, is the host's side of a name one side alone declares, as buildOnlyNames is the build's. A
-			// record that places it in no file of the host's is a doubt, and taken as one.
-			if !hostOnlyName {
-				tokenFile := hosted.Fset.File(declared.Declaration.File)
-				hostOnlyName = tokenFile == nil || !read.files[tokenFile.Name()]
+			// not compile. A record that places it in no file of the host's is a doubt, and taken as one.
+			if tokenFile := hosted.Fset.File(declared.Declaration.File); tokenFile == nil ||
+				!read.files[tokenFile.Name()] {
+				addPackageLevelNames(hostOnlyNames, declared.Declaration)
 			}
 			continue
 		}
@@ -95,6 +98,7 @@ func (reacher *bodyReacher) reachPackage(
 		if !read.files[tokenFile.Name()] {
 			// An absent initializer is no body of the build's, only a cause, as any absent body is, that reaches every
 			// one it shares.
+			addPackageLevelNames(hostOnlyNames, declared.Declaration)
 			absent++
 			continue
 		}
@@ -155,6 +159,15 @@ func (reacher *bodyReacher) reachPackage(
 			bodies[index].constantsOnlyReason = cmp.Or(bodies[index].constantsOnlyReason, reachedImports)
 		}
 	}
+	if asked := scopeAskedName(read.buildOnlyNames, hostOnlyNames); asked != "" {
+		driver := "the package's scope, by " + asked
+		for index := range bodies {
+			if bodies[index].reason == "" {
+				bodies[index].reason, bodies[index].driver = reachedScopeName, driver
+			}
+			bodies[index].constantsOnlyReason = cmp.Or(bodies[index].constantsOnlyReason, reachedScopeName)
+		}
+	}
 	switch {
 	case absent > 0:
 		unshared = "a body of the package in a file the build does not compile"
@@ -162,11 +175,59 @@ func (reacher *bodyReacher) reachPackage(
 		unshared = "a body of the package in a file the build alone compiles"
 	case len(read.buildOnlyNames) > 0:
 		unshared = "a name declared by a file the build alone compiles"
-	case hostOnlyName:
+	case len(hostOnlyNames) > 0:
 		unshared = "a name declared by a file the build does not compile"
 	}
 	reachInitializers(bodies, initializers, unshared)
 	return bodies, absent
+}
+
+// scopeAskedName is the first name, the build's side's before the host's and each side's by name, that one side alone
+// declares at package level, buildOnly the build's and hostOnly the host's, and that a rule asks its package's scope
+// about before it writes code or judges a body by it (#b255cfy): every universe name, as S1018 offers copy() only
+// while copy is the builtin, and every name or prefix's match a rule declares it asks (rules.ScopeNameAsker), as
+// stringintconv imports fmt under that name, or under fmt0 and on where it is taken. It is written with what asks it
+// and the side that declares it, empty for none. Such a name changes the answer for every body of the package, one
+// that never names it among them, since the rule asks the scope at the body's place, so the package is reached whole.
+func scopeAskedName(buildOnly map[string]bool, hostOnly map[string]bool) string {
+	for _, side := range []struct {
+		names    map[string]bool
+		declared string
+	}{
+		{buildOnly, "declared by a file the build alone compiles"},
+		{hostOnly, "declared by a file the build does not compile"},
+	} {
+		for _, name := range slices.Sorted(maps.Keys(side.names)) {
+			if types.Universe.Lookup(name) != nil {
+				return name + ", a universe name, " + side.declared
+			}
+			if asker, isAsked := rules.ScopeNameAsker(name); isAsked {
+				return name + ", which " + asker + " asks of the scope, " + side.declared
+			}
+		}
+	}
+	return ""
+}
+
+// addPackageLevelNames adds to names what declaration declares at package level, as build_dependence.PackageLevelNames
+// reads a build-only file's: a function's without a receiver, a type's, and each of a value spec's, init and blank
+// ones among them. A method, or a declaration of no object, declares none, and is added by its census name
+// (declarationName), which no scope holds, so names is empty exactly where no declaration was added: the host's side of
+// unshared reads that, as it read whether any declaration without a body was there before the names were kept.
+//
+// Mutates: names gains declaration's names
+func addPackageLevelNames(names map[string]bool, declaration build_reads.Declaration) {
+	added := false
+	for _, object := range declaration.Objects {
+		if function, isFunction := object.(*types.Func); isFunction && function.Signature().Recv() != nil {
+			continue
+		}
+		names[object.Name()] = true
+		added = true
+	}
+	if !added {
+		names[declarationName(declaration)] = true
+	}
 }
 
 // differingImports are the imports of a package that differ between the builds, sorted by path, hosted the host's

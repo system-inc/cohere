@@ -186,7 +186,7 @@ func throughEntry(test *testing.T, session *CacheSession, path string) (restored
 	test.Helper()
 	keyed := throughPackage(test, session, path)
 	key := session.keys[keyed]
-	restored, decodeError := decodedStoredEntry(test, session.caching.Store, session.known, keyed, key)
+	restored, decodeError := decodedStoredEntry(test, session.caching.Store, session.known, keyed, key, true)
 	if decodeError != nil {
 		test.Fatalf("decoding the entry of %s: %v", path, decodeError)
 	}

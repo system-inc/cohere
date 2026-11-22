@@ -191,6 +191,15 @@ func loomCommand(worktree string, arguments ...string) (*exec.Cmd, error) {
 	return command, nil
 }
 
+// loomCombined runs ahra with arguments, as loomCommand makes it, and returns everything it printed.
+func loomCombined(worktree string, arguments ...string) ([]byte, error) {
+	command, loomError := loomCommand(worktree, arguments...)
+	if loomError != nil {
+		return nil, loomError
+	}
+	return command.CombinedOutput()
+}
+
 // runLandGateJob asks Loom for a land-gate job testing commit for task, waits for its end and reads its whole log. It
 // returns the log, the job's own exit code and its id, or why the job gave no verdict, which refuses the landing.
 func runLandGateJob(
