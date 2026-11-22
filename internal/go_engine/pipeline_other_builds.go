@@ -603,6 +603,9 @@ func (engine *pipeline) extraBuildRun(
 				}, func(identifier string, judgment check.SkippedJudgment, why string) {
 					engine.judgedSkipped(extra, identifier, judgment, why)
 				})
+				if engine.forcedThrough != "" {
+					session.ForceThrough(engine.forcedThrough)
+				}
 			}
 			// Only a build restoring from the host's run inherits from it: the same run read the same bytes for both.
 			if !engine.keepsInheritanceOff {
@@ -816,7 +819,9 @@ func (engine *pipeline) extraBuildRun(
 			// The standing bodies each pass's side leaves are settled, for the census to count, and under the body
 			// differential the build's own facts are captured, for its second leg to compare those left standing by.
 			FactReachSettle: settle,
-			FactReach:       engine.bodyDifferential && factHosts != nil,
+			// And no presence reader (FactReachPresence): the second leg, the capture's one reader, compares facts
+			// alone (compareStanding), so only the host's run reads its bodies' presence, for the sides it hands out.
+			FactReach: engine.bodyDifferential && factHosts != nil,
 			// Under `--timeline` the check stamps in the round of the load it runs over, the last one counted.
 			Timeline:       engine.buildTimeline(extra, len(run.checkedFromSourceRounds)-1),
 			StandingBodies: standingBodies,

@@ -10,7 +10,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
-	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
@@ -39,7 +38,7 @@ type factReachInputs struct {
 	noReturn     func(function *types.Func) bool
 	pushed       map[string]map[types.Object]string
 	orderBound   []types.Object
-	presence     map[fact_reach.Place]standing_presence.BodyRecord
+	presence     map[fact_reach.Place]fact_reach.BodyRecord
 	presenceRead bool
 	markers      []string
 	identifier   string

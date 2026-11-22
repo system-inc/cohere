@@ -130,6 +130,12 @@ func TestTheInputsTableRefusesAMalformedLine(test *testing.T) {
 		{"a third field that is not FullKind", "cohere-go/S1000 PerUnit Full\n", "optionally FullKind"},
 		{"a name alone", "cohere-go/S1000\n", "optionally FullKind"},
 		{"a rule twice", "cohere-go/S1000 PerUnit\ncohere-go/S1000 Composes\n", "has a line already"},
+		{"a scope entry that is no name", "cohere-go/S1018 PerUnit Scope=copy,not-a-name\n", "is no name"},
+		{"a whole package's scope for a rule that is not Composes", "cohere-go/S1018 PerUnit Scope=(package)\n",
+			"a Composes rule's scope"},
+		{"a scope entry twice", "cohere-go/S1018 PerUnit Scope=copy,copy\n", "names copy twice"},
+		{"an empty scope", "cohere-go/S1018 PerUnit Scope=\n", "Scope= and its entries"},
+		{"a field after the scope", "cohere-go/S1018 PerUnit Scope=copy FullKind\n", "optionally FullKind"},
 	} {
 		_, parseError := ParseInputs("# a comment\n\n" + malformed.text)
 		if parseError == nil || !strings.Contains(parseError.Error(), malformed.saying) {
@@ -140,5 +146,33 @@ func TestTheInputsTableRefusesAMalformedLine(test *testing.T) {
 	if parseError != nil || declared["cohere-go/U1000"] != (Declared{Inputs: InputsComposes, FullKind: true}) ||
 		declared["cohere-go/S1000"] != (Declared{Inputs: InputsPerUnit}) {
 		test.Errorf("a well-formed table parsed as %v (%v)", declared, parseError)
+	}
+	scoped, scopedError := ParseInputs("cohere-go/stringintconv PerUnit FullKind Scope=fmt,fmt[0-9]+,Sprint\n" +
+		"cohere-go/tests Composes FullKind Scope=(package)\ncohere-go/consistency-no-property-alias PerUnit " +
+		"Scope=(uses)\n")
+	if scopedError != nil {
+		test.Fatalf("a well-formed table with scopes parsed with %v", scopedError)
+	}
+	for _, each := range []struct {
+		rule  string
+		name  string
+		asked bool
+	}{
+		{"cohere-go/stringintconv", "fmt", true},
+		{"cohere-go/stringintconv", "fmt0", true},
+		{"cohere-go/stringintconv", "fmt12", true},
+		{"cohere-go/stringintconv", "fmtx", false},
+		{"cohere-go/stringintconv", "Sprint", true},
+		{"cohere-go/stringintconv", "Sprintf", false},
+		{"cohere-go/tests", "Foo", false},
+		{"cohere-go/consistency-no-property-alias", "copy", false},
+	} {
+		if got := scoped[each.rule].AsksScopeName(each.name); got != each.asked {
+			test.Errorf("%s asks the scope about %s %t, want %t", each.rule, each.name, got, each.asked)
+		}
+	}
+	if !scoped["cohere-go/tests"].DeclaresScope() ||
+		!scoped["cohere-go/consistency-no-property-alias"].DeclaresScope() {
+		test.Error("a rule declaring its whole package or its body's names declares no scope")
 	}
 }

@@ -36,7 +36,9 @@ import (
 //     selection starts from, and a method set that moves through embedding sets that type's name bit by the
 //     embedding's edge, which a Named use of the operand reads too. So the census pins the row by Spinner's reason,
 //     and the differential's mutants are the Named row and the shadow rule.
-//   - Size reads the universe's len, which windows declares at package level: reached, Shadowed, by no bit at all.
+//   - Size, in package shadow, reads the universe's len, which windows declares there at package level: reached,
+//     Shadowed, by no bit at all. A universe name one side alone declares reaches its package whole besides, ScopeName
+//     (#b255cfy), so the shadowed names live in a package of their own, which Shadowed reaches first.
 //   - Configured reads settings.A, whose identity is unknown: reached, Unknown, though no bit it reads is set, and
 //     Paired sizes an array in its signature by settings.B: Unknown by its signature.
 //   - Parted selects box.Part, a field whose type is each build's own: Selected by the field's own name bit, before
@@ -45,7 +47,8 @@ import (
 //     limitTwice, declared from it, and Twice, reading limitTwice, a shared file's constant whose value differs.
 //   - Typed instantiates Sized with Number: the type argument is recorded as ValueType as well as Named, and Named
 //     reaches first by Number's name bit; Sized itself is unreached.
-//   - Bytes takes a byte, which windows declares at package level: Shadowed by its signature.
+//   - Bytes, in package shadow, takes a byte, which windows declares there at package level: Shadowed by its
+//     signature.
 //   - linked names a symbol by go:linkname, so the host records no function uses of it: its one body is reached,
 //     Unrecorded.
 //   - After, which a //line directive places in reach.rl, a file no build lists, calls platformName: reached, Named,
@@ -96,7 +99,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	got := map[string]string{}
 	drivers := map[string]string{}
 	for _, body := range census.bodies {
-		if body.packageIdentifier != "example.com/reach" {
+		if body.packageIdentifier != "example.com/reach" && body.packageIdentifier != "example.com/reach/shadow" {
 			continue
 		}
 		drivers[body.name] = strings.ReplaceAll(body.driver, root+string(filepath.Separator), "")
@@ -167,14 +170,14 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		test.Errorf("windows's census says each body is reached first by\n%v\nwant\n%v", drivers, wantDrivers)
 	}
 	recorded, recordError := os.ReadFile(fromSourceRecordFile(fromSource, on.buildRuns[1].build))
-	if recordError != nil || string(recorded) != "example.com/reach\n" {
-		test.Errorf("the plain run recorded windows's from-source packages as %q (%v), want the one package",
+	if recordError != nil || string(recorded) != "example.com/reach\nexample.com/reach/shadow\n" {
+		test.Errorf("the plain run recorded windows's from-source packages as %q (%v), want reach and shadow",
 			recorded, recordError)
 	}
-	// The plain run checks reach alone from source on windows, restoring linked, so the census within its record is
-	// the whole but for linked's one body.
+	// The plain run checks reach and shadow from source on windows, restoring linked, so the census within its record
+	// is the whole but for linked's one body.
 	within := on.buildRuns[1].bodyReachFromSource
-	if within == nil || within.checkedFromSource != 1 || within.total != census.total-1 ||
+	if within == nil || within.checkedFromSource != 2 || within.total != census.total-1 ||
 		within.reached != census.reached-1 {
 		test.Errorf("want the census within the plain run's from-source packages the whole but linked, got %+v",
 			within)
@@ -184,9 +187,9 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 			census.reached, census.absent, census.new)
 	}
 	// linked, and unsafe, which it imports and which holds no body, are unrecorded.
-	if census.recorded != 1 || census.checkedFromSource != 3 || census.byReason[reachedUnrecorded] != 1 ||
+	if census.recorded != 2 || census.checkedFromSource != 4 || census.byReason[reachedUnrecorded] != 1 ||
 		census.buildOnlyPackages != 0 || len(census.declarationsOnly) != 0 || len(census.miscounted) != 0 {
-		test.Errorf("want reach recorded and linked's one body unrecorded, none the build's alone, none of "+
+		test.Errorf("want reach and shadow recorded and linked's one body unrecorded, none the build's alone, none of "+
 			"declarations only and none miscounted, got %d of %d recorded, %d unrecorded, %d, %v and %v",
 			census.recorded, census.checkedFromSource, census.byReason[reachedUnrecorded], census.buildOnlyPackages,
 			census.declarationsOnly, census.miscounted)
@@ -217,7 +220,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		}
 	}
 	if want := map[findingStage]string{
-		stagePackageWide: "example.com/reach reach.go:141 helper: findings differ: host [cohere-go/U1000 141:6 func " +
+		stagePackageWide: "example.com/reach reach.go:132 helper: findings differ: host [cohere-go/U1000 132:6 func " +
 			"helper is unused], build []",
 	}; !maps.Equal(classed, want) {
 		test.Errorf("the differential classes apart\n%v\nwant\n%v", classed, want)
@@ -237,7 +240,7 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 		// Accepted and Shifted, each by Number's name bit in its signature.
 		"  reached by Signature, by the reason its signature gave: Sizes 0, Unrecorded 0, Miscounted 0, Unknown 0, " +
 			"Signature 0, Named 2, Constant 0, LoadMode 0, Selected 0, ValueType 0, TypeArgument 0, Shadowed 0, " +
-			"LineClaim 0, Imports 0, Initializers 0",
+			"LineClaim 0, Imports 0, ScopeName 0, Initializers 0",
 		"  lacked by the build and imported by a file it compiles, which starts the carry: 0 packages",
 		"  unreached, and the graph's unit verdict calls dependent: 0",
 		"  body differential: compared 8, failures 0",

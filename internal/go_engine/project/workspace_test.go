@@ -219,3 +219,59 @@ func TestRefuseUnlistedModulesLeavesAVendoredReplaceTargetToItsUpstream(test *te
 		}
 	}
 }
+
+// A module's replaces are read from the go.mod bytes its path was read from, when the caller has them, and the file
+// is not read again: here it is gone from the disk, and the bytes still answer.
+func TestReplacedDirectoriesReadTheBytesAlreadyRead(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	goMod := []byte("module example.com/root/listed\n\ngo 1.25\n\n" +
+		"replace example.com/vendored => ../third_party/vendored\n")
+	replaced, replacedError := replacedDirectories(root, "listed", goMod)
+	if replacedError != nil {
+		test.Fatalf("reading the replaces from bytes already read failed: %v", replacedError)
+	}
+	if want := []string{"third_party/vendored"}; !slices.Equal(replaced, want) {
+		test.Errorf("the replaced directories read %q, want %q", replaced, want)
+	}
+}
+
+// Each module's replaces are read from its own go.mod's bytes, though a use go.work leaves to a submodule comes before
+// it: the skipped use reads no go.mod, so the bytes stay at their module's index. Two modules after the skip replace
+// with directories of their own, relative to each, so bytes one index off read the first's replace against the
+// second's directory.
+func TestReplacesPastASkippedSubmoduleUseAreEachModulesOwn(test *testing.T) {
+	test.Parallel()
+	repository := gitlinkRepository(test)
+	files := map[string]string{
+		"go.work": "go 1.25\n\nuse (\n\t.\n\t./library/mod\n\t./first\n\t./second\n)\n",
+		"first/go.mod": "module example.com/root/first\n\ngo 1.25\n\n" +
+			"replace example.com/shared => ../third_party/shared\n",
+		"second/go.mod": "module example.com/root/second\n\ngo 1.25\n\n" +
+			"replace example.com/own => ./vendored/own\n",
+	}
+	if writeError := writeFiles(repository, files); writeError != nil {
+		test.Fatal(writeError)
+	}
+	// The library is a gitlink in the index alone, so its module's go.mod is on no disk: a read of it fails.
+	pinGitlink(test, repository, "library", "1")
+	covered, readError := ReadWorkspace(repository)
+	if readError != nil {
+		test.Fatalf("reading the workspace failed: %v", readError)
+	}
+	if !slices.Equal(covered.InSubmodule, []string{"library/mod"}) {
+		test.Fatalf("left to a submodule: %q, want library/mod, so no use was skipped", covered.InSubmodule)
+	}
+	wantModules := []Module{
+		{Directory: "."},
+		{Directory: "first", Path: "example.com/root/first"},
+		{Directory: "second", Path: "example.com/root/second"},
+	}
+	if !slices.Equal(covered.Modules, wantModules) {
+		test.Errorf("modules are %v, want %v", covered.Modules, wantModules)
+	}
+	if want := []string{"third_party/shared", "second/vendored/own"}; !slices.Equal(covered.Replaced, want) {
+		test.Errorf("the replaced directories read %q, want %q, each module's against its own directory",
+			covered.Replaced, want)
+	}
+}

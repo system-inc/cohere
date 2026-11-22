@@ -40,17 +40,6 @@ const (
 	InputsComposes Inputs = "Composes"
 )
 
-// Declared is one rule's declaration: its inputs, and whether it reads more of a named type than its name, directly or
-// through a helper. FullKind is a rule that renders a whole type (TypeString, a type in a message), walks a struct's
-// fields or an interface's methods, or asks identity, assignability, implementation or sizes. A unit that holds a
-// struct only by name or by pointer stays independent of a build that changes only an unexported field the unit never
-// selects, and only a rule without FullKind is sure to judge that unit alike in both builds; a rule with it is judged
-// with every named type it sees read in full.
-type Declared struct {
-	Inputs   Inputs
-	FullKind bool
-}
-
 // ruleInputsTable is rule_inputs.txt, the one home of every rule's declaration. It is the table rather than each
 // registration, since the table is what the inventory was read into, what the registry test holds every registered
 // rule to having a line in, and what cohere-dev's land gate reads at two commits to find the rules a landing widens:
@@ -71,8 +60,9 @@ func DeclaredInputs() (map[string]Declared, error) {
 }
 
 // ParseInputs is table, in rule_inputs.txt's form, by rule name: each line not blank or a comment is a rule's name, its
-// inputs and, optionally, FullKind. A line that is not, names inputs none of the three are, or names a rule a second
-// time is an error naming it, so a typo in the table fails rather than reading as a rule with no line.
+// inputs and, optionally, FullKind and then its scope (Declared.Scope, parseScope). A line that is not, names inputs
+// none of the three are, or names a rule a second time is an error naming it, so a typo in the table fails rather
+// than reading as a rule with no line.
 func ParseInputs(table string) (map[string]Declared, error) {
 	declared := map[string]Declared{}
 	for index, text := range strings.Split(table, "\n") {
@@ -80,13 +70,29 @@ func ParseInputs(table string) (map[string]Declared, error) {
 			continue
 		}
 		fields := strings.Fields(text)
-		if len(fields) < 2 || len(fields) > 3 || len(fields) == 3 && fields[2] != "FullKind" {
-			return nil, fmt.Errorf("rule_inputs.txt:%d: %q is not a rule's name, its inputs and optionally FullKind",
-				index+1, text)
+		if len(fields) < 2 || len(fields) > 4 {
+			return nil, fmt.Errorf("rule_inputs.txt:%d: %q is not a rule's name, its inputs and optionally FullKind "+
+				"and its scope", index+1, text)
 		}
-		read := Declared{Inputs: Inputs(fields[1]), FullKind: len(fields) == 3}
+		read := Declared{Inputs: Inputs(fields[1])}
 		if !slices.Contains([]Inputs{InputsPerUnit, InputsFileSyntax, InputsComposes}, read.Inputs) {
 			return nil, fmt.Errorf("rule_inputs.txt:%d: %q is none of the three inputs", index+1, fields[1])
+		}
+		rest := fields[2:]
+		if len(rest) > 0 && rest[0] == "FullKind" {
+			read.FullKind, rest = true, rest[1:]
+		}
+		if len(rest) > 1 {
+			return nil, fmt.Errorf("rule_inputs.txt:%d: %q is not a rule's name, its inputs and optionally FullKind "+
+				"and its scope", index+1, text)
+		}
+		if len(rest) == 1 {
+			scope, scopeError := parseScope(rest[0], read.Inputs)
+			if scopeError != nil {
+				return nil, fmt.Errorf("rule_inputs.txt:%d: %q is not a rule's name, its inputs and optionally "+
+					"FullKind and its scope: %w", index+1, text, scopeError)
+			}
+			read.Scope = scope
 		}
 		if _, isListed := declared[fields[0]]; isListed {
 			return nil, fmt.Errorf("rule_inputs.txt:%d: %s has a line already", index+1, fields[0])

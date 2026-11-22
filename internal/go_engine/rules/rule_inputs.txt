@@ -18,11 +18,10 @@
 # PackageExit. SA2002 is PerUnit because it asks the fact resolver which calls of the same-package function a go
 # statement starts stop the test (its test_stopping_calls answers), where testinggoroutine reads that function's body.
 #
-# Seven are Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
+# Three are Composes for a package-wide gate the reach does not carry, which the standing gate modules showed
 # (go_engine's TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips, #zvwfe26):
 #   - SA4029 judges no assignment unless the package's type index holds one of sort's slice types, which an import or
 #     a use in any file puts there.
-#   - SA5008 accepts a repeated go-flags key in a struct tag in a package any of whose files imports go-flags.
 #   - tests judges an example's name by the package's scope, by every import of its files, and by the fields and
 #     methods of the type it names.
 #   - consistency-no-abbreviated-identifier suggests a name no file of the package declares; keeps free the name of
@@ -32,15 +31,28 @@
 #     declares one of that name and signature, as bytes.Buffer's Len does (fixingMethod). The receiver's whole method
 #     set is no gate of these: a method's signature holds its receiver, so the reach reaches Len where another file
 #     gives its receiver Less and Swap.
-#   - S1018 offers copy() for a sliding loop, S1025 a conversion to string, and stringintconv an import of fmt under
-#     that name, only while no file of the package declares copy, string or fmt, a universe name or a free name looked
-#     up in the package's scope.
+#
+# A rule that asks its package's scope about a name, with LookupParent or a scope's Lookup, says how in a last field,
+# Scope= and its entries, comma-separated (inputs.go's Declared.Scope, #b255cfy): each name it asks, a prefix followed
+# by [0-9]+ for a name it numbers, (uses) for the names its body names itself, or (package) for a Composes rule that
+# asks of its whole package. go_engine's body reach reaches a package whole, ScopeName, where a file one side alone
+# compiles declares at package level a universe name or a name, or a prefix's match, a rule declares here, so a rule
+# that asks only so is PerUnit: S1018 offers copy() for a sliding loop, S1025 a conversion to string, and
+# stringintconv an import of fmt under that name or the first free fmt0, fmt1 on, only while no file of the package
+# declares the name. TestEveryScopeQuestionOfARuleIsDeclared holds every scope question in the rules' code to its
+# rule's line.
+#
+# SA5008 is PerUnit though it accepts a repeated go-flags key in a struct tag in a package any of whose files imports
+# go-flags, a package-wide gate the reach carries: its Imports reason reaches the package whole when a file one build
+# alone compiles imports go-flags (body_reacher.go, #bed0mnk). The gate reads each import's path unquoted, as that
+# reason does, so an escaped spelling can neither open it in one build while the imports read equal nor hand a build
+# the host's finding its own gate refuses (#dp67trx, the standing gates' import-goflags-escaped-*).
 
 cohere-go/S1000 PerUnit
 cohere-go/S1001 PerUnit FullKind
 cohere-go/S1002 PerUnit
 cohere-go/S1003 PerUnit
-cohere-go/S1004 PerUnit
+cohere-go/S1004 PerUnit Scope=bytes,Equal
 cohere-go/S1005 PerUnit
 cohere-go/S1006 PerUnit
 cohere-go/S1007 PerUnit
@@ -48,17 +60,17 @@ cohere-go/S1008 PerUnit
 cohere-go/S1009 PerUnit
 cohere-go/S1010 PerUnit
 cohere-go/S1011 PerUnit FullKind
-cohere-go/S1012 PerUnit
+cohere-go/S1012 PerUnit Scope=time,Since
 cohere-go/S1016 PerUnit FullKind
 cohere-go/S1017 PerUnit
-cohere-go/S1018 Composes
+cohere-go/S1018 PerUnit Scope=copy
 cohere-go/S1019 PerUnit
 cohere-go/S1020 PerUnit
 cohere-go/S1021 PerUnit
 cohere-go/S1023 PerUnit
-cohere-go/S1024 PerUnit FullKind
-cohere-go/S1025 Composes FullKind
-cohere-go/S1028 PerUnit
+cohere-go/S1024 PerUnit FullKind Scope=time,Until
+cohere-go/S1025 PerUnit FullKind Scope=string
+cohere-go/S1028 PerUnit Scope=fmt,Errorf
 cohere-go/S1029 PerUnit FullKind
 cohere-go/S1030 PerUnit
 cohere-go/S1031 PerUnit
@@ -67,7 +79,7 @@ cohere-go/S1033 PerUnit
 cohere-go/S1034 PerUnit FullKind
 cohere-go/S1035 PerUnit
 cohere-go/S1036 PerUnit
-cohere-go/S1037 PerUnit FullKind
+cohere-go/S1037 PerUnit FullKind Scope=time,Sleep
 cohere-go/S1038 PerUnit
 cohere-go/S1039 PerUnit
 cohere-go/S1040 PerUnit FullKind
@@ -148,7 +160,7 @@ cohere-go/SA5003 PerUnit
 cohere-go/SA5004 PerUnit
 cohere-go/SA5005 PerUnit
 cohere-go/SA5007 PerUnit
-cohere-go/SA5008 Composes FullKind
+cohere-go/SA5008 PerUnit FullKind
 cohere-go/SA5010 PerUnit FullKind
 cohere-go/SA5012 PerUnit FullKind
 cohere-go/SA6000 PerUnit FullKind
@@ -176,7 +188,7 @@ cohere-go/ST1016 Composes FullKind
 cohere-go/ST1017 PerUnit
 cohere-go/ST1018 PerUnit
 cohere-go/ST1019 FileSyntax
-cohere-go/U1000 Composes FullKind
+cohere-go/U1000 Composes FullKind Scope=(package)
 cohere-go/appends PerUnit
 cohere-go/asmdecl Composes FullKind
 cohere-go/assign PerUnit
@@ -190,9 +202,9 @@ cohere-go/concurrency-no-kill-by-name PerUnit
 cohere-go/concurrency-require-escape-hatch-reason PerUnit
 cohere-go/concurrency-require-joined-pipe-reader PerUnit
 cohere-go/consistency-no-abbreviated-file-name FileSyntax
-cohere-go/consistency-no-abbreviated-identifier Composes FullKind
+cohere-go/consistency-no-abbreviated-identifier Composes FullKind Scope=(package)
 cohere-go/consistency-no-ambiguous-identifier PerUnit FullKind
-cohere-go/consistency-no-any Composes FullKind
+cohere-go/consistency-no-any Composes FullKind Scope=(package)
 cohere-go/consistency-no-boolean-outcome PerUnit FullKind
 cohere-go/consistency-no-console PerUnit
 cohere-go/consistency-no-dash-punctuation FileSyntax
@@ -205,13 +217,13 @@ cohere-go/consistency-no-lonely-if PerUnit
 cohere-go/consistency-no-long-file FileSyntax
 cohere-go/consistency-no-long-line FileSyntax
 cohere-go/consistency-no-parameter-reassignment PerUnit
-cohere-go/consistency-no-property-alias PerUnit
+cohere-go/consistency-no-property-alias PerUnit Scope=(uses)
 cohere-go/consistency-no-redundant-import-alias PerUnit
 cohere-go/consistency-no-screaming-snake-case Composes
 cohere-go/consistency-no-shouting FileSyntax
 cohere-go/consistency-no-stuttering-name PerUnit
 cohere-go/consistency-no-undefined-initializer PerUnit
-cohere-go/consistency-no-uppercase-initialism Composes FullKind
+cohere-go/consistency-no-uppercase-initialism Composes FullKind Scope=(package)
 cohere-go/consistency-no-use-before-define PerUnit
 cohere-go/consistency-no-useless-concatenation PerUnit
 cohere-go/consistency-no-utils-file-name FileSyntax
@@ -257,7 +269,7 @@ cohere-go/slog PerUnit FullKind
 cohere-go/sqlrowserr Composes
 cohere-go/stdmethods PerUnit FullKind
 cohere-go/stdversion PerUnit
-cohere-go/stringintconv Composes FullKind
+cohere-go/stringintconv PerUnit FullKind Scope=fmt,fmt[0-9]+,Sprint
 cohere-go/structtag PerUnit FullKind
 cohere-go/testing-no-machine-path PerUnit
 cohere-go/testing-no-timing-assertion PerUnit
@@ -265,7 +277,7 @@ cohere-go/testing-no-uncached-run PerUnit
 cohere-go/testing-require-failure-path PerUnit
 cohere-go/testing-require-parallel Composes
 cohere-go/testinggoroutine Composes FullKind
-cohere-go/tests Composes FullKind
+cohere-go/tests Composes FullKind Scope=(package)
 cohere-go/timeformat PerUnit
 cohere-go/unmarshal PerUnit
 cohere-go/unreachable PerUnit

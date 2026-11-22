@@ -19,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
@@ -324,6 +325,9 @@ func (engine *pipeline) lintPackages(
 	// And U1000's record of each body it walks, which an extra build's U1000 splices in place of walking a body it
 	// leaves standing (#xeafx79), only in a run whose builds leave any: no other run records a body.
 	options.RecordBodies = options.FactReach && engine.leavesBodiesStanding()
+	// And what its bodies hold that the presence rows read, by standing_presence's reader, which check takes and never
+	// imports (#f5g7ym6). A run without FactReach never calls it.
+	options.FactReachPresence = standing_presence.ReadPackage
 	options.Counted = engine.described.countedAsWalked
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
