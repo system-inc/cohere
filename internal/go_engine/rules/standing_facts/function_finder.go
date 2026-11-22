@@ -151,10 +151,12 @@ func objectAt(home *types.Package, path objectpath.Path) (types.Object, bool) {
 
 // interfaceMethodAt is the method named methodName of the interface that typeName names at home's package level, its
 // own or one it embeds, as build_reads' renderer names an interface's method (IdentityMethod), and false for none, or
-// for a name of no interface.
+// for a name of no interface. The type name is looked up as objectAt looks up a package-level name, the one look of a
+// host's identity the rules' guards list for it (readHostNamed), rather than a look of its own.
 func interfaceMethodAt(home *types.Package, typeName string, methodName string) (*types.Func, bool) {
-	declared, isTypeName := home.Scope().Lookup(typeName).(*types.TypeName)
-	if !isTypeName || declared.IsAlias() {
+	object, found := objectAt(home, objectpath.Path(typeName))
+	declared, isTypeName := object.(*types.TypeName)
+	if !found || !isTypeName || declared.IsAlias() {
 		return nil, false
 	}
 	declaredInterface, isInterface := declared.Type().Underlying().(*types.Interface)
