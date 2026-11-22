@@ -3,7 +3,10 @@ package build_dependence
 import (
 	"bytes"
 	"go/ast"
+	"go/scanner"
+	"go/token"
 	"go/types"
+	"strings"
 )
 
 // Difference is what one extra build changes against the host, as its file sets say: the graph's judgment of the
@@ -68,22 +71,54 @@ type PackageDifference struct {
 	KeepsCgo bool
 }
 
-// The two spellings that open a line directive. Either anywhere in a file's bytes counts, in a string or a comment's
-// middle too, an over-approximation of the directive's rules on purpose: a directive missed leaves a unit unseeded,
-// where one too many only seeds a package that needed none.
+// The two spellings that open a line directive, which a file holding neither can hold none of.
 var (
 	lineCommentDirective  = []byte("//line ")
 	blockCommentDirective = []byte("/*line ")
 )
 
-// HoldsLineDirective reports whether file holds a line directive anywhere in its bytes (lineCommentDirective,
-// blockCommentDirective), as read reads them: the caller's, so they are the bytes the graph was built from, which in
-// the engine are the run's held bytes rather than the disk's again (pipeline.holdsLineDirective). A file read cannot
-// read is said to hold one, failing wide.
+// HoldsLineDirective reports whether file, as read reads it, holds a comment of a line directive's shape (#mtrjfyn): a
+// comment token, never text in a string or in a comment's prose, either `//line ` at the very start of its line or
+// `/*line ` anywhere (isLineDirective), the comments go/scanner, which go/parser and so the load run, reads as
+// directives. read is the caller's, so its bytes are the ones the graph was built from, which in the engine are the
+// run's held bytes rather than the disk's again (pipeline.holdsLineDirective). A file read cannot read is said to hold
+// one, failing wide.
+//
+// Where it and the scanner could disagree it errs wide, never narrower than the scanner: it reads no directive's text,
+// so it counts a comment of the shape the scanner rejects as malformed, one with no line number, line zero or a number
+// that is none, and an unterminated block comment, as it counts every one the scanner applies, a carriage return or a
+// number past any width included. And a directive counts whatever file it names, the file's own name and a file the
+// builds share among them, since only the caller knows which files a build compiles.
 func HoldsLineDirective(file string, read func(file string) ([]byte, error)) bool {
 	source, readError := read(file)
 	if readError != nil {
 		return true
 	}
-	return bytes.Contains(source, lineCommentDirective) || bytes.Contains(source, blockCommentDirective)
+	// A file holding neither spelling holds no directive, and is never scanned.
+	if !bytes.Contains(source, lineCommentDirective) && !bytes.Contains(source, blockCommentDirective) {
+		return false
+	}
+	fileSet := token.NewFileSet()
+	tokenFile := fileSet.AddFile(file, -1, len(source))
+	var scanning scanner.Scanner
+	// Ignored: a file that does not scan clean is still scanned to its end, every comment of it read, as go/scanner
+	// reads it for the parser, which reports the error itself.
+	scanning.Init(tokenFile, source, nil, scanner.ScanComments)
+	for {
+		position, scanned, literal := scanning.Scan()
+		if scanned == token.EOF {
+			return false
+		}
+		// The column as the file has it, before any directive scanned earlier moves the positions after it.
+		if scanned == token.COMMENT && isLineDirective(literal, tokenFile.PositionFor(position, false).Column == 1) {
+			return true
+		}
+	}
+}
+
+// isLineDirective reports whether comment, a comment token's text, has a line directive's shape as go/scanner reads one
+// (go/scanner's scanComment): `/*line ` anywhere, or `//line ` when atLineStart, the comment starting its line,
+// whatever its text after the spelling ends in (HoldsLineDirective says why).
+func isLineDirective(comment string, atLineStart bool) bool {
+	return strings.HasPrefix(comment, "/*line ") || strings.HasPrefix(comment, "//line ") && atLineStart
 }
