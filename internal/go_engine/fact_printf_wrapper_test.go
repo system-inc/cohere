@@ -158,3 +158,43 @@ func TestAPrintfWrapperHeldByAVariableTakesItsUserOut(test *testing.T) {
 		})
 	}
 }
+
+// printf finds a field a wrapper where a function literal assigned to it, `x.Logf = func(...) {...}`, forwards to one,
+// its fact on the field (wrapper_search.go's assignedVariable, through the field's selection). In both fixtures api's
+// shared file declares Logger, whose Logf field holds a print-shaped function, and a platform file alone assigns a
+// literal forwarding to fmt.Printf to a Logger's Logf: the host's in the -host fixture, windows's in the -extra one. So
+// the field is a wrapper in exactly that build. Target calls Logf on a Logger it is handed and names nothing else, so
+// the reach leaves it standing, and on the host's findings it would invent windows a printf finding in the first and
+// lose windows's in the second. The field's fact names it and takes Target out, and the differential fails nothing.
+func TestAPrintfWrapperHeldByAFieldTakesItsUserOut(test *testing.T) {
+	test.Parallel()
+	for _, each := range []struct {
+		fixture string
+		module  string
+		// onHost is whether the host's build holds the assignment, and windows's does not; else the reverse.
+		onHost bool
+	}{
+		{"fact-printf-field-host", "example.com/printffieldhost", true},
+		{"fact-printf-field-extra", "example.com/printffieldextra", false},
+	} {
+		test.Run(each.fixture, func(test *testing.T) {
+			test.Parallel()
+
+			settled := settleFactFixture(test, each.fixture, each.module+"/reader")
+			if reason := settled.bodies["Target"].reason; reason != "" {
+				test.Fatalf("the reach reached Target for %q, want it unreached, so that only the facts can take it "+
+					"out", reason)
+			}
+			// The field's key names it by its objectpath, Logger's first field.
+			settled.requireRemovedBy(test, "Target", "Logger.UF0", "printf wrapper")
+			if printfIn(settled.host.result.Findings, "reader.go") != each.onHost ||
+				printfIn(settled.run.result.Findings, "reader.go") == each.onHost {
+				test.Errorf("Target's call is a printf finding on the host %t and on windows %t, want the host's %t "+
+					"and windows's the other", printfIn(settled.host.result.Findings, "reader.go"),
+					printfIn(settled.run.result.Findings, "reader.go"), each.onHost)
+			}
+			requireNoDifferentialFailure(test, settled)
+			requireOwnFindingsAlike(test, each.fixture)
+		})
+	}
+}
