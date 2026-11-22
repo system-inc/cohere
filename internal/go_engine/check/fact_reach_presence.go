@@ -8,22 +8,22 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
-	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 )
 
 // factReachPresence is what each package's bodies hold that the presence rows read, by package ID, read as the last
-// action on the package finishes (checker.Options.BodiesRead), on whichever goroutine finished it.
+// action on the package finishes (checker.Options.BodiesRead), on whichever goroutine finished it, by the run's
+// presence reader (Options.FactReachPresence).
 type factReachPresence struct {
+	reader  func(read *packages.Package) (map[fact_reach.Place]fact_reach.BodyRecord, []string)
 	lock    sync.Mutex
-	read    map[string]map[fact_reach.Place]standing_presence.BodyRecord
+	read    map[string]map[fact_reach.Place]fact_reach.BodyRecord
 	markers map[string][]string
 }
 
 // readBodies reads read's bodies, and its marker interfaces, while its syntax and type information are whole, and
 // keeps an entry even where none holds anything, so a package read apart from one never read.
 func (presence *factReachPresence) readBodies(read *packages.Package) {
-	bodies := standing_presence.ReadBodies(read.Fset, read.Syntax, read.TypesInfo, read.Types)
-	markers := standing_presence.ReadMarkers(read.Syntax, read.TypesInfo)
+	bodies, markers := presence.reader(read)
 	presence.lock.Lock()
 	defer presence.lock.Unlock()
 	presence.read[read.ID] = bodies
@@ -53,7 +53,7 @@ func (presence *factReachPresence) packages() []string {
 // of is what was read of the bodies of the package of ID packageId, and whether they were read at all: a package
 // whose bodies hold nothing presence reads was read, with no entry, and one never handed over, as one whose type
 // information was gone by its last action, or a run with no presence at all, was not.
-func (presence *factReachPresence) of(packageId string) (map[fact_reach.Place]standing_presence.BodyRecord, bool) {
+func (presence *factReachPresence) of(packageId string) (map[fact_reach.Place]fact_reach.BodyRecord, bool) {
 	if presence == nil {
 		return nil, false
 	}

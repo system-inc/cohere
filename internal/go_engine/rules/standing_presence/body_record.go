@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 )
@@ -25,18 +26,6 @@ func syntaxOf(pass *analysis.Pass) packageSyntax {
 	return packageSyntax{fileSet: pass.Fset, files: pass.Files, information: pass.TypesInfo, own: pass.Pkg}
 }
 
-// BodyRecord is what one function body holds that a presence row reads and no use of stage 1's record says, as the
-// host reads it off its own syntax: the functions of the package the body starts with go where testinggoroutine hears
-// the statement, and those it hands by name to (*testing.T).Run in a _test.go file, each once, in the order the body
-// names them; whether it writes a candidate of consistency-no-any's of its own; and the method names of the marker
-// interfaces it declares, sorted. The host renders each function's key (fact_reach.PresenceRecord).
-type BodyRecord struct {
-	GoStarts     []*types.Func
-	RunStarts    []*types.Func
-	OwnAny       bool
-	LocalMarkers []string
-}
-
 // ReadBodies is the record of each function body of the package whose syntax and types these are that holds anything
 // presence reads, by its place (fact_reach.Place), read by the same walks the rows read a build's own syntax by: the
 // edges as testinggoroutine and requireparallel resolve them (testingGoroutineEdges, requireParallelEdges), a
@@ -47,9 +36,9 @@ func ReadBodies(
 	files []*ast.File,
 	information *types.Info,
 	own *types.Package,
-) map[fact_reach.Place]BodyRecord {
+) map[fact_reach.Place]fact_reach.BodyRecord {
 	syntax := packageSyntax{fileSet: fileSet, files: files, information: information, own: own}
-	records := map[fact_reach.Place]BodyRecord{}
+	records := map[fact_reach.Place]fact_reach.BodyRecord{}
 	declarations := functionDeclarations(syntax)
 	addStarts := func(edges []presenceEdge, isGo bool) {
 		for _, each := range edges {
@@ -88,6 +77,13 @@ func ReadBodies(
 		}
 	}
 	return records
+}
+
+// ReadPackage is what presence reads of the package read while its syntax and type information are whole: its bodies'
+// records (ReadBodies) and its marker interfaces' method names (ReadMarkers). The host's run takes it as its presence
+// reader (check.Options.FactReachPresence), so the engine's core never imports this package.
+func ReadPackage(read *packages.Package) (map[fact_reach.Place]fact_reach.BodyRecord, []string) {
+	return ReadBodies(read.Fset, read.Syntax, read.TypesInfo, read.Types), ReadMarkers(read.Syntax, read.TypesInfo)
 }
 
 // readBody is whether body writes a candidate of consistency-no-any's of its own, an any or an interface{} the rule's

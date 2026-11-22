@@ -215,7 +215,8 @@ func TestTheRunCapturesTheFactsReachUnderItsSwitch(test *testing.T) {
 	if off.FactReach != nil {
 		test.Errorf("without the switch the run captured %+v, want nothing", off.FactReach)
 	}
-	on, onError := Run(analyzed, reachRules, Options{FactReach: true})
+	on, onError := Run(analyzed, reachRules,
+		Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if onError != nil {
 		test.Fatalf("running with the switch: %v", onError)
 	}
@@ -354,7 +355,8 @@ func captureAlone(test *testing.T, beside ...rule.Rule) (*FactReachCapture, *Fac
 	if len(asking) != 1 {
 		test.Fatalf("the registry holds %d rules named SA4017, want 1", len(asking))
 	}
-	on, runError := Run(loaded.Packages, append(asking, beside...), Options{FactReach: true})
+	on, runError := Run(loaded.Packages, append(asking, beside...),
+		Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if runError != nil {
 		test.Fatalf("running with the switch: %v", runError)
 	}
@@ -428,7 +430,7 @@ func TestARestoredPackageHasNoCapture(test *testing.T) {
 		want int
 	}{{name: "cold", want: 3}, {name: "warm", want: 0}} {
 		result, runError := Run(analyzed, reachRules, Options{Cache: NewCacheSession(caching, reachRules),
-			FactReach: true})
+			FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 		if runError != nil {
 			test.Fatalf("running %s: %v", run.name, runError)
 		}
@@ -513,7 +515,7 @@ func TestTheCaptureHoldsNoPushedFactOfAFailedAction(test *testing.T) {
 	analyzed := loadReach(test)
 	failing := pushingAnalyzer("pushing_failed", true)
 	result, runError := Run(analyzed, []rule.Rule{houseRule(reachNilnessAnalyzer), houseRule(deprecated.Analyzer),
-		houseRule(failing)}, Options{FactReach: true})
+		houseRule(failing)}, Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if runError != nil {
 		test.Fatalf("running with the capture: %v", runError)
 	}
@@ -554,7 +556,8 @@ func TestTheRunReadsTheBodiesOfTheGivenPackagesAlone(test *testing.T) {
 	if len(given) != 1 {
 		test.Fatalf("the workspace loaded %d packages of user, want one", len(given))
 	}
-	result, runError := Run(given, reachRules, Options{FactReach: true})
+	result, runError := Run(given, reachRules,
+		Options{FactReach: true, FactReachPresence: standing_presence.ReadPackage})
 	if runError != nil || result.FactReach == nil {
 		test.Fatalf("running with the switch: %v", runError)
 	}
@@ -584,7 +587,7 @@ func TestAPackageWhoseBodiesWereNeverReadIsCapturedUnread(test *testing.T) {
 	if reach == nil || floored == nil {
 		test.Fatalf("the load holds %v, want reach and floored", byPath)
 	}
-	presence := &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{reach.ID: {}},
+	presence := &factReachPresence{read: map[string]map[fact_reach.Place]fact_reach.BodyRecord{reach.ID: {}},
 		markers: map[string][]string{}}
 	capture := captureFactReach(resolver, analyzed, nil, presence)
 	read, unread := capture.Packages[reach.ID], capture.Packages[floored.ID]

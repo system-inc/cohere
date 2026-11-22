@@ -28,7 +28,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
-	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -131,6 +130,14 @@ type Options struct {
 	// whose answers hang on the order the run walked a package in (captureFactReach). Only a host's run with extra
 	// builds sets it; the findings are the same either way.
 	FactReach bool
+
+	// FactReachPresence, when not nil, is how a run with FactReach reads what each package's bodies hold that the
+	// presence rows read, and its marker interfaces, while the package's syntax and type information are whole
+	// (FactReachPackage.Presence and Markers): standing_presence's (standing_presence.ReadPackage), which this package
+	// never imports, so no rule package's registration rides into a binary that links the engine's core (#f5g7ym6).
+	// Left nil, the run reads no presence, as a run without FactReach: every package is captured unread
+	// (FactReachPackage.PresenceRead), and a build lints it whole.
+	FactReachPresence func(read *packages.Package) (map[fact_reach.Place]fact_reach.BodyRecord, []string)
 
 	// Inheritance, when not nil, is an extra build's take of the host's run for its syntax-only rules (#y6q1x2j): each
 	// such rule skips each file it inherits and reports the host's findings there as its own (rule.InheritedFiles),
@@ -448,11 +455,14 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// every resolver it asks through, before any pass runs.
 	// And reads what each body holds that the presence rows read, while each package's syntax is whole: no later point
 	// holds it (checker.Options.BodiesRead).
+	// A run handed no reader reads none, and its presence stays nil, which reads as no presence at all.
 	var presence *factReachPresence
 	if options.FactReach {
 		resolver.RecordAskers()
-		presence = &factReachPresence{read: map[string]map[fact_reach.Place]standing_presence.BodyRecord{},
-			markers: map[string][]string{}}
+	}
+	if options.FactReach && options.FactReachPresence != nil {
+		presence = &factReachPresence{reader: options.FactReachPresence,
+			read: map[string]map[fact_reach.Place]fact_reach.BodyRecord{}, markers: map[string][]string{}}
 		checkerOptions.BodiesRead = presence.readBodies
 	}
 	session := options.Cache
