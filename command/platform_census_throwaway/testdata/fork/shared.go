@@ -16,3 +16,17 @@ func Untouched() int {
 func WordSize() uintptr {
 	return unsafe.Sizeof(uintptr(0))
 }
+
+// IFMT is one untyped constant on every platform, as syscall.S_IFMT is between linux and darwin.
+const IFMT = 0xf000
+
+// IsPipe forks by reference through its context: Mode differs, so IFMT and 0 take a uint16 on windows, though neither
+// uses anything that differs.
+func IsPipe(stat Stat) bool {
+	return stat.Mode&IFMT != 0
+}
+
+// Signal holds no fork: Kill's parameters are named differently on linux, and its type is the same.
+func Signal() error {
+	return Kill(1, 9)
+}

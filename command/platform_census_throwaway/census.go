@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -509,8 +510,13 @@ func (taken *census) compareExpressions(
 			Class:       classLocal,
 		}
 		group.ForkedExpressions++
-		if usesDiffering(taken.host, hostPackage, hostExpression, differing) ||
-			usesDiffering(build, buildPackage, buildExpression, differing) {
+		byReference := usesDiffering(taken.host, hostPackage, hostExpression, differing) ||
+			usesDiffering(build, buildPackage, buildExpression, differing)
+		if !byReference && typedByContext(hostTypeAndValue, buildPackage.TypesInfo.Types[buildExpression]) {
+			byReference = contextUsesDiffering(taken.host, hostPackage, hostExpression, differing) ||
+				contextUsesDiffering(build, buildPackage, buildExpression, differing)
+		}
+		if byReference {
 			fork.Class = classByReference
 			group.ForkedByReference++
 		} else {
@@ -578,6 +584,80 @@ func usesDiffering(
 		return !found
 	})
 	return found
+}
+
+// typedByContext says whether two answers of one expression differ only in a type its context gave it: an untyped
+// constant of one value on both sides, or nil, each of which go/types records with the type it converts to. Such a fork
+// holds nothing of its own that differs, as `syscall.S_IFMT` in `status.Mode&syscall.S_IFMT` takes Mode's type.
+func typedByContext(host types.TypeAndValue, build types.TypeAndValue) bool {
+	if host.Value != nil && build.Value != nil {
+		return host.Value.ExactString() == build.Value.ExactString()
+	}
+	return host.IsNil() && build.IsNil()
+}
+
+// contextUsesDiffering says whether what gives expression its type uses one of differing: an expression around it, or,
+// where those end at a statement, the other side of an assignment, a variable's declared type, a channel sent on, or
+// the results of the function a return statement leaves.
+func contextUsesDiffering(
+	loaded *loadedBuild,
+	owner *packages.Package,
+	expression ast.Expr,
+	differing map[declarationKey]bool,
+) bool {
+	var file *ast.File
+	for _, syntax := range owner.Syntax {
+		if syntax.FileStart <= expression.Pos() && expression.End() <= syntax.FileEnd {
+			file = syntax
+			break
+		}
+	}
+	if file == nil {
+		return false
+	}
+	path, _ := astutil.PathEnclosingInterval(file, expression.Pos(), expression.End())
+	for index, node := range path {
+		switch typed := node.(type) {
+		case ast.Expr:
+			if usesDiffering(loaded, owner, typed, differing) {
+				return true
+			}
+			continue
+		case *ast.AssignStmt:
+			for _, left := range typed.Lhs {
+				if usesDiffering(loaded, owner, left, differing) {
+					return true
+				}
+			}
+		case *ast.ValueSpec:
+			return typed.Type != nil && usesDiffering(loaded, owner, typed.Type, differing)
+		case *ast.SendStmt:
+			return usesDiffering(loaded, owner, typed.Chan, differing)
+		case *ast.ReturnStmt:
+			return resultsUseDiffering(loaded, owner, path[index+1:], differing)
+		}
+		return false
+	}
+	return false
+}
+
+// resultsUseDiffering says whether the results of the innermost function in outer, a return statement's enclosing
+// nodes, use one of differing.
+func resultsUseDiffering(
+	loaded *loadedBuild,
+	owner *packages.Package,
+	outer []ast.Node,
+	differing map[declarationKey]bool,
+) bool {
+	for _, node := range outer {
+		switch typed := node.(type) {
+		case *ast.FuncLit:
+			return typed.Type.Results != nil && usesDiffering(loaded, owner, typed.Type, differing)
+		case *ast.FuncDecl:
+			return typed.Type.Results != nil && usesDiffering(loaded, owner, typed.Type, differing)
+		}
+	}
+	return false
 }
 
 // enclosingFunction is the host function whose body or initializer holds key.
