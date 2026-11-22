@@ -372,3 +372,40 @@ func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
 			root)
 	}
 }
+
+// The package differential reports a package a build's decision restored though TypesHold declines it (#mtrjfyn). On
+// main no decision lets such a package through, so the miss is planted: under the differential's hook, walk-square's
+// windows build lets u through at its load whatever its reads say (pipeline.forcedThrough), and the differential
+// reports exactly one decline, u's, by TypesHold, for s2's Outer, whose Inner holds a lock on windows alone. A run
+// with the option and no hook forces nothing: its stream is the plain run's.
+func TestTheDifferentialReportsAPackageTheDecisionLetThroughWrongly(test *testing.T) {
+	test.Parallel()
+
+	fixture := filepath.Join("testdata", "walk-square")
+	recorder := &skippedRecorder{}
+	runOverConfigured(test, copyFixture(test, fixture), exitFindings, func(engine *pipeline) {
+		recorder.hook(engine)
+		engine.forcedThrough = walkU
+	}, "--no-cache")
+	var declined []skippedJudgment
+	for _, judgment := range recorder.judgments() {
+		if judgment.why != "" {
+			declined = append(declined, judgment)
+		}
+	}
+	if len(declined) != 1 || !strings.HasPrefix(declined[0].build, "windows/") || declined[0].identifier != walkU ||
+		declined[0].judgment != check.SkippedByTypes ||
+		!strings.HasPrefix(declined[0].why, "T object "+walkS2+".Outer") {
+		test.Errorf("the differential reported the declines %+v, want one, windows's of u by TypesHold, for s2's "+
+			"Outer", declined)
+	}
+
+	forcedRoot := copyFixture(test, fixture)
+	_, forced := runOverConfigured(test, forcedRoot, exitFindings,
+		func(engine *pipeline) { engine.forcedThrough = walkU }, "--no-cache")
+	_, plain := runOver(test, copyFixture(test, fixture), exitFindings)
+	if normalize(forced, forcedRoot) != plain {
+		test.Errorf("the option without the hook changed the run's stream:\nwith it\n%s\nwithout it\n%s",
+			normalize(forced, forcedRoot), plain)
+	}
+}

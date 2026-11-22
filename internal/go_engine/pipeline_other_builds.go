@@ -603,6 +603,9 @@ func (engine *pipeline) extraBuildRun(
 				}, func(identifier string, judgment check.SkippedJudgment, why string) {
 					engine.judgedSkipped(extra, identifier, judgment, why)
 				})
+				if engine.forcedThrough != "" {
+					session.ForceThrough(engine.forcedThrough)
+				}
 			}
 			// Only a build restoring from the host's run inherits from it: the same run read the same bytes for both.
 			if !engine.keepsInheritanceOff {

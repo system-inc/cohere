@@ -95,6 +95,10 @@ type hostState struct {
 	judgesSkipped func(identifier string, judgment SkippedJudgment, why string)
 	skipsTold     func(identifier string)
 
+	// forcedThrough, set only by a test (ForceThrough), is the ID of the package whose late decision lets it through
+	// whatever TypesHold says, the planted miss the package differential must report, empty in every run.
+	forcedThrough string
+
 	// writtenThrough are this load's packages written through to the build's own store (writeThrough), each once: an
 	// untouched package is settled from the start, so the first wave's save would write it, and every later one again.
 	writtenThrough map[*packages.Package]bool
@@ -174,6 +178,17 @@ func (session *CacheSession) JudgeSkipped(
 	if session.host != nil {
 		session.host.skipsTold = skipped
 		session.host.judgesSkipped = judged
+	}
+}
+
+// ForceThrough has the session's restore from the host's run let the package of identifier through at its load
+// whatever TypesHold says of it, so a test plants the miss the package differential must report (#mtrjfyn): a decision
+// that restored a package TypesHold declines. It holds only beside JudgeSkipped, whose judgment of the package is
+// TypesHold's, apart from the forced decision; a session with no differential's hook forces nothing, so its run is
+// unchanged. Only a test calls it, after RestoreFromHost and JudgeSkipped; a run never does.
+func (session *CacheSession) ForceThrough(identifier string) {
+	if session.host != nil && session.host.judgesSkipped != nil {
+		session.host.forcedThrough = identifier
 	}
 }
 
@@ -376,6 +391,10 @@ func (session *CacheSession) restoreFromHost(
 		// The package differential's judgment, under its test's hook alone (JudgeSkipped): a package the decision lets
 		// through is restored unchecked, and judged by TypesHold apart from the decision.
 		if state.judgesSkipped != nil {
+			// A test's planted miss (ForceThrough): the decision lets the package through whatever it reads.
+			if state.forcedThrough == candidate.ID {
+				restored.types.Holds = func(map[string]*types.Package) bool { return true }
+			}
 			restored.types.Holds = session.judgedThrough(candidate, hosted, restored.types.Holds)
 		}
 		restored.types.Declined = func() { session.declineAtLoad(candidate, hosted) }

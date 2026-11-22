@@ -112,6 +112,11 @@ type pipeline struct {
 	judgedSkipped func(build project.Build, identifier string, judgment check.SkippedJudgment, why string)
 	skippedAtLoad func(build project.Build, identifier string)
 
+	// forcedThrough, set only by a test beside judgedSkipped, is the ID of the package every extra build's late
+	// decision lets through whatever TypesHold says, the miss the package differential must report
+	// (check.CacheSession's ForceThrough). Without judgedSkipped it forces nothing.
+	forcedThrough string
+
 	// extraBuildLoads, set only by a test and by no run, is told each load of an extra build as it starts, the first
 	// and every one again, so the test counts a build's loads itself, one that skips nothing among them, which
 	// skippedAtLoad never tells of (#tfvrsf3). It is called from the builds' own goroutines, side by side.
