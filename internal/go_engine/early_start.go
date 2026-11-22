@@ -18,7 +18,8 @@ import (
 // after the first load begins unless its own answer contradicts the prediction, and every one is joined before the run
 // returns (pipeline.joinChildren), or before describeProject returns an error, so no go command outlives a run.
 type earlyStart struct {
-	// hostAnswered ends once the host's go env has answered, goEnvironment and goEnvironmentError its answer, read
+	// hostAnswered ends once the host's go env has answered and the early start has done writing it, the build
+	// context's kept place set (load.GoEnvironment.KeepContext), goEnvironment and goEnvironmentError its answer, read
 	// only after.
 	hostAnswered       sync.WaitGroup
 	goEnvironment      *load.GoEnvironment
@@ -79,12 +80,19 @@ func startEarly(
 	early.goAwaited(func() {
 		early.goEnvironment, early.goEnvironmentError = load.ReadGoEnvironment(workspace.Root,
 			workspace.Environment(), held, children)
-		early.hostAnswered.Done()
-		if fetchesListerState && early.goEnvironment != nil {
-			// Not timed: a run under `--timing` fetches its lister state where it always has, so each measurement of
-			// its children's CPU is of its own commands alone (startChildrenFirst).
+		keepsContext := fetchesListerState && early.goEnvironment != nil
+		// Not timed: a run under `--timing` fetches its lister state where it always has, so each measurement of its
+		// children's CPU is of its own commands alone (startChildrenFirst).
+		if keepsContext {
 			early.goEnvironment.KeepContext(load.PredictContext(contexts, early.goEnvironment, workspace.Environment(),
 				false))
+		}
+		// Handed out only now, its last write done (#e8w514b): KeepContext writes the answer's lister state without a
+		// lock, before anything fetches it, so a reader handed the answer first, as a load that lists, reads it as it
+		// is written. The fetch below is the lister state's own, under its once, which a load fetching beside it
+		// shares.
+		early.hostAnswered.Done()
+		if keepsContext {
 			early.goEnvironment.FetchListerState(nil)
 		}
 	})
@@ -98,7 +106,8 @@ func startEarly(
 	return early
 }
 
-// hostGoEnvironment is the host's go env, and how reading it failed, once it has answered.
+// hostGoEnvironment is the host's go env, and how reading it failed, once it has answered and the early start has done
+// writing it, so whoever it is handed to reads it whole with no await (#e8w514b).
 func (early *earlyStart) hostGoEnvironment() (*load.GoEnvironment, error) {
 	early.hostAnswered.Wait()
 	return early.goEnvironment, early.goEnvironmentError

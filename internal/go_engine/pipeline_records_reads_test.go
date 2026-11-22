@@ -61,6 +61,8 @@ func TestTheHostRecordsReadsOnlyWithAnExtraBuild(test *testing.T) {
 		isolatePipeline(test, engine)
 		// The load alone is asked, so no lint starts beside it.
 		engine.overlaps = false
+		// The first load waits for what the description started, as the pipeline's does (startChildrenFirst).
+		described.awaitForked()
 		loaded, loadError := engine.loadWorkspacePackages()
 		if loadError != nil {
 			test.Fatal(loadError)

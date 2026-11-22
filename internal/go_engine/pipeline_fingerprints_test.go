@@ -160,6 +160,8 @@ func hostLoad(test *testing.T, root string, run string) (*pipeline, *load.Loaded
 	if engine.session == nil || !engine.session.HasStore() {
 		test.Fatalf("%s has no findings cache with a store, so its load keeps no listing", run)
 	}
+	// The first load waits for what the description started, as the pipeline's does (startChildrenFirst).
+	described.awaitForked()
 	loaded, loadError := engine.loadWorkspacePackages()
 	if loadError != nil {
 		test.Fatalf("%s: %v", run, loadError)
