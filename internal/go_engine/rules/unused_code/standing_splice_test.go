@@ -167,7 +167,8 @@ func wordedVerdict(fileSet *token.FileSet, verdict result) []string {
 // where it is not, by why (#xeafx79): the side answers no record, the record holds a flag, the build reads Answer's
 // own file otherwise than the host did, or a file the record names is one the build reads otherwise, one the side
 // answers no digest of, one the build does not compile though it reads it with the host's bytes, or any past Answer's
-// own file where the side is no FileDigestHost. Each way, the verdict is the plain run's. A pass with no
+// own file where the side is no FileDigestHost, or the record does not encode, which the build counts as a record
+// that differs from its own. Each way, the verdict is the plain run's. A pass with no
 // standing answer, or none with a side that answers records, says nothing of splicing, as the host's and every plain
 // run's say nothing.
 func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
@@ -251,6 +252,15 @@ func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
 				ignoredSource.name)
 			host.recorded.Digests[ignoredSource.name] = sha256.Sum256([]byte(ignoredSource.source))
 		}, ignored: []recordedSource{ignoredSource}, want: SplicedBodies{FilesDiffer: 1}},
+		// A local of a kind no word names, which no recorder writes and so no canonical form holds, passes every
+		// check of its files and fails only to encode.
+		{name: "a record that does not encode", change: func(host *recordsHost) {
+			index := answerParsed(host.recorded)
+			host.recorded.Bodies[index].record.Locals = slices.Clone(host.recorded.Bodies[index].record.Locals)
+			host.recorded.Bodies[index].record.Locals[0].Kind = objectKind(len(kindWords))
+		}, want: SplicedBodies{RecordsDiffer: 1, DifferingBodies: [namedDifferences]DifferingBody{
+			{File: "shape.go", Offset: strings.Index(standingSources[0].source, "func Answer"), Field: "encoding"},
+		}}},
 	} {
 		host := &recordsHost{identifier: standingPackagePath, recorded: copiedRecords(recorded)}
 		each.change(host)

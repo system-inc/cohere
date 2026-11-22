@@ -45,7 +45,8 @@ type SplicedBodies struct {
 	FilesDiffer int
 	// RecordsDiffer are those whose record passed every check above but is not, end for end, the record the build
 	// writes of the body itself, walking it with a recorder on (the record differential): a hole in what a record
-	// reaches, or a read the checks of its files missed, which the body's walk keeps out of the verdict.
+	// reaches, or a read the checks of its files missed, which the body's walk keeps out of the verdict. A record that
+	// does not encode at all, as no recorder writes one, is among them too.
 	RecordsDiffer int
 	// DifferingBodies names the first of RecordsDiffer, in the order the package declares them, as many as it has
 	// room for, and holds the zero DifferingBody past them.
@@ -61,7 +62,8 @@ type SplicedBodies struct {
 // DifferingBody is a body whose host's record is not the build's own: the key it stands by, the file a reader sees
 // its `func` in and the offset of that `func` as parsed, and the first field of the canonical form the two records
 // disagree on, as the form's JSON names it, with the index of the first differing entry of a list: `uses[1]`.
-// `record` says the build wrote no record of its own at the key.
+// `record` says the build wrote no record of its own at the key, and `encoding` that the two encode differently
+// though every field agrees, or that one of them does not encode at all.
 type DifferingBody struct {
 	File   string
 	Offset int
@@ -136,6 +138,8 @@ func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, []bodyRe
 	}
 	ownRecords, ownError := builtRecords(built)
 	if ownError != nil {
+		// The build's own graph takes no record and walks every body, as a plain run does, so where its entry fails
+		// a plain run of the package fails the same way, and no fallback has a verdict to give.
 		return nil, nil, ownError
 	}
 	var taken []bodyRecord
@@ -143,7 +147,9 @@ func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, []bodyRe
 		own, isOwn := ownRecords[record.Body]
 		field, differError := recordDifference(record, own, isOwn)
 		if differError != nil {
-			return nil, nil, differError
+			// A record no recorder writes cannot be compared, so its body is walked as one whose records differ: a
+			// host's record the build cannot read costs that body's splice, never the package's findings.
+			field = "encoding"
 		}
 		if field == "" {
 			spliced.Spliced++
