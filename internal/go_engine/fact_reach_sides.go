@@ -73,6 +73,7 @@ func newFactReachSides(
 			}
 		}
 		sides.packages[analyzedPackage.ID] = newFactReachPackage(factReachInputs{
+			own:          hosted.Types,
 			fileSet:      hosted.Fset,
 			record:       record,
 			renderer:     build_reads.NewIdentityRenderer(hosted.Fset, nil),

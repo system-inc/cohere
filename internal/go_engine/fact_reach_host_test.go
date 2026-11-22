@@ -153,7 +153,7 @@ func (fixture *factReachFixture) key(test *testing.T, object types.Object) fact_
 // order, no function holding the no-return fact and no body holding anything presence reads, its bodies read, for a
 // test to add its own to.
 func (fixture *factReachFixture) inputs() factReachInputs {
-	return factReachInputs{fileSet: fixture.fileSet, record: fixture.record,
+	return factReachInputs{own: fixture.own, fileSet: fixture.fileSet, record: fixture.record,
 		renderer: build_reads.NewIdentityRenderer(fixture.fileSet, nil),
 		noReturn: func(*types.Func) bool { return false }, presenceRead: true}
 }

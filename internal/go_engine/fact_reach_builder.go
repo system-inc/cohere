@@ -14,6 +14,7 @@ import (
 )
 
 // factReachInputs are what one package's side is made from (newFactReachPackage), each the host's own:
+//   - own is the package.
 //   - fileSet places the record's declarations in their files.
 //   - record is stage 1's record of what each of the package's declarations uses.
 //   - renderer renders the identities, on the caller's goroutine.
@@ -27,6 +28,7 @@ import (
 //     the host's run held it (check.FactReachPackage.Presence), presenceRead whether it was read at all, and markers
 //     the method names of the marker interfaces the package declares (check.FactReachPackage.Markers).
 type factReachInputs struct {
+	own          *types.Package
 	fileSet      *token.FileSet
 	record       *build_reads.FunctionUses
 	renderer     *build_reads.IdentityRenderer
@@ -258,7 +260,8 @@ func (builder *factReachBuilder) meet(function *types.Func) {
 // alone, so no other object holds a wrapper fact a call reads in any build, and comparing only these keeps every other
 // kind's comparison as it was. A local variable is left out: a function literal assigned to one is called only in the
 // body that declares the variable, whose own uses of the literal's callees are compared, so that body leaves wherever
-// the variable's fact could differ. So is an object no identity names, which no build could find its own of.
+// the variable's fact could differ. So is an object no identity names, which no build could find its own of. A
+// variable or a field of another package is marked Local, its kind here no fact's (fact_reach.PushedObject).
 func (builder *factReachBuilder) meetPushed(object types.Object) {
 	facts, isRun := builder.inputs.pushed[printf.Analyzer.Name]
 	if !isRun {
@@ -296,8 +299,10 @@ func (builder *factReachBuilder) meetPushed(object types.Object) {
 	case *types.Var:
 		declared = generic.Origin()
 	}
+	_, isVariable := object.(*types.Var)
 	builder.hosted.pushedObjects = append(builder.hosted.pushedObjects, fact_reach.PushedObject{Object: rendered.key,
-		Identity: rendered.identity, Pushed: map[string]string{printf.Analyzer.Name: facts[declared]}})
+		Identity: rendered.identity, Pushed: map[string]string{printf.Analyzer.Name: facts[declared]},
+		Local: isVariable && object.Pkg() != builder.inputs.own})
 }
 
 // declare keeps each function declared declares, by its object, with the place of its body, and its parameters,

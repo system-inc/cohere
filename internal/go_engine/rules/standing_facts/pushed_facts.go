@@ -20,6 +20,10 @@ var pushedReasons = map[string]fact_reach.Reason{
 	deprecated.Analyzer.Name: "deprecation",
 }
 
+// localWrapperReason is why a variable or a field of another package was named whatever its facts read: printf may
+// hold a kind of it found in the package alone, which no fact carries (fact_reach.PushedObject.Local).
+const localWrapperReason fact_reach.Reason = "local printf wrapper"
+
 // pushedFacts are the build's own pushed facts the pass reads, beside ctrlflow's no-return, as the host's capture
 // holds them (check.FactReachPackage.Pushed): printf's wrapper facts, its result on the package, which holds the facts
 // of the package's own functions, interface methods and variables and those its imports exported that its pass looked

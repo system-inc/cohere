@@ -237,3 +237,54 @@ func TestAPrintfWrapperHeldByAGenericFieldTakesItsUserOut(test *testing.T) {
 		})
 	}
 }
+
+// printf finds a function literal assigned to another package's variable a wrapper where it forwards to one, as it does
+// one assigned to its own package's (wrapper_search.go's gather and assignedVariable), and calls of the variable read
+// that kind in the assigning package. But it exports a fact only on its own package's objects (propagate), so the kind
+// is the package's alone, in no build's facts, and no comparison of facts can see it differ (seats' review-1, must 2).
+// A field of another package's type is the same (assignedVariable, through the field's selection). In both fixtures
+// reader gives api.Logf and an api.Logger's Logf field, in a shared file, a literal each forwarding to impl.Emit, which
+// forwards to fmt.Printf in one build alone, and gives api.Tracef, in a platform file of its own alone, a literal
+// forwarding to impl.Printf, a wrapper everywhere: the host's in the -host fixture, windows's in the -extra one.
+// Target, FieldTarget and TraceTarget call one each and name nothing else, so the reach leaves them standing, with
+// api's facts of all three empty in both builds, and on the host's findings each would invent windows a printf finding
+// in the first and lose windows's in the second, and neither leg of the differential failed. Each variable or field of
+// another package of a print shape a body uses is named for that kind now (fact_reach.PushedObject.Local), so each
+// target leaves, and the differential fails nothing; and the second leg fails a standing user of one, which it does
+// here where the naming is taken away.
+func TestAPrintfWrapperFoundForAnImportedVariableTakesItsUserOut(test *testing.T) {
+	test.Parallel()
+	for _, each := range []struct {
+		fixture string
+		module  string
+		// onHost is whether the host's build makes both variables wrappers in reader, and windows's does not; else the
+		// reverse.
+		onHost bool
+	}{
+		{"fact-printf-imported-host", "example.com/printfimportedhost", true},
+		{"fact-printf-imported-extra", "example.com/printfimportedextra", false},
+	} {
+		test.Run(each.fixture, func(test *testing.T) {
+			test.Parallel()
+
+			settled := settleFactFixture(test, each.fixture, each.module+"/reader")
+			for user, callee := range map[string]string{
+				"Target": "Logf", "FieldTarget": "Logger.UF0", "TraceTarget": "Tracef",
+			} {
+				if reason := settled.bodies[user].reason; reason != "" {
+					test.Fatalf("the reach reached %s for %q, want it unreached, so that only the facts can take it "+
+						"out", user, reason)
+				}
+				settled.requireRemovedBy(test, user, callee, "local printf wrapper")
+			}
+			if printfIn(settled.host.result.Findings, "reader.go") != each.onHost ||
+				printfIn(settled.run.result.Findings, "reader.go") == each.onHost {
+				test.Errorf("the targets' calls are printf findings on the host %t and on windows %t, want the host's "+
+					"%t and windows's the other", printfIn(settled.host.result.Findings, "reader.go"),
+					printfIn(settled.run.result.Findings, "reader.go"), each.onHost)
+			}
+			requireNoDifferentialFailure(test, settled)
+			requireOwnFindingsAlike(test, each.fixture)
+		})
+	}
+}

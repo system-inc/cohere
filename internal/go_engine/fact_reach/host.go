@@ -79,10 +79,19 @@ type Function struct {
 // package shows, and a variable one where a function literal assigned to it forwards to one, its fact on the variable.
 // Neither has a body or a no-return fact of its own, so neither is a Function, and Pushed holds printf's fact alone,
 // in the fact's words, empty for no fact, and no entry where the host never ran printf on the package.
+//
+// Local is whether the object is a variable or a field of another package than the one whose bodies use it (seats'
+// review-1 on #zqx7gke, must 2). printf finds a function literal this package assigns to such a variable a wrapper as
+// it finds one assigned to its own, and its calls here read that kind, but it exports a fact only on its own
+// package's objects, so the kind is this package's alone and in no build's facts: two builds whose files assign it
+// differently, or whose literal forwards to callees of differing kinds, hold the same facts of it. No other object
+// holds a kind no fact carries (wrapper_search.go's propagate), so a build takes each such object's users out, its
+// facts unread.
 type PushedObject struct {
 	Object   Object
 	Identity build_reads.Identity
 	Pushed   map[string]string
+	Local    bool
 }
 
 // UsedObject is one object the package's bodies use: its key, the one Users is asked by, and the identity that names

@@ -66,6 +66,10 @@ import (
 // standingNoReturn is the kind the second leg counts a no-return fact's comparison under.
 const standingNoReturn = "no-return"
 
+// standingLocalWrapper is the kind the second leg counts a variable or a field of another package a standing body uses
+// under, whose printf kind in the package no fact carries (fact_reach.PushedObject.Local).
+const standingLocalWrapper = "local printf wrapper"
+
 // buildBodyDifferential is one build's body differential: how many unreached bodies it compared, each one's failure
 // line where it differed, each findings difference a later stage owns by that stage (findingStage), and the bodies
 // compared by their types, whose findings are compared once the build's rules have run.
@@ -86,8 +90,8 @@ type buildBodyDifferential struct {
 	lintedApart     int
 	lintedByNeither int
 
-	// standingCompared and standingFailed are the second leg's comparisons and failures by kind, an answer's kind or
-	// standingNoReturn; each failure's line is among failures too.
+	// standingCompared and standingFailed are the second leg's comparisons and failures by kind, an answer's kind,
+	// standingNoReturn or standingLocalWrapper; each failure's line is among failures too.
 	standingCompared map[string]int
 	standingFailed   map[string]int
 
@@ -672,6 +676,9 @@ func (differential *buildBodyDifferential) compareStandingPackage(
 // the build renders an identity of naming the host's (sameStandingObject); an object the build holds no fact of reads
 // empty, as the host's capture writes one. A difference fails at the first standing user, in the order the host
 // declares them, under the analyzer's name.
+//
+// A variable or a field of another package (fact_reach.PushedObject.Local) has a kind in the package no capture holds,
+// which the facts' reach takes every user out for, so one that stands fails whatever its facts read.
 func (differential *buildBodyDifferential) compareStandingPushed(
 	hosted *factReachPackage,
 	standing map[fact_reach.Place]bool,
@@ -689,6 +696,10 @@ func (differential *buildBodyDifferential) compareStandingPushed(
 		})
 		if len(users) == 0 {
 			continue
+		}
+		if object.Local {
+			differential.standingCompared[standingLocalWrapper]++
+			fail(users[0], object.Identity.String(), standingLocalWrapper, "a kind in no fact", "unread")
 		}
 		for _, analyzer := range slices.Sorted(maps.Keys(object.Pushed)) {
 			builtFacts, isHeld := capturedPackage.Pushed[analyzer]

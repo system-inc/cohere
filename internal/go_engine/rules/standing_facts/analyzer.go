@@ -138,7 +138,9 @@ func run(pass *analysis.Pass) (any, error) {
 	// wrapper where an implementation assigned to it anywhere in the package is one, and a variable one where the
 	// function literal assigned to it forwards to one, so either's fact can differ with its text and file the same in
 	// both builds. Neither is a function, and neither has a no-return fact. One the build has no own object of reads
-	// unknown.
+	// unknown. A variable or a field of another package is named after its facts whatever they read: printf may hold a
+	// kind of it found here alone, which neither build's facts carry (fact_reach.PushedObject.Local). Its facts are
+	// still compared first, so one that differs names it for that, as any other object's would.
 	for _, object := range host.PushedObjects() {
 		own, found := functions.pushedObject(object.Identity)
 		if !found {
@@ -148,6 +150,11 @@ func run(pass *analysis.Pass) (any, error) {
 		result.PushedCompared += compared
 		result.PushedNamed += len(differing)
 		named = append(named, differing...)
+		if object.Local {
+			result.PushedCompared++
+			result.PushedNamed++
+			named = append(named, fact_reach.Named{Object: object.Object, Reason: localWrapperReason})
+		}
 	}
 	// Each function of the package named for its own deprecation is a user of it at the place that declares it
 	// (ownDeprecationUsers).
