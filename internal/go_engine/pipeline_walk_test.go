@@ -3,6 +3,7 @@ package go_engine
 import (
 	"encoding/json"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -398,13 +399,30 @@ func TestARejudgedImporterOfAChangedAnswerDeclines(test *testing.T) {
 
 // A load the restore from the host is off for reports its own counts, and none of the load before it (#78tynz4):
 // windows declines opener at its check, then user in the reload, which turns the restore off, so its third load
-// restores nothing from the host. That load visits, leaves untouched, restores and declines at its load nothing, and
-// what is declined is check's alone, opener and user by their answers, kept over every load. A load that returned
-// before clearing the last load's counts would report the second load's visits, and its load declines, as its own.
+// restores nothing from the host. In the copy, sizer reads platform's Size, another on windows, so the first load and
+// the reload each decline it at their load. The third load visits, leaves untouched, restores and declines at its load
+// nothing, and what is declined is check's alone, opener and user by their answers, kept over every load. A load that
+// returned before clearing the last load's counts would report the reload's visits, and its load declines and their
+// reasons, sizer's, as its own.
 func TestAThirdLoadReportsItsOwnHostRestoreCounts(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-redecline")), exitFindings)
+	root := copyFixture(test, filepath.Join("testdata", "walk-redecline"))
+	for name, contents := range map[string]string{
+		"platform/size_windows.go": "package platform\n\n// Size is a size, another on windows.\nconst Size = 2\n",
+		"platform/size_other.go":   "//go:build !windows\n\npackage platform\n\n// Size is a size.\nconst Size = 1\n",
+		"sizer/sizer.go": "// Package sizer reads platform's Size.\npackage sizer\n\n" +
+			"import \"example.com/walkredecline/platform\"\n\n// Twice is twice platform's Size.\n" +
+			"func Twice() int { return platform.Size * 2 }\n",
+	} {
+		if makeError := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	engine, _ := runOver(test, root, exitFindings)
 	windows := buildRunOf(test, engine, "windows")
 	fromHost := windows.result.FromHost
 	if fromHost.ReloadRounds != 2 || windows.result.Cache.ReloadRoundsBy["hostDecline"] != 2 {
@@ -412,16 +430,19 @@ func TestAThirdLoadReportsItsOwnHostRestoreCounts(test *testing.T) {
 			"third load never ran with the restore off and the case proves nothing", fromHost.ReloadRounds,
 			windows.result.Cache.ReloadRoundsBy)
 	}
-	if fromHost.Visited != 0 || len(fromHost.Untouched) != 0 || len(fromHost.Restored) != 0 ||
-		fromHost.DeclinedAtLoad != 0 {
-		test.Errorf("windows' third load visited %d, left %q untouched, restored %q and declined %d at its load, "+
-			"want nothing, the restore off", fromHost.Visited, fromHost.Untouched, fromHost.Restored,
-			fromHost.DeclinedAtLoad)
+	if fromHost.Visited != 0 || len(fromHost.Untouched) != 0 || len(fromHost.Restored) != 0 {
+		test.Errorf("windows' third load visited %d, left %q untouched and restored %q, want nothing, the restore off",
+			fromHost.Visited, fromHost.Untouched, fromHost.Restored)
 	}
+	// What the load declined is the load's alone: its count, and its reasons among Declined, which holds check's too.
 	declined := slices.Sorted(maps.Keys(fromHost.Declined))
-	if want := []string{redeclineOpener, redeclineUser}; fromHost.DeclinedAtCheck != 2 ||
-		!slices.Equal(declined, want) || !maps.Equal(fromHost.DeclinedBy, map[string]int{"answers": 2}) {
-		test.Errorf("windows declined %d at check, %q in all, %v by reason, want %q by their answers alone",
-			fromHost.DeclinedAtCheck, declined, fromHost.DeclinedBy, want)
+	if want := []string{redeclineOpener, redeclineUser}; fromHost.DeclinedAtLoad != 0 ||
+		!slices.Equal(declined, want) {
+		test.Errorf("windows' third load declined %d at its load, and %q in all, want none at its load and %q, "+
+			"check's alone", fromHost.DeclinedAtLoad, declined, want)
+	}
+	if fromHost.DeclinedAtCheck != 2 || !maps.Equal(fromHost.DeclinedBy, map[string]int{"answers": 2}) {
+		test.Errorf("windows declined %d at check, %v by reason, want opener and user by their answers alone",
+			fromHost.DeclinedAtCheck, fromHost.DeclinedBy)
 	}
 }
