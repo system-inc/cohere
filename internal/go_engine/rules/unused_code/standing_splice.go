@@ -8,6 +8,8 @@ import (
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
+	"honnef.co/go/tools/analysis/facts/generated"
+	"honnef.co/go/tools/analysis/lint"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -48,6 +50,12 @@ type SplicedBodies struct {
 	// DifferingBodies names the first of RecordsDiffer, in the order the package declares them, as many as it has
 	// room for, and holds the zero DifferingBody past them.
 	DifferingBodies [namedDifferences]DifferingBody
+	// SpliceFailed are the bodies whose records the build took and then dropped, because the graph could not take or
+	// replay them, so a fresh graph walked every body instead (enterSpliced). They are not counted in Spliced.
+	SpliceFailed int
+	// SpliceFailure is the error the failed splice stopped at, as text for a census to read, and empty where no splice
+	// failed. A run splices once, so it holds at most one.
+	SpliceFailure string
 }
 
 // DifferingBody is a body whose host's record is not the build's own: the key it stands by, the file a reader sees
@@ -71,23 +79,24 @@ func SplicedOf(analyzerResult any) (SplicedBodies, bool) {
 	return *verdict.spliced, true
 }
 
-// standingSplice has built take the host's record of each body of pass's package that stands there, where the record
-// is usable, and is what it did with each, nil when pass holds no standing answer or no host's side that answers a
-// record. Whether a record is usable is JudgeRecords' judgment, the one the standing set's settlement takes a body out
-// by where the side holds the package's records. A usable record is then taken only where it encodes as the build's
-// own record of the body does (builtRecords), which a second graph of the package writes, built only when some record
-// is usable. Any other standing body is walked, as every body is without a standing answer. A graph that records
-// takes nothing: no run both records and stands, and a spliced local holds no object a recorder could place.
-func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, error) {
+// standingSplice is the host's record of each body of pass's package that stands there that built should take, where
+// the record is usable, and what it did with each, nil when pass holds no standing answer or no host's side that
+// answers a record. Whether a record is usable is JudgeRecords' judgment, the one the standing set's settlement takes
+// a body out by where the side holds the package's records. A usable record is then taken only where it encodes as
+// the build's own record of the body does (builtRecords), which a second graph of the package writes, built only when
+// some record is usable. Any other standing body is walked, as every body is without a standing answer. A graph that
+// records takes nothing: no run both records and stands, and a spliced local holds no object a recorder could place.
+// The records are handed back rather than taken, so enterSpliced can walk every body where taking them fails.
+func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, []bodyRecord, error) {
 	_, stands := pass.ResultOf[rule.Standing].(rule.StandingBodies)
 	host, hosts := pass.ResultOf[rule.FactHost].(BodyRecordHost)
 	if !stands || !hosts || built.recorder != nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	spliced := &SplicedBodies{}
 	spans := rule.StandingSpans(pass)
 	if len(spans) == 0 {
-		return spliced, nil
+		return spliced, nil, nil
 	}
 	var standingFunctions []*ast.FuncDecl
 	for _, file := range pass.Files {
@@ -123,18 +132,18 @@ func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, error) {
 		}
 	}
 	if len(usable) == 0 {
-		return spliced, nil
+		return spliced, nil, nil
 	}
 	ownRecords, ownError := builtRecords(built)
 	if ownError != nil {
-		return nil, ownError
+		return nil, nil, ownError
 	}
 	var taken []bodyRecord
 	for _, record := range usable {
 		own, isOwn := ownRecords[record.Body]
 		field, differError := recordDifference(record, own, isOwn)
 		if differError != nil {
-			return nil, differError
+			return nil, nil, differError
 		}
 		if field == "" {
 			spliced.Spliced++
@@ -147,13 +156,42 @@ func standingSplice(pass *analysis.Pass, built *graph) (*SplicedBodies, error) {
 		}
 		spliced.RecordsDiffer++
 	}
+	return spliced, taken, nil
+}
+
+// enterSpliced enters built, having it take taken, the records standingSplice handed back, first, and is the graph
+// whose results are the verdict and what the run did with the standing bodies, spliced as standingSplice counted
+// them. Where built cannot take the records or replay one, the run drops them all, counted in SpliceFailed in place
+// of Spliced with the error kept as SpliceFailure, and enters a fresh graph of pass's package, as passGraph builds
+// it, that walks every body, as a plain run does: a record the build cannot replay costs the splice, never the
+// package's findings. Built is not entered again, since a failed entry leaves it half walked. With nothing taken,
+// entry's error is the run's, as on a plain run, and so is the fresh graph's.
+func enterSpliced(
+	pass *analysis.Pass,
+	packageDirectives []lint.Directive,
+	generatedFiles map[string]generated.Generator,
+	built *graph,
+	taken []bodyRecord,
+	spliced *SplicedBodies,
+) (*graph, *SplicedBodies, error) {
 	if len(taken) == 0 {
-		return spliced, nil
+		return built, spliced, built.entry()
 	}
-	if takeError := built.takeRecords(taken); takeError != nil {
-		return nil, takeError
+	spliceError := built.takeRecords(taken)
+	if spliceError == nil {
+		// Entry fails only where a record it took cannot be spliced.
+		spliceError = built.entry()
 	}
-	return spliced, nil
+	if spliceError == nil {
+		return built, spliced, nil
+	}
+	// Records are taken only on a run standingSplice counted, so spliced is never nil here.
+	fellBack := *spliced
+	fellBack.SpliceFailed += len(taken)
+	fellBack.Spliced -= len(taken)
+	fellBack.SpliceFailure = spliceError.Error()
+	walked := passGraph(pass, packageDirectives, generatedFiles)
+	return walked, &fellBack, walked.entry()
 }
 
 // builtRecords is the record a build's own walk writes of each body of built's package, by the body's key: a second

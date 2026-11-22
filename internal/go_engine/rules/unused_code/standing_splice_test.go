@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"honnef.co/go/tools/analysis/facts/generated"
+	"honnef.co/go/tools/analysis/lint"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -288,6 +290,78 @@ func TestABuildWithNoRecordOfItsOwnDiffersAtRecord(test *testing.T) {
 		}
 		if field != "record" {
 			test.Errorf("%s: with no record of its own the build differs at %q, want record", each.name, field)
+		}
+	}
+}
+
+// A splice the graph fails at falls back to walking every body (#xeafx79): handed a record it cannot take, one a flag
+// keeps present, or one it takes and cannot replay, Answer's with a use of types.go's field moved to the offset of
+// the file's `package`, where nothing is declared, the run walks a fresh graph whole and finds the plain verdict,
+// counts the dropped record in SpliceFailed and not in Spliced, keeps the error as text, and fails nothing.
+func TestAFailedSpliceFallsBackToWalkingEveryBody(test *testing.T) {
+	test.Parallel()
+	recorded := hostRecords(test, standingSources)
+	plainPass := recordedPass(test, standingSources, nil)
+	plainVerdict, plainError := run(plainPass)
+	if plainError != nil {
+		test.Fatalf("running U1000 plainly: %v", plainError)
+	}
+	plainResult, isResult := plainVerdict.(result)
+	if !isResult {
+		test.Fatalf("U1000's result is %T", plainVerdict)
+	}
+	plain := wordedVerdict(plainPass.Fset, plainResult)
+	var answer bodyRecord
+	for _, body := range recorded.Bodies {
+		if body.ParsedFile == "shape.go" {
+			answer = body.record
+		}
+	}
+	if answer.Body.File != "shape.go" {
+		test.Fatal("the host recorded no body of shape.go")
+	}
+	typesFile := slices.Index(answer.PlaceFiles, "types.go")
+	declaredUse := slices.IndexFunc(answer.Uses, func(use recordedUse) bool {
+		return use.Used.Kind == endDeclared && int(use.Used.Place.File) == typesFile
+	})
+	if typesFile < 0 || declaredUse < 0 {
+		test.Fatalf("Answer's record %+v uses nothing declared in types.go: the fixture holds nothing to move", answer)
+	}
+
+	for _, each := range []struct {
+		name    string
+		change  func(*bodyRecord)
+		failure string
+	}{
+		{name: "a record the graph cannot take", change: func(record *bodyRecord) {
+			record.Present.AllFieldsUsed = true
+		}, failure: "is kept present"},
+		{name: "a record the graph cannot replay", change: func(record *bodyRecord) {
+			record.Uses = slices.Clone(record.Uses)
+			record.Uses[declaredUse].Used.Place.Offset = 0
+		}, failure: "an object declared at types.go offset 0"},
+	} {
+		record := answer
+		each.change(&record)
+		pass := recordedPass(test, standingSources, nil)
+		packageDirectives, _ := pass.ResultOf[directivesAnalyzer].([]lint.Directive)
+		generatedFiles, _ := pass.ResultOf[generated.Analyzer].(map[string]generated.Generator)
+		built := passGraph(pass, packageDirectives, generatedFiles)
+		walked, spliced, entryError := enterSpliced(pass, packageDirectives, generatedFiles, built,
+			[]bodyRecord{record}, &SplicedBodies{Spliced: 1})
+		if entryError != nil {
+			test.Errorf("%s: the run failed: %v", each.name, entryError)
+			continue
+		}
+		if spliced.Spliced != 0 || spliced.SpliceFailed != 1 || !strings.Contains(spliced.SpliceFailure, each.failure) {
+			test.Errorf("%s: the run did %+v with Answer's body, want it dropped into SpliceFailed for an error "+
+				"naming %q", each.name, *spliced, each.failure)
+		}
+		if walked == built {
+			test.Errorf("%s: the verdict is read from the graph whose splice failed", each.name)
+		}
+		if verdict := wordedVerdict(pass.Fset, walked.results()); !slices.Equal(verdict, plain) {
+			test.Errorf("%s: the verdict is\n%v\nwant the plain run's\n%v", each.name, verdict, plain)
 		}
 	}
 }

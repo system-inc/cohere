@@ -43,13 +43,13 @@ func run(pass *analysis.Pass) (any, error) {
 
 	graph := passGraph(pass, packageDirectives, generatedFiles)
 	// An extra build splices the host's record of each body that stands there in place of walking it, where the
-	// record is usable, before entry walks the rest.
-	spliced, spliceError := standingSplice(pass, graph)
+	// record is usable, before entry walks the rest, and walks every body where the splice fails.
+	spliced, taken, spliceError := standingSplice(pass, graph)
 	if spliceError != nil {
 		return nil, spliceError
 	}
-	// Entry fails only where a record it took cannot be spliced.
-	if entryError := graph.entry(); entryError != nil {
+	graph, spliced, entryError := enterSpliced(pass, packageDirectives, generatedFiles, graph, taken, spliced)
+	if entryError != nil {
 		return nil, entryError
 	}
 	verdict := graph.results()
