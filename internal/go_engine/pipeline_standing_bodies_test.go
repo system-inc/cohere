@@ -343,7 +343,8 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 // the census does. The finding the gate decides there is named by its rule, its line in file, a fragment of its
 // message, and fix, where not empty, a fragment one of its suggestions holds in its message or an edit's text; finder
 // is the build that finds it, "host" or "build" for the other, the second finding nothing of the rule on that line
-// that matches. standing is how many declarations the other build took the host's findings in with the switch on.
+// that matches, or "neither", where the gate opens in both builds. standing is how many declarations the other build
+// took the host's findings in with the switch on.
 //
 // imports is whether what opens or closes the gate is an import that one build's file alone holds in the gated
 // declaration's own package. The reach reaches such a package whole, Imports (#bed0mnk), so stood cannot stand there:
@@ -353,17 +354,23 @@ func TestStandingBodiesFindWhatEveryBodyHeardFinds(test *testing.T) {
 //
 // What such a row no longer shows by a standing body: the other build judges the reached declaration itself, so its
 // findings read the same whatever the inputs table declares for the rule, and a rule flipped to PerUnit there would
-// pass every one of them. So the row holds the table's line directly: its rule is absent from the run's confined set
-// (pipeline.standingConfined), as a dispatched rule declared Composes is and one declared PerUnit is not. That line
-// is what the imports reason will be rebuilt from, the rules' own table (version (b), #bed0mnk), and a standing body
-// shows it again then. The finding is still held to the build that opens the gate, with the switch on as off.
+// pass every one of them. So the row holds the table's line directly: confined is whether its rule is in the run's
+// confined set (pipeline.standingConfined), as a dispatched rule declared PerUnit is and one declared Composes is not.
+// An imports row's rule is not confined but SA5008's, the imports reason being what carries its gate (#dp67trx). That
+// line is what the imports reason will be rebuilt from, the rules' own table (version (b), #bed0mnk), and a standing
+// body shows it again then. The finding is still held to the build that opens the gate, with the switch on as off.
 //
 // scopeName is whether what opens or closes the gate is a universe name, or a name a rule declares it asks its scope
 // about, that one build's file alone declares at package level in the gated declaration's own package. The reach
-// reaches such a package whole, ScopeName (#b255cfy), so the rule is PerUnit in the table and confined, the opposite
-// of an imports row: the reason is what keeps a confined rule's fix right, and with it dropped stood stands with the
-// host's finding and its fix. The gate flips a fix alone in all three, which the body differential cannot see, since
-// it compares a finding's rule, place and message (findingsWithin), never its suggestions.
+// reaches such a package whole, ScopeName (#b255cfy), so the rule is PerUnit in the table and confined, as SA5008's
+// imports rows are and the others are not: the reason is what keeps a confined rule's fix right, and with it dropped
+// stood stands with the host's finding and its fix. The gate flips a fix alone in all three, which the body
+// differential cannot see, since it compares a finding's rule, place and message (findingsWithin), never its
+// suggestions.
+//
+// confined is held for every row, a standing one's too, whose rule the table declares Composes, never confined, so the
+// other build judges the standing body itself. The row writes the table's line rather than reading it from
+// rules.DeclaredInputs, so a line flipped in the table alone fails here.
 type standingGate struct {
 	module    string
 	stood     string
@@ -376,16 +383,22 @@ type standingGate struct {
 	standing  int
 	imports   bool
 	scopeName bool
+	confined  bool
 }
 
-// standingGates are the modules, two for each gate the table holds Composes for: the thing that opens or closes it in
-// the other build's file alone (-win), and in the host's alone (-host). In each pair one module's finding is the
-// host's alone, which the other build would invent were the body left to the host for the rule, and the other's is
-// the other build's alone, which it would lose.
+// standingGates are the modules, two for each gate the table holds Composes for, or held for until a reason carried
+// it: the thing that opens or closes it in the other build's file alone (-win), and in the host's alone (-host). In
+// each pair one module's finding is the host's alone, which the other build would invent were the body left to the
+// host for the rule, and the other's is the other build's alone, which it would lose.
 //   - SA4029 by a method of sort used through an alias (sort-alias-*), from a shared file that imports no sort, and by
 //     a bare import of sort (sort-import-*): either puts sort's slice types in the package's type index.
 //   - SA5008 by an import of go-flags (import-goflags-*), a stub by the module's replace, after which a repeated
-//     `default` key in a struct tag is accepted anywhere in the package.
+//     `default` key in a struct tag is accepted anywhere in the package. SA5008 is PerUnit, its gate carried by the
+//     imports reason, and the gate reads the import's path, not its literal's text (#dp67trx): an import spelled with
+//     an escape, `go\x2dflags`, opens it in its own build alone (import-goflags-escaped-win), and one build's escaped
+//     import beside the other's plain one, which leave the imports equal and Target standing, opens it in both, so
+//     neither finds it and the other build takes no finding of the host's that its own gate would refuse
+//     (import-goflags-escaped-both). Each escaped file is written into the run's copy (standingGateWritten).
 //   - tests by the package's scope, `ExampleFoo` referring to an unknown identifier unless some file declares Foo
 //     (example-*), by its imports, `ExampleBuffer` unless some file imports bytes (example-import-*), and by the
 //     members of the type an example names, `ExampleFoo_Bar` referring to an unknown field or method unless some file
@@ -402,12 +415,19 @@ type standingGate struct {
 //     (sprintf-scope-*), and stringintconv imports fmt under its own name only while no file declares fmt
 //     (stringint-scope-*). The host's -host modules declare it in a file windows does not compile, the -win in
 //     windows's alone.
+//   - ST1016 by every file's methods of one type, a method naming its receiver otherwise in one build's file alone
+//     (receiver-names-*). It is the one gate here that hears no body: Target, which stands, holds a local Thing, a
+//     closure and a function value whose named parameters are one, each shaped like a receiver, and the pinned
+//     message counts none of them, so a rule that read bodies would count them and lose the pin (#dp67trx,
+//     TestReceiverNamesHearNoBody). Target names nothing of the package's Thing, whose method set differs and would
+//     reach it by Named, and no method, whose printf wrapper fact the other build never looks up and which so takes
+//     it out of the standing set.
 //
 // Four of the pairs flip their gate by an import in a file of the gated declaration's own package, a bare one or one
-// a use takes: sort-import-*, import-goflags-*, example-import-* and abbreviated-sort-* (standingGate.imports), and
-// three by a name one side alone declares there, copy-scope-*, sprintf-scope-* and stringint-scope-*
-// (standingGate.scopeName). There the reach leaves nothing of the package standing, and what stands is the quiet
-// package's one body.
+// a use takes: sort-import-*, import-goflags-* but import-goflags-escaped-both, example-import-* and
+// abbreviated-sort-* (standingGate.imports), and three by a name one side alone declares there, copy-scope-*,
+// sprintf-scope-* and stringint-scope-* (standingGate.scopeName). There the reach leaves nothing of the package
+// standing, and what stands is the quiet package's one body.
 var standingGates = []standingGate{
 	{module: "sort-alias-win", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
 		fragment: "sort.IntSlice is a type, not a function", finder: "build", standing: 2},
@@ -418,9 +438,13 @@ var standingGates = []standingGate{
 	{module: "sort-import-host", stood: "target", file: "shared.go", rule: "SA4029", line: 5,
 		fragment: "sort.IntSlice is a type, not a function", finder: "host", standing: 1, imports: true},
 	{module: "import-goflags-win", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
-		fragment: `duplicate struct tag "default"`, finder: "host", standing: 1, imports: true},
+		fragment: `duplicate struct tag "default"`, finder: "host", standing: 1, imports: true, confined: true},
 	{module: "import-goflags-host", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
-		fragment: `duplicate struct tag "default"`, finder: "build", standing: 1, imports: true},
+		fragment: `duplicate struct tag "default"`, finder: "build", standing: 1, imports: true, confined: true},
+	{module: "import-goflags-escaped-win", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
+		fragment: `duplicate struct tag "default"`, finder: "host", standing: 1, imports: true, confined: true},
+	{module: "import-goflags-escaped-both", stood: "Target", file: "shared.go", rule: "SA5008", line: 5,
+		fragment: `duplicate struct tag "default"`, finder: "neither", standing: 1, confined: true},
 	{module: "example-win", stood: "ExampleFoo", file: "example_test.go", rule: "tests", line: 3,
 		fragment: "ExampleFoo refers to unknown identifier: Foo", finder: "host", standing: 2},
 	{module: "example-host", stood: "ExampleFoo", file: "example_test.go", rule: "tests", line: 3,
@@ -451,28 +475,61 @@ var standingGates = []standingGate{
 		standing: 1},
 	{module: "copy-scope-win", stood: "target", file: "shared.go", rule: "S1018", line: 4,
 		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "host", standing: 1,
-		scopeName: true},
+		scopeName: true, confined: true},
 	{module: "copy-scope-host", stood: "target", file: "shared.go", rule: "S1018", line: 4,
 		fragment: "should use copy() instead of loop", fix: "Use copy() instead of loop", finder: "build", standing: 1,
-		scopeName: true},
+		scopeName: true, confined: true},
 	{module: "sprintf-scope-win", stood: "target", file: "shared.go", rule: "S1025", line: 8,
 		fragment: "should use a simple conversion", fix: "Replace with conversion to string", finder: "host",
-		standing: 1, scopeName: true},
+		standing: 1, scopeName: true, confined: true},
 	{module: "sprintf-scope-host", stood: "target", file: "shared.go", rule: "S1025", line: 8,
 		fragment: "should use a simple conversion", fix: "Replace with conversion to string", finder: "build",
-		standing: 1, scopeName: true},
+		standing: 1, scopeName: true, confined: true},
 	{module: "stringint-scope-win", stood: "target", file: "shared.go", rule: "stringintconv", line: 4,
-		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "host", standing: 1, scopeName: true},
+		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "host", standing: 1, scopeName: true,
+		confined: true},
 	{module: "stringint-scope-host", stood: "target", file: "shared.go", rule: "stringintconv", line: 4,
-		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "build", standing: 1, scopeName: true},
+		fragment: "conversion from int to string", fix: "fmt.Sprint", finder: "build", standing: 1, scopeName: true,
+		confined: true},
+	{module: "receiver-names-win", stood: "Target", file: "shared.go", rule: "ST1016", line: 5,
+		fragment: `same receiver name (seen 1x "thing", 2x "t")`, finder: "build", standing: 1},
+	{module: "receiver-names-host", stood: "Target", file: "shared.go", rule: "ST1016", line: 5,
+		fragment: `same receiver name (seen 1x "thing", 2x "t")`, finder: "host", standing: 1},
 }
 
-// runStandingGate runs the engine over a copy of the standing gate module named with the registry's rules, under the
-// body reach census with `--no-cache --no-fix --build-dependence`, with the standing bodies' switch as switched, and
-// returns the pipeline, its stream, normalized, and the copy's root.
+// standingGateWritten are the files of standing gate modules that import go-flags spelled with an escape,
+// `go\x2dflags`, by module and then by name, which runStandingGate writes into its copy rather than testdata keeping
+// them: gofmt canonicalizes an import path, rewriting the escape to `go-flags`, and internal/guard holds every Go file
+// the module owns, testdata included, to gofmt, as the release's first step does, while the escape is what the
+// modules test.
+var standingGateWritten = map[string]map[string]string{
+	"import-goflags-escaped-win": {"part_windows.go": `package gate
+
+// The import spells go-flags with an escape, which names the same path.
+import _ "github.com/jessevdk/go\x2dflags"
+
+func Other() {}
+`},
+	"import-goflags-escaped-both": {"part_other.go": `//go:build !windows
+
+package gate
+
+// The import spells go-flags with an escape, which names the same path windows's file imports.
+import _ "github.com/jessevdk/go\x2dflags"
+
+func Other() {}
+`},
+}
+
+// runStandingGate runs the engine over a copy of the standing gate module named, its standingGateWritten files written
+// into it, with the registry's rules, under the body reach census with `--no-cache --no-fix --build-dependence`, with
+// the standing bodies' switch as switched, and returns the pipeline, its stream, normalized, and the copy's root.
 func runStandingGate(test *testing.T, module string, switched bool) (*pipeline, string, string) {
 	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", "standing-gates", module))
+	for name, contents := range standingGateWritten[module] {
+		writeTestFile(test, filepath.Join(root, name), contents)
+	}
 	engine, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(engine *pipeline) {
 		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 		engine.standingBodies = switched
@@ -534,10 +591,11 @@ func reachedBy(run buildRun, stood string, file string, reason bodyReachReason) 
 // that opens it and not in the other, with the switch on as off, and the other build's own findings, and the
 // stream's, with the switch on are those with it off. A rule whose finding in a body hangs on such a gate is Composes
 // in the inputs table, so it is never confined, and the other build judges the standing body itself for it, where the
-// host's findings there would be wrong. Where an import in the declaration's own package flips the gate, the reach
-// has reached the package whole already (#bed0mnk), so the declaration does not stand, the other build judges it
-// whatever the table declares, the module's quiet package is what stands, and the rule is held out of the run's
-// confined set in the standing body's place (standingGate.imports).
+// host's findings there would be wrong. Where an import in the declaration's own package flips the gate, or a name one
+// side alone declares there, the reach has reached the package whole already (#bed0mnk, #b255cfy), so the declaration
+// does not stand, the other build judges it whatever the table declares, the module's quiet package is what stands,
+// and the rule's line in the table, confined or not, is held in the standing body's place (standingGate.imports,
+// standingGate.scopeName, standingGate.confined).
 func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 	test.Parallel()
 
@@ -560,12 +618,6 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 					test.Error("with the switch on the quiet package's Stable did not stand in the other build, so " +
 						"the module's run leaves nothing standing")
 				}
-				// The rule is PerUnit now, confined, so the reason is all that keeps stood from standing with the
-				// host's finding and its fix.
-				if on.standingConfined == nil || !on.standingConfined[rule.Namespace+gate.rule] {
-					test.Errorf("with the switch on the run does not confine %s for the standing bodies, which the "+
-						"inputs table declares PerUnit", gate.rule)
-				}
 			case gate.imports:
 				if !reachedBy(on.buildRuns[1], gate.stood, gate.file, reachedImports) {
 					test.Errorf("with the switch on %s is not reached by %s in the other build, its package's "+
@@ -575,16 +627,18 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 					test.Error("with the switch on the quiet package's Stable did not stand in the other build, so " +
 						"the module's run leaves nothing standing")
 				}
-				// Nothing above reads the inputs table for a reached declaration, so its line for the rule is held
-				// here: a rule it declares Composes is never confined. A run that confined nothing at all has no
-				// set to read the rule's absence from.
-				if on.standingConfined == nil || on.standingConfined[rule.Namespace+gate.rule] {
-					test.Errorf("with the switch on the run confines %s for the standing bodies, or has no confined "+
-						"set, want a set without the rule, which the inputs table declares Composes", gate.rule)
-				}
 			case !stoodIn(on.buildRuns[1], gate.stood, gate.file):
 				test.Errorf("with the switch on %s did not stand in the other build, so the module holds nothing of "+
 					"the gate", gate.stood)
+			}
+			// Nothing above reads the inputs table for a reached declaration, so its line for the rule is held here,
+			// for every row: a rule it declares Composes is never confined, and one it declares PerUnit is, a
+			// scopeName row's among them, where the reason is all that keeps stood from standing with the host's
+			// finding and its fix. A run that confined nothing at all has no set to read the rule's absence from.
+			if on.standingConfined == nil || on.standingConfined[rule.Namespace+gate.rule] != gate.confined {
+				test.Errorf("with the switch on the run confines %s for the standing bodies %t, or has no confined "+
+					"set, want %t, as the inputs table declares it", gate.rule,
+					on.standingConfined[rule.Namespace+gate.rule], gate.confined)
 			}
 			// The settled set is settled with the switch off too, so what stood in effect is the count of declarations
 			// the other build took the host's findings in: the module's own with the switch on, none with it off.
@@ -600,7 +654,7 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 				host, other := findsGate(each.engine.buildRuns[0], gate), findsGate(each.engine.buildRuns[1], gate)
 				if host != (gate.finder == "host") || other != (gate.finder == "build") {
 					test.Errorf("with the switch %s %s at %s:%d %q is found by the host %t and by the other build "+
-						"%t, want by the %s alone", each.switched, gate.rule, gate.file, gate.line, gate.fragment, host,
+						"%t, want it found by %s", each.switched, gate.rule, gate.file, gate.line, gate.fragment, host,
 						other, gate.finder)
 				}
 			}
@@ -612,6 +666,49 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 			if !slices.Equal(findingLines(onStream), findingLines(offStream)) {
 				test.Errorf("the findings with the switch on are\n%q\nwant those with it off\n%q",
 					findingLines(onStream), findingLines(offStream))
+			}
+		})
+	}
+}
+
+// receiverNameLines are ST1016's finding lines of stream, sorted.
+func receiverNameLines(stream string) []string {
+	return slices.DeleteFunc(findingLines(stream), func(line string) bool {
+		return !strings.Contains(line, `"`+rule.Namespace+`ST1016"`)
+	})
+}
+
+// ST1016 hears no function body (#dp67trx): it reads each file's top-level type declarations, each type's method set
+// and each receiver's name and file, every one a declaration, so a body stripped from a build's type check changes
+// nothing it finds. Over the receiver-names modules, whose standing Target holds everything in a body that looks like
+// a receiver, a plain run, one judging no build's dependence, finds the module's one finding, its message counting
+// the methods' receivers alone, and the census path finds exactly that with the switch off and with it on
+// (standingGates holds where and in which build). Nothing is stripped yet, so what holds a rule that reads bodies
+// today is the message: one that counted Target's parameters finds another, in both builds.
+func TestReceiverNamesHearNoBody(test *testing.T) {
+	test.Parallel()
+
+	for _, module := range []string{"receiver-names-win", "receiver-names-host"} {
+		test.Run(module, func(test *testing.T) {
+			test.Parallel()
+			root := copyFixture(test, filepath.Join("testdata", "standing-gates", module))
+			_, plainStream, _ := runOverRegistered(test, root, exitFindings, rules.All(), nil, "--no-cache",
+				"--no-fix")
+			plain := receiverNameLines(normalize(plainStream, root))
+			_, offStream, _ := runStandingGate(test, module, false)
+			_, onStream, _ := runStandingGate(test, module, true)
+			if len(plain) != 1 || !strings.Contains(plain[0], `(seen 1x \"thing\", 2x \"t\")`) {
+				test.Errorf("a plain run found %d of ST1016's findings, want the module's one, counting the methods' "+
+					"receivers alone:\n%s", len(plain), strings.Join(plain, ""))
+			}
+			for _, each := range []struct {
+				switched string
+				stream   string
+			}{{"off", offStream}, {"on", onStream}} {
+				if found := receiverNameLines(each.stream); !slices.Equal(found, plain) {
+					test.Errorf("ST1016's findings with the switch %s are\n%s\nwant a plain run's\n%s", each.switched,
+						strings.Join(found, ""), strings.Join(plain, ""))
+				}
 			}
 		})
 	}

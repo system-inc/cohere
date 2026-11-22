@@ -1,6 +1,8 @@
 package invalid_struct_tag
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"honnef.co/go/tools/staticcheck/sa5008"
@@ -39,10 +41,49 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 		"flags")
 }
 
+// escapedSource is the escaped fixture's one Go file, escaped.go. It imports go-flags spelled with an escape,
+// `go\x2dflags`, and the escape is what the fixture tests, so the file is never kept in testdata: gofmt canonicalizes
+// an import path, rewriting it to `go-flags`, and internal/guard holds every Go file the module owns, testdata
+// included, to gofmt, as the release's first step does.
+const escapedSource = `// Package escaped imports go-flags spelled with an escape, which names the same path, so the
+// keys go-flags repeats are left alone in it, and every other key repeated is still found.
+package escaped
+
+import _ "github.com/jessevdk/go\x2dflags"
+
+type options struct {
+	// The original compares the import's raw text, reads no go-flags import here, and reports the key go-flags repeats
+	// on purpose.
+	A []int ` + "`default:\"foo\" default:\"bar\"`" + ` // port drops: duplicate struct tag "default"
+	B int   ` + "`long:\"foo\" long:\"bar\"`" + `
+}
+`
+
+// escapedTestdata is a testdata of the test's own holding the escaped fixture: testdata/escaped's go.mod and vendor
+// folder, copied, and escaped.go written beside them from escapedSource.
+func escapedTestdata(test *testing.T) string {
+	test.Helper()
+	testdata := test.TempDir()
+	folder := filepath.Join(testdata, "escaped")
+	fixture := filepath.Join(analysistest.TestData(), "escaped")
+	if copyError := os.CopyFS(folder, os.DirFS(fixture)); copyError != nil {
+		test.Fatalf("copying %s: %v", fixture, copyError)
+	}
+	written := filepath.Join(folder, "escaped.go")
+	if writeError := os.WriteFile(written, []byte(escapedSource), 0o600); writeError != nil {
+		test.Fatalf("writing %s: %v", written, writeError)
+	}
+	return testdata
+}
+
 // The differences fixture holds the tags whose reading the two could part on, several keys at once, several names to
 // a line and a nested struct. It records no difference, since there is none, so the two must agree there finding for
-// finding.
+// finding. The escaped fixture holds the one place they part: a package importing go-flags spelled with an escape,
+// `go\x2dflags`, whose repeated `default` key the original reports, comparing the import's raw text, and the port
+// rightly leaves alone, reading its path (#dp67trx). Its one record is that drop, and a key go-flags does not repeat
+// is found by both. Its Go file is written into a copy of it (escapedTestdata).
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	vendored.RequireIdentical(test, sa5008.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	vendored.RequireOnlyAdjudicated(test, sa5008.Analyzer, Analyzer, escapedTestdata(test), "escaped")
 }
