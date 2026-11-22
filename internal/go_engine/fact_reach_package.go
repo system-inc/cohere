@@ -89,6 +89,10 @@ type factReachPackage struct {
 	// variable's initializer uses where the initializer is declared.
 	functions []fact_reach.Function
 
+	// pushedObjects are the objects only printf's wrapper fact is compared on, each once, in the order the record first
+	// names them (fact_reach.Host.PushedObjects).
+	pushedObjects []fact_reach.PushedObject
+
 	// recorded are, by a body's place, the questions the host's answers about its function and its parameters make,
 	// and imported the questions its answers about the functions of other packages the bodies and the variables'
 	// initializers use make. Both are in the order of their keys, since the answers come in a map's order and the fixed
@@ -188,6 +192,12 @@ func (hosted *factReachPackage) Places() []fact_reach.Place {
 // every object already.
 func (hosted *factReachPackage) Functions() []fact_reach.Function {
 	return hosted.functions
+}
+
+// PushedObjects are the interface methods and the variables of a print or printf function's shape the package's
+// bodies and its variables' initializers use, each once, with the host's wrapper fact.
+func (hosted *factReachPackage) PushedObjects() []fact_reach.PushedObject {
+	return hosted.pushedObjects
 }
 
 // Imported are the questions the host's answers about the functions of other packages the package's bodies and its

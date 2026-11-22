@@ -24,6 +24,10 @@ type Host interface {
 	// host's fact.
 	Functions() []Function
 
+	// PushedObjects are the objects no function a body declares or names is, whose printf wrapper fact a body's
+	// findings can turn on, each a body or a variable's initializer uses once, with the host's fact (PushedObject).
+	PushedObjects() []PushedObject
+
 	// Imported are the answers the host's analysis of the package read from other packages, each asked of the build
 	// before any body leaves: one that differs names the object it is about, whose users leave.
 	Imported() []Question
@@ -67,6 +71,38 @@ type Function struct {
 	Identity build_reads.Identity
 	NoReturn bool
 	Pushed   map[string]string
+}
+
+// PushedObject is one object the build compares a pushed fact of and nothing else (#zqx7gke): a method of an
+// interface, or a package-level variable or a field, whose type has the shape of a print or printf function. printf
+// finds an interface method a wrapper where a method implementing it is one, which an assignment anywhere in the
+// package shows, and a variable one where a function literal assigned to it forwards to one, its fact on the variable.
+// Neither has a body or a no-return fact of its own, so neither is a Function, and Pushed holds printf's fact alone,
+// in the fact's words, empty for no fact, and no entry where the host never ran printf on the package.
+//
+// Local is whether the object is a variable or a field of another package than the one whose bodies use it (seats'
+// review-1 on #zqx7gke, must 2). printf finds a function literal this package assigns to such a variable a wrapper as
+// it finds one assigned to its own, and its calls here read that kind, but it exports a fact only on its own
+// package's objects, so the kind is this package's alone and in no build's facts: two builds whose files assign it
+// differently, or whose literal forwards to callees of differing kinds, hold the same facts of it. So a build names
+// each such object "local printf wrapper", in every build and whatever its facts read, and takes its users out. That
+// covers every kind printf holds that no fact carries, by rules/vet/printf's code:
+//   - propagate (wrapper_search.go:229-237) is the one place a kind is set that is neither a fact's nor a name's
+//     (wrapper_kinds.go:28-52 keeps only those), and it exports a fact wherever the candidate is the package's own.
+//   - A candidate of another package comes only from gather's function literal branch, through assignedVariable
+//     (wrapper_search.go:139-167): an imported variable, `pkg.Logf = func...` (:162-164), or a field the selection
+//     reaches, `x.Logf = func...` (:156-160), a field of another package's type, one promoted through an embedded
+//     one among them, which the record names by the selected field itself.
+//   - A method of another package's interface, gathered from an interface of the package's own syntax that embeds
+//     it, is never given a kind: a candidate with no body is forwarded only from the implementations
+//     methodImplementations finds (wrapper_search.go:86-94), which it finds only for the package's own interface
+//     methods (:315).
+//   - A local variable is the package's own, and its fact is exported as any other.
+type PushedObject struct {
+	Object   Object
+	Identity build_reads.Identity
+	Pushed   map[string]string
+	Local    bool
 }
 
 // UsedObject is one object the package's bodies use: its key, the one Users is asked by, and the identity that names
