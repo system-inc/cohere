@@ -83,7 +83,7 @@ func copiedRecords(recorded BodyRecords) BodyRecords {
 	return BodyRecords{Bodies: slices.Clone(recorded.Bodies), Digests: maps.Clone(recorded.Digests)}
 }
 
-// answerKey is the key of Answer's body in standingSources, as a standing body is keyed.
+// answerKey is the key of Answer's body in pass, whose shape.go declares it, as a standing body is keyed.
 func answerKey(test *testing.T, pass *analysis.Pass) recordedPlace {
 	test.Helper()
 	for _, file := range pass.Files {
@@ -98,15 +98,15 @@ func answerKey(test *testing.T, pass *analysis.Pass) recordedPlace {
 			}
 		}
 	}
-	test.Fatal("standingSources declare no Answer")
+	test.Fatal("the pass's shape.go declares no Answer")
 	return recordedPlace{}
 }
 
-// splicedRun is U1000's run over standingSources as an extra build's, in which Answer stands and the host's side is
-// host, its verdict worded, and what it says it did with Answer's body.
-func splicedRun(test *testing.T, host BodyRecordHost) ([]string, SplicedBodies) {
+// splicedRun is U1000's run over sources as an extra build's, in which Answer stands and the host's side is host, its
+// verdict worded, and what it says it did with Answer's body.
+func splicedRun(test *testing.T, sources []recordedSource, host BodyRecordHost) ([]string, SplicedBodies) {
 	test.Helper()
-	pass := recordedPass(test, standingSources, nil)
+	pass := recordedPass(test, sources, nil)
 	pass.ResultOf[rule.Standing] = standingAt{place: answerKey(test, pass)}
 	pass.ResultOf[rule.FactHost] = host
 	verdict, runError := run(pass)
@@ -186,7 +186,7 @@ func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
 		return -1
 	}
 	bodiesOnly := bodiesOnlyHost{sides: recordsHost{identifier: standingPackagePath, recorded: recorded}}
-	if verdict, spliced := splicedRun(test, bodiesOnly); spliced != (SplicedBodies{FilesDiffer: 1}) ||
+	if verdict, spliced := splicedRun(test, standingSources, bodiesOnly); spliced != (SplicedBodies{FilesDiffer: 1}) ||
 		!slices.Equal(verdict, plain) {
 		test.Errorf("with a side that answers no file's digest the run did %+v with Answer's body and found\n%v\nwant "+
 			"it walked for its named file and the plain verdict\n%v", spliced, verdict, plain)
@@ -226,7 +226,7 @@ func TestAStandingBodyIsSplicedOnlyFromAUsableRecord(test *testing.T) {
 	} {
 		host := &recordsHost{identifier: standingPackagePath, recorded: copiedRecords(recorded)}
 		each.change(host)
-		verdict, spliced := splicedRun(test, *host)
+		verdict, spliced := splicedRun(test, standingSources, *host)
 		if spliced != each.want {
 			test.Errorf("%s: the run did %+v with Answer's body, want %+v", each.name, spliced, each.want)
 		}

@@ -68,9 +68,11 @@ func unusedFindings(run buildRun, root string) []string {
 
 // On the census path with the standing bodies' switch on, the host records Answer's body and windows's build, where
 // Answer stands, splices the host's record of it in place of walking it (#xeafx79): the one splice any pass of the
-// run says it made. Answer's is the body U1000's verdict hangs on, the field group reported only while something
-// adds the body's edges, so windows's own U1000 findings, spliced, are those it finds walking with the switch off,
-// and the merged findings are the same either way. With the switch off nothing stands, and no pass says it spliced.
+// run says it made, once the record differential found windows's own record of the body to be the host's, end for
+// end, no record differing. Answer's is the body U1000's verdict hangs on, the field group reported only while
+// something adds the body's edges, so windows's own U1000 findings, spliced, are those it finds walking with the
+// switch off, and the merged findings are the same either way. With the switch off nothing stands, and no pass says
+// it spliced.
 func TestAStandingBodyU1000NeedsIsSplicedFromTheHostsRecord(test *testing.T) {
 	test.Parallel()
 	off, offStream, offRoot, offSpliced := runSplicedGate(test, false)
@@ -86,8 +88,8 @@ func TestAStandingBodyU1000NeedsIsSplicedFromTheHostsRecord(test *testing.T) {
 		test.Errorf("with the switch off U1000 says it did %+v with standing bodies, want nothing", offSpliced)
 	}
 	if !slices.Equal(onSpliced, []unused_code.SplicedBodies{{Spliced: 1}}) {
-		test.Errorf("with the switch on U1000 says it did %+v with standing bodies, want Answer's spliced in one pass",
-			onSpliced)
+		test.Errorf("with the switch on U1000 says it did %+v with standing bodies, want Answer's spliced in one pass "+
+			"and no record differing from the build's own", onSpliced)
 	}
 	walked, spliced := unusedFindings(off.buildRuns[1], offRoot), unusedFindings(on.buildRuns[1], onRoot)
 	if !slices.ContainsFunc(walked, func(finding string) bool {
