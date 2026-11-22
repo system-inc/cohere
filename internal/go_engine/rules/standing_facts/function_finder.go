@@ -68,13 +68,40 @@ func (finder *functionFinder) find(identity build_reads.Identity) (types.Object,
 	default:
 		return nil, false
 	}
-	if home == finder.pass.Pkg {
-		file := finder.pass.Fset.File(object.Pos())
-		if file == nil || file.Name() != identity.File {
-			return nil, false
-		}
+	return object, finder.inIdentityFile(home, object, identity)
+}
+
+// pushedObject is the build's object for identity of an object only a wrapper fact is compared on
+// (fact_reach.PushedObject): a variable or a field, found as find finds one, or a method of an interface, which find
+// leaves unfound (methodAt), found here among the methods of the interface its type names, held to its file as find
+// holds an object of the pass's own package. It is false when the build has none.
+func (finder *functionFinder) pushedObject(identity build_reads.Identity) (types.Object, bool) {
+	if identity.Kind != build_reads.IdentityMethod {
+		return finder.find(identity)
 	}
-	return object, true
+	home := finder.packageAt(identity.PackagePath)
+	if home == nil {
+		return nil, false
+	}
+	method, found := interfaceMethodAt(home, string(identity.Path), identity.Method)
+	if !found {
+		return nil, false
+	}
+	return method, finder.inIdentityFile(home, method, identity)
+}
+
+// inIdentityFile reports whether object, found in home, is declared in the file identity names, as find requires of an
+// object of the pass's own package, and true for another package's, which is not held to its file.
+func (finder *functionFinder) inIdentityFile(
+	home *types.Package,
+	object types.Object,
+	identity build_reads.Identity,
+) bool {
+	if home != finder.pass.Pkg {
+		return true
+	}
+	file := finder.pass.Fset.File(object.Pos())
+	return file != nil && file.Name() == identity.File
 }
 
 // packageAt is the package at path as the pass's package sees it: itself, or the one package of that path among
@@ -122,10 +149,30 @@ func objectAt(home *types.Package, path objectpath.Path) (types.Object, bool) {
 	return object, true
 }
 
+// interfaceMethodAt is the method named methodName of the interface that typeName names at home's package level, its
+// own or one it embeds, as build_reads' renderer names an interface's method (IdentityMethod), and false for none, or
+// for a name of no interface.
+func interfaceMethodAt(home *types.Package, typeName string, methodName string) (*types.Func, bool) {
+	declared, isTypeName := home.Scope().Lookup(typeName).(*types.TypeName)
+	if !isTypeName || declared.IsAlias() {
+		return nil, false
+	}
+	declaredInterface, isInterface := declared.Type().Underlying().(*types.Interface)
+	if !isInterface {
+		return nil, false
+	}
+	for method := range declaredInterface.Methods() {
+		if method.Name() == methodName {
+			return method, true
+		}
+	}
+	return nil, false
+}
+
 // methodAt is the method named methodName declared on the named type that typeName names at home's package level, as
 // build_reads' renderer names one (IdentityMethod), exported or not. A generic type's methods are its origin's. An
-// interface declares no method this way, so one of an interface type is not found, which is fine: the host leaves
-// those out, since no body is theirs.
+// interface declares no method this way, so one of an interface type is not found, which is fine: the host compares
+// no fact of one but its wrapper fact, which pushedObject finds it for (interfaceMethodAt).
 func methodAt(home *types.Package, typeName string, methodName string) (*types.Func, bool) {
 	declared, isTypeName := home.Scope().Lookup(typeName).(*types.TypeName)
 	if !isTypeName || declared.IsAlias() {

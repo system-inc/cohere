@@ -9,17 +9,16 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check"
 )
 
-// Two printf wrapper facts unit B does not compare, each shown on a pair of modules as #7v2bzvd's deprecation was
-// (#zqx7gke): one on an interface method, one on a variable holding a function literal. standing_facts compares the
-// wrapper fact of each function the host's side meets, and the host's side meets neither: meet leaves out every method
-// of an interface, and meets a *types.Func alone, never a variable. So a body whose only printf callee is one of these
-// stands where the reach leaves it, its printf finding the host's while the build's differs.
+// Two printf wrapper facts that are no function's, each shown on a pair of modules as #7v2bzvd's deprecation was
+// (#zqx7gke): one on an interface method, one on a variable holding a function literal. meet leaves out every method
+// of an interface and meets a *types.Func alone, so unit B once compared neither, and a body whose only printf callee
+// was one of these stood where the reach left it, its printf finding the host's while the build's differed. The host's
+// side meets them now (meetPushed), standing_facts compares each one's fact as a function's, and the second leg
+// compares each one a standing body uses (compareStandingPushed).
 //
-// The build's own findings with the standing bodies' switch on are those with it off all the same, today: printf is a
+// The build's own findings with the standing bodies' switch on were those with it off all the same: printf is a
 // Composes rule (rules/rule_inputs.txt), never confined (standingConfinedRules), so it hears every body and keeps its
-// own findings. What is wrong is the standing set, which the census counts and a confined printf would trust; the
-// first leg sees the findings differ, owed to CalleeFacts or PackageWide with neither cause shown, and the second leg
-// compares only the facts of functions a standing body declares, so it never meets either object.
+// own findings. What was wrong is the standing set, which the census counts and a confined printf would trust.
 
 // printfIn is whether findings hold a printf finding in a file named file.
 func printfIn(findings []check.Finding, file string) bool {
@@ -69,7 +68,7 @@ func requireNoDifferentialFailure(test *testing.T, settled *factKindsSettled) {
 // printer to a Logger: the host's in the -host fixture, windows's in the -extra one. So Logger.Logf is a wrapper in
 // exactly that build. Target calls Logf through a Logger and names nothing else, so the reach leaves it standing, and
 // on the host's findings it would invent windows a printf finding in the first and lose windows's in the second.
-// Logger.Logf's fact should name it and take Target out, and the differential then fails nothing.
+// Logger.Logf's fact names it and takes Target out, and the differential fails nothing.
 func TestAPrintfWrapperFoundThroughAnInterfaceMethodTakesItsUserOut(test *testing.T) {
 	test.Parallel()
 	for _, each := range []struct {
@@ -112,7 +111,7 @@ func TestAPrintfWrapperFoundThroughAnInterfaceMethodTakesItsUserOut(test *testin
 // Named. Its findings are the build's own, and nothing more is owed. TypedLogf states its type, and AssignedLogf is
 // given its literal in init, so neither takes a bit from emit: the reach leaves TypedTarget and AssignedTarget
 // standing, and on the host's findings each would invent windows a printf finding in the first and lose windows's in
-// the second. Each variable's fact should name it and take its user out, and the differential then fails nothing.
+// the second. Each variable's fact names it and takes its user out, and the differential fails nothing.
 func TestAPrintfWrapperHeldByAVariableTakesItsUserOut(test *testing.T) {
 	test.Parallel()
 	for _, each := range []struct {

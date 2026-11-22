@@ -27,8 +27,10 @@ type Result struct {
 	FunctionsCompared int
 	FunctionsNamed    int
 
-	// PushedCompared is how many of the functions' other pushed facts, a wrapper's and a deprecation, were compared
-	// with the host's, and PushedNamed how many of them named their function: the fact differed.
+	// PushedCompared is how many of the functions' other pushed facts, a wrapper's and a deprecation, and of the
+	// wrapper facts of the interface methods and variables a body uses (fact_reach.Host.PushedObjects), were compared
+	// with the host's, and PushedNamed how many of them named their object: the fact differed, or the build could not
+	// read it.
 	PushedCompared int
 	PushedNamed    int
 
