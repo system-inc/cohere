@@ -17,12 +17,14 @@ func (Second) label() string { return "second" }
 
 func (Variant) marker() {}
 
-// describe declares a type that embeds First and so has its label, an interface that type satisfies, and a method
-// value of First's, all in the body the strip takes away, and only it uses strings.
+// describe declares a type that embeds First and so has its label, an interface that type satisfies, a method value
+// of First's, and one of Other's, which nothing else in this file serves, all in the body the strip takes away, and
+// only it uses strings.
 func describe() string {
 	type local struct{ First }
 	type labeler interface{ label() string }
 	var value labeler = local{}
 	method := First{}.label
-	return strings.TrimSpace(value.label() + method())
+	otherMethod := Other{}.name
+	return strings.TrimSpace(value.label() + method() + otherMethod())
 }

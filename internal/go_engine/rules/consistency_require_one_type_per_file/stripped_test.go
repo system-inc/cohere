@@ -13,7 +13,9 @@ import (
 // method's receiver in its signature, and stage 3's strip (#9fbrnra) leaves both typed. So with describe's body
 // stripped from the type check, the stripped run finds what the plain one does, finding for finding: Second, the extra
 // type. That body declares a local type with First's promoted label, which an index counting a body's types would
-// count in the plain run and could not in the stripped one, where the type is never checked. marker's body is
+// count in the plain run and could not in the stripped one, where the type is never checked. It also takes a method
+// value of Other, which other.go serves, and an index serving a type through a body's method values would serve
+// Other in stripped.go in the plain run, from a selection the stripped run never records. marker's body is
 // stripped too, and Variant stays a marker, since marker_type reads the emptiness of a body from the syntax, which
 // keeps it. A strip that drops strings, which only describe uses, changes nothing, since served reads no import. A
 // strip that hands the rule bodiless syntax makes marker look written in assembly, a real method, and Variant a second
