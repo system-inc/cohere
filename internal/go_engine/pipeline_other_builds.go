@@ -595,6 +595,11 @@ func (engine *pipeline) extraBuildRun(
 			if engine.keepsWalkOff {
 				session.VisitEvery()
 			}
+			if engine.declinedAtLoad != nil {
+				session.TellDeclinesAtLoad(func(identifier string, why string) {
+					engine.declinedAtLoad(extra, identifier, why)
+				})
+			}
 			if engine.judgedSkipped != nil {
 				session.JudgeSkipped(func(identifier string) {
 					if engine.skippedAtLoad != nil {

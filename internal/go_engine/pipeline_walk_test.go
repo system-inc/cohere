@@ -2,13 +2,17 @@ package go_engine
 
 import (
 	"encoding/json"
+	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
 // The walk-square fixture's packages (#qbvtkfm): s1, whose Inner holds a lock on windows alone, s2, whose Outer holds
@@ -340,6 +344,11 @@ const (
 	rejudgeReader   = "example.com/walkrejudge/reader"
 	redeclineOpener = "example.com/walkredecline/opener"
 	redeclineUser   = "example.com/walkredecline/user"
+
+	// The third load's test adds them to its copy: platform's Size, which windows declares otherwise, and sizer,
+	// which reads it.
+	redeclinePlatform = "example.com/walkredecline/platform"
+	redeclineSizer    = "example.com/walkredecline/sizer"
 )
 
 // A check-time decline re-judges what is above it rather than excluding it (#axbw09w): windows declines logger at its
@@ -392,5 +401,83 @@ func TestARejudgedImporterOfAChangedAnswerDeclines(test *testing.T) {
 			test.Errorf("want the comparison in %s found by the host alone, got the host %t and windows %t", file,
 				foundIn(host, file), foundIn(windows, file))
 		}
+	}
+}
+
+// A load the restore from the host is off for reports its own counts, and none of the load before it (#78tynz4):
+// windows declines opener at its check, then user in the reload, which turns the restore off, so its third load
+// restores nothing from the host. In the copy, sizer reads platform's Size, another on windows, so the first load and
+// the reload each decline it at their load. The third load visits, leaves untouched, restores and declines at its load
+// nothing, and what is declined is check's alone, opener and user by their answers, kept over every load. A load that
+// returned before clearing the last load's counts would report the reload's visits, and its load declines and their
+// reasons, sizer's, as its own. The reload's decline of sizer is read as it happens (pipeline.declinedAtLoad), so a
+// copy in which it stopped proves nothing and fails as such.
+func TestAThirdLoadReportsItsOwnHostRestoreCounts(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "walk-redecline"))
+	for name, contents := range map[string]string{
+		"platform/size_windows.go": "package platform\n\n// Size is a size, another on windows.\nconst Size = 2\n",
+		"platform/size_other.go":   "//go:build !windows\n\npackage platform\n\n// Size is a size.\nconst Size = 1\n",
+		"sizer/sizer.go": "// Package sizer reads platform's Size.\npackage sizer\n\n" +
+			"import \"example.com/walkredecline/platform\"\n\n// Twice is twice platform's Size.\n" +
+			"func Twice() int { return platform.Size * 2 }\n",
+	} {
+		if makeError := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	// What each of windows' loads declined, by ID, the first load's first, told from the build's goroutine.
+	var telling sync.Mutex
+	var windowsDeclines []map[string]string
+	isWindows := func(extra project.Build) bool {
+		return extra.OperatingSystem == "windows" && !slices.Contains(extra.Tags, "cohere_extra")
+	}
+	engine, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
+		engine.extraBuildLoads = func(extra project.Build) {
+			if isWindows(extra) {
+				telling.Lock()
+				defer telling.Unlock()
+				windowsDeclines = append(windowsDeclines, map[string]string{})
+			}
+		}
+		engine.declinedAtLoad = func(extra project.Build, identifier string, why string) {
+			if isWindows(extra) {
+				telling.Lock()
+				defer telling.Unlock()
+				windowsDeclines[len(windowsDeclines)-1][identifier] = why
+			}
+		}
+	}, "--no-cache")
+	windows := buildRunOf(test, engine, "windows")
+	fromHost := windows.result.FromHost
+	if fromHost.ReloadRounds != 2 || windows.result.Cache.ReloadRoundsBy["hostDecline"] != 2 {
+		test.Fatalf("windows' check declines asked %d loads and the build loaded again %v, want two of each, or the "+
+			"third load never ran with the restore off and the case proves nothing", fromHost.ReloadRounds,
+			windows.result.Cache.ReloadRoundsBy)
+	}
+	if len(windowsDeclines) != 3 || !strings.HasPrefix(windowsDeclines[1][redeclineSizer], "T object "+
+		redeclinePlatform+".Size") {
+		test.Fatalf("windows' loads declined %v at their load, want three loads, the second declining sizer by "+
+			"platform's Size, or the third load has no load decline of the second's to keep and the case proves "+
+			"nothing", windowsDeclines)
+	}
+	if fromHost.Visited != 0 || len(fromHost.Untouched) != 0 || len(fromHost.Restored) != 0 {
+		test.Errorf("windows' third load visited %d, left %q untouched and restored %q, want nothing, the restore off",
+			fromHost.Visited, fromHost.Untouched, fromHost.Restored)
+	}
+	// What the load declined is the load's alone: its count, and its reasons among Declined, which holds check's too.
+	declined := slices.Sorted(maps.Keys(fromHost.Declined))
+	if want := []string{redeclineOpener, redeclineUser}; fromHost.DeclinedAtLoad != 0 ||
+		!slices.Equal(declined, want) {
+		test.Errorf("windows' third load declined %d at its load, and %q in all, want none at its load and %q, "+
+			"check's alone", fromHost.DeclinedAtLoad, declined, want)
+	}
+	if fromHost.DeclinedAtCheck != 2 || !maps.Equal(fromHost.DeclinedBy, map[string]int{"answers": 2}) {
+		test.Errorf("windows declined %d at check, %v by reason, want opener and user by their answers alone",
+			fromHost.DeclinedAtCheck, fromHost.DeclinedBy)
 	}
 }
