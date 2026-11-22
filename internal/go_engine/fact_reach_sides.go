@@ -86,6 +86,7 @@ func newFactReachSides(
 			markers:      captured.Markers,
 			identifier:   analyzedPackage.ID,
 			bodies:       captured.Bodies,
+			recordsHeld:  captured.RecordsHeld,
 		})
 	}
 	return sides

@@ -27,8 +27,9 @@ import (
 //   - presence is what each body holds that the presence rows read, by its place, read off the package's syntax while
 //     the host's run held it (check.FactReachPackage.Presence), presenceRead whether it was read at all, and markers
 //     the method names of the marker interfaces the package declares (check.FactReachPackage.Markers).
-//   - identifier is the package's ID, and bodies what the host's U1000 recorded of its bodies
-//     (check.FactReachPackage.Bodies).
+//   - identifier is the package's ID, bodies what the host's U1000 recorded of its bodies
+//     (check.FactReachPackage.Bodies), and recordsHeld whether it recorded them at all
+//     (check.FactReachPackage.RecordsHeld).
 type factReachInputs struct {
 	fileSet      *token.FileSet
 	record       *build_reads.FunctionUses
@@ -43,6 +44,7 @@ type factReachInputs struct {
 	markers      []string
 	identifier   string
 	bodies       unused_code.BodyRecords
+	recordsHeld  bool
 }
 
 // factReachRendered is an object as a package's side names it: its identity, and its key, known false for an object
@@ -182,7 +184,7 @@ func newFactReachPackage(inputs factReachInputs) *factReachPackage {
 			fact_reach.Named{Object: rendered.key, Reason: factReachOrderBound})
 	}
 	builder.hosted.identifier = inputs.identifier
-	builder.hosted.holdBodies(inputs.bodies)
+	builder.hosted.holdBodies(inputs.bodies, inputs.recordsHeld)
 	return builder.hosted
 }
 

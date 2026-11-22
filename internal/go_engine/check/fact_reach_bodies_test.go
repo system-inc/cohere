@@ -2,15 +2,20 @@ package check
 
 import (
 	"crypto/sha256"
+	"errors"
+	"go/types"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
 // bodiesFiles are the workspace the capture of U1000's records is read over: one package of two files, one a `//line`
@@ -93,6 +98,100 @@ func TestTheCaptureTakesU1000sRecordsOnlyWhenAsked(test *testing.T) {
 	for name, path := range map[string]string{"plain.go": plain, "lined.go": lined} {
 		if digest := hosted.Bodies.Digests[path]; digest != sha256.Sum256([]byte(bodiesFiles[name])) {
 			test.Errorf("asked, the digest of %s is %x, want the sha256 of its bytes", name, digest)
+		}
+	}
+}
+
+// bareFiles are a workspace of one package that declares no function, so U1000 walks no body of it.
+var bareFiles = map[string]string{
+	"go.mod": "module example.com/bare\n\ngo 1.24\n",
+	"bare.go": "// Package bare declares no function.\npackage bare\n\n" +
+		"// Value is the package's one declaration.\nvar Value = 1\n",
+}
+
+// The capture says it holds U1000's records of a package exactly where U1000's action on the package ran with its
+// records asked (#xeafx79): not with the ask off, not where U1000 is not among the rules though the ask is on, and
+// not where its action failed, while a package with no body is held, empty, with its one file digested. The failure
+// is planted on a graph of U1000's own run, its result kept, so only the action's error tells it apart.
+func TestTheCaptureHoldsRecordsExactlyWhereU1000RanAsked(test *testing.T) {
+	test.Parallel()
+	analyzed, _, unused := loadBodies(test)
+	nilness := houseRule(reachNilnessAnalyzer)
+	for _, each := range []struct {
+		name    string
+		running []rule.Rule
+		options Options
+		wants   bool
+	}{
+		{name: "unasked", running: []rule.Rule{unused, nilness}, options: Options{FactReach: true}},
+		{name: "asked without U1000", running: []rule.Rule{nilness},
+			options: Options{FactReach: true, RecordBodies: true}},
+		{name: "asked", running: []rule.Rule{unused, nilness}, options: Options{FactReach: true, RecordBodies: true},
+			wants: true},
+	} {
+		result, runError := Run(analyzed, each.running, each.options)
+		if runError != nil {
+			test.Fatalf("running %s: %v", each.name, runError)
+		}
+		hosted := result.FactReach.Packages[analyzed[0].ID]
+		if hosted == nil {
+			test.Fatalf("%s, the capture holds no side of the package", each.name)
+		}
+		if hosted.RecordsHeld != each.wants {
+			test.Errorf("%s, the capture holds the package's records %t, want %t", each.name, hosted.RecordsHeld,
+				each.wants)
+		}
+	}
+
+	bareRoot := test.TempDir()
+	writeFiles(test, bareRoot, bareFiles)
+	bare, loadError := load.Packages(bareRoot, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil || len(bare.Diagnostics) > 0 || len(bare.Packages) != 1 {
+		test.Fatalf("loading the bare workspace: %v %+v", loadError, bare)
+	}
+	bareResult, bareError := Run(bare.Packages, []rule.Rule{unused, nilness}, Options{FactReach: true,
+		RecordBodies: true})
+	if bareError != nil {
+		test.Fatalf("running over the bare workspace: %v", bareError)
+	}
+	bareHosted := bareResult.FactReach.Packages[bare.Packages[0].ID]
+	if bareHosted == nil {
+		test.Fatal("the capture holds no side of the package with no body")
+	}
+	digest, isDigested := bareHosted.Bodies.Digests[filepath.Join(bareRoot, "bare.go")]
+	if !bareHosted.RecordsHeld || len(bareHosted.Bodies.Bodies) != 0 || !isDigested ||
+		digest != sha256.Sum256([]byte(bareFiles["bare.go"])) {
+		test.Errorf("over a package with no body, the capture holds its records %t, %d bodies and bare.go's digest "+
+			"%t %x, want its records held, no body and bare.go's sha256", bareHosted.RecordsHeld,
+			len(bareHosted.Bodies.Bodies), isDigested, digest)
+	}
+
+	graph, analyzeError := analyzeWrapped([]*analysis.Analyzer{unused_code.Analyzer}, analyzed,
+		&checker.Options{RecordBodies: true, BodyRecords: rule.BodyRecords})
+	if analyzeError != nil {
+		test.Fatalf("analyzing with U1000 asked to record: %v", analyzeError)
+	}
+	var ran *checker.Action
+	for _, root := range graph.Roots {
+		if root.Analyzer == unused_code.Analyzer {
+			ran = root
+		}
+	}
+	if ran == nil || ran.Err != nil {
+		test.Fatalf("U1000's action is %+v, want one that ran", ran)
+	}
+	failed := &checker.Graph{Roots: []*checker.Action{{Analyzer: unused_code.Analyzer, Package: ran.Package,
+		IsRoot: true, Result: ran.Result, Err: errors.New("planted failure")}}}
+	for _, each := range []struct {
+		name  string
+		graph *checker.Graph
+		wants bool
+	}{{name: "ran", graph: graph, wants: true}, {name: "failed", graph: failed}} {
+		hosted := &FactReachPackage{}
+		captureBodies(map[*types.Package]*FactReachPackage{ran.Package.Types: hosted}, []*checker.Graph{each.graph})
+		if hosted.RecordsHeld != each.wants || (len(hosted.Bodies.Bodies) > 0) != each.wants {
+			test.Errorf("where U1000's action %s, the capture holds %d bodies, its records held %t, want %t",
+				each.name, len(hosted.Bodies.Bodies), hosted.RecordsHeld, each.wants)
 		}
 	}
 }

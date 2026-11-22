@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -13,11 +14,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
-// recordedSources are a package of two files, one a `//line` directive renames at its one function, so that body is
-// keyed by the directive's name and parsed from the file's own.
+// recordedSources are a package of three files: one a `//line` directive renames at its one function, so that body is
+// keyed by the directive's name and parsed from the file's own, and one that holds no body, only the variable Plain's
+// body reads.
 var recordedSources = []recordedSource{
-	{name: "plain.go", source: "package recorded\n\nfunc Plain() int {\n\tvalue := 1\n\treturn value\n}\n"},
+	{name: "plain.go", source: "package recorded\n\nfunc Plain() int {\n\tvalue := declared\n\treturn value\n}\n"},
 	{name: "lined.go", source: "package recorded\n\n//line other.go:40\nfunc Lined() int {\n\treturn Plain()\n}\n"},
+	{name: "declared.go", source: "package recorded\n\nvar declared = 1\n"},
 }
 
 // recordedPass is a pass of U1000 over sources, holding what its requirements hand it and, under rule.BodyRecords,
@@ -84,10 +87,11 @@ func TestAPassNotAskedRecordsNoBody(test *testing.T) {
 }
 
 // Asked, U1000's result hands on each body's record keyed as a standing body is keyed, the `//line` directive's name
-// for Lined's and the file's own for Plain's, each with the file it was parsed from, and the sha256 of each such file's
-// bytes as the pass read them. A file the pass cannot read again has no digest, while its body's record is still handed
-// on, so the host's side answers no record there (go_engine's factReachPackage.BodyRecord). Any other analyzer's
-// result holds none.
+// for Lined's and the file's own for Plain's, each with the file it was parsed from and the files it rests on, those
+// declaring what it uses outside it, none its own, and the sha256 of every file's bytes as the pass read them,
+// declared.go's though it holds no body. Neither record is flagged, so each is summarizable. A file the pass cannot
+// read again has no digest, while its body's record is still handed on, so the host's side answers no record there
+// (go_engine's factReachPackage.BodyRecord). Any other analyzer's result holds none.
 func TestAnAskedRunHandsEachBodyOnWithTheFileItWasParsedFrom(test *testing.T) {
 	test.Parallel()
 	asked := true
@@ -100,17 +104,20 @@ func TestAnAskedRunHandsEachBodyOnWithTheFileItWasParsedFrom(test *testing.T) {
 		test.Fatal("the asked run hands no records on")
 	}
 	type handed struct {
-		file       string
-		offset     int
-		parsedFile string
+		file         string
+		offset       int
+		parsedFile   string
+		files        string
+		summarizable bool
 	}
 	var got []handed
 	for _, body := range recorded.Bodies {
 		file, offset := body.Key()
-		got = append(got, handed{file: file, offset: offset, parsedFile: body.ParsedFile})
+		got = append(got, handed{file: file, offset: offset, parsedFile: body.ParsedFile,
+			files: strings.Join(body.Files(), " "), summarizable: body.Summarizable()})
 	}
-	want := []handed{{file: "plain.go", offset: 18, parsedFile: "plain.go"},
-		{file: "other.go", offset: 37, parsedFile: "lined.go"}}
+	want := []handed{{file: "plain.go", offset: 18, parsedFile: "plain.go", files: "declared.go", summarizable: true},
+		{file: "other.go", offset: 37, parsedFile: "lined.go", files: "plain.go", summarizable: true}}
 	if !slices.Equal(got, want) {
 		test.Errorf("the run handed the bodies %+v, want %+v", got, want)
 	}
@@ -119,8 +126,8 @@ func TestAnAskedRunHandsEachBodyOnWithTheFileItWasParsedFrom(test *testing.T) {
 			test.Errorf("the digest of %s is %x, want the sha256 of its bytes", each.name, digest)
 		}
 	}
-	if len(recorded.Digests) != 2 {
-		test.Errorf("the run digested %d files, want plain.go and lined.go", len(recorded.Digests))
+	if len(recorded.Digests) != len(recordedSources) {
+		test.Errorf("the run digested %d files, want plain.go, lined.go and declared.go", len(recorded.Digests))
 	}
 
 	unread, unreadError := run(recordedPass(test, recordedSources, &asked, "lined.go"))
@@ -134,5 +141,26 @@ func TestAnAskedRunHandsEachBodyOnWithTheFileItWasParsedFrom(test *testing.T) {
 	}
 	if _, isRecorded := RecordedOf([]lint.Directive(nil)); isRecorded {
 		test.Error("another analyzer's result hands records on")
+	}
+}
+
+// A body whose record carries a flag, here an interface type literal with an unexported method
+// (recordedPresence.UnexportedInterfaceMethod), is one no record can stand for, so its record is not summarizable.
+func TestAFlaggedRecordIsNotSummarizable(test *testing.T) {
+	test.Parallel()
+	asked := true
+	sources := []recordedSource{{name: "flagged.go",
+		source: "package recorded\n\nfunc Flagged() any {\n\tvar hidden interface{ hidden() }\n\treturn hidden\n}\n"}}
+	verdict, runError := run(recordedPass(test, sources, &asked))
+	if runError != nil {
+		test.Fatalf("running U1000: %v", runError)
+	}
+	recorded, _ := RecordedOf(verdict)
+	if len(recorded.Bodies) != 1 {
+		test.Fatalf("the run handed %d bodies, want Flagged's", len(recorded.Bodies))
+	}
+	if !recorded.Bodies[0].record.Present.UnexportedInterfaceMethod || recorded.Bodies[0].Summarizable() {
+		test.Errorf("Flagged's record is flagged %+v and summarizable %t, want the unexported method's flag and not "+
+			"summarizable", recorded.Bodies[0].record.Present, recorded.Bodies[0].Summarizable())
 	}
 }

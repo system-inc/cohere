@@ -24,8 +24,8 @@ var bodyRecordsFiles = map[string]string{
 
 // capturedBodies runs U1000 and SA4017, which runs ctrlflow, so the capture holds a side of the package, over the
 // body records project with the facts' reach captured, its bodies recorded as recordBodies says, and returns the
-// package's ID, what the capture holds of its bodies, and the project's root.
-func capturedBodies(test *testing.T, recordBodies bool) (string, unused_code.BodyRecords, string) {
+// package's ID, what the capture holds of the package, and the project's root.
+func capturedBodies(test *testing.T, recordBodies bool) (string, *check.FactReachPackage, string) {
 	test.Helper()
 	root := writtenFixture(test, bodyRecordsFiles)
 	loaded, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
@@ -50,20 +50,24 @@ func capturedBodies(test *testing.T, recordBodies bool) (string, unused_code.Bod
 	if captured == nil {
 		test.Fatal("the capture holds no side of the package")
 	}
-	return identifier, captured.Bodies, root
+	return identifier, captured, root
 }
 
 // A package's side answers the host's record of a body by the package's ID and the body's key, the `//line`
 // directive's name for Lined's, never the name its file was parsed under, with the sha256 of the file it was parsed
 // from (#xeafx79): lined.go's for Lined, plain.go's for Plain. It answers nothing for another package's ID, a test
 // variant's among them, nor for a body whose file it holds no digest of, nor for any body of a package whose host was
-// not asked to record.
+// not asked to record. It holds the records of its own package's ID only where the host recorded them.
 func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 	test.Parallel()
-	identifier, recorded, root := capturedBodies(test, true)
+	identifier, captured, root := capturedBodies(test, true)
 	hosted := &factReachPackage{identifier: identifier}
-	hosted.holdBodies(recorded)
+	hosted.holdBodies(captured.Bodies, captured.RecordsHeld)
 	var side unused_code.BodyRecordHost = factReachHost{factReachPackage: hosted}
+	if !side.RecordsHeld(identifier) || side.RecordsHeld(identifier+" [example.com/records.test]") {
+		test.Errorf("the side holds its package's records %t and the test variant's %t, want only its own",
+			side.RecordsHeld(identifier), side.RecordsHeld(identifier+" [example.com/records.test]"))
+	}
 	for _, each := range []struct {
 		name       string
 		file       string
@@ -98,24 +102,27 @@ func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 	}
 
 	undigested := &factReachPackage{identifier: identifier}
-	undigested.holdBodies(unused_code.BodyRecords{Bodies: recorded.Bodies})
+	undigested.holdBodies(unused_code.BodyRecords{Bodies: captured.Bodies.Bodies}, true)
 	if _, _, isRecorded := undigested.BodyRecord(identifier, filepath.Join(root, "plain.go"), 103); isRecorded {
 		test.Error("a side holding no digest of plain.go answers Plain's record")
 	}
 
 	unaskedIdentifier, unasked, unaskedRoot := capturedBodies(test, false)
 	unaskedSide := &factReachPackage{identifier: unaskedIdentifier}
-	unaskedSide.holdBodies(unasked)
+	unaskedSide.holdBodies(unasked.Bodies, unasked.RecordsHeld)
 	if _, _, isRecorded := unaskedSide.BodyRecord(unaskedIdentifier, filepath.Join(unaskedRoot, "plain.go"),
 		103); isRecorded {
 		test.Error("the side of a host not asked to record answers Plain's record")
+	}
+	if unaskedSide.RecordsHeld(unaskedIdentifier) {
+		test.Error("the side of a host not asked to record holds its records")
 	}
 }
 
 // On the census path with the standing bodies' switch on, the host's U1000 records its bodies and the side windows's
 // build hands its passes answers each, as the standing bodies fixture's PlantedKept, which stands there, with the
-// sha256 of standing.go (#xeafx79). With the switch off no build leaves a body standing, so the host records nothing,
-// and the side answers no body.
+// sha256 of standing.go (#xeafx79), and holds the package's records. With the switch off no build leaves a body
+// standing, so the host records nothing, and the side answers no body and holds no records.
 func TestTheSideABuildIsHandedAnswersAStandingBodysRecord(test *testing.T) {
 	test.Parallel()
 	for _, switched := range []bool{true, false} {
@@ -142,6 +149,9 @@ func TestTheSideABuildIsHandedAnswersAStandingBodysRecord(test *testing.T) {
 		if len(kept) != 1 {
 			test.Fatalf("switched %t, windows's census holds %d bodies named PlantedKept, want 1", switched,
 				len(kept))
+		}
+		if held := side.RecordsHeld("example.com/standing"); held != switched {
+			test.Errorf("switched %t, the side holds example.com/standing's records %t", switched, held)
 		}
 		body, digest, isRecorded := side.BodyRecord("example.com/standing", kept[0].file, kept[0].offset)
 		if !switched {

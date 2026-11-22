@@ -133,9 +133,11 @@ type factReachPackage struct {
 
 	// bodyRecords are what the host's U1000 recorded of the package's bodies (check.FactReachPackage.Bodies), and
 	// recordedAt each record's index among bodyRecords.Bodies, by its body's key, so a build's U1000 is answered one
-	// body's record without a search (BodyRecord). Both are empty where the host recorded none.
+	// body's record without a search (BodyRecord). Both are empty where the host recorded none. recordsHeld is whether
+	// the host recorded at all (check.FactReachPackage.RecordsHeld), true for a package with no body too (RecordsHeld).
 	bodyRecords unused_code.BodyRecords
 	recordedAt  map[fact_reach.Place]int
+	recordsHeld bool
 }
 
 // The compiler holds a build's side to what its U1000 asks of a standing body's record.
@@ -217,9 +219,9 @@ func (hosted *factReachPackage) Declared(place fact_reach.Place) []fact_reach.Ob
 }
 
 // holdBodies keeps recorded, what the host's U1000 recorded of the package's bodies, indexed by each body's key, which
-// U1000 keeps no two records of (unused_code.BodyRecords.Bodies).
-func (hosted *factReachPackage) holdBodies(recorded unused_code.BodyRecords) {
-	hosted.bodyRecords = recorded
+// U1000 keeps no two records of (unused_code.BodyRecords.Bodies), and held, whether it recorded them at all.
+func (hosted *factReachPackage) holdBodies(recorded unused_code.BodyRecords, held bool) {
+	hosted.bodyRecords, hosted.recordsHeld = recorded, held
 	if len(recorded.Bodies) == 0 {
 		return
 	}
@@ -254,6 +256,15 @@ func (hosted *factReachPackage) BodyRecord(
 		return unused_code.RecordedBody{}, [sha256.Size]byte{}, false
 	}
 	return recorded, digest, true
+}
+
+// RecordsHeld is whether the side holds the host's records of packageId, the package's own ID alone: true where the
+// host's U1000 ran on the package with its records asked and did not fail, a package with no body among them, and
+// false where the gate kept the records unasked, where U1000 was not enabled, where its action failed, and for another
+// package's ID. Where it is true, a body BodyRecord answers no record of is one the host could not record, or whose
+// file it could not read again.
+func (hosted *factReachPackage) RecordsHeld(packageId string) bool {
+	return packageId == hosted.identifier && hosted.recordsHeld
 }
 
 // inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build settles

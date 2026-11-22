@@ -88,11 +88,16 @@ type FactReachPackage struct {
 	Markers []string
 
 	// Bodies are what U1000's action on the package recorded of each function body it walked, under
-	// Options.RecordBodies (#xeafx79), with the digest of each file it parsed them from (unused_code.RecordedOf), a
+	// Options.RecordBodies (#xeafx79), with the digest of every file of the package (unused_code.RecordedOf), a
 	// later wave's counting: what an extra build's U1000 splices in place of walking a body it leaves standing. They
 	// are empty where nothing asked, where U1000 did not run on the package, or where it failed, and then the
 	// package's side answers no body's record, and a build walks every body of it.
 	Bodies unused_code.BodyRecords
+
+	// RecordsHeld is whether Bodies holds what U1000 recorded at all: whether its action on the package ran with its
+	// records asked, and did not fail, a package with no body among them. Where it is false, Bodies is empty because
+	// nothing was recorded, not because nothing was there to record.
+	RecordsHeld bool
 }
 
 // factReachKinds is what one captured package's answers are, by kind: each kind that answered about its objects, in the
@@ -221,9 +226,9 @@ func capturePushed(captured map[*types.Package]*FactReachPackage, graphs []*chec
 	}
 }
 
-// captureBodies holds, on each package of captured, what U1000's action on it in graphs recorded of its bodies, an
-// action that failed holding none a build could trust. A run not asked to record has U1000's results hold none, and
-// the packages none (unused_code.RecordedOf).
+// captureBodies holds, on each package of captured, what U1000's action on it in graphs recorded of its bodies, and
+// that it was recorded, an action that failed holding none a build could trust. A run not asked to record has U1000's
+// results hold none, and the packages none, as a run without U1000 does (unused_code.RecordedOf).
 func captureBodies(captured map[*types.Package]*FactReachPackage, graphs []*checker.Graph) {
 	for _, graph := range graphs {
 		for action := range graph.All() {
@@ -235,7 +240,7 @@ func captureBodies(captured map[*types.Package]*FactReachPackage, graphs []*chec
 				continue
 			}
 			if recorded, isRecorded := unused_code.RecordedOf(action.Result); isRecorded {
-				hosted.Bodies = recorded
+				hosted.Bodies, hosted.RecordsHeld = recorded, true
 			}
 		}
 	}
