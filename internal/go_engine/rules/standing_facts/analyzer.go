@@ -123,7 +123,7 @@ func run(pass *analysis.Pass) (any, error) {
 			named = append(named, fact_reach.Named{Object: function.Object, Reason: noReturnReason})
 			result.FunctionsNamed++
 		}
-		compared, differing := pushed.differing(function.Object, function.Pushed, own)
+		compared, differing := pushed.differing(function.Object, function.Pushed, own, false)
 		result.PushedCompared += compared
 		result.PushedNamed += len(differing)
 		named = append(named, differing...)
@@ -146,7 +146,7 @@ func run(pass *analysis.Pass) (any, error) {
 		if !found {
 			own = nil
 		}
-		compared, differing := pushed.differing(object.Object, object.Pushed, own)
+		compared, differing := pushed.differing(object.Object, object.Pushed, own, true)
 		result.PushedCompared += compared
 		result.PushedNamed += len(differing)
 		named = append(named, differing...)

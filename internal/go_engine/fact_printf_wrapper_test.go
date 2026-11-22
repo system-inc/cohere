@@ -337,3 +337,23 @@ func TestTheSecondLegReadsAnIdentityTwoObjectsShareAsNeithers(test *testing.T) {
 		}
 	}
 }
+
+// A body that only takes a print-shaped object of its own package as a value, `_ = logger.Logf`, has printf look no
+// fact up of it in either build (seats' review-1, a should). It once left for "unknown printf wrapper", as a function
+// printf never looked up does. But the package's own search is the one place a fact of its own object is made, and
+// every object it makes one of is among those it holds, so one it never looked up holds no fact in the build, and,
+// the host's fact empty too, Target stands, its variable, field and interface method compared equal. The second leg
+// compares the three as Target stands, and fails nothing.
+func TestAPrintShapedObjectOfItsOwnNoCallNamesLeavesItsUserStanding(test *testing.T) {
+	test.Parallel()
+
+	settled := settleFactFixture(test, "fact-printf-unread", "example.com/printfunread/reader")
+	if reason := settled.bodies["Target"].reason; reason != "" {
+		test.Fatalf("the reach reached Target for %q, want it unreached, so that only the facts can take it out",
+			reason)
+	}
+	if removal, removed := settled.removal(test, "Target"); removed {
+		test.Errorf("Target left the standing set by %q for %q, want it standing", removal.Object, removal.Reason)
+	}
+	requireNoDifferentialFailure(test, settled)
+}

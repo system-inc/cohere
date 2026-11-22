@@ -49,10 +49,18 @@ type pushedFacts struct {
 // them, with the build's own of own, the build's object for it, nil where the build has none, whose every fact then
 // reads unknown. It is how many facts it compared, and the namings of key for each that differs from the host's or
 // that the build cannot read, under its analyzer's reason, in the analyzers' order.
+//
+// ownUnlookedEmpty is whether an object of the package's own that the build's printf never looked up reads as holding
+// no fact, rather than unknown, as an interface method, a variable or a field does (fact_reach.PushedObject). The
+// pass's search is the one place a wrapper fact of its own package's object is made (wrapper_search.go's propagate),
+// and every object it makes one of is among those Wrappers holds, so one it never looked up holds no fact in the
+// build: a body that only takes it as a value, `_ = logger.Logf`, stands where the host's fact is empty too (seats'
+// review-1, a should). A function's is left unknown, as #9y28qqr weighs.
 func (pushed pushedFacts) differing(
 	key fact_reach.Object,
 	hosted map[string]string,
 	own types.Object,
+	ownUnlookedEmpty bool,
 ) (int, []fact_reach.Named) {
 	compared := 0
 	var named []fact_reach.Named
@@ -60,6 +68,7 @@ func (pushed pushedFacts) differing(
 		words, isSeen, isRead := "", false, true
 		if own != nil {
 			words, isSeen, isRead = pushed.words(analyzer, own)
+			isSeen = isSeen || ownUnlookedEmpty && own.Pkg() == pushed.home
 		}
 		if !isRead {
 			continue
