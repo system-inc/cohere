@@ -1159,7 +1159,7 @@ since nothing they read changed in the build, their findings the host's and thei
 never a gap, `"visited":21` those its walk visited, each judged,
 `"restoredFromHost":301` the packages it restored, `"declinedAtLoad":12` those its load checked after all, since
 what they read of types did not hold, and `"declinedAtCheck":3` those its check declined, since a fact or answer they
-read did not. `"declinedBy"` counts each decline, and each package never restored, by why: `ownInputs` (its own files differ), `noHostEntry`, `neverRestorable` (what it read cannot be recorded, as with cgo), `readsUnknown`, `exportData` (its export data did not read), `typeReads` (a type it read), `lookups` (a rule's lookup), `factReads` (a fact), `deprecations` (a deprecation) or `answers` (an answer).
+read did not. `"declinedBy"` counts each decline, and each package never restored, by why: `ownInputs` (its own files differ), `noHostEntry`, `neverRestorable` (what it read cannot be recorded, as with cgo), `readsUnknown`, `exportData` (its export data did not read), `typeReads` (a type it read), `lookups` (a rule's lookup), `factReads` (a fact), `deprecations` (a deprecation), `answers` (an answer that differs) or `unnamedAnswers` (an answer its record could not name, so the build could not check it).
 `"reloadRounds":2` counts every time the build was loaded again, and `"reloadRoundsBy"` each of those under every
 reason it had: `hostDecline` (a package its check declined, at most 2 such rounds) or `missingAnswer` (a question
 reached a restored package with no answer of it kept). `"writtenThrough":301` counts the packages it restored whose

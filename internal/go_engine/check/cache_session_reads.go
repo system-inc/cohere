@@ -151,7 +151,7 @@ func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 			session.trusted[current] = true
 			return
 		}
-		if session.readsHold(current) {
+		if holds, _ := session.readsHold(current); holds {
 			session.trusted[current] = true
 			return
 		}
@@ -163,28 +163,48 @@ func (session *CacheSession) holdAliasHits(reachable []*packages.Package) {
 	}
 }
 
+// unnamedAnswers is why an entry whose reads could not all be named never holds: an answer it read was of an object
+// with no objectpath, or of an owner its run did not key, so no build can check it. The record counts it apart from an
+// answer that differs, since a build could close the gap where it could never close a platform's difference.
+const unnamedAnswers = "unnamed: an answer it read of another package could not be named, so the build cannot check it"
+
 // readsHold reports whether every read of the entry restored for current holds in this run: its owner is a package
 // the load reached, and either the owner's first key is the one it had when the read was made, or the owner's answer
-// now is the one read (see currentAnswer). An entry whose reads could not all be named never holds.
-func (session *CacheSession) readsHold(current *packages.Package) bool {
+// now is the one read (see currentAnswer). An entry whose reads could not all be named never holds. When it does not
+// hold it says why, as a reason the record counts by its first word: unnamedAnswers for reads not all named, else A
+// and the first read that does not hold, its kind and its object as the read names it, its owner's ID and objectpath.
+func (session *CacheSession) readsHold(current *packages.Package) (bool, string) {
 	restored := session.hits[current]
-	if restored == nil || restored.readsIncomplete {
-		return false
+	if restored == nil {
+		return false, "A no entry of it is restored to read answers from"
+	}
+	if restored.readsIncomplete {
+		return false, unnamedAnswers
 	}
 	for _, read := range restored.reads {
 		owner := session.byIdentifier[read.Owner]
 		if owner == nil {
-			return false
+			return false, "A the build has no package " + read.Owner + ", whose answer " + read.Kind + " of " +
+				readObjectName(read) + " it read"
 		}
 		if key, keyed := session.keys[owner]; keyed && bytes.Equal(key[:], read.OwnerKey) {
 			continue
 		}
 		answer, answered := session.currentAnswer(owner, read)
-		if !answered || !bytes.Equal(answer, read.Value) {
-			return false
+		if !answered {
+			return false, "A the build has no answer " + read.Kind + " of " + readObjectName(read) + " to ask"
+		}
+		if !bytes.Equal(answer, read.Value) {
+			return false, "A answer " + read.Kind + " of " + readObjectName(read) + " differs in the build"
 		}
 	}
-	return true
+	return true, ""
+}
+
+// readObjectName is the object read answers of, as a reason names it: its owner's ID and its objectpath there, the
+// two that identify a read beside its kind (readsOf).
+func readObjectName(read storedRead) string {
+	return read.Owner + "." + string(read.Path)
 }
 
 // currentAnswer is the answer of read's kind at read's path in owner as the run finds it, and whether the run has it
@@ -217,7 +237,7 @@ func (session *CacheSession) currentAnswer(owner *packages.Package, read storedR
 // holdsBySecondKey reports whether the entry decideBySecondKey just restored for current by its second key holds,
 // its reads checked as readsHold checks them, and trusts it when it does.
 func (session *CacheSession) holdsBySecondKey(current *packages.Package) bool {
-	if !session.readsHold(current) {
+	if holds, _ := session.readsHold(current); !holds {
 		return false
 	}
 	session.trusted[current] = true

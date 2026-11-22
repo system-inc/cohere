@@ -38,7 +38,7 @@ import (
 // the load declined (their types' reads did not hold, or their export data did not read) and check declined (their
 // facts or answers did not hold), how many times the build was loaded again for those, and every decline and every
 // package never a candidate by the first word of why: inputs, noEntry, sizes, never, unknown, noReads, export, T, L, F,
-// D or A.
+// D, A or unnamed.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
 // wall time it ran within.
@@ -215,6 +215,7 @@ var declineKeys = map[string]string{
 	"F":       "factReads",
 	"D":       "deprecations",
 	"A":       "answers",
+	"unnamed": "unnamedAnswers",
 	"never":   "neverRestorable",
 	"unknown": "readsUnknown",
 	"export":  "exportData",
@@ -682,8 +683,10 @@ func (session *CacheSession) decideHostRestores(graphs []*checker.Graph) []strin
 		// drops it from restoring (declineAtLoad) before the load returns, so its facts and reads are always asked
 		// (#a6caffk).
 		why := exported.factsHold(candidate, hosted.kept, state)
-		if why == "" && (hosted.restored.readsIncomplete || !session.readsHold(candidate)) {
-			why = "A an answer it read of another package differs in the build, or cannot be named"
+		// The restore is the candidate's hit (restoreFromHost), so readsHold reads hosted's answers: unnamed when
+		// its record could not name them all, else the first that differs in the build.
+		if why == "" {
+			_, why = session.readsHold(candidate)
 		}
 		whys[index] = why
 	})
