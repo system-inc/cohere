@@ -267,6 +267,19 @@ func (hosted *factReachPackage) RecordsHeld(packageId string) bool {
 	return packageId == hosted.identifier && hosted.recordsHeld
 }
 
+// FileDigest is the sha256 of the package's file parsed under filename, of the bytes the host's rules read
+// (unused_code.BodyRecords.Digests), whether or not the file holds a body: what a build checks its own copy of each
+// file a record rests on against (unused_code.RecordedBody.Files) before it takes the record. It is false for packageId
+// other than the package's own, and for a file the side holds no digest of, one the host did not record or could not
+// read again.
+func (hosted *factReachPackage) FileDigest(packageId string, filename string) ([sha256.Size]byte, bool) {
+	if packageId != hosted.identifier {
+		return [sha256.Size]byte{}, false
+	}
+	digest, isDigested := hosted.bodyRecords.Digests[filename]
+	return digest, isDigested
+}
+
 // inBuild is the package's side in a build whose reach leaves standing to the host, partial saying the build settles
 // the package, which it does with standing empty where the package's variable initializers alone are unreached.
 func (hosted *factReachPackage) inBuild(standing map[fact_reach.Place]bool, partial bool) fact_reach.Host {

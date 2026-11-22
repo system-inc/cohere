@@ -13,13 +13,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 )
 
-// bodyRecordsFiles are a project of one package of two files, one a `//line` directive renames at its one function,
-// so that body is keyed by the directive's name and parsed from the file's own.
+// bodyRecordsFiles are a project of one package of three files: one a `//line` directive renames at its one function,
+// so that body is keyed by the directive's name and parsed from the file's own, and one that holds no body.
 var bodyRecordsFiles = map[string]string{
 	"project/go.mod": "module example.com/records\n\ngo 1.24\n",
 	"project/plain.go": "// Package records holds a body keyed by its own file and one keyed by a directive's.\n" +
 		"package records\n\nfunc Plain() int {\n\tvalue := 1\n\treturn value\n}\n",
-	"project/lined.go": "package records\n\n//line other.go:40\nfunc Lined() int {\n\treturn Plain()\n}\n",
+	"project/lined.go":    "package records\n\n//line other.go:40\nfunc Lined() int {\n\treturn Plain()\n}\n",
+	"project/declared.go": "package records\n\n// Declared is the file's one declaration, no body.\nvar Declared = 1\n",
 }
 
 // capturedBodies runs U1000 and SA4017, which runs ctrlflow, so the capture holds a side of the package, over the
@@ -57,7 +58,9 @@ func capturedBodies(test *testing.T, recordBodies bool) (string, *check.FactReac
 // directive's name for Lined's, never the name its file was parsed under, with the sha256 of the file it was parsed
 // from (#xeafx79): lined.go's for Lined, plain.go's for Plain. It answers nothing for another package's ID, a test
 // variant's among them, nor for a body whose file it holds no digest of, nor for any body of a package whose host was
-// not asked to record. It holds the records of its own package's ID only where the host recorded them.
+// not asked to record. It holds the records of its own package's ID only where the host recorded them, and answers
+// the digest of each of its files, declared.go's though it holds no body, but none for another package's ID or a file
+// it holds no digest of.
 func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 	test.Parallel()
 	identifier, captured, root := capturedBodies(test, true)
@@ -67,6 +70,24 @@ func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 	if !side.RecordsHeld(identifier) || side.RecordsHeld(identifier+" [example.com/records.test]") {
 		test.Errorf("the side holds its package's records %t and the test variant's %t, want only its own",
 			side.RecordsHeld(identifier), side.RecordsHeld(identifier+" [example.com/records.test]"))
+	}
+	// The method as rules' unused_code.FileDigestHost declares it, which the side is held to once that is on main.
+	digests, isDigests := side.(interface {
+		FileDigest(packageId string, filename string) ([sha256.Size]byte, bool)
+	})
+	if !isDigests {
+		test.Fatal("the side answers no file's digest")
+	}
+	declared := filepath.Join(root, "declared.go")
+	if digest, isDigested := digests.FileDigest(identifier, declared); !isDigested ||
+		digest != sha256.Sum256([]byte(bodyRecordsFiles["project/declared.go"])) {
+		test.Errorf("the side answers declared.go's digest %t %x, want its sha256", isDigested, digest)
+	}
+	if _, isDigested := digests.FileDigest(identifier+" [example.com/records.test]", declared); isDigested {
+		test.Error("the side answers declared.go's digest for the test variant's ID")
+	}
+	if _, isDigested := digests.FileDigest(identifier, filepath.Join(root, "absent.go")); isDigested {
+		test.Error("the side answers a digest of a file the package does not hold")
 	}
 	for _, each := range []struct {
 		name       string
