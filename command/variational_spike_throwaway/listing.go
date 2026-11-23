@@ -53,7 +53,13 @@ const noFilesError = "build constraints exclude all Go files"
 // names: the whole graph, every package's compiled files, and nothing compiled. listExports adds the export data.
 // depsFromSource makes every package outside the standard library one of ours, as the engine's `--no-cache` run checks
 // them from source, the standard library alone restored.
-func listBuild(root string, patterns []string, build configuration, workFile string, depsFromSource bool) (*listedBuild, error) {
+func listBuild(
+	root string,
+	patterns []string,
+	build configuration,
+	workFile string,
+	depsFromSource bool,
+) (*listedBuild, error) {
 	environment := build.environment(workFile)
 	cgoOn, cgoError := cgoEnabled(root, environment)
 	if cgoError != nil {

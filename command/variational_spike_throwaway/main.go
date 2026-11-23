@@ -22,6 +22,9 @@
 //	--cpu-profile <file>     after the timed phases, profile the variational check into file and the host's plain
 //	                         check into file.host-plain, each run --profile-repeat times
 //	--profile-repeat <n>     how many times each profiled check runs, 1 by default
+//	--check-workers <n>      check ours in parallel along the import graph on n workers, the variational check and
+//	                         the host's plain check each, as the engine schedules them; 0, the default, checks one
+//	                         package at a time
 //	--deadline <duration>    stop the run once it has taken this long, 0 for none
 //	--stop-above-gigabytes   stop the run once the process holds more than this much memory, 0 for none
 //
@@ -74,6 +77,9 @@ type commandLine struct {
 	// variational lookups in parallel when scheduleParallel says the importer is safe for it, else one at a time.
 	scheduleWorkers  int
 	scheduleParallel bool
+	// checkWorkers, when above zero, checks ours in parallel on the engine's schedule with that many workers: the
+	// variational check the proof projects, and the host's plain check beside it.
+	checkWorkers int
 	// depsFromSource checks every package outside the standard library from source as one of ours, the engine's
 	// `--no-cache` shape, so only the standard library comes through the importer.
 	depsFromSource bool
@@ -163,6 +169,7 @@ func parseCommandLine(arguments []string, standardError io.Writer) (commandLine,
 	flags.IntVar(&asked.profileRepeat, "profile-repeat", 1, "how many times each profiled check runs")
 	flags.IntVar(&asked.scheduleWorkers, "schedule-workers", 0, "replay the importer on the engine's schedule")
 	flags.BoolVar(&asked.scheduleParallel, "schedule-parallel", false, "replay lookups in parallel, not one at a time")
+	flags.IntVar(&asked.checkWorkers, "check-workers", 0, "check ours in parallel on the engine's schedule")
 	flags.BoolVar(&asked.depsFromSource, "deps-from-source", false, "check every package outside std from source")
 	flags.DurationVar(&asked.deadline, "deadline", 0, "stop once the run has taken this long")
 	flags.Float64Var(&asked.stopAboveGigabytes, "stop-above-gigabytes", 0, "stop once the process holds more")
@@ -174,6 +181,9 @@ func parseCommandLine(arguments []string, standardError io.Writer) (commandLine,
 	}
 	if asked.scheduleWorkers < 0 {
 		return asked, errors.New("--schedule-workers must not be negative")
+	}
+	if asked.checkWorkers < 0 {
+		return asked, errors.New("--check-workers must not be negative")
 	}
 	if asked.profileRepeat < 1 {
 		return asked, errors.New("--profile-repeat must be at least 1")

@@ -38,7 +38,7 @@ func recordReads(
 	sizes types.Sizes,
 ) map[string][]importRead {
 	reads := map[string][]importRead{}
-	checked := map[string]*types.Package{}
+	checked := newOursChecked()
 	for _, our := range ordered {
 		files := our.filesIn(0)
 		listedPackage := host.packages[our.path]
@@ -50,12 +50,12 @@ func recordReads(
 			Importer:  resolvingImporter{importer: hostImporter, importMap: listedPackage.ImportMap, checked: checked},
 			Sizes:     sizes,
 			GoVersion: goVersionOf(our),
-			Error:     func(error) {},
+			Error:     func(error) { /* The timed plain check reports this package's errors. */ },
 		}
 		// Ignored: the timed plain check reports this package's errors; this pass only gathers what it reads.
 		checkedTypes, _ := configuration.Check(our.path, fileSet, files, info)
 		if !host.oursFromExport[our.path] {
-			checked[our.path] = checkedTypes
+			checked.put(our.path, checkedTypes)
 		}
 		seen := map[importRead]bool{}
 		note := func(read importRead) {
@@ -78,14 +78,14 @@ func recordReads(
 			note(importRead{path: named.Obj().Pkg().Path(), name: named.Obj().Name(), member: selection.Obj().Name()})
 		}
 		sort.Slice(reads[our.path], func(left int, right int) bool {
-			a, b := reads[our.path][left], reads[our.path][right]
-			if a.path != b.path {
-				return a.path < b.path
+			earlier, later := reads[our.path][left], reads[our.path][right]
+			if earlier.path != later.path {
+				return earlier.path < later.path
 			}
-			if a.name != b.name {
-				return a.name < b.name
+			if earlier.name != later.name {
+				return earlier.name < later.name
 			}
-			return a.member < b.member
+			return earlier.member < later.member
 		})
 	}
 	return reads
@@ -93,10 +93,11 @@ func recordReads(
 
 // namedOf is the named type a selection's receiver is, through one pointer, or nil.
 func namedOf(receiver types.Type) *types.Named {
+	withoutPointer := receiver
 	if pointer, isPointer := types.Unalias(receiver).(*types.Pointer); isPointer {
-		receiver = pointer.Elem()
+		withoutPointer = pointer.Elem()
 	}
-	named, _ := types.Unalias(receiver).(*types.Named)
+	named, _ := types.Unalias(withoutPointer).(*types.Named)
 	if named == nil {
 		return nil
 	}
@@ -142,7 +143,12 @@ type scheduleRun struct {
 
 // runSchedule runs job for each of ordered on workers goroutines, each starting once every one of ours it imports is
 // done, as the engine schedules its checks, and measures the whole and each job.
-func runSchedule(ordered []*ourPackage, ours map[string]*ourPackage, workers int, job func(*ourPackage) int) scheduleRun {
+func runSchedule(
+	ordered []*ourPackage,
+	ours map[string]*ourPackage,
+	workers int,
+	job func(*ourPackage) int,
+) scheduleRun {
 	waiting := map[string]int{}
 	dependents := map[string][]string{}
 	for _, our := range ordered {

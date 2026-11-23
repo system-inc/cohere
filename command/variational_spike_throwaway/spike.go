@@ -108,8 +108,19 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	}
 	importer := merged.New(fileSet, exportSources(fileSet, exports), all)
 
-	say(progress, "variational-spike: checking %d packages once for %d builds\n", len(ordered), len(listed))
-	checked, variationalCounts := checkVariationally(fileSet, ordered, ours, importer, all, sizes, measure)
+	var checked []*checkedPackage
+	var variationalCounts checkCounts
+	if asked.checkWorkers > 0 {
+		say(progress, "variational-spike: checking %d packages once for %d builds, in parallel on %d workers\n",
+			len(ordered), len(listed), asked.checkWorkers)
+		var variationalRun parallelRun
+		checked, variationalCounts, variationalRun = checkVariationallyInParallel(fileSet, ordered, ours, importer, all,
+			sizes, asked.checkWorkers)
+		report.Parallel = &parallelReport{Workers: asked.checkWorkers, Variational: variationalRun}
+	} else {
+		say(progress, "variational-spike: checking %d packages once for %d builds\n", len(ordered), len(listed))
+		checked, variationalCounts = checkVariationally(fileSet, ordered, ours, importer, all, sizes, measure)
+	}
 	report.Timing.VariationalImport = variationalCounts.imports
 	report.Timing.VariationalCheck = variationalCounts.checks
 	importerTiming := importer.Timing()
@@ -150,6 +161,25 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	}
 	report.Timing.PlainDecodeSeconds = baselineImporter.Timing().Decode.Seconds()
 	report.Shortfalls = importer.Shortfalls()
+
+	if report.Parallel != nil {
+		say(progress, "variational-spike: checking the host plainly, in parallel on %d workers\n", asked.checkWorkers)
+		// A fresh importer, as the baselines' is, read whole at each import: a plain universe read at once by checks
+		// that run at once would read its export data at once.
+		parallelImporter := merged.New(fileSet, exportSources(fileSet, exports), all)
+		counts, run := checkPlainlyInParallel(fileSet, ordered, ours, listed[0], parallelImporter.PlainWhole(0), 0,
+			sizes, asked.checkWorkers)
+		report.Parallel.HostPlain = run
+		report.Parallel.HostPlainDecodeSeconds = parallelImporter.Timing().Decode.Seconds()
+		// The serial host baseline checked the same packages, so an error here is one the parallel schedule made.
+		report.Errors.Plain += counts.errors
+		for _, spelled := range counts.firstErrors {
+			if len(report.Errors.PlainFirst) < firstErrorsKept {
+				report.Errors.PlainFirst = append(report.Errors.PlainFirst,
+					report.Builds[0].Target+" in parallel: "+spelled)
+			}
+		}
+	}
 
 	if asked.scheduleWorkers > 0 {
 		say(progress, "variational-spike: replaying the importer on the engine's schedule, %d workers\n",
@@ -205,8 +235,6 @@ func exportSources(fileSet *token.FileSet, exports []map[string]string) []merged
 }
 
 // addOurs reports each of checked and sums them.
-//
-// Mutates: report gets ours and the totals.
 func (report *spikeReport) addOurs(checked []*checkedPackage) {
 	for _, each := range checked {
 		inEvery := 0

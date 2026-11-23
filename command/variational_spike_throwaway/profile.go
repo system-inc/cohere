@@ -32,11 +32,11 @@ const (
 // alone, the collector's CPU in it and the idle mark workers' part of that, and what it allocated.
 type profileRepeat struct {
 	Check phaseTiming `json:"check"`
-	// ThreadCPUSeconds is the check's own thread's CPU: its work, the collector assists it was charged and the
+	// ThreadCpuSeconds is the check's own thread's CPU: its work, the collector assists it was charged and the
 	// runtime work it did on its own stack, but none of the background mark workers' on other threads.
-	ThreadCPUSeconds        float64 `json:"threadCpuSeconds"`
-	CollectorCPUSeconds     float64 `json:"collectorCpuSeconds"`
-	CollectorIdleCPUSeconds float64 `json:"collectorIdleCpuSeconds"`
+	ThreadCpuSeconds        float64 `json:"threadCpuSeconds"`
+	CollectorCpuSeconds     float64 `json:"collectorCpuSeconds"`
+	CollectorIdleCpuSeconds float64 `json:"collectorIdleCpuSeconds"`
 	AllocatedBytes          uint64  `json:"allocatedBytes"`
 }
 
@@ -128,15 +128,15 @@ func repeatOnce(repeat func()) profileRepeat {
 	check := measure(repeat)
 	threadAfter, threadKnownAfter := cpu_clock.Thread()
 	metrics.Read(samples)
-	threadCPU := 0.0
+	threadCpu := 0.0
 	if threadKnown && threadKnownAfter {
-		threadCPU = (threadAfter - threadBefore).Seconds()
+		threadCpu = (threadAfter - threadBefore).Seconds()
 	}
 	return profileRepeat{
 		Check:                   check,
-		ThreadCPUSeconds:        threadCPU,
-		CollectorCPUSeconds:     samples[0].Value.Float64() - collectorBefore,
-		CollectorIdleCPUSeconds: samples[1].Value.Float64() - idleBefore,
+		ThreadCpuSeconds:        threadCpu,
+		CollectorCpuSeconds:     samples[0].Value.Float64() - collectorBefore,
+		CollectorIdleCpuSeconds: samples[1].Value.Float64() - idleBefore,
 		AllocatedBytes:          samples[2].Value.Uint64() - allocatedBefore,
 	}
 }
@@ -144,14 +144,14 @@ func repeatOnce(repeat func()) profileRepeat {
 // repeatSummary is repeats' process CPU and their check thread's, each median, least and mean, the collector's CPU over them all and its idle mark workers'
 // part, and the median bytes allocated.
 type repeatSummary struct {
-	medianCPU            float64
-	leastCPU             float64
-	meanCPU              float64
-	medianThreadCPU      float64
-	leastThreadCPU       float64
-	meanThreadCPU        float64
-	collectorCPU         float64
-	collectorIdleCPU     float64
+	medianCpu            float64
+	leastCpu             float64
+	meanCpu              float64
+	medianThreadCpu      float64
+	leastThreadCpu       float64
+	meanThreadCpu        float64
+	collectorCpu         float64
+	collectorIdleCpu     float64
 	medianAllocatedBytes float64
 }
 
@@ -165,18 +165,18 @@ func summarize(repeats []profileRepeat) repeatSummary {
 	thread := make([]float64, len(repeats))
 	allocated := make([]float64, len(repeats))
 	for index, repeat := range repeats {
-		cpu[index] = repeat.Check.CPUSeconds()
-		thread[index] = repeat.ThreadCPUSeconds
-		summary.meanThreadCPU += thread[index] / float64(len(repeats))
+		cpu[index] = repeat.Check.CpuSeconds()
+		thread[index] = repeat.ThreadCpuSeconds
+		summary.meanThreadCpu += thread[index] / float64(len(repeats))
 		allocated[index] = float64(repeat.AllocatedBytes)
-		summary.meanCPU += cpu[index] / float64(len(repeats))
-		summary.collectorCPU += repeat.CollectorCPUSeconds
-		summary.collectorIdleCPU += repeat.CollectorIdleCPUSeconds
+		summary.meanCpu += cpu[index] / float64(len(repeats))
+		summary.collectorCpu += repeat.CollectorCpuSeconds
+		summary.collectorIdleCpu += repeat.CollectorIdleCpuSeconds
 	}
-	summary.leastCPU = least(cpu)
-	summary.medianCPU = median(cpu)
-	summary.leastThreadCPU = least(thread)
-	summary.medianThreadCPU = median(thread)
+	summary.leastCpu = least(cpu)
+	summary.medianCpu = median(cpu)
+	summary.leastThreadCpu = least(thread)
+	summary.medianThreadCpu = median(thread)
 	summary.medianAllocatedBytes = median(allocated)
 	return summary
 }
