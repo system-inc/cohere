@@ -141,6 +141,9 @@ func TestNoTargetStandsWhoseCalleeStopsReturningOrWhoseConstantDiffers(test *tes
 	for _, each := range standingReasons {
 		test.Run(each.module, func(test *testing.T) {
 			test.Parallel()
+			// The reach and its census judge what each build checks from source, the standard library's packages
+			// among them, so every run computes them rather than restore them from the template.
+			coldSystemCacheFor(test)
 			off, offStream, offRoot := runStandingReason(test, each.module, false)
 			on, onStream, onRoot := runStandingReason(test, each.module, true)
 			if len(off.buildRuns) != 2 || len(on.buildRuns) != 2 {

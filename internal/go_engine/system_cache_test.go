@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,6 +34,10 @@ func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
 // another.
 var testsSystemCache string
 
+// testsEnvironment is the process's environment as TestMain left it, sorted, which the system cache's template is
+// filled under (seededSystemCache).
+var testsEnvironment []string
+
 func TestMain(suite *testing.M) {
 	if os.Getenv(timingMarginChildVariable) != "" {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
@@ -51,23 +57,40 @@ func TestMain(suite *testing.M) {
 	if setError := os.Setenv("GOENV", "off"); setError != nil {
 		os.Exit(refuse(os.Stderr, setError))
 	}
+	testsEnvironment = slices.Sorted(slices.Values(os.Environ()))
 	code := suite.Run()
 	removeSystemCache()
 	os.Exit(code)
 }
 
-// isolatedSource is source with a new, empty system cache of the run's own, unless source names one or the test set
-// the variable to one of its own, which the run then reads. Each run of a test that names none computes the standard
-// library and writes its table where no other run reads it, so its records are what they are for a cold system cache
-// whatever ran before: tests run side by side, and a test that compares two of its own runs, or counts what one
-// restored, would otherwise read tables another run wrote. A test of what a warm system cache does names one, shared by
-// the runs it compares (sharingSystemCache).
+// isolatedSource is source with a new system cache of the run's own, seeded from the template (seededSystemCache),
+// unless source names one or the test set the variable to one of its own, which the run then reads. Each run of a test
+// that names none starts from the same system cache, the template's, whatever ran before, and writes what it computes
+// where no other run reads it: tests run side by side, and a test that compares two of its own runs, or counts what one
+// restored, would otherwise read tables another run wrote, its counts turning on which ran first (#2htryg8). A test of
+// what a cold system cache does has every run of it read an empty one of its own (coldSystemCacheFor), and a test of
+// what a warm one does names one shared by the runs it compares (sharingSystemCache).
 func isolatedSource(test *testing.T, source standardLibrarySource) standardLibrarySource {
 	test.Helper()
 	if source.systemCacheRoot == "" && os.Getenv(system_cache_testing.Variable) == testsSystemCache {
-		source.systemCacheRoot = test.TempDir()
+		source.systemCacheRoot = seededSystemCache(test)
 	}
 	return source
+}
+
+// coldTests are the tests every run of which that names no system cache reads a new, empty one of its own rather
+// than one seeded from the template (coldSystemCacheFor), each test by itself.
+var coldTests sync.Map
+
+// coldSystemCacheFor has every run of test that names no system cache read and write a new, empty one of its own, as
+// every run did before the template (#2htryg8): for a test of what a run computing the standard library does, which
+// the template's entries would restore instead, or one that holds a run restoring it to a run computing it. It is
+// test's alone, a subtest's apart from its parent's, and test's cleanup forgets it. A new test of the cold path opts
+// in here: one left unmarked reads the template and passes warm, never seeing the path it means to test.
+func coldSystemCacheFor(test *testing.T) {
+	test.Helper()
+	coldTests.Store(test, true)
+	test.Cleanup(func() { coldTests.Delete(test) })
 }
 
 // sharingSystemCache has a pipeline read from and write to the system cache at root, which every run of a test given

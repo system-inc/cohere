@@ -175,6 +175,9 @@ func TestAClosureLookupOfAnAbsentPackageReadsNothing(test *testing.T) {
 func TestATagBuildLeavesUntouchedAllButTheLeafsReaders(test *testing.T) {
 	test.Parallel()
 
+	// The walk judges what each build checks from source, the standard library's packages among them, so every run
+	// computes them rather than restore them from the template, as the warm system cache's case below does.
+	coldSystemCacheFor(test)
 	engine, streamed := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
 	tagged := buildRunOf(test, engine, "cohere_extra")
 	want := []string{walkDormant, walkH, walkHasher, walkLonely, walkOther, walkS1, walkS2, walkU}

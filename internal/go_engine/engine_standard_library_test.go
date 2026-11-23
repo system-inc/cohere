@@ -58,6 +58,8 @@ func onlyFromSystemCache(counts contract.LintCache) contract.LintCache {
 func TestTheStandardLibraryComesFromTheSystemCacheUnderNoCache(test *testing.T) {
 	test.Parallel()
 
+	// The plain run computes the standard library, which the records restored from the system cache are held to.
+	coldSystemCacheFor(test)
 	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
@@ -86,6 +88,8 @@ func TestTheStandardLibraryComesFromTheSystemCacheUnderNoCache(test *testing.T) 
 func TestTheSystemCachesEntriesChangeNoRecordInACachedRun(test *testing.T) {
 	test.Parallel()
 
+	// The plain run computes the standard library, which the records restored from the system cache are held to.
+	coldSystemCacheFor(test)
 	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	withoutTable := runCachedEngine(test, copyFixture(test, standardLibraryFixture), "--no-system-cache")
 	root := copyFixture(test, standardLibraryFixture)
@@ -126,6 +130,8 @@ func equalEntries(before map[string]string, after map[string]string) bool {
 func TestASystemCacheUnderAnotherIdentityRestoresNothing(test *testing.T) {
 	test.Parallel()
 
+	// The plain run computes the standard library, which the records restored from the system cache are held to.
+	coldSystemCacheFor(test)
 	reading, _ := filledSystemCache(test, rules.All(), "release one", nil)
 	root := copyFixture(test, standardLibraryFixture)
 	plain := runCachedEngine(test, root, "--no-cache")
@@ -167,6 +173,8 @@ func probeFactsRule() rule.Rule {
 func TestASystemCacheUnderAnotherFactOptionRestoresNothing(test *testing.T) {
 	test.Parallel()
 
+	// The plain run computes the standard library, which the records restored from the system cache are held to.
+	coldSystemCacheFor(test)
 	registered := append(rules.All(), probeFactsRule())
 	settingMode := func(mode string) func(root string) {
 		return func(root string) {
@@ -198,6 +206,8 @@ func TestASystemCacheUnderAnotherFactOptionRestoresNothing(test *testing.T) {
 //
 // Not parallel: it sets the process's own `GOFLAGS`, which every go command the engine runs reads.
 func TestASystemCacheUnderAnotherBuildRestoresNothing(test *testing.T) {
+	// The plain run computes the standard library, which the records restored from the system cache are held to.
+	coldSystemCacheFor(test)
 	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	test.Setenv("GOFLAGS", "-tags=probe")
 	root := copyFixture(test, standardLibraryFixture)
@@ -259,6 +269,8 @@ func mirroredGoRoot(test *testing.T, goRoot string, changed string, suffix strin
 //
 // Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
 func TestAStandardLibraryFileEditedInPlaceMisses(test *testing.T) {
+	// The plain run computes the standard library, which the records restored from the system cache are held to.
+	coldSystemCacheFor(test)
 	root := copyFixture(test, standardLibraryFixture)
 	goRoot := goEnvironmentIn(test, root, nil)["GOROOT"]
 	mirror := mirroredGoRoot(test, goRoot, "src/unicode/utf8/utf8.go", "")
@@ -291,6 +303,8 @@ func TestAStandardLibraryFileEditedInPlaceMisses(test *testing.T) {
 //
 // Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
 func TestTheSystemCacheKeysAGorootReachedThroughALinkApart(test *testing.T) {
+	// The plain run computes the standard library, which the records restored from the system cache are held to.
+	coldSystemCacheFor(test)
 	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
 	goRoot := goEnvironmentIn(test, root, nil)["GOROOT"]

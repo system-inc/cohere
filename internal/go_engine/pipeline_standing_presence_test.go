@@ -104,6 +104,9 @@ func TestAStandingBodyThatNamesARowsCandidateLeavesTheStandingSet(test *testing.
 	for _, presence := range standingPresences {
 		test.Run(presence.module, func(test *testing.T) {
 			test.Parallel()
+			// The reach and its census judge what each build checks from source, the standard library's packages
+			// among them, so every run computes them rather than restore them from the template.
+			coldSystemCacheFor(test)
 			off, offStream, _ := runStandingGate(test, presence.module, false)
 			on, onStream, _ := runStandingGate(test, presence.module, true)
 			if len(off.buildRuns) != 2 || len(on.buildRuns) != 2 {
