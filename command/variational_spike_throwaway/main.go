@@ -70,6 +70,10 @@ type commandLine struct {
 	// cpuProfile, when given, is where the profiled repeats of the variational check go, profileRepeat how many.
 	cpuProfile    string
 	profileRepeat int
+	// scheduleWorkers, when above zero, replays the importer on the engine's schedule with that many workers, its
+	// variational lookups in parallel when scheduleParallel says the importer is safe for it, else one at a time.
+	scheduleWorkers  int
+	scheduleParallel bool
 	// deadline and stopAboveGigabytes bound the run, zero for no bound.
 	deadline           time.Duration
 	stopAboveGigabytes float64
@@ -154,6 +158,8 @@ func parseCommandLine(arguments []string, standardError io.Writer) (commandLine,
 	flags.BoolVar(&asked.plant, "plant-mismatch", false, "change one projected answer before the proof")
 	flags.StringVar(&asked.cpuProfile, "cpu-profile", "", "profile repeats of each check into this file")
 	flags.IntVar(&asked.profileRepeat, "profile-repeat", 1, "how many times each profiled check runs")
+	flags.IntVar(&asked.scheduleWorkers, "schedule-workers", 0, "replay the importer on the engine's schedule")
+	flags.BoolVar(&asked.scheduleParallel, "schedule-parallel", false, "replay lookups in parallel, not one at a time")
 	flags.DurationVar(&asked.deadline, "deadline", 0, "stop once the run has taken this long")
 	flags.Float64Var(&asked.stopAboveGigabytes, "stop-above-gigabytes", 0, "stop once the process holds more")
 	if parseError := flags.Parse(arguments); parseError != nil {
@@ -161,6 +167,9 @@ func parseCommandLine(arguments []string, standardError io.Writer) (commandLine,
 	}
 	if flags.NArg() != 0 {
 		return asked, fmt.Errorf("unexpected arguments %q", flags.Args())
+	}
+	if asked.scheduleWorkers < 0 {
+		return asked, errors.New("--schedule-workers must not be negative")
 	}
 	if asked.profileRepeat < 1 {
 		return asked, errors.New("--profile-repeat must be at least 1")

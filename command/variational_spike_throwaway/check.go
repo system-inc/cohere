@@ -16,10 +16,12 @@ type checkedPackage struct {
 
 // checkCounts is what one run of checks over ours reported: how long its imports and its checks took, and its errors.
 type checkCounts struct {
-	imports     phaseTiming
-	checks      phaseTiming
-	errors      int
-	firstErrors []string
+	imports phaseTiming
+	checks  phaseTiming
+	// checkSeconds is each package's check wall, for the schedule's model.
+	checkSeconds map[string]float64
+	errors       int
+	firstErrors  []string
 }
 
 // noteError counts reported, spelling the first few.
@@ -56,7 +58,7 @@ func checkVariationally(
 	sizes types.Sizes,
 	timed func(func()) phaseTiming,
 ) ([]*checkedPackage, checkCounts) {
-	counts := checkCounts{}
+	counts := checkCounts{checkSeconds: map[string]float64{}}
 	checked := make([]*checkedPackage, 0, len(ordered))
 	for _, our := range ordered {
 		counts.imports = counts.imports.add(timed(func() {
@@ -78,11 +80,13 @@ func checkVariationally(
 			Error:     func(reported error) { counts.noteError(reported.Error()) },
 		}
 		var checkedTypes *types.Package
-		counts.checks = counts.checks.add(timed(func() {
+		checkTiming := timed(func() {
 			// Ignored: every error went to Error above. The Info holds no Types map: Variation.Types is the answer, and a
 			// plain map beside it would record every expression twice.
 			checkedTypes, _ = configuration.Check(our.path, fileSet, our.files, &types.Info{})
-		}))
+		})
+		counts.checks = counts.checks.add(checkTiming)
+		counts.checkSeconds[our.path] = checkTiming.WallSeconds
 		importer.Add(checkedTypes)
 		checked = append(checked, &checkedPackage{our: our, variation: variation})
 	}
@@ -103,7 +107,7 @@ func checkPlainly(
 	sizes types.Sizes,
 	timed func(func()) phaseTiming,
 ) checkCounts {
-	counts := checkCounts{}
+	counts := checkCounts{checkSeconds: map[string]float64{}}
 	checked := map[string]*types.Package{}
 	for _, our := range ordered {
 		files := our.filesIn(build)
@@ -126,11 +130,13 @@ func checkPlainly(
 			Error:     func(reported error) { counts.noteError(reported.Error()) },
 		}
 		var checkedTypes *types.Package
-		counts.checks = counts.checks.add(timed(func() {
+		checkTiming := timed(func() {
 			// Ignored: every error went to Error above.
 			checkedTypes, _ = configuration.Check(our.path, fileSet, files,
 				&types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
-		}))
+		})
+		counts.checks = counts.checks.add(checkTiming)
+		counts.checkSeconds[our.path] = checkTiming.WallSeconds
 		if !listed.oursFromExport[our.path] {
 			checked[our.path] = checkedTypes
 		}
