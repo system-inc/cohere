@@ -2,3 +2,6 @@
 	path = TypeScript
 	url = https://github.com/system-inc/TypeScript.git
 	branch = adamic
+[submodule "libraries/go/go-types"]
+	path = libraries/go/go-types
+	url = https://github.com/system-inc/go-types.git
