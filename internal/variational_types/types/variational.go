@@ -168,6 +168,40 @@ func SetUnderlyingVariants(n *Named, variants []UnderlyingVariant) {
 	}
 }
 
+// VariantsOf is obj's answers by build, or nil when one answer holds in every build.
+func VariantsOf(obj Object) []Variant {
+	variation := variationOf(obj)
+	if variation == nil || len(variation.variants) == 0 {
+		return nil
+	}
+	variants := make([]Variant, len(variation.variants))
+	for index, variant := range variation.variants {
+		variants[index] = Variant{Builds: variant.mask, Type: variant.typ, Value: variant.val}
+	}
+	return variants
+}
+
+// PresenceOf is the builds obj exists in, or zero when it exists in every build.
+func PresenceOf(obj Object) Mask {
+	variation := variationOf(obj)
+	if variation == nil {
+		return 0
+	}
+	return variation.presence
+}
+
+// UnderlyingVariantsOf is n's underlying types by build, or nil when one holds in every build.
+func UnderlyingVariantsOf(n *Named) []UnderlyingVariant {
+	if n.variation == nil {
+		return nil
+	}
+	variants := make([]UnderlyingVariant, len(n.variation.variants))
+	for index, variant := range n.variation.variants {
+		variants[index] = UnderlyingVariant{Builds: variant.mask, Underlying: variant.rhs}
+	}
+	return variants
+}
+
 // appendVariant adds variant to variants, folding it into an answer alike.
 func appendVariant(variants []objectVariant, variant objectVariant) []objectVariant {
 	for index := range variants {
