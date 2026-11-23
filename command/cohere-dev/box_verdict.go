@@ -84,6 +84,11 @@ type boxVerdict struct {
 	// whichever test it was framing when the report was printed, often one that passed, so a report is read from the
 	// stream itself: printing only the failed tests' output dropped every stack (#bnabymg, Nov 12).
 	raceReports []string
+	// timeouts is, for each package whose test binary hit go test's -timeout, everything it printed from its timeout's
+	// panic on: the tests still running and every goroutine's stack. test2json gives that text to whichever test it
+	// was framing, which never ends with a pass or a fail, so printing only the failed tests' output dropped it and a
+	// timeout read as a bare `FAIL` with no test named (internal/go_engine on Sun2, Nov 23, #r28e4nh).
+	timeouts map[string][]string
 	// box names who ran the tests, as the gate's lines say it: the Mac the gap ran on, the land-gate job Loom placed,
 	// or the stand-in. It is the road's to set, since the box's own output never names it.
 	box string
@@ -94,6 +99,9 @@ type boxVerdict struct {
 	corpora       string
 	unlaidCorpora []string
 }
+
+// timeoutPanic opens what a test binary prints when go test's -timeout ends it (testing's own words).
+const timeoutPanic = "panic: test timed out after "
 
 // raceReportStart and raceReportEnd are the race detector's lines around each report it prints.
 const (
@@ -116,11 +124,13 @@ type testEvent struct {
 // ignored: a gap prints its own lines around the command's.
 func readTestJson(output []byte) boxVerdict {
 	verdict := boxVerdict{failedOutput: map[string][]string{}, skipped: map[string][]string{},
-		optIn: map[string][]string{}}
+		optIn: map[string][]string{}, timeouts: map[string][]string{}}
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	// reading is whether the stream is inside a race report, from its first line to the rule that ends it.
 	reading := false
+	// timedOut is each package whose timeout panic the stream is inside, from its panic's line to the package's end.
+	timedOut := map[string]bool{}
 	for scanner.Scan() {
 		line := scanner.Text()
 		if why, isRefusal := strings.CutPrefix(line, sharedBoxRefusedMarker); isRefusal {
@@ -139,6 +149,11 @@ func readTestJson(output []byte) boxVerdict {
 		}
 		key := event.Package + " " + event.Test
 		switch {
+		// A timeout's text is kept once, as the package's, never again as the output of the test it was framed in.
+		case event.Action == "output" && (timedOut[event.Package] ||
+			strings.HasPrefix(strings.TrimSpace(event.Output), timeoutPanic)):
+			timedOut[event.Package] = true
+			verdict.timeouts[event.Package] = append(verdict.timeouts[event.Package], event.Output)
 		case event.Action == "output":
 			verdict.failedOutput[key] = append(verdict.failedOutput[key], event.Output)
 			text := strings.TrimSpace(event.Output)
@@ -152,8 +167,10 @@ func readTestJson(output []byte) boxVerdict {
 				verdict.raceReports[len(verdict.raceReports)-1] += event.Output
 			}
 		case event.Test == "" && event.Action == "pass":
+			timedOut[event.Package] = false
 			verdict.packagesPassed++
 		case event.Test == "" && event.Action == "fail":
+			timedOut[event.Package] = false
 			verdict.packagesFailed = append(verdict.packagesFailed, event.Package)
 		case event.Action == "fail":
 			verdict.failedTests = append(verdict.failedTests, key)
@@ -404,6 +421,25 @@ func lastWords(output []byte, fallback string) string {
 	return fallback
 }
 
+// failureReport is each failed test and package with its output, and each package's timeout whole, every goroutine's
+// stack included, so a timeout names what it was waiting on.
+func (verdict boxVerdict) failureReport() string {
+	report := strings.Builder{}
+	for _, failure := range slices.Concat(verdict.failedTests, verdict.packagesFailed) {
+		fmt.Fprintf(&report, "  %s\n", failure)
+		for _, line := range slices.Concat(verdict.failedOutput[failure], verdict.failedOutput[failure+" "]) {
+			fmt.Fprintf(&report, "    %s", line)
+		}
+		if timeout := verdict.timeouts[failure]; len(timeout) > 0 {
+			report.WriteString("    its test binary timed out, which printed:\n")
+			for _, line := range timeout {
+				fmt.Fprintf(&report, "      %s", line)
+			}
+		}
+	}
+	return report.String()
+}
+
 func describeEnd(runError error) string {
 	if runError == nil {
 		return "with exit 0"
@@ -443,27 +479,13 @@ func runModuleTests(
 	if verdict.failed() {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s failed, so nothing landed:\n", verdict.box,
 			platform)
-		for _, failure := range slices.Concat(verdict.failedTests, verdict.packagesFailed) {
-			fmt.Fprintf(streams.Errors, "  %s\n", failure)
-			for _, line := range verdict.failedOutput[failure] {
-				fmt.Fprintf(streams.Errors, "    %s", line)
-			}
-			for _, line := range verdict.failedOutput[failure+" "] {
-				fmt.Fprintf(streams.Errors, "    %s", line)
-			}
-		}
+		fmt.Fprint(streams.Errors, verdict.failureReport())
 		return 1, ""
 	}
 	if verdict.race != nil && verdict.race.failed() {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run on %s failed, so nothing landed:\n", verdict.box,
 			platform)
-		for _, failure := range slices.Concat(verdict.race.failedTests, verdict.race.packagesFailed) {
-			fmt.Fprintf(streams.Errors, "  %s\n", failure)
-			output := verdict.race.failedOutput
-			for _, line := range slices.Concat(output[failure], output[failure+" "]) {
-				fmt.Fprintf(streams.Errors, "    %s", line)
-			}
-		}
+		fmt.Fprint(streams.Errors, verdict.race.failureReport())
 		printRaceReports(verdict.race.raceReports)
 		return 1, ""
 	}
