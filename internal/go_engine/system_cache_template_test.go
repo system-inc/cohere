@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -92,10 +91,8 @@ func fillSystemCacheTemplate() (systemCacheTemplate, error) {
 		}
 	}
 	// A repository of its own, as every fixture's copy is (copyFixture).
-	initialize := exec.Command("git", "init", "-q")
-	initialize.Dir = project
-	if output, initializeError := initialize.CombinedOutput(); initializeError != nil {
-		return systemCacheTemplate{}, fmt.Errorf("git init: %w: %s", initializeError, output)
+	if writeError := writeRepository(project); writeError != nil {
+		return systemCacheTemplate{}, writeError
 	}
 	var standardError bytes.Buffer
 	exitCode := runWithStandardLibrary(

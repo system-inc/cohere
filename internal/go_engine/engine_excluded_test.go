@@ -38,7 +38,9 @@ func excludedModule(test *testing.T, files map[string]string) string {
 	for name, contents := range files {
 		writeTextRulesFile(test, directory, name, []byte(contents))
 	}
-	runGit(test, directory, "init", "-q")
+	if writeError := writeRepository(directory); writeError != nil {
+		test.Fatalf("writing %s's repository: %v", directory, writeError)
+	}
 	return directory
 }
 
