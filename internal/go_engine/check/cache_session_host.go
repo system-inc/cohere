@@ -97,6 +97,11 @@ type hostState struct {
 	untouched  map[*packages.Package]*hostRestore
 	visited    int
 
+	// below are, for each package a late decision of this load reaches, the packages below it restored from the host's
+	// run, a map[*types.Package]*types.Package by the *packages.Package, made once each from its imports' own
+	// (restoredReach).
+	below *sync.Map
+
 	// visitsEvery has the walk visit every package the host kept, leaving none untouched (VisitEvery).
 	visitsEvery bool
 
@@ -271,6 +276,7 @@ func (session *CacheSession) restoreFromHost(
 	// of its packages or types through it.
 	state.restoring = map[*packages.Package]*hostRestore{}
 	state.untouched = map[*packages.Package]*hostRestore{}
+	state.below = &sync.Map{}
 	state.visited = 0
 	state.writtenThrough = map[*packages.Package]bool{}
 	// The last load's renderings are counted before they go, so the counts cover every load.
@@ -577,40 +583,110 @@ func (session *CacheSession) judgedThrough(
 // package still among the restores is one whose own verdict held and whose types were read from the host's export
 // data; an untouched one was marked before the load began (Restore), and a decline at check loads the build again
 // with renderings of its own.
+//
+// They are what candidate reaches restored (restoredReach), less any of a path closure gives another package of, one
+// candidate's walk met after another of its path. Every package's types are made at its own path, by the loader's
+// check and by export_data.Read alike, so a reached package's types are closure's at their own path exactly when the
+// package is closure's. The map is shared with the memo when nothing is left out, and only read.
 func (session *CacheSession) restoredBelow(
 	candidate *packages.Package,
 	closure map[string]*types.Package,
 ) map[*types.Package]*types.Package {
-	// The load set every package's imports before it decided any, so the walk reads them without the lock; only
-	// whether each reached package is still among the restores is asked under it.
-	visited := map[*packages.Package]bool{}
-	var reached []*packages.Package
-	var collect func(importer *packages.Package)
-	collect = func(importer *packages.Package) {
-		for _, imported := range importer.Imports {
-			if visited[imported] {
-				continue
+	reached := session.restoredReach(candidate)
+	for built := range reached {
+		if closure[built.Path()] != built {
+			restored := make(map[*types.Package]*types.Package, len(reached))
+			for kept, hostTypes := range reached {
+				if closure[kept.Path()] == kept {
+					restored[kept] = hostTypes
+				}
 			}
-			visited[imported] = true
-			reached = append(reached, imported)
-			collect(imported)
+			return restored
 		}
 	}
-	collect(candidate)
+	return reached
+}
+
+// restoredReach are the types of every package importer reaches through its imports that this load restored from the
+// host's run, decided late and held, or left untouched, each by the types of the host's package it was restored from,
+// made once a load (#r28e4nh): the union of each import's own and the imports themselves that are restored. A walk of
+// every import from each candidate made the same set again for every decision.
+//
+// It is exact, the set a walk of importer's imports finds, and final once made. It is asked only by a late decision,
+// whose package's imports are all done, and so every package below it: the loader needs every package below one
+// decided late, and a needed package is done only once its own imports are (load's needed and load). A package done is
+// in the restores or not for the rest of the load, since only its own decline drops it (declineAtLoad), within its own
+// restoreTypes, before it is done, and its types are set by then. So a set made of done packages never changes, and
+// one made from its imports' sets is theirs together.
+//
+// One import's set holding everything the others and the imports themselves add is shared rather than copied, as down
+// a chain of single imports, so the memo holds about one set per fork in the graph rather than one per package.
+func (session *CacheSession) restoredReach(importer *packages.Package) map[*types.Package]*types.Package {
 	state := session.host
-	restored := map[*types.Package]*types.Package{}
+	if known, isKnown := state.below.Load(importer); isKnown {
+		reached, isReached := known.(map[*types.Package]*types.Package)
+		if !isReached {
+			// Invariant: restoredReach stores only a map[*types.Package]*types.Package.
+			panic(fmt.Sprintf("check: the restores below %s are a %T", importer.ID, known))
+		}
+		return reached
+	}
+	// Each import's set first, with no lock held, since each may be made here, taking the lock itself.
+	importsReached := make([]map[*types.Package]*types.Package, 0, len(importer.Imports))
+	var largest map[*types.Package]*types.Package
+	for _, imported := range importer.Imports {
+		importReached := session.restoredReach(imported)
+		importsReached = append(importsReached, importReached)
+		if len(importReached) > len(largest) {
+			largest = importReached
+		}
+	}
+	// The imports themselves restored, whether each is still among the restores asked under the lock.
+	direct := map[*types.Package]*types.Package{}
 	state.lock.RLock()
-	defer state.lock.RUnlock()
-	for _, imported := range reached {
+	for _, imported := range importer.Imports {
 		hosted, judged := state.restoring[imported]
 		if !judged {
 			hosted = state.untouched[imported]
 		}
-		if hosted != nil && imported.Types != nil && closure[imported.PkgPath] == imported.Types {
-			restored[imported.Types] = hosted.kept.types
+		if hosted != nil && imported.Types != nil {
+			direct[imported.Types] = hosted.kept.types
 		}
 	}
-	return restored
+	state.lock.RUnlock()
+	// A package's types are restored from one host package, so a set holding a package's types holds its entry.
+	importsReached = append(importsReached, direct)
+	reached := largest
+	for _, other := range importsReached {
+		if !holdsEvery(reached, other) {
+			reached = map[*types.Package]*types.Package{}
+			for _, each := range importsReached {
+				maps.Copy(reached, each)
+			}
+			break
+		}
+	}
+	if reached == nil {
+		reached = map[*types.Package]*types.Package{}
+	}
+	// Two decisions may make one package's set at once; both make the same set, so either may store it.
+	stored, _ := state.below.LoadOrStore(importer, reached)
+	storedReached, isReached := stored.(map[*types.Package]*types.Package)
+	if !isReached {
+		// Invariant: restoredReach stores only a map[*types.Package]*types.Package.
+		panic(fmt.Sprintf("check: the restores below %s are a %T", importer.ID, stored))
+	}
+	return storedReached
+}
+
+// holdsEvery reports whether every key of subset is a key of set.
+func holdsEvery(set map[*types.Package]*types.Package, subset map[*types.Package]*types.Package) bool {
+	for key := range subset {
+		if _, held := set[key]; !held {
+			return false
+		}
+	}
+	return true
 }
 
 // declineAtLoad drops candidate, which the load checks from source after all, from the hits restored from the host,
