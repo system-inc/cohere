@@ -104,6 +104,8 @@ type boxVerdict struct {
 	// test binary's run, from its pass or fail.
 	steps          []string
 	packageSeconds map[string]float64
+	// budget is the core budget the box's run said it kept to (boxBudgetMarker), empty when it kept to none.
+	budget string
 	// box names who ran the tests, as the gate's lines say it: the Mac the gap ran on, the land-gate job Loom placed,
 	// or the stand-in. It is the road's to set, since the box's own output never names it.
 	box string
@@ -113,6 +115,17 @@ type boxVerdict struct {
 	// hold why it wasn't laid (#5r0vrte). Both are the road's to set; only a gate box holds corpora.
 	corpora       string
 	unlaidCorpora []string
+	// packagesReported is every package the run ended, by import path, in order: each pass, each fail and each
+	// package-level skip, a package with no test files. A split gate holds each half's to exactly the packages it was
+	// given (gate_split.go).
+	packagesReported []string
+	// parts is a split gate's two halves' verdicts, each under its box's name, which the merged verdict sums; empty for
+	// a gate one box ran whole. halves says on the land line which box ran which half, empty when parts is.
+	parts  []boxVerdict
+	halves string
+	// wholeBecause is why a gate that would have split ran whole on one box, as the land line says it, empty when it
+	// split or was never to.
+	wholeBecause string
 }
 
 // timeoutPanic opens what a test binary prints when go test's -timeout ends it (testing's own words).
@@ -152,6 +165,10 @@ func readTestJson(output []byte) boxVerdict {
 		line := scanner.Text()
 		if why, isRefusal := strings.CutPrefix(line, sharedBoxRefusedMarker); isRefusal {
 			verdict.refused = strings.TrimSpace(why)
+			continue
+		}
+		if budget, isBudget := strings.CutPrefix(line, boxBudgetMarker); isBudget {
+			verdict.budget = strings.TrimSpace(budget)
 			continue
 		}
 		if step, isStep := strings.CutPrefix(line, boxStepMarker); isStep {
@@ -195,10 +212,14 @@ func readTestJson(output []byte) boxVerdict {
 			timedOut[event.Package] = false
 			verdict.packageSeconds[event.Package] = event.Elapsed
 			verdict.packagesPassed++
+			verdict.packagesReported = append(verdict.packagesReported, event.Package)
 		case event.Test == "" && event.Action == "fail":
 			timedOut[event.Package] = false
 			verdict.packageSeconds[event.Package] = event.Elapsed
 			verdict.packagesFailed = append(verdict.packagesFailed, event.Package)
+			verdict.packagesReported = append(verdict.packagesReported, event.Package)
+		case event.Test == "" && event.Action == "skip":
+			verdict.packagesReported = append(verdict.packagesReported, event.Package)
 		case event.Action == "fail":
 			verdict.failedTests = append(verdict.failedTests, key)
 		// A package-level skip is a package with no test files, which skipped no test. An opt-in skip, said in the
@@ -327,7 +348,8 @@ func testsNamed(tests map[string][]string) []string {
 
 // runBoxGate runs the module's tests on a gate box, on the road setting names, and returns what the box said, or why
 // there is no verdict from it, which refuses the landing. A verdict about another tree than commit is no verdict.
-// setting is what gateVariable says, never gateOffSetting, which runModuleTests keeps on Kirk's Mac.
+// setting is what gateVariable says, never gateOffSetting, which runModuleTests keeps on Kirk's Mac. testing is the
+// gate's environment, in which a split gate lists its packages here (gate_split.go).
 func runBoxGate(
 	worktree string,
 	commit string,
@@ -335,6 +357,7 @@ func runBoxGate(
 	patterns []string,
 	races []string,
 	setting string,
+	testing []string,
 ) (boxVerdict, string) {
 	var output []byte
 	var runError error
@@ -342,6 +365,8 @@ func runBoxGate(
 	job := ""
 	corporaLaid := ""
 	unlaidCorpora := []string{}
+	// wholeBecause is why a gate that would have split runs whole, empty when it splits or was never to.
+	wholeBecause := ""
 	switch setting {
 	case "", "on":
 		boxes, boxesError := gateBoxes(os.Getenv(gateBoxesVariable))
@@ -352,13 +377,29 @@ func runBoxGate(
 		if waitError != nil {
 			return boxVerdict{}, waitError.Error()
 		}
+		splitting, splitError := gateSplitSetting(os.Getenv(gateSplitVariable))
+		if splitError != nil {
+			return boxVerdict{}, splitError.Error()
+		}
 		corpora, unlaid, corporaError := gateCorpora(worktree, commit)
 		if corporaError != nil {
 			return boxVerdict{}, "the corpora this landing pins can't be read: " + corporaError.Error()
 		}
 		corporaLaid, unlaidCorpora = corporaNamed(corpora), unlaid
-		var unavailable string
-		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, patterns, races, corpora, boxes, wait)
+		pin, unavailable := feedGateCommit(worktree, commit)
+		if unavailable != "" {
+			return boxVerdict{}, unavailable
+		}
+		if splitting && len(boxes) >= 2 {
+			split := runSplitGate(worktree, commit, pin, patterns, races, corpora, boxes, testing)
+			if split.whole == nil {
+				split.verdict.corpora, split.verdict.unlaidCorpora = corporaLaid, unlaidCorpora
+				return split.verdict, split.unavailable
+			}
+			boxes, wholeBecause = split.whole, split.because
+		}
+		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, pin, patterns, races, corpora, boxes,
+			wait)
 		if unavailable != "" {
 			return boxVerdict{}, unavailable
 		}
@@ -383,12 +424,27 @@ func runBoxGate(
 		output, runError = command.CombinedOutput()
 		box = standInBox
 	}
+	verdict, unavailable := readBoxRun(output, runError, box, commit, races)
+	if unavailable != "" {
+		return boxVerdict{}, unavailable
+	}
+	verdict.job = job
+	verdict.corpora, verdict.unlaidCorpora = corporaLaid, unlaidCorpora
+	if wholeBecause != "" {
+		verdict.wholeBecause = wholeBecause + ", so the whole gate ran on " + box
+	}
+	return verdict, ""
+}
+
+// readBoxRun reads what box's run of commit printed, output, ended as runError says, its module's run and then its
+// -race run, asked for races, and returns its verdict, or why it is no verdict, which refuses the landing.
+func readBoxRun(output []byte, runError error, box string, commit string, races []string) (boxVerdict, string) {
 	moduleOutput, raceOutput, raced := bytes.Cut(output, []byte("\n"+boxRaceMarker+"\n"))
 	verdict := readTestJson(moduleOutput)
-	verdict.box, verdict.job = box, job
-	verdict.corpora, verdict.unlaidCorpora = corporaLaid, unlaidCorpora
+	verdict.box = box
 	if raced {
 		race := readTestJson(raceOutput)
+		race.box = box
 		verdict.race = &race
 	}
 	raceFailed := verdict.race != nil && verdict.race.failed()
@@ -449,9 +505,21 @@ func lastWords(output []byte, fallback string) string {
 }
 
 // timingReport is where a run's time went, in one line: each step it said, then its slowest test binaries, each by
-// import path and seconds. It is empty when the run said neither.
+// import path and seconds. It is empty when the run said neither. A split gate's is each half's, under its box's name.
 func (verdict boxVerdict) timingReport() string {
+	if len(verdict.parts) > 0 {
+		halves := []string{}
+		for _, part := range verdict.parts {
+			if timing := part.timingReport(); timing != "" {
+				halves = append(halves, part.box+" "+timing)
+			}
+		}
+		return strings.Join(halves, "; ")
+	}
 	parts := []string{}
+	if verdict.budget != "" {
+		parts = append(parts, "within "+verdict.budget)
+	}
 	if len(verdict.steps) > 0 {
 		parts = append(parts, "by step "+strings.Join(verdict.steps, ", "))
 	}
@@ -488,6 +556,20 @@ func (verdict boxVerdict) failureReport() string {
 	return report.String()
 }
 
+// failedOn names who ran the verdict's failures: its box, or of a split gate each half's box that failed.
+func (verdict boxVerdict) failedOn() string {
+	if len(verdict.parts) == 0 {
+		return verdict.box
+	}
+	failing := []string{}
+	for _, part := range verdict.parts {
+		if part.failed() {
+			failing = append(failing, part.box)
+		}
+	}
+	return strings.Join(failing, " and ")
+}
+
 func describeEnd(runError error) string {
 	if runError == nil {
 		return "with exit 0"
@@ -512,7 +594,7 @@ func runModuleTests(
 	if setting == gateOffSetting {
 		return runModuleTestsHere(worktree, testing, patterns, races)
 	}
-	verdict, unavailable := runBoxGate(worktree, commit, task, patterns, races, setting)
+	verdict, unavailable := runBoxGate(worktree, commit, task, patterns, races, setting, testing)
 	if unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no verdict from a gate box, so nothing landed, and its tests never "+
 			"fall back to Kirk's Mac: %s\n", unavailable)
@@ -534,14 +616,14 @@ func runModuleTests(
 		}
 	}
 	if verdict.failed() {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s failed, so nothing landed:\n", verdict.box,
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s failed, so nothing landed:\n", verdict.failedOn(),
 			platform)
 		fmt.Fprint(streams.Errors, verdict.failureReport())
 		return 1, ""
 	}
 	if verdict.race != nil && verdict.race.failed() {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run on %s failed, so nothing landed:\n", verdict.box,
-			platform)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run on %s failed, so nothing landed:\n",
+			verdict.race.failedOn(), platform)
 		fmt.Fprint(streams.Errors, verdict.race.failureReport())
 		printRaceReports(verdict.race.raceReports)
 		return 1, ""
@@ -549,6 +631,11 @@ func runModuleTests(
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s passed, %d packages\n", verdict.box, platform,
 		verdict.packagesPassed)
 	where := fmt.Sprintf("on %s (%s, %d packages, %s)", verdict.box, platform, verdict.packagesPassed, sharedBoxTrust)
+	// A split gate names which box ran which half (gate_split.go).
+	if verdict.halves != "" {
+		where = fmt.Sprintf("on %s (%s, %d packages: %s, %s)", verdict.box, platform, verdict.packagesPassed,
+			verdict.halves, sharedBoxTrust)
+	}
 	if verdict.job != "" {
 		where = fmt.Sprintf("on a scratch box (%s, %d packages, %s; land-gate job %s)", platform,
 			verdict.packagesPassed, sharedBoxTrust, verdict.job)
@@ -593,6 +680,10 @@ func runModuleTests(
 	for _, unlaid := range verdict.unlaidCorpora {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", unlaid)
 		where += "; " + unlaid
+	}
+	if verdict.wholeBecause != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", verdict.wholeBecause)
+		where += "; " + verdict.wholeBecause
 	}
 	// Where the gate's time went joins the landing's body too, so main's history holds it beside the gate's total.
 	if timing := verdict.timingReport(); timing != "" {

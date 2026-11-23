@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/system-inc/cohere/internal/streams"
@@ -183,9 +185,93 @@ func waitSetting(variable string, setting string, fallback time.Duration) (time.
 	return wait, nil
 }
 
-// runOnGateBoxes puts commit in Loom's feed, then runs the module's tests on the first of boxes that is free, through
-// gap, and returns everything gap printed, the box it ran on and how gap ended. It returns why no box ran them
-// instead, which refuses the landing: the feed didn't take the commit, or every box stayed held for wait.
+// feedGateCommit puts commit in Loom's feed and reads the TypeScript pin it records, empty for a tree with none. It
+// returns why the feed didn't take it instead, which refuses the landing.
+func feedGateCommit(worktree string, commit string) (string, string) {
+	pushed, pushError := loomCombined(worktree, "loom", "push", "--feed", commit, "--repository", "cohere")
+	if pushError != nil {
+		return "", fmt.Sprintf("Loom's feed didn't take %s (%s)", shortCommit(commit),
+			lastWords(pushed, describeEnd(pushError)))
+	}
+	// Ignored: a tree with no TypeScript gitlink needs no pin, and the box's script skips an empty one.
+	pin, _ := gitOutput(worktree, "rev-parse", "--verify", "--quiet", commit+":TypeScript")
+	return pin, ""
+}
+
+// macBoxCoreBudgets is how many cores each gate Mac that shares herself with other work gives a gate, by her name:
+// Marin carries Ahra's texting line and AhraHands, so a job of ours there keeps to all but two of her 12 cores (Kirk's
+// box plan, Nov 23, relayed on #bc8nf0r). A Mac not named here gives a gate all of hers.
+var macBoxCoreBudgets = map[string]int{"Marin": 10}
+
+// macBoxRemoteCommand is the command gap runs over ssh on the gate box named box: macBoxScript, given commit, its pin,
+// the race tokens, the corpora and the packages to test, which are the module's patterns for the whole gate and a
+// half's import paths for a split one (gate_split.go), with box's core budget when macBoxCoreBudgets names one.
+func macBoxRemoteCommand(
+	box string,
+	commit string,
+	pin string,
+	races []string,
+	corpora []gateCorpus,
+	packages []string,
+) string {
+	budget := ""
+	if cores, budgeted := macBoxCoreBudgets[box]; budgeted {
+		budget = fmt.Sprintf("%s=%d ", boxCoreBudgetVariable, cores)
+	}
+	// Encoded, so nothing in the script is read by a shell before the box's bash: gap's command is one argument to ssh.
+	return "echo " + base64.StdEncoding.EncodeToString([]byte(macBoxScript)) + " | base64 -d | " + budget +
+		"bash -s -- " +
+		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' '" + corporaArgument(corpora) + "' " +
+		strings.Join(packages, " ")
+}
+
+// gateBoxHeld reads box's claim, `gap --box <Mac>`, which exits 0 only while she is free, and returns what holds her,
+// as the land line names it, empty while she is free.
+func gateBoxHeld(worktree string, box string) string {
+	read, readError := loomCombined(worktree, "loom", "gap", "--box", box)
+	if readError != nil {
+		return box + " (" + lastWords(read, describeEnd(readError)) + ")"
+	}
+	return ""
+}
+
+// runOnGateBox runs remote on box in her gap, writing what it does to lines, and returns everything gap printed,
+// whether gap said she stayed held, so remote never ran, and how gap ended. It returns why nothing ran instead, which
+// refuses the landing: she lacked a corpus and laying it failed, or she still lacks it once laid.
+func runOnGateBox(
+	worktree string,
+	box string,
+	remote string,
+	corpora []gateCorpus,
+	lines io.Writer,
+) ([]byte, bool, string, error) {
+	output, runError := loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh", box,
+		remote)
+	// A box that lacks a corpus the landing pins tests nothing and names it, so it is laid there, in a gap of its own,
+	// and the box is asked once more. Laid once, a corpus stays for every landing that pins it.
+	if places := unlaidIn(output); len(places) > 0 && !gapHeld(runError, output) {
+		laid, layError := layCorpora(worktree, box, corpora, places, lines)
+		// Ignored: a line to the terminal that never arrives loses nothing the verdict needs, and the stream keeps its
+		// error for streams.Finish to report.
+		fmt.Fprint(lines, corpusLaidLines(laid))
+		if layError != nil {
+			return nil, false, fmt.Sprintf("%s lacks %s, and laying it failed: %v", box, strings.Join(places, ", "),
+				layError), nil
+		}
+		output, runError = loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh",
+			box, remote)
+		if places := unlaidIn(output); len(places) > 0 {
+			return nil, false, fmt.Sprintf("%s still lacks %s after it was laid there", box,
+				strings.Join(places, ", ")), nil
+		}
+	}
+	return output, gapHeld(runError, output), "", runError
+}
+
+// runOnGateBoxes runs the module's tests on the first of boxes that is free, through gap, the commit already in Loom's
+// feed with its pin (feedGateCommit), and returns everything gap printed, the box it ran on and how gap ended. It
+// returns why no box ran them instead, which refuses the landing: every box stayed held for wait, or a corpus a box
+// lacked couldn't be laid.
 //
 // A Mac's gap waits on another org's claim for as long as a claim may stand rather than refusing, so each box's claim
 // is read first, `gap --box <Mac>`, which exits 0 only while she is free, and a held one is passed over. A box taken
@@ -193,23 +279,16 @@ func waitSetting(variable string, setting string, fallback time.Duration) (time.
 func runOnGateBoxes(
 	worktree string,
 	commit string,
+	pin string,
 	patterns []string,
 	races []string,
 	corpora []gateCorpus,
 	boxes []string,
 	wait time.Duration,
 ) ([]byte, string, string, error) {
-	pushed, pushError := loomCombined(worktree, "loom", "push", "--feed", commit, "--repository", "cohere")
-	if pushError != nil {
-		return nil, "", fmt.Sprintf("Loom's feed didn't take %s (%s)", shortCommit(commit),
-			lastWords(pushed, describeEnd(pushError))), nil
-	}
-	// Ignored: a tree with no TypeScript gitlink needs no pin, and the box's script skips an empty one.
-	pin, _ := gitOutput(worktree, "rev-parse", "--verify", "--quiet", commit+":TypeScript")
-	// Encoded, so nothing in the script is read by a shell before the box's bash: gap's command is one argument to ssh.
-	remote := "echo " + base64.StdEncoding.EncodeToString([]byte(macBoxScript)) + " | base64 -d | bash -s -- " +
-		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' '" + corporaArgument(corpora) + "' " +
-		strings.Join(patterns, " ")
+	// A whole gate's command is made for each box in turn, since each may hold her own core budget.
+	remoteFor := func(box string) string { return macBoxRemoteCommand(box, commit, pin, races, corpora, patterns) }
+	lines := gateLines{lock: &sync.Mutex{}}
 	started := time.Now()
 	// asked is how many times every box has been asked. A land always asks twice before it refuses, so a wait shorter
 	// than one round of asking still asks again: on a loaded box one round outlasted a 2s wait (Sun2, Nov 16).
@@ -218,9 +297,7 @@ func runOnGateBoxes(
 		asked++
 		held := []string{}
 		for _, box := range boxes {
-			read, readError := loomCombined(worktree, "loom", "gap", "--box", box)
-			if readError != nil {
-				words := box + " (" + lastWords(read, describeEnd(readError)) + ")"
+			if words := gateBoxHeld(worktree, box); words != "" {
 				fmt.Fprintf(streams.Errors, "cohere-dev: %s is held: %s\n", box, words)
 				held = append(held, words)
 				continue
@@ -228,25 +305,11 @@ func runOnGateBoxes(
 			fmt.Fprintf(streams.Errors, "cohere-dev: testing %s on %s in her gap; the land lock stays held while it "+
 				"runs\n", shortCommit(commit), box)
 			streams.Show(streams.Errors)
-			output, runError := loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--",
-				"ssh", box, remote)
-			// A box that lacks a corpus the landing pins tests nothing and names it, so it is laid there, in a gap
-			// of its own, and the box is asked once more. Laid once, a corpus stays for every landing that pins it.
-			if places := unlaidIn(output); len(places) > 0 && !gapHeld(runError, output) {
-				laid, layError := layCorpora(worktree, box, corpora, places)
-				fmt.Fprint(streams.Errors, corpusLaidLines(laid))
-				if layError != nil {
-					return nil, "", fmt.Sprintf("%s lacks %s, and laying it failed: %v", box,
-						strings.Join(places, ", "), layError), nil
-				}
-				output, runError = loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--",
-					"ssh", box, remote)
-				if places := unlaidIn(output); len(places) > 0 {
-					return nil, "", fmt.Sprintf("%s still lacks %s after it was laid there", box,
-						strings.Join(places, ", ")), nil
-				}
+			output, stayedHeld, unavailable, runError := runOnGateBox(worktree, box, remoteFor(box), corpora, lines)
+			if unavailable != "" {
+				return nil, "", unavailable, nil
 			}
-			if gapHeld(runError, output) {
+			if stayedHeld {
 				words := box + " (" + lastWords(output, describeEnd(runError)) + ")"
 				fmt.Fprintf(streams.Errors, "cohere-dev: %s is held: %s\n", box, words)
 				held = append(held, words)

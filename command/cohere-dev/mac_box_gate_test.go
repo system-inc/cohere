@@ -24,10 +24,13 @@ type macBoxFixture struct {
 	*landFixture
 	// replies holds what the stand-in ahra answers: `push.fails` makes the push fail, `<box>.held` makes the box's
 	// claim read held, in its words when it holds any, `<box>.run` is what her gap prints, with `COMMIT` the commit the
-	// remote names, and `<box>.exit` its exit. `<box>.unlaid` is what her gap prints in place of `<box>.run` until a
-	// gap carrying corpora has laid them, which copies its carry to `<box>.carry` and its remote to `<box>.lay`, or
-	// prints `<box>.lay.fails` and exits 1 when that is there. The stand-in writes each call it took to `calls`, one
-	// line each, and each box's remote command whole to `<box>.remote`.
+	// remote names, and `<box>.exit` its exit. `<box>.passes`, `<plain seconds> <race seconds>`, makes her gap print a
+	// passing run of exactly the packages and race tokens her remote names in place of `<box>.run`, but for the package
+	// `<box>.omit` names, which it leaves out, `<box>.fails`, which fails, and `<box>.extra`, which it adds.
+	// `<box>.unlaid` is what her gap prints in place of `<box>.run` until a gap carrying corpora has laid them, which
+	// copies its carry to `<box>.carry` and its remote to `<box>.lay`, or prints `<box>.lay.fails` and exits 1 when
+	// that is there. The stand-in writes each call it took to `calls`, one line each, and each box's remote command
+	// whole to `<box>.remote`.
 	replies string
 	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
@@ -58,6 +61,33 @@ gap)
   fi
   printf '%s' "${10}" > "$replies/$box.remote"
   if [ -e "$replies/$box.unlaid" ] && [ ! -e "$replies/$box.laid" ]; then cat "$replies/$box.unlaid"; exit 0; fi
+  if [ -e "$replies/$box.passes" ]; then
+    read -r plain race < "$replies/$box.passes"
+    omit=$(cat "$replies/$box.omit" 2>/dev/null || true); fails=$(cat "$replies/$box.fails" 2>/dev/null || true)
+    # The remote's arguments after its script, an empty one written - so each keeps its place, nothing globbed.
+    set -f
+    set -- $(printf '%s' "${10}" | sed "s/^.* bash -s -- //; s/''/-/g" | tr -d "'")
+    echo "` + boxMarker + `$1 on darwin/arm64"
+    races="$3"; shift 4
+    failed=0
+    for package in "$@"; do
+      [ "$package" != "$omit" ] || continue
+      if [ "$package" = "$fails" ]; then
+        echo '{"Action":"fail","Package":"'"$package"'","Test":"TestPlantedFailure"}'
+        echo '{"Action":"fail","Package":"'"$package"'","Elapsed":'"$plain"'}'; failed=1; continue
+      fi
+      echo '{"Action":"pass","Package":"'"$package"'","Elapsed":'"$plain"'}'
+    done
+    [ ! -e "$replies/$box.extra" ] || echo '{"Action":"pass","Package":"'"$(cat "$replies/$box.extra")"'"}'
+    [ "$failed" = 0 ] || exit 1
+    [ "$races" != - ] || exit 0
+    echo "` + boxRaceMarker + `"
+    for token in $(printf '%s' "$races" | tr , ' '); do
+      directory="${token%%@*}"
+      echo '{"Action":"pass","Package":"example.com/fixture/'"${directory#./}"'","Elapsed":'"$race"'}'
+    done
+    exit 0
+  fi
   commit=$(printf '%s' "${10}" | sed 's/.* bash -s -- \([0-9a-f]*\) .*/\1/')
   sed "s/COMMIT/$commit/g" "$replies/$box.run"
   exit "$(cat "$replies/$box.exit" 2>/dev/null || echo 0)" ;;
@@ -65,12 +95,20 @@ esac
 echo "the stand-in has no answer for: $*"; exit 2
 `
 
+// macBoxGoList answers a go list as go would for the fixture's module, which a split gate lists its packages by: each
+// directory holding a Go file, by its import path and its directory. Any other go command it answers with nothing.
+const macBoxGoList = `[ "$1" = list ] || exit 0
+find . -name '*.go' | sed 's|/[^/]*$||' | sort -u | while read -r directory; do
+  echo "example.com/fixture/${directory#./} $(pwd -P)/${directory#./}"
+done
+`
+
 func newMacBoxFixture(test *testing.T, raced bool) *macBoxFixture {
 	test.Helper()
 	fixture := &macBoxFixture{landFixture: newLandFixture(test), replies: test.TempDir()}
 	stand := test.TempDir()
 	fixture.goCalls = filepath.Join(stand, "go")
-	recorder := "#!/bin/sh\necho \"$*\" >> '" + fixture.goCalls + "'\n"
+	recorder := "#!/bin/sh\necho \"$*\" >> '" + fixture.goCalls + "'\n" + macBoxGoList
 	if writeError := executable_testing.WriteFile(filepath.Join(filepath.Dir(fixture.log), "go"),
 		[]byte(recorder), 0o755); writeError != nil {
 		test.Fatal(writeError)
@@ -80,9 +118,10 @@ func newMacBoxFixture(test *testing.T, raced bool) *macBoxFixture {
 		test.Fatal(writeError)
 	}
 	// A short wait in line, so a landing that wrongly finds every box held refuses in seconds rather than holding the
-	// test for gateWaitDefault. A case that means the wait sets its own, later, which wins.
+	// test for gateWaitDefault. A case that means the wait sets its own, later, which wins. The gate runs whole on one
+	// box, as these tests pin it, and a test of the split (gate_split_test.go) turns it on.
 	fixture.environment = append(fixture.environment, gateVariable+"=on", loomStandInVariable+"="+ahra,
-		"GATE_REPLIES="+fixture.replies, gateWaitVariable+"=5s")
+		"GATE_REPLIES="+fixture.replies, gateWaitVariable+"=5s", gateSplitVariable+"="+gateSplitOffSetting)
 	worktree := fixture.worktree("a")
 	writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
 	writeFixtureFile(test, filepath.Join(worktree, "alpha", "alpha_test.go"),
@@ -297,7 +336,9 @@ func TestALandingTestsOnTheGatesMacsAndNeverOnKirksMac(test *testing.T) {
 // macBoxRemote is a gap's remote command: the encoded script through bash, then its arguments, the commit, the pin and
 // the races quoted, then the patterns.
 var macBoxRemote = regexp.MustCompile(
-	`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| bash -s -- ([0-9a-f]{40}) '([0-9a-f]*)' '([^']*)' '([^']*)' (.*)$`,
+	// A box with a core budget (macBoxCoreBudgets), Marin, has it set before bash.
+	`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| (?:` + boxCoreBudgetVariable + `=[0-9]+ )?bash -s -- ([0-9a-f]{40}) ` +
+		`'([0-9a-f]*)' '([^']*)' '([^']*)' (.*)$`,
 )
 
 // The push puts the commit being landed in Loom's feed for cohere, the gap runs on Sun2 within its bound over ssh to
@@ -463,6 +504,53 @@ func TestTheGatesScriptsParseAndSayTheirSteps(test *testing.T) {
 	if bashError != nil || !regexp.MustCompile(`\A`+regexp.QuoteMeta(boxStepMarker)+`toolchain [0-9]+\n`+
 		regexp.QuoteMeta(boxStepMarker)+`modules [0-9]+\n\z`).Match(output) {
 		test.Errorf("the gate's opening said its steps as (%v):\n%s", bashError, output)
+	}
+}
+
+// Marin gives a gate all but two of her cores (macBoxCoreBudgets): her command carries the budget and Sun2's none, and
+// the script, as sharedBoxGate spells it, runs go with two threads a test binary and half the budget's binaries at
+// once, saying the budget it held; a budget of one core holds no binary and refuses.
+func TestAGateMacKeepsToHerCoreBudget(test *testing.T) {
+	test.Parallel()
+	needs.Tool(test, "bash", "the gate's script is a bash script")
+	marin := macBoxRemoteCommand("Marin", "0123", "", nil, nil, []string{"./..."})
+	sun2 := macBoxRemoteCommand("Sun2", "0123", "", nil, nil, []string{"./..."})
+	if !strings.Contains(marin, " | "+boxCoreBudgetVariable+"=10 bash -s -- ") ||
+		strings.Contains(sun2, boxCoreBudgetVariable) {
+		test.Errorf("Marin's command or Sun2's carries the wrong budget:\n%.300s\n%.300s", marin[len(marin)-120:],
+			sun2[len(sun2)-120:])
+	}
+	_, after, found := strings.Cut(sharedBoxGate, "# A box that shares herself with other work")
+	block, _, closed := strings.Cut(after, "\nfi\n")
+	if !found || !closed {
+		test.Fatal("sharedBoxGate holds no budget block to run")
+	}
+	run := func(cores string) (string, error) {
+		test.Helper()
+		bash := exec.Command("bash", "-s")
+		bash.Stdin = strings.NewReader("set -euo pipefail\nrefuse() { echo \"" + sharedBoxRefusedMarker +
+			"$*\"; exit 1; }\nGOFLAGS=\"-buildvcs=false -trimpath\"\n# " + block + "\nfi\n" +
+			"echo \"GOFLAGS=$GOFLAGS GOMAXPROCS=${GOMAXPROCS:-unset}\"\n")
+		// Without the pool's own `GOMAXPROCS` and `GOFLAGS`, which a token sets, so only the block can set them.
+		bash.Env = append(slices.DeleteFunc(os.Environ(), func(variable string) bool {
+			return strings.HasPrefix(variable, "GOMAXPROCS=") || strings.HasPrefix(variable, "GOFLAGS=") ||
+				strings.HasPrefix(variable, boxCoreBudgetVariable+"=")
+		}), boxCoreBudgetVariable+"="+cores)
+		output, bashError := bash.CombinedOutput()
+		return string(output), bashError
+	}
+	said, runError := run("10")
+	if want := boxBudgetMarker + "10 cores, go test -p 5 on 2 threads each\nGOFLAGS=-buildvcs=false -trimpath -p 5 " +
+		"GOMAXPROCS=2\n"; runError != nil || said != want {
+		test.Errorf("a budget of 10 ran as (%v):\n%s\nwant\n%s", runError, said, want)
+	}
+	if said, runError := run("1"); runError == nil || !strings.Contains(said, sharedBoxRefusedMarker+
+		"a core budget of 1 holds no test binary") {
+		test.Errorf("a budget of 1 wasn't refused (%v):\n%s", runError, said)
+	}
+	if verdict := readTestJson([]byte(boxBudgetMarker + "10 cores, go test -p 5 on 2 threads each\n" + boxStepMarker +
+		"tests 60")); verdict.timingReport() != "within 10 cores, go test -p 5 on 2 threads each; by step tests 1m0s" {
+		test.Errorf("a budgeted run's timing reads %q", verdict.timingReport())
 	}
 }
 
