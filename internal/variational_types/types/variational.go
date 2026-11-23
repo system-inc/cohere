@@ -19,6 +19,7 @@ package types
 import (
 	"go/ast"
 	"go/constant"
+	"iter"
 	"math/bits"
 )
 
@@ -31,7 +32,7 @@ type Mask uint8
 type Variation struct {
 	Builds Mask
 	Files  map[*ast.File]Mask
-	Types  map[ast.Expr][]BuildTypeAndValue
+	Types  map[ast.Expr]Answers
 
 	// Counts of the check's work, for the spike's report.
 	Units    int // units run to their end
@@ -42,6 +43,93 @@ type Variation struct {
 type BuildTypeAndValue struct {
 	Builds Mask
 	TypeAndValue
+}
+
+// Answers are an expression's answers by build. Nearly every expression has one, kept inline so the map needs no
+// slice for it; the rest are in more.
+type Answers struct {
+	first      BuildTypeAndValue
+	firstOrder int64
+	more       []orderedAnswer
+}
+
+// orderedAnswer is an answer with the order it was written in (see vrecord's order).
+type orderedAnswer struct {
+	BuildTypeAndValue
+	order int64
+}
+
+// Len is how many answers there are.
+func (answers Answers) Len() int {
+	if answers.first.Builds == 0 {
+		return 0
+	}
+	return 1 + len(answers.more)
+}
+
+// All yields each answer.
+func (answers Answers) All() iter.Seq[BuildTypeAndValue] {
+	return func(yield func(BuildTypeAndValue) bool) {
+		if answers.first.Builds == 0 || !yield(answers.first) {
+			return
+		}
+		for _, answer := range answers.more {
+			if !yield(answer.BuildTypeAndValue) {
+				return
+			}
+		}
+	}
+}
+
+// with is answers after an answer tv written for builds with order: it takes those builds from each earlier answer
+// written at an order no higher, as a plain check's later write replaces its earlier one, and an earlier answer at a
+// higher order keeps its builds. answers itself is never changed, so an undo can put it back.
+func (answers Answers) with(builds Mask, tv TypeAndValue, order int64) Answers {
+	// The common cases: the expression's first answer, or a write again for the builds of its only answer.
+	if answers.first.Builds == 0 {
+		return Answers{first: BuildTypeAndValue{Builds: builds, TypeAndValue: tv}, firstOrder: order}
+	}
+	if len(answers.more) == 0 && answers.first.Builds&^builds == 0 && answers.firstOrder <= order {
+		return Answers{first: BuildTypeAndValue{Builds: builds, TypeAndValue: tv}, firstOrder: order}
+	}
+	all := make([]orderedAnswer, 0, 2+len(answers.more))
+	all = append(all, orderedAnswer{answers.first, answers.firstOrder})
+	all = append(all, answers.more...)
+	kept := all[:0:0]
+	for _, earlier := range all {
+		if earlier.Builds&builds != 0 {
+			if earlier.order > order {
+				builds &^= earlier.Builds
+			} else {
+				earlier.Builds &^= builds
+			}
+		}
+		if earlier.Builds != 0 {
+			kept = append(kept, earlier)
+		}
+	}
+	if builds != 0 {
+		folded := false
+		for index := range kept {
+			if kept[index].TypeAndValue == tv {
+				kept[index].Builds |= builds
+				kept[index].order = max(kept[index].order, order)
+				folded = true
+				break
+			}
+		}
+		if !folded {
+			kept = append(kept, orderedAnswer{BuildTypeAndValue{Builds: builds, TypeAndValue: tv}, order})
+		}
+	}
+	if len(kept) == 0 {
+		return Answers{}
+	}
+	result := Answers{first: kept[0].BuildTypeAndValue, firstOrder: kept[0].order}
+	if len(kept) > 1 {
+		result.more = kept[1:]
+	}
+	return result
 }
 
 // variational is the state of the variational check in progress, if any.
@@ -355,25 +443,22 @@ func (check *Checker) fileMask(file *ast.File) Mask {
 	return variation.Builds
 }
 
-// vrecord is one Types answer recorded under a unit's builds.
-type vrecord struct {
-	expr ast.Expr
-	mask Mask
-	tv   TypeAndValue
-	// persistent is set once a declaration unit that recorded it has finished: the declaration never runs again, so
-	// an enclosing unit that restarts keeps it.
-	persistent bool
-	// order is the iota of the constant being declared when it was recorded, or -1. An inherited initializer is one
-	// expression written once for each constant of its group, and a plain check's last write is the group's last
-	// constant; merged declarations run in another order, so the fold keeps the highest iota instead.
-	order int64
+// vundo is what an answer write replaced, so a unit that restarts can put it back.
+type vundo struct {
+	expr     ast.Expr
+	had      bool
+	previous Answers
 }
 
-// runUnit runs run once for builds, or once for each group of them that answers alike when a read inside splits it.
-// A declaration unit's work outlives any unit around it that restarts, since a declared object is never declared
-// again; an action unit's is redone with the unit around it.
-func (check *Checker) runUnit(builds Mask, run func(Mask), declaration bool) {
-	pending := []Mask{builds}
+// runUnit runs run once for builds, or once for each group of them that answers alike when a read inside splits it;
+// run reads the group it runs for from variational.mask. A declaration unit's work outlives any unit around it that
+// restarts, since a declared object is never declared again; an action unit's is redone with the unit around it.
+func (check *Checker) runUnit(builds Mask, run func(), declaration bool) {
+	split := check.tryUnit(builds, run, declaration)
+	if split == nil {
+		return
+	}
+	pending := split
 	for len(pending) > 0 {
 		part := pending[0]
 		pending = pending[1:]
@@ -384,11 +469,11 @@ func (check *Checker) runUnit(builds Mask, run func(Mask), declaration bool) {
 }
 
 // tryUnit runs run under builds and returns nil, or the split a read raised, after putting back what the abandoned
-// run changed: its records, its delayed actions, its untyped expressions, its object path and its environment. What a
+// run changed: its answers, its delayed actions, its untyped expressions, its object path and its environment. What a
 // finished declaration inside it did is kept.
-func (check *Checker) tryUnit(builds Mask, run func(Mask), declaration bool) (split []Mask) {
+func (check *Checker) tryUnit(builds Mask, run func(), declaration bool) (split []Mask) {
 	savedMask := variational.mask
-	savedRecords := len(check.vrecords)
+	savedUndo := len(check.vundo)
 	savedDelayed := len(check.delayed)
 	savedUntyped := len(check.untypedLog)
 	savedPositions := len(check.posStack)
@@ -407,13 +492,16 @@ func (check *Checker) tryUnit(builds Mask, run func(Mask), declaration bool) (sp
 		if !isSplit {
 			panic(recovered)
 		}
-		kept := check.vrecords[:savedRecords]
-		for _, record := range check.vrecords[savedRecords:] {
-			if record.persistent {
-				kept = append(kept, record)
+		types := variational.variation.Types
+		for index := len(check.vundo) - 1; index >= savedUndo; index-- {
+			undo := check.vundo[index]
+			if undo.had {
+				types[undo.expr] = undo.previous
+			} else {
+				delete(types, undo.expr)
 			}
 		}
-		check.vrecords = kept
+		check.vundo = check.vundo[:savedUndo]
 		for index := savedDelayed; index < len(check.delayed); index++ {
 			if !check.delayed[index].persistent {
 				check.delayed[index].f = func() {}
@@ -431,12 +519,13 @@ func (check *Checker) tryUnit(builds Mask, run func(Mask), declaration bool) (sp
 		variational.variation.Restarts++
 		split = request.parts
 	}()
-	run(builds)
+	run()
 	check.flushUntyped(savedUntyped)
+	// A finished declaration's answers stay whatever happens around it, and nothing undoes a unit no other holds.
+	if declaration || variational.depth == 1 {
+		check.vundo = check.vundo[:savedUndo]
+	}
 	if declaration {
-		for index := savedRecords; index < len(check.vrecords); index++ {
-			check.vrecords[index].persistent = true
-		}
 		for index := savedDelayed; index < len(check.delayed); index++ {
 			check.delayed[index].persistent = true
 		}
@@ -459,24 +548,24 @@ func (check *Checker) flushUntyped(from int) {
 	check.untypedLog = check.untypedLog[:from]
 }
 
-// recordVariational keeps x's answer under the current unit's builds.
+// recordVariational writes x's answer for the current unit's builds, keeping what it replaced while a unit runs that
+// could restart.
 func (check *Checker) recordVariational(x ast.Expr, tv TypeAndValue) {
 	mask := variational.all
 	if variational.depth > 0 {
 		mask = variational.mask
 	}
-	check.vrecords = append(check.vrecords, vrecord{expr: x, mask: mask, tv: tv, order: check.recordOrder})
+	types := variational.variation.Types
+	previous, had := types[x]
+	if variational.depth > 0 {
+		check.vundo = append(check.vundo, vundo{expr: x, had: had, previous: previous})
+	}
+	types[x] = previous.with(mask, tv, check.recordOrder)
 }
 
-// rewriteVariational replaces the last answer kept for x under the current unit's builds, as recordCommaOkTypes
-// rewrites a recorded type.
+// rewriteVariational replaces x's answer for the current unit's builds, as recordCommaOkTypes rewrites a recorded type.
 func (check *Checker) rewriteVariational(x ast.Expr, tv TypeAndValue) {
-	for index := len(check.vrecords) - 1; index >= 0; index-- {
-		if check.vrecords[index].expr == x {
-			check.vrecords[index].tv = tv
-			return
-		}
-	}
+	check.recordVariational(x, tv)
 }
 
 // startVariational begins a variational check of check's package, if its configuration asks for one.
@@ -486,7 +575,7 @@ func (check *Checker) startVariational() bool {
 		return false
 	}
 	if variation.Types == nil {
-		variation.Types = map[ast.Expr][]BuildTypeAndValue{}
+		variation.Types = map[ast.Expr]Answers{}
 	}
 	variational.active = true
 	variational.all = variation.Builds
@@ -497,49 +586,9 @@ func (check *Checker) startVariational() bool {
 	return true
 }
 
-// endVariational writes the kept answers into the variation and ends the check. A later answer for an expression
-// replaces an earlier one in the builds both hold, as a plain check's later write replaces its earlier one (an
-// inherited iota is written once for each constant of its group, a generic call again once it is instantiated).
+// endVariational ends the check. Its answers are already in the variation, written as they came.
 func (check *Checker) endVariational() {
-	types := variational.variation.Types
-	orders := map[ast.Expr][]int64{}
-	for _, record := range check.vrecords {
-		var answers []BuildTypeAndValue
-		var kept []int64
-		for index, earlier := range types[record.expr] {
-			earlierOrder := orders[record.expr][index]
-			if earlierOrder > record.order {
-				record.mask &^= earlier.Builds
-			} else {
-				earlier.Builds &^= record.mask
-			}
-			if earlier.Builds != 0 {
-				answers = append(answers, earlier)
-				kept = append(kept, earlierOrder)
-			}
-		}
-		if record.mask == 0 {
-			types[record.expr] = answers
-			orders[record.expr] = kept
-			continue
-		}
-		folded := false
-		for index := range answers {
-			if answers[index].TypeAndValue == record.tv {
-				answers[index].Builds |= record.mask
-				kept[index] = max(kept[index], record.order)
-				folded = true
-				break
-			}
-		}
-		if !folded {
-			answers = append(answers, BuildTypeAndValue{Builds: record.mask, TypeAndValue: record.tv})
-			kept = append(kept, record.order)
-		}
-		types[record.expr] = answers
-		orders[record.expr] = kept
-	}
-	check.vrecords = nil
+	check.vundo = nil
 	variational.active = false
 	variational.variation = nil
 }
@@ -701,7 +750,8 @@ func (check *Checker) declareVariational(obj Object, d *declInfo) {
 	every := Mask(0)
 	for _, declared := range decls {
 		every |= declared.mask
-		check.runUnit(declared.mask, func(builds Mask) {
+		check.runUnit(declared.mask, func() {
+			builds := variational.mask
 			base.typ = nil
 			for _, sibling := range siblings {
 				sibling.typ = nil
@@ -837,17 +887,23 @@ func freshBodyScope(sig *Signature) {
 	scope.children = scope.children[:scope.bodyChildren]
 }
 
-// rewriteCommaOk is recordCommaOkTypes for a variational check without a Types map: x's last kept answer, and each
-// parenthesized expression inside it, becomes the comma-ok tuple.
+// rewriteCommaOk is recordCommaOkTypes for a variational check without a Types map: x's answer for the current
+// unit's builds, and each parenthesized expression inside it, becomes the comma-ok tuple.
 func (check *Checker) rewriteCommaOk(x ast.Expr, t0 Type, t1 Type) {
+	mask := variational.all
+	if variational.depth > 0 {
+		mask = variational.mask
+	}
 	for {
-		for index := len(check.vrecords) - 1; index >= 0; index-- {
-			if check.vrecords[index].expr == x {
+		for answer := range variational.variation.Types[x].All() {
+			if answer.Builds&mask == mask {
+				tv := answer.TypeAndValue
 				pos := x.Pos()
-				check.vrecords[index].tv.Type = NewTuple(
+				tv.Type = NewTuple(
 					newVar(LocalVar, pos, check.pkg, "", t0),
 					newVar(LocalVar, pos, check.pkg, "", t1),
 				)
+				check.recordVariational(x, tv)
 				break
 			}
 		}

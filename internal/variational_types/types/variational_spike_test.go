@@ -151,14 +151,14 @@ func projectAndCompare(t *testing.T, fixtures []fixtureFile) map[string]bool {
 	forked := map[string]bool{}
 	for expression, answers := range variation.Types {
 		covered := types.Mask(0)
-		for _, built := range answers {
+		for built := range answers.All() {
 			if covered&built.Builds != 0 {
 				t.Errorf("%s: two answers for one build", fileSet.Position(expression.Pos()))
 			}
 			covered |= built.Builds
 		}
 		distinct := map[string]bool{}
-		for _, built := range answers {
+		for built := range answers.All() {
 			distinct[answer(built.TypeAndValue)] = true
 		}
 		if len(distinct) > 1 {
@@ -181,10 +181,18 @@ func projectAndCompare(t *testing.T, fixtures []fixtureFile) map[string]bool {
 		// them (the 1 of an IncDec statement).
 		projected := map[string]string{}
 		for expression, answers := range variation.Types {
-			for _, candidate := range answers {
-				if candidate.Builds&build != 0 {
-					projected[positionKey(fileSet, expression)] = answer(candidate.TypeAndValue)
+			for candidate := range answers.All() {
+				if candidate.Builds&build == 0 {
+					continue
 				}
+				key := positionKey(fileSet, expression)
+				if earlier, held := projected[key]; held {
+					// Two nodes at one place answer for this build: a run abandoned for a split left its own
+					// node (one the checker makes afresh, as an IncDec's 1) behind.
+					t.Errorf("build %03b, %s: two answers at one place, %q and %q", build, key, earlier,
+						answer(candidate.TypeAndValue))
+				}
+				projected[key] = answer(candidate.TypeAndValue)
 			}
 		}
 		plainKeys := map[string]bool{}
@@ -203,7 +211,7 @@ func projectAndCompare(t *testing.T, fixtures []fixtureFile) map[string]bool {
 			t.Errorf("build %03b: no expression compared", build)
 		}
 		for expression, answers := range variation.Types {
-			for _, candidate := range answers {
+			for candidate := range answers.All() {
 				if planned := plainKeys[positionKey(fileSet, expression)]; candidate.Builds&build != 0 && !planned {
 					t.Errorf("build %03b, %s %s: projected %q, and the plain check has no answer", build,
 						fileSet.Position(expression.Pos()), types.ExprString(expression), answer(candidate.TypeAndValue))
