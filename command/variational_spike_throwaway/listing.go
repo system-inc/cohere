@@ -51,7 +51,9 @@ const noFilesError = "build constraints exclude all Go files"
 
 // listBuild runs `go list -e -deps -compiled -json` over patterns in root under build, reading the workspace workFile
 // names: the whole graph, every package's compiled files, and nothing compiled. listExports adds the export data.
-func listBuild(root string, patterns []string, build configuration, workFile string) (*listedBuild, error) {
+// depsFromSource makes every package outside the standard library one of ours, as the engine's `--no-cache` run checks
+// them from source, the standard library alone restored.
+func listBuild(root string, patterns []string, build configuration, workFile string, depsFromSource bool) (*listedBuild, error) {
 	environment := build.environment(workFile)
 	cgoOn, cgoError := cgoEnabled(root, environment)
 	if cgoError != nil {
@@ -71,7 +73,7 @@ func listBuild(root string, patterns []string, build configuration, workFile str
 			}
 		}
 		listed.packages[each.ImportPath] = each
-		if !each.DepOnly {
+		if !each.DepOnly || depsFromSource && !each.Standard {
 			listed.matched = append(listed.matched, each.ImportPath)
 		}
 	}

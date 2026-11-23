@@ -46,7 +46,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	report.Timing.ListingGraph = measure(func() {
 		for _, build := range configurations {
 			say(progress, "variational-spike: listing %s\n", build.target(build.cgo == "1"))
-			each, eachError := listBuild(root, asked.patterns, build, side.workFile)
+			each, eachError := listBuild(root, asked.patterns, build, side.workFile, asked.depsFromSource)
 			if eachError != nil {
 				listError = eachError
 				return
