@@ -73,21 +73,25 @@ type oursTotals struct {
 // the phases that import and check: decode is the builds' reading summed over the builds, decode wait the merge's wall
 // time waiting on it, the builds one object needs read at once, and merge the merge's wall time less that wait.
 type timingReport struct {
-	ListingGraph                 phaseTiming   `json:"listingGraph"`
-	ListingExports               phaseTiming   `json:"listingExports"`
-	Parse                        phaseTiming   `json:"parse"`
-	VariationalImport            phaseTiming   `json:"variationalImport"`
-	VariationalDecodeSeconds     float64       `json:"variationalDecodeSeconds"`
-	VariationalDecodeWaitSeconds float64       `json:"variationalDecodeWaitSeconds"`
-	VariationalMergeSeconds      float64       `json:"variationalMergeSeconds"`
-	VariationalCheck             phaseTiming   `json:"variationalCheck"`
-	HostPlainImport              phaseTiming   `json:"hostPlainImport"`
-	HostPlainCheck               phaseTiming   `json:"hostPlainCheck"`
-	EveryBuildPlainImport        phaseTiming   `json:"everyBuildPlainImport"`
-	EveryBuildPlainCheck         phaseTiming   `json:"everyBuildPlainCheck"`
-	PlainCheckByBuild            []phaseTiming `json:"plainCheckByBuild"`
-	HostPlainDecodeSeconds       float64       `json:"hostPlainDecodeSeconds"`
-	PlainDecodeSeconds           float64       `json:"plainDecodeSeconds"`
+	ListingGraph                 phaseTiming `json:"listingGraph"`
+	ListingExports               phaseTiming `json:"listingExports"`
+	Parse                        phaseTiming `json:"parse"`
+	VariationalImport            phaseTiming `json:"variationalImport"`
+	VariationalDecodeSeconds     float64     `json:"variationalDecodeSeconds"`
+	VariationalDecodeWaitSeconds float64     `json:"variationalDecodeWaitSeconds"`
+	VariationalMergeSeconds      float64     `json:"variationalMergeSeconds"`
+	VariationalCheck             phaseTiming `json:"variationalCheck"`
+	// VariationalOnSchedule is whether the variational import and check ran on the parallel schedule, when their rows
+	// sum each package's wall alone and hold no CPU: the process's CPU over one job is every running job's, so CPU is
+	// measured across the whole schedule, in the parallel report.
+	VariationalOnSchedule  bool          `json:"variationalOnSchedule"`
+	HostPlainImport        phaseTiming   `json:"hostPlainImport"`
+	HostPlainCheck         phaseTiming   `json:"hostPlainCheck"`
+	EveryBuildPlainImport  phaseTiming   `json:"everyBuildPlainImport"`
+	EveryBuildPlainCheck   phaseTiming   `json:"everyBuildPlainCheck"`
+	PlainCheckByBuild      []phaseTiming `json:"plainCheckByBuild"`
+	HostPlainDecodeSeconds float64       `json:"hostPlainDecodeSeconds"`
+	PlainDecodeSeconds     float64       `json:"plainDecodeSeconds"`
 }
 
 // parallelReport is ours checked in parallel along the import graph on the engine's schedule, one types.Checker a
@@ -225,26 +229,37 @@ func tableText(report *spikeReport) string {
 	rows := []struct {
 		name  string
 		phase phaseTiming
+		// onSchedule rows ran on the parallel schedule, so their CPU isn't measured by phase.
+		onSchedule bool
 	}{
-		{"listing: graph, nothing compiled", timing.ListingGraph},
-		{"listing: export data, not ours", timing.ListingExports},
-		{"parse (ours, once)", timing.Parse},
-		{"variational import", timing.VariationalImport},
-		{"variational check", timing.VariationalCheck},
-		{"baseline: host plain import", timing.HostPlainImport},
-		{"baseline: host plain check", timing.HostPlainCheck},
-		{"baseline: every build plain import", timing.EveryBuildPlainImport},
-		{"baseline: every build plain check", timing.EveryBuildPlainCheck},
+		{"listing: graph, nothing compiled", timing.ListingGraph, false},
+		{"listing: export data, not ours", timing.ListingExports, false},
+		{"parse (ours, once)", timing.Parse, false},
+		{"variational import", timing.VariationalImport, timing.VariationalOnSchedule},
+		{"variational check", timing.VariationalCheck, timing.VariationalOnSchedule},
+		{"baseline: host plain import", timing.HostPlainImport, false},
+		{"baseline: host plain check", timing.HostPlainCheck, false},
+		{"baseline: every build plain import", timing.EveryBuildPlainImport, false},
+		{"baseline: every build plain check", timing.EveryBuildPlainCheck, false},
 	}
 	for _, row := range rows {
+		if row.onSchedule {
+			fmt.Fprintf(output, "%-34s %9.3f %9s %9s\n", row.name, row.phase.WallSeconds, "n/a", "n/a")
+			continue
+		}
 		fmt.Fprintf(output, "%-34s %9.3f %9.3f %9.3f\n", row.name, row.phase.WallSeconds, row.phase.CpuSeconds(),
 			row.phase.ChildrenCpuSeconds)
+	}
+	if timing.VariationalOnSchedule {
+		fmt.Fprintf(output, "the variational rows ran on the parallel schedule: their wall sums each package's alone, "+
+			"and their cpu, not measured by phase, is the schedule's process cpu in the parallel table below\n")
 	}
 	fmt.Fprintf(output, "importer: variational decode %.3fs summed over builds, %.3fs waited on, merge %.3fs wall; "+
 		"host plain decode %.3fs; every build plain decode %.3fs\n", timing.VariationalDecodeSeconds,
 		timing.VariationalDecodeWaitSeconds, timing.VariationalMergeSeconds, timing.HostPlainDecodeSeconds,
 		timing.PlainDecodeSeconds)
-	if timing.HostPlainCheck.CpuSeconds() > 0 && timing.EveryBuildPlainCheck.CpuSeconds() > 0 {
+	if !timing.VariationalOnSchedule && timing.VariationalCheck.CpuSeconds() > 0 &&
+		timing.HostPlainCheck.CpuSeconds() > 0 && timing.EveryBuildPlainCheck.CpuSeconds() > 0 {
 		fmt.Fprintf(output, "variational check cpu over host plain check: %.2fx; over every build summed: %.2fx\n",
 			timing.VariationalCheck.CpuSeconds()/timing.HostPlainCheck.CpuSeconds(),
 			timing.VariationalCheck.CpuSeconds()/timing.EveryBuildPlainCheck.CpuSeconds())
@@ -418,4 +433,19 @@ func writeParallel(output *strings.Builder, parallel *parallelReport) {
 		parallel.HostPlainWarmSeconds,
 		parallel.HostPlainDecodeSeconds,
 	)
+	writeCpuRatio(output, "variational schedule", parallel.Variational, parallel.HostPlain)
+}
+
+// writeCpuRatio writes the process CPU of run over that of hostPlain, each across its whole schedule, or says it
+// wasn't measured, never a ratio of nothing.
+//
+// Mutates: output gets the line.
+func writeCpuRatio(output *strings.Builder, name string, run parallelRun, hostPlain parallelRun) {
+	if run.Process.CpuSeconds() <= 0 || hostPlain.Process.CpuSeconds() <= 0 {
+		fmt.Fprintf(output, "%s cpu over host plain schedule cpu: not measured, the platform gives no process cpu\n",
+			name)
+		return
+	}
+	fmt.Fprintf(output, "%s cpu over host plain schedule cpu: %.2fx\n", name,
+		run.Process.CpuSeconds()/hostPlain.Process.CpuSeconds())
 }

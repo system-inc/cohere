@@ -117,6 +117,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 		checked, variationalCounts, variationalRun = checkVariationallyInParallel(fileSet, ordered, ours, importer, all,
 			sizes, asked.checkWorkers)
 		report.Parallel = &parallelReport{Workers: asked.checkWorkers, Variational: variationalRun}
+		report.Timing.VariationalOnSchedule = true
 	} else {
 		say(progress, "variational-spike: checking %d packages once for %d builds\n", len(ordered), len(listed))
 		checked, variationalCounts = checkVariationally(fileSet, ordered, ours, importer, all, sizes, measure)

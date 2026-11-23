@@ -216,6 +216,11 @@ func TestParallelChecksProveOneBuild(test *testing.T) {
 	if len(report.Proof) != 1 || report.Proof[0].Compared == 0 {
 		test.Errorf("the proof compared nothing: %+v", report.Proof)
 	}
+	// The parallel schedule measures CPU across itself, never by phase, so no row may read as no CPU spent.
+	table := tableText(report)
+	if !report.Timing.VariationalOnSchedule || strings.Contains(table, " 0.00x") || !strings.Contains(table, "n/a") {
+		test.Errorf("the table prints the parallel variational rows' unmeasured cpu as a number:\n%s", table)
+	}
 }
 
 // TestParallelChecksProveEveryBuild runs the parallel fixture through the whole spike with --check-workers for darwin,
