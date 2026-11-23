@@ -201,6 +201,17 @@ func TestParallelChecksProveOneBuild(test *testing.T) {
 	if report.Parallel.HostPlainWarmSeconds <= 0 {
 		test.Errorf("the host plain warm-up took %vs, want some time", report.Parallel.HostPlainWarmSeconds)
 	}
+	if report.Parallel.VariationalWarmSeconds <= 0 || len(report.Parallel.VariationalWarmed.JobSeconds) !=
+		parallelFixturePackages {
+		test.Errorf("the warmed variational schedule: warm-up %vs, %d jobs, want some time and %d",
+			report.Parallel.VariationalWarmSeconds, len(report.Parallel.VariationalWarmed.JobSeconds),
+			parallelFixturePackages)
+	}
+	// Merged whole before it, every package not ours leaves the warmed schedule nothing to read or merge.
+	if report.Parallel.VariationalWarmedDecodeSeconds != 0 || report.Parallel.VariationalWarmedMergeSeconds != 0 {
+		test.Errorf("the warmed schedule decoded %vs and merged %vs, want nothing",
+			report.Parallel.VariationalWarmedDecodeSeconds, report.Parallel.VariationalWarmedMergeSeconds)
+	}
 	if report.Parallel.Workers != parallelWorkers {
 		test.Errorf("%d workers reported, want %d", report.Parallel.Workers, parallelWorkers)
 	}
@@ -271,6 +282,17 @@ func TestParallelChecksProveEveryBuild(test *testing.T) {
 	}
 	if report.Parallel.HostPlainWarmSeconds <= 0 {
 		test.Errorf("the host plain warm-up took %vs, want some time", report.Parallel.HostPlainWarmSeconds)
+	}
+	if report.Parallel.VariationalWarmSeconds <= 0 || len(report.Parallel.VariationalWarmed.JobSeconds) !=
+		parallelFixturePackages {
+		test.Errorf("the warmed variational schedule: warm-up %vs, %d jobs, want some time and %d",
+			report.Parallel.VariationalWarmSeconds, len(report.Parallel.VariationalWarmed.JobSeconds),
+			parallelFixturePackages)
+	}
+	// Merged whole before it, every package not ours leaves the warmed schedule nothing to read or merge.
+	if report.Parallel.VariationalWarmedDecodeSeconds != 0 || report.Parallel.VariationalWarmedMergeSeconds != 0 {
+		test.Errorf("the warmed schedule decoded %vs and merged %vs, want nothing",
+			report.Parallel.VariationalWarmedDecodeSeconds, report.Parallel.VariationalWarmedMergeSeconds)
 	}
 	for _, row := range []struct {
 		name string

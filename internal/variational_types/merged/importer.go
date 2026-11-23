@@ -26,6 +26,10 @@ type Importer struct {
 	all     types.Mask
 	builds  []*build // one for each build in all
 
+	// warmed are the types Warm has walked, read and written by many goroutines at once, so held apart from the
+	// merge's lock.
+	warmed sync.Map
+
 	// mutex is the merge's lock. Every field below is held under it, and a merge runs whole while holding it. Merges
 	// of different objects don't run at once: one merge's types reach another's (a field's type, an embedded
 	// interface), and its end compares and completes them, which a merge still running elsewhere could be writing.
@@ -175,6 +179,26 @@ func (importer *Importer) resolve(work func(*resolution)) {
 			placed.entry.made.Store(&madeObject{object: placed.made})
 		}
 	})
+}
+
+// Warm imports path into the merged universe and merges every object of it and every type they reach, each in every
+// build it differs in, so checks after it read only merged objects and merge nothing of path's. It is safe for many
+// goroutines at once, as Import and lookups are, and a type any call walked is walked once across them. Called outside
+// every check, it reads outside every unit, as a merge does.
+func (importer *Importer) Warm(path string) error {
+	imported, importError := importer.Import(path)
+	if importError != nil {
+		return importError
+	}
+	walk := typeWalk{firstVisit: func(reachedType types.Type) bool {
+		_, walked := importer.warmed.LoadOrStore(reachedType, true)
+		return !walked
+	}}
+	scope := imported.Scope()
+	for _, name := range scope.Names() {
+		walk.object(scope.Lookup(name))
+	}
+	return nil
 }
 
 // Add makes checked, a package checked from source, the answer Import gives for its path.

@@ -176,6 +176,31 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 		counts, run := checkPlainlyInParallel(fileSet, ordered, ours, listed[0], hostPlainWhole, 0,
 			sizes, asked.checkWorkers)
 		report.Parallel.HostPlain = run
+
+		say(progress, "variational-spike: checking %d packages once for %d builds again, warmed, in parallel on %d "+
+			"workers\n", len(ordered), len(listed), asked.checkWorkers)
+		// A fresh importer: the cold schedule's holds everything merged already, and holds ours as added.
+		warmImporter := merged.New(fileSet, exportSources(fileSet, exports), all)
+		variationalWarm := measure(func() {
+			warmVariationally(ordered, ours, listed, warmImporter, asked.checkWorkers)
+		})
+		report.Parallel.VariationalWarmSeconds = variationalWarm.WallSeconds
+		report.Parallel.VariationalWarmCpuSeconds = variationalWarm.CpuSeconds()
+		beforeWarmed := warmImporter.Timing()
+		// The warmed schedule's answers are the cold one's, already proved, so only its errors and its time are kept.
+		_, warmedCounts, warmedRun := checkVariationallyInParallel(fileSet, ordered, ours, warmImporter, all, sizes,
+			asked.checkWorkers)
+		afterWarmed := warmImporter.Timing()
+		report.Parallel.VariationalWarmed = warmedRun
+		report.Parallel.VariationalWarmedDecodeSeconds = (afterWarmed.Decode - beforeWarmed.Decode).Seconds()
+		report.Parallel.VariationalWarmedMergeSeconds = (afterWarmed.Merge + afterWarmed.DecodeWait -
+			beforeWarmed.Merge - beforeWarmed.DecodeWait).Seconds()
+		report.Errors.Variational += warmedCounts.errors
+		for _, spelled := range warmedCounts.firstErrors {
+			if len(report.Errors.VariationalFirst) < firstErrorsKept {
+				report.Errors.VariationalFirst = append(report.Errors.VariationalFirst, "warmed schedule: "+spelled)
+			}
+		}
 		report.Parallel.HostPlainDecodeSeconds = parallelImporter.Timing().Decode.Seconds()
 		// The serial host baseline checked the same packages, so an error here is one the parallel schedule made.
 		report.Errors.Plain += counts.errors
