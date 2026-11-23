@@ -31,6 +31,11 @@ type standardLibrarySource struct {
 	// systemCacheRoot, when not empty, is the system cache's root in place of cache.SystemCacheRoot's, for a test that
 	// gives a run a system cache of its own beside others running in parallel; every run leaves it empty.
 	systemCacheRoot string
+
+	// goAnswers, when not nil, are go env's answers the test process keeps, which the run's go env reads in place of
+	// starting a child where one was kept under the same key (load.GoAnswers), for a test process running hundreds of
+	// runs, each fork of which faults its heap (#2htryg8); every run leaves it nil.
+	goAnswers *load.GoAnswers
 }
 
 // errorOverlaid is why a build whose go flags name an overlay keeps no system cache (overlaidGoFlags), which the run
