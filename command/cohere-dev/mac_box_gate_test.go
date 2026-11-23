@@ -440,6 +440,32 @@ func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T)
 	}
 }
 
+// Every script the gate runs on a box parses as bash, and the gate's own opening, as sharedBoxGate spells it, says a
+// step it ends as `<step> <seconds>` after boxStepMarker, which is how a landing reads where its gate's time went.
+func TestTheGatesScriptsParseAndSayTheirSteps(test *testing.T) {
+	test.Parallel()
+	needs.Tool(test, "bash", "the gate's scripts are bash scripts")
+	for name, script := range map[string]string{"macBoxScript": macBoxScript, "landGateScript": landGateScript,
+		"corpusLayScript": corpusLayScript, "performanceScript": performanceScript} {
+		bash := exec.Command("bash", "-n")
+		bash.Stdin = strings.NewReader(script)
+		if output, bashError := bash.CombinedOutput(); bashError != nil {
+			test.Errorf("%s doesn't parse: %v\n%s", name, bashError, output)
+		}
+	}
+	opening, _, found := strings.Cut(sharedBoxGate, sharedBoxToolchainCheck)
+	if !found {
+		test.Fatal("sharedBoxGate doesn't hold the toolchain check its opening is cut at")
+	}
+	bash := exec.Command("bash", "-s")
+	bash.Stdin = strings.NewReader("set -euo pipefail\n" + opening + "step toolchain\nstep modules\n")
+	output, bashError := bash.CombinedOutput()
+	if bashError != nil || !regexp.MustCompile(`\A`+regexp.QuoteMeta(boxStepMarker)+`toolchain [0-9]+\n`+
+		regexp.QuoteMeta(boxStepMarker)+`modules [0-9]+\n\z`).Match(output) {
+		test.Errorf("the gate's opening said its steps as (%v):\n%s", bashError, output)
+	}
+}
+
 // The setting of the gate's boxes is a list tried in order, Sun2 then Marin unless it says, and it never names
 // Shackler, whatever its case; the wait is Go's duration, 2 hours unless it says.
 func TestTheGatesBoxesAndItsWaitAreSettings(test *testing.T) {

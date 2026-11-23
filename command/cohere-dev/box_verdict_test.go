@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +53,29 @@ func TestABoxsRunIsReadFromItsMarkerAndItsJson(test *testing.T) {
 	}
 	if got := verdict.failedOutput["example.com/two TestBroken"]; !reflect.DeepEqual(got, []string{"broken here\n"}) {
 		test.Errorf("the failed test's output read as %q", got)
+	}
+}
+
+// A run says where its time went: each step the box said it ended, in order, and its slowest test binaries by the
+// seconds of their pass or fail, slowest first and by name among equals, the rest left out past slowestPackagesShown.
+func TestAGateRunSaysWhereItsTimeWent(test *testing.T) {
+	test.Parallel()
+	lines := []string{boxMarker + "0123456789abcdef on darwin/arm64", boxStepMarker + "toolchain 3",
+		boxStepMarker + "modules 41"}
+	for index := range slowestPackagesShown + 2 {
+		lines = append(lines, fmt.Sprintf(`{"Action":"pass","Package":"example.com/p%02d","Elapsed":%d.5}`, index,
+			index))
+	}
+	lines = append(lines, `{"Action":"fail","Package":"example.com/slow","Elapsed":484.2}`,
+		`{"Action":"pass","Package":"example.com/tied","Elapsed":9.5}`, boxStepMarker+"tests 1862")
+	want := "by step toolchain 3s, modules 41s, tests 31m2s; slowest test binaries example.com/slow 484.2s, " +
+		"example.com/p09 9.5s, example.com/tied 9.5s, example.com/p08 8.5s, example.com/p07 7.5s, example.com/p06 " +
+		"6.5s, example.com/p05 5.5s, example.com/p04 4.5s"
+	if said := readTestJson([]byte(strings.Join(lines, "\n"))).timingReport(); said != want {
+		test.Errorf("the run's timing reads\n%s\nwant\n%s", said, want)
+	}
+	if said := readTestJson([]byte(boxMarker + "0123456789abcdef on darwin/arm64")).timingReport(); said != "" {
+		test.Errorf("a run that said no step and passed no package reads %q", said)
 	}
 }
 
