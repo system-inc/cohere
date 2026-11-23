@@ -159,7 +159,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 		_, warmVariational := checkVariationally(fileSet, ordered, ours, importer, all, sizes, measure)
 		warmHost := checkPlainly(fileSet, ordered, listed[0], baselineImporter.Plain(0), 0, sizes, measure)
 		report.Schedule = scheduleImporter(ordered, ours, reads, len(listed),
-			func() *merged.Importer { return merged.New(fileSet, exports, all) },
+			func() *merged.Importer { return merged.New(fileSet, exportSources(fileSet, exports), all) },
 			warmVariational.checkSeconds, warmHost.checkSeconds, asked.scheduleWorkers, !asked.scheduleParallel)
 	}
 
