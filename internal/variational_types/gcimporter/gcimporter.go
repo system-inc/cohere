@@ -17,9 +17,10 @@ import (
 )
 
 // Import imports a gc-generated package given its import path and srcDir, adds
-// the corresponding package object to the packages map, and returns the object.
-// The packages map must contain all packages already imported.
-func Import(fset *token.FileSet, packages map[string]*types.Package, path, srcDir string, lookup func(path string) (io.ReadCloser, error)) (pkg *types.Package, err error) {
+// the corresponding package object to the universe's packages, and returns the object.
+// The universe must contain all packages already imported. (cohere's: the package's
+// objects are read the first time each is looked up, into the same universe.)
+func Import(fset *token.FileSet, universe *Universe, path, srcDir string, lookup func(path string) (io.ReadCloser, error)) (pkg *types.Package, err error) {
 	var rc io.ReadCloser
 	var id string
 	if lookup != nil {
@@ -31,7 +32,7 @@ func Import(fset *token.FileSet, packages map[string]*types.Package, path, srcDi
 		id = path
 
 		// No need to re-import if the package was imported completely before.
-		if pkg = packages[id]; pkg != nil && pkg.Complete() {
+		if pkg = universe.Packages[id]; pkg != nil && pkg.Complete() {
 			return
 		}
 		f, err := lookup(path)
@@ -50,7 +51,7 @@ func Import(fset *token.FileSet, packages map[string]*types.Package, path, srcDi
 		}
 
 		// no need to re-import if the package was imported completely before
-		if pkg = packages[id]; pkg != nil && pkg.Complete() {
+		if pkg = universe.Packages[id]; pkg != nil && pkg.Complete() {
 			return
 		}
 
@@ -78,7 +79,7 @@ func Import(fset *token.FileSet, packages map[string]*types.Package, path, srcDi
 	s := string(data)
 
 	input := pkgbits.NewPkgDecoder(id, s)
-	pkg = readUnifiedPackage(fset, nil, packages, input)
+	pkg = readUnifiedPackage(fset, nil, universe, input)
 
 	return
 }

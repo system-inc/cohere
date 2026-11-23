@@ -33,6 +33,12 @@ type Importer struct {
 	aliases  map[*types.TypeName]*aliasRecord
 	context  *types.Context // instances are shared across builds through it
 
+	// resolving are the objects whose merge is running, so one reached again before its merge has kept it fails
+	// loudly instead of waiting forever on its own lazy entry.
+	resolving map[objectKey]bool
+	// depth is how many resolutions are running, one inside another: only the outermost ends the merge.
+	depth int
+
 	// The work a merge leaves for its end, when every named type has its underlying type and every interface is
 	// complete, since comparing types before then could read a type still being made.
 	later      []func()
@@ -65,7 +71,7 @@ type Shortfalls struct {
 type build struct {
 	index      int
 	mask       types.Mask
-	packages   map[string]*types.Package
+	universe   *gcimporter.Universe      // its packages, each object read the first time it is looked up
 	translated map[types.Type]types.Type // memoized; a type parameter maps to the merged one its declaration binds
 }
 
@@ -145,6 +151,8 @@ func New(fileSet *token.FileSet, exports []map[string]string, all types.Mask) *I
 		locals:   map[localKey]*namedRecord{},
 		aliases:  map[*types.TypeName]*aliasRecord{},
 		context:  types.NewContext(),
+
+		resolving: map[objectKey]bool{},
 	}
 	for index := range exports {
 		mask := types.Mask(1) << index
@@ -154,14 +162,15 @@ func New(fileSet *token.FileSet, exports []map[string]string, all types.Mask) *I
 		importer.builds = append(importer.builds, &build{
 			index:      index,
 			mask:       mask,
-			packages:   map[string]*types.Package{},
+			universe:   gcimporter.NewUniverse(),
 			translated: map[types.Type]types.Type{},
 		})
 	}
 	return importer
 }
 
-// Import is path's package in the merged universe, every object of it merged across the builds that compile it.
+// Import is path's package in the merged universe. Its scope holds a lazy entry for every name any build declares,
+// and an object is merged across the builds that compile path the first time it is looked up.
 func (importer *Importer) Import(path string) (pkg *types.Package, err error) {
 	if path == "unsafe" {
 		return types.Unsafe, nil
@@ -172,10 +181,7 @@ func (importer *Importer) Import(path string) (pkg *types.Package, err error) {
 	if merged := importer.packages[path]; merged != nil && merged.Complete() {
 		return merged, nil
 	}
-	started := time.Now()
-	decodeBefore := importer.decode
 	defer func() {
-		importer.merge += time.Since(started) - (importer.decode - decodeBefore)
 		if recovered := recover(); recovered != nil {
 			failure, isFailure := recovered.(decodeFailure)
 			if !isFailure {
@@ -184,7 +190,30 @@ func (importer *Importer) Import(path string) (pkg *types.Package, err error) {
 			pkg, err = nil, failure.err
 		}
 	}()
-	return importer.mergePackage(path)
+	importer.resolve(func() { pkg, err = importer.mergePackage(path) })
+	return pkg, err
+}
+
+// resolve runs work, a merge the check asked for, outside every unit of the variational check, since a split's panic
+// in the middle of a merge would leave it half done, and ends the merge once the outermost resolution is done. A
+// resolution can reach others (a type's underlying type reaching another package's object), which run inside it and
+// leave their comparisons to its end.
+func (importer *Importer) resolve(work func()) {
+	types.Outside(func() {
+		if importer.depth > 0 {
+			work()
+			return
+		}
+		importer.depth++
+		started := time.Now()
+		decodeBefore := importer.decoded()
+		defer func() {
+			importer.depth--
+			importer.merge += time.Since(started) - (importer.decoded() - decodeBefore)
+		}()
+		work()
+		importer.finish()
+	})
 }
 
 // Add makes checked, a package checked from source, the answer Import gives for its path.
@@ -193,7 +222,8 @@ func (importer *Importer) Add(checked *types.Package) {
 }
 
 // Plain is build b's own export data, unmerged, for the plain baseline. It shares build b's universe with the merge,
-// so each package is decoded once whichever reads it first.
+// so each package is decoded once whichever reads it first, and as the merge does it reads each object the first
+// time the check looks it up, the time counted in Timing's decode.
 func (importer *Importer) Plain(build int) types.Importer {
 	for _, candidate := range importer.builds {
 		if candidate.index == build {
@@ -205,7 +235,17 @@ func (importer *Importer) Plain(build int) types.Importer {
 
 // Timing is the time spent reading export data and the time spent merging what was read.
 func (importer *Importer) Timing() (decode time.Duration, merge time.Duration) {
-	return importer.decode, importer.merge
+	return importer.decoded(), importer.merge
+}
+
+// decoded is the time spent reading export data: each package's import, and each object read on demand since, in
+// every build.
+func (importer *Importer) decoded() time.Duration {
+	total := importer.decode
+	for _, build := range importer.builds {
+		total += build.universe.Elapsed
+	}
+	return total
 }
 
 // Shortfalls counts what the merge could not keep exactly so far.
@@ -236,7 +276,7 @@ func (plain plainImporter) Import(path string) (pkg *types.Package, err error) {
 	if !plain.importer.decodeIn(plain.build, path) {
 		return nil, fmt.Errorf("build %d doesn't compile %q", plain.build.index, path)
 	}
-	return plain.build.packages[path], nil
+	return plain.build.universe.Packages[path], nil
 }
 
 // decodeIn reads path's export data into build's universe unless it is read already, and reports whether build
@@ -246,11 +286,11 @@ func (importer *Importer) decodeIn(build *build, path string) bool {
 	if !compiled {
 		return false
 	}
-	if decoded := build.packages[path]; decoded != nil && decoded.Complete() {
+	if decoded := build.universe.Packages[path]; decoded != nil && decoded.Complete() {
 		return true
 	}
 	started := time.Now()
-	_, err := gcimporter.Import(importer.fileSet, build.packages, path, "", func(asked string) (io.ReadCloser, error) {
+	_, err := gcimporter.Import(importer.fileSet, build.universe, path, "", func(asked string) (io.ReadCloser, error) {
 		askedFile, askedCompiled := importer.exports[build.index][asked]
 		if !askedCompiled {
 			return nil, fmt.Errorf("build %d has no export data for %q", build.index, asked)
@@ -264,7 +304,23 @@ func (importer *Importer) decodeIn(build *build, path string) bool {
 	return true
 }
 
-// mergePackage merges every object of path across the builds that compile it, then ends the merge.
+// declared is build's object of name at path's package level, or nil when build doesn't declare it. A package build
+// has only reached through another's export data holds the objects that one refers to, so its export data is read
+// only when the name isn't among them.
+func (importer *Importer) declared(build *build, path string, name string) types.Object {
+	if pkg := build.universe.Packages[path]; pkg != nil {
+		if object := pkg.Scope().Lookup(name); object != nil || pkg.Complete() {
+			return object
+		}
+	}
+	if !importer.decodeIn(build, path) {
+		return nil
+	}
+	return build.universe.Packages[path].Scope().Lookup(name)
+}
+
+// mergePackage gives path's merged package a lazy entry for each name the builds that compile path declare, and its
+// imports, and marks it complete. No object is merged until it is looked up.
 func (importer *Importer) mergePackage(path string) (*types.Package, error) {
 	var names []string
 	var imports []*types.Package
@@ -273,7 +329,7 @@ func (importer *Importer) mergePackage(path string) (*types.Package, error) {
 		if !importer.decodeIn(build, path) {
 			continue
 		}
-		decoded := build.packages[path]
+		decoded := build.universe.Packages[path]
 		name = decoded.Name()
 		names = append(names, decoded.Scope().Names()...)
 		imports = append(imports, decoded.Imports()...)
@@ -284,9 +340,8 @@ func (importer *Importer) mergePackage(path string) (*types.Package, error) {
 	merged := importer.mergedPackage(path, name)
 	slices.Sort(names)
 	for _, objectName := range slices.Compact(names) {
-		importer.object(path, objectName)
+		merged.Scope().InsertLazy(objectName, importer.resolver(path, objectName))
 	}
-	importer.finish()
 
 	var mergedImports []*types.Package
 	for _, imported := range imports {
@@ -324,18 +379,58 @@ func (importer *Importer) mergedPackageOf(pkg *types.Package) *types.Package {
 	return importer.mergedPackage(pkg.Path(), pkg.Name())
 }
 
-// object is the merged object of path's package-level name, merged across every build that compiles path the first
-// time it is reached, or nil when no build declares it.
-func (importer *Importer) object(path string, name string) types.Object {
+// object is the merged object of name at the package level of pkg (a build's package or a merged one), reached from
+// a type being translated: looked up through the merged package's lazy entry, given one when the package isn't
+// imported yet, or nil when no build declares it.
+func (importer *Importer) object(pkg *types.Package, name string) types.Object {
+	key := objectKey{path: pkg.Path(), name: name}
+	if made, merged := importer.objects[key]; merged {
+		return made
+	}
+	merged := importer.mergedPackageOf(pkg)
+	if checked := importer.checked[key.path]; checked != nil {
+		return checked.Scope().Lookup(name)
+	}
+	if importer.resolving[key] {
+		// Only a type name could be reached again while it is merged, and its merge keeps it before reading anything.
+		panic(fmt.Sprintf("merged: %s.%s reached again before its merge kept it", key.path, name))
+	}
+	declared := false
+	for _, build := range importer.builds {
+		if importer.declared(build, key.path, name) != nil {
+			declared = true
+			break
+		}
+	}
+	if !declared {
+		importer.objects[key] = nil
+		return nil
+	}
+	merged.Scope().InsertLazy(name, importer.resolver(key.path, name))
+	return merged.Scope().Lookup(name)
+}
+
+// resolver is the lazy entry of path's package-level name: the first Lookup merges the object, outside every unit.
+func (importer *Importer) resolver(path string, name string) func() types.Object {
+	return func() types.Object {
+		var made types.Object
+		importer.resolve(func() { made = importer.mergeObject(path, name) })
+		if made == nil {
+			panic(fmt.Sprintf("merged: no build declares %s.%s, yet it has a lazy entry", path, name))
+		}
+		return made
+	}
+}
+
+// mergeObject merges path's package-level name across every build that declares it, keeping the merged object for
+// object to find, or is nil when no build does. Its comparisons are left to the end of the resolution.
+func (importer *Importer) mergeObject(path string, name string) types.Object {
 	key := objectKey{path: path, name: name}
 	if made, merged := importer.objects[key]; merged {
 		return made
 	}
-	if checked := importer.checked[path]; checked != nil {
-		made := checked.Scope().Lookup(name)
-		importer.objects[key] = made
-		return made
-	}
+	importer.resolving[key] = true
+	defer delete(importer.resolving, key)
 
 	type declared struct {
 		build  *build
@@ -343,10 +438,7 @@ func (importer *Importer) object(path string, name string) types.Object {
 	}
 	var found []declared
 	for _, build := range importer.builds {
-		if !importer.decodeIn(build, path) {
-			continue
-		}
-		if object := build.packages[path].Scope().Lookup(name); object != nil {
+		if object := importer.declared(build, path, name); object != nil {
 			found = append(found, declared{build: build, object: object})
 		}
 	}
@@ -411,7 +503,6 @@ func (importer *Importer) object(path string, name string) types.Object {
 	case *types.TypeName:
 		typeName := types.NewTypeName(first.Pos(), pkg, name, nil)
 		importer.objects[key] = typeName
-		pkg.Scope().Insert(typeName)
 		if first.IsAlias() {
 			importer.mergeAlias(typeName, kept[0].build, first)
 			for _, candidate := range kept[1:] {
@@ -439,7 +530,6 @@ func (importer *Importer) object(path string, name string) types.Object {
 		panic(fmt.Sprintf("merged: a package-level %T", first))
 	}
 	importer.objects[key] = made
-	pkg.Scope().Insert(made)
 	if builds != importer.all {
 		types.SetPresence(made, builds)
 	}
@@ -625,31 +715,44 @@ func (importer *Importer) signatureVariants(declared *declaration) []types.Varia
 
 // finish ends a merge: type parameters get their constraints and aliases their builds, interfaces are completed,
 // and then, with every type whole, each named type's underlying types and each object's answers are compared by build.
+//
+// Each step can reach objects not merged yet, whose merges leave work of their own, so the steps run again, in order,
+// until none is left.
 func (importer *Importer) finish() {
-	for len(importer.later) > 0 {
-		later := importer.later
-		importer.later = nil
-		for _, run := range later {
-			run()
+	for {
+		switch {
+		case len(importer.later) > 0:
+			later := importer.later
+			importer.later = nil
+			for _, run := range later {
+				run()
+			}
+		case len(importer.interfaces) > 0:
+			interfaces := importer.interfaces
+			importer.interfaces = nil
+			for _, completing := range interfaces {
+				completing.Complete()
+			}
+		case len(importer.named) > 0:
+			named := importer.named
+			importer.named = nil
+			for _, record := range named {
+				importer.finishNamed(record)
+			}
+		case len(importer.variants) > 0:
+			variants := importer.variants
+			importer.variants = nil
+			for _, record := range variants {
+				answers := record.variants
+				if record.declaration != nil {
+					answers = importer.signatureVariants(record.declaration)
+				}
+				types.SetVariants(record.object, answers)
+			}
+		default:
+			return
 		}
 	}
-	for _, completing := range importer.interfaces {
-		completing.Complete()
-	}
-	importer.interfaces = nil
-
-	for _, record := range importer.named {
-		importer.finishNamed(record)
-	}
-	importer.named = nil
-	for _, record := range importer.variants {
-		variants := record.variants
-		if record.declaration != nil {
-			variants = importer.signatureVariants(record.declaration)
-		}
-		types.SetVariants(record.object, variants)
-	}
-	importer.variants = nil
 }
 
 // finishNamed compares a named type's underlying types by build, and its methods' presence and signatures.
@@ -813,7 +916,7 @@ func (importer *Importer) translateNamed(build *build, named *types.Named) types
 		return named // error and comparable, the universe's own
 	}
 	if typeName.Parent() == typeName.Pkg().Scope() {
-		object := importer.object(typeName.Pkg().Path(), typeName.Name())
+		object := importer.object(typeName.Pkg(), typeName.Name())
 		if object == nil {
 			panic(fmt.Sprintf("merged: %s.%s is in no build's scope", typeName.Pkg().Path(), typeName.Name()))
 		}
@@ -850,7 +953,7 @@ func (importer *Importer) translateAlias(build *build, alias *types.Alias) types
 	if typeName.Parent() != typeName.Pkg().Scope() {
 		return importer.translate(build, alias.Rhs())
 	}
-	merged, isTypeName := importer.object(typeName.Pkg().Path(), typeName.Name()).(*types.TypeName)
+	merged, isTypeName := importer.object(typeName.Pkg(), typeName.Name()).(*types.TypeName)
 	if !isTypeName {
 		panic(fmt.Sprintf("merged: %s.%s is in no build's scope", typeName.Pkg().Path(), typeName.Name()))
 	}

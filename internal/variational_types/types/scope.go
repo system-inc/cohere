@@ -137,7 +137,7 @@ func (s *Scope) Insert(obj Object) Object {
 // InsertLazy leaves s unchanged and returns false. Otherwise it
 // records the binding and returns true. The object's parent scope
 // will be set to s after resolve is called.
-func (s *Scope) _InsertLazy(name string, resolve func() Object) bool {
+func (s *Scope) InsertLazy(name string, resolve func() Object) bool {
 	if s.elems[name] != nil {
 		return false
 	}

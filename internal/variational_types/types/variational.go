@@ -327,6 +327,16 @@ func splitAt(parts []Mask) {
 	panic(splitRequest{parts: parts})
 }
 
+// Outside runs work as if no unit were running, so no read inside it splits: for the merging importer, which resolves
+// an imported object the first time a unit reads it, and would be left half done by a split's panic. A unit that reads
+// the object afterwards answers for its own builds as always.
+func Outside(work func()) {
+	savedDepth := variational.depth
+	variational.depth = 0
+	defer func() { variational.depth = savedDepth }()
+	work()
+}
+
 // readingVariation reports whether a read must answer by build: a variational check is in a unit.
 func readingVariation() bool {
 	return variational.active && variational.depth > 0

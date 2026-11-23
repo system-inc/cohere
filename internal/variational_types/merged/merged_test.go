@@ -3,7 +3,9 @@ package merged_test
 import (
 	"encoding/json"
 	"errors"
+	"go/ast"
 	"go/constant"
+	"go/parser"
 	"go/token"
 	"io"
 	"os"
@@ -85,8 +87,10 @@ func TestMergedImporterKeepsOneObjectPerDeclarationAndItsAnswersByBuild(test *te
 	if syscallError != nil {
 		test.Fatal(syscallError)
 	}
-	decode, merge := importer.Timing()
-	test.Logf("decode %v, merge %v, shortfalls %+v", decode, merge, importer.Shortfalls())
+	defer func() {
+		decode, merge := importer.Timing()
+		test.Logf("decode %v, merge %v, shortfalls %+v", decode, merge, importer.Shortfalls())
+	}()
 
 	again, againError := importer.Import("os")
 	if againError != nil || again != osPackage {
@@ -175,4 +179,74 @@ func assertValues(test *testing.T, object types.Object, expected func(builds typ
 			test.Errorf("%s is %s in builds %03b", object.Name(), variant.Value, variant.Builds)
 		}
 	}
+}
+
+// probeSource reads imported objects only inside the check's units, so each is merged lazily while a unit runs: the
+// separator's value differs by build, and os.File's merge reaches os.file and the platform packages beneath it, some
+// of whose objects only some builds declare, which a unit would split on.
+const probeSource = `package probe
+
+import "os"
+
+func Separator() rune { return os.PathSeparator }
+
+func Name(file *os.File) string { return file.Name() }
+`
+
+func TestMergedImporterResolvesInsideTheChecksUnits(test *testing.T) {
+	exports := make([]map[string]string, len(buildSystems))
+	for index, goos := range buildSystems {
+		exports[index] = listExports(test, goos)
+	}
+	fileSet := token.NewFileSet()
+	importer := merged.New(fileSet, exports, everyBuild)
+	file, parseError := parser.ParseFile(fileSet, "probe.go", probeSource, 0)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	variation := &types.Variation{Builds: everyBuild}
+	var reported []string
+	configuration := &types.Config{
+		Variation: variation,
+		Importer:  importer,
+		Error:     func(checkError error) { reported = append(reported, checkError.Error()) },
+	}
+	if _, checkError := configuration.Check("probe", fileSet, []*ast.File{file}, &types.Info{}); checkError != nil {
+		test.Fatalf("the check failed: %v (every error: %q)", checkError, reported)
+	}
+
+	var separator, name ast.Expr
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch node := node.(type) {
+		case *ast.SelectorExpr:
+			if node.Sel.Name == "PathSeparator" {
+				separator = node
+			}
+		case *ast.CallExpr:
+			name = node
+		}
+		return true
+	})
+	values := map[types.Mask]string{}
+	for answer := range variation.Types[separator].All() {
+		values[answer.Builds] = answer.Value.ExactString()
+	}
+	if values[buildDarwin|buildLinux] != "47" || values[buildWindows] != "92" || len(values) != 2 {
+		test.Errorf("os.PathSeparator answers %v by build, and wants 47 on darwin and linux, 92 on windows", values)
+	}
+	for answer := range variation.Types[name].All() {
+		if answer.Builds != everyBuild || types.TypeString(answer.Type, nil) != "string" {
+			test.Errorf("file.Name() answers %s in builds %03b", answer.Type, answer.Builds)
+		}
+	}
+
+	osPackage, osError := importer.Import("os")
+	if osError != nil {
+		test.Fatal(osError)
+	}
+	if variants := types.UnderlyingVariantsOf(lookupNamed(test, osPackage, "file")); len(variants) != 2 {
+		test.Errorf("os.file, merged inside a unit, has underlying variants %v", variants)
+	}
+	decode, merge := importer.Timing()
+	test.Logf("decode %v, merge %v, %d units, %d restarts", decode, merge, variation.Units, variation.Restarts)
 }

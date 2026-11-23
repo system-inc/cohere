@@ -19,8 +19,8 @@ type pkgReader struct {
 
 	fake fakeFileSet
 
-	ctxt    *types.Context
-	imports map[string]*types.Package // previously imported packages, indexed by path
+	ctxt     *types.Context
+	universe *Universe // previously imported packages, and the objects being read on demand (cohere's)
 
 	// lazily initialized arrays corresponding to the unified IR
 	// PosBase, Pkg, and Type sections, respectively.
@@ -28,27 +28,18 @@ type pkgReader struct {
 	pkgs     []*types.Package
 	typs     []types.Type
 
-	// laterFns holds functions that need to be invoked at the end of
-	// import reading.
-	//
-	// TODO(mdempsky): Is it safe to have a single "later" slice or do
-	// we need to have multiple passes? See comments on CL 386002 and
-	// go.dev/issue/52104.
-	laterFns []func()
-
-	// ifaces holds a list of constructed Interfaces, which need to have
-	// Complete called after importing is done.
-	ifaces []*types.Interface
+	// cohere's: the functions to be invoked at the end of import reading, and the constructed Interfaces that need
+	// Complete called then, are the universe's, since a read on demand ends after the package's import has.
 }
 
 // later adds a function to be invoked at the end of import reading.
 func (pr *pkgReader) later(fn func()) {
-	pr.laterFns = append(pr.laterFns, fn)
+	pr.universe.later = append(pr.universe.later, fn)
 }
 
 // readUnifiedPackage reads a package description from the given
 // unified IR export data decoder.
-func readUnifiedPackage(fset *token.FileSet, ctxt *types.Context, imports map[string]*types.Package, input pkgbits.PkgDecoder) *types.Package {
+func readUnifiedPackage(fset *token.FileSet, ctxt *types.Context, universe *Universe, input pkgbits.PkgDecoder) *types.Package {
 	pr := pkgReader{
 		PkgDecoder: input,
 
@@ -57,8 +48,8 @@ func readUnifiedPackage(fset *token.FileSet, ctxt *types.Context, imports map[st
 			files: make(map[string]*fileInfo),
 		},
 
-		ctxt:    ctxt,
-		imports: imports,
+		ctxt:     ctxt,
+		universe: universe,
 
 		posBases: make([]string, input.NumElems(pkgbits.SectionPosBase)),
 		pkgs:     make([]*types.Package, input.NumElems(pkgbits.SectionPkg)),
@@ -85,12 +76,10 @@ func readUnifiedPackage(fset *token.FileSet, ctxt *types.Context, imports map[st
 
 	r.Sync(pkgbits.SyncEOF)
 
-	for _, fn := range pr.laterFns {
-		fn()
-	}
-
-	for _, iface := range pr.ifaces {
-		iface.Complete()
+	// cohere's: the objects above are only named, each read when it is first looked up, which finishes its own work;
+	// this finishes any the package's own reading left.
+	if universe.depth == 0 {
+		universe.finish()
 	}
 
 	// Imports() of pkg are all of the transitive packages that were loaded.
@@ -234,14 +223,14 @@ func (r *reader) doPkg() *types.Package {
 		return types.Unsafe
 	}
 
-	if pkg := r.p.imports[path]; pkg != nil {
+	if pkg := r.p.universe.Packages[path]; pkg != nil {
 		return pkg
 	}
 
 	name := r.String()
 
 	pkg := types.NewPackage(path, name)
-	r.p.imports[path] = pkg
+	r.p.universe.Packages[path] = pkg
 
 	return pkg
 }
@@ -397,7 +386,7 @@ func (r *reader) interfaceType() *types.Interface {
 	//
 	// TODO(mdempsky): After CL 424876 lands, it should be safe to call
 	// iface.Complete() immediately.
-	r.p.ifaces = append(r.p.ifaces, iface)
+	r.p.universe.ifaces = append(r.p.universe.ifaces, iface)
 
 	return iface
 }
@@ -444,8 +433,22 @@ func (r *reader) obj() (types.Object, []types.Type) {
 		assert(!r.Bool())
 	}
 
-	pkg, name := r.p.objIdx(r.Reloc(pkgbits.SectionObj))
-	obj := pkgScope(pkg).Lookup(name)
+	idx := r.Reloc(pkgbits.SectionObj)
+	pkg, name, tag := r.p.objIdx(idx)
+	// cohere's: a type whose declaration is being read is taken as it stands, and an alias reached inside its own
+	// declaration is read again, since looking either up would wait on its own lazy entry.
+	var obj types.Object
+	if pkg != nil {
+		key := objectKey{path: pkg.Path(), name: name}
+		if declaring := r.p.universe.declaring[key]; declaring != nil {
+			obj = declaring
+		} else if r.p.universe.aliasing[key] {
+			obj = r.p.readObject(idx, pkg, name, tag)
+		}
+	}
+	if obj == nil {
+		obj = pkgScope(pkg).Lookup(name)
+	}
 
 	targs := make([]types.Type, r.Len())
 	for i := range targs {
@@ -455,7 +458,7 @@ func (r *reader) obj() (types.Object, []types.Type) {
 	return obj, targs
 }
 
-func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
+func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string, pkgbits.CodeObj) {
 
 	var objPkg *types.Package
 	var objName string
@@ -472,28 +475,41 @@ func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
 
 	if tag == pkgbits.ObjStub {
 		assert(objPkg == nil || objPkg == types.Unsafe)
-		return objPkg, objName
+		return objPkg, objName, tag
 	}
 
 	// Ignore local types promoted to global scope (#55110).
 	if _, suffix := splitVargenSuffix(objName); suffix != "" {
-		return objPkg, objName
+		return objPkg, objName, tag
 	}
 
 	// TODO(mark): This, like the above splitVargenSuffix, is not ideal.
 	// Ignore generic methods promoted to global scope.
 	if strings.Contains(objName, ".") {
-		return objPkg, objName
+		return objPkg, objName, tag
 	}
 
-	if objPkg.Scope().Lookup(objName) == nil {
+	// cohere's: the object is read the first time it is looked up, as types2's importer reads it. A name already in
+	// the scope keeps its entry.
+	objPkg.Scope().InsertLazy(objName, func() types.Object {
+		return pr.universe.resolve(func() types.Object { return pr.readObject(idx, objPkg, objName, tag) })
+	})
+
+	return objPkg, objName, tag
+}
+
+// readObject reads the package-level object idx, named objName in objPkg (cohere's: the eager reader's body, run on
+// demand).
+func (pr *pkgReader) readObject(idx pkgbits.Index, objPkg *types.Package, objName string, tag pkgbits.CodeObj) (declared types.Object) {
+	key := objectKey{path: objPkg.Path(), name: objName}
+	{
 		dict := pr.objDictIdx(idx)
 
 		r := pr.newReader(pkgbits.SectionObj, idx, pkgbits.SyncObject1)
 		r.dict = dict
 
 		declare := func(obj types.Object) {
-			objPkg.Scope().Insert(obj)
+			declared = obj
 		}
 
 		switch tag {
@@ -501,6 +517,10 @@ func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
 			panic("weird")
 
 		case pkgbits.ObjAlias:
+			if !pr.universe.aliasing[key] {
+				pr.universe.aliasing[key] = true
+				defer delete(pr.universe.aliasing, key)
+			}
 			pos := r.pos()
 			var tparams []*types.TypeParam
 			if r.Version().Has(pkgbits.AliasTypeParamNames) {
@@ -530,6 +550,8 @@ func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
 			obj := types.NewTypeName(pos, objPkg, objName, nil)
 			named := types.NewNamed(obj, nil, nil)
 			declare(obj)
+			pr.universe.declaring[key] = obj
+			defer delete(pr.universe.declaring, key)
 
 			named.SetTypeParams(r.typeParamNames(false))
 
@@ -555,7 +577,7 @@ func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
 				}
 
 				newIface := types.NewInterfaceType(methods, embeds)
-				r.p.ifaces = append(r.p.ifaces, newIface)
+				r.p.universe.ifaces = append(r.p.universe.ifaces, newIface)
 				underlying = newIface
 			}
 
@@ -595,7 +617,7 @@ func (pr *pkgReader) objIdx(idx pkgbits.Index) (*types.Package, string) {
 		}
 	}
 
-	return objPkg, objName
+	return declared
 }
 
 func (pr *pkgReader) objDictIdx(idx pkgbits.Index) *readerDict {
