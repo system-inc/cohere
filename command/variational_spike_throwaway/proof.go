@@ -30,7 +30,8 @@ type projection struct {
 	answers map[expressionKey]string
 	// noPosition counts expressions with no position holding the build, left out as the oracle leaves its own out.
 	noPosition int
-	// ambiguous are the expressions more than one answer of which holds the build, each kept at its first.
+	// ambiguous are the expressions more than one answer of which holds the build, each kept at its first, and the keys
+	// two expressions answer at.
 	ambiguous []expressionKey
 }
 
@@ -41,7 +42,7 @@ func projectTo(fileSet *token.FileSet, checked []*checkedPackage, build int) pro
 	for _, each := range checked {
 		for expression, answers := range each.variation.Types {
 			held := 0
-			for _, answer := range answers {
+			for answer := range answers.All() {
 				if answer.Builds&bit == 0 {
 					continue
 				}
@@ -53,7 +54,13 @@ func projectTo(fileSet *token.FileSet, checked []*checkedPackage, build int) pro
 					continue
 				}
 				if held == 1 {
-					projected.answers[keyOf(fileSet, expression)] = canonical.Answer(answer.TypeAndValue)
+					key := keyOf(fileSet, expression)
+					// Two nodes at one key answering for this build is ambiguous too: a run abandoned for a split
+					// could leave behind a node the checker makes afresh (an IncDec's 1).
+					if _, taken := projected.answers[key]; taken {
+						projected.ambiguous = append(projected.ambiguous, key)
+					}
+					projected.answers[key] = canonical.Answer(answer.TypeAndValue)
 				}
 			}
 			if held > 1 && keyable(expression) {

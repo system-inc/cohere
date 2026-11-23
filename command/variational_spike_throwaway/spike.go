@@ -190,7 +190,7 @@ func (report *spikeReport) addOurs(checked []*checkedPackage) {
 		}
 		forked := 0
 		for _, answers := range each.variation.Types {
-			if len(answers) > 1 {
+			if answers.Len() > 1 {
 				forked++
 			}
 		}

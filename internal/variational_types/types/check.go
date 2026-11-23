@@ -164,7 +164,7 @@ type Checker struct {
 	cleaners   []cleaner             // list of types that may need a final cleanup at the end of type-checking
 
 	// cohere's variational spike
-	vrecords    []vrecord  // Types answers kept under the builds of the unit that recorded them
+	vundo       []vundo    // what each answer write replaced while a unit that could restart runs
 	untypedLog  []ast.Expr // untyped expressions in the order remembered, so a unit can flush or drop its own
 	recordOrder int64      // the iota of the constant being declared, or -1 (see vrecord.order)
 
@@ -213,7 +213,7 @@ func (check *Checker) later(f func()) *action {
 		// each group of them when a read inside splits it.
 		builds := variational.mask
 		plain := f
-		f = func() { check.runUnit(builds, func(Mask) { plain() }, false) }
+		f = func() { check.runUnit(builds, plain, false) }
 	}
 	i := len(check.delayed)
 	check.delayed = append(check.delayed, action{version: check.version, f: f})
