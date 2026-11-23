@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 
+	"github.com/system-inc/cohere/internal/variational_types/merged"
 	"github.com/system-inc/cohere/internal/variational_types/types"
 )
 
@@ -46,7 +47,7 @@ func checkVariationally(
 	fileSet *token.FileSet,
 	ordered []*ourPackage,
 	ours map[string]*ourPackage,
-	importer mergingImporter,
+	importer *merged.Importer,
 	all types.Mask,
 	sizes types.Sizes,
 ) ([]*checkedPackage, checkCounts) {

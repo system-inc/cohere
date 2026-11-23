@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"runtime/debug"
 
+	"github.com/system-inc/cohere/internal/variational_types/merged"
 	"github.com/system-inc/cohere/internal/variational_types/types"
 )
 
@@ -34,7 +35,6 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 		Root:      root,
 		Patterns:  asked.patterns,
 		Workspace: "GOWORK=off, the tree holds no go.work",
-		Importer:  importerName,
 		Notes:     spikeNotes,
 	}
 	if side.directory != "" {
@@ -91,7 +91,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	for index, each := range listed {
 		exports[index] = each.exports()
 	}
-	importer := newImporter(fileSet, exports, all, listed, sizes)
+	importer := merged.New(fileSet, exports, all)
 
 	say(progress, "variational-spike: checking %d packages once for %d builds\n", len(ordered), len(listed))
 	checked, variationalCounts := checkVariationally(fileSet, ordered, ours, importer, all, sizes)
@@ -123,7 +123,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	}
 	plainDecode, _ := importer.Timing()
 	report.Timing.PlainDecodeSeconds = (plainDecode - decode).Seconds()
-	report.noteImporterErrors(importer)
+	report.Shortfalls = importer.Shortfalls()
 
 	sources := &sourceCache{contents: map[string][]byte{}}
 	for index, each := range listed {

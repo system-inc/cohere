@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/variational_types/merged"
 )
 
 // spikeReport is the whole run, written to --json.
@@ -11,15 +13,16 @@ type spikeReport struct {
 	Root      string         `json:"root"`
 	Patterns  []string       `json:"patterns"`
 	Workspace string         `json:"workspace"`
-	Importer  string         `json:"importer"`
 	Builds    []buildListing `json:"builds"`
 	// Ours is every package the patterns matched, in the order they were checked.
-	Ours    []ourReport      `json:"ours"`
-	Totals  oursTotals       `json:"totals"`
-	Timing  timingReport     `json:"timing"`
-	Proof   []buildProof     `json:"proof"`
-	Errors  checkErrors      `json:"errors"`
-	Planted *differenceAtKey `json:"planted,omitempty"`
+	Ours   []ourReport  `json:"ours"`
+	Totals oursTotals   `json:"totals"`
+	Timing timingReport `json:"timing"`
+	Proof  []buildProof `json:"proof"`
+	Errors checkErrors  `json:"errors"`
+	// Shortfalls are what the merging importer could not keep exactly.
+	Shortfalls merged.Shortfalls `json:"shortfalls"`
+	Planted    *differenceAtKey  `json:"planted,omitempty"`
 	// PeakResidentBytes is the most memory the process held resident over the whole run, the oracle's loads included.
 	PeakResidentBytes int64    `json:"peakResidentBytes"`
 	Notes             []string `json:"notes"`
@@ -81,8 +84,6 @@ type checkErrors struct {
 	VariationalFirst []string `json:"variationalFirst,omitempty"`
 	Plain            int      `json:"plain"`
 	PlainFirst       []string `json:"plainFirst,omitempty"`
-	StandIn          int      `json:"standIn"`
-	StandInFirst     []string `json:"standInFirst,omitempty"`
 }
 
 // buildProof is the projection to one build against the oracle's plain answers. Compared counts the expressions both
@@ -141,6 +142,10 @@ var spikeNotes = []string{
 		"spelling of its type and exact constant value.",
 	"The variational check imports everything not ours before each package is checked, so the import phase is " +
 		"timed apart from the check; the plain baselines do the same with each build's own export data.",
+	"The merging importer decodes each build's export data into that build's own universe, which its plain " +
+		"importer shares: a package is decoded once, by whichever imports it first, so the variational import pays " +
+		"every build's decode and the baselines' imports find most of it done. Decode is counted once, in the " +
+		"importer's own timing.",
 	"CPU is the process's own user and system time from getrusage around each phase; listing's go list runs are " +
 		"children, counted apart. Every check runs on one goroutine.",
 	"The oracle loads each build with go/packages, every package checked from source with go/types, as the " +
@@ -151,7 +156,7 @@ var spikeNotes = []string{
 func tableText(report *spikeReport) string {
 	output := &strings.Builder{}
 	fmt.Fprintf(output, "variational spike over %s, patterns %s\n", report.Root, strings.Join(report.Patterns, " "))
-	fmt.Fprintf(output, "workspace: %s; importer: %s\n", report.Workspace, report.Importer)
+	fmt.Fprintf(output, "workspace: %s\n", report.Workspace)
 	for _, build := range report.Builds {
 		fmt.Fprintf(output, "  bit %d  %-40s %5d packages listed, %d matched (cgo: %s)\n", build.Bit, build.Target,
 			build.Packages, build.Matched, build.CgoChoice)
@@ -203,8 +208,11 @@ func tableText(report *spikeReport) string {
 	}
 
 	errors := report.Errors
-	fmt.Fprintf(output, "\nerrors: variational check %d, plain checks %d, stand-in importer %d\n", errors.Variational,
-		errors.Plain, errors.StandIn)
+	fmt.Fprintf(output, "\nerrors: variational check %d, plain checks %d\n", errors.Variational, errors.Plain)
+	shortfalls := report.Shortfalls
+	fmt.Fprintf(output, "merge shortfalls: %d kind conflicts, %d unbound signatures, %d stray type parameters, "+
+		"%d generic alias variants\n", shortfalls.KindConflicts, shortfalls.UnboundSignatures,
+		shortfalls.StrayTypeParameters, shortfalls.GenericAliasVariants)
 	for _, spelled := range errors.VariationalFirst {
 		fmt.Fprintf(output, "  variational: %s\n", spelled)
 	}
