@@ -399,7 +399,7 @@ func runGateHalves(
 			// stream keeps its error for streams.Finish to report.
 			fmt.Fprintf(lines, "cohere-dev: testing %s's half on %s in her gap, %d packages%s; the land lock stays "+
 				"held while it runs\n", shortCommit(commit), half.box, len(half.packages), racesNamed(half))
-			remote := macBoxRemoteCommand(commit, pin, half.races, corpora, half.packages)
+			remote := macBoxRemoteCommand(half.box, commit, pin, half.races, corpora, half.packages)
 			output, stayedHeld, unavailable, runError := runOnGateBox(worktree, half.box, remote, corpora, lines)
 			runs[index] = halfRun{output: output, stayedHeld: stayedHeld, unavailable: unavailable, runError: runError}
 		})
