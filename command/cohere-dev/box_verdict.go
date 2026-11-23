@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
@@ -19,7 +21,9 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/needs"
@@ -57,6 +61,13 @@ const boxMarker = "cohere-dev-gate: tested "
 // reads apart from the module's run before it (#bnabymg).
 const boxRaceMarker = "cohere-dev-gate: race"
 
+// boxStepMarker opens each line a gate box's run prints when a step of it ends, `<step> <seconds>`, so a landing says
+// what its gate's time went to (#bc8nf0r).
+const boxStepMarker = "cohere-dev-gate: step "
+
+// slowestPackagesShown is how many of a run's slowest test binaries the land line names, each with its time.
+const slowestPackagesShown = 8
+
 // boxRaceVariable carries racePatterns' tokens, comma-separated, each `./<directory>` or `./<directory>@<run>`, to a
 // stand-in for the road, as the box's script gets them as its third argument.
 const boxRaceVariable = "COHERE_DEV_GATE_RACE"
@@ -89,6 +100,10 @@ type boxVerdict struct {
 	// was framing, which never ends with a pass or a fail, so printing only the failed tests' output dropped it and a
 	// timeout read as a bare `FAIL` with no test named (internal/go_engine on Sun2, Nov 23, #r28e4nh).
 	timeouts map[string][]string
+	// steps is each step the box's run said it ended, `<step> <seconds>`, in order, and packageSeconds each package's
+	// test binary's run, from its pass or fail.
+	steps          []string
+	packageSeconds map[string]float64
 	// box names who ran the tests, as the gate's lines say it: the Mac the gap ran on, the land-gate job Loom placed,
 	// or the stand-in. It is the road's to set, since the box's own output never names it.
 	box string
@@ -118,13 +133,15 @@ type testEvent struct {
 	Package string
 	Test    string
 	Output  string
+	// Elapsed is a pass's or a fail's seconds: a package's is its test binary's run, its compile not counted.
+	Elapsed float64
 }
 
 // readTestJson reads `go test -json` from output, with the box's marker line before it, and anything else it printed
 // ignored: a gap prints its own lines around the command's.
 func readTestJson(output []byte) boxVerdict {
 	verdict := boxVerdict{failedOutput: map[string][]string{}, skipped: map[string][]string{},
-		optIn: map[string][]string{}, timeouts: map[string][]string{}}
+		optIn: map[string][]string{}, timeouts: map[string][]string{}, packageSeconds: map[string]float64{}}
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	// reading is whether the stream is inside a race report, from its first line to the rule that ends it.
@@ -135,6 +152,14 @@ func readTestJson(output []byte) boxVerdict {
 		line := scanner.Text()
 		if why, isRefusal := strings.CutPrefix(line, sharedBoxRefusedMarker); isRefusal {
 			verdict.refused = strings.TrimSpace(why)
+			continue
+		}
+		if step, isStep := strings.CutPrefix(line, boxStepMarker); isStep {
+			name, seconds, _ := strings.Cut(strings.TrimSpace(step), " ")
+			// Ignored: a step whose seconds don't read is said as 0s, since steps only say where the time went and no
+			// verdict comes from them.
+			spent, _ := strconv.Atoi(seconds)
+			verdict.steps = append(verdict.steps, name+" "+(time.Duration(spent)*time.Second).String())
 			continue
 		}
 		if rest, isMarker := strings.CutPrefix(line, boxMarker); isMarker {
@@ -168,9 +193,11 @@ func readTestJson(output []byte) boxVerdict {
 			}
 		case event.Test == "" && event.Action == "pass":
 			timedOut[event.Package] = false
+			verdict.packageSeconds[event.Package] = event.Elapsed
 			verdict.packagesPassed++
 		case event.Test == "" && event.Action == "fail":
 			timedOut[event.Package] = false
+			verdict.packageSeconds[event.Package] = event.Elapsed
 			verdict.packagesFailed = append(verdict.packagesFailed, event.Package)
 		case event.Action == "fail":
 			verdict.failedTests = append(verdict.failedTests, key)
@@ -421,6 +448,27 @@ func lastWords(output []byte, fallback string) string {
 	return fallback
 }
 
+// timingReport is where a run's time went, in one line: each step it said, then its slowest test binaries, each by
+// import path and seconds. It is empty when the run said neither.
+func (verdict boxVerdict) timingReport() string {
+	parts := []string{}
+	if len(verdict.steps) > 0 {
+		parts = append(parts, "by step "+strings.Join(verdict.steps, ", "))
+	}
+	packages := slices.Collect(maps.Keys(verdict.packageSeconds))
+	slices.SortFunc(packages, func(one string, other string) int {
+		return cmp.Or(cmp.Compare(verdict.packageSeconds[other], verdict.packageSeconds[one]), cmp.Compare(one, other))
+	})
+	slowest := []string{}
+	for _, named := range packages[:min(slowestPackagesShown, len(packages))] {
+		slowest = append(slowest, fmt.Sprintf("%s %.1fs", named, verdict.packageSeconds[named]))
+	}
+	if len(slowest) > 0 {
+		parts = append(parts, "slowest test binaries "+strings.Join(slowest, ", "))
+	}
+	return strings.Join(parts, "; ")
+}
+
 // failureReport is each failed test and package with its output, and each package's timeout whole, every goroutine's
 // stack included, so a timeout names what it was waiting on.
 func (verdict boxVerdict) failureReport() string {
@@ -476,6 +524,15 @@ func runModuleTests(
 		return 1, ""
 	}
 	platform := verdict.operatingSystem + "/" + verdict.architecture
+	// Where the gate's time went, said whatever its verdict, so a slow gate can be read from any landing (#bc8nf0r).
+	if timing := verdict.timingReport(); timing != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s's gate, %s\n", verdict.box, timing)
+	}
+	if verdict.race != nil {
+		if timing := verdict.race.timingReport(); timing != "" {
+			fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run, %s\n", verdict.box, timing)
+		}
+	}
 	if verdict.failed() {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s failed, so nothing landed:\n", verdict.box,
 			platform)

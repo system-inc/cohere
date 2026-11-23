@@ -95,6 +95,9 @@ found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha
 // test of the plain tokens, then one of each token's package with its run, every one through the same filter so the
 // run after the marker reads as one stream, and a failure of any is the run's, after the rest have run.
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
+# step says how many seconds the step it names took, from the end of the one before it (#bc8nf0r).
+stepStarted=$(date +%s)
+step() { stepEnded=$(date +%s); echo "` + boxStepMarker + `$1 $((stepEnded - stepStarted))"; stepStarted=$stepEnded; }
 ` + sharedBoxToolchainCheck + `nodePath=""
 if [ -e "$node/bin/node" ]; then
   nodeFound=$(sha256sum "$node/bin/node" | cut -d' ' -f1)
@@ -109,9 +112,12 @@ gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
 trap 'rm -rf "$gocache"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
 export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
+step toolchain
 downloaded=$(go mod download 2>&1) || refuse "go mod download failed: $(echo "$downloaded" | tail -n 1)"
 verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verified" | tail -n 1)"
+step modules
 go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
+step tests
 if [ -n "$races" ]; then
   echo "` + boxRaceMarker + `"
   # Split on commas alone, never on a run's characters, and each run quoted, so nothing of it globs.
@@ -127,6 +133,7 @@ if [ -n "$races" ]; then
     go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -race $plainRaces |
       grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1
   fi
+  step race
   for race in "${raceTokens[@]}"; do
     case "$race" in
     *` + raceRunSeparator + `*)
@@ -134,6 +141,7 @@ if [ -n "$races" ]; then
         "${race%%` + raceRunSeparator + `*}" | grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1 ;;
     esac
   done
+  step race-runs
   [ "$raceFailed" = 0 ] || exit 1
 fi
 `
