@@ -8,10 +8,10 @@ package types
 
 import (
 	"fmt"
+	. "github.com/system-inc/cohere/internal/variational_types/errors"
 	"go/ast"
 	"go/constant"
 	"go/token"
-	. "github.com/system-inc/cohere/internal/variational_types/errors"
 	"os"
 )
 
@@ -164,8 +164,9 @@ type Checker struct {
 	cleaners   []cleaner             // list of types that may need a final cleanup at the end of type-checking
 
 	// cohere's variational spike
-	vrecords   []vrecord  // Types answers kept under the builds of the unit that recorded them
-	untypedLog []ast.Expr // untyped expressions in the order remembered, so a unit can flush or drop its own
+	vrecords    []vrecord  // Types answers kept under the builds of the unit that recorded them
+	untypedLog  []ast.Expr // untyped expressions in the order remembered, so a unit can flush or drop its own
+	recordOrder int64      // the iota of the constant being declared, or -1 (see vrecord.order)
 
 	// environment within which the current object is type-checked (valid only
 	// for the duration of type-checking a specific object)

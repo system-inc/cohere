@@ -39,6 +39,11 @@ func (check *Checker) funcBody(decl *declInfo, name string, sig *Signature, body
 	}
 	check.indent = 0
 
+	// cohere's variational spike: a body run again, for other builds, starts from the signature's own scope.
+	if variational.active {
+		freshBodyScope(sig)
+	}
+
 	check.stmtList(0, body.List)
 
 	if check.hasLabel {
