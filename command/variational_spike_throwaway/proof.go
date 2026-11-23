@@ -46,7 +46,7 @@ func projectTo(fileSet *token.FileSet, checked []*checkedPackage, build int) pro
 					continue
 				}
 				held++
-				if !expression.Pos().IsValid() {
+				if !keyable(expression) {
 					if held == 1 {
 						projected.noPosition++
 					}
@@ -56,7 +56,7 @@ func projectTo(fileSet *token.FileSet, checked []*checkedPackage, build int) pro
 					projected.answers[keyOf(fileSet, expression)] = canonical.Answer(answer.TypeAndValue)
 				}
 			}
-			if held > 1 && expression.Pos().IsValid() {
+			if held > 1 && keyable(expression) {
 				projected.ambiguous = append(projected.ambiguous, keyOf(fileSet, expression))
 			}
 		}
