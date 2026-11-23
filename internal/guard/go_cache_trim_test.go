@@ -44,9 +44,10 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		}
 		relative := filepath.ToSlash(native)
 		if entry.IsDir() {
-			// The vendored compiler, caches and fixtures hold no caller of ours.
-			if relative != "." &&
-				(strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" || relative == "TypeScript") {
+			// The vendored compiler, libraries' copies of other modules and fork of go/types, caches and fixtures
+			// hold no caller of ours.
+			if relative != "." && (strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" ||
+				relative == "TypeScript" || relative == "libraries") {
 				return filepath.SkipDir
 			}
 			return nil

@@ -140,8 +140,9 @@ func (value settings) ForDisplay() string { return "" }`,
 }
 
 // optionsDisplayProblems reads every Go file under module, tests included, and says what breaks the accessor's
-// two censuses, sorted. Skipped, as the gofmt guard skips them, are the TypeScript submodule, directories whose name
-// begins with a dot, and node_modules, none of which can import cohere's rule package.
+// two censuses, sorted. Skipped, as the gofmt guard skips them, are the TypeScript submodule, libraries' copies of
+// other modules and their fork of go/types, directories whose name begins with a dot, and node_modules, none of which
+// can import cohere's rule package.
 func optionsDisplayProblems(test *testing.T, module string) []string {
 	test.Helper()
 
@@ -154,6 +155,7 @@ func optionsDisplayProblems(test *testing.T, module string) []string {
 		}
 		if entry.IsDir() {
 			if path != module && (path == filepath.Join(module, "TypeScript") ||
+				path == filepath.Join(module, "libraries") ||
 				strings.HasPrefix(entry.Name(), ".") || entry.Name() == "node_modules") {
 				return filepath.SkipDir
 			}

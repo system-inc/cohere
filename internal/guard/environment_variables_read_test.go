@@ -281,7 +281,9 @@ var sourceExtensions = map[string]bool{
 	".js": true, ".mjs": true, ".cjs": true, ".ts": true, ".py": true,
 }
 
-// mentionedOutsideTests reports, of the names given, the ones a source of ours that is not a test mentions.
+// mentionedOutsideTests reports, of the names given, the ones a source of ours that is not a test mentions. The
+// TypeScript submodule and libraries, whose copies of other modules and fork of go/types are not ours to read
+// environment variables in, are skipped with hidden directories, node_modules and testdata.
 func mentionedOutsideTests(test *testing.T, module string, names map[string][]string) map[string]bool {
 	test.Helper()
 	mentioned := map[string]bool{}
@@ -291,6 +293,7 @@ func mentionedOutsideTests(test *testing.T, module string, names map[string][]st
 		}
 		if entry.IsDir() {
 			if path != module && (path == filepath.Join(module, "TypeScript") ||
+				path == filepath.Join(module, "libraries") ||
 				strings.HasPrefix(entry.Name(), ".") || entry.Name() == "node_modules" ||
 				entry.Name() == "testdata") {
 				return filepath.SkipDir

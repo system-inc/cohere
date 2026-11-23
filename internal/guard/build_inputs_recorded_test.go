@@ -264,9 +264,10 @@ func lineNumbers(lines []int) []string {
 	return spelled
 }
 
-// ourTestFiles is every _test.go file the module's packages hold: the TypeScript submodule, which is upstream's,
-// directories whose name begins with a dot, node_modules and testdata left out, the last since its files are fixtures
-// some test reads, not tests that run.
+// ourTestFiles is every _test.go file the module's packages hold: the TypeScript submodule and libraries' copies of
+// other modules and fork of go/types, which are upstream's or their own repository's, directories whose name begins
+// with a dot, node_modules and testdata left out, the last since its files are fixtures some test reads, not tests
+// that run.
 func ourTestFiles(test *testing.T, module string) []string {
 	test.Helper()
 	files := []string{}
@@ -276,6 +277,7 @@ func ourTestFiles(test *testing.T, module string) []string {
 		}
 		if entry.IsDir() {
 			if path != module && (path == filepath.Join(module, "TypeScript") ||
+				path == filepath.Join(module, "libraries") ||
 				strings.HasPrefix(entry.Name(), ".") || entry.Name() == "node_modules" ||
 				entry.Name() == "testdata") {
 				return filepath.SkipDir

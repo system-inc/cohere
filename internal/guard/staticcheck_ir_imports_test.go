@@ -54,8 +54,9 @@ type staticcheckIntermediateRepresentationImport struct {
 }
 
 // staticcheckIntermediateRepresentationImporters is every import of staticcheck's intermediate representation by a
-// Go file under root that is not a test, outside the vendored TypeScript, hidden directories and fixtures, read from
-// each file's imports alone, and how many files it read.
+// Go file under root that is not a test, outside the vendored TypeScript, libraries (whose copy of staticcheck is
+// staticcheck, go/ir and all), hidden directories and fixtures, read from each file's imports alone, and how many
+// files it read.
 func staticcheckIntermediateRepresentationImporters(
 	root string,
 ) (importers []staticcheckIntermediateRepresentationImport, read int, walkError error) {
@@ -71,7 +72,7 @@ func staticcheckIntermediateRepresentationImporters(
 		relative := filepath.ToSlash(native)
 		if entry.IsDir() {
 			if relative != "." && (strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" ||
-				relative == "TypeScript") {
+				relative == "TypeScript" || relative == "libraries") {
 				return filepath.SkipDir
 			}
 			return nil
