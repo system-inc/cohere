@@ -155,6 +155,9 @@ var _, _ = dep.Other(1)
 	} {
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
+			// The reach and its census judge what each build checks from source, the standard library's packages
+			// among them, so every run computes them rather than restore them from the template.
+			coldSystemCacheFor(test)
 
 			files := map[string]string{"shared.go": strings.TrimPrefix(each.shared, "\n")}
 			for name, contents := range each.dep {

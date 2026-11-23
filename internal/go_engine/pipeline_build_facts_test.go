@@ -145,6 +145,8 @@ func TestAPlainRunComparesNoFacts(test *testing.T) {
 func TestTheFactsCensusFollowsACallerChainAcrossBothGraphs(test *testing.T) {
 	test.Parallel()
 
+	// The case checked from source computes the standard library, beside the case restoring it from the table.
+	coldSystemCacheFor(test)
 	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
 	for _, each := range []struct {
 		name      string

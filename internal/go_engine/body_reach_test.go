@@ -71,6 +71,9 @@ import (
 func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	test.Parallel()
 
+	// The reach and its census judge what each build checks from source, the standard library's packages among them,
+	// so every run computes them rather than restore them from the template.
+	coldSystemCacheFor(test)
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	fromSource := test.TempDir()
 	// A plain run records the packages each build checks from source, which the census then counts apart.
@@ -852,6 +855,9 @@ func Plain() string {
 func TestABodyReachingAStructThroughAPointerNoExpressionNamesIsReached(test *testing.T) {
 	test.Parallel()
 
+	// The reach and its census judge what each build checks from source, the standard library's packages among them,
+	// so every run computes them rather than restore them from the template.
+	coldSystemCacheFor(test)
 	other := "amd64"
 	if runtime.GOARCH == "amd64" {
 		other = "arm64"

@@ -227,6 +227,9 @@ func quiet() {
 	} {
 		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
+			// The reach and its census judge what each build checks from source, the standard library's packages
+			// among them, so every run computes them rather than restore them from the template.
+			coldSystemCacheFor(test)
 
 			root := copyFixture(test, filepath.Join("testdata", "body-reach-initializer-causes"))
 			for name, contents := range each.files {

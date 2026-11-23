@@ -303,6 +303,9 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 	for _, step := range packageDifferentialFixtures {
 		test.Run(step.fixture, func(test *testing.T) {
 			test.Parallel()
+			// The differential judges what each build checks from source, the standard library's packages among
+			// them, so every run computes them rather than restore them from the template.
+			coldSystemCacheFor(test)
 
 			fixture := filepath.Join("testdata", step.fixture)
 			recorder := &skippedRecorder{}

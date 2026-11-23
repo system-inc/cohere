@@ -124,6 +124,8 @@ func TestTheWidthIsTheHostsLiveHeapsWhenEveryShareIsLow(test *testing.T) {
 // record reads its share over the line at the gate.
 func TestTheWidthIsMeasuredWhenABuildChecksMuchFromSource(test *testing.T) {
 	test.Parallel()
+	// The premise is a build checking net/http from source, which a template holding it would restore.
+	coldSystemCacheFor(test)
 	root := threeExtraBuilds(test)
 	third := thirdPlatform()
 	writeFixtureFiles(test, root, map[string]string{
