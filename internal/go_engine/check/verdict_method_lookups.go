@@ -194,7 +194,7 @@ func (judged verdict) methodJudgmentOf(
 		_, isMethod := answer.(*types.Func)
 		judgment.answer = answerInBuild{name: objectName(answer), isMethod: isMethod,
 			hostLines: answerLinesOf(answer),
-			restored:  answer.Pkg() != nil && judged.restored[judged.closure(answer.Pkg().Path())]}
+			restored:  answer.Pkg() != nil && judged.restoredFromHost(judged.closure(answer.Pkg().Path()))}
 		if !judgment.answer.restored {
 			judgment.answer.counterpart, judgment.answer.missing = judged.counterpart(answer)
 		}

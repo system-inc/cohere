@@ -41,7 +41,9 @@ import (
 // D, A or unnamed.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
-// wall time it ran within.
+// wall time it ran within. NodesReused, NodesRendered and NodesUnmatched are the verdicts' nodes over every load: those
+// of a package restored from the host whose lines were the host's (typeGraph.hostLines), those rendered in the build,
+// and those of a restored package the host had no node of the same path and name for, rendered in the build too.
 type HostRestoreCounts struct {
 	Untouched       []string
 	Visited         int
@@ -52,6 +54,9 @@ type HostRestoreCounts struct {
 	DeclinedBy      map[string]int
 	Declined        map[string]string
 	Deciding        time.Duration
+	NodesReused     int
+	NodesRendered   int
+	NodesUnmatched  int
 }
 
 // hostRestore is one package an extra build restores from the host's run, and what deciding it has learned: the first
@@ -76,6 +81,12 @@ type hostState struct {
 
 	// deciding is the time TypesHold and FactsHold took over every load, in nanoseconds, summed across goroutines.
 	deciding atomic.Int64
+
+	// nodesReused, nodesRendered and nodesUnmatched are the nodes of every earlier load's renderings, taken from the
+	// host's graph, rendered, and rendered with no host node to take (ReadsBuild.nodeCounts).
+	nodesReused    int
+	nodesRendered  int
+	nodesUnmatched int
 
 	// restoring are this load's packages restored from the host's run and decided late, and renderings the verdicts'
 	// memo of this load's types. untouched are this load's packages restored from the host's run that the walk left
@@ -262,6 +273,13 @@ func (session *CacheSession) restoreFromHost(
 	state.untouched = map[*packages.Package]*hostRestore{}
 	state.visited = 0
 	state.writtenThrough = map[*packages.Package]bool{}
+	// The last load's renderings are counted before they go, so the counts cover every load.
+	if state.renderings != nil {
+		reused, rendered, unmatched := state.renderings.nodeCounts()
+		state.nodesReused += reused
+		state.nodesRendered += rendered
+		state.nodesUnmatched += unmatched
+	}
 	state.renderings = NewReadsBuild()
 	state.loadDeclines = map[string]int{}
 	state.loadReasons = map[string]string{}
@@ -552,13 +570,17 @@ func (session *CacheSession) judgedThrough(
 }
 
 // restoredBelow are the types of the packages of closure, what candidate reaches by path, that this load restored from
-// the host's run, decided late or left untouched. Each is done when candidate's restore is decided, its types set and
-// its decline, if any, counted (declineAtLoad), so a package still among the restores is one whose types were read from
-// the host's export data.
+// the host's run, decided late or left untouched, each by the types of the host's package it was restored from, the
+// entry of the same ID (hostEntry.types), whose nodes the verdict's build takes the host's lines of (typeGraph). Each
+// is done when candidate's restore is decided, since the loader decides a package only once its imports are done
+// (load's restoreTypes after every import's done), its types set and its decline, if any, counted (declineAtLoad), so a
+// package still among the restores is one whose own verdict held and whose types were read from the host's export
+// data; an untouched one was marked before the load began (Restore), and a decline at check loads the build again
+// with renderings of its own.
 func (session *CacheSession) restoredBelow(
 	candidate *packages.Package,
 	closure map[string]*types.Package,
-) map[*types.Package]bool {
+) map[*types.Package]*types.Package {
 	// The load set every package's imports before it decided any, so the walk reads them without the lock; only
 	// whether each reached package is still among the restores is asked under it.
 	visited := map[*packages.Package]bool{}
@@ -576,14 +598,16 @@ func (session *CacheSession) restoredBelow(
 	}
 	collect(candidate)
 	state := session.host
-	restored := map[*types.Package]bool{}
+	restored := map[*types.Package]*types.Package{}
 	state.lock.RLock()
 	defer state.lock.RUnlock()
 	for _, imported := range reached {
-		_, judged := state.restoring[imported]
-		_, untouched := state.untouched[imported]
-		if (judged || untouched) && imported.Types != nil && closure[imported.PkgPath] == imported.Types {
-			restored[imported.Types] = true
+		hosted, judged := state.restoring[imported]
+		if !judged {
+			hosted = state.untouched[imported]
+		}
+		if hosted != nil && imported.Types != nil && closure[imported.PkgPath] == imported.Types {
+			restored[imported.Types] = hosted.kept.types
 		}
 	}
 	return restored
@@ -1010,6 +1034,15 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 		DeclinedBy:      map[string]int{},
 		Declined:        map[string]string{},
 		Deciding:        time.Duration(state.deciding.Load()),
+		NodesReused:     state.nodesReused,
+		NodesRendered:   state.nodesRendered,
+		NodesUnmatched:  state.nodesUnmatched,
+	}
+	if state.renderings != nil {
+		reused, rendered, unmatched := state.renderings.nodeCounts()
+		counts.NodesReused += reused
+		counts.NodesRendered += rendered
+		counts.NodesUnmatched += unmatched
 	}
 	for candidate, hosted := range state.restoring {
 		hosted.lock.Lock()
@@ -1100,7 +1133,8 @@ func (session *CacheSession) keepForBuilds(
 		if packageReads == nil || packageReads.Never() != "" || session.restored(keptPackage) {
 			continue
 		}
-		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage]}
+		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage],
+			types: keptPackage.Types}
 		if session.written[keptPackage] {
 			key := session.keys[keptPackage]
 			// The record the run wrote of it holds its body, which a build writing the package through names, in the

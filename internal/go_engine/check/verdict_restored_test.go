@@ -32,9 +32,10 @@ var restoredSources = map[string]string{
 
 // restoredWorld is the fixture on the host, hidden and its user checked from source, the user's type reads recorded
 // and a Method lookup of Close added, answered by hidden's closer or by none, and hidden as a build restores it from
-// the host, read from the export data the host's check of it writes.
+// the host, read from the export data the host's check of it writes, which the build restored from hostHidden.
 type restoredWorld struct {
 	restoring    Restoring
+	hostHidden   *types.Package
 	exportHidden *types.Package
 }
 
@@ -97,6 +98,7 @@ func checkedRestoredWorld(test *testing.T, answered bool) restoredWorld {
 	reads.AddLookup(lookup)
 	return restoredWorld{
 		restoring:    Restoring{Path: restoredUserPath, Imports: []string{restoredHiddenPath}, Reads: reads},
+		hostHidden:   hostHidden,
 		exportHidden: exportHidden,
 	}
 }
@@ -112,10 +114,10 @@ func TestAMethodLookupAsksAPackageRestoredFromTheHostOfTheHost(test *testing.T) 
 	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
 	for _, step := range []struct {
 		name     string
-		restored map[*types.Package]bool
+		restored map[*types.Package]*types.Package
 		want     string
 	}{
-		{"restored from the host", map[*types.Package]bool{world.exportHidden: true}, ""},
+		{"restored from the host", map[*types.Package]*types.Package{world.exportHidden: world.hostHidden}, ""},
 		{"checked from source", nil,
 			"L lookup Method Close: its answer " + restoredHiddenPath + ".Close is not in the build: the build's " +
 				restoredHiddenPath + " has no closer.M0"},
@@ -139,7 +141,7 @@ func TestTheBuildNeverIndexesARestoredPackageTheHostStandsFor(test *testing.T) {
 
 	world := checkedRestoredWorld(test, true)
 	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
-	restored := map[*types.Package]bool{world.exportHidden: true}
+	restored := map[*types.Package]*types.Package{world.exportHidden: world.hostHidden}
 	build := measuredReadsBuild()
 	walked, indexed := map[*types.Package]int{}, map[*types.Package]int{}
 	build.walking = func(root *types.Package) { walked[root]++ }
@@ -213,8 +215,8 @@ func TestALaterVerdictIndexesAPackageAnEarlierOneSkipped(test *testing.T) {
 	host, build := measuredReadsBuild(), measuredReadsBuild()
 	indexed := map[*types.Package]int{}
 	build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
-	if holds, why := TypesHold(restoring, closure, map[*types.Package]bool{buildClosers: true}, host,
-		build); !holds {
+	if holds, why := TypesHold(restoring, closure, map[*types.Package]*types.Package{buildClosers: hostClosers},
+		host, build); !holds {
 		test.Fatalf("the verdict that restored closers does not hold: %s", why)
 	}
 	if indexed[buildClosers] != 0 {
@@ -244,7 +246,7 @@ func TestTheMethodIndexIsBuiltOncePerBuild(test *testing.T) {
 	host.indexing, build.indexing = counted(hostIndexed), counted(buildIndexed)
 	subject := world.restoring.Reads.Lookups()[0].Subject
 	closure := map[string]*types.Package{restoredHiddenPath: world.exportHidden}
-	for _, restored := range []map[*types.Package]bool{{world.exportHidden: true}, nil} {
+	for _, restored := range []map[*types.Package]*types.Package{{world.exportHidden: world.hostHidden}, nil} {
 		for range 3 {
 			reads := &build_reads.Reads{}
 			for _, lookup := range world.restoring.Reads.Lookups() {

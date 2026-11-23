@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
@@ -28,6 +29,21 @@ import (
 // (packageOf, sizesForWalk) and interfacesLock, which take none, so no order of taking them can deadlock: a digest
 // renders its package's part under that package's lock, lets it go, digests what the part points to in other packages
 // under theirs, and takes its own again to close its components (digestOf).
+//
+// A build's graph takes the lines of a node of a package it restored from the host's run from the host's graph
+// (hostLines), which the host renders once for its own verdicts and every build's, and never renders them itself. The
+// packages it takes them for are those whose restore is final in the load (CacheSession.restoredBelow): each whose own
+// verdict held, which the load decides before any package above it, or which the walk left untouched before the load
+// began. Such a package's types render as the host's: read from the host's export data, and every type its
+// declarations use whole read alike in the build, by its verdict or by the walk's induction. That is what pins a
+// defined type declared over another package's, `type T q.X`, which has no edge to q.X and takes, read from export
+// data, the build's q.X struct: its own reads use q.X whole (build_reads' roleDeclared), so a build whose q.X differs
+// declines the package and checks it from source. Only the lines renderedTypeName writes are taken: the node's observed
+// lines are a property of another package's type, its edges are the build's, and so is its digest, whose successors
+// may be packages the build checked from source. An alias is never taken: export data names the type it stands for,
+// which the build resolves to its own object of that path, and an alias's chain through other packages is pinned by
+// no read of the package's. Taking the host's lines holds the build's part lock while the host's graph takes its own,
+// which never waits on a build's graph, so the order is always the build's first and no deadlock can come of it.
 type typeGraph struct {
 	// lock guards packages, sizes and walked.
 	lock     sync.Mutex
@@ -48,6 +64,22 @@ type typeGraph struct {
 	// rendered, nil outside tests, is told of each type name as it is rendered, under its package's lock, so a test
 	// can count the renderings.
 	rendered func(*types.TypeName)
+
+	// restoredFrom are the packages of the build restored from the host's run, a hostPackage by the build's
+	// *types.Package, learned from the verdicts (learnRestored), whose nodes take the host's lines (hostLines).
+	// reusedNodes, renderedNodes and unmatchedNodes count the nodes that took the host's lines, those rendered here,
+	// and those of a restored package the host's graph had no node of the same path and name for, rendered here too.
+	restoredFrom   sync.Map
+	reusedNodes    atomic.Int64
+	renderedNodes  atomic.Int64
+	unmatchedNodes atomic.Int64
+}
+
+// hostPackage is the host's package a package of the build was restored from, nil when the host kept none, and the
+// host's graph, which renders its nodes.
+type hostPackage struct {
+	graph *typeGraph
+	types *types.Package
 }
 
 // packageTypeGraph is one package's type names in a graph, by type name, each a node, under the package's own lock.
@@ -56,13 +88,15 @@ type packageTypeGraph struct {
 	nodes map[*types.TypeName]*typeNode
 }
 
-// typeNode is one type name of the graph: its rendered lines, the type names they name, the types of the fields its
-// lines render by their properties (closureStep.observedTypes), and its component's digest once it is known. Its
-// edges and observed types are what its rendering visited, which a dependence set follows (dependenceReach), set once
-// as the node is made and never changed after.
+// typeNode is one type name of the graph: its rendered lines, the first ownLineCount of them renderedTypeName's and the
+// rest its observed lines, the type names they name, the types of the fields its lines render by their properties
+// (closureStep.observedTypes), and its component's digest once it is known. Its edges and observed types are what its
+// rendering visited, which a dependence set follows (dependenceReach), set once as the node is made and never changed
+// after.
 type typeNode struct {
 	typeName      *types.TypeName
 	lines         []string
+	ownLineCount  int
 	edges         []*types.TypeName
 	observedTypes []types.Type
 	digest        cache.Key
@@ -154,14 +188,77 @@ func (graph *typeGraph) nodeOf(part *packageTypeGraph, typeName *types.TypeName,
 		graph.rendered(typeName)
 	}
 	step := directTypeNames(declarationTypes(typeName, graph.importerSees), sizes)
+	own := graph.ownLines(typeName)
 	node := &typeNode{
-		typeName:      typeName,
-		lines:         append(renderedTypeName(typeName, graph.importerSees), step.observed...),
+		typeName: typeName,
+		// A new slice: the host's lines are its node's, whose observed lines follow them in the same array.
+		lines:         slices.Concat(own, step.observed),
+		ownLineCount:  len(own),
 		edges:         step.typeNames,
 		observedTypes: step.observedTypes,
 	}
 	part.nodes[typeName] = node
 	return node
+}
+
+// ownLines are typeName's lines as renderedTypeName writes them: the host's node's (hostLines), for a type name of a
+// package the build restored from the host's run, and otherwise rendered here, each node counted by which.
+func (graph *typeGraph) ownLines(typeName *types.TypeName) []string {
+	if hostLines, reused := graph.hostLines(typeName); reused {
+		graph.reusedNodes.Add(1)
+		return hostLines
+	}
+	graph.renderedNodes.Add(1)
+	return renderedTypeName(typeName, graph.importerSees)
+}
+
+// hostLines are the lines renderedTypeName writes of the host's type name of typeName's path and name, rendered by the
+// host's graph under its own package's lock, once for every build, and whether there are any to take: none for an
+// alias (see typeGraph), for a package the build did not restore from the host's run, nor where the host has no
+// package-level type name of the path and name, which is counted.
+func (graph *typeGraph) hostLines(typeName *types.TypeName) ([]string, bool) {
+	if typeName.IsAlias() {
+		return nil, false
+	}
+	learned, restored := graph.restoredFrom.Load(typeName.Pkg())
+	if !restored {
+		return nil, false
+	}
+	from, _ := learned.(hostPackage)
+	// A local type is no package-level type name of the host's, though one of its name may be.
+	if from.types == nil || typeName.Parent() != typeName.Pkg().Scope() {
+		graph.unmatchedNodes.Add(1)
+		return nil, false
+	}
+	hostTypeName, isTypeName := from.types.Scope().Lookup(typeName.Name()).(*types.TypeName)
+	if !isTypeName || hostTypeName.IsAlias() || hostTypeName.Pkg().Path() != typeName.Pkg().Path() {
+		graph.unmatchedNodes.Add(1)
+		return nil, false
+	}
+	node := from.graph.renderedNode(hostTypeName, from.graph.sizesForWalk())
+	return node.lines[:node.ownLineCount], true
+}
+
+// learnRestored has the graph take the lines of each package of restored, a package of the build restored from the
+// host's run by the host's package it was restored from, from host, the host's graph (hostLines), the first time it
+// learns of the package. Restored is a property of the package's types, read from the host's export data, which the
+// load never changes, so every verdict that names a package tells the same. A graph that is its own host learns
+// nothing, since its lock would be taken twice.
+func (graph *typeGraph) learnRestored(host *typeGraph, restored map[*types.Package]*types.Package) {
+	if host == graph {
+		return
+	}
+	for built, hostTypes := range restored {
+		if _, known := graph.restoredFrom.Load(built); !known {
+			graph.restoredFrom.LoadOrStore(built, hostPackage{graph: host, types: hostTypes})
+		}
+	}
+}
+
+// nodeCounts are how many nodes took the host's lines, how many were rendered here, and how many of those were of a
+// restored package the host had no node of the same path and name for.
+func (graph *typeGraph) nodeCounts() (int, int, int) {
+	return int(graph.reusedNodes.Load()), int(graph.renderedNodes.Load()), int(graph.unmatchedNodes.Load())
 }
 
 // renderedNode is typeName's node, rendered under its package's lock the first time it is asked (nodeOf). Its edges and

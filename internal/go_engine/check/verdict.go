@@ -23,16 +23,23 @@ var useDiffers = map[build_reads.UseKind]string{
 }
 
 // verdict is one package's reads judged in another build: the host's memo and the build's, the packages the judged
-// package reaches in the build by path, its closure, those of them the build restored from the host's run, at check
-// time the build's facts as its action inherited them, nil at the load's, which asks no fact, and the closures its
-// Interface and Method lookups ask of, each gathered once for the verdict.
+// package reaches in the build by path, its closure, those of them the build restored from the host's run, each by the
+// host's package it was restored from (restoredFromHost), at check time the build's facts as its action inherited
+// them, nil at the load's, which asks no fact, and the closures its Interface and Method lookups ask of, each gathered
+// once for the verdict.
 type verdict struct {
 	host     *ReadsBuild
 	build    *ReadsBuild
 	closure  ClosureLookup
-	restored map[*types.Package]bool
+	restored map[*types.Package]*types.Package
 	fact     FactLookup
 	methods  *verdictClosures
+}
+
+// restoredFromHost reports whether the build restored built from the host's run.
+func (judged verdict) restoredFromHost(built *types.Package) bool {
+	_, restored := judged.restored[built]
+	return restored
 }
 
 // verdictClosures are a verdict's import closures as its Interface and Method lookups ask them: the host's, by the
@@ -326,7 +333,7 @@ func (judged verdict) closureCandidates(
 		}
 		counted := kept(list(indexed))
 		hostCandidates = append(hostCandidates, counted...)
-		if judged.restored[buildClosure.byPath[indexed.owner.Path()]] {
+		if judged.restoredFromHost(buildClosure.byPath[indexed.owner.Path()]) {
 			buildCandidates = append(buildCandidates, counted...)
 		}
 	}
@@ -404,7 +411,7 @@ func (judged verdict) buildCandidates(
 	judged.indexBuildCandidates(hostHas)
 	var candidates []*types.TypeName
 	for _, indexed := range judged.build.methodsNamed(name) {
-		if !buildClosure.reached[indexed.owner] || judged.restored[indexed.owner] && hostHas(indexed.owner) {
+		if !buildClosure.reached[indexed.owner] || judged.restoredFromHost(indexed.owner) && hostHas(indexed.owner) {
 			continue
 		}
 		candidates = append(candidates, list(indexed)...)
@@ -425,7 +432,7 @@ func (judged verdict) buildCandidates(
 func (judged verdict) indexBuildCandidates(hostHas func(owner *types.Package) bool) {
 	skipped := judged.methods.buildUnindexed[:0]
 	for _, owner := range judged.methods.buildUnindexed {
-		if judged.restored[owner] && hostHas(owner) {
+		if judged.restoredFromHost(owner) && hostHas(owner) {
 			skipped = append(skipped, owner)
 			continue
 		}
