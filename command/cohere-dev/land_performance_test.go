@@ -70,6 +70,12 @@ func (fixture *performanceFixture) landing(environment ...string) (bool, string,
 	return landed, string(output), string(readMaybeMissing(fixture.test, filepath.Join(fixture.replies, "calls")))
 }
 
+// performanceMainBinary is the digest of the binary main's file before the landing measured, another program's.
+const performanceMainBinary = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
+
+// performanceFixtureBinary is the digest the stand-in Shackler says her binary has.
+const performanceFixtureBinary = "5f0c3a9e1d2b4c6a8e0f1a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d"
+
 // shacklerSays is everything the stand-in Shackler prints for a measurement, `COMMIT` the commit the remote names:
 // a gap's own quiet line among the script's, her machine, the cold rounds at the root with walls coldWalls, deeafbf4's,
 // which find 7 things there and exit 1, as an older tree may, and the warm and timeline rows, each with its fills.
@@ -95,6 +101,7 @@ func shacklerSays(coldWalls []int64) string {
 	say("phase modules 640")
 	say("phase build 11870")
 	say("tested COMMIT on darwin/arm64")
+	say("binary %s", performanceFixtureBinary)
 	say("machine 12 Apple M2 Max")
 	say("go go1.27.1")
 	say("load before 0.89 0.91 1.28")
@@ -149,12 +156,30 @@ func previousPerformance(test *testing.T, commit string, machine string, wall pe
 		file.Machine.Cpu, file.Machine.Cores = "Apple M1", 8
 	}
 	file.Engine.Cold.Root.Wall, file.Engine.Cold.Root.User = wall, user
+	// main's binary was another program than the one being landed, as a landing that changes the engine builds.
+	file.Tools.Binary = performanceMainBinary
 	file.Note = "the first measurement, so nothing to compare"
 	contents, renderError := renderPerformance(file)
 	if renderError != nil {
 		test.Fatal(renderError)
 	}
 	return contents
+}
+
+// sameBinaryPerformance is a previous file's contents with its binary the one the stand-in Shackler says she built,
+// as main's file reads before a landing that changed nothing the engine compiles.
+func sameBinaryPerformance(test *testing.T, contents []byte) []byte {
+	test.Helper()
+	file := performanceFile{}
+	if decodeError := json.Unmarshal([]byte(performanceBody(string(contents))), &file); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	file.Tools.Binary = performanceFixtureBinary
+	same, renderError := renderPerformance(file)
+	if renderError != nil {
+		test.Fatal(renderError)
+	}
+	return same
 }
 
 // uncountedPerformance is a previous file's contents as main's files read before each row recorded what it checked.
@@ -207,6 +232,15 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 				performanceSpreadOf(12000, 11900, 12100), performanceSpreadOf(48000, 47600, 48400)),
 			note: "against 11111111: cold root wall faster by 2200 ms, 18%, ranges apart (9800 ms, was 12000), " +
 				"user faster by 8800 ms, 18%, ranges apart (39200 ms, was 48000); cold deeafbf4 wall level",
+		},
+		{
+			name: "the same binary reads as the box's drift",
+			previous: sameBinaryPerformance(test, previousPerformance(test, performancePreviousCommit,
+				performanceBox, performanceSpreadOf(12000, 11900, 12100), performanceSpreadOf(48000, 47600, 48400))),
+			note: "against 11111111, the same binary (sha256 5f0c3a9e1d2b), so no change to the engine and any " +
+				"difference is the box's: cold root wall drifted down by 2200 ms, 18%, the box's ranges apart " +
+				"(9800 ms, was 12000), user drifted down by 8800 ms, 18%, the box's ranges apart (39200 ms, was " +
+				"48000); cold deeafbf4 wall level",
 		},
 		{
 			name: "another machine reads as its own line",
@@ -276,7 +310,7 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 					LoadAfter: []float64{1.1, 0.95, 1.27}, HeldQuiet: true})},
 				{"tools", measured.Tools, performanceTools{Cohere: shortCommit(measured.Commit) +
 					" CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache " +
-					"the box kept", Go: "go1.27.1"}},
+					"the box kept", Go: "go1.27.1", Binary: performanceFixtureBinary}},
 				{"schema", measured.Schema, 1},
 			} {
 				if fmt.Sprint(check.got) != fmt.Sprint(check.want) {
@@ -429,6 +463,11 @@ func TestAMeasurementThatFailsRefusesTheLanding(test *testing.T) {
 			said: `Shackler's run line "cold root 2 9700 38800 970 0 0" doesn't read as a row`,
 		},
 		{
+			name: "a binary with no digest",
+			run:  strings.Replace(passing, "binary "+performanceFixtureBinary+"\n", "binary \n", 1),
+			said: `Shackler's measurement said the binary's digest as "", not a sha256`,
+		},
+		{
 			name: "a gap that ended badly",
 			run:  "ssh: connect to host shackler: Connection refused\n",
 			exit: "255",
@@ -500,10 +539,15 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 		test.Fatal(problem)
 	}
 	current := performanceFileOf(measurement, performancePreviousCommit, time.Unix(0, 0))
-	otherBuild, otherShape, otherChecked := current, current, current
+	otherBuild, otherShape, otherChecked, sameBinary, otherBinary := current, current, current, current, current
 	otherBuild.Tools.Go = "go1.27.2"
 	otherShape.Engine.Rounds.Cold = 5
 	otherChecked.Engine.Cold.Deeafbf4.Checked = &performanceChecked{Files: 2210, Findings: 1100}
+	otherChecked.Tools.Binary = performanceMainBinary
+	// main's file measured the same binary a little faster at the root, and another binary just the same.
+	sameBinary.Engine.Cold.Root.Wall = performanceSpreadOf(9500, 9450, 9550)
+	otherBinary.Engine.Cold.Root.Wall = sameBinary.Engine.Cold.Root.Wall
+	otherBinary.Tools.Binary = performanceMainBinary
 	for _, row := range []struct {
 		name     string
 		previous performanceFile
@@ -521,6 +565,14 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 		{"a row that checked otherwise", otherChecked, "", "against 11111111: cold root wall level (9800 ms, was " +
 			"9800), user level (39200 ms, was 39200); cold deeafbf4 checked 95 files and 7 findings, and main's 2210 " +
 			"and 1100, so not compared; warm root wall level (800 ms, was 800), user level (3200 ms, was 3200)"},
+		{"the same binary", sameBinary, "", "against 11111111, the same binary (sha256 5f0c3a9e1d2b), so no change " +
+			"to the engine and any difference is the box's: cold root wall drifted up by 300 ms, 3%, the box's " +
+			"ranges apart (9800 ms, was 9500), user level (39200 ms, was 39200); cold deeafbf4 wall level (4100 ms, " +
+			"was 4100), user level (16400 ms, was 16400); warm root wall level (800 ms, was 800), user level (3200 " +
+			"ms, was 3200)"},
+		{"another binary", otherBinary, "", "against 11111111: cold root wall slower by 300 ms, 3%, ranges apart " +
+			"(9800 ms, was 9500), user level (39200 ms, was 39200); cold deeafbf4 wall level (4100 ms, was 4100), " +
+			"user level (16400 ms, was 16400); warm root wall level (800 ms, was 800), user level (3200 ms, was 3200)"},
 	} {
 		if note := performanceNote(current, row.previous, true, row.unread); note != row.want {
 			test.Errorf("%s: the note reads\n%s\nwant\n%s", row.name, note, row.want)

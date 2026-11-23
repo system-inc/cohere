@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -192,6 +193,9 @@ built=$(GOCACHE="$base/gocache" ` + performanceBuild + ` -o "$base/cohere" ./com
 cd "$base"
 phase build
 say "tested $commit on $(go env GOOS)/$(go env GOARCH)"
+# The binary's digest: a -trimpath build of the same source is the same bytes, so a landing that changed no file the
+# engine compiles builds main's binary again, and its note can say any difference is the box's (#6wnsnq2).
+say "binary $(sha256sum "$base/cohere" | cut -d' ' -f1)"
 say "machine $(sysctl -n hw.ncpu) $(sysctl -n machdep.cpu.brand_string)"
 say "go $(go env GOVERSION)"
 # Her load as gap's own quiet lines read it, and the busiest processes beside it.
@@ -338,11 +342,16 @@ type performanceMachine struct {
 	HeldQuiet  bool      `json:"heldQuiet"`
 }
 
-// performanceTools is what ran: the binary, by the commit it was built at and how, and the Go that built it.
+// performanceTools is what ran: the binary, by the commit it was built at and how, the Go that built it, and the
+// binary's sha256. Binary is empty in a file written before files recorded it.
 type performanceTools struct {
 	Cohere string `json:"cohere"`
 	Go     string `json:"go"`
+	Binary string `json:"binary,omitempty"`
 }
+
+// sha256Pattern is a sha256 as sha256sum prints it, which the measurement says its binary's digest as.
+var sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // performanceFile is Performance.jsonc's body (#hed1mkb's schema).
 type performanceFile struct {
@@ -367,9 +376,9 @@ type performanceRun struct {
 
 // performanceMeasurement is everything the script said.
 type performanceMeasurement struct {
-	commit, platform, cpu, goVersion string
-	cores                            int
-	loadBefore, loadAfter            []float64
+	commit, platform, cpu, goVersion, binary string
+	cores                                    int
+	loadBefore, loadAfter                    []float64
 	// phases are the script's phases, each as the land line says it, "build 12.3s".
 	phases   []string
 	runs     []performanceRun
@@ -575,6 +584,8 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 			measurement.cpu = strings.TrimSpace(cpu)
 		case "go":
 			measurement.goVersion = strings.TrimSpace(rest)
+		case "binary":
+			measurement.binary = strings.TrimSpace(rest)
 		case "load":
 			when, figures, _ := strings.Cut(rest, " ")
 			load, loadProblem := loadOf(figures)
@@ -619,6 +630,9 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 		measurement.goVersion == "":
 		return performanceMeasurement{}, performanceBox + "'s measurement never said her platform, her cpu and cores " +
 			"or her Go"
+	case !sha256Pattern.MatchString(measurement.binary):
+		return performanceMeasurement{}, fmt.Sprintf("%s's measurement said the binary's digest as %q, not a sha256",
+			performanceBox, measurement.binary)
 	case measurement.loadBefore == nil || measurement.loadAfter == nil:
 		return performanceMeasurement{}, performanceBox + "'s measurement never said her load before and after"
 	case measurement.timeline == nil:
@@ -786,7 +800,8 @@ func performanceFileOf(measurement performanceMeasurement, commit string, measur
 		Tools: performanceTools{
 			Cohere: shortCommit(commit) + " " + performanceBuild + ", " + measurement.platform +
 				", on a cache the box kept",
-			Go: measurement.goVersion,
+			Go:     measurement.goVersion,
+			Binary: measurement.binary,
 		},
 		Engine: performanceEngine{
 			Rounds: performanceRounds{
@@ -866,6 +881,13 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 			against, previous.Schema, previous.Engine.Rounds.Cold, previous.Engine.Rounds.Deeafbf4,
 			previous.Engine.Rounds.Warm)
 	}
+	// The same binary as main's ran: this landing changed nothing the engine compiles, so every difference is the
+	// box's own drift between two measurements of one program, which the note says rather than calling it slower.
+	sameBinary := current.Tools.Binary != "" && current.Tools.Binary == previous.Tools.Binary
+	compared := spreadCompared
+	if sameBinary {
+		compared = driftCompared
+	}
 	rows := []string{}
 	uncounted := false
 	for _, row := range performanceRows {
@@ -878,11 +900,15 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 				before.Checked.Findings))
 			continue
 		}
-		rows = append(rows, row.name+" wall "+spreadCompared(now.Wall, before.Wall)+", user "+
-			spreadCompared(now.User, before.User))
+		rows = append(rows, row.name+" wall "+compared(now.Wall, before.Wall)+", user "+
+			compared(now.User, before.User))
 	}
 	if uncounted {
 		rows = append([]string{"main's file records no checked counts"}, rows...)
+	}
+	if sameBinary {
+		return "against " + against + ", the same binary (sha256 " + current.Tools.Binary[:12] + "), so no change " +
+			"to the engine and any difference is the box's: " + strings.Join(rows, "; ")
 	}
 	return "against " + against + ": " + strings.Join(rows, "; ")
 }
@@ -911,6 +937,22 @@ func spreadCompared(now performanceSpread, before performanceSpread) string {
 	}
 	return fmt.Sprintf("%s by %d ms, %d%%, ranges apart (%s)", direction, change,
 		(change*100+before.Median/2)/before.Median, figures)
+}
+
+// driftCompared says how two measurements of one binary compare: level while their ranges overlap, and otherwise
+// drifted up or down by so much, which is the box's spread between runs and never the engine's speed.
+func driftCompared(now performanceSpread, before performanceSpread) string {
+	said := spreadCompared(now, before)
+	for _, word := range []string{"slower", "faster"} {
+		if rest, found := strings.CutPrefix(said, word+" by "); found {
+			direction := "up"
+			if word == "faster" {
+				direction = "down"
+			}
+			return "drifted " + direction + " by " + strings.Replace(rest, "ranges apart", "the box's ranges apart", 1)
+		}
+	}
+	return said
 }
 
 // machineNamed is a machine as the note names it: her name, her cpu and her cores.
