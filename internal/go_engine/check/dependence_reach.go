@@ -1,11 +1,11 @@
 package check
 
 import (
-	"go/types"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"

@@ -1,13 +1,13 @@
 package build_dependence
 
 import (
-	"go/types"
 	"path/filepath"
 	"runtime"
 	"runtime/metrics"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

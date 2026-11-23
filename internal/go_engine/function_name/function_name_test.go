@@ -2,11 +2,11 @@ package function_name_test
 
 import (
 	"go/token"
-	"go/types"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"

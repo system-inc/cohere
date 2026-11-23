@@ -4,9 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"reflect"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // unorderedSource is a package whose walk meets its unused objects out of the order they are written in: first's body

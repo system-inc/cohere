@@ -21,7 +21,8 @@ package intermediate_representation
 
 import (
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // -- wrappers -----------------------------------------------------------

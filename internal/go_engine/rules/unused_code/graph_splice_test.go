@@ -5,12 +5,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/generated"
 )

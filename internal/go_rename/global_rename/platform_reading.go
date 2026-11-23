@@ -3,9 +3,10 @@ package global_rename
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"path/filepath"
 	"sort"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )

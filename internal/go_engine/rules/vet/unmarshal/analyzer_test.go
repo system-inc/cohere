@@ -2,11 +2,11 @@ package unmarshal
 
 import (
 	"cmp"
-	"go/types"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	upstream "golang.org/x/tools/go/analysis/passes/unmarshal"
 	"golang.org/x/tools/go/packages"

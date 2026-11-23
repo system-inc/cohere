@@ -2,10 +2,10 @@ package fact_resolver_test
 
 import (
 	"fmt"
-	"go/types"
 	"reflect"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 

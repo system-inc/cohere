@@ -1,9 +1,10 @@
 package check
 
 import (
-	"go/types"
 	"slices"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // methodSetNamesFixture is one package of a method set rule's own, checked in memory, and the sets it asks of it.

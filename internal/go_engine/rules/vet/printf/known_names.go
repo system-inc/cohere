@@ -1,8 +1,9 @@
 package printf
 
 import (
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // knownNames are the print functions known by name, knownPrintFunctions with what the -funcs flag added, as

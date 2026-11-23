@@ -4,8 +4,9 @@ import (
 	"cmp"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // kindEdge says the from object's bit depends on the to object's bit (rule 3): from is an object a unit declares, and

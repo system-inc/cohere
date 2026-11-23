@@ -2,7 +2,8 @@ package correctness_no_caller_data_mutation
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )

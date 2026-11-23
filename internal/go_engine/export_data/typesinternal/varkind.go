@@ -22,7 +22,7 @@
 
 package typesinternal
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 type VarKind = types.VarKind
 

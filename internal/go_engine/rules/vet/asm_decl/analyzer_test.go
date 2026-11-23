@@ -5,13 +5,13 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/asmdecl"
 

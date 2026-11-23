@@ -5,11 +5,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 )

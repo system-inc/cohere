@@ -3,12 +3,12 @@ package fact_resolver_test
 import (
 	"bytes"
 	"fmt"
-	"go/types"
 	"reflect"
 	"slices"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"

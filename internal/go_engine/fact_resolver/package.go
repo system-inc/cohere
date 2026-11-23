@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"sync"
 	"sync/atomic"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"

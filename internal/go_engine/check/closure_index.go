@@ -1,9 +1,9 @@
 package check
 
 import (
-	"go/types"
 	"math/bits"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

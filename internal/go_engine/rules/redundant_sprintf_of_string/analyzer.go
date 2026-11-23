@@ -22,8 +22,8 @@ package redundant_sprintf_of_string
 
 import (
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/go/types/typeutil"

@@ -3,9 +3,10 @@ package check
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // answeredFromWhole is the hand on a variant run's answers: every question about an object of a variant is answered

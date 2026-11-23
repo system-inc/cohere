@@ -6,7 +6,6 @@ import (
 	"go/build/constraint"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"go/version"
 	"io"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Dimensions are what a set of files' build constraints vary on, from their `//go:build` (or `// +build`) lines

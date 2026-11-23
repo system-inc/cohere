@@ -3,12 +3,12 @@ package build_reads
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"reflect"
 	"slices"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

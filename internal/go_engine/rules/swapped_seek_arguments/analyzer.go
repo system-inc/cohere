@@ -31,9 +31,9 @@ package swapped_seek_arguments
 
 import (
 	"go/ast"
-	"go/types"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/knowledge"
 

@@ -2,7 +2,8 @@ package standing_facts
 
 import (
 	"bytes"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"

@@ -1,6 +1,6 @@
 package iface_assert
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // term is one elementary type set, as x/tools' typeparams.term is, which copies go/types' own:
 //

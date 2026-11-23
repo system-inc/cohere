@@ -16,13 +16,14 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"os"
 	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"

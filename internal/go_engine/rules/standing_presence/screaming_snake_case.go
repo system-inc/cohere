@@ -3,10 +3,10 @@ package standing_presence
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"

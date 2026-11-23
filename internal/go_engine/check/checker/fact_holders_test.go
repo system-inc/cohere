@@ -3,12 +3,12 @@ package checker
 import (
 	"fmt"
 	"go/constant"
-	"go/types"
 	"slices"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 )

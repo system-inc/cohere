@@ -25,8 +25,8 @@ package index_compared_as_contains
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

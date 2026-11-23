@@ -10,8 +10,8 @@ package correctness_require_handled_error
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"

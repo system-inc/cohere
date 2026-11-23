@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"reflect"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

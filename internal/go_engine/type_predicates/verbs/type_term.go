@@ -1,6 +1,6 @@
 package verbs
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // typeTerm is one elementary type set, as x/tools' typeparams term is: a nil term is the empty set, a term with no
 // type the set of every type, a term without tilde the set of its one type, and a term with tilde the set of every

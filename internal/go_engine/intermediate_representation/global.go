@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A Global is a named Value holding the address of a package-level

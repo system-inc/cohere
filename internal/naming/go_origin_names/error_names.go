@@ -3,9 +3,9 @@ package go_origin_names
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/typeutil"
 )
 

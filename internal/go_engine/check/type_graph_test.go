@@ -6,11 +6,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"maps"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )

@@ -11,9 +11,9 @@ package child_process
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/ast/inspector"

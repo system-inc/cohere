@@ -5,12 +5,13 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // useWalkSources are standard-library packages whose syntax holds every kind of expression the walk places, checked

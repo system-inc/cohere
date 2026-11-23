@@ -2,10 +2,10 @@ package standing_facts
 
 import (
 	"fmt"
-	"go/types"
 	"maps"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/facts/deprecated"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"

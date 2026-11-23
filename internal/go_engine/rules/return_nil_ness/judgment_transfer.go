@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/exp/typeparams"
 	"honnef.co/go/tools/go/types/typeutil"
 

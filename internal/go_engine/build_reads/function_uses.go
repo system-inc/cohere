@@ -2,10 +2,10 @@ package build_reads
 
 import (
 	"go/token"
-	"go/types"
 	"iter"
 	"sync"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 )
 

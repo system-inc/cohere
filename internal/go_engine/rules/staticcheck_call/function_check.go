@@ -16,9 +16,9 @@ package staticcheck_call
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/go/types/typeutil"
 

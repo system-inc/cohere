@@ -2,9 +2,9 @@ package test_failure_in_goroutine
 
 import (
 	"fmt"
-	"go/types"
 	"reflect"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 

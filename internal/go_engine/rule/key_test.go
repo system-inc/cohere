@@ -2,10 +2,10 @@ package rule
 
 import (
 	"fmt"
-	"go/types"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

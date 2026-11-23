@@ -3,7 +3,8 @@ package consistency_no_abbreviated_identifier
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/naming/abbreviation"

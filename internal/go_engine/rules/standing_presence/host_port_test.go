@@ -1,8 +1,9 @@
 package standing_presence
 
 import (
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // hostport judges a package that imports fmt, and never net itself (#xeafx79, the reader's S3), whose own dial

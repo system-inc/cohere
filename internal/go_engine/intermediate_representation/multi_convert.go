@@ -1,6 +1,6 @@
 package intermediate_representation
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // The MultiConvert instruction yields the conversion of value X to type
 // Type(). Either X.Type() or Type() must be a type parameter. Each

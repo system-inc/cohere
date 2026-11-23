@@ -9,10 +9,11 @@ package load_memo
 
 import (
 	"go/token"
-	"go/types"
 	"runtime"
 	"sync"
 	"weak"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Memo is what a rule reads off each package, by the load the package belongs to. A run of the engine can load the

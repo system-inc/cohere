@@ -2,8 +2,9 @@ package testing_goroutine
 
 import (
 	"go/ast"
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // localFunctionDeclarations is a lookup of the declaration in files of each function and method they declare, built on

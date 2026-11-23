@@ -21,7 +21,7 @@
 package typesinternal
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // ReceiverNamed returns the named type (if any) associated with the

@@ -1,6 +1,6 @@
 package printf
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // calleeName is a called print function's full name, as fullName gives it, formatted only when a message is: every
 // message reads it with %s, which calls String. Formatting it for every call of a print function, though most calls

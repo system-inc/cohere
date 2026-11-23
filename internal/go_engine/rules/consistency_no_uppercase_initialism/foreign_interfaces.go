@@ -1,7 +1,7 @@
 package consistency_no_uppercase_initialism
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )

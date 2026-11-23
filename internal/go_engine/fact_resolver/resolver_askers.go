@@ -1,6 +1,6 @@
 package fact_resolver
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // RecordAskers has the resolver record, from now on, the bodies whose rules ask each answer (NoteAsker), for the body
 // differential (#5vbs1np, must 5). It is called before the run's passes start, and never in a run that does not

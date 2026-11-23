@@ -17,8 +17,8 @@ package buffer_string_conversion
 
 import (
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/go/types/typeutil"
 

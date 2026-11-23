@@ -8,7 +8,8 @@ package intermediate_representation
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // newVariable creates a 'var' for use in a types.Tuple.

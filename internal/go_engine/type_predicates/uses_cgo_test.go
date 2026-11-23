@@ -1,8 +1,9 @@
 package type_predicates
 
 import (
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // UsesCgo answers whether a package's types import runtime/cgo directly, and nothing else: vet's cgocall and the

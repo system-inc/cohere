@@ -14,13 +14,13 @@ import (
 	"cmp"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"maps"
 	"reflect"
 	"slices"
 	"strconv"
 	"sync"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

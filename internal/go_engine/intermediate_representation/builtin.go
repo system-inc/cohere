@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A Builtin represents a specific use of a built-in function, e.g. len.

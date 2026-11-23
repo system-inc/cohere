@@ -1,8 +1,7 @@
 package odd_slice_argument
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

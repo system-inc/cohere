@@ -1,6 +1,6 @@
 package intermediate_representation
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // buildWrapper builds fn.Body for a method wrapper.
 func (packageBuilder *builder) buildWrapper(function *Function) {

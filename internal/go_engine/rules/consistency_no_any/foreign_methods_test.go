@@ -3,9 +3,10 @@ package consistency_no_any
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"runtime"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // declaringPackage is a package declaring count named types, each with one exported method of its own name, imported

@@ -1,6 +1,6 @@
 package locks
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // maximumTermCount bounds the terms a union may normalize to before the computation gives up, as the original's does.
 const maximumTermCount = 100

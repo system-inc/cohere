@@ -1,6 +1,6 @@
 package type_predicates
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // OnlyBasicValues is whether a value of valueType holds only basic values: a basic type, or a struct whose fields,
 // unexported ones too, all are. function_purity asks it of each parameter of the function it judges, and the restore

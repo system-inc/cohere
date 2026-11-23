@@ -2,9 +2,9 @@ package staticcheck_code
 
 import (
 	"go/ast"
-	"go/types"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/function_name"

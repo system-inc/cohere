@@ -1,8 +1,7 @@
 package fact_resolver_test
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"

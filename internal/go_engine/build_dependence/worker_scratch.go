@@ -1,8 +1,9 @@
 package build_dependence
 
 import (
-	"go/types"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // workerScratch is the walk and the namer one worker adds packages with (Graph.AddPackage), their maps and slices kept

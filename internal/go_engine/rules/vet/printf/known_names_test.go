@@ -2,9 +2,10 @@ package printf
 
 import (
 	"go/token"
-	"go/types"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // holdsObjects are functions and a variable of each shape a full name takes: a package's function, a method on a

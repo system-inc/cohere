@@ -2,7 +2,8 @@ package go_origin_names
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // contextTable names the context each of a short list of calls returns; a context from any other call is left for

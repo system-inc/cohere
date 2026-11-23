@@ -28,10 +28,10 @@ package deprecated_use
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"go/version"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/deprecated"
 	"honnef.co/go/tools/analysis/facts/generated"

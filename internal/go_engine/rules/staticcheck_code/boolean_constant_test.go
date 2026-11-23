@@ -4,9 +4,9 @@ package staticcheck_code_test
 import (
 	"go/ast"
 	"go/constant"
-	"go/types"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/code"
 

@@ -25,8 +25,8 @@ package dynamic_printf_format
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/go/types/typeutil"
 

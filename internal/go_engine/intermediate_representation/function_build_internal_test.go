@@ -7,8 +7,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // boundWrapperSource holds a function whose body makes a bound method wrapper, the function a method value closes

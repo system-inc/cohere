@@ -2,9 +2,10 @@ package unused_code
 
 import (
 	"go/token"
-	"go/types"
 	"slices"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // ignoredKey is a line a //lint:ignore U1000 directive covers, or a whole file, with line -1, that a

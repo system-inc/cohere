@@ -2,8 +2,9 @@ package standing_presence
 
 import (
 	"go/ast"
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"

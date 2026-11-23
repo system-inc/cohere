@@ -2,9 +2,9 @@ package load
 
 import (
 	"go/ast"
-	"go/types"
 	"sync"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"
 )

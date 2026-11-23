@@ -1,9 +1,9 @@
 package go_engine
 
 import (
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"

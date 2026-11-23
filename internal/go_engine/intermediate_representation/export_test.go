@@ -7,8 +7,9 @@ package intermediate_representation
 // takes no further turn.
 
 import (
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/static_single_assignment"
 )

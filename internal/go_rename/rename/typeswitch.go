@@ -2,7 +2,8 @@ package rename
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A type switch's guard, `switch value := subject.(type)`, declares no object of its own: go/types gives each

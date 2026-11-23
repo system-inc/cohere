@@ -1,6 +1,6 @@
 package locks
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // term is one elementary set of types. x/tools' typeparams.term, generated there from the type checker's own:
 //

@@ -1,8 +1,9 @@
 package fact_resolver_test
 
 import (
-	"go/types"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // keepHand is a hand on a run's answers that answers every question with answer, when it has one, and keeps every

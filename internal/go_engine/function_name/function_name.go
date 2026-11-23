@@ -5,8 +5,9 @@
 package function_name
 
 import (
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Matches is whether function's full name is name, as types.Func's FullName and typeutil.FuncName spell it: its

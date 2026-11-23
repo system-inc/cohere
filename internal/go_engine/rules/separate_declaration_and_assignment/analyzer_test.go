@@ -6,12 +6,12 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/simple/s1021"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"

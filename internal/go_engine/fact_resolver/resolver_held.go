@@ -1,7 +1,7 @@
 package fact_resolver
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // Held is a test's hand on the answers a run gives (#h350vqr), which only a test sets. The unit-isolation test

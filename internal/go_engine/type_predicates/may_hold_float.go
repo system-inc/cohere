@@ -1,8 +1,7 @@
 package type_predicates
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 )
 

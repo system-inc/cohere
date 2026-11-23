@@ -2,7 +2,8 @@ package odd_slice_argument
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )

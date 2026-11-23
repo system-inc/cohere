@@ -3,9 +3,9 @@ package standing_facts
 import (
 	"cmp"
 	"go/ast"
-	"go/types"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/call_groups"

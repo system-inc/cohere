@@ -60,9 +60,9 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"runtime"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 )
 

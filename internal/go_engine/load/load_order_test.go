@@ -2,7 +2,6 @@ package load
 
 import (
 	"fmt"
-	"go/types"
 	"runtime"
 	"slices"
 	"strings"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

@@ -17,8 +17,8 @@ package unnecessary_blank_identifier
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/go/ast/astutil"
 

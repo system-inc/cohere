@@ -1,6 +1,6 @@
 package iface_assert
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // freeTypeParameters remembers which types hold a free type parameter, for a sequence of questions about types that
 // overlap. The zero value is ready. x/tools' typeparams.Free, which adapts go/types' infer.go.

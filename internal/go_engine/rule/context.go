@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
 

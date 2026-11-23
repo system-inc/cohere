@@ -5,13 +5,14 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // No rule writes the TypeScript syntax tree, and this is what makes that structural rather than remembered.

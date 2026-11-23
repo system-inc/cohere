@@ -2,11 +2,11 @@ package return_nil_ness_test
 
 import (
 	"fmt"
-	"go/types"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 

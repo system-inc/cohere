@@ -12,8 +12,9 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // debug and trace are gcimporter.go's, which declares them beside Import, the compiler's unified reader, which is not

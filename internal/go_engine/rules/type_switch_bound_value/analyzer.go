@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/edit"
 

@@ -18,7 +18,8 @@ package misaligned_atomic_field
 
 import (
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"

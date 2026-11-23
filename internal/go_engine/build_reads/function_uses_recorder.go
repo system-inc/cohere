@@ -3,9 +3,10 @@ package build_reads
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"slices"
 	"strconv"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // functionUsesRecorder records what each top-level declaration of one package uses as the use walk reaches each node

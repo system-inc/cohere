@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/test_functions"
 )

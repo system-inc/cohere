@@ -2,9 +2,10 @@ package call_groups_test
 
 import (
 	"go/token"
-	"go/types"
 	"slices"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/call_groups"
 )

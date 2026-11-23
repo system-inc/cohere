@@ -2,7 +2,8 @@ package build_reads
 
 import (
 	"cmp"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // objectOrdering orders the objects of one sort (see compare), remembering how go/types wrote each object it had to

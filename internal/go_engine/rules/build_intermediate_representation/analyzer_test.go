@@ -3,13 +3,13 @@ package build_intermediate_representation
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"reflect"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"honnef.co/go/tools/go/ir"

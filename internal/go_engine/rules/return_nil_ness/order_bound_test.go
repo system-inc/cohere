@@ -1,10 +1,11 @@
 package return_nil_ness_test
 
 import (
-	"go/types"
 	"maps"
 	"slices"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
 )

@@ -1,8 +1,9 @@
 package load_memo
 
 import (
-	"go/types"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Load is what one load's packages read, each package read once.

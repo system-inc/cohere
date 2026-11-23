@@ -2,12 +2,12 @@ package fact_resolver
 
 import (
 	"go/token"
-	"go/types"
 	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"

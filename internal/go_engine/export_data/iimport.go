@@ -31,13 +31,13 @@ import (
 	"fmt"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"io"
 	"math/big"
 	"slices"
 	"sort"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 
 	// cohere: x/tools' internal aliases and typesinternal, copied beside this

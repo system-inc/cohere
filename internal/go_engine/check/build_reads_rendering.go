@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/type_predicates"
 )

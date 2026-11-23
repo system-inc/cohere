@@ -1,9 +1,9 @@
 package fact_resolver_test
 
 import (
-	"go/types"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"

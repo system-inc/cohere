@@ -2,12 +2,12 @@ package build_reads
 
 import (
 	"go/ast"
-	"go/types"
 	"slices"
 	"strconv"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 )
 

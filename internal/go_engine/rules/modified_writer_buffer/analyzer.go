@@ -16,8 +16,7 @@
 package modified_writer_buffer
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/knowledge"
 

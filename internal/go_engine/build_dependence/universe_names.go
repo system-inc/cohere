@@ -1,8 +1,9 @@
 package build_dependence
 
 import (
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // universeNameBits are the universe's names, each with its bit in a unit's universeNames, in the universe's order.

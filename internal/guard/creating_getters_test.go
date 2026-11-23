@@ -7,13 +7,14 @@ package guard
 
 import (
 	"go/ast"
-	"go/types"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // creatingGetters are the compiler's getters that write: each creates the symbol table it is asked for

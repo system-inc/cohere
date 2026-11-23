@@ -2,13 +2,13 @@ package odd_slice_argument_test
 
 import (
 	"fmt"
-	"go/types"
 	"maps"
 	"reflect"
 	"slices"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // IdentifierRecord is one identifier in a file, in source order, with the declaration it resolves to.

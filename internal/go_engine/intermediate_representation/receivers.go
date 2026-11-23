@@ -7,7 +7,7 @@ package intermediate_representation
 // This file defines what a method's receiver gives: its type, its type arguments, and the method's signature
 // with the receiver as its first parameter.
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // methodReceiverType returns the receiver type of method `object`.
 func methodReceiverType(object *types.Func) types.Type {

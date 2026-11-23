@@ -3,11 +3,11 @@ package function_purity_test
 import (
 	"cmp"
 	"fmt"
-	"go/types"
 	"reflect"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"

@@ -20,8 +20,8 @@ package argument_overwritten_before_use
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"

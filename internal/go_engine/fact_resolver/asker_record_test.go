@@ -3,9 +3,10 @@ package fact_resolver_test
 import (
 	"cmp"
 	"go/token"
-	"go/types"
 	"slices"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )

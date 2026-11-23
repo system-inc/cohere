@@ -18,9 +18,9 @@ package unencodable_binary_value
 
 import (
 	"fmt"
-	"go/types"
 	"go/version"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

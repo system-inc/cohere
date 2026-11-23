@@ -1,6 +1,6 @@
 package go_origin_names
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // TypeName is a named type by package path and name.
 type TypeName struct {

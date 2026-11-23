@@ -11,13 +11,14 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"iter"
 	"reflect"
 	"slices"
 	"strings"
 	"sync"
 	"unsafe"
+
+	"github.com/system-inc/go-types/types"
 )
 
 type Id int

@@ -5,9 +5,10 @@ package intermediate_representation_test
 import (
 	"go/importer"
 	"go/token"
-	"go/types"
 	"sync"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )

@@ -31,9 +31,9 @@ package test_failure_in_goroutine
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"iter"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/go/types/typeutil"
 

@@ -1,12 +1,12 @@
 package printf
 
 import (
-	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	original "golang.org/x/tools/go/analysis/passes/printf"
 	"golang.org/x/tools/txtar"

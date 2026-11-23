@@ -1,8 +1,7 @@
 package return_nil_ness
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

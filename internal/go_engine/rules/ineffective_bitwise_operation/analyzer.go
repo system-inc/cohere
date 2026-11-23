@@ -21,8 +21,8 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/ast/astutil"
 	"honnef.co/go/tools/go/types/typeutil"
 

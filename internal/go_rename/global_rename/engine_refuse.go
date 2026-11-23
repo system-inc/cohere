@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

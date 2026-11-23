@@ -3,13 +3,13 @@ package check
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"

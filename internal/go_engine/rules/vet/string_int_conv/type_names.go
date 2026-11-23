@@ -1,8 +1,9 @@
 package string_int_conv
 
 import (
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // describe is how a finding names described, a type within the type set of within, whose name is withinName where

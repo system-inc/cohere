@@ -3,10 +3,10 @@ package fact_resolver
 import (
 	"cmp"
 	"fmt"
-	"go/types"
 	"maps"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 )
 

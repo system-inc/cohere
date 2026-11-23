@@ -3,8 +3,9 @@ package canonical_function_hash
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )

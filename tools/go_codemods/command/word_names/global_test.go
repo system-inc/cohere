@@ -3,11 +3,12 @@ package main
 import (
 	"bufio"
 	"go/ast"
-	"go/types"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_rename/rename"

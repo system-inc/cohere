@@ -3,7 +3,8 @@ package build_dependence
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // bodyWalk turns a unit's body or initializers into its references (rule 4), so a build judges the body by its bits

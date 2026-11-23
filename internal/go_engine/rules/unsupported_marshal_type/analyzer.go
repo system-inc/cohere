@@ -15,8 +15,8 @@ package unsupported_marshal_type
 
 import (
 	"fmt"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/staticcheck/fakejson"
 	"honnef.co/go/tools/staticcheck/fakexml"
 

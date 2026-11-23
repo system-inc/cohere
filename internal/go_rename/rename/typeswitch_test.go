@@ -2,9 +2,10 @@ package rename
 
 import (
 	"go/ast"
-	"go/types"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // proposeClauseVariables proposes newName for the clause variables of every type switch, every clause when

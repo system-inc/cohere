@@ -1,7 +1,7 @@
 package build_dependence
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // Dependence is one build's judgment of the graph's units and objects (Against).

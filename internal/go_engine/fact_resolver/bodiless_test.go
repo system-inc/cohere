@@ -3,11 +3,11 @@ package fact_resolver_test
 import (
 	"bytes"
 	"fmt"
-	"go/types"
 	"reflect"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"

@@ -1,7 +1,6 @@
 package odd_slice_argument_test
 
 import (
-	"go/types"
 	"io/fs"
 	"math/rand/v2"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 

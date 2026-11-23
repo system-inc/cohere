@@ -2,7 +2,8 @@ package string_int_conv
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // errorInterface is the predeclared error's interface, `interface{ Error() string }`.

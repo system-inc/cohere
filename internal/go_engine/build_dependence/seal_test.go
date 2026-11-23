@@ -2,12 +2,12 @@ package build_dependence
 
 import (
 	"fmt"
-	"go/types"
 	"maps"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

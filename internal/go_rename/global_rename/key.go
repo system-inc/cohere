@@ -9,8 +9,9 @@ package global_rename
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Key identifies one declaration across every type-checked copy of its package. go/packages checks a package

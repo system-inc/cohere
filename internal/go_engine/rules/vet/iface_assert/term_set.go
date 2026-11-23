@@ -3,7 +3,8 @@ package iface_assert
 import (
 	"errors"
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // maximumTermCount is the most terms a union's normal form may hold before the term set is given up. go/types refuses a

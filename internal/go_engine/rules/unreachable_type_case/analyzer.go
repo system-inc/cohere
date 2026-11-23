@@ -15,7 +15,8 @@ package unreachable_type_case
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"

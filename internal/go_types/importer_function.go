@@ -1,6 +1,6 @@
 package go_types
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 type importerFunction func(path string) (*types.Package, error)
 

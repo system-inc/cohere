@@ -2,7 +2,8 @@ package build_dependence
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // unitVisitor is newUnit's one walk of a declaration: it counts the syntax nodes under it, the declaration itself

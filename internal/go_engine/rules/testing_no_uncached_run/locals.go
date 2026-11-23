@@ -2,7 +2,8 @@ package testing_no_uncached_run
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )

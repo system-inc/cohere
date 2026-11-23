@@ -17,13 +17,14 @@ import (
 	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )

@@ -29,10 +29,10 @@ package invalid_struct_tag
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/staticcheck/fakereflect"
 	"honnef.co/go/tools/staticcheck/fakexml"
 

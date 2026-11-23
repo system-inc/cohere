@@ -9,8 +9,9 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )

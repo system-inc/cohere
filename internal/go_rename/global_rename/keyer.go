@@ -2,7 +2,8 @@ package global_rename
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // keyer computes and remembers keys.

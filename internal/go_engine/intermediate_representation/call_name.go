@@ -1,8 +1,7 @@
 package intermediate_representation
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 )
 

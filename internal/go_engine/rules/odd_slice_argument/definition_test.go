@@ -1,10 +1,10 @@
 package odd_slice_argument
 
 import (
-	"go/types"
 	"reflect"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"

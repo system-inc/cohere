@@ -2,7 +2,8 @@ package unused_code
 
 import (
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // unsafeImporter imports package unsafe and no other, the one import a record test's shapes need, so no shape reads

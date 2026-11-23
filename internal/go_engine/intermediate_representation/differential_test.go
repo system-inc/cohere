@@ -19,7 +19,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -30,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 	"honnef.co/go/tools/go/ir"
 

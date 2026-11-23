@@ -2,10 +2,11 @@ package intermediate_representation
 
 import (
 	"go/ast"
-	"go/types"
 	"runtime"
 	"sync"
 	"sync/atomic"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A Package is a single analyzed Go package containing Members for

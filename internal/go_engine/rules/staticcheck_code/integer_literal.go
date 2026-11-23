@@ -3,7 +3,8 @@ package staticcheck_code
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )

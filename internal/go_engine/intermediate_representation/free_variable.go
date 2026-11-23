@@ -1,6 +1,6 @@
 package intermediate_representation
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // A FreeVariable represents a free variable of the function to which it
 // belongs.

@@ -15,8 +15,8 @@ package separate_declaration_and_assignment
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

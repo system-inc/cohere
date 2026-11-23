@@ -2,11 +2,11 @@ package standing_presence
 
 import (
 	"go/ast"
-	"go/types"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/objectpath"
 

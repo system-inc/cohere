@@ -1,6 +1,6 @@
 package intermediate_representation
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // The TypeAssert instruction tests whether interface value X has type
 // AssertedType.

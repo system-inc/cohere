@@ -3,8 +3,8 @@ package consistency_no_any
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
 

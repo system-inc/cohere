@@ -4,12 +4,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

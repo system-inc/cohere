@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/go/types/typeutil"
 

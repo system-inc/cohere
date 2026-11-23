@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/ast"
-	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 

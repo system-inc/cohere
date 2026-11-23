@@ -2,12 +2,12 @@ package check
 
 import (
 	"fmt"
-	"go/types"
 	"reflect"
 	"slices"
 	"strings"
 	"sync"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/objectpath"
 	"honnef.co/go/tools/analysis/facts/deprecated"

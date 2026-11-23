@@ -2,9 +2,10 @@ package build_reads
 
 import (
 	"go/ast"
-	"go/types"
 	"reflect"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // wholeDeclarationTypeReads are own's type reads as collectTypeReads collected them before the walk recorded what each

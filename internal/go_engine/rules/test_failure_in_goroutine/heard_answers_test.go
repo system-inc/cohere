@@ -3,8 +3,9 @@ package test_failure_in_goroutine
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // heardAnswers is a test's hand on a run's answers (fact_resolver.Held): it hears each question the run would compute

@@ -1,10 +1,11 @@
 package build_dependence
 
 import (
-	"go/types"
 	"maps"
 	"slices"
 	"sort"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // resolvedGraph is the graph's records resolved into nodes: every object a unit declares has a node, and each node two

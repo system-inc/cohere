@@ -25,8 +25,8 @@ package string_int_conv
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

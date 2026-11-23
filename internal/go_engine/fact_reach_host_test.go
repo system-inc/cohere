@@ -5,13 +5,14 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"

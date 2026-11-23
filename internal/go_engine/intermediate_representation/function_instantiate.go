@@ -1,8 +1,9 @@
 package intermediate_representation
 
 import (
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // instance returns a Function that is the instantiation of generic

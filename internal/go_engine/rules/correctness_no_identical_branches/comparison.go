@@ -3,8 +3,9 @@ package correctness_no_identical_branches
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"reflect"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // comparison walks two branches in parallel and says whether they are the same code. It is used for one pair of

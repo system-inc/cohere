@@ -6,8 +6,9 @@ package intermediate_representation
 
 import (
 	"fmt"
-	"go/types"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A generic records information about a generic origin function,

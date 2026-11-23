@@ -12,12 +12,13 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"io"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"

@@ -13,7 +13,8 @@ package spinning_empty_loop
 import (
 	"go/ast"
 	"go/constant"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"

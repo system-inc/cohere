@@ -3,8 +3,9 @@ package consistency_no_any
 import (
 	"flag"
 	"go/ast"
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )

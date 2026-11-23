@@ -5,10 +5,11 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"math/big"
 	"slices"
 	"strconv"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // bodyRenderer renders one package's bodies (RenderBodies), own's, on one goroutine, each text kept once by

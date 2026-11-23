@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
-	"go/types"
 	"sort"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

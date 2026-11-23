@@ -10,7 +10,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"regexp"
 	"sort"
@@ -20,6 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

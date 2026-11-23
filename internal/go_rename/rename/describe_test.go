@@ -5,8 +5,9 @@ import (
 	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A declaration of another package is described the same whichever way a load read that package: from its source,

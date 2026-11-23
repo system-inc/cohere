@@ -4,9 +4,10 @@ import (
 	"cmp"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"math"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // bodyRecorder writes a bodyRecord for each function declaration's body the walk reads (#xeafx79). A graph holds one

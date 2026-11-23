@@ -13,8 +13,7 @@
 package non_pointer_pool_value
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 	"honnef.co/go/tools/knowledge"
 

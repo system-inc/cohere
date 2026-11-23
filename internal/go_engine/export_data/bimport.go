@@ -28,8 +28,9 @@ package export_data
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 func errorf(format string, args ...any) {

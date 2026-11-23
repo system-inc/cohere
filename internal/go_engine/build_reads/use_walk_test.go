@@ -5,8 +5,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // The unplaced fixture's paths: dependency, whose two structs a value of the user's own reaches through a pointer and

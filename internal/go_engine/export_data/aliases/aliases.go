@@ -22,7 +22,8 @@ package aliases
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // New creates a new TypeName in Package pkg that

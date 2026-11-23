@@ -27,11 +27,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"math"
 	"slices"
 	"unsafe"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/lint"
 )

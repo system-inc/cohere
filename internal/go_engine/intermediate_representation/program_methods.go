@@ -7,7 +7,7 @@ package intermediate_representation
 // This file defines utilities for population of method sets.
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // objectMethod returns the Function for a given method symbol.

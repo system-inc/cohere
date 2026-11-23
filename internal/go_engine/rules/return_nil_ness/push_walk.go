@@ -2,8 +2,8 @@ package return_nil_ness
 
 import (
 	"fmt"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"

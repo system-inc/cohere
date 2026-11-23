@@ -1,6 +1,6 @@
 package check
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // importerFunction is a function as a types.Importer, for a test that type-checks packages of its own in memory.
 type importerFunction func(path string) (*types.Package, error)

@@ -14,8 +14,9 @@ package shell_command_as_program
 
 import (
 	"go/ast"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"

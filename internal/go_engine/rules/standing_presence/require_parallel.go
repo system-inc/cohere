@@ -2,8 +2,9 @@ package standing_presence
 
 import (
 	"go/ast"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // requireParallelEdges are the edges testing-require-parallel reads, in the order of syntax's files: each

@@ -9,11 +9,11 @@ package concurrency_no_kill_by_name
 import (
 	"go/ast"
 	"go/constant"
-	"go/types"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

@@ -3,13 +3,13 @@ package main
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path"
 	"slices"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/typeutil"
 )
 

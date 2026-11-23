@@ -7,8 +7,7 @@ package intermediate_representation
 // This file defines questions asked of types. Some of these belong in go/types.
 
 import (
-	"go/types"
-
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/exp/typeparams"
 
 	"github.com/system-inc/cohere/internal/go_engine/core_type"

@@ -4,11 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"go/token"
-	"go/types"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

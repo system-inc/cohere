@@ -1,6 +1,6 @@
 package intermediate_representation
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // A type for representing a canonized list of types.
 type typeList []types.Type

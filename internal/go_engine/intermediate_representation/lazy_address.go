@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A lazyAddress is an lvalue whose address is the result of an instruction.

@@ -9,12 +9,13 @@ package main
 
 import (
 	"fmt"
-	"go/types"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"

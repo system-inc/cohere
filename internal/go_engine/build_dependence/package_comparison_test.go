@@ -3,9 +3,9 @@ package build_dependence
 import (
 	"fmt"
 	"go/token"
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/packages"
 

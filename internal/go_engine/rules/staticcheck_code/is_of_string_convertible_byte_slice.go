@@ -2,8 +2,9 @@ package staticcheck_code
 
 import (
 	"go/ast"
-	"go/types"
 	"go/version"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"

@@ -9,10 +9,11 @@ import (
 	"go/constant"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"math/big"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )

@@ -3,13 +3,13 @@ package return_nil_ness_test
 import (
 	"cmp"
 	"fmt"
-	"go/types"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"sync/atomic"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"

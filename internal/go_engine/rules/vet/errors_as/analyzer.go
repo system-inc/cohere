@@ -14,8 +14,8 @@ package errors_as
 
 import (
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

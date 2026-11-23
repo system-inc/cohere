@@ -5,10 +5,11 @@ import (
 	"cmp"
 	"fmt"
 	"go/token"
-	"go/types"
 	"iter"
 	"slices"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Answered is one answer a run holds: the kind, whose hooks a reader may call (Kind.OrderBound), the object the answer

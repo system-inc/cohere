@@ -25,13 +25,13 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"go/types"
 	"log"
 	"maps"
 	"os"
 	"sort"
 	"strconv"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/astutil"
 

@@ -29,10 +29,10 @@ package fact_resolver
 
 import (
 	"fmt"
-	"go/types"
 	"sync"
 	"sync/atomic"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/types/objectpath"

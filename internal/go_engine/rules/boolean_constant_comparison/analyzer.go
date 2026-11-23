@@ -17,9 +17,9 @@ package boolean_constant_comparison
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/go/types/typeutil"
 

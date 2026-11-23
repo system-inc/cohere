@@ -6,7 +6,6 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"maps"
 	"os"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"
 

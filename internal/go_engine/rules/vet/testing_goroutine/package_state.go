@@ -2,7 +2,8 @@ package testing_goroutine
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // packageState is what the port keeps over one package: what it reads once, on the first node heard, since the

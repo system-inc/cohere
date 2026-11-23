@@ -3,7 +3,6 @@ package check
 import (
 	"fmt"
 	"go/constant"
-	"go/types"
 	"os"
 	"runtime"
 	"slices"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	release "github.com/system-inc/cohere/internal/release/packaging"

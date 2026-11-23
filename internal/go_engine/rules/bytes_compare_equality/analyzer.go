@@ -22,9 +22,9 @@ import (
 	"go/ast"
 	"go/format"
 	"go/token"
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/edit"
 

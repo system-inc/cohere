@@ -1,7 +1,7 @@
 package intermediate_representation
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // unaliasDeeply is given with every alias in it replaced by the type it stands for, however deep: through

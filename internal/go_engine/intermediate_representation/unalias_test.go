@@ -3,8 +3,9 @@ package intermediate_representation_test
 // An instance's name is its type arguments unaliased (unalias.go, #6pt3bt8).
 
 import (
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )

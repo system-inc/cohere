@@ -5,7 +5,8 @@ package verbs
 
 import (
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Kinds is the set of kinds of operand a printf verb accepts, a bitmask.

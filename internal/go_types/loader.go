@@ -6,11 +6,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 type loader struct {

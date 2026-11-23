@@ -22,12 +22,12 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

@@ -3,7 +3,8 @@ package build_reads
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // BodyRenderings are how one package's check typed each of its bodies, written out, for the body differential of

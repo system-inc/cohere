@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/constant"
-	"go/types"
 	"strconv"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/exp/typeparams"
 )
 

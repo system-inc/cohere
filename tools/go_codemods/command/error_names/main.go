@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"os"
 	"regexp"
 	"sort"
@@ -33,6 +32,7 @@ import (
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/policy"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/typeutil"
 )

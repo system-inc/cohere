@@ -2,7 +2,8 @@ package build_dependence
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // membersVisitor is collectMembers' walk of a unit's header: the unit, the owners of the members it declares, and

@@ -3,13 +3,13 @@ package invalid_struct_tag
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"io"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

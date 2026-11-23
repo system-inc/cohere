@@ -6,12 +6,12 @@ import (
 	"go/constant"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"maps"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"

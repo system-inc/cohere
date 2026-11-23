@@ -1,7 +1,6 @@
 package load
 
 import (
-	"go/types"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -9,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"

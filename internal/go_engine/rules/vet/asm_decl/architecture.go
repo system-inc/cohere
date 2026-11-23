@@ -1,6 +1,6 @@
 package asm_decl
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // architecture is how one `GOARCH` lays out a function's arguments and names the registers the judgment reads.
 // x/tools' asmdecl asmArch.

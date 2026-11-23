@@ -3,8 +3,8 @@ package unused_code
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/lint"
 	"honnef.co/go/tools/go/types/typeutil"
 )

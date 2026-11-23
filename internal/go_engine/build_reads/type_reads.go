@@ -2,9 +2,10 @@ package build_reads
 
 import (
 	"go/ast"
-	"go/types"
 	"slices"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // typeReads are the type reads of one package as its walk collects them, on the walk's own goroutine, and publishes

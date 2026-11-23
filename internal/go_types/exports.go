@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"go/importer"
 	"go/token"
-	"go/types"
 	"io"
 	"os"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Exports is a found product: the export data file of each package it holds.

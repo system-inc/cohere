@@ -11,7 +11,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // NewProgram returns a new IR Program. go/ir takes a BuilderMode here; ours has none. Its functions

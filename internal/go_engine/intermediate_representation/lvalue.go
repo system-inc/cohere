@@ -9,7 +9,8 @@ package intermediate_representation
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // An lvalue represents an assignable location that may appear on the

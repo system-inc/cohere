@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // An address is an lvalue represented by a true pointer.

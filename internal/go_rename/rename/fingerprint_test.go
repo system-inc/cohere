@@ -5,10 +5,11 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"reflect"
 	"slices"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // cgo's translation of a source file, which names it, in the directory %s, in a //line directive at its package

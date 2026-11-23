@@ -2,7 +2,8 @@ package signal_channel_analyzer
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // declaredValues maps each variable declared with a value of its own, by `:=` or by `var`, to that value, across the

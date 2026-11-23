@@ -1,8 +1,9 @@
 package standing_facts_test
 
 import (
-	"go/types"
 	"maps"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_reach"
 	"github.com/system-inc/cohere/internal/go_engine/rules/standing_presence"

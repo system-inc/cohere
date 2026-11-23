@@ -2,7 +2,8 @@ package check
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // methodSetNameKey is a method's or field's name as a method set tells names apart, go/types' Id (object.go:76 at

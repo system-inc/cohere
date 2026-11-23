@@ -3,7 +3,6 @@ package check
 import (
 	"errors"
 	"fmt"
-	"go/types"
 	"maps"
 	"slices"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"

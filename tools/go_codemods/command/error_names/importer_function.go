@@ -1,6 +1,6 @@
 package main
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // importerFunction adapts a function to types.Importer.
 type importerFunction func(path string) (*types.Package, error)

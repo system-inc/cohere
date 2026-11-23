@@ -1,6 +1,6 @@
 package intermediate_representation
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // The Allocation instruction reserves space for a variable of the given type,
 // zero-initializes it, and yields its address.

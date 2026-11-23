@@ -250,7 +250,6 @@ import (
 	"fmt"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"io"
 	"math/big"
 	"reflect"
@@ -259,6 +258,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 )
 

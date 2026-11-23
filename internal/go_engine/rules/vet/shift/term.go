@@ -1,6 +1,6 @@
 package shift
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // term is one elementary type set: nil is the empty set, a term with no type is every type, a term without a tilde
 // is its type alone, and one with a tilde is every type whose underlying type is its type. x/tools' typeparams.term.

@@ -2,13 +2,13 @@ package check
 
 import (
 	"go/ast"
-	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/structtag"
 

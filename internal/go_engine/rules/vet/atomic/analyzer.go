@@ -14,10 +14,10 @@ import (
 	"go/ast"
 	"go/printer"
 	"go/token"
-	"go/types"
 	"slices"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

@@ -1,7 +1,7 @@
 package build_dependence
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // IdentifiedObjects answers a build's bits of the live objects of packages the graph holds by records read back from

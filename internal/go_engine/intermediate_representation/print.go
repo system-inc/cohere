@@ -10,7 +10,8 @@ package intermediate_representation
 
 import (
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 func relativeType(resolvedType types.Type, from *types.Package) string {

@@ -2,12 +2,12 @@ package discarded_pure_call
 
 import (
 	"bytes"
-	"go/types"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"

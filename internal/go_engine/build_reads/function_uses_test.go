@@ -5,11 +5,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"maps"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // fixtureFile is one file of a fixture's package of path.

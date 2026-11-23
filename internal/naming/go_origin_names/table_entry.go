@@ -1,8 +1,9 @@
 package go_origin_names
 
 import (
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // tableEntry names what one call produces, the error of a standard library call or the context a call returns.

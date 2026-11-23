@@ -2,11 +2,11 @@ package intermediate_representation_test
 
 import (
 	"fmt"
-	"go/types"
 	"math/big"
 	"reflect"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"

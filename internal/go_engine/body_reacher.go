@@ -3,11 +3,11 @@ package go_engine
 import (
 	"cmp"
 	"go/token"
-	"go/types"
 	"maps"
 	"slices"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_dependence"

@@ -16,10 +16,10 @@ package correctness_no_caller_data_mutation
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 	"unicode"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
 

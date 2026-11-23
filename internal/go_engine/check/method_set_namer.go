@@ -1,6 +1,6 @@
 package check
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // methodSetNamer gives the method names of a type's method set, exactly the names types.NewMethodSet(set).At(index).
 // Obj().Name() gives, without building the set: no types.Selection, no index path, no sorted list. indexPackage reads

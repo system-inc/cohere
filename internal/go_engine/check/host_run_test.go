@@ -5,7 +5,6 @@ import (
 	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -14,6 +13,7 @@ import (
 	"testing"
 	"weak"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/export_data"

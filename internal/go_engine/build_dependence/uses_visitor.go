@@ -2,7 +2,8 @@ package build_dependence
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // usesVisitor is addUses' walk of one root: the object whose bit depends on what the root uses, which bit, and whether

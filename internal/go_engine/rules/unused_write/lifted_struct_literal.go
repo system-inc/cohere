@@ -3,9 +3,9 @@ package unused_write
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"maps"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/cfg"
 
 	"github.com/system-inc/cohere/internal/go_engine/core_type"

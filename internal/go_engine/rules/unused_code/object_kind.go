@@ -1,6 +1,6 @@
 package unused_code
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // objectKind is which kind of object a finding names, a byte where a body's record holds one a local (#xeafx79).
 type objectKind uint8

@@ -1,9 +1,9 @@
 package printf
 
 import (
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

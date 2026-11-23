@@ -3,11 +3,11 @@ package check
 import (
 	"crypto/sha256"
 	"errors"
-	"go/types"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 

@@ -3,8 +3,9 @@ package build_dependence
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // judgment is one build's judgment on a resolved graph: the build's difference, the units seeded so far, the seed

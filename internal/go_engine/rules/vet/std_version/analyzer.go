@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
-	"go/types"
 	"go/version"
 	"slices"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

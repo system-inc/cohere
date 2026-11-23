@@ -1,9 +1,9 @@
 package check
 
 import (
-	"go/types"
 	"sync"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

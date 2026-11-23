@@ -2,9 +2,9 @@ package correctness_require_handled_error
 
 import (
 	"go/ast"
-	"go/types"
 	"go/version"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

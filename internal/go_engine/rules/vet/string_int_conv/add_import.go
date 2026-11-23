@@ -3,11 +3,11 @@ package string_int_conv
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

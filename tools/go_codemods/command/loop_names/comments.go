@@ -2,9 +2,10 @@ package main
 
 import (
 	"go/ast"
-	"go/types"
 	"strings"
 	"unicode"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 )

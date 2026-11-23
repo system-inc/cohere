@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
-	"go/types"
 	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"go/version"
 	"sync"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 )
 

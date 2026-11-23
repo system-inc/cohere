@@ -4,7 +4,7 @@ package main
 // are its package's own, kept to its letter (internal/goengine/rules/consistency_no_abbreviated_identifier), so
 // the -global pass proposes exactly the names the rule flags.
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // isOurs is whether a declared object's name is this package's to choose: not an import's name, not an embedded
 // field, which is named for its type, and not a method another package fixes.

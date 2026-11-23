@@ -5,8 +5,9 @@ import (
 	"go/ast"
 	"go/scanner"
 	"go/token"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // Difference is what one extra build changes against the host, as its file sets say: the graph's judgment of the

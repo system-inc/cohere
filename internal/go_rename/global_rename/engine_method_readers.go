@@ -3,7 +3,8 @@ package global_rename
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // methodReaderRefusal is why the encoding guard keeps a method's name, or "": a method is read by name at run time

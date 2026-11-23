@@ -3,9 +3,10 @@ package guard
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"sort"
 	"strconv"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // syntaxTreeWriteScan reads packages for writes into the syntax tree, and keeps what it found.

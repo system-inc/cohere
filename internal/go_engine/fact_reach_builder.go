@@ -3,9 +3,10 @@ package go_engine
 import (
 	"cmp"
 	"go/token"
-	"go/types"
 	"maps"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 	"github.com/system-inc/cohere/internal/go_engine/check"

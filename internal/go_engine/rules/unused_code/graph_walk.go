@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/lint"
 	"honnef.co/go/tools/go/ast/astutil"
 	"honnef.co/go/tools/go/types/typeutil"

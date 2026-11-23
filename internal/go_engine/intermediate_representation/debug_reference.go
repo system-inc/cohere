@@ -7,7 +7,8 @@ package intermediate_representation
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A debugReference maps a source-level expression, Expression, to the IR value X that is the value of that

@@ -3,7 +3,7 @@ package intermediate_representation
 // This file creates the members of a package created from its types alone, each on its first lookup (#npb86tz).
 
 import (
-	"go/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // memberOf is the member for object, a package-level constant, variable or function of irPackage or a method of

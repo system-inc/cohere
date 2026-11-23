@@ -2,9 +2,10 @@ package return_nil_ness
 
 import (
 	"cmp"
-	"go/types"
 	"maps"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/call_groups"
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"

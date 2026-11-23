@@ -1,8 +1,9 @@
 package check
 
 import (
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // fieldsHolderPath is the path of the package each field fixture's Box is declared in, whose unexported field inner

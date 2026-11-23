@@ -11,8 +11,8 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/exp/typeparams"
 )
 

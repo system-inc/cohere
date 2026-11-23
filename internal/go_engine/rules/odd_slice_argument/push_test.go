@@ -1,11 +1,11 @@
 package odd_slice_argument
 
 import (
-	"go/types"
 	"reflect"
 	"slices"
 	"sync/atomic"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/generated"
 

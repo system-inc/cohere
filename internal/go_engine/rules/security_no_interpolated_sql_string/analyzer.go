@@ -53,10 +53,10 @@ package security_no_interpolated_sql_string
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

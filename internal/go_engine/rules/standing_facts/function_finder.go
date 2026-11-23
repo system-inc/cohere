@@ -2,8 +2,8 @@ package standing_facts
 
 import (
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/objectpath"
 

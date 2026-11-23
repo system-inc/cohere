@@ -3,7 +3,8 @@ package shift
 import (
 	"go/ast"
 	"go/constant"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // markDead puts into dead every node of the branches statement, an if or a switch, can never take, by a constant

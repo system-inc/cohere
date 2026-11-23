@@ -8,8 +8,9 @@ package intermediate_representation
 
 import (
 	"go/ast"
-	"go/types"
 	"go/version"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // fileGoVersion is the Go version the type checker recorded for file, or the empty string, an unknown

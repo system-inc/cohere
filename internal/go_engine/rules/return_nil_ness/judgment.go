@@ -2,10 +2,10 @@ package return_nil_ness
 
 import (
 	"fmt"
-	"go/types"
 	"slices"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/dfa"
 	"honnef.co/go/tools/go/types/typeutil"
 

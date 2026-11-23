@@ -1,6 +1,6 @@
 package intermediate_representation
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // Terminates reports whether function is supposed to return: whether it has at least one theoretic path that
 // returns from it. An explicit panic does not count as returning, nor does leaving a range over time.Tick's

@@ -3,12 +3,13 @@ package check
 import (
 	"cmp"
 	"fmt"
-	"go/types"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )

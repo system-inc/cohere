@@ -3,12 +3,13 @@ package global_rename
 import (
 	"bufio"
 	"bytes"
-	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/go_rename/rename"

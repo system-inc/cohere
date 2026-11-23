@@ -1,6 +1,6 @@
 package type_predicates
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // BinaryEncodable is whether encoding/binary.Write can encode a value of judged: a number of fixed size, a bool when
 // boolEncodable says the standard library encodes one, as Go 1.8's does, and an array or a struct of encodable values,

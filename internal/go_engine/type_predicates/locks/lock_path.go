@@ -2,7 +2,8 @@ package locks
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // lockerType is sync.Locker's method set, `interface{ Lock(); Unlock() }`, built here rather than looked up, since

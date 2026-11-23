@@ -1,8 +1,9 @@
 package build_reads
 
 import (
-	"go/types"
 	"iter"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // ClosurePackages are roots and every package they reach through their imports, each once, in the order a walk

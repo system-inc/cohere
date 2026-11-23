@@ -4,10 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/export_data"

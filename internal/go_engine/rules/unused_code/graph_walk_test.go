@@ -4,8 +4,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // definedSource is a package whose function declares a function literal's parameter, which go/types records in Defs

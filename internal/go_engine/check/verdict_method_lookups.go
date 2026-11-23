@@ -2,8 +2,9 @@ package check
 
 import (
 	"bytes"
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"
 )

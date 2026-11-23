@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path/filepath"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/rule"

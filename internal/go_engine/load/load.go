@@ -20,13 +20,13 @@ package load
 import (
 	"fmt"
 	"go/build"
-	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"

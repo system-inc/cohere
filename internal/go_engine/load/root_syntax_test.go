@@ -1,13 +1,13 @@
 package load
 
 import (
-	"go/types"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

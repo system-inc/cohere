@@ -4,11 +4,11 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

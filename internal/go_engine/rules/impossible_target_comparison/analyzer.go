@@ -27,8 +27,8 @@ import (
 	"go/build/constraint"
 	"go/constant"
 	"go/token"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

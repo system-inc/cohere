@@ -8,7 +8,8 @@ package intermediate_representation
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // instance returns whether an expression is a simple or qualified identifier

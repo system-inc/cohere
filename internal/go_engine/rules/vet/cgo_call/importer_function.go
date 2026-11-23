@@ -1,6 +1,6 @@
 package cgo_call
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // importerFunction is a types.Importer that is a function. x/tools' importerFunc in cgocall.
 type importerFunction func(path string) (*types.Package, error)

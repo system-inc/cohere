@@ -9,8 +9,9 @@ package intermediate_representation
 
 import (
 	"fmt"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // zeroString returns the string representation of the zero value for any type `resolvedType`.

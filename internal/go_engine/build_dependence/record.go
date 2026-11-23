@@ -2,9 +2,10 @@ package build_dependence
 
 import (
 	"cmp"
-	"go/types"
 	"slices"
 	"strconv"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A package's record names every object instead of holding it (#6a3kjvz), so a record read back from a store, with no

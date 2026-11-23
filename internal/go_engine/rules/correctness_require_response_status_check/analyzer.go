@@ -39,9 +39,9 @@ package correctness_require_response_status_check
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"slices"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

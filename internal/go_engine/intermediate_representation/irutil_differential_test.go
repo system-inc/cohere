@@ -9,10 +9,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/ir/irutil"
 

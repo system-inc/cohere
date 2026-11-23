@@ -6,13 +6,14 @@ import (
 	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none

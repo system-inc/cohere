@@ -2,8 +2,9 @@ package function_triviality
 
 import (
 	"fmt"
-	"go/types"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"

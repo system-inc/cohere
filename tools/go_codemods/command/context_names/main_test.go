@@ -6,12 +6,13 @@ import (
 	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/naming/go_origin_names"

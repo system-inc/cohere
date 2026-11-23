@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A Type is a Member of a Package representing a package-level named type.

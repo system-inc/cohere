@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"slices"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

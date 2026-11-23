@@ -5,9 +5,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // The packages the reads below write and read: user's API names dependency's Thing, in a variable's type, a

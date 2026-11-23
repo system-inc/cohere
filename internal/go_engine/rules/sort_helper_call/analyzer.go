@@ -24,10 +24,10 @@ package sort_helper_call
 
 import (
 	"go/ast"
-	"go/types"
 	"slices"
 	"strconv"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

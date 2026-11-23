@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A blank is a dummy variable whose name is "_".

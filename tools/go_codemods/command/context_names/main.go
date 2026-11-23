@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,6 +29,7 @@ import (
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/policy"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/mod/modfile"
 )
 

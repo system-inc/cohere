@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"go/ast"
-	"go/types"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"

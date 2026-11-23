@@ -2,7 +2,8 @@ package global_rename
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // nameOf gives the name an object has in the world being modeled: its own name, or its name once the

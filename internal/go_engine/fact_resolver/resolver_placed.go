@@ -5,11 +5,12 @@ import (
 	"cmp"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"iter"
 	"maps"
 	"slices"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // PlacedAnswer is one answer the run holds about a function a package declares, or one of its parameters, by place

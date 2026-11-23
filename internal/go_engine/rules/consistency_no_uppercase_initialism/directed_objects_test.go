@@ -5,9 +5,10 @@ import (
 	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )

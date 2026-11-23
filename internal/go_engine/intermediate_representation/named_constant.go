@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // A NamedConstant is a Member of a Package representing a package-level

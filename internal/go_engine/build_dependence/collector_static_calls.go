@@ -2,7 +2,8 @@ package build_dependence
 
 import (
 	"go/ast"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // staticCallees are the functions bodies call statically, each as its generic declares it and once: a plain or

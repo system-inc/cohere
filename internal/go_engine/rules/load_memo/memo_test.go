@@ -2,9 +2,10 @@ package load_memo
 
 import (
 	"go/token"
-	"go/types"
 	"runtime"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // countingMemo is a memo whose compute counts each package it is asked to read, and reads off the package its path.

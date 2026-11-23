@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"go/version"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

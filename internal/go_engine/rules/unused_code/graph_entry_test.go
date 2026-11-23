@@ -4,10 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"reflect"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/facts/generated"
 )
 

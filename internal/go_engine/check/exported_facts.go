@@ -1,9 +1,9 @@
 package check
 
 import (
-	"go/types"
 	"reflect"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"

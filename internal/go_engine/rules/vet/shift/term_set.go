@@ -3,7 +3,8 @@ package shift
 import (
 	"errors"
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // The type set of a type parameter, computed as x/tools' internal/typeparams computes it: normalize.go here, and

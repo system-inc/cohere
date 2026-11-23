@@ -2,10 +2,10 @@ package printf
 
 import (
 	"go/ast"
-	"go/types"
 	"regexp"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 )
 

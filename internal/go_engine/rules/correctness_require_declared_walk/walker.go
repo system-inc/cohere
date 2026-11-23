@@ -4,11 +4,11 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

@@ -14,10 +14,10 @@ package consistency_no_redundant_import_alias
 
 import (
 	"go/ast"
-	"go/types"
 	"path"
 	"strconv"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

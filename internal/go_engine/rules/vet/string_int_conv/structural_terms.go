@@ -3,7 +3,8 @@ package string_int_conv
 import (
 	"errors"
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // errorEmptyTypeSet is the error of a constraint no type satisfies. x/tools' typeparams ErrEmptyTypeSet.

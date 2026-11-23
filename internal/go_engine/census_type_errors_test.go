@@ -1,9 +1,9 @@
 package go_engine
 
 import (
-	"go/types"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 )
 

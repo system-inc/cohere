@@ -1,11 +1,11 @@
 package test_failure_in_goroutine
 
 import (
-	"go/types"
 	"maps"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"

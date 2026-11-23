@@ -21,11 +21,11 @@ package invalid_template
 
 import (
 	"go/ast"
-	"go/types"
 	htmltemplate "html/template"
 	"strings"
 	texttemplate "text/template"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/function_name"

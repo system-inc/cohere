@@ -6,11 +6,11 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"

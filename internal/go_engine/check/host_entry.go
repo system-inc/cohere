@@ -1,12 +1,12 @@
 package check
 
 import (
-	"go/types"
 	"maps"
 	"reflect"
 	"sync"
 	"sync/atomic"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"

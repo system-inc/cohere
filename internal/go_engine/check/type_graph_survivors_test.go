@@ -1,8 +1,9 @@
 package check
 
 import (
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )

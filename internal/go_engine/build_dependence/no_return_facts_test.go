@@ -3,9 +3,10 @@ package build_dependence
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"maps"
 	"slices"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // noReturnKey is a declared function as both builds can match it: its package ID, the file parsed and the offset of

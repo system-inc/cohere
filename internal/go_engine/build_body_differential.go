@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"cmp"
 	"fmt"
-	"go/types"
 	"maps"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 

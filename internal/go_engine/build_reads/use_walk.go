@@ -3,7 +3,8 @@ package build_reads
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // The kinds of use a package makes of other packages' types, read from where each expression and type expression of

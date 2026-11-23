@@ -3,7 +3,6 @@ package build_dependence
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"maps"
 	"path/filepath"
 	"reflect"
@@ -12,6 +11,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/needs"

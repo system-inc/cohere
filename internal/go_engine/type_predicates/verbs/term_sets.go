@@ -1,6 +1,6 @@
 package verbs
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // maximumTermCount is how many terms a union may normalize to before its type set is not computed, as x/tools'
 // typeparams bounds it.

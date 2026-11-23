@@ -2,8 +2,9 @@ package type_predicates
 
 import (
 	"fmt"
-	"go/types"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/type_predicates/locks"
 	"github.com/system-inc/cohere/internal/go_engine/type_predicates/verbs"

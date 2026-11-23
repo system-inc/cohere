@@ -2,9 +2,9 @@ package intermediate_representation
 
 import (
 	"fmt"
-	"go/types"
 	"sync"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/go/types/typeutil"
 )
 

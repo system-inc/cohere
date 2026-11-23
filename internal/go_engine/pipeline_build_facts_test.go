@@ -1,13 +1,13 @@
 package go_engine
 
 import (
-	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"
 

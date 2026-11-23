@@ -3,9 +3,9 @@ package check
 import (
 	"bytes"
 	"go/token"
-	"go/types"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/gcexportdata"
 )
 

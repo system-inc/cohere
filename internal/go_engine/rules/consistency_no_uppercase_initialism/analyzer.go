@@ -17,11 +17,11 @@ package consistency_no_uppercase_initialism
 
 import (
 	"go/ast"
-	"go/types"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

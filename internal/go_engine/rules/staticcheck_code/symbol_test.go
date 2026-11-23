@@ -3,10 +3,10 @@ package staticcheck_code_test
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 	"reflect"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/code"
 	"honnef.co/go/tools/analysis/facts/generated"

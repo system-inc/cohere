@@ -2,11 +2,11 @@ package standing_facts_test
 
 import (
 	"cmp"
-	"go/types"
 	"maps"
 	"slices"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/build_reads"

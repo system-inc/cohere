@@ -43,7 +43,6 @@ import (
 	"go/ast"
 	"go/format"
 	"go/token"
-	"go/types"
 	"log"
 	"maps"
 	"os"
@@ -57,6 +56,7 @@ import (
 	"testing"
 	"text/scanner"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	// cohere: checker and internal are the copies imported below.
 	"golang.org/x/tools/go/packages"

@@ -3,10 +3,11 @@ package guard
 import (
 	"go/ast"
 	"go/token"
-	"go/types"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // syntaxTreeWriteReader reads one package's files.

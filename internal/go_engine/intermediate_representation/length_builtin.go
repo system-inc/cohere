@@ -6,7 +6,7 @@ package intermediate_representation
 
 // This file defines the len builtin specialized to one operand type.
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 var lenResults = types.NewTuple(anonymousVariable(tInt))
 

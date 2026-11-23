@@ -1,6 +1,6 @@
 package fact_reach
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // BodyRecord is what one function body holds that a presence row reads and no use of stage 1's record says, as the
 // host reads it off its own syntax (standing_presence.ReadBodies): the functions of the package the body starts with

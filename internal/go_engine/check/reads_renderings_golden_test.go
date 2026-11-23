@@ -3,7 +3,6 @@ package check
 import (
 	"encoding/hex"
 	"flag"
-	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/deprecated"
 

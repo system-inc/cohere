@@ -1,6 +1,6 @@
 package type_predicates
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // RuntimeCgoPath is the import path whose presence among a package's imports says it uses cgo: the cgo tool's
 // translation adds the import, and so does the load for a package whose cgo files it type-checked with package "C"

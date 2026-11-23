@@ -1,11 +1,11 @@
 package typed_nil_interface_comparison_test
 
 import (
-	"go/types"
 	"slices"
 	"sync"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"

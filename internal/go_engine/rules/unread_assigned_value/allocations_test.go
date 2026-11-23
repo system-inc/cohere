@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"testing"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"

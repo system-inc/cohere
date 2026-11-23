@@ -2,7 +2,8 @@ package intermediate_representation
 
 import (
 	"fmt"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // register is a mix-in embedded by all IR values that are also

@@ -13,8 +13,8 @@ package redundant_slice_length
 
 import (
 	"go/ast"
-	"go/types"
 
+	"github.com/system-inc/go-types/types"
 	"honnef.co/go/tools/analysis/edit"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"

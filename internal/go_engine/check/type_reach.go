@@ -1,9 +1,10 @@
 package check
 
 import (
-	"go/types"
 	"math/bits"
 	"sync"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // typeReach is the packages each type name's closure reaches, a set of bits by package (packageBits), memoized for one

@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"reflect"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // storageMethods is how many objects TestGraphIsSizedOnceAndWordsNoObjectWhileBuilding builds a graph of, enough

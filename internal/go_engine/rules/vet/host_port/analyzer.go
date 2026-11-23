@@ -25,10 +25,10 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-	"go/types"
 	"slices"
 	"strconv"
 
+	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 

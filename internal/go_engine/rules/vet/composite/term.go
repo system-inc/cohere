@@ -1,6 +1,6 @@
 package composite
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // term is one elementary type set, as a term of a constraint's union spells it. x/tools' typeparams term, itself the
 // compiler's types2 typeterm.go:

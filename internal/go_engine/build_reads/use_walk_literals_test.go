@@ -5,10 +5,11 @@ import (
 	"go/importer"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // literalElements is how many elements the table literal of TestWalkingALiteralsElementsHoldsNoContextForEach holds:

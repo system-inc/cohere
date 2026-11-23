@@ -2,8 +2,9 @@ package build_dependence
 
 import (
 	"go/token"
-	"go/types"
 	"testing"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // IdentifiedObjects fails wide where it cannot name an object to one package (#w72zxtq): an object of a package

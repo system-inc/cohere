@@ -1,10 +1,11 @@
 package intermediate_representation
 
 import (
-	"go/types"
 	"slices"
 	"sync"
 	"sync/atomic"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // BuildCensus counts, while it is open, the programs each package's source functions are built in, so a test can

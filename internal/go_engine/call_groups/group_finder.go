@@ -3,7 +3,7 @@
 // over the callees its walks recorded, and the facts' reach over the calls a build's own syntax makes (#5vbs1np).
 package call_groups
 
-import "go/types"
+import "github.com/system-inc/go-types/types"
 
 // Of is every group of callees, each function to the functions it calls: each strongly connected component of two
 // functions or more, by Tarjan's algorithm, in no order. A function alone, though it calls itself, is no group: it is

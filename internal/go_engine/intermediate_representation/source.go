@@ -14,7 +14,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
+
+	"github.com/system-inc/go-types/types"
 )
 
 // EnclosingFunction returns the function that contains the syntax
