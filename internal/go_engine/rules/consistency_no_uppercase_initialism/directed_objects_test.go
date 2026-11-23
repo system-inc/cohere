@@ -22,7 +22,8 @@ func checkedContextOf(test *testing.T, source string) *rule.Context {
 		test.Fatalf("parsing the case: %v", parseError)
 	}
 	info := &types.Info{Defs: map[*ast.Ident]types.Object{}}
-	checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("case", fileSet, []*ast.File{file}, info)
+	checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("case", fileSet,
+		[]*ast.File{file}, info)
 	if checkError != nil {
 		test.Fatalf("checking the case: %v", checkError)
 	}

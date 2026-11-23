@@ -4,8 +4,9 @@
 // toolchain the fork is taken from.
 //
 // The fork's reader reads an object the first time it is looked up, and a universe of packages is read from one
-// goroutine at a time. A checker that looks an imported object up reads the universe from its own goroutine, outside any
-// lock its importer holds, so checks on many goroutines sharing one importer once panicked on a nil type, half read.
+// goroutine at a time. A checker that looks an imported object up reads the universe from its own goroutine, outside
+// any lock its importer holds, so checks on many goroutines sharing one importer once panicked on a nil type, half
+// read.
 // This importer reads each import whole before handing it back, as go/importer did, and leaves no lookup anything to
 // read.
 package export_importer

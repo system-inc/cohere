@@ -37,8 +37,8 @@ func TestWalkingALiteralsElementsHoldsNoContextForEach(test *testing.T) {
 	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{},
 		Defs: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{},
 		Instances: map[*ast.Ident]types.Instance{}}
-	checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("table", fileSet, []*ast.File{file},
-		info)
+	checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("table", fileSet,
+		[]*ast.File{file}, info)
 	if checkError != nil {
 		test.Fatal(checkError)
 	}
