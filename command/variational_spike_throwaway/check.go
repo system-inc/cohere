@@ -41,10 +41,12 @@ func goVersionOf(our *ourPackage) string {
 }
 
 // checkVariationally checks each of ordered once for every build in all, after importing what it imports that isn't
-// ours, so the imports are timed apart and no import runs inside a variational check, whose state is the fork's
-// package state. timed measures each package's imports and check, or only runs them. Each checked package is given to importer for the packages of ours that import it, and the imports
-// stay interleaved with the checks: a package not ours can import one of ours, and imported before that one is added
-// it would read ours' export data, a second identity for every type of it.
+// ours. The importer is lazy, so an import only lays out a package's names: each object is read and merged the first
+// time the check looks it up, inside the check's time and outside every unit (types.Outside), so the import row holds
+// less than all of the importing. timed measures each package's imports and check, or only runs them. Each checked
+// package is given to importer for the packages of ours that import it, and the imports stay interleaved with the
+// checks: a package not ours can import one of ours, and imported before that one is added it would read ours' export
+// data, a second identity for every type of it.
 func checkVariationally(
 	fileSet *token.FileSet,
 	ordered []*ourPackage,
