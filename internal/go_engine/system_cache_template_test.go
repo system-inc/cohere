@@ -3,11 +3,14 @@ package go_engine
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -148,13 +151,46 @@ func fillSystemCacheTemplate() (systemCacheTemplate, error) {
 func templateFilled(test *testing.T) systemCacheTemplate {
 	test.Helper()
 	if !slices.Equal(slices.Sorted(slices.Values(os.Environ())), testsEnvironment) {
-		test.Fatal("the system cache's template is filled under TestMain's environment alone, and this test changed it")
+		test.Fatal(templateRefusal)
 	}
 	template, templateError := filledSystemCacheTemplate()
 	if templateError != nil {
 		test.Fatalf("filling the system cache's template: %v", templateError)
 	}
 	return template
+}
+
+// templateRefusal is what templateFilled says as it refuses an environment other than TestMain's.
+const templateRefusal = "the system cache's template is filled under TestMain's environment alone, and this test " +
+	"changed it"
+
+// templateRefusalChildVariable marks a test binary TestTheTemplateRefusesAChangedEnvironment started on itself as the
+// child that changes the environment and asks for the template.
+const templateRefusalChildVariable = "COHERE_TEST_TEMPLATE_REFUSAL_CHILD"
+
+// A test that changed the environment and then asks for the template fails, refused, and never fills it under keys of
+// an environment other than TestMain's (templateFilled). A test that must fail would fail this one, so the asker runs
+// in a child, this test binary run on this test alone, as the timing margin's run is (TestMain): the child sets a
+// variable and asks, and must exit failing with the refusal.
+func TestTheTemplateRefusesAChangedEnvironment(test *testing.T) {
+	if os.Getenv(templateRefusalChildVariable) != "" {
+		// The child, not parallel, since test.Setenv refuses a parallel test.
+		test.Setenv(templateRefusalChildVariable, "changed")
+		templateFilled(test)
+		return
+	}
+	test.Parallel()
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		test.Fatalf("finding the test binary: %v", executableError)
+	}
+	command := exec.Command(executable, "-test.run=^TestTheTemplateRefusesAChangedEnvironment$", "-test.count=1")
+	command.Env = append(os.Environ(), templateRefusalChildVariable+"=1")
+	output, runError := command.CombinedOutput()
+	var exitError *exec.ExitError
+	if !errors.As(runError, &exitError) || !strings.Contains(string(output), templateRefusal) {
+		test.Errorf("want the child to fail with %q, got %v:\n%s", templateRefusal, runError, output)
+	}
 }
 
 // seededSystemCache is a new system cache root of the run's own whose store holds a hard link to every entry of the
