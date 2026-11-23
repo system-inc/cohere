@@ -380,6 +380,8 @@ func TestOtherBuildsHashOnlyTheFilesTheHostsDidNot(test *testing.T) {
 	if writeError := os.WriteFile(filepath.Join(reach, "reach.go"), []byte(reachFile), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
+	// The template's fill hashes files of its own, so it is filled before the count is read (templateFilled).
+	templateFilled(test)
 	before := cache.FilesHashed()
 	engine, _ := runOverWith(test, root, exitFindings)
 	hashed := cache.FilesHashed() - before

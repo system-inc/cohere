@@ -365,6 +365,8 @@ func TestAPlainRunReadsNoRecord(test *testing.T) {
 			len(host), len(standardLibrary))
 	}
 	readsOf := func(switches ...string) (int, int) {
+		// The template's fill reads keys of its own, so it is filled before the observer is set (templateFilled).
+		templateFilled(test)
 		var counting sync.Mutex
 		hostReads, standardLibraryReads := 0, 0
 		stop := cache.ObserveReads(func(key cache.Key) {

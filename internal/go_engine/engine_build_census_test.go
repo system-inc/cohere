@@ -32,6 +32,8 @@ func TestEachPackageIsBuiltOnceOverATree(test *testing.T) {
 		}
 		directory = root
 	}
+	// The template's fill builds packages of its own, so it is filled before the census opens (templateFilled).
+	templateFilled(test)
 	census := intermediate_representation.OpenBuildCensus()
 	ran := runCachedEngine(test, directory)
 	census.Close()
