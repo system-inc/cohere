@@ -34,9 +34,9 @@ import (
 //     landing in the box's words.
 //   - What was gated is what lands, plus this file alone. It is written after the gate, so nothing that builds or tests
 //     may read it, which internal/guard holds (TestNothingThatBuildsOrTestsReadsPerformanceJsonc).
-//   - The comparison is honest: a number is "moved" only when its new min..max range doesn't overlap the old one, and
-//     "level" otherwise; another machine, another build or another shape of measurement is a line of its own, never a
-//     comparison.
+//   - The comparison is honest: a number is "moved" only when its new minimum to maximum range doesn't overlap the
+//     old one, and "level" otherwise; another machine, another build or another shape of measurement is a line of its
+//     own, never a comparison.
 //   - The file records that the box was held quiet, and her load before and after.
 //   - A test-only landing measures too, and Go is the only engine measured.
 //
@@ -97,13 +97,15 @@ const (
 // file's tools say it whole.
 const performanceBuild = "CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'"
 
-// performanceSchema is the file's schema, which Adamic's Performance.jsonc matches (#hed1mkb).
-const performanceSchema = 1
+// performanceSchema is the file's schema, which Adamic's Performance.jsonc matches (#hed1mkb). Schema 2 spells each
+// key whole, minimum, maximum and system where schema 1 wrote min, max and sys (Kirk, Nov 23, #cc5ftw6), so a file of
+// schema 1 is another shape of measurement, its note's own line, never compared.
+const performanceSchema = 2
 
 // performanceHeader opens the file, above the body native.FormatHouse prints.
 const performanceHeader = "// Performance.jsonc: main's performance at this commit, rewritten by cohere-dev land " +
 	"in every landing commit (#6wnsnq2).\n// Git history is the series. Never edit it by hand. Times are integer " +
-	"milliseconds, the median of the rounds with their min and max.\n"
+	"milliseconds, the median of the rounds with their minimum and maximum.\n"
 
 // performanceScript is what Shackler runs, from the land that runs it rather than from the tree it measures, so no
 // branch can change how it is measured. Its arguments are the commit, deeafbf4's commit and the counts of fills, cold
@@ -266,8 +268,8 @@ say "load after $(loadNow)"
 // performanceSpread is one time of a row, in integer milliseconds: the median of its rounds, and their least and most.
 type performanceSpread struct {
 	Median  int64 `json:"median"`
-	Minimum int64 `json:"min"`
-	Maximum int64 `json:"max"`
+	Minimum int64 `json:"minimum"`
+	Maximum int64 `json:"maximum"`
 }
 
 // performanceChecked is what a row's rounds checked, each the same: the files the engine walked and the findings it
@@ -282,7 +284,7 @@ type performanceChecked struct {
 type performanceRow struct {
 	Wall    performanceSpread   `json:"wall"`
 	User    performanceSpread   `json:"user"`
-	System  performanceSpread   `json:"sys"`
+	System  performanceSpread   `json:"system"`
 	Checked *performanceChecked `json:"checked,omitempty"`
 }
 
@@ -687,7 +689,7 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 	return measurement, ""
 }
 
-// performanceRunOf reads a run's line after its kind, `<mode> <tree> <round> <wall> <user> <sys> <exit> <findings>
+// performanceRunOf reads a run's line after its kind, `<mode> <tree> <round> <wall> <user> <system> <exit> <findings>
 // <filesWalked> <summaryFindings>`, or says why it doesn't read.
 func performanceRunOf(rest string) (performanceRun, string) {
 	fields := strings.Fields(rest)
