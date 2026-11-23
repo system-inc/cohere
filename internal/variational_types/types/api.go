@@ -329,7 +329,9 @@ type Info struct {
 }
 
 func (info *Info) recordTypes() bool {
-	return info.Types != nil
+	// cohere's variational spike: a variational check records its answers in Variation.Types, with or without a
+	// Types map here.
+	return info.Types != nil || variational.active
 }
 
 // TypeOf returns the type of expression e, or nil if not found.

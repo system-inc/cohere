@@ -800,3 +800,25 @@ func freshBodyScope(sig *Signature) {
 	}
 	scope.children = scope.children[:scope.bodyChildren]
 }
+
+// rewriteCommaOk is recordCommaOkTypes for a variational check without a Types map: x's last kept answer, and each
+// parenthesized expression inside it, becomes the comma-ok tuple.
+func (check *Checker) rewriteCommaOk(x ast.Expr, t0 Type, t1 Type) {
+	for {
+		for index := len(check.vrecords) - 1; index >= 0; index-- {
+			if check.vrecords[index].expr == x {
+				pos := x.Pos()
+				check.vrecords[index].tv.Type = NewTuple(
+					newVar(LocalVar, pos, check.pkg, "", t0),
+					newVar(LocalVar, pos, check.pkg, "", t1),
+				)
+				break
+			}
+		}
+		parenthesized, isParenthesized := x.(*ast.ParenExpr)
+		if !isParenthesized {
+			return
+		}
+		x = parenthesized.X
+	}
+}

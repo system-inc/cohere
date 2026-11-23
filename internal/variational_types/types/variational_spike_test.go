@@ -177,14 +177,21 @@ func projectAndCompare(t *testing.T, fixtures []fixtureFile) map[string]bool {
 		if _, checkError := plainConfiguration.Check("fork", fileSet, built, plain); checkError != nil {
 			t.Fatalf("plain check of build %03b: %v", build, checkError)
 		}
-		matched := 0
-		for expression, want := range plain.Types {
-			got := ""
-			for _, candidate := range variation.Types[expression] {
+		// Keyed by position and text, never by node: a checker makes some nodes afresh each time it checks
+		// them (the 1 of an IncDec statement).
+		projected := map[string]string{}
+		for expression, answers := range variation.Types {
+			for _, candidate := range answers {
 				if candidate.Builds&build != 0 {
-					got = answer(candidate.TypeAndValue)
+					projected[positionKey(fileSet, expression)] = answer(candidate.TypeAndValue)
 				}
 			}
+		}
+		plainKeys := map[string]bool{}
+		matched := 0
+		for expression, want := range plain.Types {
+			plainKeys[positionKey(fileSet, expression)] = true
+			got := projected[positionKey(fileSet, expression)]
 			if got != answer(want) {
 				t.Errorf("build %03b, %s %s: projected %q, plain %q", build, fileSet.Position(expression.Pos()),
 					types.ExprString(expression), got, answer(want))
@@ -197,7 +204,7 @@ func projectAndCompare(t *testing.T, fixtures []fixtureFile) map[string]bool {
 		}
 		for expression, answers := range variation.Types {
 			for _, candidate := range answers {
-				if _, planned := plain.Types[expression]; candidate.Builds&build != 0 && !planned {
+				if planned := plainKeys[positionKey(fileSet, expression)]; candidate.Builds&build != 0 && !planned {
 					t.Errorf("build %03b, %s %s: projected %q, and the plain check has no answer", build,
 						fileSet.Position(expression.Pos()), types.ExprString(expression), answer(candidate.TypeAndValue))
 				}
@@ -212,6 +219,12 @@ func projectAndCompare(t *testing.T, fixtures []fixtureFile) map[string]bool {
 	t.Logf("functions that forked: %s; units %d, restarts %d", strings.Join(forkedNames, ", "), variation.Units,
 		variation.Restarts)
 	return forked
+}
+
+// positionKey names expression by where it is and what it says.
+func positionKey(fileSet *token.FileSet, expression ast.Expr) string {
+	return fileSet.Position(expression.Pos()).String() + "-" + fileSet.Position(expression.End()).String() + " " +
+		types.ExprString(expression)
 }
 
 // enclosingFunction is the name of the function declaration holding expression, or the empty string.

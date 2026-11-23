@@ -105,6 +105,9 @@ func (check *Checker) recordCommaOkTypes(x ast.Expr, a []*operand) {
 	}
 	t0, t1 := a[0].typ(), a[1].typ()
 	assert(isTyped(t0) && isTyped(t1) && (allBoolean(t1) || t1 == universeError))
+	if variational.active && check.Types == nil {
+		check.rewriteCommaOk(x, t0, t1)
+	}
 	if m := check.Types; m != nil {
 		for {
 			tv := m[x]
