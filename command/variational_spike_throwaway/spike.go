@@ -235,9 +235,10 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	}
 
 	sources := &sourceCache{contents: map[string][]byte{}}
+	places := newDeclarationPlaces(fileSet, ours)
 	for index, each := range listed {
 		say(progress, "variational-spike: proving %s against its oracle\n", report.Builds[index].Target)
-		oracle, oracleError := loadOracle(root, asked.patterns, each.configuration, side.workFile, ours)
+		oracle, oracleError := loadOracle(root, asked.patterns, each.configuration, side.workFile, places)
 		if oracleError != nil {
 			return nil, oracleError
 		}
@@ -246,7 +247,17 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 			planted := plantMismatch(projected)
 			report.Planted = &differenceAtKey{Build: index, File: planted.file, Start: planted.start, End: planted.end}
 		}
-		report.Proof = append(report.Proof, proveBuild(report.Builds[index].Target, projected, oracle, sources))
+		proof := proveBuild(report.Builds[index].Target, projected, oracle, sources)
+		// Each build's Info maps are the host's with its own overlay laid over them, or with the next build's when
+		// --plant-wrong-overlay asks for a proof that must show red.
+		overlayBuild := index
+		if asked.plantOverlay {
+			overlayBuild = (index + 1) % len(listed)
+		}
+		proof.Maps = proveInfo(projectInfo(fileSet, checked, index, overlayBuild, places), oracle.info,
+			overlaySizes(checked, index), sources)
+		proof.Green = proof.Green && mapsGreen(proof.Maps)
+		report.Proof = append(report.Proof, proof)
 		// The build's whole graph is garbage now, and the next build's load needs the room.
 		oracle = nil
 		runtime.GC()

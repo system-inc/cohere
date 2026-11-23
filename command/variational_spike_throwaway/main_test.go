@@ -53,6 +53,7 @@ func TestFixtureProjectsExactlyToEveryBuild(test *testing.T) {
 			test.Errorf("%s: %d of %d matched", proof.Target, proof.Matched, proof.Compared)
 		}
 	}
+	requireEveryMapGreen(test, report, mapExpectations{overlaid: true})
 	if report.Totals.ForkedExpressions == 0 || report.Totals.Restarts == 0 {
 		test.Errorf("the fixture forks, yet %d expressions have more than one answer and %d units restarted",
 			report.Totals.ForkedExpressions, report.Totals.Restarts)
@@ -227,6 +228,7 @@ func TestParallelChecksProveOneBuild(test *testing.T) {
 	if len(report.Proof) != 1 || report.Proof[0].Compared == 0 {
 		test.Errorf("the proof compared nothing: %+v", report.Proof)
 	}
+	requireEveryMapGreen(test, report, mapExpectations{instances: true})
 	// The parallel schedule measures CPU across itself, never by phase, so no row may read as no CPU spent.
 	table := tableText(report)
 	if !report.Timing.VariationalOnSchedule || strings.Contains(table, " 0.00x") || !strings.Contains(table, "n/a") {
@@ -268,6 +270,7 @@ func TestParallelChecksProveEveryBuild(test *testing.T) {
 	if report.Totals.ForkedExpressions == 0 {
 		test.Error("the fixture's files differ by build, yet no expression has more than one answer")
 	}
+	requireEveryMapGreen(test, report, mapExpectations{overlaid: true, instances: true})
 	forkedIn := map[string]bool{}
 	for _, our := range report.Ours {
 		forkedIn[our.Path] = our.ForkedExpressions != 0
@@ -338,11 +341,87 @@ func TestCgoPackagesProveEveryBuild(test *testing.T) {
 			test.Errorf("%s: %d of %d matched", proof.Target, proof.Matched, proof.Compared)
 		}
 	}
+	requireEveryMapGreen(test, report, mapExpectations{overlaid: true})
 	for _, our := range report.Ours {
 		// cgo's files for the host, at least its types and the file it rewrote, and the pure file for linux.
 		if our.Path == "example.com/cgo/native" && (our.Files < 3 || our.FilesInEveryBuild != 0) {
 			test.Errorf("native has %d files, %d in every build, want cgo's generated files for the host and the "+
 				"pure file for linux, none shared", our.Files, our.FilesInEveryBuild)
+		}
+	}
+}
+
+// mapExpectations are what a fixture's Info map proof must hold beyond every map matching: overlays for every build
+// but the host, when the fixture's builds differ, and instances compared, when the fixture instantiates generics.
+type mapExpectations struct {
+	overlaid  bool
+	instances bool
+}
+
+// requireEveryMapGreen requires every build's every Info map to match the oracle's, Defs and Uses to have compared
+// something, and what expected says, logging each map's counts.
+func requireEveryMapGreen(test *testing.T, report *spikeReport, expected mapExpectations) {
+	test.Helper()
+	instances := 0
+	for index, proof := range report.Proof {
+		if len(proof.Maps) != len(infoMapNames) {
+			test.Fatalf("%s: %d maps proved, want %d", proof.Target, len(proof.Maps), len(infoMapNames))
+		}
+		overlay := 0
+		for _, mapped := range proof.Maps {
+			test.Logf("%s %s: %d compared, %d matched, %d mismatched, %d only projected, %d only plain, overlay %d",
+				proof.Target, mapped.Map, mapped.Compared, mapped.Matched, mapped.Mismatched, mapped.OnlyProjected,
+				mapped.OnlyPlain, mapped.Overlay)
+			if !mapped.Green {
+				test.Errorf("%s %s is red: %+v", proof.Target, mapped.Map, mapped.FirstDifferences)
+			}
+			if (mapped.Map == infoMapDefs || mapped.Map == infoMapUses) && mapped.Compared == 0 {
+				test.Errorf("%s %s compared nothing", proof.Target, mapped.Map)
+			}
+			if mapped.Map == infoMapInstances {
+				instances += mapped.Compared
+			}
+			overlay += mapped.Overlay
+		}
+		if expected.overlaid && index > 0 && overlay == 0 {
+			test.Errorf("%s differs from the host, yet its overlay holds nothing", proof.Target)
+		}
+	}
+	if expected.instances && instances == 0 {
+		test.Error("the fixture instantiates generics, yet no build compared an instance")
+	}
+}
+
+// TestWrongOverlayShowsRed runs the parallel fixture for three builds with each build's Info maps projected through
+// the next build's overlay, the host's through linux's and windows' through none: every build's maps must then show
+// red while Types, which no overlay touches, stays green. TestParallelChecksProveEveryBuild is the same run with each
+// build's own overlay, green.
+func TestWrongOverlayShowsRed(test *testing.T) {
+	test.Parallel()
+	asked, parseError := parseCommandLine([]string{
+		"--root", parallelFixtureRoot,
+		"--host", "darwin/arm64,cgo=0",
+		"--build", "linux/arm64",
+		"--build", "windows/arm64",
+		"--check-workers", strconv.Itoa(parallelWorkers),
+		"--plant-wrong-overlay",
+	}, io.Discard)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	report, spikeError := runSpike(asked, io.Discard)
+	if spikeError != nil {
+		test.Fatal(spikeError)
+	}
+	if report.green() {
+		test.Fatal("a wrong build's overlay left the run green")
+	}
+	for _, proof := range report.Proof {
+		if proof.Mismatched != 0 || proof.OnlyProjected != 0 || proof.OnlyPlain != 0 {
+			test.Errorf("%s: Types turned red, though no overlay reaches it", proof.Target)
+		}
+		if mapsGreen(proof.Maps) {
+			test.Errorf("%s: every map matched through another build's overlay", proof.Target)
 		}
 	}
 }

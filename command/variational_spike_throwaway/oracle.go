@@ -76,18 +76,21 @@ type oracleBuild struct {
 	packageErrors int
 	firstErrors   []string
 	load          phaseTiming
+	// info is the build's every other Info map, spelled.
+	info infoAnswers
 }
 
 // loadOracle loads patterns in root under build with go/packages, every package checked from source, and keeps the
-// answers of the expressions of ours.
+// answers of the expressions of ours, the packages places names, and every other Info map's answers in them, spelled
+// as places says of where each object is declared.
 func loadOracle(
 	root string,
 	patterns []string,
 	build configuration,
 	workFile string,
-	ours map[string]*ourPackage,
+	places declarationPlaces,
 ) (*oracleBuild, error) {
-	oracle := &oracleBuild{answers: map[expressionKey]string{}}
+	oracle := &oracleBuild{answers: map[expressionKey]string{}, info: newInfoAnswers()}
 	buildFlags := []string{"-buildvcs=false"}
 	if len(build.tags) != 0 {
 		buildFlags = append(buildFlags, "-tags="+strings.Join(build.tags, ","))
@@ -114,7 +117,7 @@ func loadOracle(
 				oracle.firstErrors = append(oracle.firstErrors, visited.ID+": "+packageError.Error())
 			}
 		}
-		if _, isOurs := ours[visited.PkgPath]; !isOurs || visited.TypesInfo == nil {
+		if _, isOurs := places.ours[visited.PkgPath]; !isOurs || visited.TypesInfo == nil {
 			return
 		}
 		for expression, typeAndValue := range visited.TypesInfo.Types {
@@ -131,6 +134,12 @@ func loadOracle(
 			}
 			oracle.answers[key] = plainAnswer(typeAndValue)
 		}
+		spelling := plainInfoSpelling{fileSet: fileSet, places: places}
+		spellInto(oracle.info[infoMapDefs], fileSet, visited.TypesInfo.Defs, spelling.object)
+		spellInto(oracle.info[infoMapUses], fileSet, visited.TypesInfo.Uses, spelling.object)
+		spellInto(oracle.info[infoMapImplicits], fileSet, visited.TypesInfo.Implicits, spelling.object)
+		spellInto(oracle.info[infoMapSelections], fileSet, visited.TypesInfo.Selections, spelling.selection)
+		spellInto(oracle.info[infoMapInstances], fileSet, visited.TypesInfo.Instances, spelling.instance)
 	})
 	return oracle, nil
 }

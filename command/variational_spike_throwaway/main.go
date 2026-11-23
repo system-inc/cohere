@@ -19,6 +19,8 @@
 //	--tests                  test variants; not built yet, so only false is taken
 //	--json <file>            every number, written when given
 //	--plant-mismatch         change one projected answer of the host before the proof, which must then show red
+//	--plant-wrong-overlay    project each build's Info maps through the next build's overlay, which the proof must
+//	                         then show red
 //	--cpu-profile <file>     after the timed phases, profile the variational check into file and the host's plain
 //	                         check into file.host-plain, each run --profile-repeat times
 //	--profile-repeat <n>     how many times each profiled check runs, 1 by default
@@ -70,6 +72,8 @@ type commandLine struct {
 	patterns []string
 	jsonFile string
 	plant    bool
+	// plantOverlay projects each build's Info maps through the next build's overlay, so the proof must show red.
+	plantOverlay bool
 	// cpuProfile, when given, is where the profiled repeats of the variational check go, profileRepeat how many.
 	cpuProfile    string
 	profileRepeat int
@@ -165,6 +169,7 @@ func parseCommandLine(arguments []string, standardError io.Writer) (commandLine,
 	tests := flags.Bool("tests", false, "test variants, not built yet")
 	flags.StringVar(&asked.jsonFile, "json", "", "the file every number is written to")
 	flags.BoolVar(&asked.plant, "plant-mismatch", false, "change one projected answer before the proof")
+	flags.BoolVar(&asked.plantOverlay, "plant-wrong-overlay", false, "project through the next build's overlay")
 	flags.StringVar(&asked.cpuProfile, "cpu-profile", "", "profile repeats of each check into this file")
 	flags.IntVar(&asked.profileRepeat, "profile-repeat", 1, "how many times each profiled check runs")
 	flags.IntVar(&asked.scheduleWorkers, "schedule-workers", 0, "replay the importer on the engine's schedule")

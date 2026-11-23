@@ -149,6 +149,23 @@ type buildProof struct {
 	FirstMismatches     []difference `json:"firstMismatches"`
 	FirstOneSided       []difference `json:"firstOneSided"`
 	FirstAmbiguous      []difference `json:"firstAmbiguous"`
+	// Maps are the build's every other Info map, projected, against the oracle's.
+	Maps []mapProof `json:"maps"`
+}
+
+// mapProof is one Info map of one build, projected, against the oracle's: Compared counts the keys both hold, Matched
+// and Mismatched split it, and each side's own keys are counted apart. Overlay is how many keys the build's overlay
+// answers differently from the host, none for the host itself.
+type mapProof struct {
+	Map              string       `json:"map"`
+	Compared         int          `json:"compared"`
+	Matched          int          `json:"matched"`
+	Mismatched       int          `json:"mismatched"`
+	OnlyProjected    int          `json:"onlyProjected"`
+	OnlyPlain        int          `json:"onlyPlain"`
+	Overlay          int          `json:"overlay"`
+	Green            bool         `json:"green"`
+	FirstDifferences []difference `json:"firstDifferences"`
 }
 
 // difference is one expression the projection and the oracle don't agree on.
@@ -211,6 +228,12 @@ var spikeNotes = []string{
 	"With --check-workers, every package the host plain schedule imports is read whole before it, untimed by it " +
 		"and reported apart as the warm-up, so the plain wall holds no decode, while the variational wall holds " +
 		"its own lazy decode and merge. The walk's measured cost over the plain check is so an upper bound.",
+	"Beside Types, each build's Defs, Uses, Implicits, Selections and Instances are projected (the host's answers " +
+		"with the build's overlay laid over them) and compared with the oracle's, key for key, keyed as Types is. " +
+		"An object is its kind, package, name and type in the build; its position too when it is ours and declared " +
+		"in a file every build of its package compiles, only that it is in a file of some builds when it isn't, " +
+		"and nothing of where it is when it isn't ours. A selection is its kind, index, indirection and object, " +
+		"and an instance its type arguments and type. Every check, variational and plain, records every map.",
 	"The oracle loads each build with go/packages, every package checked from source with go/types, as the " +
 		"platform census does; its load time is not part of any price.",
 }
@@ -318,6 +341,19 @@ func tableText(report *spikeReport) string {
 			proof.Mismatched, proof.OnlyProjected, proof.OnlyPlain, proof.Ambiguous, verdict,
 			proof.OracleLoad.WallSeconds)
 	}
+	fmt.Fprintf(output, "\n%-40s %-10s %9s %9s %9s %9s %9s %9s %7s\n", "info maps", "map", "compared", "matched",
+		"mismatch", "proj only", "plain only", "overlay", "verdict")
+	for _, proof := range report.Proof {
+		for _, mapped := range proof.Maps {
+			verdict := "red"
+			if mapped.Green {
+				verdict = "green"
+			}
+			fmt.Fprintf(output, "%-40s %-10s %9d %9d %9d %9d %9d %9d %7s\n", proof.Target, mapped.Map,
+				mapped.Compared, mapped.Matched, mapped.Mismatched, mapped.OnlyProjected, mapped.OnlyPlain,
+				mapped.Overlay, verdict)
+		}
+	}
 	for _, proof := range report.Proof {
 		fmt.Fprintf(output, "left out, no position: %d plain, %d projected; oracle keys held twice: %d (%s)\n",
 			proof.NoPositionPlain, proof.NoPositionProjected, proof.OracleDuplicates, proof.Target)
@@ -326,6 +362,10 @@ func tableText(report *spikeReport) string {
 		writeDifferences(output, "first mismatches in "+proof.Target, proof.FirstMismatches, differencesKept)
 		writeDifferences(output, "first expressions one side holds in "+proof.Target, proof.FirstOneSided, 10)
 		writeDifferences(output, "first ambiguous expressions in "+proof.Target, proof.FirstAmbiguous, 5)
+		for _, mapped := range proof.Maps {
+			writeDifferences(output, "first differences of "+mapped.Map+" in "+proof.Target, mapped.FirstDifferences,
+				10)
+		}
 	}
 	fmt.Fprintf(output, "\npeak resident %.2f GiB\n", float64(report.PeakResidentBytes)/(1<<30))
 	return output.String()
