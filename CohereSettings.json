@@ -1,5 +1,23 @@
 {
-    "ignorePatterns": ["TypeScript/**", "internal/format/prettier/bundles/**"],
+    "ignorePatterns": [
+        "TypeScript/**",
+        "internal/format/prettier/bundles/**",
+        {
+            "pattern": "libraries/go/tools/**",
+            "reason": "Somebody else's code, copied from the module cache by tools/go_libraries and kept as its authors released it but for its go/types imports, which its COPIED.md lists.",
+            "kind": "thirdParty"
+        },
+        {
+            "pattern": "libraries/go/go-tools/**",
+            "reason": "Somebody else's code, copied from the module cache by tools/go_libraries and kept as its authors released it but for its go/types imports, which its COPIED.md lists.",
+            "kind": "thirdParty"
+        },
+        {
+            "pattern": "libraries/go/exp/typeparams/**",
+            "reason": "Somebody else's code, copied from the module cache by tools/go_libraries and kept as its authors released it but for its go/types imports, which its COPIED.md lists.",
+            "kind": "thirdParty"
+        }
+    ],
     "go": {
         "rules": {},
         "targets": ["freebsd/arm64"]
