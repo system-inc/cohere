@@ -758,20 +758,20 @@ func (check *Checker) selector(x *operand, e *ast.SelectorExpr, wantType bool) {
 			case *Const:
 				assert(exp.Val() != nil)
 				x.mode_ = constant_
-				x.typ_ = exp.typ
-				x.val = exp.val
+				x.typ_ = exp.Type()
+				x.val = exp.Val()
 			case *TypeName:
 				x.mode_ = typexpr
-				x.typ_ = exp.typ
+				x.typ_ = exp.Type()
 			case *Var:
 				x.mode_ = variable
-				x.typ_ = exp.typ
+				x.typ_ = exp.Type()
 				if pkg.cgo && strings.HasPrefix(exp.name, "_Cvar_") {
 					x.typ_ = x.typ().(*Pointer).base
 				}
 			case *Func:
 				x.mode_ = funcMode
-				x.typ_ = exp.typ
+				x.typ_ = exp.Type()
 				if pkg.cgo && strings.HasPrefix(exp.name, "_Cmacro_") {
 					x.mode_ = value
 					x.typ_ = x.typ().(*Signature).results.vars[0].typ

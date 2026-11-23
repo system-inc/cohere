@@ -194,6 +194,18 @@ func computeInterfaceTypeSet(check *Checker, pos token.Pos, ityp *Interface) *_T
 	// reason.
 	ityp.tset = &_TypeSet{terms: allTermlist} // TODO(gri) is this sufficient?
 
+	// cohere's variational spike: a type set abandoned by a split, or computed from answers that differ by build,
+	// keeps no memo, so the next read computes it for its own builds.
+	completed := false
+	if variational.active {
+		narrowedBefore := variational.narrowed
+		defer func() {
+			if !completed || variational.narrowed != narrowedBefore {
+				ityp.tset = nil
+			}
+		}()
+	}
+
 	var unionSets map[*Union]*_TypeSet
 	if check != nil {
 		if check.unionTypeSets == nil {
@@ -315,6 +327,7 @@ func computeInterfaceTypeSet(check *Checker, pos token.Pos, ityp *Interface) *_T
 	}
 	ityp.tset.terms = allTerms
 
+	completed = true
 	return ityp.tset
 }
 
@@ -379,6 +392,23 @@ func computeUnionTypeSet(check *Checker, unionSets map[*Union]*_TypeSet, pos tok
 
 	// avoid infinite recursion (see also computeInterfaceTypeSet)
 	unionSets[utyp] = new(_TypeSet)
+
+	// cohere's variational spike: as in computeInterfaceTypeSet, an abandoned or narrowed type set keeps no memo.
+	if variational.active {
+		narrowedBefore := variational.narrowed
+		completed := false
+		defer func() {
+			if !completed || variational.narrowed != narrowedBefore {
+				delete(unionSets, utyp)
+			}
+		}()
+		defer func() {
+			if recover := recover(); recover != nil {
+				panic(recover)
+			}
+			completed = true
+		}()
+	}
 
 	var allTerms termlist
 	for _, t := range utyp.terms {

@@ -129,6 +129,8 @@ type Named struct {
 
 	// loader may be provided to lazily load type parameters, underlying type, methods, and delayed functions
 	loader func(*Named) ([]*TypeParam, Type, []*Func, []func())
+
+	variation *namedVariation // cohere's variational spike: the underlying type by build, when it differs
 }
 
 // instance holds information that is only necessary for instantiated named
@@ -599,6 +601,9 @@ func (n *Named) rhs() Type {
 //
 // [underlying type]: https://go.dev/ref/spec#Underlying_types.
 func (n *Named) Underlying() Type {
+	if n.variation != nil {
+		return n.pickUnderlying()
+	}
 	n.unpack()
 
 	// The gccimporter depends on writing a nil underlying via NewNamed and
@@ -656,6 +661,14 @@ func (n *Named) resolveUnderlying() {
 				seen[t] = true
 			}
 
+			// A named type whose underlying type differs by build answers for the current builds, and the chain
+			// that reached it keeps no memo (cohere's variational spike).
+			if t.variation != nil {
+				u = t.Underlying()
+				path = nil
+				break
+			}
+
 			// don't recalculate the underlying
 			if t.stateHas(hasUnder) {
 				u = t.underlying
@@ -698,6 +711,10 @@ func (n *Named) lookupMethod(pkg *Package, name string, foldCase bool) (int, *Fu
 		// Look up the method index in orig, and only instantiate method at the
 		// matching index (if any).
 		if i := n.Origin().methodIndex(name, foldCase); i >= 0 {
+			// cohere's variational spike: a method declared in only some builds is found in those alone.
+			if !presentHere(variationOf(n.Origin().methods[i])) {
+				return -1, nil
+			}
 			// For instances, m.Method(i) will be different from the orig method.
 			return i, n.Method(i)
 		}
@@ -821,6 +838,9 @@ func (n *Named) expandRHS() (rhs Type) {
 // TODO(rfindley): eliminate this function or give it a better name.
 func safeUnderlying(typ Type) Type {
 	if t := asNamed(typ); t != nil {
+		if t.variation != nil {
+			return t.Underlying()
+		}
 		return t.underlying
 	}
 	return typ.Underlying()

@@ -71,6 +71,9 @@ func (check *Checker) recordTypeAndValue(x ast.Expr, mode operandMode, typ Type,
 	if m := check.Types; m != nil {
 		m[x] = TypeAndValue{mode, typ, val}
 	}
+	if variational.active {
+		check.recordVariational(x, TypeAndValue{mode, typ, val})
+	}
 	check.recordTypeAndValueInSyntax(x, mode, typ, val)
 }
 
@@ -112,6 +115,9 @@ func (check *Checker) recordCommaOkTypes(x ast.Expr, a []*operand) {
 				newVar(LocalVar, pos, check.pkg, "", t1),
 			)
 			m[x] = tv
+			if variational.active {
+				check.rewriteVariational(x, tv)
+			}
 			// if x is a parenthesized expression (p.X), update p.X
 			p, _ := x.(*ast.ParenExpr)
 			if p == nil {

@@ -142,6 +142,12 @@ func (check *Checker) objDecl(obj Object) {
 	}(check.environment)
 	check.environment = environment{scope: d.file, version: d.version}
 
+	// cohere's variational spike: each of the object's declarations is checked as a unit under its builds.
+	if variational.active {
+		check.declareVariational(obj, d)
+		return
+	}
+
 	// Const and var declarations must not have initialization
 	// cycles. We track them by remembering the current declaration
 	// in check.decl. Initialization expressions depending on other
@@ -562,7 +568,19 @@ func (check *Checker) typeDecl(obj *TypeName, tdecl *ast.TypeSpec) {
 		versionErr = true
 	}
 
-	named := check.newNamed(obj, nil, nil)
+	// cohere's variational spike: a type declared again for other builds, or declared again after a split, keeps the
+	// one named type it was given first, as Go's own rule has it: one declaration, one type.
+	var named *Named
+	if variation := obj.variation; variation != nil && variation.named != nil {
+		named = variation.named
+		named.resetForVariant()
+		obj.typ = named
+	} else {
+		named = check.newNamed(obj, nil, nil)
+		if variation != nil {
+			variation.named = named
+		}
+	}
 	if tdecl.TypeParams != nil {
 		check.openScope(tdecl, "type parameters")
 		defer check.closeScope()

@@ -30,12 +30,16 @@ type Scope struct {
 	pos, end token.Pos         // scope extent; may be invalid
 	comment  string            // for debugging only
 	isFunc   bool              // set if this is a function scope (internal use only)
+
+	// cohere's variational spike: objects of a name in builds the name's first object doesn't exist in, when they
+	// can't be one object (they are of different kinds)
+	alternates map[string][]Object
 }
 
 // NewScope returns a new, empty scope contained in the given parent
 // scope, if any. The comment is for debugging only.
 func NewScope(parent *Scope, pos, end token.Pos, comment string) *Scope {
-	s := &Scope{parent, nil, 0, nil, pos, end, comment, false}
+	s := &Scope{parent, nil, 0, nil, pos, end, comment, false, nil}
 	// don't add children to Universe scope!
 	if parent != nil && parent != Universe {
 		parent.children = append(parent.children, s)
@@ -70,7 +74,22 @@ func (s *Scope) Child(i int) *Scope { return s.children[i] }
 
 // Lookup returns the object in scope s with the given name if such an
 // object exists; otherwise the result is nil.
-func (s *Scope) Lookup(name string) Object { return resolve(name, s.elems[name]) }
+func (s *Scope) Lookup(name string) Object {
+	obj := resolve(name, s.elems[name])
+	if obj != nil && variational.active {
+		// cohere's variational spike: an object that exists in only some builds is found in those alone, and another
+		// of the same name may stand in the rest.
+		if !presentHere(variationOf(obj)) {
+			for _, alternate := range s.alternates[name] {
+				if presentHere(variationOf(alternate)) {
+					return alternate
+				}
+			}
+			return nil
+		}
+	}
+	return obj
+}
 
 // lookupIgnoringCase returns the objects in scope s whose names match
 // the given name ignoring case. If exported is set, only exported names

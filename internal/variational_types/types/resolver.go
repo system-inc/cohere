@@ -27,6 +27,7 @@ type declInfo struct {
 	inherited bool          // if set, the init expression is inherited from a previous constant declaration
 	tdecl     *ast.TypeSpec // type declaration, or nil
 	fdecl     *ast.FuncDecl // func declaration, or nil
+	mask      Mask          // cohere's variational spike: the builds the declaration's file compiles in
 
 	// The deps field tracks initialization expression dependencies.
 	deps map[Object]bool // lazily initialized
@@ -119,7 +120,14 @@ func (check *Checker) declarePkgObj(ident *ast.Ident, obj Object, d *declInfo) {
 		return
 	}
 
-	check.declare(check.pkg.scope, ident, obj, nopos)
+	switch check.mergeVariant(ident, obj, d) {
+	case variantMerged:
+		return
+	case variantAlternate:
+		check.recordDef(ident, obj)
+	default:
+		check.declare(check.pkg.scope, ident, obj, nopos)
+	}
 	check.objMap[obj] = d
 	obj.setOrder(uint32(len(check.objMap)))
 }
@@ -237,6 +245,7 @@ func (check *Checker) collectObjects() {
 	fileScopes := make([]*Scope, len(check.files)) // fileScopes[i] corresponds to check.files[i]
 	for fileNo, file := range check.files {
 		check.version = asGoVersion(check.versions[file])
+		fileMask := check.fileMask(file)
 
 		// The package identifier denotes the current package,
 		// but there is no corresponding package object.
@@ -359,7 +368,7 @@ func (check *Checker) collectObjects() {
 						init = d.init[i]
 					}
 
-					d := &declInfo{file: fileScope, version: check.version, vtyp: d.typ, init: init, inherited: d.inherited}
+					d := &declInfo{file: fileScope, mask: fileMask, version: check.version, vtyp: d.typ, init: init, inherited: d.inherited}
 					check.declarePkgObj(name, obj, d)
 				}
 
@@ -374,7 +383,7 @@ func (check *Checker) collectObjects() {
 					// The lhs elements are only set up after the for loop below,
 					// but that's ok because declareVar only collects the declInfo
 					// for a later phase.
-					d1 = &declInfo{file: fileScope, version: check.version, lhs: lhs, vtyp: d.spec.Type, init: d.spec.Values[0]}
+					d1 = &declInfo{file: fileScope, mask: fileMask, version: check.version, lhs: lhs, vtyp: d.spec.Type, init: d.spec.Values[0]}
 				}
 
 				// declare all variables
@@ -389,14 +398,14 @@ func (check *Checker) collectObjects() {
 						if i < len(d.spec.Values) {
 							init = d.spec.Values[i]
 						}
-						di = &declInfo{file: fileScope, version: check.version, vtyp: d.spec.Type, init: init}
+						di = &declInfo{file: fileScope, mask: fileMask, version: check.version, vtyp: d.spec.Type, init: init}
 					}
 
 					check.declarePkgObj(name, obj, di)
 				}
 			case typeDecl:
 				obj := NewTypeName(d.spec.Name.Pos(), pkg, d.spec.Name.Name, nil)
-				check.declarePkgObj(d.spec.Name, obj, &declInfo{file: fileScope, version: check.version, tdecl: d.spec})
+				check.declarePkgObj(d.spec.Name, obj, &declInfo{file: fileScope, mask: fileMask, version: check.version, tdecl: d.spec})
 			case funcDecl:
 				name := d.decl.Name.Name
 				obj := NewFunc(d.decl.Name.Pos(), pkg, name, nil) // signature set later
@@ -434,7 +443,16 @@ func (check *Checker) collectObjects() {
 							check.softErrorf(obj, MissingInitBody, "func init must have a body")
 						}
 					} else {
-						check.declare(pkg.scope, d.decl.Name, obj, nopos)
+						// cohere's variational spike: a function declared again in another build's file is one
+						// object with a declaration for each.
+						switch check.mergeVariant(d.decl.Name, obj, &declInfo{file: fileScope, mask: fileMask, version: check.version, fdecl: d.decl}) {
+						case variantMerged:
+							return
+						case variantAlternate:
+							check.recordDef(d.decl.Name, obj)
+						default:
+							check.declare(pkg.scope, d.decl.Name, obj, nopos)
+						}
 					}
 				} else {
 					// method
@@ -448,7 +466,7 @@ func (check *Checker) collectObjects() {
 					_ = tparam0 != nil && check.verifyVersionf(tparam0, go1_27, "generic method")
 					check.recordDef(d.decl.Name, obj)
 				}
-				info := &declInfo{file: fileScope, version: check.version, fdecl: d.decl}
+				info := &declInfo{file: fileScope, mask: fileMask, version: check.version, fdecl: d.decl}
 				// Methods are not package-level objects but we still track them in the
 				// object map so that we can handle them like regular functions (if the
 				// receiver is invalid); also we need their fdecl info when associating
@@ -493,6 +511,11 @@ func (check *Checker) collectObjects() {
 		ptr, base := check.resolveBaseTypeName(m.ptr, m.recv)
 		if base != nil {
 			m.obj.hasPtrRecv_ = ptr
+			// cohere's variational spike: a method declared again in another build's file is one method with a
+			// declaration for each.
+			if check.mergeMethodVariant(check.methods[base], m.obj) {
+				continue
+			}
 			check.methods[base] = append(check.methods[base], m.obj)
 		}
 	}

@@ -95,7 +95,7 @@ func (check *Checker) ident(x *operand, e *ast.Ident, wantType bool) {
 			}
 			x.val = check.iota
 		} else {
-			x.val = obj.val
+			x.val = obj.Val()
 		}
 		assert(x.val != nil)
 		x.mode_ = constant_

@@ -100,6 +100,8 @@ type object struct {
 	typ       Type
 	order_    uint32
 	scopePos_ token.Pos
+
+	variation *objectVariation // cohere's variational spike: nil when the object holds the same in every build
 }
 
 // Parent returns the scope in which the object is declared.
@@ -117,7 +119,14 @@ func (obj *object) Pkg() *Package { return obj.pkg }
 func (obj *object) Name() string { return obj.name }
 
 // Type returns the object's type.
-func (obj *object) Type() Type { return obj.typ }
+func (obj *object) Type() Type {
+	if obj.variation != nil {
+		if variant, picked := pickObjectVariant(obj.variation); picked {
+			return variant.typ
+		}
+	}
+	return obj.typ
+}
 
 // Exported reports whether the object is exported (starts with a capital letter).
 // It doesn't take into account whether the object is in a local (function) scope
@@ -210,7 +219,7 @@ type PkgName struct {
 // NewPkgName returns a new PkgName object representing an imported package.
 // The remaining arguments set the attributes found with all Objects.
 func NewPkgName(pos token.Pos, pkg *Package, name string, imported *Package) *PkgName {
-	return &PkgName{object{nil, pos, pkg, name, Typ[Invalid], 0, nopos}, imported}
+	return &PkgName{object{nil, pos, pkg, name, Typ[Invalid], 0, nopos, nil}, imported}
 }
 
 // Imported returns the package that was imported.
@@ -226,11 +235,18 @@ type Const struct {
 // NewConst returns a new constant with value val.
 // The remaining arguments set the attributes found with all Objects.
 func NewConst(pos token.Pos, pkg *Package, name string, typ Type, val constant.Value) *Const {
-	return &Const{object{nil, pos, pkg, name, typ, 0, nopos}, val}
+	return &Const{object{nil, pos, pkg, name, typ, 0, nopos, nil}, val}
 }
 
 // Val returns the constant's value.
-func (obj *Const) Val() constant.Value { return obj.val }
+func (obj *Const) Val() constant.Value {
+	if obj.variation != nil {
+		if variant, picked := pickObjectVariant(obj.variation); picked {
+			return variant.val
+		}
+	}
+	return obj.val
+}
 
 func (*Const) isDependency() {} // a constant may be a dependency of an initialization expression
 
@@ -251,7 +267,7 @@ type TypeName struct {
 // argument for NewNamed, which will set the TypeName's type as a side-
 // effect.
 func NewTypeName(pos token.Pos, pkg *Package, name string, typ Type) *TypeName {
-	return &TypeName{object{nil, pos, pkg, name, typ, 0, nopos}}
+	return &TypeName{object{nil, pos, pkg, name, typ, 0, nopos, nil}}
 }
 
 // NewTypeNameLazy returns a new defined type like NewTypeName, but it
@@ -365,7 +381,7 @@ func NewField(pos token.Pos, pkg *Package, name string, typ Type, embedded bool)
 // newVar returns a new variable.
 // The arguments set the attributes found with all Objects.
 func newVar(kind VarKind, pos token.Pos, pkg *Package, name string, typ Type) *Var {
-	return &Var{object: object{nil, pos, pkg, name, typ, 0, nopos}, kind: kind}
+	return &Var{object: object{nil, pos, pkg, name, typ, 0, nopos, nil}, kind: kind}
 }
 
 // Anonymous reports whether the variable is an embedded field.
@@ -416,7 +432,7 @@ func NewFunc(pos token.Pos, pkg *Package, name string, sig *Signature) *Func {
 		// as this would violate object.{Type,color} invariants.
 		// TODO(adonovan): propose to disallow NewFunc with nil *Signature.
 	}
-	return &Func{object{nil, pos, pkg, name, typ, 0, nopos}, nil, false, false}
+	return &Func{object{nil, pos, pkg, name, typ, 0, nopos, nil}, nil, false, false}
 }
 
 // Signature returns the signature (type) of the function or method.
