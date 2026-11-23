@@ -95,6 +95,8 @@ type action struct {
 	version goVersion   // applicable language version
 	f       func()      // action to be executed
 	desc    *actionDesc // action description; may be nil, requires debug to be set
+
+	persistent bool // cohere's variational spike: pushed by a finished declaration, so kept when a unit around it restarts
 }
 
 // If debug is set, describef sets a printf-formatted description for action a.
@@ -210,7 +212,7 @@ func (check *Checker) later(f func()) *action {
 		// each group of them when a read inside splits it.
 		builds := variational.mask
 		plain := f
-		f = func() { check.runUnit(builds, func(Mask) { plain() }) }
+		f = func() { check.runUnit(builds, func(Mask) { plain() }, false) }
 	}
 	i := len(check.delayed)
 	check.delayed = append(check.delayed, action{version: check.version, f: f})

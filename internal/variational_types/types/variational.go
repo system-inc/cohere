@@ -326,24 +326,29 @@ type vrecord struct {
 	expr ast.Expr
 	mask Mask
 	tv   TypeAndValue
+	// persistent is set once a declaration unit that recorded it has finished: the declaration never runs again, so
+	// an enclosing unit that restarts keeps it.
+	persistent bool
 }
 
 // runUnit runs run once for builds, or once for each group of them that answers alike when a read inside splits it.
-// parts says what the run started as; groups come out in the order the splits gave them.
-func (check *Checker) runUnit(builds Mask, run func(Mask)) {
+// A declaration unit's work outlives any unit around it that restarts, since a declared object is never declared
+// again; an action unit's is redone with the unit around it.
+func (check *Checker) runUnit(builds Mask, run func(Mask), declaration bool) {
 	pending := []Mask{builds}
 	for len(pending) > 0 {
 		part := pending[0]
 		pending = pending[1:]
-		if split := check.tryUnit(part, run); split != nil {
+		if split := check.tryUnit(part, run, declaration); split != nil {
 			pending = append(split, pending...)
 		}
 	}
 }
 
 // tryUnit runs run under builds and returns nil, or the split a read raised, after putting back what the abandoned
-// run changed: its records, its delayed actions, its untyped expressions, its object path and its environment.
-func (check *Checker) tryUnit(builds Mask, run func(Mask)) (split []Mask) {
+// run changed: its records, its delayed actions, its untyped expressions, its object path and its environment. What a
+// finished declaration inside it did is kept.
+func (check *Checker) tryUnit(builds Mask, run func(Mask), declaration bool) (split []Mask) {
 	savedMask := variational.mask
 	savedRecords := len(check.vrecords)
 	savedDelayed := len(check.delayed)
@@ -364,8 +369,18 @@ func (check *Checker) tryUnit(builds Mask, run func(Mask)) (split []Mask) {
 		if !isSplit {
 			panic(recovered)
 		}
-		check.vrecords = check.vrecords[:savedRecords]
-		check.delayed = check.delayed[:savedDelayed]
+		kept := check.vrecords[:savedRecords]
+		for _, record := range check.vrecords[savedRecords:] {
+			if record.persistent {
+				kept = append(kept, record)
+			}
+		}
+		check.vrecords = kept
+		for index := savedDelayed; index < len(check.delayed); index++ {
+			if !check.delayed[index].persistent {
+				check.delayed[index].f = func() {}
+			}
+		}
 		for _, expr := range check.untypedLog[savedUntyped:] {
 			delete(check.untyped, expr)
 		}
@@ -380,6 +395,14 @@ func (check *Checker) tryUnit(builds Mask, run func(Mask)) (split []Mask) {
 	}()
 	run(builds)
 	check.flushUntyped(savedUntyped)
+	if declaration {
+		for index := savedRecords; index < len(check.vrecords); index++ {
+			check.vrecords[index].persistent = true
+		}
+		for index := savedDelayed; index < len(check.delayed); index++ {
+			check.delayed[index].persistent = true
+		}
+	}
 	variational.variation.Units++
 	return nil
 }
@@ -632,7 +655,7 @@ func (check *Checker) declareVariational(obj Object, d *declInfo) {
 			default:
 				panic("unreachable")
 			}
-		})
+		}, true)
 	}
 	var collapsed []objectVariant
 	for _, answer := range answers {
