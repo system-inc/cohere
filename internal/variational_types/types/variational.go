@@ -1,0 +1,926 @@
+// This file is the spike's variability (#yraxcp9): one check of a package for every build at once. It is cohere's,
+// not upstream's, and every other file of the fork reaches into it at a few marked sites.
+//
+// The model. A build set is a Mask, one bit per build. A package-level object keeps one identity across every build
+// that declares it, as Go's own rule for a declared type has it (one declaration, one type), and only its properties
+// may differ: a constant's value, a variable's or function's type, a named type's underlying type, and in which builds
+// it exists at all. The checker runs each unit of work (a package-level declaration, a delayed action such as a
+// function body) under the builds it holds in. When a read inside a unit would answer differently across those builds,
+// the read panics with a split, and the unit starts again once for each group of builds that answer alike. A unit
+// that never reads a differing property runs once for all of its builds, which is the shared case and nearly every
+// case.
+//
+// The spike checks one package at a time, on one goroutine, so the build set a unit runs under is held here, in
+// package state, and the reads that never see a Checker (Named.Underlying above all) can reach it. Threading it
+// through the checker instead is the full design's work, sized in the spike's report.
+
+package types
+
+import (
+	"go/ast"
+	"go/constant"
+	"iter"
+	"math/bits"
+)
+
+// Mask is a set of builds, bit b for build b. The spike holds at most eight.
+type Mask uint8
+
+// Variation is what a variational check is given and what it answers. Builds is every build the check covers, and
+// Files says which of them compile each file, a file it doesn't name compiling in every one. Types is the answer:
+// every expression's type and value, with the builds each holds in.
+type Variation struct {
+	Builds Mask
+	Files  map[*ast.File]Mask
+	Types  map[ast.Expr]Answers
+
+	// Counts of the check's work, for the spike's report.
+	Units    int // units run to their end
+	Restarts int // unit runs abandoned for a split
+}
+
+// BuildTypeAndValue is an expression's answer in Builds.
+type BuildTypeAndValue struct {
+	Builds Mask
+	TypeAndValue
+}
+
+// Answers are an expression's answers by build. Nearly every expression has one, kept inline so the map needs no
+// slice for it; the rest are in more.
+type Answers struct {
+	first      BuildTypeAndValue
+	firstOrder int64
+	more       []orderedAnswer
+}
+
+// orderedAnswer is an answer with the order it was written in (see vrecord's order).
+type orderedAnswer struct {
+	BuildTypeAndValue
+	order int64
+}
+
+// Len is how many answers there are.
+func (answers Answers) Len() int {
+	if answers.first.Builds == 0 {
+		return 0
+	}
+	return 1 + len(answers.more)
+}
+
+// All yields each answer.
+func (answers Answers) All() iter.Seq[BuildTypeAndValue] {
+	return func(yield func(BuildTypeAndValue) bool) {
+		if answers.first.Builds == 0 || !yield(answers.first) {
+			return
+		}
+		for _, answer := range answers.more {
+			if !yield(answer.BuildTypeAndValue) {
+				return
+			}
+		}
+	}
+}
+
+// with is answers after an answer tv written for builds with order: it takes those builds from each earlier answer
+// written at an order no higher, as a plain check's later write replaces its earlier one, and an earlier answer at a
+// higher order keeps its builds. answers itself is never changed, so an undo can put it back.
+func (answers Answers) with(builds Mask, tv TypeAndValue, order int64) Answers {
+	// The common cases: the expression's first answer, or a write again for the builds of its only answer.
+	if answers.first.Builds == 0 {
+		return Answers{first: BuildTypeAndValue{Builds: builds, TypeAndValue: tv}, firstOrder: order}
+	}
+	if len(answers.more) == 0 && answers.first.Builds&^builds == 0 && answers.firstOrder <= order {
+		return Answers{first: BuildTypeAndValue{Builds: builds, TypeAndValue: tv}, firstOrder: order}
+	}
+	all := make([]orderedAnswer, 0, 2+len(answers.more))
+	all = append(all, orderedAnswer{answers.first, answers.firstOrder})
+	all = append(all, answers.more...)
+	kept := all[:0:0]
+	for _, earlier := range all {
+		if earlier.Builds&builds != 0 {
+			if earlier.order > order {
+				builds &^= earlier.Builds
+			} else {
+				earlier.Builds &^= builds
+			}
+		}
+		if earlier.Builds != 0 {
+			kept = append(kept, earlier)
+		}
+	}
+	if builds != 0 {
+		folded := false
+		for index := range kept {
+			if kept[index].TypeAndValue == tv {
+				kept[index].Builds |= builds
+				kept[index].order = max(kept[index].order, order)
+				folded = true
+				break
+			}
+		}
+		if !folded {
+			kept = append(kept, orderedAnswer{BuildTypeAndValue{Builds: builds, TypeAndValue: tv}, order})
+		}
+	}
+	if len(kept) == 0 {
+		return Answers{}
+	}
+	result := Answers{first: kept[0].BuildTypeAndValue, firstOrder: kept[0].order}
+	if len(kept) > 1 {
+		result.more = kept[1:]
+	}
+	return result
+}
+
+// variational is the state of the variational check in progress, if any.
+var variational struct {
+	active    bool
+	all       Mask
+	mask      Mask // the builds the current unit runs under
+	depth     int  // how many units are running; a read outside every unit never splits
+	narrowed  uint64
+	variation *Variation
+}
+
+// splitRequest is the panic a read raises when its answer differs across the current unit's builds: parts are the
+// groups of builds that answer alike, and together they are the unit's builds.
+type splitRequest struct{ parts []Mask }
+
+// objectVariation is what a package-level object holds when it doesn't hold the same in every build.
+type objectVariation struct {
+	presence Mask            // the builds it exists in; zero for every build
+	variants []objectVariant // its answers by build once declared; nil while one answer holds everywhere
+	decls    []declVariant   // a source object declared in more than one file: each declaration and its builds
+	named    *Named          // a type name's one named type, kept across its declarations
+}
+
+type objectVariant struct {
+	mask Mask
+	typ  Type
+	val  constant.Value
+}
+
+type declVariant struct {
+	mask Mask
+	decl *declInfo
+	iota constant.Value // a constant's iota in this declaration
+}
+
+// namedVariation is a named type's underlying type by build, when it differs.
+type namedVariation struct {
+	variants []namedVariant
+}
+
+type namedVariant struct {
+	mask       Mask
+	rhs        Type
+	underlying Type
+}
+
+// variationOf is obj's variation, or nil.
+func variationOf(obj Object) *objectVariation {
+	if base, isBase := obj.(interface{ base() *object }); isBase {
+		return base.base().variation
+	}
+	return nil
+}
+
+func (obj *object) base() *object { return obj }
+
+// ensureVariation is obj's variation, made when it has none.
+func (obj *object) ensureVariation() *objectVariation {
+	if obj.variation == nil {
+		obj.variation = &objectVariation{}
+	}
+	return obj.variation
+}
+
+// Variant is one answer of an imported object, for the importer that merges each build's export data.
+type Variant struct {
+	Builds Mask
+	Type   Type
+	Value  constant.Value
+}
+
+// SetVariants gives obj its answers by build, which the merging importer read from each build's export data. Answers
+// alike are kept as one. obj's own type and value are set to the first answer's.
+func SetVariants(obj Object, variants []Variant) {
+	base := obj.(interface{ base() *object }).base()
+	collapsed := make([]objectVariant, 0, len(variants))
+	for _, variant := range variants {
+		collapsed = appendVariant(collapsed, objectVariant{variant.Builds, variant.Type, variant.Value})
+	}
+	if len(collapsed) == 0 {
+		return
+	}
+	base.typ = collapsed[0].typ
+	if constantObject, isConstant := obj.(*Const); isConstant {
+		constantObject.val = collapsed[0].val
+	}
+	if len(collapsed) > 1 {
+		base.ensureVariation().variants = collapsed
+	}
+}
+
+// SetPresence says obj exists only in builds.
+func SetPresence(obj Object, builds Mask) {
+	base := obj.(interface{ base() *object }).base()
+	base.ensureVariation().presence = builds
+}
+
+// UnderlyingVariant is one of a named type's underlying types, for the merging importer.
+type UnderlyingVariant struct {
+	Builds     Mask
+	Underlying Type
+}
+
+// SetUnderlyingVariants gives n its underlying types by build. Alike ones are kept as one, and when one is left n is
+// left as it is.
+func SetUnderlyingVariants(n *Named, variants []UnderlyingVariant) {
+	var kept []namedVariant
+	for _, variant := range variants {
+		merged := false
+		for index := range kept {
+			if Identical(kept[index].rhs, variant.Underlying) {
+				kept[index].mask |= variant.Builds
+				merged = true
+				break
+			}
+		}
+		if !merged {
+			kept = append(kept, namedVariant{mask: variant.Builds, rhs: variant.Underlying, underlying: variant.Underlying})
+		}
+	}
+	if len(kept) > 1 {
+		n.variation = &namedVariation{variants: kept}
+	}
+}
+
+// VariantsOf is obj's answers by build, or nil when one answer holds in every build.
+func VariantsOf(obj Object) []Variant {
+	variation := variationOf(obj)
+	if variation == nil || len(variation.variants) == 0 {
+		return nil
+	}
+	variants := make([]Variant, len(variation.variants))
+	for index, variant := range variation.variants {
+		variants[index] = Variant{Builds: variant.mask, Type: variant.typ, Value: variant.val}
+	}
+	return variants
+}
+
+// PresenceOf is the builds obj exists in, or zero when it exists in every build.
+func PresenceOf(obj Object) Mask {
+	variation := variationOf(obj)
+	if variation == nil {
+		return 0
+	}
+	return variation.presence
+}
+
+// UnderlyingVariantsOf is n's underlying types by build, or nil when one holds in every build.
+func UnderlyingVariantsOf(n *Named) []UnderlyingVariant {
+	if n.variation == nil {
+		return nil
+	}
+	variants := make([]UnderlyingVariant, len(n.variation.variants))
+	for index, variant := range n.variation.variants {
+		variants[index] = UnderlyingVariant{Builds: variant.mask, Underlying: variant.rhs}
+	}
+	return variants
+}
+
+// appendVariant adds variant to variants, folding it into an answer alike.
+func appendVariant(variants []objectVariant, variant objectVariant) []objectVariant {
+	for index := range variants {
+		if sameAnswer(variants[index], variant) {
+			variants[index].mask |= variant.mask
+			return variants
+		}
+	}
+	return append(variants, variant)
+}
+
+// sameAnswer reports whether two answers are alike: identical types, and equal values when they are constants.
+func sameAnswer(left objectVariant, right objectVariant) bool {
+	if (left.typ == nil) != (right.typ == nil) {
+		return false
+	}
+	if left.typ != nil && !Identical(left.typ, right.typ) {
+		return false
+	}
+	if (left.val == nil) != (right.val == nil) {
+		return false
+	}
+	return left.val == nil || left.val.Kind() == right.val.Kind() && left.val.ExactString() == right.val.ExactString()
+}
+
+// splitAt raises a split of the current unit's builds into parts, plus whatever of them no part holds.
+func splitAt(parts []Mask) {
+	covered := Mask(0)
+	for _, part := range parts {
+		covered |= part
+	}
+	if rest := variational.mask &^ covered; rest != 0 {
+		parts = append(parts, rest)
+	}
+	panic(splitRequest{parts: parts})
+}
+
+// Outside runs work as if no unit were running, so no read inside it splits: for the merging importer, which resolves
+// an imported object the first time a unit reads it, and would be left half done by a split's panic. A unit that reads
+// the object afterwards answers for its own builds as always.
+func Outside(work func()) {
+	savedDepth := variational.depth
+	variational.depth = 0
+	defer func() { variational.depth = savedDepth }()
+	work()
+}
+
+// readingVariation reports whether a read must answer by build: a variational check is in a unit.
+func readingVariation() bool {
+	return variational.active && variational.depth > 0
+}
+
+// pickObjectVariant is the answer of obj's variation for the current unit's builds, splitting the unit when they
+// differ.
+func pickObjectVariant(variation *objectVariation) (objectVariant, bool) {
+	if variation == nil || len(variation.variants) == 0 || !readingVariation() {
+		return objectVariant{}, false
+	}
+	variational.narrowed++
+	mask := variational.mask
+	first := -1
+	var parts []Mask
+	for index, variant := range variation.variants {
+		if variant.mask&mask == 0 {
+			continue
+		}
+		parts = append(parts, variant.mask&mask)
+		if first < 0 {
+			first = index
+		}
+	}
+	if len(parts) > 1 {
+		splitAt(parts)
+	}
+	if first < 0 {
+		return variation.variants[0], true
+	}
+	if variation.variants[first].mask&mask != mask {
+		// The answer holds in some of the unit's builds and the object is absent in the rest.
+		splitAt(parts)
+	}
+	return variation.variants[first], true
+}
+
+// presentHere reports whether an object with variation exists in the current unit's builds: true in all of them,
+// false in none, and a split when only some.
+func presentHere(variation *objectVariation) bool {
+	if variation == nil || variation.presence == 0 || !readingVariation() {
+		return true
+	}
+	mask := variational.mask
+	switch {
+	case mask&variation.presence == mask:
+		return true
+	case mask&variation.presence == 0:
+		return false
+	default:
+		splitAt([]Mask{mask & variation.presence, mask &^ variation.presence})
+		return false
+	}
+}
+
+// pickUnderlying is n's underlying type in the current unit's builds, splitting the unit when they differ.
+func (n *Named) pickUnderlying() Type {
+	variation := n.variation
+	if !readingVariation() {
+		return variation.variants[0].resolved(n)
+	}
+	variational.narrowed++
+	mask := variational.mask
+	first := -1
+	var parts []Mask
+	for index, variant := range variation.variants {
+		if variant.mask&mask == 0 {
+			continue
+		}
+		parts = append(parts, variant.mask&mask)
+		if first < 0 {
+			first = index
+		}
+	}
+	if len(parts) > 1 {
+		splitAt(parts)
+	}
+	if first < 0 {
+		first = 0
+	}
+	return variation.variants[first].resolved(n)
+}
+
+// resolved is variant's underlying type, following its right-hand side through aliases and named types.
+func (variant *namedVariant) resolved(n *Named) Type {
+	if variant.underlying != nil {
+		return variant.underlying
+	}
+	before := variational.narrowed
+	var underlying Type
+	switch rhs := Unalias(variant.rhs).(type) {
+	case *Named:
+		underlying = rhs.Underlying()
+	case nil:
+		underlying = Typ[Invalid]
+	default:
+		underlying = rhs.Underlying()
+	}
+	if variational.narrowed == before {
+		variant.underlying = underlying
+	}
+	return underlying
+}
+
+// fileMask is the builds file compiles in.
+func (check *Checker) fileMask(file *ast.File) Mask {
+	variation := check.conf.Variation
+	if variation == nil {
+		return 0
+	}
+	if mask, named := variation.Files[file]; named {
+		return mask
+	}
+	return variation.Builds
+}
+
+// vundo is what an answer write replaced, so a unit that restarts can put it back.
+type vundo struct {
+	expr     ast.Expr
+	had      bool
+	previous Answers
+}
+
+// runUnit runs run once for builds, or once for each group of them that answers alike when a read inside splits it;
+// run reads the group it runs for from variational.mask. A declaration unit's work outlives any unit around it that
+// restarts, since a declared object is never declared again; an action unit's is redone with the unit around it.
+func (check *Checker) runUnit(builds Mask, run func(), declaration bool) {
+	split := check.tryUnit(builds, run, declaration)
+	if split == nil {
+		return
+	}
+	pending := split
+	for len(pending) > 0 {
+		part := pending[0]
+		pending = pending[1:]
+		if split := check.tryUnit(part, run, declaration); split != nil {
+			pending = append(split, pending...)
+		}
+	}
+}
+
+// tryUnit runs run under builds and returns nil, or the split a read raised, after putting back what the abandoned
+// run changed: its answers, its delayed actions, its untyped expressions, its object path and its environment. What a
+// finished declaration inside it did is kept.
+func (check *Checker) tryUnit(builds Mask, run func(), declaration bool) (split []Mask) {
+	savedMask := variational.mask
+	savedUndo := len(check.vundo)
+	savedDelayed := len(check.delayed)
+	savedUntyped := len(check.untypedLog)
+	savedPositions := len(check.posStack)
+	savedPath := len(check.objPath)
+	savedEnvironment := check.environment
+	variational.mask = builds
+	variational.depth++
+	defer func() {
+		variational.depth--
+		variational.mask = savedMask
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+		request, isSplit := recovered.(splitRequest)
+		if !isSplit {
+			panic(recovered)
+		}
+		types := variational.variation.Types
+		for index := len(check.vundo) - 1; index >= savedUndo; index-- {
+			undo := check.vundo[index]
+			if undo.had {
+				types[undo.expr] = undo.previous
+			} else {
+				delete(types, undo.expr)
+			}
+		}
+		check.vundo = check.vundo[:savedUndo]
+		for index := savedDelayed; index < len(check.delayed); index++ {
+			if !check.delayed[index].persistent {
+				check.delayed[index].f = func() {}
+			}
+		}
+		for _, expr := range check.untypedLog[savedUntyped:] {
+			delete(check.untyped, expr)
+		}
+		check.untypedLog = check.untypedLog[:savedUntyped]
+		check.posStack = check.posStack[:savedPositions]
+		for len(check.objPath) > savedPath {
+			check.pop()
+		}
+		check.environment = savedEnvironment
+		variational.variation.Restarts++
+		split = request.parts
+	}()
+	run()
+	check.flushUntyped(savedUntyped)
+	// A finished declaration's answers stay whatever happens around it, and nothing undoes a unit no other holds.
+	if declaration || variational.depth == 1 {
+		check.vundo = check.vundo[:savedUndo]
+	}
+	if declaration {
+		for index := savedDelayed; index < len(check.delayed); index++ {
+			check.delayed[index].persistent = true
+		}
+	}
+	variational.variation.Units++
+	return nil
+}
+
+// flushUntyped records, under the current unit's builds, the untyped expressions the unit remembered and never
+// typed, since nothing after the unit can type them.
+func (check *Checker) flushUntyped(from int) {
+	for _, expr := range check.untypedLog[from:] {
+		info, remembered := check.untyped[expr]
+		if !remembered {
+			continue
+		}
+		delete(check.untyped, expr)
+		check.recordTypeAndValue(expr, info.mode, info.typ, info.val)
+	}
+	check.untypedLog = check.untypedLog[:from]
+}
+
+// recordVariational writes x's answer for the current unit's builds, keeping what it replaced while a unit runs that
+// could restart.
+func (check *Checker) recordVariational(x ast.Expr, tv TypeAndValue) {
+	mask := variational.all
+	if variational.depth > 0 {
+		mask = variational.mask
+	}
+	types := variational.variation.Types
+	previous, had := types[x]
+	if variational.depth > 0 {
+		check.vundo = append(check.vundo, vundo{expr: x, had: had, previous: previous})
+	}
+	types[x] = previous.with(mask, tv, check.recordOrder)
+}
+
+// rewriteVariational replaces x's answer for the current unit's builds, as recordCommaOkTypes rewrites a recorded type.
+func (check *Checker) rewriteVariational(x ast.Expr, tv TypeAndValue) {
+	check.recordVariational(x, tv)
+}
+
+// startVariational begins a variational check of check's package, if its configuration asks for one.
+func (check *Checker) startVariational() bool {
+	variation := check.conf.Variation
+	if variation == nil {
+		return false
+	}
+	if variation.Types == nil {
+		variation.Types = map[ast.Expr]Answers{}
+	}
+	variational.active = true
+	variational.all = variation.Builds
+	variational.mask = variation.Builds
+	variational.depth = 0
+	variational.variation = variation
+	check.recordOrder = -1
+	return true
+}
+
+// endVariational ends the check. Its answers are already in the variation, written as they came.
+func (check *Checker) endVariational() {
+	check.vundo = nil
+	variational.active = false
+	variational.variation = nil
+}
+
+// buildCount is how many builds mask holds.
+func buildCount(mask Mask) int { return bits.OnesCount8(uint8(mask)) }
+
+// How mergeVariant declared a package-level object.
+const (
+	variantNew       = iota // the name's first object: declare it as always
+	variantMerged           // folded into the name's first object as another build's declaration
+	variantAlternate        // another kind in builds the first doesn't hold: kept beside it, never declared
+)
+
+// mergeVariant folds obj, declared by d, into the package-level object of its name when they are declared in disjoint
+// builds and are of one kind, so the name is one object with a declaration for each. A name's first object only notes
+// the builds it exists in. Objects of one name in overlapping builds are left to be redeclarations, as always.
+func (check *Checker) mergeVariant(ident *ast.Ident, obj Object, d *declInfo) int {
+	if !variational.active || obj.Name() == "_" {
+		return variantNew
+	}
+	base := obj.(interface{ base() *object }).base()
+	first := check.pkg.scope.elems[obj.Name()]
+	if first == nil {
+		if d.mask != variational.all {
+			base.ensureVariation().presence = d.mask
+		}
+		return variantNew
+	}
+	firstDecl := check.objMap[first]
+	if firstDecl == nil {
+		return variantNew
+	}
+	firstBase := first.(interface{ base() *object }).base()
+	firstVariation := firstBase.ensureVariation()
+	if len(firstVariation.decls) == 0 {
+		firstVariation.decls = []declVariant{{mask: firstDecl.mask, decl: firstDecl, iota: iotaOf(first)}}
+		firstVariation.presence = firstDecl.mask
+	}
+	held := firstVariation.presence
+	for _, alternate := range check.pkg.scope.alternates[obj.Name()] {
+		held |= variationOf(alternate).presence
+	}
+	if held&d.mask != 0 {
+		return variantNew
+	}
+	if variantKind(first) != variantKind(obj) {
+		base.ensureVariation().presence = d.mask
+		if check.pkg.scope.alternates == nil {
+			check.pkg.scope.alternates = map[string][]Object{}
+		}
+		check.pkg.scope.alternates[obj.Name()] = append(check.pkg.scope.alternates[obj.Name()], obj)
+		obj.setParent(check.pkg.scope)
+		return variantAlternate
+	}
+	firstVariation.decls = append(firstVariation.decls, declVariant{mask: d.mask, decl: d, iota: iotaOf(obj)})
+	firstVariation.presence |= d.mask
+	if firstVariation.presence == variational.all {
+		firstVariation.presence = 0
+	}
+	check.recordDef(ident, first)
+	return variantMerged
+}
+
+// mergeMethodVariant folds method into the method of its name among methods when they are declared in disjoint
+// builds, and reports whether it did.
+func (check *Checker) mergeMethodVariant(methods []*Func, method *Func) bool {
+	if !variational.active {
+		return false
+	}
+	d := check.objMap[method]
+	if d == nil {
+		return false
+	}
+	for _, first := range methods {
+		if first.name != method.name {
+			continue
+		}
+		firstDecl := check.objMap[first]
+		variation := first.ensureVariation()
+		if len(variation.decls) == 0 {
+			variation.decls = []declVariant{{mask: firstDecl.mask, decl: firstDecl}}
+			variation.presence = firstDecl.mask
+		}
+		if variation.presence&d.mask != 0 {
+			return false
+		}
+		variation.decls = append(variation.decls, declVariant{mask: d.mask, decl: d})
+		variation.presence |= d.mask
+		if variation.presence == variational.all {
+			variation.presence = 0
+		}
+		delete(check.objMap, method)
+		check.recordDef(d.fdecl.Name, first)
+		return true
+	}
+	if d.mask != variational.all {
+		method.ensureVariation().presence = d.mask
+	}
+	return false
+}
+
+// iotaOf is a constant's iota as collectObjects left it in the constant's value, or nil.
+func iotaOf(obj Object) constant.Value {
+	if constantObject, isConstant := obj.(*Const); isConstant {
+		return constantObject.val
+	}
+	return nil
+}
+
+// variantKind tells package-level objects' kinds apart.
+func variantKind(obj Object) int {
+	switch obj.(type) {
+	case *Const:
+		return 1
+	case *Var:
+		return 2
+	case *TypeName:
+		return 3
+	case *Func:
+		return 4
+	}
+	return 0
+}
+
+// declareVariational checks each of obj's declarations as a unit under the builds its file compiles in, splitting a
+// unit whose reads differ across its builds, and keeps obj's answers by build. A named type keeps one identity across
+// every run, and its underlying type is what varies.
+func (check *Checker) declareVariational(obj Object, d *declInfo) {
+	base := obj.(interface{ base() *object }).base()
+	variation := variationOf(obj)
+	var decls []declVariant
+	if variation != nil && len(variation.decls) > 0 {
+		decls = variation.decls
+	} else {
+		mask := d.mask
+		if mask == 0 {
+			mask = variational.all
+		}
+		decls = []declVariant{{mask: mask, decl: d, iota: iotaOf(obj)}}
+	}
+	typeName, isTypeName := obj.(*TypeName)
+	isDefinedType := isTypeName && !decls[0].decl.tdecl.Assign.IsValid()
+	if isDefinedType || len(decls) > 1 {
+		variation = base.ensureVariation()
+	}
+	var answers []objectVariant
+	// An n:1 variable declaration types every variable on its left at once, so each run starts them all untyped and
+	// keeps each one's answer.
+	var siblings []*Var
+	siblingAnswers := map[*Var][]objectVariant{}
+	if variable, isVariable := obj.(*Var); isVariable && len(decls) == 1 && len(decls[0].decl.lhs) > 1 {
+		for _, sibling := range decls[0].decl.lhs {
+			if sibling != variable {
+				siblings = append(siblings, sibling)
+			}
+		}
+	}
+	every := Mask(0)
+	for _, declared := range decls {
+		every |= declared.mask
+		check.runUnit(declared.mask, func() {
+			builds := variational.mask
+			base.typ = nil
+			for _, sibling := range siblings {
+				sibling.typ = nil
+			}
+			if constantObject, isConstant := obj.(*Const); isConstant {
+				constantObject.val = declared.iota
+			}
+			check.environment = environment{scope: declared.decl.file, version: declared.decl.version}
+			switch obj := obj.(type) {
+			case *Const:
+				check.decl = declared.decl
+				// Only a constant declared in more than one build's file runs out of its file's order; any other
+				// constant's records keep the plain check's order, the order its declarations ran in.
+				savedOrder := check.recordOrder
+				if iota, isInt := constant.Int64Val(declared.iota); isInt && len(decls) > 1 {
+					check.recordOrder = iota
+				}
+				check.constDecl(obj, declared.decl.vtyp, declared.decl.init, declared.decl.inherited)
+				check.recordOrder = savedOrder
+				answers = append(answers, objectVariant{mask: builds, typ: obj.typ, val: obj.val})
+			case *Var:
+				check.decl = declared.decl
+				check.varDecl(obj, declared.decl.lhs, declared.decl.vtyp, declared.decl.init)
+				answers = append(answers, objectVariant{mask: builds, typ: obj.typ})
+				for _, sibling := range siblings {
+					siblingAnswers[sibling] = append(siblingAnswers[sibling], objectVariant{mask: builds, typ: sibling.typ})
+				}
+			case *TypeName:
+				check.typeDecl(obj, declared.decl.tdecl)
+				if named := asNamed(obj.typ); isDefinedType && named != nil {
+					answers = append(answers, objectVariant{mask: builds, typ: named.fromRHS})
+				} else {
+					answers = append(answers, objectVariant{mask: builds, typ: obj.typ})
+				}
+			case *Func:
+				check.funcDecl(obj, declared.decl)
+				answers = append(answers, objectVariant{mask: builds, typ: obj.typ})
+			default:
+				panic("unreachable")
+			}
+		}, true)
+	}
+	for _, sibling := range siblings {
+		var siblingCollapsed []objectVariant
+		for _, answer := range siblingAnswers[sibling] {
+			siblingCollapsed = appendVariant(siblingCollapsed, answer)
+		}
+		if len(siblingCollapsed) == 0 {
+			continue
+		}
+		sibling.typ = siblingCollapsed[0].typ
+		if len(siblingCollapsed) > 1 {
+			sibling.ensureVariation().variants = siblingCollapsed
+		}
+	}
+	var collapsed []objectVariant
+	for _, answer := range answers {
+		collapsed = appendVariant(collapsed, answer)
+	}
+	if isDefinedType {
+		named := variation.named
+		if named != nil && len(collapsed) > 1 {
+			variants := make([]namedVariant, len(collapsed))
+			for index, answer := range collapsed {
+				variants[index] = namedVariant{mask: answer.mask, rhs: answer.typ}
+			}
+			named.variation = &namedVariation{variants: variants}
+			named.fromRHS = collapsed[0].typ
+		}
+		if named != nil {
+			base.typ = named
+		}
+		// Methods are collected once, for every build the type is declared in.
+		saved := variational.mask
+		variational.mask = every
+		check.collectMethods(typeName)
+		variational.mask = saved
+		return
+	}
+	if len(collapsed) == 0 {
+		return
+	}
+	base.typ = collapsed[0].typ
+	if constantObject, isConstant := obj.(*Const); isConstant {
+		constantObject.val = collapsed[0].val
+	}
+	if len(collapsed) > 1 {
+		variation = base.ensureVariation()
+		variation.variants = collapsed
+	}
+}
+
+// resetForVariant readies n to be declared again, for another build's declaration or another group of builds after a
+// split: its right-hand side, underlying type and type parameters are taken again.
+func (n *Named) resetForVariant() {
+	n.fromRHS = nil
+	n.underlying = nil
+	n.tparams = nil
+	n.variation = nil
+	n.state_ = 0
+}
+
+// freshBodyScope puts sig's scope back to what the signature declared in it, when its body runs again: the receiver,
+// parameters, results and type parameters, and no child scope the last run opened.
+func freshBodyScope(sig *Signature) {
+	scope := sig.scope
+	if !scope.bodyRan {
+		scope.bodyRan = true
+		scope.bodyChildren = len(scope.children)
+		return
+	}
+	own := map[Object]bool{}
+	if sig.recv != nil {
+		own[sig.recv] = true
+	}
+	for _, tuple := range []*Tuple{sig.params, sig.results} {
+		if tuple != nil {
+			for _, variable := range tuple.vars {
+				own[variable] = true
+			}
+		}
+	}
+	for _, list := range []*TypeParamList{sig.tparams, sig.rparams} {
+		for _, parameter := range list.list() {
+			own[parameter.obj] = true
+		}
+	}
+	for name, obj := range scope.elems {
+		if !own[resolve(name, obj)] {
+			delete(scope.elems, name)
+		}
+	}
+	scope.children = scope.children[:scope.bodyChildren]
+}
+
+// rewriteCommaOk is recordCommaOkTypes for a variational check without a Types map: x's answer for the current
+// unit's builds, and each parenthesized expression inside it, becomes the comma-ok tuple.
+func (check *Checker) rewriteCommaOk(x ast.Expr, t0 Type, t1 Type) {
+	mask := variational.all
+	if variational.depth > 0 {
+		mask = variational.mask
+	}
+	for {
+		for answer := range variational.variation.Types[x].All() {
+			if answer.Builds&mask == mask {
+				tv := answer.TypeAndValue
+				pos := x.Pos()
+				tv.Type = NewTuple(
+					newVar(LocalVar, pos, check.pkg, "", t0),
+					newVar(LocalVar, pos, check.pkg, "", t1),
+				)
+				check.recordVariational(x, tv)
+				break
+			}
+		}
+		parenthesized, isParenthesized := x.(*ast.ParenExpr)
+		if !isParenthesized {
+			return
+		}
+		x = parenthesized.X
+	}
+}
