@@ -6,6 +6,7 @@ go 1.27
 // module no gate tests.
 use (
 	.
+	./libraries/go/go-types
 	./TypeScript/tsc
 	./TypeScript-shim/ast
 	./TypeScript-shim/bundled

@@ -23,6 +23,9 @@ replace (
 	// module of its own so Adamic can import it through its cohere submodule (#ejcnkja).
 	github.com/system-inc/cohere/static_single_assignment => ./static_single_assignment
 
+	// Go's go/types with the one-walk check, a submodule of its own repository (#hmepe1g).
+	github.com/system-inc/go-types => ./libraries/go/go-types
+
 	// React's mutation and aliasing model, the effect vocabulary and the mutable ranges inferred from
 	// it, shared with Adamic the same way (#kr2yp54).
 	github.com/system-inc/cohere/mutation_aliasing => ./mutation_aliasing
@@ -59,6 +62,7 @@ require (
 	github.com/system-inc/cohere/memory_limit v0.0.0
 	github.com/system-inc/cohere/mutation_aliasing v0.0.0
 	github.com/system-inc/cohere/static_single_assignment v0.0.0
+	github.com/system-inc/go-types v0.0.0
 
 	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing
 	// Prettier means matching it byte for byte on an already-Prettier-formatted tree. typescript-go's
