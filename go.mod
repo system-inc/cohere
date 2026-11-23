@@ -36,6 +36,18 @@ replace (
 
 	// Go's build cache layout and how to delete from it safely, shared with Loom the same way (#xwfdr3d).
 	github.com/system-inc/cohere/go_cache => ./go_cache
+
+	// Our fork of go/types, a submodule, which the Go engine type-checks with in place of the standard library's
+	// (#cs9qm4x).
+	github.com/system-inc/go-types => ./libraries/go/go-types
+
+	// x/tools, staticcheck and x/exp/typeparams hand go/types values to the engine, and Go cannot mix the fork's
+	// types with the standard library's, so each is replaced with a copy whose go/types imports name the fork.
+	// tools/go_libraries writes the copies from the module cache at the versions required below, and is rerun on
+	// every bump; each copy's `COPIED.md` lists what it changed (#cs9qm4x).
+	golang.org/x/tools => ./libraries/go/tools
+	honnef.co/go/tools => ./libraries/go/go-tools
+	golang.org/x/exp/typeparams => ./libraries/go/exp/typeparams
 )
 
 require (
@@ -59,6 +71,9 @@ require (
 	github.com/system-inc/cohere/memory_limit v0.0.0
 	github.com/system-inc/cohere/mutation_aliasing v0.0.0
 	github.com/system-inc/cohere/static_single_assignment v0.0.0
+
+	// The fork of go/types the Go engine type-checks with, and the copies replaced above import (#cs9qm4x).
+	github.com/system-inc/go-types v0.0.0
 
 	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing
 	// Prettier means matching it byte for byte on an already-Prettier-formatted tree. typescript-go's
