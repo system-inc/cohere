@@ -105,11 +105,16 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	report.addOurs(checked)
 
 	say(progress, "variational-spike: checking every build plainly\n")
+	// A fresh importer: the merge's shares each build's decoded packages with its Plain, so reusing it would hide
+	// the baselines' decode in the variational run's.
+	baselineImporter := merged.New(fileSet, exports, all)
 	for index, each := range listed {
-		counts := checkPlainly(fileSet, ordered, each, importer.Plain(index), index, sizes)
+		counts := checkPlainly(fileSet, ordered, each, baselineImporter.Plain(index), index, sizes)
 		if index == 0 {
 			report.Timing.HostPlainImport = counts.imports
 			report.Timing.HostPlainCheck = counts.checks
+			hostDecode, _ := baselineImporter.Timing()
+			report.Timing.HostPlainDecodeSeconds = hostDecode.Seconds()
 		}
 		report.Timing.EveryBuildPlainImport = report.Timing.EveryBuildPlainImport.add(counts.imports)
 		report.Timing.EveryBuildPlainCheck = report.Timing.EveryBuildPlainCheck.add(counts.checks)
@@ -121,8 +126,8 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 			}
 		}
 	}
-	plainDecode, _ := importer.Timing()
-	report.Timing.PlainDecodeSeconds = (plainDecode - decode).Seconds()
+	plainDecode, _ := baselineImporter.Timing()
+	report.Timing.PlainDecodeSeconds = plainDecode.Seconds()
 	report.Shortfalls = importer.Shortfalls()
 
 	sources := &sourceCache{contents: map[string][]byte{}}

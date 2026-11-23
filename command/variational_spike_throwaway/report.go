@@ -75,6 +75,7 @@ type timingReport struct {
 	EveryBuildPlainImport    phaseTiming   `json:"everyBuildPlainImport"`
 	EveryBuildPlainCheck     phaseTiming   `json:"everyBuildPlainCheck"`
 	PlainCheckByBuild        []phaseTiming `json:"plainCheckByBuild"`
+	HostPlainDecodeSeconds   float64       `json:"hostPlainDecodeSeconds"`
 	PlainDecodeSeconds       float64       `json:"plainDecodeSeconds"`
 }
 
@@ -142,10 +143,10 @@ var spikeNotes = []string{
 		"spelling of its type and exact constant value.",
 	"The variational check imports everything not ours before each package is checked, so the import phase is " +
 		"timed apart from the check; the plain baselines do the same with each build's own export data.",
-	"The merging importer decodes each build's export data into that build's own universe, which its plain " +
-		"importer shares: a package is decoded once, by whichever imports it first, so the variational import pays " +
-		"every build's decode and the baselines' imports find most of it done. Decode is counted once, in the " +
-		"importer's own timing.",
+	"The baselines import through a fresh merging importer's Plain, since an importer's Plain shares each build's " +
+		"decoded packages with its merge: each run pays its own decode.",
+	"The variational check is given an Info without a Types map, since Variation.Types is its answer; each plain " +
+		"check records into a Types map, as it must to record at all.",
 	"CPU is the process's own user and system time from getrusage around each phase; listing's go list runs are " +
 		"children, counted apart. Every check runs on one goroutine.",
 	"The oracle loads each build with go/packages, every package checked from source with go/types, as the " +
@@ -199,8 +200,9 @@ func tableText(report *spikeReport) string {
 		fmt.Fprintf(output, "%-34s %9.3f %9.3f %9.3f\n", row.name, row.phase.WallSeconds, row.phase.CPUSeconds(),
 			row.phase.ChildrenCPUSeconds)
 	}
-	fmt.Fprintf(output, "importer: variational decode %.3fs, merge %.3fs; plain decode %.3fs\n",
-		timing.VariationalDecodeSeconds, timing.VariationalMergeSeconds, timing.PlainDecodeSeconds)
+	fmt.Fprintf(output, "importer (wall): variational decode %.3fs, merge %.3fs; host plain decode %.3fs; every build "+
+		"plain decode %.3fs\n", timing.VariationalDecodeSeconds, timing.VariationalMergeSeconds,
+		timing.HostPlainDecodeSeconds, timing.PlainDecodeSeconds)
 	if timing.HostPlainCheck.CPUSeconds() > 0 && timing.EveryBuildPlainCheck.CPUSeconds() > 0 {
 		fmt.Fprintf(output, "variational check cpu over host plain check: %.2fx; over every build summed: %.2fx\n",
 			timing.VariationalCheck.CPUSeconds()/timing.HostPlainCheck.CPUSeconds(),

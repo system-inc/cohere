@@ -74,9 +74,9 @@ func checkVariationally(
 		}
 		var checkedTypes *types.Package
 		counts.checks = counts.checks.add(measure(func() {
-			// Ignored: every error went to Error above.
-			checkedTypes, _ = configuration.Check(our.path, fileSet, our.files,
-				&types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
+			// Ignored: every error went to Error above. The Info holds no Types map: Variation.Types is the answer, and a
+			// plain map beside it would record every expression twice.
+			checkedTypes, _ = configuration.Check(our.path, fileSet, our.files, &types.Info{})
 		}))
 		importer.Add(checkedTypes)
 		checked = append(checked, &checkedPackage{our: our, variation: variation})
@@ -85,7 +85,8 @@ func checkVariationally(
 }
 
 // checkPlainly checks each of ordered that build compiles the plain way, with only build's files and build's own
-// export data, unmerged: the baseline the variational check is priced against.
+// export data, unmerged: the baseline the variational check is priced against. Its answers go to a Types map, as a
+// plain check's must to be recorded at all.
 func checkPlainly(
 	fileSet *token.FileSet,
 	ordered []*ourPackage,
