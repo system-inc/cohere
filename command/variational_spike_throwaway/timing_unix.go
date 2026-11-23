@@ -30,7 +30,7 @@ func (started resourceSample) since() phaseTiming {
 		WallSeconds:   ended.wall.Sub(started.wall).Seconds(),
 		UserSeconds:   elapsed(started.self.Utime, ended.self.Utime),
 		SystemSeconds: elapsed(started.self.Stime, ended.self.Stime),
-		ChildrenCPUSeconds: elapsed(started.children.Utime, ended.children.Utime) +
+		ChildrenCpuSeconds: elapsed(started.children.Utime, ended.children.Utime) +
 			elapsed(started.children.Stime, ended.children.Stime),
 	}
 }

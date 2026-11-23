@@ -24,6 +24,8 @@ type spikeReport struct {
 	Profile *profileReport `json:"profile,omitempty"`
 	// Schedule is the importer replayed on the engine's schedule, when --schedule-workers asked for it.
 	Schedule *scheduleReport `json:"schedule,omitempty"`
+	// Parallel is ours checked in parallel on the engine's schedule, when --check-workers asked for it.
+	Parallel *parallelReport `json:"parallel,omitempty"`
 	// Shortfalls are what the merging importer could not keep exactly.
 	Shortfalls merged.Shortfalls `json:"shortfalls"`
 	Planted    *differenceAtKey  `json:"planted,omitempty"`
@@ -86,6 +88,20 @@ type timingReport struct {
 	PlainCheckByBuild            []phaseTiming `json:"plainCheckByBuild"`
 	HostPlainDecodeSeconds       float64       `json:"hostPlainDecodeSeconds"`
 	PlainDecodeSeconds           float64       `json:"plainDecodeSeconds"`
+}
+
+// parallelReport is ours checked in parallel along the import graph on the engine's schedule, one types.Checker a
+// package: the variational check the proof projects, and the host's plain check, each on its own run of the schedule.
+type parallelReport struct {
+	Workers     int         `json:"workers"`
+	Variational parallelRun `json:"variational"`
+	HostPlain   parallelRun `json:"hostPlain"`
+	// HostPlainWarmSeconds is the wall of reading whole, before the host plain schedule and outside its timing, every
+	// package the schedule imports, so the schedule reads only decoded types.
+	HostPlainWarmSeconds float64 `json:"hostPlainWarmSeconds"`
+	// HostPlainDecodeSeconds is the parallel host plain importer's decode, each package read whole at its import, all
+	// of it in the warm-up, where the serial baseline's host plain decode reads only what its checks look up.
+	HostPlainDecodeSeconds float64 `json:"hostPlainDecodeSeconds"`
 }
 
 // checkErrors is every check's errors, which a sound run has none of.
@@ -163,7 +179,15 @@ var spikeNotes = []string{
 	"The variational check is given an Info without a Types map, since Variation.Types is its answer; each plain " +
 		"check records into a Types map, as it must to record at all.",
 	"CPU is the process's own user and system time from getrusage around each phase; listing's go list runs are " +
-		"children, counted apart. Every check runs on one goroutine.",
+		"children, counted apart. Every check runs on one goroutine, unless --check-workers runs them in parallel.",
+	"With --check-workers, the variational check runs on the engine's schedule, each of ours once every one of " +
+		"ours it imports is checked, and its import and check rows sum each package's wall alone; the schedule's " +
+		"wall is the real critical path, and the process's CPU is measured across the whole schedule. The host's " +
+		"plain check runs the same way beside the serial baselines, through a fresh importer that reads each " +
+		"package whole at its import, so its checks read only decoded types.",
+	"With --check-workers, every package the host plain schedule imports is read whole before it, untimed by it " +
+		"and reported apart as the warm-up, so the plain wall holds no decode, while the variational wall holds " +
+		"its own lazy decode and merge. The walk's measured cost over the plain check is so an upper bound.",
 	"The oracle loads each build with go/packages, every package checked from source with go/types, as the " +
 		"platform census does; its load time is not part of any price.",
 }
@@ -213,17 +237,17 @@ func tableText(report *spikeReport) string {
 		{"baseline: every build plain check", timing.EveryBuildPlainCheck},
 	}
 	for _, row := range rows {
-		fmt.Fprintf(output, "%-34s %9.3f %9.3f %9.3f\n", row.name, row.phase.WallSeconds, row.phase.CPUSeconds(),
-			row.phase.ChildrenCPUSeconds)
+		fmt.Fprintf(output, "%-34s %9.3f %9.3f %9.3f\n", row.name, row.phase.WallSeconds, row.phase.CpuSeconds(),
+			row.phase.ChildrenCpuSeconds)
 	}
 	fmt.Fprintf(output, "importer: variational decode %.3fs summed over builds, %.3fs waited on, merge %.3fs wall; "+
 		"host plain decode %.3fs; every build plain decode %.3fs\n", timing.VariationalDecodeSeconds,
 		timing.VariationalDecodeWaitSeconds, timing.VariationalMergeSeconds, timing.HostPlainDecodeSeconds,
 		timing.PlainDecodeSeconds)
-	if timing.HostPlainCheck.CPUSeconds() > 0 && timing.EveryBuildPlainCheck.CPUSeconds() > 0 {
+	if timing.HostPlainCheck.CpuSeconds() > 0 && timing.EveryBuildPlainCheck.CpuSeconds() > 0 {
 		fmt.Fprintf(output, "variational check cpu over host plain check: %.2fx; over every build summed: %.2fx\n",
-			timing.VariationalCheck.CPUSeconds()/timing.HostPlainCheck.CPUSeconds(),
-			timing.VariationalCheck.CPUSeconds()/timing.EveryBuildPlainCheck.CPUSeconds())
+			timing.VariationalCheck.CpuSeconds()/timing.HostPlainCheck.CpuSeconds(),
+			timing.VariationalCheck.CpuSeconds()/timing.EveryBuildPlainCheck.CpuSeconds())
 	}
 
 	if report.Profile != nil {
@@ -231,6 +255,9 @@ func tableText(report *spikeReport) string {
 	}
 	if report.Schedule != nil {
 		writeSchedule(output, report.Schedule)
+	}
+	if report.Parallel != nil {
+		writeParallel(output, report.Parallel)
 	}
 
 	errors := report.Errors
@@ -304,17 +331,17 @@ func writeProfile(output *strings.Builder, profiled *profileReport) {
 		summary repeatSummary
 	}{{"variational", variational}, {"host plain", hostPlain}} {
 		fmt.Fprintf(output, "%-12s %-8s %10.4f %10.4f %10.4f %12.3f %14.3f %10.1f\n", row.name, "process",
-			row.summary.medianCPU, row.summary.leastCPU, row.summary.meanCPU, row.summary.collectorCPU,
-			row.summary.collectorIdleCPU, row.summary.medianAllocatedBytes/(1<<20))
-		fmt.Fprintf(output, "%-12s %-8s %10.4f %10.4f %10.4f\n", "", "thread", row.summary.medianThreadCPU,
-			row.summary.leastThreadCPU, row.summary.meanThreadCPU)
+			row.summary.medianCpu, row.summary.leastCpu, row.summary.meanCpu, row.summary.collectorCpu,
+			row.summary.collectorIdleCpu, row.summary.medianAllocatedBytes/(1<<20))
+		fmt.Fprintf(output, "%-12s %-8s %10.4f %10.4f %10.4f\n", "", "thread", row.summary.medianThreadCpu,
+			row.summary.leastThreadCpu, row.summary.meanThreadCpu)
 	}
-	if hostPlain.medianCPU > 0 && hostPlain.medianThreadCPU > 0 && hostPlain.medianAllocatedBytes > 0 {
+	if hostPlain.medianCpu > 0 && hostPlain.medianThreadCpu > 0 && hostPlain.medianAllocatedBytes > 0 {
 		fmt.Fprintf(output, "variational over host plain, process cpu: %.2fx median, %.2fx least, %.2fx mean; "+
 			"thread cpu: %.2fx median, %.2fx least, %.2fx mean; %.2fx allocation\n",
-			variational.medianCPU/hostPlain.medianCPU, variational.leastCPU/hostPlain.leastCPU,
-			variational.meanCPU/hostPlain.meanCPU, variational.medianThreadCPU/hostPlain.medianThreadCPU,
-			variational.leastThreadCPU/hostPlain.leastThreadCPU, variational.meanThreadCPU/hostPlain.meanThreadCPU,
+			variational.medianCpu/hostPlain.medianCpu, variational.leastCpu/hostPlain.leastCpu,
+			variational.meanCpu/hostPlain.meanCpu, variational.medianThreadCpu/hostPlain.medianThreadCpu,
+			variational.leastThreadCpu/hostPlain.leastThreadCpu, variational.meanThreadCpu/hostPlain.meanThreadCpu,
 			variational.medianAllocatedBytes/hostPlain.medianAllocatedBytes)
 	}
 	for _, row := range []struct {
@@ -323,11 +350,11 @@ func writeProfile(output *strings.Builder, profiled *profileReport) {
 	}{{"variational", profiled.Variational}, {"host plain", profiled.HostPlain}} {
 		fmt.Fprintf(output, "%s process cpu s by repeat:", row.name)
 		for _, repeat := range row.repeats {
-			fmt.Fprintf(output, " %.3f", repeat.Check.CPUSeconds())
+			fmt.Fprintf(output, " %.3f", repeat.Check.CpuSeconds())
 		}
 		fmt.Fprintf(output, "\n%s thread cpu s by repeat: ", row.name)
 		for _, repeat := range row.repeats {
-			fmt.Fprintf(output, " %.3f", repeat.ThreadCPUSeconds)
+			fmt.Fprintf(output, " %.3f", repeat.ThreadCpuSeconds)
 		}
 		fmt.Fprintf(output, "\n")
 	}
@@ -358,4 +385,37 @@ func writeSchedule(output *strings.Builder, schedule *scheduleReport) {
 		"%.3fs, host plain %.3fs, so the walk adds %+.3fs; checks alone %.3fs and %.3fs\n", schedule.VariationalPath,
 		schedule.HostPlainPath, schedule.VariationalPath-schedule.HostPlainPath, schedule.VariationalCheckOn,
 		schedule.HostPlainCheckOn)
+}
+
+// writeParallel writes ours checked in parallel on the engine's schedule: each run's wall, which is its real critical
+// path, the process's CPU across it and its jobs' wall summed.
+//
+// Mutates: output gets the lines.
+func writeParallel(output *strings.Builder, parallel *parallelReport) {
+	fmt.Fprintf(output, "\nours checked in parallel on the engine's schedule: %d workers, one checker a package\n",
+		parallel.Workers)
+	fmt.Fprintf(output, "%-34s %9s %9s %9s\n", "check", "wall s", "cpu s", "jobs s")
+	for _, row := range []struct {
+		name string
+		run  parallelRun
+	}{
+		{"variational check (the proof's)", parallel.Variational},
+		{"host plain check", parallel.HostPlain},
+	} {
+		jobs := 0.0
+		for _, seconds := range row.run.JobSeconds {
+			jobs += seconds
+		}
+		fmt.Fprintf(output, "%-34s %9.3f %9.3f %9.3f\n", row.name, row.run.WallSeconds, row.run.Process.CpuSeconds(),
+			jobs)
+	}
+	fmt.Fprintf(
+		output,
+		"critical path, measured: the walk adds %+.3fs of wall over the host's plain check, an upper bound, "+
+			"since the variational wall holds its own decode and the plain wall none; host plain warm-up, each "+
+			"package read whole before its schedule: %.3fs wall, %.3fs decode\n",
+		parallel.Variational.WallSeconds-parallel.HostPlain.WallSeconds,
+		parallel.HostPlainWarmSeconds,
+		parallel.HostPlainDecodeSeconds,
+	)
 }

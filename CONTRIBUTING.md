@@ -172,7 +172,8 @@ lays the root at that commit and deeafbf4 once, checks the pinned Go toolchain, 
 build, `CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'`, on a Go cache she keeps. Over an empty system store for
 that binary it runs the Go engine with a clean environment under `/usr/bin/time -l`: the cold row at the root, 2 fills
 and 3 rounds, deeafbf4's, 2 and 2, a warm run after one that fills the project store, and one `--timeline` run. It
-writes `Performance.jsonc` at the root of the tree that lands: medians and ranges in milliseconds, what each row
+writes `Performance.jsonc` at the root of the tree that lands: each time a `median` with its `minimum` and
+`maximum` in milliseconds, every key spelled whole (schema 2), what each row
 `checked` by the engine's own records (its lint record's files walked and its findings, which every round of the row
 must agree on, or the landing refuses), her cpu, cores and load before and after, that she was held quiet, the build,
 the timeline's wall areas, and a note against main's file before it. A row reads "slower by" or "faster by" so much

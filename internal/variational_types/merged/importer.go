@@ -189,12 +189,30 @@ func (importer *Importer) Add(checked *types.Package) {
 // time the check looks it up, the time counted in Timing's decode. A plain check reads build b's types without its
 // lock, so it runs while nothing merges.
 func (importer *Importer) Plain(build int) types.Importer {
+	return plainImporter{build: importer.buildAt(build)}
+}
+
+// PlainWhole is Plain for plain checks that run at once, on the engine's schedule: each package is read whole at its
+// import, under build b's lock, every object of it and every type they reach, so the checks read only what is decoded
+// and never the build's universe at once. It reads more than the checks need, each package's every object where Plain
+// reads those looked up, and that time is counted in Timing's decode. A package imported again is walked once, so a
+// caller can import every package ahead of timed checks and leave them no export data to read. Like Plain, it runs
+// while nothing merges.
+func (importer *Importer) PlainWhole(build int) types.Importer {
+	return plainImporter{
+		build: importer.buildAt(build),
+		whole: &wholeReading{packages: map[*types.Package]bool{}, walked: map[types.Type]bool{}},
+	}
+}
+
+// buildAt is the build whose bit is index, or nil when it is outside the importer's builds.
+func (importer *Importer) buildAt(index int) *build {
 	for _, candidate := range importer.builds {
-		if candidate.index == build {
-			return plainImporter{build: candidate}
+		if candidate.index == index {
+			return candidate
 		}
 	}
-	return plainImporter{}
+	return nil
 }
 
 // Timing is the time spent reading export data and the time spent merging what was read.

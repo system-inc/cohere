@@ -3,6 +3,8 @@ package main
 import (
 	"go/ast"
 	"go/token"
+	"maps"
+	"sync"
 
 	"github.com/system-inc/cohere/internal/variational_types/merged"
 	"github.com/system-inc/go-types/types"
@@ -25,12 +27,64 @@ type checkCounts struct {
 }
 
 // noteError counts reported, spelling the first few.
-//
-// Mutates: counts gets the error.
 func (counts *checkCounts) noteError(reported string) {
 	counts.errors++
 	if len(counts.firstErrors) < firstErrorsKept {
 		counts.firstErrors = append(counts.firstErrors, reported)
+	}
+}
+
+// absorb sums one package's counts into counts. A job of a parallel schedule counts into its own checkCounts, which
+// no other job writes, and its schedule absorbs them under a lock as the job ends.
+func (counts *checkCounts) absorb(job checkCounts) {
+	counts.imports = counts.imports.add(job.imports)
+	counts.checks = counts.checks.add(job.checks)
+	maps.Copy(counts.checkSeconds, job.checkSeconds)
+	counts.errors += job.errors
+	for _, reported := range job.firstErrors {
+		if len(counts.firstErrors) < firstErrorsKept {
+			counts.firstErrors = append(counts.firstErrors, reported)
+		}
+	}
+}
+
+// parallelRun is one check of ours on the engine's schedule: its wall, which is the real critical path its workers
+// gave, the process's CPU across the whole of it, and each package's job seconds (its imports and its check) and check
+// seconds, each by wall alone.
+type parallelRun struct {
+	WallSeconds  float64            `json:"wallSeconds"`
+	Process      phaseTiming        `json:"process"`
+	JobSeconds   map[string]float64 `json:"jobSeconds"`
+	CheckSeconds map[string]float64 `json:"checkSeconds"`
+}
+
+// onSchedule runs job for each of ordered on runSchedule's workers, as the engine schedules its checks, and measures
+// the whole: the schedule's wall and each job's from runSchedule, the process's CPU across it from measure. Each job
+// counts into a checkCounts of its own, absorbed into the one returned as the job ends.
+func onSchedule(
+	ordered []*ourPackage,
+	ours map[string]*ourPackage,
+	workers int,
+	job func(*ourPackage) checkCounts,
+) (checkCounts, parallelRun) {
+	counts := checkCounts{checkSeconds: map[string]float64{}}
+	var countsLock sync.Mutex
+	var run scheduleRun
+	process := measure(func() {
+		run = runSchedule(ordered, ours, workers, func(our *ourPackage) int {
+			jobCounts := job(our)
+			countsLock.Lock()
+			defer countsLock.Unlock()
+			counts.absorb(jobCounts)
+			// No lookup is replayed, so none is missed: the check's errors are in counts.
+			return 0
+		})
+	})
+	return counts, parallelRun{
+		WallSeconds:  run.WallSeconds,
+		Process:      process,
+		JobSeconds:   run.JobSeconds,
+		CheckSeconds: counts.checkSeconds,
 	}
 }
 
@@ -61,36 +115,81 @@ func checkVariationally(
 	counts := checkCounts{checkSeconds: map[string]float64{}}
 	checked := make([]*checkedPackage, 0, len(ordered))
 	for _, our := range ordered {
-		counts.imports = counts.imports.add(timed(func() {
-			for _, imported := range our.imports {
-				if _, isOurs := ours[imported]; isOurs || imported == "unsafe" {
-					continue
-				}
-				if _, importError := importer.Import(imported); importError != nil {
-					counts.noteError(our.path + ": importing " + imported + ": " + importError.Error())
-				}
-			}
-		}))
-		variation := &types.Variation{Builds: all, Files: our.masks}
-		configuration := &types.Config{
-			Variation: variation,
-			Importer:  resolvingImporter{importer: importer, importMap: our.importMap},
-			Sizes:     sizes,
-			GoVersion: goVersionOf(our),
-			Error:     func(reported error) { counts.noteError(reported.Error()) },
-		}
-		var checkedTypes *types.Package
-		checkTiming := timed(func() {
-			// Ignored: every error went to Error above. The Info holds no Types map: Variation.Types is the answer, and a
-			// plain map beside it would record every expression twice.
-			checkedTypes, _ = configuration.Check(our.path, fileSet, our.files, &types.Info{})
-		})
-		counts.checks = counts.checks.add(checkTiming)
-		counts.checkSeconds[our.path] = checkTiming.WallSeconds
-		importer.Add(checkedTypes)
-		checked = append(checked, &checkedPackage{our: our, variation: variation})
+		each, eachCounts := checkOneVariationally(fileSet, our, ours, importer, all, sizes, timed)
+		counts.absorb(eachCounts)
+		checked = append(checked, each)
 	}
 	return checked, counts
+}
+
+// checkVariationallyInParallel checks ordered as checkVariationally does, but on workers goroutines along ours' import
+// graph, one types.Checker a package, as the engine schedules its checks: each of ours starts once every one of ours
+// it imports is checked and added to importer, which is safe for many goroutines at once, and imports what it imports
+// that isn't ours inside its own job. Each job's phases are timed by wall alone, since the process's CPU over one job
+// is every running job's; the run's wall and the process's CPU across it are its price. checked is in ordered's order,
+// whatever order the jobs ran in, so the proof reads it as it reads the serial check's.
+func checkVariationallyInParallel(
+	fileSet *token.FileSet,
+	ordered []*ourPackage,
+	ours map[string]*ourPackage,
+	importer *merged.Importer,
+	all types.Mask,
+	sizes types.Sizes,
+	workers int,
+) ([]*checkedPackage, checkCounts, parallelRun) {
+	positions := make(map[string]int, len(ordered))
+	for index, our := range ordered {
+		positions[our.path] = index
+	}
+	// Each job writes its own element, and runSchedule's wait is over before checked is read.
+	checked := make([]*checkedPackage, len(ordered))
+	counts, run := onSchedule(ordered, ours, workers, func(our *ourPackage) checkCounts {
+		each, eachCounts := checkOneVariationally(fileSet, our, ours, importer, all, sizes, wallOnly)
+		checked[positions[our.path]] = each
+		return eachCounts
+	})
+	return checked, counts, run
+}
+
+// checkOneVariationally is our checked once for every build in all, after importing what it imports that isn't ours,
+// and given to importer for the packages of ours that import it, with its own counts.
+func checkOneVariationally(
+	fileSet *token.FileSet,
+	our *ourPackage,
+	ours map[string]*ourPackage,
+	importer *merged.Importer,
+	all types.Mask,
+	sizes types.Sizes,
+	timed func(func()) phaseTiming,
+) (*checkedPackage, checkCounts) {
+	counts := checkCounts{checkSeconds: map[string]float64{}}
+	counts.imports = timed(func() {
+		for _, imported := range our.imports {
+			if _, isOurs := ours[imported]; isOurs || imported == "unsafe" {
+				continue
+			}
+			if _, importError := importer.Import(imported); importError != nil {
+				counts.noteError(our.path + ": importing " + imported + ": " + importError.Error())
+			}
+		}
+	})
+	variation := &types.Variation{Builds: all, Files: our.masks}
+	configuration := &types.Config{
+		Variation: variation,
+		Importer:  resolvingImporter{importer: importer, importMap: our.importMap},
+		Sizes:     sizes,
+		GoVersion: goVersionOf(our),
+		Error:     func(reported error) { counts.noteError(reported.Error()) },
+	}
+	var checkedTypes *types.Package
+	counts.checks = timed(func() {
+		// Ignored: every error went to Error above. The Info holds no Types map: Variation.Types is the answer, and a
+		// plain map beside it would record every expression twice.
+		checkedTypes, _ = configuration.Check(our.path, fileSet, our.files, &types.Info{})
+	})
+	counts.checkSeconds[our.path] = counts.checks.WallSeconds
+	importer.Add(checkedTypes)
+	return &checkedPackage{our: our, variation: variation}, counts
 }
 
 // checkPlainly checks each of ordered that build compiles the plain way, with only build's files: the baseline the
@@ -108,38 +207,106 @@ func checkPlainly(
 	timed func(func()) phaseTiming,
 ) checkCounts {
 	counts := checkCounts{checkSeconds: map[string]float64{}}
-	checked := map[string]*types.Package{}
+	checked := newOursChecked()
 	for _, our := range ordered {
-		files := our.filesIn(build)
+		counts.absorb(checkOnePlainly(fileSet, our, listed, importer, checked, build, sizes, timed))
+	}
+	return counts
+}
+
+// checkPlainlyInParallel checks ordered as checkPlainly does, on workers goroutines along ours' import graph as
+// checkVariationallyInParallel schedules them, each job's phases timed by wall alone. importer must be safe under
+// checks that run at once, which merged.Importer.PlainWhole is and Plain isn't.
+func checkPlainlyInParallel(
+	fileSet *token.FileSet,
+	ordered []*ourPackage,
+	ours map[string]*ourPackage,
+	listed *listedBuild,
+	importer types.Importer,
+	build int,
+	sizes types.Sizes,
+	workers int,
+) (checkCounts, parallelRun) {
+	checked := newOursChecked()
+	return onSchedule(ordered, ours, workers, func(our *ourPackage) checkCounts {
+		return checkOnePlainly(fileSet, our, listed, importer, checked, build, sizes, wallOnly)
+	})
+}
+
+// warmPlainly imports through importer every package that checkPlainly's checks of ordered import from it in build:
+// each import of a package build compiles, as its build spells it, but ours checked from source, which the checks
+// import from one another. Through PlainWhole, which reads each package whole at its import and once, a schedule
+// checked after it reads no export data, so the plain side's timed wall holds none of the decode the variational
+// side's lazy imports pay inside theirs.
+func warmPlainly(
+	ordered []*ourPackage,
+	ours map[string]*ourPackage,
+	listed *listedBuild,
+	importer types.Importer,
+	build int,
+) {
+	for _, our := range ordered {
 		listedPackage := listed.packages[our.path]
-		if len(files) == 0 || listedPackage == nil {
+		if len(our.filesIn(build)) == 0 || listedPackage == nil {
 			continue
 		}
-		resolving := resolvingImporter{importer: importer, importMap: listedPackage.ImportMap, checked: checked}
-		counts.imports = counts.imports.add(timed(func() {
-			for _, imported := range listedPackage.Imports {
-				if _, importError := resolving.Import(imported); importError != nil {
-					counts.noteError(our.path + ": importing " + imported + ": " + importError.Error())
-				}
+		for _, imported := range listedPackage.Imports {
+			resolvedPath := imported
+			if resolved, mapped := listedPackage.ImportMap[imported]; mapped {
+				resolvedPath = resolved
 			}
-		}))
-		configuration := &types.Config{
-			Importer:  resolving,
-			Sizes:     sizes,
-			GoVersion: goVersionOf(our),
-			Error:     func(reported error) { counts.noteError(reported.Error()) },
+			if _, isOurs := ours[resolvedPath]; resolvedPath == "unsafe" ||
+				isOurs && !listed.oursFromExport[resolvedPath] {
+				continue
+			}
+			// Ignored: a package that can't be imported fails the same way in the timed check, which reports it.
+			_, _ = importer.Import(resolvedPath)
 		}
-		var checkedTypes *types.Package
-		checkTiming := timed(func() {
-			// Ignored: every error went to Error above.
-			checkedTypes, _ = configuration.Check(our.path, fileSet, files,
-				&types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
-		})
-		counts.checks = counts.checks.add(checkTiming)
-		counts.checkSeconds[our.path] = checkTiming.WallSeconds
-		if !listed.oursFromExport[our.path] {
-			checked[our.path] = checkedTypes
+	}
+}
+
+// checkOnePlainly is our checked as build compiles it, with its own counts, when build compiles it: its imports
+// first, then the check, and the checked package given to checked for the packages of ours that import it, unless a
+// package not ours imports it, which reads it from export data.
+func checkOnePlainly(
+	fileSet *token.FileSet,
+	our *ourPackage,
+	listed *listedBuild,
+	importer types.Importer,
+	checked *oursChecked,
+	build int,
+	sizes types.Sizes,
+	timed func(func()) phaseTiming,
+) checkCounts {
+	counts := checkCounts{checkSeconds: map[string]float64{}}
+	files := our.filesIn(build)
+	listedPackage := listed.packages[our.path]
+	if len(files) == 0 || listedPackage == nil {
+		return counts
+	}
+	resolving := resolvingImporter{importer: importer, importMap: listedPackage.ImportMap, checked: checked}
+	counts.imports = timed(func() {
+		for _, imported := range listedPackage.Imports {
+			if _, importError := resolving.Import(imported); importError != nil {
+				counts.noteError(our.path + ": importing " + imported + ": " + importError.Error())
+			}
 		}
+	})
+	configuration := &types.Config{
+		Importer:  resolving,
+		Sizes:     sizes,
+		GoVersion: goVersionOf(our),
+		Error:     func(reported error) { counts.noteError(reported.Error()) },
+	}
+	var checkedTypes *types.Package
+	counts.checks = timed(func() {
+		// Ignored: every error went to Error above.
+		checkedTypes, _ = configuration.Check(our.path, fileSet, files,
+			&types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
+	})
+	counts.checkSeconds[our.path] = counts.checks.WallSeconds
+	if !listed.oursFromExport[our.path] {
+		checked.put(our.path, checkedTypes)
 	}
 	return counts
 }

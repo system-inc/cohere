@@ -24,10 +24,13 @@ type macBoxFixture struct {
 	*landFixture
 	// replies holds what the stand-in ahra answers: `push.fails` makes the push fail, `<box>.held` makes the box's
 	// claim read held, in its words when it holds any, `<box>.run` is what her gap prints, with `COMMIT` the commit the
-	// remote names, and `<box>.exit` its exit. `<box>.unlaid` is what her gap prints in place of `<box>.run` until a
-	// gap carrying corpora has laid them, which copies its carry to `<box>.carry` and its remote to `<box>.lay`, or
-	// prints `<box>.lay.fails` and exits 1 when that is there. The stand-in writes each call it took to `calls`, one
-	// line each, and each box's remote command whole to `<box>.remote`.
+	// remote names, and `<box>.exit` its exit. `<box>.passes`, `<plain seconds> <race seconds>`, makes her gap print a
+	// passing run of exactly the packages and race tokens her remote names in place of `<box>.run`, but for the package
+	// `<box>.omit` names, which it leaves out, `<box>.fails`, which fails, and `<box>.extra`, which it adds.
+	// `<box>.unlaid` is what her gap prints in place of `<box>.run` until a gap carrying corpora has laid them, which
+	// copies its carry to `<box>.carry` and its remote to `<box>.lay`, or prints `<box>.lay.fails` and exits 1 when
+	// that is there. The stand-in writes each call it took to `calls`, one line each, and each box's remote command
+	// whole to `<box>.remote`.
 	replies string
 	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
@@ -58,6 +61,33 @@ gap)
   fi
   printf '%s' "${10}" > "$replies/$box.remote"
   if [ -e "$replies/$box.unlaid" ] && [ ! -e "$replies/$box.laid" ]; then cat "$replies/$box.unlaid"; exit 0; fi
+  if [ -e "$replies/$box.passes" ]; then
+    read -r plain race < "$replies/$box.passes"
+    omit=$(cat "$replies/$box.omit" 2>/dev/null || true); fails=$(cat "$replies/$box.fails" 2>/dev/null || true)
+    # The remote's arguments after its script, an empty one written - so each keeps its place, nothing globbed.
+    set -f
+    set -- $(printf '%s' "${10}" | sed "s/^.* bash -s -- //; s/''/-/g" | tr -d "'")
+    echo "` + boxMarker + `$1 on darwin/arm64"
+    races="$3"; shift 4
+    failed=0
+    for package in "$@"; do
+      [ "$package" != "$omit" ] || continue
+      if [ "$package" = "$fails" ]; then
+        echo '{"Action":"fail","Package":"'"$package"'","Test":"TestPlantedFailure"}'
+        echo '{"Action":"fail","Package":"'"$package"'","Elapsed":'"$plain"'}'; failed=1; continue
+      fi
+      echo '{"Action":"pass","Package":"'"$package"'","Elapsed":'"$plain"'}'
+    done
+    [ ! -e "$replies/$box.extra" ] || echo '{"Action":"pass","Package":"'"$(cat "$replies/$box.extra")"'"}'
+    [ "$failed" = 0 ] || exit 1
+    [ "$races" != - ] || exit 0
+    echo "` + boxRaceMarker + `"
+    for token in $(printf '%s' "$races" | tr , ' '); do
+      directory="${token%%@*}"
+      echo '{"Action":"pass","Package":"example.com/fixture/'"${directory#./}"'","Elapsed":'"$race"'}'
+    done
+    exit 0
+  fi
   commit=$(printf '%s' "${10}" | sed 's/.* bash -s -- \([0-9a-f]*\) .*/\1/')
   sed "s/COMMIT/$commit/g" "$replies/$box.run"
   exit "$(cat "$replies/$box.exit" 2>/dev/null || echo 0)" ;;
@@ -65,12 +95,20 @@ esac
 echo "the stand-in has no answer for: $*"; exit 2
 `
 
+// macBoxGoList answers a go list as go would for the fixture's module, which a split gate lists its packages by: each
+// directory holding a Go file, by its import path and its directory. Any other go command it answers with nothing.
+const macBoxGoList = `[ "$1" = list ] || exit 0
+find . -name '*.go' | sed 's|/[^/]*$||' | sort -u | while read -r directory; do
+  echo "example.com/fixture/${directory#./} $(pwd -P)/${directory#./}"
+done
+`
+
 func newMacBoxFixture(test *testing.T, raced bool) *macBoxFixture {
 	test.Helper()
 	fixture := &macBoxFixture{landFixture: newLandFixture(test), replies: test.TempDir()}
 	stand := test.TempDir()
 	fixture.goCalls = filepath.Join(stand, "go")
-	recorder := "#!/bin/sh\necho \"$*\" >> '" + fixture.goCalls + "'\n"
+	recorder := "#!/bin/sh\necho \"$*\" >> '" + fixture.goCalls + "'\n" + macBoxGoList
 	if writeError := executable_testing.WriteFile(filepath.Join(filepath.Dir(fixture.log), "go"),
 		[]byte(recorder), 0o755); writeError != nil {
 		test.Fatal(writeError)
@@ -80,9 +118,10 @@ func newMacBoxFixture(test *testing.T, raced bool) *macBoxFixture {
 		test.Fatal(writeError)
 	}
 	// A short wait in line, so a landing that wrongly finds every box held refuses in seconds rather than holding the
-	// test for gateWaitDefault. A case that means the wait sets its own, later, which wins.
+	// test for gateWaitDefault. A case that means the wait sets its own, later, which wins. The gate runs whole on one
+	// box, as these tests pin it, and a test of the split (gate_split_test.go) turns it on.
 	fixture.environment = append(fixture.environment, gateVariable+"=on", loomStandInVariable+"="+ahra,
-		"GATE_REPLIES="+fixture.replies, gateWaitVariable+"=5s")
+		"GATE_REPLIES="+fixture.replies, gateWaitVariable+"=5s", gateSplitVariable+"="+gateSplitOffSetting)
 	worktree := fixture.worktree("a")
 	writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
 	writeFixtureFile(test, filepath.Join(worktree, "alpha", "alpha_test.go"),

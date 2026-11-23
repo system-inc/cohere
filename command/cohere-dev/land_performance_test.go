@@ -311,7 +311,7 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 				{"tools", measured.Tools, performanceTools{Cohere: shortCommit(measured.Commit) +
 					" CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache " +
 					"the box kept", Go: "go1.27.1", Binary: performanceFixtureBinary}},
-				{"schema", measured.Schema, 1},
+				{"schema", measured.Schema, 2},
 			} {
 				if fmt.Sprint(check.got) != fmt.Sprint(check.want) {
 					test.Errorf("the file's %s is %+v, want %+v", check.what, check.got, check.want)
@@ -542,6 +542,9 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 	otherBuild, otherShape, otherChecked, sameBinary, otherBinary := current, current, current, current, current
 	otherBuild.Tools.Go = "go1.27.2"
 	otherShape.Engine.Rounds.Cold = 5
+	// A file written before keys were spelled whole, schema 1, reads as another shape, its min and max never read.
+	oldSpelling := current
+	oldSpelling.Schema = 1
 	otherChecked.Engine.Cold.Deeafbf4.Checked = &performanceChecked{Files: 2210, Findings: 1100}
 	otherChecked.Tools.Binary = performanceMainBinary
 	// main's file measured the same binary a little faster at the root, and another binary just the same.
@@ -558,8 +561,11 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 			"-ldflags='-s -w', darwin/arm64, on a cache the box kept with go1.27.1, and main's at 11111111 as " +
 			"CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box " +
 			"kept with go1.27.2: another build, so not compared"},
-		{"another shape", otherShape, "", fmt.Sprintf("main's at 11111111 was measured in another shape (schema 1, "+
+		{"another shape", otherShape, "", fmt.Sprintf("main's at 11111111 was measured in another shape (schema 2, "+
 			"rounds 5/2/%d), so not compared", performanceWarmRounds)},
+		{"the old spelling", oldSpelling, "", fmt.Sprintf("main's at 11111111 was measured in another shape "+
+			"(schema 1, rounds %d/%d/%d), so not compared", performanceColdRounds, performanceReferenceRounds,
+			performanceWarmRounds)},
 		{"a file that doesn't read", current, "unexpected end of JSON input", "main's Performance.jsonc didn't " +
 			"read (unexpected end of JSON input), so nothing is compared"},
 		{"a row that checked otherwise", otherChecked, "", "against 11111111: cold root wall level (9800 ms, was " +
