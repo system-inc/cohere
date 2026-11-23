@@ -289,28 +289,37 @@ func writeProfile(output *strings.Builder, profiled *profileReport) {
 	variational, hostPlain := summarize(profiled.Variational), summarize(profiled.HostPlain)
 	fmt.Fprintf(output, "\nprofiled %d repeats of each check at %d Hz: %s and %s\n", profiled.Repeats,
 		profiled.RateHertz, profiled.VariationalProfile, profiled.HostPlainProfile)
-	fmt.Fprintf(output, "%-12s %10s %10s %10s %12s %14s %10s\n", "check", "median s", "least s", "mean s",
-		"all gc cpu s", "of it idle s", "median MiB")
+	fmt.Fprintf(output, "%-12s %-8s %10s %10s %10s %12s %14s %10s\n", "check", "cpu of", "median s", "least s",
+		"mean s", "all gc cpu s", "of it idle s", "median MiB")
 	for _, row := range []struct {
 		name    string
 		summary repeatSummary
 	}{{"variational", variational}, {"host plain", hostPlain}} {
-		fmt.Fprintf(output, "%-12s %10.4f %10.4f %10.4f %12.3f %14.3f %10.1f\n", row.name, row.summary.medianCPU,
-			row.summary.leastCPU, row.summary.meanCPU, row.summary.collectorCPU, row.summary.collectorIdleCPU,
-			row.summary.medianAllocatedBytes/(1<<20))
+		fmt.Fprintf(output, "%-12s %-8s %10.4f %10.4f %10.4f %12.3f %14.3f %10.1f\n", row.name, "process",
+			row.summary.medianCPU, row.summary.leastCPU, row.summary.meanCPU, row.summary.collectorCPU,
+			row.summary.collectorIdleCPU, row.summary.medianAllocatedBytes/(1<<20))
+		fmt.Fprintf(output, "%-12s %-8s %10.4f %10.4f %10.4f\n", "", "thread", row.summary.medianThreadCPU,
+			row.summary.leastThreadCPU, row.summary.meanThreadCPU)
 	}
-	if hostPlain.medianCPU > 0 && hostPlain.medianAllocatedBytes > 0 {
-		fmt.Fprintf(output, "variational over host plain: %.2fx median cpu, %.2fx least, %.2fx mean, %.2fx allocation\n",
+	if hostPlain.medianCPU > 0 && hostPlain.medianThreadCPU > 0 && hostPlain.medianAllocatedBytes > 0 {
+		fmt.Fprintf(output, "variational over host plain, process cpu: %.2fx median, %.2fx least, %.2fx mean; "+
+			"thread cpu: %.2fx median, %.2fx least, %.2fx mean; %.2fx allocation\n",
 			variational.medianCPU/hostPlain.medianCPU, variational.leastCPU/hostPlain.leastCPU,
-			variational.meanCPU/hostPlain.meanCPU, variational.medianAllocatedBytes/hostPlain.medianAllocatedBytes)
+			variational.meanCPU/hostPlain.meanCPU, variational.medianThreadCPU/hostPlain.medianThreadCPU,
+			variational.leastThreadCPU/hostPlain.leastThreadCPU, variational.meanThreadCPU/hostPlain.meanThreadCPU,
+			variational.medianAllocatedBytes/hostPlain.medianAllocatedBytes)
 	}
 	for _, row := range []struct {
 		name    string
 		repeats []profileRepeat
 	}{{"variational", profiled.Variational}, {"host plain", profiled.HostPlain}} {
-		fmt.Fprintf(output, "%s cpu s by repeat:", row.name)
+		fmt.Fprintf(output, "%s process cpu s by repeat:", row.name)
 		for _, repeat := range row.repeats {
 			fmt.Fprintf(output, " %.3f", repeat.Check.CPUSeconds())
+		}
+		fmt.Fprintf(output, "\n%s thread cpu s by repeat: ", row.name)
+		for _, repeat := range row.repeats {
+			fmt.Fprintf(output, " %.3f", repeat.ThreadCPUSeconds)
 		}
 		fmt.Fprintf(output, "\n")
 	}

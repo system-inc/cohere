@@ -9,6 +9,7 @@ import (
 	"runtime/pprof"
 	"sort"
 
+	"github.com/system-inc/cohere/internal/cpu_clock"
 	"github.com/system-inc/cohere/internal/variational_types/merged"
 	"github.com/system-inc/cohere/internal/variational_types/types"
 )
@@ -27,13 +28,16 @@ const (
 	allocationMetric    = "/gc/heap/allocs:bytes"
 )
 
-// profileRepeat is one repeat of one check over every package: its time, the collector's CPU in it and the idle mark
-// workers' part of that, and what it allocated.
+// profileRepeat is one repeat of one check over every package: its time, the CPU of the thread the check ran on
+// alone, the collector's CPU in it and the idle mark workers' part of that, and what it allocated.
 type profileRepeat struct {
-	Check                   phaseTiming `json:"check"`
-	CollectorCPUSeconds     float64     `json:"collectorCpuSeconds"`
-	CollectorIdleCPUSeconds float64     `json:"collectorIdleCpuSeconds"`
-	AllocatedBytes          uint64      `json:"allocatedBytes"`
+	Check phaseTiming `json:"check"`
+	// ThreadCPUSeconds is the check's own thread's CPU: its work, the collector assists it was charged and the
+	// runtime work it did on its own stack, but none of the background mark workers' on other threads.
+	ThreadCPUSeconds        float64 `json:"threadCpuSeconds"`
+	CollectorCPUSeconds     float64 `json:"collectorCpuSeconds"`
+	CollectorIdleCPUSeconds float64 `json:"collectorIdleCpuSeconds"`
+	AllocatedBytes          uint64  `json:"allocatedBytes"`
 }
 
 // profileReport is the repeats of both checks under the profiler, and where their profiles went.
@@ -111,28 +115,41 @@ func underProfile(file string, work func()) error {
 }
 
 // repeatOnce runs one repeat, measured as a whole, its imports with it (the importer is warm, so they are cache hits),
-// and reads the collector's CPU and the bytes allocated around it.
+// on a goroutine held to its thread so the thread's own CPU clock is the check's, and reads the collector's CPU and
+// the bytes allocated around it.
 func repeatOnce(repeat func()) profileRepeat {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	samples := []metrics.Sample{{Name: collectorMetric}, {Name: collectorIdleMetric}, {Name: allocationMetric}}
 	metrics.Read(samples)
 	collectorBefore, idleBefore := samples[0].Value.Float64(), samples[1].Value.Float64()
 	allocatedBefore := samples[2].Value.Uint64()
+	threadBefore, threadKnown := cpu_clock.Thread()
 	check := measure(repeat)
+	threadAfter, threadKnownAfter := cpu_clock.Thread()
 	metrics.Read(samples)
+	threadCPU := 0.0
+	if threadKnown && threadKnownAfter {
+		threadCPU = (threadAfter - threadBefore).Seconds()
+	}
 	return profileRepeat{
 		Check:                   check,
+		ThreadCPUSeconds:        threadCPU,
 		CollectorCPUSeconds:     samples[0].Value.Float64() - collectorBefore,
 		CollectorIdleCPUSeconds: samples[1].Value.Float64() - idleBefore,
 		AllocatedBytes:          samples[2].Value.Uint64() - allocatedBefore,
 	}
 }
 
-// repeatSummary is repeats' CPU, median, least and mean, the collector's CPU over them all and its idle mark workers'
+// repeatSummary is repeats' process CPU and their check thread's, each median, least and mean, the collector's CPU over them all and its idle mark workers'
 // part, and the median bytes allocated.
 type repeatSummary struct {
 	medianCPU            float64
 	leastCPU             float64
 	meanCPU              float64
+	medianThreadCPU      float64
+	leastThreadCPU       float64
+	meanThreadCPU        float64
 	collectorCPU         float64
 	collectorIdleCPU     float64
 	medianAllocatedBytes float64
@@ -145,9 +162,12 @@ func summarize(repeats []profileRepeat) repeatSummary {
 	}
 	summary := repeatSummary{}
 	cpu := make([]float64, len(repeats))
+	thread := make([]float64, len(repeats))
 	allocated := make([]float64, len(repeats))
 	for index, repeat := range repeats {
 		cpu[index] = repeat.Check.CPUSeconds()
+		thread[index] = repeat.ThreadCPUSeconds
+		summary.meanThreadCPU += thread[index] / float64(len(repeats))
 		allocated[index] = float64(repeat.AllocatedBytes)
 		summary.meanCPU += cpu[index] / float64(len(repeats))
 		summary.collectorCPU += repeat.CollectorCPUSeconds
@@ -155,6 +175,8 @@ func summarize(repeats []profileRepeat) repeatSummary {
 	}
 	summary.leastCPU = least(cpu)
 	summary.medianCPU = median(cpu)
+	summary.leastThreadCPU = least(thread)
+	summary.medianThreadCPU = median(thread)
 	summary.medianAllocatedBytes = median(allocated)
 	return summary
 }
