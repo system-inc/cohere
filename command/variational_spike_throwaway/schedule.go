@@ -263,13 +263,14 @@ func scheduleImporter(
 		}
 		return replayReads(variational, reads[our.path])
 	})
+	// A plain importer's lazy universe takes no lock of its own, so its lookups are always one at a time within its
+	// build. The host's whole decode is a few hundredths of a second, so this barely slows the baseline.
 	host := newImporter()
 	hostPlain := host.Plain(0)
+	var hostLock sync.Mutex
 	report.HostPlainImport = runSchedule(ordered, ours, workers, func(our *ourPackage) int {
-		if serialized {
-			serial.Lock()
-			defer serial.Unlock()
-		}
+		hostLock.Lock()
+		defer hostLock.Unlock()
 		return replayReads(hostPlain, reads[our.path])
 	})
 	// Today each build reads its own, the builds side by side: one schedule a build, all of them at once, each
@@ -280,14 +281,14 @@ func scheduleImporter(
 	var builders sync.WaitGroup
 	for build := range builds {
 		plain := every.Plain(build)
+		var buildLock sync.Mutex
 		builders.Add(1)
 		go func() {
 			defer builders.Done()
 			runs[build] = runSchedule(ordered, ours, workers, func(our *ourPackage) int {
-				if serialized {
-					serial.Lock()
-					defer serial.Unlock()
-				}
+				// One at a time within the build, as the host's: a plain universe takes no lock of its own.
+				buildLock.Lock()
+				defer buildLock.Unlock()
 				return replayReads(plain, reads[our.path])
 			})
 		}()
