@@ -85,7 +85,8 @@ var coldTests sync.Map
 // coldSystemCacheFor has every run of test that names no system cache read and write a new, empty one of its own, as
 // every run did before the template (#2htryg8): for a test of what a run computing the standard library does, which
 // the template's entries would restore instead, or one that holds a run restoring it to a run computing it. It is
-// test's alone, a subtest's apart from its parent's, and test's cleanup forgets it.
+// test's alone, a subtest's apart from its parent's, and test's cleanup forgets it. A new test of the cold path opts
+// in here: one left unmarked reads the template and passes warm, never seeing the path it means to test.
 func coldSystemCacheFor(test *testing.T) {
 	test.Helper()
 	coldTests.Store(test, true)
