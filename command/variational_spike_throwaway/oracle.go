@@ -27,8 +27,14 @@ type expressionKey struct {
 	kind  string
 }
 
-// keyOf is expression's key in fileSet.
+// keyOf is expression's key in fileSet. A constraint's implicit interface, which the checker makes around a `~T` or
+// `A|B` constraint and gives no position, is keyed by the constraint it wraps.
 func keyOf(fileSet *token.FileSet, expression ast.Expr) expressionKey {
+	if wrapped := implicitConstraint(expression); wrapped != nil {
+		key := keyOf(fileSet, wrapped)
+		key.kind = "implicit interface of " + key.kind
+		return key
+	}
 	tokenFile := fileSet.File(expression.Pos())
 	if tokenFile == nil {
 		return expressionKey{kind: reflect.TypeOf(expression).String()}
@@ -39,6 +45,25 @@ func keyOf(fileSet *token.FileSet, expression ast.Expr) expressionKey {
 		end:   tokenFile.Offset(expression.End()),
 		kind:  reflect.TypeOf(expression).String(),
 	}
+}
+
+// implicitConstraint is the constraint expression a positionless implicit interface wraps, or nil for any other
+// expression. go/types' Checker.bound wraps the constraint as the interface's one embedded element.
+func implicitConstraint(expression ast.Expr) ast.Expr {
+	iface, isInterface := expression.(*ast.InterfaceType)
+	if !isInterface || iface.Pos().IsValid() || iface.Methods == nil || len(iface.Methods.List) != 1 {
+		return nil
+	}
+	element := iface.Methods.List[0]
+	if len(element.Names) != 0 || element.Type == nil || !element.Type.Pos().IsValid() {
+		return nil
+	}
+	return element.Type
+}
+
+// keyable reports whether expression has a key of its own: a position, or a constraint it wraps.
+func keyable(expression ast.Expr) bool {
+	return expression.Pos().IsValid() || implicitConstraint(expression) != nil
 }
 
 // oracleBuild is one build's plain answers for our packages' expressions, from go/packages.
@@ -93,9 +118,9 @@ func loadOracle(
 			return
 		}
 		for expression, typeAndValue := range visited.TypesInfo.Types {
-			// A node the checker made for itself (a constraint's implicit interface) has no position, so every one of
-			// them would share one key: counted apart, never compared.
-			if !expression.Pos().IsValid() {
+			// A node the checker made for itself with nothing to key it by would share one key with every other:
+			// counted apart, never compared. A constraint's implicit interface is keyed by its constraint (keyOf).
+			if !keyable(expression) {
 				oracle.noPosition++
 				continue
 			}
