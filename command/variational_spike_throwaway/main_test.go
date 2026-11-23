@@ -36,8 +36,8 @@ func fixtureCommandLine(test *testing.T, plant bool) commandLine {
 
 // TestFixtureProjectsExactlyToEveryBuild runs the fixture through the whole spike: one variational check, each build's
 // projection compared with go/packages' plain answers, every expression matched and none on one side only.
-// Not parallel: the fork holds a variational check's state in package variables, one check at a time.
 func TestFixtureProjectsExactlyToEveryBuild(test *testing.T) {
+	test.Parallel()
 	report, spikeError := runSpike(fixtureCommandLine(test, false), io.Discard)
 	if spikeError != nil {
 		test.Fatal(spikeError)
@@ -61,8 +61,8 @@ func TestFixtureProjectsExactlyToEveryBuild(test *testing.T) {
 
 // TestPlantedMismatchShowsRed changes one projected answer of the host before the proof, which must count exactly that
 // one as mismatched and call the run red, while the other builds stay green.
-// Not parallel: the fork holds a variational check's state in package variables, one check at a time.
 func TestPlantedMismatchShowsRed(test *testing.T) {
+	test.Parallel()
 	report, spikeError := runSpike(fixtureCommandLine(test, true), io.Discard)
 	if spikeError != nil {
 		test.Fatal(spikeError)
@@ -95,13 +95,15 @@ func TestMixedArchitecturesAreRefused(test *testing.T) {
 	}
 }
 
-// parallelFixtureRoot is six packages of ours: shape, imported by left and right, both imported by top, and words and
-// records beside them, importing nothing of ours. Every one reads the standard library's types, many of them the same
-// ones, so checks that run at once read one importer at once.
+// parallelFixtureRoot is nine packages of ours: shape, imported by left and right, both imported by top; words and
+// records beside them, importing nothing of ours; and platform and status, whose files differ by build (a handle, a
+// separator and a count of another type in each, and syscall's Stat_t where the build has one), both imported with
+// shape by uses. Every one reads the standard library's types, many of them the same ones, so checks that run at once
+// read one importer at once.
 var parallelFixtureRoot = filepath.Join("testdata", "parallel")
 
 // parallelFixturePackages is how many of ours the parallel fixture holds.
-const parallelFixturePackages = 6
+const parallelFixturePackages = 9
 
 // parallelWorkers is more workers than the fixture's widest level of the import graph, so every package that can run
 // beside another does.
@@ -111,8 +113,8 @@ const parallelWorkers = 4
 // schedule several times, each through a fresh whole-reading importer, as the parallel host baseline does. Under
 // `-race` a check reading what another job writes fails the test; without it the checks must still report no error
 // and time every package.
-// Not parallel: a plain check reads the fork's variational state, which another test's variational check writes.
 func TestParallelPlainChecksAreSafe(test *testing.T) {
+	test.Parallel()
 	root, rootError := filepath.Abs(parallelFixtureRoot)
 	if rootError != nil {
 		test.Fatal(rootError)
@@ -167,11 +169,8 @@ func TestParallelPlainChecksAreSafe(test *testing.T) {
 // TestParallelChecksProveOneBuild runs the parallel fixture through the whole spike with --check-workers for its host
 // alone: the variational check on the engine's schedule, its answers projected and proved green against the oracle,
 // and the host's plain check on the same schedule beside it, every package of both timed.
-// Not parallel: the fork holds a variational check's state in package variables, one check at a time.
 func TestParallelChecksProveOneBuild(test *testing.T) {
-	test.Skip("the fork at 169774a holds a variational check's state in package variables (types/variational.go's " +
-		"variational), so checks that run at once write into each other's Variation, even for one build; this runs " +
-		"once the fork keeps that state per check")
+	test.Parallel()
 	asked, parseError := parseCommandLine([]string{
 		"--root", parallelFixtureRoot,
 		"--host", "darwin/arm64,cgo=0",
@@ -204,5 +203,62 @@ func TestParallelChecksProveOneBuild(test *testing.T) {
 	}
 	if len(report.Proof) != 1 || report.Proof[0].Compared == 0 {
 		test.Errorf("the proof compared nothing: %+v", report.Proof)
+	}
+}
+
+// TestParallelChecksProveEveryBuild runs the parallel fixture through the whole spike with --check-workers for darwin,
+// linux and windows: the variational check of every package on the engine's schedule, many at once through one merged
+// importer, platform's and status's answers forking by build and crossing into uses, each build's projection compared
+// with go/packages' plain answers. Under `-race` a check reading what another writes fails the test.
+func TestParallelChecksProveEveryBuild(test *testing.T) {
+	test.Parallel()
+	asked, parseError := parseCommandLine([]string{
+		"--root", parallelFixtureRoot,
+		"--host", "darwin/arm64,cgo=0",
+		"--build", "linux/arm64",
+		"--build", "windows/arm64",
+		"--check-workers", strconv.Itoa(parallelWorkers),
+	}, io.Discard)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	report, spikeError := runSpike(asked, io.Discard)
+	if spikeError != nil {
+		test.Fatal(spikeError)
+	}
+	if !report.green() {
+		test.Errorf("the parallel fixture's proof is red:\n%s", tableText(report))
+	}
+	if len(report.Proof) != 3 {
+		test.Fatalf("%d builds proved, want 3", len(report.Proof))
+	}
+	for _, proof := range report.Proof {
+		if proof.Compared == 0 || proof.Matched != proof.Compared {
+			test.Errorf("%s: %d of %d matched", proof.Target, proof.Matched, proof.Compared)
+		}
+	}
+	if report.Totals.ForkedExpressions == 0 {
+		test.Error("the fixture's files differ by build, yet no expression has more than one answer")
+	}
+	forkedIn := map[string]bool{}
+	for _, our := range report.Ours {
+		forkedIn[our.Path] = our.ForkedExpressions != 0
+	}
+	for _, path := range []string{"example.com/parallel/platform", "example.com/parallel/uses"} {
+		if !forkedIn[path] {
+			test.Errorf("%s has no expression with more than one answer, though its builds read other types", path)
+		}
+	}
+	if report.Parallel == nil {
+		test.Fatal("--check-workers asked for a parallel check, and the report holds none")
+	}
+	for _, row := range []struct {
+		name string
+		run  parallelRun
+	}{{"variational", report.Parallel.Variational}, {"host plain", report.Parallel.HostPlain}} {
+		if len(row.run.JobSeconds) != parallelFixturePackages || row.run.WallSeconds <= 0 {
+			test.Errorf("%s: %d jobs timed over %vs, want %d over some time", row.name, len(row.run.JobSeconds),
+				row.run.WallSeconds, parallelFixturePackages)
+		}
 	}
 }
