@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/variational_types/canonical"
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/canonical"
+	"github.com/system-inc/go-types/types"
 )
 
 // differencesKept is how many differences a build's proof spells out.

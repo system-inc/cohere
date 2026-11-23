@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // resolvingImporter imports for one of ours: it spells each import path as the package's build resolved it (a vendored

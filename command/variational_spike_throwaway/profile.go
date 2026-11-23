@@ -11,7 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/cpu_clock"
 	"github.com/system-inc/cohere/internal/variational_types/merged"
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // profileRate is the CPU profile's samples a second, above pprof's 100 so a check of tenths of a second leaves enough.

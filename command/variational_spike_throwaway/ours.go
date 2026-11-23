@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // ourPackage is one package the patterns matched, over every build: the union of each build's compiled files, each

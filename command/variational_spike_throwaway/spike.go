@@ -11,7 +11,7 @@ import (
 	"runtime/debug"
 
 	"github.com/system-inc/cohere/internal/variational_types/merged"
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // runSpike lists every build, checks ours once for all of them and plainly for the baselines, and proves the

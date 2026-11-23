@@ -5,7 +5,7 @@ import (
 	"go/token"
 
 	"github.com/system-inc/cohere/internal/variational_types/merged"
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // checkedPackage is one of ours after the variational check: its answers by build and the check's counts.

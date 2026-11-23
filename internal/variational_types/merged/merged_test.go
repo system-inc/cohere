@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/variational_types/merged"
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/types"
 )
 
 // The test's builds: bit 0 is darwin, bit 1 linux, bit 2 windows, every one arm64 without cgo.

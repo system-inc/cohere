@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/variational_types/gcimporter"
-	"github.com/system-inc/cohere/internal/variational_types/types"
+	"github.com/system-inc/go-types/gcimporter"
+	"github.com/system-inc/go-types/types"
 )
 
 // Importer merges every build's export data into one universe, a package at a time as the check imports them.
