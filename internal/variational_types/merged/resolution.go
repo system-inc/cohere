@@ -52,6 +52,15 @@ type methodRecord struct {
 	function    *types.Func
 	builds      types.Mask
 	declaration *declaration
+	// indices are the method's index among the named type's methods in each build that declares it, as that build's
+	// export data orders them.
+	indices []buildIndex
+}
+
+// buildIndex is an index in the builds of mask.
+type buildIndex struct {
+	builds types.Mask
+	index  int
 }
 
 // declaration is a declared function or method across builds: the type parameters its signature binds, made from the
@@ -448,23 +457,25 @@ func (resolution *resolution) fillNamed(record *namedRecord, build *build, named
 		record.named.SetUnderlying(underlying)
 	}
 	record.underlyings = append(record.underlyings, types.UnderlyingVariant{Builds: build.mask, Underlying: underlying})
-	for _, method := range methods {
-		resolution.mergeMethod(record, build, method)
+	for index, method := range methods {
+		resolution.mergeMethod(record, build, method, index)
 	}
 }
 
-// mergeMethod adds build's method to its merged named type's method of that name, made when it is first reached.
+// mergeMethod adds build's method, at index among build's methods, to its merged named type's method of that name,
+// made when it is first reached.
 //
-// Mutates: record gets the method, or the method of its name gets build.
-func (resolution *resolution) mergeMethod(record *namedRecord, build *build, method *types.Func) {
+// Mutates: record gets the method, or the method of its name gets build and its index there.
+func (resolution *resolution) mergeMethod(record *namedRecord, build *build, method *types.Func, index int) {
 	for _, existing := range record.methods {
 		if existing.function.Name() == method.Name() {
 			existing.builds |= build.mask
+			existing.indices = append(existing.indices, buildIndex{build.mask, index})
 			resolution.declaredSignature(build, method.Signature(), existing.declaration)
 			return
 		}
 	}
-	made := &methodRecord{builds: build.mask, declaration: &declaration{}}
+	made := &methodRecord{builds: build.mask, declaration: &declaration{}, indices: []buildIndex{{build.mask, index}}}
 	signature := resolution.declaredSignature(build, method.Signature(), made.declaration)
 	made.function = types.NewFunc(
 		method.Pos(),
@@ -666,6 +677,27 @@ func (resolution *resolution) finishNamed(record *namedRecord) {
 		}
 		types.SetVariants(method.function, resolution.signatureVariants(method.declaration))
 	}
+	// A build whose methods sit at other places than the merged list's (one declares fewer, or orders them otherwise)
+	// gives each method its index there, so a selection reads as that build's plain check reads it.
+	if record.methodOrderDiffers() {
+		for _, method := range record.methods {
+			for _, given := range method.indices {
+				types.SetMethodIndex(method.function, given.builds, given.index)
+			}
+		}
+	}
+}
+
+// methodOrderDiffers reports whether any build's method sits at another index than its place in the merged list.
+func (record *namedRecord) methodOrderDiffers() bool {
+	for place, method := range record.methods {
+		for _, given := range method.indices {
+			if given.index != place {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // translate is build's type typed as the merged universe has it.
