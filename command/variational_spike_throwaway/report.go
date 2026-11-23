@@ -65,23 +65,25 @@ type oursTotals struct {
 	ForkedExpressions int `json:"forkedExpressions"`
 }
 
-// timingReport is every phase apart. Decode and merge are the importer's own count of its work inside the phase that
-// imported, wall time only.
+// timingReport is every phase apart. Decode, decode wait and merge are the importer's own count of its work inside
+// the phases that import and check: decode is the builds' reading summed over the builds, decode wait the merge's wall
+// time waiting on it, the builds one object needs read at once, and merge the merge's wall time less that wait.
 type timingReport struct {
-	ListingGraph             phaseTiming   `json:"listingGraph"`
-	ListingExports           phaseTiming   `json:"listingExports"`
-	Parse                    phaseTiming   `json:"parse"`
-	VariationalImport        phaseTiming   `json:"variationalImport"`
-	VariationalDecodeSeconds float64       `json:"variationalDecodeSeconds"`
-	VariationalMergeSeconds  float64       `json:"variationalMergeSeconds"`
-	VariationalCheck         phaseTiming   `json:"variationalCheck"`
-	HostPlainImport          phaseTiming   `json:"hostPlainImport"`
-	HostPlainCheck           phaseTiming   `json:"hostPlainCheck"`
-	EveryBuildPlainImport    phaseTiming   `json:"everyBuildPlainImport"`
-	EveryBuildPlainCheck     phaseTiming   `json:"everyBuildPlainCheck"`
-	PlainCheckByBuild        []phaseTiming `json:"plainCheckByBuild"`
-	HostPlainDecodeSeconds   float64       `json:"hostPlainDecodeSeconds"`
-	PlainDecodeSeconds       float64       `json:"plainDecodeSeconds"`
+	ListingGraph                 phaseTiming   `json:"listingGraph"`
+	ListingExports               phaseTiming   `json:"listingExports"`
+	Parse                        phaseTiming   `json:"parse"`
+	VariationalImport            phaseTiming   `json:"variationalImport"`
+	VariationalDecodeSeconds     float64       `json:"variationalDecodeSeconds"`
+	VariationalDecodeWaitSeconds float64       `json:"variationalDecodeWaitSeconds"`
+	VariationalMergeSeconds      float64       `json:"variationalMergeSeconds"`
+	VariationalCheck             phaseTiming   `json:"variationalCheck"`
+	HostPlainImport              phaseTiming   `json:"hostPlainImport"`
+	HostPlainCheck               phaseTiming   `json:"hostPlainCheck"`
+	EveryBuildPlainImport        phaseTiming   `json:"everyBuildPlainImport"`
+	EveryBuildPlainCheck         phaseTiming   `json:"everyBuildPlainCheck"`
+	PlainCheckByBuild            []phaseTiming `json:"plainCheckByBuild"`
+	HostPlainDecodeSeconds       float64       `json:"hostPlainDecodeSeconds"`
+	PlainDecodeSeconds           float64       `json:"plainDecodeSeconds"`
 }
 
 // checkErrors is every check's errors, which a sound run has none of.
@@ -212,9 +214,10 @@ func tableText(report *spikeReport) string {
 		fmt.Fprintf(output, "%-34s %9.3f %9.3f %9.3f\n", row.name, row.phase.WallSeconds, row.phase.CPUSeconds(),
 			row.phase.ChildrenCPUSeconds)
 	}
-	fmt.Fprintf(output, "importer (wall): variational decode %.3fs, merge %.3fs; host plain decode %.3fs; every build "+
-		"plain decode %.3fs\n", timing.VariationalDecodeSeconds, timing.VariationalMergeSeconds,
-		timing.HostPlainDecodeSeconds, timing.PlainDecodeSeconds)
+	fmt.Fprintf(output, "importer: variational decode %.3fs summed over builds, %.3fs waited on, merge %.3fs wall; "+
+		"host plain decode %.3fs; every build plain decode %.3fs\n", timing.VariationalDecodeSeconds,
+		timing.VariationalDecodeWaitSeconds, timing.VariationalMergeSeconds, timing.HostPlainDecodeSeconds,
+		timing.PlainDecodeSeconds)
 	if timing.HostPlainCheck.CPUSeconds() > 0 && timing.EveryBuildPlainCheck.CPUSeconds() > 0 {
 		fmt.Fprintf(output, "variational check cpu over host plain check: %.2fx; over every build summed: %.2fx\n",
 			timing.VariationalCheck.CPUSeconds()/timing.HostPlainCheck.CPUSeconds(),
@@ -229,8 +232,8 @@ func tableText(report *spikeReport) string {
 	fmt.Fprintf(output, "\nerrors: variational check %d, plain checks %d\n", errors.Variational, errors.Plain)
 	shortfalls := report.Shortfalls
 	fmt.Fprintf(output, "merge shortfalls: %d kind conflicts, %d unbound signatures, %d stray type parameters, "+
-		"%d generic alias variants\n", shortfalls.KindConflicts, shortfalls.UnboundSignatures,
-		shortfalls.StrayTypeParameters, shortfalls.GenericAliasVariants)
+		"%d generic alias variants, %d merged type sets\n", shortfalls.KindConflicts, shortfalls.UnboundSignatures,
+		shortfalls.StrayTypeParameters, shortfalls.GenericAliasVariants, shortfalls.MergedTypeSets)
 	for _, spelled := range errors.VariationalFirst {
 		fmt.Fprintf(output, "  variational: %s\n", spelled)
 	}

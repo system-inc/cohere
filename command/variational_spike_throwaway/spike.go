@@ -106,30 +106,37 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	for index, each := range listed {
 		exports[index] = each.exports()
 	}
-	importer := merged.New(fileSet, exports, all)
+	importer := merged.New(fileSet, exportSources(fileSet, exports), all)
 
 	say(progress, "variational-spike: checking %d packages once for %d builds\n", len(ordered), len(listed))
 	checked, variationalCounts := checkVariationally(fileSet, ordered, ours, importer, all, sizes, measure)
 	report.Timing.VariationalImport = variationalCounts.imports
 	report.Timing.VariationalCheck = variationalCounts.checks
-	decode, merge := importer.Timing()
-	report.Timing.VariationalDecodeSeconds = decode.Seconds()
-	report.Timing.VariationalMergeSeconds = merge.Seconds()
+	importerTiming := importer.Timing()
+	report.Timing.VariationalDecodeSeconds = importerTiming.Decode.Seconds()
+	report.Timing.VariationalDecodeWaitSeconds = importerTiming.DecodeWait.Seconds()
+	report.Timing.VariationalMergeSeconds = importerTiming.Merge.Seconds()
 	report.Errors.Variational = variationalCounts.errors
 	report.Errors.VariationalFirst = variationalCounts.firstErrors
+	// A build's export data the merge couldn't read is an error of the variational check, for that build.
+	for _, failure := range importer.Failures() {
+		report.Errors.Variational++
+		if len(report.Errors.VariationalFirst) < firstErrorsKept {
+			report.Errors.VariationalFirst = append(report.Errors.VariationalFirst, failure.Error())
+		}
+	}
 	report.addOurs(checked)
 
 	say(progress, "variational-spike: checking every build plainly\n")
 	// A fresh importer: the merge's shares each build's decoded packages with its Plain, so reusing it would hide
 	// the baselines' decode in the variational run's.
-	baselineImporter := merged.New(fileSet, exports, all)
+	baselineImporter := merged.New(fileSet, exportSources(fileSet, exports), all)
 	for index, each := range listed {
 		counts := checkPlainly(fileSet, ordered, each, baselineImporter.Plain(index), index, sizes, measure)
 		if index == 0 {
 			report.Timing.HostPlainImport = counts.imports
 			report.Timing.HostPlainCheck = counts.checks
-			hostDecode, _ := baselineImporter.Timing()
-			report.Timing.HostPlainDecodeSeconds = hostDecode.Seconds()
+			report.Timing.HostPlainDecodeSeconds = baselineImporter.Timing().Decode.Seconds()
 		}
 		report.Timing.EveryBuildPlainImport = report.Timing.EveryBuildPlainImport.add(counts.imports)
 		report.Timing.EveryBuildPlainCheck = report.Timing.EveryBuildPlainCheck.add(counts.checks)
@@ -141,8 +148,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 			}
 		}
 	}
-	plainDecode, _ := baselineImporter.Timing()
-	report.Timing.PlainDecodeSeconds = plainDecode.Seconds()
+	report.Timing.PlainDecodeSeconds = baselineImporter.Timing().Decode.Seconds()
 	report.Shortfalls = importer.Shortfalls()
 
 	if asked.cpuProfile != "" {
@@ -175,6 +181,15 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	}
 	report.PeakResidentBytes = peakResidentBytes(runtime.GOOS)
 	return report, nil
+}
+
+// exportSources is a source for each build, reading the export data files exports[b] names for build b.
+func exportSources(fileSet *token.FileSet, exports []map[string]string) []merged.Source {
+	sources := make([]merged.Source, len(exports))
+	for index, files := range exports {
+		sources[index] = merged.ExportData(fileSet, files)
+	}
+	return sources
 }
 
 // addOurs reports each of checked and sums them.
