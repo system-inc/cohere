@@ -45,7 +45,9 @@ func keyOf(fileSet *token.FileSet, expression ast.Expr) expressionKey {
 type oracleBuild struct {
 	answers map[expressionKey]string
 	// duplicates counts expressions whose key another expression of the build already held.
-	duplicates    int
+	duplicates int
+	// noPosition counts expressions with no position, left out of the comparison.
+	noPosition    int
 	packageErrors int
 	firstErrors   []string
 	load          phaseTiming
@@ -91,6 +93,12 @@ func loadOracle(
 			return
 		}
 		for expression, typeAndValue := range visited.TypesInfo.Types {
+			// A node the checker made for itself (a constraint's implicit interface) has no position, so every one of
+			// them would share one key: counted apart, never compared.
+			if !expression.Pos().IsValid() {
+				oracle.noPosition++
+				continue
+			}
 			key := keyOf(fileSet, expression)
 			if _, held := oracle.answers[key]; held {
 				oracle.duplicates++

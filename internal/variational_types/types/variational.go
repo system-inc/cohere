@@ -713,8 +713,10 @@ func (check *Checker) declareVariational(obj Object, d *declInfo) {
 			switch obj := obj.(type) {
 			case *Const:
 				check.decl = declared.decl
+				// Only a constant declared in more than one build's file runs out of its file's order; any other
+				// constant's records keep the plain check's order, the order its declarations ran in.
 				savedOrder := check.recordOrder
-				if iota, isInt := constant.Int64Val(declared.iota); isInt {
+				if iota, isInt := constant.Int64Val(declared.iota); isInt && len(decls) > 1 {
 					check.recordOrder = iota
 				}
 				check.constDecl(obj, declared.decl.vtyp, declared.decl.init, declared.decl.inherited)

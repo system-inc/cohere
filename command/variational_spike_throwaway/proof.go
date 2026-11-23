@@ -28,6 +28,8 @@ const plantedSuffix = " (planted)"
 // spelled as the oracle spells its own.
 type projection struct {
 	answers map[expressionKey]string
+	// noPosition counts expressions with no position holding the build, left out as the oracle leaves its own out.
+	noPosition int
 	// ambiguous are the expressions more than one answer of which holds the build, each kept at its first.
 	ambiguous []expressionKey
 }
@@ -44,11 +46,17 @@ func projectTo(fileSet *token.FileSet, checked []*checkedPackage, build int) pro
 					continue
 				}
 				held++
+				if !expression.Pos().IsValid() {
+					if held == 1 {
+						projected.noPosition++
+					}
+					continue
+				}
 				if held == 1 {
 					projected.answers[keyOf(fileSet, expression)] = canonical.Answer(answer.TypeAndValue)
 				}
 			}
-			if held > 1 {
+			if held > 1 && expression.Pos().IsValid() {
 				projected.ambiguous = append(projected.ambiguous, keyOf(fileSet, expression))
 			}
 		}
@@ -74,6 +82,8 @@ func proveBuild(target string, projected projection, oracle *oracleBuild, source
 	proof := buildProof{
 		Target:              target,
 		OracleDuplicates:    oracle.duplicates,
+		NoPositionPlain:     oracle.noPosition,
+		NoPositionProjected: projected.noPosition,
 		OraclePackageErrors: oracle.packageErrors,
 		OracleFirstErrors:   oracle.firstErrors,
 		OracleLoad:          oracle.load,

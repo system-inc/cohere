@@ -69,6 +69,19 @@ func Switch(value any) int {
 }
 
 func Shift() int { return 1 << N }
+
+// UseKinds' last constant is declared first, through a type, as internal/go_engine/build_reads/use_kinds.go's
+// usedKindsEnd is: the group's shared 1 << iota then ends on UsedConstant in a plain check, not on the last constant.
+type UseKinds uint8
+
+const (
+	UsedNamed UseKinds = 1 << iota
+	UsedSelected
+	UsedConstant
+	usedKindsEnd
+)
+
+type useKindTable [usedKindsEnd]bool
 `},
 	{"unix.go", buildDarwin | buildLinux, `package fork
 

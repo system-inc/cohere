@@ -100,6 +100,8 @@ type buildProof struct {
 	Ambiguous           int          `json:"ambiguous"`
 	Green               bool         `json:"green"`
 	OracleDuplicates    int          `json:"oracleDuplicates"`
+	NoPositionPlain     int          `json:"noPositionPlain"`
+	NoPositionProjected int          `json:"noPositionProjected"`
 	OraclePackageErrors int          `json:"oraclePackageErrors"`
 	OracleFirstErrors   []string     `json:"oracleFirstErrors,omitempty"`
 	OracleLoad          phaseTiming  `json:"oracleLoad"`
@@ -232,6 +234,10 @@ func tableText(report *spikeReport) string {
 		fmt.Fprintf(output, "%-40s %9d %9d %9d %9d %9d %9d %7s %8.1f\n", proof.Target, proof.Compared, proof.Matched,
 			proof.Mismatched, proof.OnlyProjected, proof.OnlyPlain, proof.Ambiguous, verdict,
 			proof.OracleLoad.WallSeconds)
+	}
+	for _, proof := range report.Proof {
+		fmt.Fprintf(output, "left out, no position: %d plain, %d projected; oracle keys held twice: %d (%s)\n",
+			proof.NoPositionPlain, proof.NoPositionProjected, proof.OracleDuplicates, proof.Target)
 	}
 	for _, proof := range report.Proof {
 		writeDifferences(output, "first mismatches in "+proof.Target, proof.FirstMismatches, differencesKept)
