@@ -22,6 +22,8 @@ type spikeReport struct {
 	Errors checkErrors  `json:"errors"`
 	// Profile is the profiled repeats of each check, when --cpu-profile asked for them.
 	Profile *profileReport `json:"profile,omitempty"`
+	// Schedule is the importer replayed on the engine's schedule, when --schedule-workers asked for it.
+	Schedule *scheduleReport `json:"schedule,omitempty"`
 	// Shortfalls are what the merging importer could not keep exactly.
 	Shortfalls merged.Shortfalls `json:"shortfalls"`
 	Planted    *differenceAtKey  `json:"planted,omitempty"`
@@ -227,6 +229,9 @@ func tableText(report *spikeReport) string {
 	if report.Profile != nil {
 		writeProfile(output, report.Profile)
 	}
+	if report.Schedule != nil {
+		writeSchedule(output, report.Schedule)
+	}
 
 	errors := report.Errors
 	fmt.Fprintf(output, "\nerrors: variational check %d, plain checks %d\n", errors.Variational, errors.Plain)
@@ -326,4 +331,31 @@ func writeProfile(output *strings.Builder, profiled *profileReport) {
 		}
 		fmt.Fprintf(output, "\n")
 	}
+}
+
+// writeSchedule writes the importer replayed on the engine's schedule and the critical path the model gives.
+//
+// Mutates: output gets the lines.
+func writeSchedule(output *strings.Builder, schedule *scheduleReport) {
+	order := "in parallel"
+	if schedule.Serialized {
+		order = "one lookup at a time, the importer not being safe for more"
+	}
+	fmt.Fprintf(output, "\nthe importer on the engine's schedule: %d workers, %d reads, %s\n", schedule.Workers,
+		schedule.Reads, order)
+	fmt.Fprintf(output, "%-34s %9s %9s\n", "replay", "wall s", "missed")
+	for _, row := range []struct {
+		name string
+		run  scheduleRun
+	}{
+		{"variational importer", schedule.VariationalImport},
+		{"host plain importer", schedule.HostPlainImport},
+		{"every build's plain, side by side", schedule.EveryBuildImport},
+	} {
+		fmt.Fprintf(output, "%-34s %9.3f %9d\n", row.name, row.run.WallSeconds, row.run.Missed)
+	}
+	fmt.Fprintf(output, "critical path (model: warm checks plus measured lookups, on the import graph): variational "+
+		"%.3fs, host plain %.3fs, so the walk adds %+.3fs; checks alone %.3fs and %.3fs\n", schedule.VariationalPath,
+		schedule.HostPlainPath, schedule.VariationalPath-schedule.HostPlainPath, schedule.VariationalCheckOn,
+		schedule.HostPlainCheckOn)
 }

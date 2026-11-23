@@ -151,6 +151,18 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	report.Timing.PlainDecodeSeconds = baselineImporter.Timing().Decode.Seconds()
 	report.Shortfalls = importer.Shortfalls()
 
+	if asked.scheduleWorkers > 0 {
+		say(progress, "variational-spike: replaying the importer on the engine's schedule, %d workers\n",
+			asked.scheduleWorkers)
+		reads := recordReads(fileSet, ordered, ours, listed[0], baselineImporter.Plain(0), sizes)
+		// Warm checks, one package at a time, each timed apart: the model's check weights, with no import work in them.
+		_, warmVariational := checkVariationally(fileSet, ordered, ours, importer, all, sizes, measure)
+		warmHost := checkPlainly(fileSet, ordered, listed[0], baselineImporter.Plain(0), 0, sizes, measure)
+		report.Schedule = scheduleImporter(ordered, ours, reads, len(listed),
+			func() *merged.Importer { return merged.New(fileSet, exportSources(fileSet, exports), all) },
+			warmVariational.checkSeconds, warmHost.checkSeconds, asked.scheduleWorkers, !asked.scheduleParallel)
+	}
+
 	if asked.cpuProfile != "" {
 		say(progress, "variational-spike: profiling each check %d times\n", asked.profileRepeat)
 		profiled, profileError := profileChecks(fileSet, ordered, ours, importer, all, listed[0],
