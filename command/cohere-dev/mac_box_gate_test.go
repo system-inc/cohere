@@ -336,7 +336,9 @@ func TestALandingTestsOnTheGatesMacsAndNeverOnKirksMac(test *testing.T) {
 // macBoxRemote is a gap's remote command: the encoded script through bash, then its arguments, the commit, the pin and
 // the races quoted, then the patterns.
 var macBoxRemote = regexp.MustCompile(
-	`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| bash -s -- ([0-9a-f]{40}) '([0-9a-f]*)' '([^']*)' '([^']*)' (.*)$`,
+	// A box with a core budget (macBoxCoreBudgets), Marin, has it set before bash.
+	`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| (?:` + boxCoreBudgetVariable + `=[0-9]+ )?bash -s -- ([0-9a-f]{40}) ` +
+		`'([0-9a-f]*)' '([^']*)' '([^']*)' (.*)$`,
 )
 
 // The push puts the commit being landed in Loom's feed for cohere, the gap runs on Sun2 within its bound over ssh to
@@ -502,6 +504,53 @@ func TestTheGatesScriptsParseAndSayTheirSteps(test *testing.T) {
 	if bashError != nil || !regexp.MustCompile(`\A`+regexp.QuoteMeta(boxStepMarker)+`toolchain [0-9]+\n`+
 		regexp.QuoteMeta(boxStepMarker)+`modules [0-9]+\n\z`).Match(output) {
 		test.Errorf("the gate's opening said its steps as (%v):\n%s", bashError, output)
+	}
+}
+
+// Marin gives a gate all but two of her cores (macBoxCoreBudgets): her command carries the budget and Sun2's none, and
+// the script, as sharedBoxGate spells it, runs go with two threads a test binary and half the budget's binaries at
+// once, saying the budget it held; a budget of one core holds no binary and refuses.
+func TestAGateMacKeepsToHerCoreBudget(test *testing.T) {
+	test.Parallel()
+	needs.Tool(test, "bash", "the gate's script is a bash script")
+	marin := macBoxRemoteCommand("Marin", "0123", "", nil, nil, []string{"./..."})
+	sun2 := macBoxRemoteCommand("Sun2", "0123", "", nil, nil, []string{"./..."})
+	if !strings.Contains(marin, " | "+boxCoreBudgetVariable+"=10 bash -s -- ") ||
+		strings.Contains(sun2, boxCoreBudgetVariable) {
+		test.Errorf("Marin's command or Sun2's carries the wrong budget:\n%.300s\n%.300s", marin[len(marin)-120:],
+			sun2[len(sun2)-120:])
+	}
+	_, after, found := strings.Cut(sharedBoxGate, "# A box that shares herself with other work")
+	block, _, closed := strings.Cut(after, "\nfi\n")
+	if !found || !closed {
+		test.Fatal("sharedBoxGate holds no budget block to run")
+	}
+	run := func(cores string) (string, error) {
+		test.Helper()
+		bash := exec.Command("bash", "-s")
+		bash.Stdin = strings.NewReader("set -euo pipefail\nrefuse() { echo \"" + sharedBoxRefusedMarker +
+			"$*\"; exit 1; }\nGOFLAGS=\"-buildvcs=false -trimpath\"\n# " + block + "\nfi\n" +
+			"echo \"GOFLAGS=$GOFLAGS GOMAXPROCS=${GOMAXPROCS:-unset}\"\n")
+		// Without the pool's own `GOMAXPROCS` and `GOFLAGS`, which a token sets, so only the block can set them.
+		bash.Env = append(slices.DeleteFunc(os.Environ(), func(variable string) bool {
+			return strings.HasPrefix(variable, "GOMAXPROCS=") || strings.HasPrefix(variable, "GOFLAGS=") ||
+				strings.HasPrefix(variable, boxCoreBudgetVariable+"=")
+		}), boxCoreBudgetVariable+"="+cores)
+		output, bashError := bash.CombinedOutput()
+		return string(output), bashError
+	}
+	said, runError := run("10")
+	if want := boxBudgetMarker + "10 cores, go test -p 5 on 2 threads each\nGOFLAGS=-buildvcs=false -trimpath -p 5 " +
+		"GOMAXPROCS=2\n"; runError != nil || said != want {
+		test.Errorf("a budget of 10 ran as (%v):\n%s\nwant\n%s", runError, said, want)
+	}
+	if said, runError := run("1"); runError == nil || !strings.Contains(said, sharedBoxRefusedMarker+
+		"a core budget of 1 holds no test binary") {
+		test.Errorf("a budget of 1 wasn't refused (%v):\n%s", runError, said)
+	}
+	if verdict := readTestJson([]byte(boxBudgetMarker + "10 cores, go test -p 5 on 2 threads each\n" + boxStepMarker +
+		"tests 60")); verdict.timingReport() != "within 10 cores, go test -p 5 on 2 threads each; by step tests 1m0s" {
+		test.Errorf("a budgeted run's timing reads %q", verdict.timingReport())
 	}
 }
 

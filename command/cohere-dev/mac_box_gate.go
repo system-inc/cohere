@@ -198,12 +198,29 @@ func feedGateCommit(worktree string, commit string) (string, string) {
 	return pin, ""
 }
 
-// macBoxRemoteCommand is the command gap runs over ssh on a gate box: macBoxScript, given commit, its pin, the race
-// tokens, the corpora and the packages to test, which are the module's patterns for the whole gate and a half's import
-// paths for a split one (gate_split.go).
-func macBoxRemoteCommand(commit string, pin string, races []string, corpora []gateCorpus, packages []string) string {
+// macBoxCoreBudgets is how many cores each gate Mac that shares herself with other work gives a gate, by her name:
+// Marin carries Ahra's texting line and AhraHands, so a job of ours there keeps to all but two of her 12 cores (Kirk's
+// box plan, Nov 23, relayed on #bc8nf0r). A Mac not named here gives a gate all of hers.
+var macBoxCoreBudgets = map[string]int{"Marin": 10}
+
+// macBoxRemoteCommand is the command gap runs over ssh on the gate box named box: macBoxScript, given commit, its pin,
+// the race tokens, the corpora and the packages to test, which are the module's patterns for the whole gate and a
+// half's import paths for a split one (gate_split.go), with box's core budget when macBoxCoreBudgets names one.
+func macBoxRemoteCommand(
+	box string,
+	commit string,
+	pin string,
+	races []string,
+	corpora []gateCorpus,
+	packages []string,
+) string {
+	budget := ""
+	if cores, budgeted := macBoxCoreBudgets[box]; budgeted {
+		budget = fmt.Sprintf("%s=%d ", boxCoreBudgetVariable, cores)
+	}
 	// Encoded, so nothing in the script is read by a shell before the box's bash: gap's command is one argument to ssh.
-	return "echo " + base64.StdEncoding.EncodeToString([]byte(macBoxScript)) + " | base64 -d | bash -s -- " +
+	return "echo " + base64.StdEncoding.EncodeToString([]byte(macBoxScript)) + " | base64 -d | " + budget +
+		"bash -s -- " +
 		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' '" + corporaArgument(corpora) + "' " +
 		strings.Join(packages, " ")
 }
@@ -269,7 +286,8 @@ func runOnGateBoxes(
 	boxes []string,
 	wait time.Duration,
 ) ([]byte, string, string, error) {
-	remote := macBoxRemoteCommand(commit, pin, races, corpora, patterns)
+	// A whole gate's command is made for each box in turn, since each may hold her own core budget.
+	remoteFor := func(box string) string { return macBoxRemoteCommand(box, commit, pin, races, corpora, patterns) }
 	lines := gateLines{lock: &sync.Mutex{}}
 	started := time.Now()
 	// asked is how many times every box has been asked. A land always asks twice before it refuses, so a wait shorter
@@ -287,7 +305,7 @@ func runOnGateBoxes(
 			fmt.Fprintf(streams.Errors, "cohere-dev: testing %s on %s in her gap; the land lock stays held while it "+
 				"runs\n", shortCommit(commit), box)
 			streams.Show(streams.Errors)
-			output, stayedHeld, unavailable, runError := runOnGateBox(worktree, box, remote, corpora, lines)
+			output, stayedHeld, unavailable, runError := runOnGateBox(worktree, box, remoteFor(box), corpora, lines)
 			if unavailable != "" {
 				return nil, "", unavailable, nil
 			}

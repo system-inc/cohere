@@ -94,6 +94,12 @@ found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha
 // module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box. The -race run is one go
 // test of the plain tokens, then one of each token's package with its run, every one through the same filter so the
 // run after the marker reads as one stream, and a failure of any is the run's, after the rest have run.
+// boxCoreBudgetVariable carries a gate box's core budget (macBoxCoreBudgets) to her script, unset for a box with none.
+const boxCoreBudgetVariable = "COHERE_DEV_GATE_CORES"
+
+// boxBudgetMarker opens the line a gate box's run prints when it kept to a core budget, the budget after it.
+const boxBudgetMarker = "cohere-dev-gate: budget "
+
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 # step says how many seconds the step it names took, from the end of the one before it (#bc8nf0r).
 stepStarted=$(date +%s)
@@ -107,6 +113,15 @@ fi
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
 export PATH="$goroot/bin:$nodePath` + sharedBoxSystemPath + `"
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
+# A box that shares herself with other work gives the gate a budget of cores (macBoxCoreBudgets): two threads a test
+# binary, and half the budget's binaries at once, so the gate's Go work holds that many threads. macOS caps no job's
+# cores, so it is a budget, kept by Go's own settings, and the run says it held one.
+if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
+  budgetPackages=$(( ` + boxCoreBudgetVariable + ` / 2 ))
+  [ "$budgetPackages" -ge 1 ] || refuse "a core budget of ${` + boxCoreBudgetVariable + `} holds no test binary"
+  export GOMAXPROCS=2 GOFLAGS="$GOFLAGS -p $budgetPackages"
+  echo "` + boxBudgetMarker + `${` + boxCoreBudgetVariable + `} cores, go test -p $budgetPackages on 2 threads each"
+fi
 gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
 # The run's own temporary directory, when the script before this made one, goes with the cache.
 trap 'rm -rf "$gocache"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT

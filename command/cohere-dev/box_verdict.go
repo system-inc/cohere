@@ -104,6 +104,8 @@ type boxVerdict struct {
 	// test binary's run, from its pass or fail.
 	steps          []string
 	packageSeconds map[string]float64
+	// budget is the core budget the box's run said it kept to (boxBudgetMarker), empty when it kept to none.
+	budget string
 	// box names who ran the tests, as the gate's lines say it: the Mac the gap ran on, the land-gate job Loom placed,
 	// or the stand-in. It is the road's to set, since the box's own output never names it.
 	box string
@@ -163,6 +165,10 @@ func readTestJson(output []byte) boxVerdict {
 		line := scanner.Text()
 		if why, isRefusal := strings.CutPrefix(line, sharedBoxRefusedMarker); isRefusal {
 			verdict.refused = strings.TrimSpace(why)
+			continue
+		}
+		if budget, isBudget := strings.CutPrefix(line, boxBudgetMarker); isBudget {
+			verdict.budget = strings.TrimSpace(budget)
 			continue
 		}
 		if step, isStep := strings.CutPrefix(line, boxStepMarker); isStep {
@@ -511,6 +517,9 @@ func (verdict boxVerdict) timingReport() string {
 		return strings.Join(halves, "; ")
 	}
 	parts := []string{}
+	if verdict.budget != "" {
+		parts = append(parts, "within "+verdict.budget)
+	}
 	if len(verdict.steps) > 0 {
 		parts = append(parts, "by step "+strings.Join(verdict.steps, ", "))
 	}
