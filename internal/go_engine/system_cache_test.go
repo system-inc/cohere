@@ -71,7 +71,8 @@ func TestMain(suite *testing.M) {
 // restored, would otherwise read tables another run wrote, its counts turning on which ran first (#2htryg8). A test of
 // what a cold system cache does has every run of it read an empty one of its own (coldSystemCacheFor), and a test of
 // what a warm one does names one shared by the runs it compares (sharingSystemCache). The source also reads the go
-// answers the process keeps (testsGoAnswers), so a run under what decided an answer before forks no go env for it.
+// answers the process keeps (testsGoAnswers), so a run under what decided an answer before forks no go env or
+// `go tool dist list` for it.
 func isolatedSource(test *testing.T, source standardLibrarySource) standardLibrarySource {
 	test.Helper()
 	if source.systemCacheRoot == "" && os.Getenv(system_cache_testing.Variable) == testsSystemCache {
@@ -85,7 +86,7 @@ func isolatedSource(test *testing.T, source standardLibrarySource) standardLibra
 	return source
 }
 
-// testsGoAnswers are go env's answers this test binary keeps (load.GoAnswers), which every
+// testsGoAnswers are go env's and `go tool dist list`'s answers this test binary keeps (load.GoAnswers), which every
 // run isolatedSource gives a source reads under TestMain's environment (#2htryg8).
 var testsGoAnswers = load.NewGoAnswers()
 

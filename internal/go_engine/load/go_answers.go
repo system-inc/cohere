@@ -12,11 +12,11 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
-// GoAnswers are what go env answered a test process, kept by everything that decides each answer, so a run asking
-// under what decided one asked before reads it rather than starting a child (#2htryg8). On darwin go starts each child
-// with fork, which marks the whole heap copy-on-write, so a test process running hundreds of runs side by side faults
-// on every page it next writes after each one; the engine's own run asks every time, since a person's environment
-// and toolchain move between runs. Nil in every run but a test's (Children.Answers); a failed
+// GoAnswers are what go env and `go tool dist list` answered a test process, kept by everything that decides each
+// answer, so a run asking under what decided one asked before reads it rather than starting a child (#2htryg8). On
+// darwin go starts each child with fork, which marks the whole heap copy-on-write, so a test process running hundreds
+// of runs side by side faults on every page it next writes after each one; the engine's own run asks every time, since
+// a person's environment and toolchain move between runs. Nil in every run but a test's (Children.Answers); a failed
 // ask is never kept.
 type GoAnswers struct {
 	lock sync.Mutex
@@ -24,6 +24,9 @@ type GoAnswers struct {
 	// environments are go env's answers by goEnvironmentKey, each with the workspace it was asked in, which the answer
 	// is moved from to the asker's (relocated).
 	environments map[string]keptGoEnvironment
+
+	// ports are what `go tool dist list -json` printed, by the key its asker gave (Ports).
+	ports map[string][]byte
 }
 
 // keptGoEnvironment is one go env answer GoAnswers keeps, and the workspace it was asked in.
@@ -34,7 +37,26 @@ type keptGoEnvironment struct {
 
 // NewGoAnswers is a GoAnswers that has kept nothing yet.
 func NewGoAnswers() *GoAnswers {
-	return &GoAnswers{environments: map[string]keptGoEnvironment{}}
+	return &GoAnswers{environments: map[string]keptGoEnvironment{}, ports: map[string][]byte{}}
+}
+
+// Ports is what `go tool dist list -json` printed under key, which the caller makes of everything that decides it,
+// asked by ask the first time and kept when it succeeds.
+func (answers *GoAnswers) Ports(key string, ask func() ([]byte, error)) ([]byte, error) {
+	answers.lock.Lock()
+	output, kept := answers.ports[key]
+	answers.lock.Unlock()
+	if kept {
+		return output, nil
+	}
+	output, askError := ask()
+	if askError != nil {
+		return nil, askError
+	}
+	answers.lock.Lock()
+	defer answers.lock.Unlock()
+	answers.ports[key] = output
+	return output, nil
 }
 
 // goEnvironment is go env's answer in workspace under environment, the whole one, read from an answer kept under the

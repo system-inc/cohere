@@ -1,7 +1,9 @@
 package go_engine
 
 import (
+	"os"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -107,10 +109,39 @@ func startEarly(
 		early.portsAnswered.Add(1)
 		early.goAwaited(func() {
 			defer early.portsAnswered.Done()
-			early.ports, early.portsError = project.ReadPorts(workspace.Root, workspace.Environment())
+			early.ports, early.portsError = early.readPortsOf(workspace, children.Answers)
 		})
 	}
 	return early
+}
+
+// readPortsOf is the toolchain's ports in workspace under its environment (project.ReadPorts), read from what answers
+// kept for the same toolchain when a test's run keeps answers (load.GoAnswers): the toolchain is the one the host's go
+// env names, its `GOROOT` and `GOVERSION`, under the process's environment and the workspace's, `PWD` aside, which
+// moves with the asker and which `go tool dist list` never reads. A run that keeps none, or whose go env failed, asks.
+// Called on the early start's goroutine of its own, so the wait for the host's go env holds nothing else up.
+func (early *earlyStart) readPortsOf(workspace project.Workspace, answers *load.GoAnswers) ([]project.Port, error) {
+	if answers == nil {
+		return project.ReadPorts(workspace.Root, workspace.Environment())
+	}
+	goEnvironment, goEnvironmentError := early.hostGoEnvironment()
+	if goEnvironmentError != nil {
+		return project.ReadPorts(workspace.Root, workspace.Environment())
+	}
+	values := goEnvironment.Values()
+	key := []string{values["GOROOT"], values["GOVERSION"]}
+	for _, variable := range append(os.Environ(), workspace.Environment()...) {
+		if !strings.HasPrefix(variable, "PWD=") {
+			key = append(key, variable)
+		}
+	}
+	output, listError := answers.Ports(strings.Join(key, "\x00"), func() ([]byte, error) {
+		return project.ListPorts(workspace.Root, workspace.Environment())
+	})
+	if listError != nil {
+		return nil, listError
+	}
+	return project.ParsePorts(workspace.Root, output)
 }
 
 // hostGoEnvironment is the host's go env, and how reading it failed, once it has answered and the early start has done
