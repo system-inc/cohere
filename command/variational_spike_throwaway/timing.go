@@ -62,6 +62,13 @@ func measure(phase func()) phaseTiming {
 	return started.since()
 }
 
+// unmeasured runs phase and measures nothing, for the profiled repeats: a getrusage around each package would cost
+// a share of a small package's check, and on darwin the profiler's ticks land on the getrusage that reads them.
+func unmeasured(phase func()) phaseTiming {
+	phase()
+	return phaseTiming{}
+}
+
 // elapsed is the time from started to ended, counted in whole microseconds so an unchanged clock is exactly zero.
 func elapsed(started syscall.Timeval, ended syscall.Timeval) float64 {
 	microseconds := (ended.Sec-started.Sec)*1_000_000 + int64(ended.Usec-started.Usec)

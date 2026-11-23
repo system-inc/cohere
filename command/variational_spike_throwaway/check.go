@@ -42,7 +42,9 @@ func goVersionOf(our *ourPackage) string {
 
 // checkVariationally checks each of ordered once for every build in all, after importing what it imports that isn't
 // ours, so the imports are timed apart and no import runs inside a variational check, whose state is the fork's
-// package state. Each checked package is given to importer for the packages of ours that import it.
+// package state. timed measures each package's imports and check, or only runs them. Each checked package is given to importer for the packages of ours that import it, and the imports
+// stay interleaved with the checks: a package not ours can import one of ours, and imported before that one is added
+// it would read ours' export data, a second identity for every type of it.
 func checkVariationally(
 	fileSet *token.FileSet,
 	ordered []*ourPackage,
@@ -50,11 +52,12 @@ func checkVariationally(
 	importer *merged.Importer,
 	all types.Mask,
 	sizes types.Sizes,
+	timed func(func()) phaseTiming,
 ) ([]*checkedPackage, checkCounts) {
 	counts := checkCounts{}
 	checked := make([]*checkedPackage, 0, len(ordered))
 	for _, our := range ordered {
-		counts.imports = counts.imports.add(measure(func() {
+		counts.imports = counts.imports.add(timed(func() {
 			for _, imported := range our.imports {
 				if _, isOurs := ours[imported]; isOurs || imported == "unsafe" {
 					continue
@@ -73,7 +76,7 @@ func checkVariationally(
 			Error:     func(reported error) { counts.noteError(reported.Error()) },
 		}
 		var checkedTypes *types.Package
-		counts.checks = counts.checks.add(measure(func() {
+		counts.checks = counts.checks.add(timed(func() {
 			// Ignored: every error went to Error above. The Info holds no Types map: Variation.Types is the answer, and a
 			// plain map beside it would record every expression twice.
 			checkedTypes, _ = configuration.Check(our.path, fileSet, our.files, &types.Info{})
@@ -85,7 +88,8 @@ func checkVariationally(
 }
 
 // checkPlainly checks each of ordered that build compiles the plain way, with only build's files and build's own
-// export data, unmerged: the baseline the variational check is priced against. Its answers go to a Types map, as a
+// export data, unmerged: the baseline the variational check is priced against, each phase of each package run
+// through timed. Its answers go to a Types map, as a
 // plain check's must to be recorded at all.
 func checkPlainly(
 	fileSet *token.FileSet,
@@ -94,6 +98,7 @@ func checkPlainly(
 	importer types.Importer,
 	build int,
 	sizes types.Sizes,
+	timed func(func()) phaseTiming,
 ) checkCounts {
 	counts := checkCounts{}
 	for _, our := range ordered {
@@ -102,7 +107,7 @@ func checkPlainly(
 		if len(files) == 0 || listedPackage == nil {
 			continue
 		}
-		counts.imports = counts.imports.add(measure(func() {
+		counts.imports = counts.imports.add(timed(func() {
 			for _, imported := range listedPackage.Imports {
 				if imported == "unsafe" {
 					continue
@@ -118,7 +123,7 @@ func checkPlainly(
 			GoVersion: goVersionOf(our),
 			Error:     func(reported error) { counts.noteError(reported.Error()) },
 		}
-		counts.checks = counts.checks.add(measure(func() {
+		counts.checks = counts.checks.add(timed(func() {
 			// Ignored: every error went to Error above.
 			_, _ = configuration.Check(our.path, fileSet, files, &types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
 		}))

@@ -19,6 +19,9 @@
 //	--tests                  test variants; not built yet, so only false is taken
 //	--json <file>            every number, written when given
 //	--plant-mismatch         change one projected answer of the host before the proof, which must then show red
+//	--cpu-profile <file>     after the timed phases, profile the variational check into file and the host's plain
+//	                         check into file.host-plain, each run --profile-repeat times
+//	--profile-repeat <n>     how many times each profiled check runs, 1 by default
 //	--deadline <duration>    stop the run once it has taken this long, 0 for none
 //	--stop-above-gigabytes   stop the run once the process holds more than this much memory, 0 for none
 //
@@ -64,6 +67,9 @@ type commandLine struct {
 	patterns []string
 	jsonFile string
 	plant    bool
+	// cpuProfile, when given, is where the profiled repeats of the variational check go, profileRepeat how many.
+	cpuProfile    string
+	profileRepeat int
 	// deadline and stopAboveGigabytes bound the run, zero for no bound.
 	deadline           time.Duration
 	stopAboveGigabytes float64
@@ -146,6 +152,8 @@ func parseCommandLine(arguments []string, standardError io.Writer) (commandLine,
 	tests := flags.Bool("tests", false, "test variants, not built yet")
 	flags.StringVar(&asked.jsonFile, "json", "", "the file every number is written to")
 	flags.BoolVar(&asked.plant, "plant-mismatch", false, "change one projected answer before the proof")
+	flags.StringVar(&asked.cpuProfile, "cpu-profile", "", "profile repeats of each check into this file")
+	flags.IntVar(&asked.profileRepeat, "profile-repeat", 1, "how many times each profiled check runs")
 	flags.DurationVar(&asked.deadline, "deadline", 0, "stop once the run has taken this long")
 	flags.Float64Var(&asked.stopAboveGigabytes, "stop-above-gigabytes", 0, "stop once the process holds more")
 	if parseError := flags.Parse(arguments); parseError != nil {
@@ -153,6 +161,9 @@ func parseCommandLine(arguments []string, standardError io.Writer) (commandLine,
 	}
 	if flags.NArg() != 0 {
 		return asked, fmt.Errorf("unexpected arguments %q", flags.Args())
+	}
+	if asked.profileRepeat < 1 {
+		return asked, errors.New("--profile-repeat must be at least 1")
 	}
 	if *tests {
 		return asked, errors.New("--tests: test variants are not built yet; the spike checks packages only")

@@ -94,7 +94,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	importer := merged.New(fileSet, exports, all)
 
 	say(progress, "variational-spike: checking %d packages once for %d builds\n", len(ordered), len(listed))
-	checked, variationalCounts := checkVariationally(fileSet, ordered, ours, importer, all, sizes)
+	checked, variationalCounts := checkVariationally(fileSet, ordered, ours, importer, all, sizes, measure)
 	report.Timing.VariationalImport = variationalCounts.imports
 	report.Timing.VariationalCheck = variationalCounts.checks
 	decode, merge := importer.Timing()
@@ -109,7 +109,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	// the baselines' decode in the variational run's.
 	baselineImporter := merged.New(fileSet, exports, all)
 	for index, each := range listed {
-		counts := checkPlainly(fileSet, ordered, each, baselineImporter.Plain(index), index, sizes)
+		counts := checkPlainly(fileSet, ordered, each, baselineImporter.Plain(index), index, sizes, measure)
 		if index == 0 {
 			report.Timing.HostPlainImport = counts.imports
 			report.Timing.HostPlainCheck = counts.checks
@@ -129,6 +129,16 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	plainDecode, _ := baselineImporter.Timing()
 	report.Timing.PlainDecodeSeconds = plainDecode.Seconds()
 	report.Shortfalls = importer.Shortfalls()
+
+	if asked.cpuProfile != "" {
+		say(progress, "variational-spike: profiling each check %d times\n", asked.profileRepeat)
+		profiled, profileError := profileChecks(fileSet, ordered, ours, importer, all, listed[0],
+			baselineImporter.Plain(0), sizes, asked.profileRepeat, asked.cpuProfile)
+		if profileError != nil {
+			return nil, profileError
+		}
+		report.Profile = profiled
+	}
 
 	sources := &sourceCache{contents: map[string][]byte{}}
 	for index, each := range listed {
