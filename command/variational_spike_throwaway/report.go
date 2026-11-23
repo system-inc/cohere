@@ -38,6 +38,8 @@ type buildListing struct {
 	CgoChoice  string `json:"cgoChoice"`
 	Packages   int    `json:"packages"`
 	Matched    int    `json:"matched"`
+	// Exported counts the packages whose export data the second go list gave: every package not ours, but unsafe.
+	Exported int `json:"exported"`
 }
 
 // ourReport is one of ours after the variational check.
@@ -66,7 +68,8 @@ type oursTotals struct {
 // timingReport is every phase apart. Decode and merge are the importer's own count of its work inside the phase that
 // imported, wall time only.
 type timingReport struct {
-	Listing                  phaseTiming   `json:"listing"`
+	ListingGraph             phaseTiming   `json:"listingGraph"`
+	ListingExports           phaseTiming   `json:"listingExports"`
 	Parse                    phaseTiming   `json:"parse"`
 	VariationalImport        phaseTiming   `json:"variationalImport"`
 	VariationalDecodeSeconds float64       `json:"variationalDecodeSeconds"`
@@ -145,6 +148,10 @@ var spikeNotes = []string{
 	"Ours are the packages any build's patterns matched; a file's mask is the builds whose go list compiles it.",
 	"An expression is keyed by file, start and end offsets, and its syntax node's kind; its answer is the census's " +
 		"spelling of its type and exact constant value.",
+	"Listing is two go list runs a build: the graph with -deps -compiled, which compiles nothing, then -export " +
+		"naming only the packages not ours, so ours are compiled only where a package not ours imports one.",
+	"The plain baselines read ours as they checked them, from source, in dependency order, and everything else " +
+		"from export data.",
 	"The variational check imports everything not ours before each package is checked, so the import phase is " +
 		"timed apart from the check; the plain baselines do the same with each build's own export data.",
 	"The baselines import through a fresh merging importer's Plain, since an importer's Plain shares each build's " +
@@ -163,8 +170,8 @@ func tableText(report *spikeReport) string {
 	fmt.Fprintf(output, "variational spike over %s, patterns %s\n", report.Root, strings.Join(report.Patterns, " "))
 	fmt.Fprintf(output, "workspace: %s\n", report.Workspace)
 	for _, build := range report.Builds {
-		fmt.Fprintf(output, "  bit %d  %-40s %5d packages listed, %d matched (cgo: %s)\n", build.Bit, build.Target,
-			build.Packages, build.Matched, build.CgoChoice)
+		fmt.Fprintf(output, "  bit %d  %-40s %5d packages listed, %d matched, %d exported (cgo: %s)\n", build.Bit,
+			build.Target, build.Packages, build.Matched, build.Exported, build.CgoChoice)
 	}
 	totals := report.Totals
 	fmt.Fprintf(output, "\nours: %d packages, %d files (%d in every build), %d units, %d restarts, %d expressions, "+
@@ -191,7 +198,8 @@ func tableText(report *spikeReport) string {
 		name  string
 		phase phaseTiming
 	}{
-		{"listing (go list, every build)", timing.Listing},
+		{"listing: graph, nothing compiled", timing.ListingGraph},
+		{"listing: export data, not ours", timing.ListingExports},
 		{"parse (ours, once)", timing.Parse},
 		{"variational import", timing.VariationalImport},
 		{"variational check", timing.VariationalCheck},

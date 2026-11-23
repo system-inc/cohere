@@ -87,10 +87,11 @@ func checkVariationally(
 	return checked, counts
 }
 
-// checkPlainly checks each of ordered that build compiles the plain way, with only build's files and build's own
-// export data, unmerged: the baseline the variational check is priced against, each phase of each package run
-// through timed. Its answers go to a Types map, as a
-// plain check's must to be recorded at all.
+// checkPlainly checks each of ordered that build compiles the plain way, with only build's files: the baseline the
+// variational check is priced against, each phase of each package run through timed. Ours come from this run's own
+// checks, in dependency order, but those a package not ours imports, which come with everything else from build's own
+// export data, unmerged, as that package's export data reads them. Its answers go to a Types map, as a plain check's
+// must to be recorded at all.
 func checkPlainly(
 	fileSet *token.FileSet,
 	ordered []*ourPackage,
@@ -101,32 +102,36 @@ func checkPlainly(
 	timed func(func()) phaseTiming,
 ) checkCounts {
 	counts := checkCounts{}
+	checked := map[string]*types.Package{}
 	for _, our := range ordered {
 		files := our.filesIn(build)
 		listedPackage := listed.packages[our.path]
 		if len(files) == 0 || listedPackage == nil {
 			continue
 		}
+		resolving := resolvingImporter{importer: importer, importMap: listedPackage.ImportMap, checked: checked}
 		counts.imports = counts.imports.add(timed(func() {
 			for _, imported := range listedPackage.Imports {
-				if imported == "unsafe" {
-					continue
-				}
-				if _, importError := importer.Import(imported); importError != nil {
+				if _, importError := resolving.Import(imported); importError != nil {
 					counts.noteError(our.path + ": importing " + imported + ": " + importError.Error())
 				}
 			}
 		}))
 		configuration := &types.Config{
-			Importer:  resolvingImporter{importer: importer, importMap: listedPackage.ImportMap},
+			Importer:  resolving,
 			Sizes:     sizes,
 			GoVersion: goVersionOf(our),
 			Error:     func(reported error) { counts.noteError(reported.Error()) },
 		}
+		var checkedTypes *types.Package
 		counts.checks = counts.checks.add(timed(func() {
 			// Ignored: every error went to Error above.
-			_, _ = configuration.Check(our.path, fileSet, files, &types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
+			checkedTypes, _ = configuration.Check(our.path, fileSet, files,
+				&types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
 		}))
+		if !listed.oursFromExport[our.path] {
+			checked[our.path] = checkedTypes
+		}
 	}
 	return counts
 }

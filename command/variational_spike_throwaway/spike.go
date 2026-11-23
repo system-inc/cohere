@@ -43,7 +43,7 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 
 	listed := make([]*listedBuild, 0, len(configurations))
 	var listError error
-	report.Timing.Listing = measure(func() {
+	report.Timing.ListingGraph = measure(func() {
 		for _, build := range configurations {
 			say(progress, "variational-spike: listing %s\n", build.target(build.cgo == "1"))
 			each, eachError := listBuild(root, asked.patterns, build, side.workFile)
@@ -73,6 +73,21 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 	}
 	if len(ours) == 0 {
 		return nil, errors.New("the patterns match no package in any build")
+	}
+	report.Timing.ListingExports = measure(func() {
+		for _, each := range listed {
+			say(progress, "variational-spike: listing export data for %s\n", each.configuration.target(each.cgoEnabled))
+			if exportError := listExports(root, each, side.workFile, ours); exportError != nil {
+				listError = exportError
+				return
+			}
+		}
+	})
+	if listError != nil {
+		return nil, listError
+	}
+	for index, each := range listed {
+		report.Builds[index].Exported = len(each.exports())
 	}
 	fileSet := token.NewFileSet()
 	var parseError error
