@@ -21,7 +21,6 @@ type listedPackage struct {
 	DepOnly         bool
 	Export          string
 	GoFiles         []string
-	CgoFiles        []string
 	CompiledGoFiles []string
 	Imports         []string
 	ImportMap       map[string]string
@@ -91,7 +90,7 @@ func listBuild(
 // read from export data, so they are never named and never compiled; go compiles one of ours only when a package not
 // ours imports it, and its export data is then named too.
 //
-// Mutates: listed's packages get their export data files, and listed its oursFromExport.
+// Mutates: listed gets its packages' export data files and its oursFromExport.
 func listExports(root string, listed *listedBuild, workFile string, ours map[string]*ourPackage) error {
 	listed.oursFromExport = map[string]bool{}
 	var reached []string

@@ -28,12 +28,13 @@ type ourPackage struct {
 }
 
 // collectOurs gathers the packages any build's patterns matched, the union of every build's files and imports for
-// each. A package one of whose builds compiles cgo files is refused: the spike checks Go files only.
+// each. A package's files are each build's compiled Go files, as go list -compiled gives them: a build that runs cgo
+// gives cgo's generated files in its cgo files' stead, each in that build's place in the cache, so a generated file
+// holds that build's bit alone, as go/packages hands the oracle the same files.
 func collectOurs(builds []*listedBuild) (map[string]*ourPackage, error) {
 	ours := map[string]*ourPackage{}
 	fileMasks := map[string]map[string]types.Mask{}
 	importSets := map[string]map[string]bool{}
-	var cgoPackages []string
 	for index, build := range builds {
 		bit := types.Mask(1) << index
 		for _, path := range build.matched {
@@ -41,10 +42,6 @@ func collectOurs(builds []*listedBuild) (map[string]*ourPackage, error) {
 			if listed.Error != nil && !strings.Contains(listed.Error.Err, noFilesError) {
 				return nil, fmt.Errorf("%s in %s: %s", path, build.configuration.target(build.cgoEnabled),
 					listed.Error.Err)
-			}
-			if len(listed.CgoFiles) != 0 {
-				cgoPackages = append(cgoPackages, fmt.Sprintf("%s in %s (%s)", path,
-					build.configuration.target(build.cgoEnabled), strings.Join(listed.CgoFiles, ", ")))
 			}
 			our := ours[path]
 			if our == nil {
@@ -70,11 +67,6 @@ func collectOurs(builds []*listedBuild) (map[string]*ourPackage, error) {
 			}
 		}
 	}
-	if len(cgoPackages) != 0 {
-		sort.Strings(cgoPackages)
-		return nil, fmt.Errorf("these of ours compile cgo files, which the spike doesn't check: %s",
-			strings.Join(cgoPackages, "; "))
-	}
 	for path, our := range ours {
 		for file := range fileMasks[path] {
 			our.fileNames = append(our.fileNames, file)
@@ -91,7 +83,7 @@ func collectOurs(builds []*listedBuild) (map[string]*ourPackage, error) {
 
 // parseOurs parses every file of ours once, into fileSet, and gives each its builds.
 //
-// Mutates: each of ours gets its files and masks.
+// Mutates: ours each get their files and masks.
 func parseOurs(fileSet *token.FileSet, ours map[string]*ourPackage, builds []*listedBuild) error {
 	for _, our := range ours {
 		our.masks = map[*ast.File]types.Mask{}

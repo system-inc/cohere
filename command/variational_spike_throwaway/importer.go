@@ -13,6 +13,13 @@ type resolvingImporter struct {
 	checked   *oursChecked
 }
 
+// pseudoPackage says whether path names a package no export data holds: unsafe, which the checker knows itself, and
+// C, which go list names among a cgo package's imports though the files a build that runs cgo checks are cgo's
+// generated ones, which import no C.
+func pseudoPackage(path string) bool {
+	return path == "unsafe" || path == "C"
+}
+
 func (resolving resolvingImporter) Import(path string) (*types.Package, error) {
 	if path == "unsafe" {
 		return types.Unsafe, nil

@@ -304,3 +304,45 @@ func TestParallelChecksProveEveryBuild(test *testing.T) {
 		}
 	}
 }
+
+// cgoFixtureRoot is native, which adds through C where its build runs cgo and in Go where it doesn't, and use, which
+// reads native's declarations, C's types among them, from another package of ours.
+var cgoFixtureRoot = filepath.Join("testdata", "cgo")
+
+// TestCgoPackagesProveEveryBuild runs the cgo fixture through the whole spike, in parallel, for the host with cgo on
+// and linux with it off: the host's native is cgo's generated files, as go list -compiled and go/packages both give
+// them, linux's its pure Go file, and each build's projection must match go/packages' plain answers exactly.
+func TestCgoPackagesProveEveryBuild(test *testing.T) {
+	test.Parallel()
+	asked, parseError := parseCommandLine([]string{
+		"--root", cgoFixtureRoot,
+		"--host", "darwin/arm64,cgo=1",
+		"--build", "linux/arm64",
+		"--check-workers", "2",
+	}, io.Discard)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	report, spikeError := runSpike(asked, io.Discard)
+	if spikeError != nil {
+		test.Fatal(spikeError)
+	}
+	if !report.green() {
+		test.Errorf("the cgo fixture's proof is red:\n%s", tableText(report))
+	}
+	if len(report.Proof) != 2 {
+		test.Fatalf("%d builds proved, want 2", len(report.Proof))
+	}
+	for _, proof := range report.Proof {
+		if proof.Compared == 0 || proof.Matched != proof.Compared {
+			test.Errorf("%s: %d of %d matched", proof.Target, proof.Matched, proof.Compared)
+		}
+	}
+	for _, our := range report.Ours {
+		// cgo's files for the host, at least its types and the file it rewrote, and the pure file for linux.
+		if our.Path == "example.com/cgo/native" && (our.Files < 3 || our.FilesInEveryBuild != 0) {
+			test.Errorf("native has %d files, %d in every build, want cgo's generated files for the host and the "+
+				"pure file for linux, none shared", our.Files, our.FilesInEveryBuild)
+		}
+	}
+}

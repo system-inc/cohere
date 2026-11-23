@@ -182,6 +182,9 @@ type differenceAtKey struct {
 var spikeNotes = []string{
 	"Bit b of a mask is build b, the host first and each --build after in the order given.",
 	"Ours are the packages any build's patterns matched; a file's mask is the builds whose go list compiles it.",
+	"A build that runs cgo checks a cgo package as cgo's generated Go files, which go list -compiled gives in the " +
+		"build's own place in the cache, so each holds that build's bit alone, as go/packages hands the oracle the " +
+		"same files; a build with cgo off checks the files its constraints keep.",
 	"An expression is keyed by file, start and end offsets, and its syntax node's kind; its answer is the census's " +
 		"spelling of its type and exact constant value.",
 	"Listing is two go list runs a build: the graph with -deps -compiled, which compiles nothing, then -export " +

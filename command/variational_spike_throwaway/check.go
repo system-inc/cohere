@@ -180,7 +180,7 @@ func warmVariationally(
 	warming := map[string]bool{}
 	for _, our := range ordered {
 		for _, imported := range our.imports {
-			if _, isOurs := ours[imported]; !isOurs && imported != "unsafe" && !importsOurs[imported] {
+			if _, isOurs := ours[imported]; !isOurs && !pseudoPackage(imported) && !importsOurs[imported] {
 				warming[imported] = true
 			}
 		}
@@ -216,7 +216,7 @@ func checkOneVariationally(
 	counts := checkCounts{checkSeconds: map[string]float64{}}
 	counts.imports = timed(func() {
 		for _, imported := range our.imports {
-			if _, isOurs := ours[imported]; isOurs || imported == "unsafe" {
+			if _, isOurs := ours[imported]; isOurs || pseudoPackage(imported) {
 				continue
 			}
 			if _, importError := importer.Import(imported); importError != nil {
@@ -306,7 +306,7 @@ func warmPlainly(
 			if resolved, mapped := listedPackage.ImportMap[imported]; mapped {
 				resolvedPath = resolved
 			}
-			if _, isOurs := ours[resolvedPath]; resolvedPath == "unsafe" ||
+			if _, isOurs := ours[resolvedPath]; pseudoPackage(resolvedPath) ||
 				isOurs && !listed.oursFromExport[resolvedPath] {
 				continue
 			}
@@ -338,6 +338,9 @@ func checkOnePlainly(
 	resolving := resolvingImporter{importer: importer, importMap: listedPackage.ImportMap, checked: checked}
 	counts.imports = timed(func() {
 		for _, imported := range listedPackage.Imports {
+			if pseudoPackage(imported) {
+				continue
+			}
 			if _, importError := resolving.Import(imported); importError != nil {
 				counts.noteError(our.path + ": importing " + imported + ": " + importError.Error())
 			}
