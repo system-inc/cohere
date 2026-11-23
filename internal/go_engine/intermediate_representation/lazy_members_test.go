@@ -3,7 +3,6 @@ package intermediate_representation_test
 // A package created from its types alone creates each member on its first lookup, once (#npb86tz).
 
 import (
-	"go/importer"
 	"go/token"
 	"sync"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // TestAPackageFromItsTypesCreatesEachMemberOnFirstLookup creates strings from its types alone and holds it to no
@@ -19,7 +19,7 @@ import (
 // every member, as go/ir's does, fails the first count.
 func TestAPackageFromItsTypesCreatesEachMemberOnFirstLookup(test *testing.T) {
 	test.Parallel()
-	stringsTypes, importError := importer.Default().Import("strings")
+	stringsTypes, importError := export_importer.Default().Import("strings")
 	if importError != nil {
 		test.Fatal(importError)
 	}
@@ -116,7 +116,7 @@ func TestABuildCreatesOnlyTheImportMembersItReaches(test *testing.T) {
 import "strings"
 
 func Shout(text string) string { return strings.ToUpper(text) }
-`, importer.Default())
+`, export_importer.Default())
 	imported := built.Program.ImportedPackage("strings")
 	if imported == nil {
 		test.Fatal("strings wasn't created")

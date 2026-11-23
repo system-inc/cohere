@@ -2,7 +2,6 @@ package consistency_no_uppercase_initialism
 
 import (
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // checkedContextOf is a context holding source parsed and type-checked as one package.
@@ -22,7 +22,7 @@ func checkedContextOf(test *testing.T, source string) *rule.Context {
 		test.Fatalf("parsing the case: %v", parseError)
 	}
 	info := &types.Info{Defs: map[*ast.Ident]types.Object{}}
-	checked, checkError := (&types.Config{Importer: importer.Default()}).Check("case", fileSet, []*ast.File{file}, info)
+	checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("case", fileSet, []*ast.File{file}, info)
 	if checkError != nil {
 		test.Fatalf("checking the case: %v", checkError)
 	}

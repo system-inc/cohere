@@ -2,7 +2,6 @@ package check
 
 import (
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"path/filepath"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/export_data"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // A kept package's export data reader holds the package's types and nothing else of the host's analysis: its syntax
@@ -34,7 +34,7 @@ func TestKeptExportDataHoldsOnlyThePackagesTypes(test *testing.T) {
 		test.Fatal(parseError)
 	}
 	information := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{}}
-	checked, checkError := (&types.Config{Importer: importer.Default()}).Check("example.com/kept", fileSet,
+	checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("example.com/kept", fileSet,
 		[]*ast.File{file}, information)
 	if checkError != nil {
 		test.Fatal(checkError)

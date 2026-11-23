@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"os"
@@ -27,10 +26,11 @@ import (
 	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`, as internal/go_rename/rename's tests do: under
-// `GOFLAGS=-trimpath` the test binary has none baked in, and importer.Default finds the standard library
+// `GOFLAGS=-trimpath` the test binary has none baked in, and export_importer.Default finds the standard library
 // through go/build.
 func TestMain(main *testing.M) {
 	output, goEnvironmentError := exec.Command("go", "env", "GOROOT").Output()
@@ -198,7 +198,7 @@ func main() {
 `
 	// Build an IR program from the parsed file.
 	// Load its dependencies from gc binary export data.
-	mainPackage, _ := buildPackage(test, input, importer.Default())
+	mainPackage, _ := buildPackage(test, input, export_importer.Default())
 
 	// The main package, its direct and indirect dependencies are loaded.
 	deps := []string{
@@ -434,8 +434,8 @@ func TestGo117Builtins(test *testing.T) {
 		importer types.Importer
 	}{
 		{"slice to array pointer", "package p; var s []byte; var _ = (*[4]byte)(s)", nil},
-		{"unsafe slice", `package p; import "unsafe"; var _ = unsafe.Add(nil, 0)`, importer.Default()},
-		{"unsafe add", `package p; import "unsafe"; var _ = unsafe.Slice((*int)(nil), 0)`, importer.Default()},
+		{"unsafe slice", `package p; import "unsafe"; var _ = unsafe.Add(nil, 0)`, export_importer.Default()},
+		{"unsafe add", `package p; import "unsafe"; var _ = unsafe.Slice((*int)(nil), 0)`, export_importer.Default()},
 	}
 
 	for _, tc := range tests {

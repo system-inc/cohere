@@ -2,7 +2,6 @@ package return_nil_ness
 
 import (
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"testing"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // numberingSource is a package of two functions with pointers enough to number: parameters, a nil constant, calls,
@@ -55,7 +55,7 @@ func builtNumberingFunctions(test *testing.T) []*intermediate_representation.Fun
 		Scopes:     map[ast.Node]*types.Scope{},
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
 	}
-	configuration := types.Config{Importer: importer.Default()}
+	configuration := types.Config{Importer: export_importer.Default()}
 	packageTypes, checkError := configuration.Check("numbered", fileSet, []*ast.File{file}, info)
 	if checkError != nil {
 		test.Fatalf("type checking the source: %v", checkError)

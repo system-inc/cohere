@@ -2,7 +2,6 @@ package build_reads
 
 import (
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"runtime"
@@ -10,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/system-inc/go-types/types"
+
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // literalElements is how many elements the table literal of TestWalkingALiteralsElementsHoldsNoContextForEach holds:
@@ -36,7 +37,7 @@ func TestWalkingALiteralsElementsHoldsNoContextForEach(test *testing.T) {
 	info := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Uses: map[*ast.Ident]types.Object{},
 		Defs: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{},
 		Instances: map[*ast.Ident]types.Instance{}}
-	checked, checkError := (&types.Config{Importer: importer.Default()}).Check("table", fileSet, []*ast.File{file},
+	checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("table", fileSet, []*ast.File{file},
 		info)
 	if checkError != nil {
 		test.Fatal(checkError)

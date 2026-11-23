@@ -2,12 +2,13 @@ package rename
 
 import (
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"testing"
 
 	"github.com/system-inc/go-types/types"
+
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // A declaration of another package is described the same whichever way a load read that package: from its source,
@@ -23,7 +24,7 @@ func TestADeclarationIsDescribedByTheFileItsLineDirectivesName(test *testing.T) 
 		if parseError != nil {
 			test.Fatalf("parsing %s: %v", filename, parseError)
 		}
-		checked, checkError := (&types.Config{Importer: importer.Default()}).Check("runtime/cgo", fileSet,
+		checked, checkError := (&types.Config{Importer: export_importer.Default()}).Check("runtime/cgo", fileSet,
 			[]*ast.File{file}, nil)
 		if checkError != nil {
 			test.Fatalf("checking %s: %v", filename, checkError)

@@ -3,7 +3,6 @@ package main
 import (
 	"go/ast"
 	"go/build"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 )
 
@@ -111,14 +111,14 @@ func typeCheck(test *testing.T, source string) fixture {
 // packages.
 func typeCheckAs(test *testing.T, packagePath string, source string) fixture {
 	test.Helper()
-	rule := checkFile(test, fixtureModule+"/rule", rulePackageSource, importer.Default())
-	optionSchema := checkFile(test, fixtureModule+"/optionschema", optionSchemaPackageSource, importer.Default())
+	rule := checkFile(test, fixtureModule+"/rule", rulePackageSource, export_importer.Default())
+	optionSchema := checkFile(test, fixtureModule+"/optionschema", optionSchemaPackageSource, export_importer.Default())
 	return checkFile(test, packagePath, source, fixtureImporter{
 		packages: map[string]*types.Package{
 			fixtureModule + "/rule":         rule.packageTypes,
 			fixtureModule + "/optionschema": optionSchema.packageTypes,
 		},
-		fallback: importer.Default(),
+		fallback: export_importer.Default(),
 	})
 }
 
@@ -458,7 +458,7 @@ func TestFormatShimSettingsContext(test *testing.T) {
 	test.Parallel()
 	const shimPath = "github.com/microsoft/TypeScript/tsc/shim/format"
 	// One standard library importer for both packages, so both read the same context.Context.
-	standardLibrary := importer.Default()
+	standardLibrary := export_importer.Default()
 	shim := checkFile(test, shimPath, formatShimSource, standardLibrary)
 	words := fixtureWords(test)
 	for call, want := range map[string]candidate{

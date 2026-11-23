@@ -3,7 +3,6 @@ package main
 import (
 	"go/ast"
 	"go/build"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/system-inc/go-types/types"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_types/export_importer"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
@@ -74,7 +74,7 @@ func typeCheckFile(test *testing.T, baseName string, source string) fixture {
 		Selections: map[*ast.SelectorExpr]*types.Selection{},
 		Instances:  map[*ast.Ident]types.Instance{},
 	}
-	configuration := types.Config{Importer: importer.Default()}
+	configuration := types.Config{Importer: export_importer.Default()}
 	packageTypes, checkError := configuration.Check("fixture", fileSet, []*ast.File{file}, info)
 	if checkError != nil {
 		test.Fatalf("type-checking: %v", checkError)
