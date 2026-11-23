@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/needs"
 )
@@ -509,10 +510,14 @@ func TestTheGatesScriptsParseAndSayTheirSteps(test *testing.T) {
 
 // Marin gives a gate all but two of her cores (macBoxCoreBudgets): her command carries the budget and Sun2's none, and
 // the script, as sharedBoxGate spells it, runs go with two threads a test binary and half the budget's binaries at
-// once, saying the budget it held; a budget of one core holds no binary and refuses.
+// once, saying the budget it held, in flags go itself accepts: a go command run under them lists a package. A budget of
+// one core holds no binary and refuses.
 func TestAGateMacKeepsToHerCoreBudget(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
+	needs.Tool(test, "go", "go itself reads the flags the budget sets")
+	// The go command runs outside the module, where nothing of ours is read, so Go's test cache needs no record of it.
+	outside := build_inputs.OutsideModule(test, test.TempDir())
 	marin := macBoxRemoteCommand("Marin", "0123", "", nil, nil, []string{"./..."})
 	sun2 := macBoxRemoteCommand("Sun2", "0123", "", nil, nil, []string{"./..."})
 	if !strings.Contains(marin, " | "+boxCoreBudgetVariable+"=10 bash -s -- ") ||
@@ -530,7 +535,9 @@ func TestAGateMacKeepsToHerCoreBudget(test *testing.T) {
 		bash := exec.Command("bash", "-s")
 		bash.Stdin = strings.NewReader("set -euo pipefail\nrefuse() { echo \"" + sharedBoxRefusedMarker +
 			"$*\"; exit 1; }\nGOFLAGS=\"-buildvcs=false -trimpath\"\n# " + block + "\nfi\n" +
-			"echo \"GOFLAGS=$GOFLAGS GOMAXPROCS=${GOMAXPROCS:-unset}\"\n")
+			"echo \"GOFLAGS=$GOFLAGS GOMAXPROCS=${GOMAXPROCS:-unset}\"\n" +
+			"GOWORK=off go list -e -f 'go read the flags and listed {{.ImportPath}}' runtime\n")
+		bash.Dir = outside
 		// Without the pool's own `GOMAXPROCS` and `GOFLAGS`, which a token sets, so only the block can set them.
 		bash.Env = append(slices.DeleteFunc(os.Environ(), func(variable string) bool {
 			return strings.HasPrefix(variable, "GOMAXPROCS=") || strings.HasPrefix(variable, "GOFLAGS=") ||
@@ -540,8 +547,8 @@ func TestAGateMacKeepsToHerCoreBudget(test *testing.T) {
 		return string(output), bashError
 	}
 	said, runError := run("10")
-	if want := boxBudgetMarker + "10 cores, go test -p 5 on 2 threads each\nGOFLAGS=-buildvcs=false -trimpath -p 5 " +
-		"GOMAXPROCS=2\n"; runError != nil || said != want {
+	if want := boxBudgetMarker + "10 cores, go test -p 5 on 2 threads each\nGOFLAGS=-buildvcs=false -trimpath -p=5 " +
+		"GOMAXPROCS=2\ngo read the flags and listed runtime\n"; runError != nil || said != want {
 		test.Errorf("a budget of 10 ran as (%v):\n%s\nwant\n%s", runError, said, want)
 	}
 	if said, runError := run("1"); runError == nil || !strings.Contains(said, sharedBoxRefusedMarker+

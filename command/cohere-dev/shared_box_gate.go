@@ -119,7 +119,8 @@ export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -tr
 if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
   budgetPackages=$(( ` + boxCoreBudgetVariable + ` / 2 ))
   [ "$budgetPackages" -ge 1 ] || refuse "a core budget of ${` + boxCoreBudgetVariable + `} holds no test binary"
-  export GOMAXPROCS=2 GOFLAGS="$GOFLAGS -p $budgetPackages"
+  # -p=N as one word: go splits GOFLAGS on spaces, so "-p 5" reached it as -p and a stray 5, and refused every run.
+  export GOMAXPROCS=2 GOFLAGS="$GOFLAGS -p=$budgetPackages"
   echo "` + boxBudgetMarker + `${` + boxCoreBudgetVariable + `} cores, go test -p $budgetPackages on 2 threads each"
 fi
 gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
