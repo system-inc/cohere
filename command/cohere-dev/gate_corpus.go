@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/corpus"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // The private corpora on the gate's Macs (#5r0vrte). Some tests read code outside this repository (internal/corpus),
@@ -245,8 +244,14 @@ func recipeDigestOf(script string, recipe corpusRecipe) string {
 }
 
 // layCorpora lays on box the corpora at places, the ones her run said she lacks, in a gap of their own carrying them,
-// and returns what the gap said, or why they weren't laid, which refuses the landing.
-func layCorpora(worktree string, box string, corpora []gateCorpus, places []string) (string, error) {
+// saying so to lines, and returns what the gap said, or why they weren't laid, which refuses the landing.
+func layCorpora(
+	worktree string,
+	box string,
+	corpora []gateCorpus,
+	places []string,
+	lines io.Writer,
+) (string, error) {
 	laying := []gateCorpus{}
 	for _, each := range corpora {
 		if slices.Contains(places, each.place()) {
@@ -262,7 +267,9 @@ func layCorpora(worktree string, box string, corpora []gateCorpus, places []stri
 	}
 	defer func() {
 		if removeError := os.RemoveAll(directory); removeError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: the corpora's scratch %s stays: %v\n", directory, removeError)
+			// Ignored: a line to the terminal that never arrives loses nothing the verdict needs, and the
+			// stream keeps its error for streams.Finish to report.
+			fmt.Fprintf(lines, "cohere-dev: the corpora's scratch %s stays: %v\n", directory, removeError)
 		}
 	}()
 	carry := filepath.Join(directory, "corpora.tar.gz")
@@ -282,9 +289,10 @@ func layCorpora(worktree string, box string, corpora []gateCorpus, places []stri
 	if digestError != nil {
 		return "", digestError
 	}
-	fmt.Fprintf(streams.Errors, "cohere-dev: %s lacks %s, so it is laid there, %d MiB carried, and she is asked "+
-		"again\n", box, strings.Join(places, ", "), information.Size()>>20)
-	streams.Show(streams.Errors)
+	// Ignored: a line to the terminal that never arrives loses nothing the verdict needs, and the stream keeps its
+	// error for streams.Finish to report.
+	fmt.Fprintf(lines, "cohere-dev: %s lacks %s, so it is laid there, %d MiB carried, and she is asked again\n", box,
+		strings.Join(places, ", "), information.Size()>>20)
 	remote := "echo " + base64.StdEncoding.EncodeToString([]byte(corpusLayScript)) + " | base64 -d | bash -s -- " +
 		"\"$TMPDIR/carry/" + digest + "\" " + strings.Join(specs, " ")
 	command, loomError := loomCommand(worktree, "loom", "gap", "--box", box, "--within", corpusLayBound, "--carry",
