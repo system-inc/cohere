@@ -34,12 +34,16 @@ type Scope struct {
 	// cohere's variational spike: objects of a name in builds the name's first object doesn't exist in, when they
 	// can't be one object (they are of different kinds)
 	alternates map[string][]Object
+	// a function's scope: whether its body has run once, and how many child scopes it had before, so a run again
+	// for other builds starts from the signature alone
+	bodyRan      bool
+	bodyChildren int
 }
 
 // NewScope returns a new, empty scope contained in the given parent
 // scope, if any. The comment is for debugging only.
 func NewScope(parent *Scope, pos, end token.Pos, comment string) *Scope {
-	s := &Scope{parent, nil, 0, nil, pos, end, comment, false, nil}
+	s := &Scope{parent, nil, 0, nil, pos, end, comment, false, nil, false, 0}
 	// don't add children to Universe scope!
 	if parent != nil && parent != Universe {
 		parent.children = append(parent.children, s)

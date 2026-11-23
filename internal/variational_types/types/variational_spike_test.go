@@ -22,11 +22,13 @@ const (
 
 // fixtureFiles is the census's fork fixture with the Square's contagion case beside it: a struct whose unexported
 // field differs by build, reached through a pointer by a body that only passes the pointer.
-var fixtureFiles = []struct {
+type fixtureFile struct {
 	name   string
 	builds types.Mask
 	source string
-}{
+}
+
+var fixtureFiles = []fixtureFile{
 	{"shared.go", everyBuild, `package fork
 
 import "unsafe"
@@ -109,11 +111,28 @@ func answer(tv types.TypeAndValue) string { return canonical.Answer(tv) }
 // TestVariationalCheckProjectsToEachBuild checks the fixture once for every build, then checks each build alone the
 // plain way, and requires every expression's projected answer to be the plain one, in every build.
 func TestVariationalCheckProjectsToEachBuild(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the fork holds a variational check's unit state in package variables, one check at a time.
+	forked := projectAndCompare(t, fixtureFiles)
+	for _, mustNotFork := range []string{"Untouched", "Signal", "Pass", "Size", "WordSize"} {
+		if forked[mustNotFork] {
+			t.Errorf("%s forked, though nothing it reads differs by build", mustNotFork)
+		}
+	}
+	for _, mustFork := range []string{"F", "IsPipe", "InnerSize", "Join"} {
+		if !forked[mustFork] {
+			t.Errorf("%s didn't fork, though it reads what differs by build", mustFork)
+		}
+	}
+}
+
+// projectAndCompare checks fixtures once for every build, compares the projection to each build's plain check, and
+// returns the functions with an expression answered differently by build.
+func projectAndCompare(t *testing.T, fixtures []fixtureFile) map[string]bool {
+	t.Helper()
 	fileSet := token.NewFileSet()
 	var files []*ast.File
 	masks := map[*ast.File]types.Mask{}
-	for _, fixture := range fixtureFiles {
+	for _, fixture := range fixtures {
 		parsed, parseError := parser.ParseFile(fileSet, fixture.name, fixture.source, parser.ParseComments)
 		if parseError != nil {
 			t.Fatal(parseError)
@@ -123,7 +142,7 @@ func TestVariationalCheckProjectsToEachBuild(t *testing.T) {
 	}
 	variation := &types.Variation{Builds: everyBuild, Files: masks}
 	configuration := &types.Config{Variation: variation, Importer: unsafeImporter{}}
-	if _, checkError := configuration.Check("fork", fileSet, files, &types.Info{Types: map[ast.Expr]types.TypeAndValue{}}); checkError != nil {
+	if _, checkError := configuration.Check("fork", fileSet, files, &types.Info{}); checkError != nil {
 		t.Fatalf("variational check: %v", checkError)
 	}
 	if len(variation.Types) == 0 {
@@ -138,7 +157,11 @@ func TestVariationalCheckProjectsToEachBuild(t *testing.T) {
 			}
 			covered |= built.Builds
 		}
-		if len(answers) > 1 {
+		distinct := map[string]bool{}
+		for _, built := range answers {
+			distinct[answer(built.TypeAndValue)] = true
+		}
+		if len(distinct) > 1 {
 			forked[enclosingFunction(files, fileSet, expression)] = true
 		}
 	}
@@ -152,16 +175,23 @@ func TestVariationalCheckProjectsToEachBuild(t *testing.T) {
 		plain := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}}
 		plainConfiguration := &types.Config{Importer: unsafeImporter{}}
 		if _, checkError := plainConfiguration.Check("fork", fileSet, built, plain); checkError != nil {
-			t.Fatalf("plain check of build %b: %v", build, checkError)
+			t.Fatalf("plain check of build %03b: %v", build, checkError)
 		}
-		matched := 0
-		for expression, want := range plain.Types {
-			got := ""
-			for _, candidate := range variation.Types[expression] {
+		// Keyed by position and text, never by node: a checker makes some nodes afresh each time it checks
+		// them (the 1 of an IncDec statement).
+		projected := map[string]string{}
+		for expression, answers := range variation.Types {
+			for _, candidate := range answers {
 				if candidate.Builds&build != 0 {
-					got = answer(candidate.TypeAndValue)
+					projected[positionKey(fileSet, expression)] = answer(candidate.TypeAndValue)
 				}
 			}
+		}
+		plainKeys := map[string]bool{}
+		matched := 0
+		for expression, want := range plain.Types {
+			plainKeys[positionKey(fileSet, expression)] = true
+			got := projected[positionKey(fileSet, expression)]
 			if got != answer(want) {
 				t.Errorf("build %03b, %s %s: projected %q, plain %q", build, fileSet.Position(expression.Pos()),
 					types.ExprString(expression), got, answer(want))
@@ -172,6 +202,14 @@ func TestVariationalCheckProjectsToEachBuild(t *testing.T) {
 		if matched == 0 {
 			t.Errorf("build %03b: no expression compared", build)
 		}
+		for expression, answers := range variation.Types {
+			for _, candidate := range answers {
+				if planned := plainKeys[positionKey(fileSet, expression)]; candidate.Builds&build != 0 && !planned {
+					t.Errorf("build %03b, %s %s: projected %q, and the plain check has no answer", build,
+						fileSet.Position(expression.Pos()), types.ExprString(expression), answer(candidate.TypeAndValue))
+				}
+			}
+		}
 	}
 	var forkedNames []string
 	for name := range forked {
@@ -180,16 +218,13 @@ func TestVariationalCheckProjectsToEachBuild(t *testing.T) {
 	sort.Strings(forkedNames)
 	t.Logf("functions that forked: %s; units %d, restarts %d", strings.Join(forkedNames, ", "), variation.Units,
 		variation.Restarts)
-	for _, mustNotFork := range []string{"Untouched", "Signal", "Pass", "Size", "WordSize"} {
-		if forked[mustNotFork] {
-			t.Errorf("%s forked, though nothing it reads differs by build", mustNotFork)
-		}
-	}
-	for _, mustFork := range []string{"F", "IsPipe", "InnerSize", "Join"} {
-		if !forked[mustFork] {
-			t.Errorf("%s didn't fork, though it reads what differs by build", mustFork)
-		}
-	}
+	return forked
+}
+
+// positionKey names expression by where it is and what it says.
+func positionKey(fileSet *token.FileSet, expression ast.Expr) string {
+	return fileSet.Position(expression.Pos()).String() + "-" + fileSet.Position(expression.End()).String() + " " +
+		types.ExprString(expression)
 }
 
 // enclosingFunction is the name of the function declaration holding expression, or the empty string.

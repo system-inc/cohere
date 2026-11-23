@@ -19,7 +19,7 @@ package types
 import (
 	"go/ast"
 	"go/constant"
-		"math/bits"
+	"math/bits"
 )
 
 // Mask is a set of builds, bit b for build b. The spike holds at most eight.
@@ -60,10 +60,10 @@ type splitRequest struct{ parts []Mask }
 
 // objectVariation is what a package-level object holds when it doesn't hold the same in every build.
 type objectVariation struct {
-	presence Mask             // the builds it exists in; zero for every build
-	variants []objectVariant  // its answers by build once declared; nil while one answer holds everywhere
-	decls    []declVariant    // a source object declared in more than one file: each declaration and its builds
-	named    *Named           // a type name's one named type, kept across its declarations
+	presence Mask            // the builds it exists in; zero for every build
+	variants []objectVariant // its answers by build once declared; nil while one answer holds everywhere
+	decls    []declVariant   // a source object declared in more than one file: each declaration and its builds
+	named    *Named          // a type name's one named type, kept across its declarations
 }
 
 type objectVariant struct {
@@ -166,6 +166,40 @@ func SetUnderlyingVariants(n *Named, variants []UnderlyingVariant) {
 	if len(kept) > 1 {
 		n.variation = &namedVariation{variants: kept}
 	}
+}
+
+// VariantsOf is obj's answers by build, or nil when one answer holds in every build.
+func VariantsOf(obj Object) []Variant {
+	variation := variationOf(obj)
+	if variation == nil || len(variation.variants) == 0 {
+		return nil
+	}
+	variants := make([]Variant, len(variation.variants))
+	for index, variant := range variation.variants {
+		variants[index] = Variant{Builds: variant.mask, Type: variant.typ, Value: variant.val}
+	}
+	return variants
+}
+
+// PresenceOf is the builds obj exists in, or zero when it exists in every build.
+func PresenceOf(obj Object) Mask {
+	variation := variationOf(obj)
+	if variation == nil {
+		return 0
+	}
+	return variation.presence
+}
+
+// UnderlyingVariantsOf is n's underlying types by build, or nil when one holds in every build.
+func UnderlyingVariantsOf(n *Named) []UnderlyingVariant {
+	if n.variation == nil {
+		return nil
+	}
+	variants := make([]UnderlyingVariant, len(n.variation.variants))
+	for index, variant := range n.variation.variants {
+		variants[index] = UnderlyingVariant{Builds: variant.mask, Underlying: variant.rhs}
+	}
+	return variants
 }
 
 // appendVariant adds variant to variants, folding it into an answer alike.
@@ -329,6 +363,10 @@ type vrecord struct {
 	// persistent is set once a declaration unit that recorded it has finished: the declaration never runs again, so
 	// an enclosing unit that restarts keeps it.
 	persistent bool
+	// order is the iota of the constant being declared when it was recorded, or -1. An inherited initializer is one
+	// expression written once for each constant of its group, and a plain check's last write is the group's last
+	// constant; merged declarations run in another order, so the fold keeps the highest iota instead.
+	order int64
 }
 
 // runUnit runs run once for builds, or once for each group of them that answers alike when a read inside splits it.
@@ -427,7 +465,7 @@ func (check *Checker) recordVariational(x ast.Expr, tv TypeAndValue) {
 	if variational.depth > 0 {
 		mask = variational.mask
 	}
-	check.vrecords = append(check.vrecords, vrecord{expr: x, mask: mask, tv: tv})
+	check.vrecords = append(check.vrecords, vrecord{expr: x, mask: mask, tv: tv, order: check.recordOrder})
 }
 
 // rewriteVariational replaces the last answer kept for x under the current unit's builds, as recordCommaOkTypes
@@ -455,26 +493,51 @@ func (check *Checker) startVariational() bool {
 	variational.mask = variation.Builds
 	variational.depth = 0
 	variational.variation = variation
+	check.recordOrder = -1
 	return true
 }
 
-// endVariational writes the kept answers into the variation and ends the check.
+// endVariational writes the kept answers into the variation and ends the check. A later answer for an expression
+// replaces an earlier one in the builds both hold, as a plain check's later write replaces its earlier one (an
+// inherited iota is written once for each constant of its group, a generic call again once it is instantiated).
 func (check *Checker) endVariational() {
 	types := variational.variation.Types
+	orders := map[ast.Expr][]int64{}
 	for _, record := range check.vrecords {
-		answers := types[record.expr]
+		var answers []BuildTypeAndValue
+		var kept []int64
+		for index, earlier := range types[record.expr] {
+			earlierOrder := orders[record.expr][index]
+			if earlierOrder > record.order {
+				record.mask &^= earlier.Builds
+			} else {
+				earlier.Builds &^= record.mask
+			}
+			if earlier.Builds != 0 {
+				answers = append(answers, earlier)
+				kept = append(kept, earlierOrder)
+			}
+		}
+		if record.mask == 0 {
+			types[record.expr] = answers
+			orders[record.expr] = kept
+			continue
+		}
 		folded := false
 		for index := range answers {
 			if answers[index].TypeAndValue == record.tv {
 				answers[index].Builds |= record.mask
+				kept[index] = max(kept[index], record.order)
 				folded = true
 				break
 			}
 		}
 		if !folded {
 			answers = append(answers, BuildTypeAndValue{Builds: record.mask, TypeAndValue: record.tv})
+			kept = append(kept, record.order)
 		}
 		types[record.expr] = answers
+		orders[record.expr] = kept
 	}
 	check.vrecords = nil
 	variational.active = false
@@ -624,11 +687,25 @@ func (check *Checker) declareVariational(obj Object, d *declInfo) {
 		variation = base.ensureVariation()
 	}
 	var answers []objectVariant
+	// An n:1 variable declaration types every variable on its left at once, so each run starts them all untyped and
+	// keeps each one's answer.
+	var siblings []*Var
+	siblingAnswers := map[*Var][]objectVariant{}
+	if variable, isVariable := obj.(*Var); isVariable && len(decls) == 1 && len(decls[0].decl.lhs) > 1 {
+		for _, sibling := range decls[0].decl.lhs {
+			if sibling != variable {
+				siblings = append(siblings, sibling)
+			}
+		}
+	}
 	every := Mask(0)
 	for _, declared := range decls {
 		every |= declared.mask
 		check.runUnit(declared.mask, func(builds Mask) {
 			base.typ = nil
+			for _, sibling := range siblings {
+				sibling.typ = nil
+			}
 			if constantObject, isConstant := obj.(*Const); isConstant {
 				constantObject.val = declared.iota
 			}
@@ -636,12 +713,20 @@ func (check *Checker) declareVariational(obj Object, d *declInfo) {
 			switch obj := obj.(type) {
 			case *Const:
 				check.decl = declared.decl
+				savedOrder := check.recordOrder
+				if iota, isInt := constant.Int64Val(declared.iota); isInt {
+					check.recordOrder = iota
+				}
 				check.constDecl(obj, declared.decl.vtyp, declared.decl.init, declared.decl.inherited)
+				check.recordOrder = savedOrder
 				answers = append(answers, objectVariant{mask: builds, typ: obj.typ, val: obj.val})
 			case *Var:
 				check.decl = declared.decl
 				check.varDecl(obj, declared.decl.lhs, declared.decl.vtyp, declared.decl.init)
 				answers = append(answers, objectVariant{mask: builds, typ: obj.typ})
+				for _, sibling := range siblings {
+					siblingAnswers[sibling] = append(siblingAnswers[sibling], objectVariant{mask: builds, typ: sibling.typ})
+				}
 			case *TypeName:
 				check.typeDecl(obj, declared.decl.tdecl)
 				if named := asNamed(obj.typ); isDefinedType && named != nil {
@@ -656,6 +741,19 @@ func (check *Checker) declareVariational(obj Object, d *declInfo) {
 				panic("unreachable")
 			}
 		}, true)
+	}
+	for _, sibling := range siblings {
+		var siblingCollapsed []objectVariant
+		for _, answer := range siblingAnswers[sibling] {
+			siblingCollapsed = appendVariant(siblingCollapsed, answer)
+		}
+		if len(siblingCollapsed) == 0 {
+			continue
+		}
+		sibling.typ = siblingCollapsed[0].typ
+		if len(siblingCollapsed) > 1 {
+			sibling.ensureVariation().variants = siblingCollapsed
+		}
 	}
 	var collapsed []objectVariant
 	for _, answer := range answers {
@@ -702,4 +800,59 @@ func (n *Named) resetForVariant() {
 	n.tparams = nil
 	n.variation = nil
 	n.state_ = 0
+}
+
+// freshBodyScope puts sig's scope back to what the signature declared in it, when its body runs again: the receiver,
+// parameters, results and type parameters, and no child scope the last run opened.
+func freshBodyScope(sig *Signature) {
+	scope := sig.scope
+	if !scope.bodyRan {
+		scope.bodyRan = true
+		scope.bodyChildren = len(scope.children)
+		return
+	}
+	own := map[Object]bool{}
+	if sig.recv != nil {
+		own[sig.recv] = true
+	}
+	for _, tuple := range []*Tuple{sig.params, sig.results} {
+		if tuple != nil {
+			for _, variable := range tuple.vars {
+				own[variable] = true
+			}
+		}
+	}
+	for _, list := range []*TypeParamList{sig.tparams, sig.rparams} {
+		for _, parameter := range list.list() {
+			own[parameter.obj] = true
+		}
+	}
+	for name, obj := range scope.elems {
+		if !own[resolve(name, obj)] {
+			delete(scope.elems, name)
+		}
+	}
+	scope.children = scope.children[:scope.bodyChildren]
+}
+
+// rewriteCommaOk is recordCommaOkTypes for a variational check without a Types map: x's last kept answer, and each
+// parenthesized expression inside it, becomes the comma-ok tuple.
+func (check *Checker) rewriteCommaOk(x ast.Expr, t0 Type, t1 Type) {
+	for {
+		for index := len(check.vrecords) - 1; index >= 0; index-- {
+			if check.vrecords[index].expr == x {
+				pos := x.Pos()
+				check.vrecords[index].tv.Type = NewTuple(
+					newVar(LocalVar, pos, check.pkg, "", t0),
+					newVar(LocalVar, pos, check.pkg, "", t1),
+				)
+				break
+			}
+		}
+		parenthesized, isParenthesized := x.(*ast.ParenExpr)
+		if !isParenthesized {
+			return
+		}
+		x = parenthesized.X
+	}
 }
