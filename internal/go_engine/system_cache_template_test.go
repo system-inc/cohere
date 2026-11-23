@@ -143,6 +143,23 @@ func fillSystemCacheTemplate() (systemCacheTemplate, error) {
 	return template, nil
 }
 
+// templateFilled is the template (systemCacheTemplate), filled now if no run has filled it yet, failing test if the
+// fill fails. A test that reads a count of the whole process around a run, such as cache.FilesHashed, or observes it,
+// such as cache.ObserveReads, calls it before its first read: the fill is a run of its own, which moves those counts,
+// and the first run to need the template fills it, inside the window of a test run alone (#2htryg8). It refuses an
+// environment other than TestMain's (testsEnvironment), which the template's keys are made under.
+func templateFilled(test *testing.T) systemCacheTemplate {
+	test.Helper()
+	if !slices.Equal(slices.Sorted(slices.Values(os.Environ())), testsEnvironment) {
+		test.Fatal("the system cache's template is filled under TestMain's environment alone, and this test changed it")
+	}
+	template, templateError := filledSystemCacheTemplate()
+	if templateError != nil {
+		test.Fatalf("filling the system cache's template: %v", templateError)
+	}
+	return template
+}
+
 // seededSystemCache is a new system cache root of the run's own whose store holds a hard link to every entry of the
 // template (systemCacheTemplate). The store never writes a file in place: a write renames a whole file over the
 // link's name, and a removal, a damaged entry's or a trim's, removes the link alone, so nothing a run does reaches
@@ -156,10 +173,7 @@ func seededSystemCache(test *testing.T) string {
 		!slices.Equal(slices.Sorted(slices.Values(os.Environ())), testsEnvironment) {
 		return test.TempDir()
 	}
-	template, templateError := filledSystemCacheTemplate()
-	if templateError != nil {
-		test.Fatalf("filling the system cache's template: %v", templateError)
-	}
+	template := templateFilled(test)
 	root := test.TempDir()
 	store := systemStoreDirectory(root)
 	for _, shard := range template.shards {
@@ -186,10 +200,7 @@ func TestASeededRunRestoresFromTheTemplateAndLeavesItAsItWas(test *testing.T) {
 	if seeded.counts.FromSystemCache == 0 {
 		test.Errorf("want the seeded run to restore the standard library from the template, got %+v", seeded.counts)
 	}
-	template, templateError := filledSystemCacheTemplate()
-	if templateError != nil {
-		test.Fatal(templateError)
-	}
+	template := templateFilled(test)
 	for _, relative := range template.files {
 		information, statError := os.Stat(filepath.Join(template.store, relative))
 		if statError != nil {

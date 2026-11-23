@@ -93,6 +93,8 @@ func TestAWarmBuildOpensNoRecordItsPacksHold(test *testing.T) {
 	if len(held) == 0 {
 		test.Fatal("the warm runs left no pack holding a key")
 	}
+	// The template's fill reads keys of its own, so it is filled before the observer is set (templateFilled).
+	templateFilled(test)
 	var counting sync.Mutex
 	opened := 0
 	stop := cache.ObserveReads(func(key cache.Key) {
