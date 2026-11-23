@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"maps"
+	"slices"
 	"sync"
 
 	"github.com/system-inc/cohere/internal/variational_types/merged"
@@ -151,6 +152,56 @@ func checkVariationallyInParallel(
 	return checked, counts, run
 }
 
+// warmVariationally merges whole into importer, on workers goroutines and outside every check, so outside every unit,
+// every package not ours that a check of ordered imports: each imported, and every object of it and every type they
+// reach merged, so a schedule checked after it reads only merged objects. A package not ours that imports one of ours
+// in any of listed is left to the schedule's own import: imported before that one of ours is added, it would read
+// ours' export data, a second identity for each of its types.
+func warmVariationally(
+	ordered []*ourPackage,
+	ours map[string]*ourPackage,
+	listed []*listedBuild,
+	importer *merged.Importer,
+	workers int,
+) {
+	importsOurs := map[string]bool{}
+	for _, build := range listed {
+		for path, listedPackage := range build.packages {
+			if _, isOurs := ours[path]; isOurs {
+				continue
+			}
+			for _, imported := range listedPackage.Imports {
+				if _, importsOne := ours[imported]; importsOne {
+					importsOurs[path] = true
+				}
+			}
+		}
+	}
+	warming := map[string]bool{}
+	for _, our := range ordered {
+		for _, imported := range our.imports {
+			if _, isOurs := ours[imported]; !isOurs && !pseudoPackage(imported) && !importsOurs[imported] {
+				warming[imported] = true
+			}
+		}
+	}
+	paths := make(chan string, len(warming))
+	for _, path := range slices.Sorted(maps.Keys(warming)) {
+		paths <- path
+	}
+	close(paths)
+	var group sync.WaitGroup
+	for range workers {
+		group.Go(func() {
+			for path := range paths {
+				// Ignored: a package that can't be imported fails the same way in the timed check, which reports it.
+				_ = importer.Warm(path)
+			}
+		})
+	}
+	group.Wait()
+}
+
 // checkOneVariationally is our checked once for every build in all, after importing what it imports that isn't ours,
 // and given to importer for the packages of ours that import it, with its own counts.
 func checkOneVariationally(
@@ -165,7 +216,7 @@ func checkOneVariationally(
 	counts := checkCounts{checkSeconds: map[string]float64{}}
 	counts.imports = timed(func() {
 		for _, imported := range our.imports {
-			if _, isOurs := ours[imported]; isOurs || imported == "unsafe" {
+			if _, isOurs := ours[imported]; isOurs || pseudoPackage(imported) {
 				continue
 			}
 			if _, importError := importer.Import(imported); importError != nil {
@@ -255,7 +306,7 @@ func warmPlainly(
 			if resolved, mapped := listedPackage.ImportMap[imported]; mapped {
 				resolvedPath = resolved
 			}
-			if _, isOurs := ours[resolvedPath]; resolvedPath == "unsafe" ||
+			if _, isOurs := ours[resolvedPath]; pseudoPackage(resolvedPath) ||
 				isOurs && !listed.oursFromExport[resolvedPath] {
 				continue
 			}
@@ -287,6 +338,9 @@ func checkOnePlainly(
 	resolving := resolvingImporter{importer: importer, importMap: listedPackage.ImportMap, checked: checked}
 	counts.imports = timed(func() {
 		for _, imported := range listedPackage.Imports {
+			if pseudoPackage(imported) {
+				continue
+			}
 			if _, importError := resolving.Import(imported); importError != nil {
 				counts.noteError(our.path + ": importing " + imported + ": " + importError.Error())
 			}

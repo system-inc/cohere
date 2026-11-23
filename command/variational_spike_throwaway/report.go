@@ -73,29 +73,45 @@ type oursTotals struct {
 // the phases that import and check: decode is the builds' reading summed over the builds, decode wait the merge's wall
 // time waiting on it, the builds one object needs read at once, and merge the merge's wall time less that wait.
 type timingReport struct {
-	ListingGraph                 phaseTiming   `json:"listingGraph"`
-	ListingExports               phaseTiming   `json:"listingExports"`
-	Parse                        phaseTiming   `json:"parse"`
-	VariationalImport            phaseTiming   `json:"variationalImport"`
-	VariationalDecodeSeconds     float64       `json:"variationalDecodeSeconds"`
-	VariationalDecodeWaitSeconds float64       `json:"variationalDecodeWaitSeconds"`
-	VariationalMergeSeconds      float64       `json:"variationalMergeSeconds"`
-	VariationalCheck             phaseTiming   `json:"variationalCheck"`
-	HostPlainImport              phaseTiming   `json:"hostPlainImport"`
-	HostPlainCheck               phaseTiming   `json:"hostPlainCheck"`
-	EveryBuildPlainImport        phaseTiming   `json:"everyBuildPlainImport"`
-	EveryBuildPlainCheck         phaseTiming   `json:"everyBuildPlainCheck"`
-	PlainCheckByBuild            []phaseTiming `json:"plainCheckByBuild"`
-	HostPlainDecodeSeconds       float64       `json:"hostPlainDecodeSeconds"`
-	PlainDecodeSeconds           float64       `json:"plainDecodeSeconds"`
+	ListingGraph                 phaseTiming `json:"listingGraph"`
+	ListingExports               phaseTiming `json:"listingExports"`
+	Parse                        phaseTiming `json:"parse"`
+	VariationalImport            phaseTiming `json:"variationalImport"`
+	VariationalDecodeSeconds     float64     `json:"variationalDecodeSeconds"`
+	VariationalDecodeWaitSeconds float64     `json:"variationalDecodeWaitSeconds"`
+	VariationalMergeSeconds      float64     `json:"variationalMergeSeconds"`
+	VariationalCheck             phaseTiming `json:"variationalCheck"`
+	// VariationalOnSchedule is whether the variational import and check ran on the parallel schedule, when their rows
+	// sum each package's wall alone and hold no CPU: the process's CPU over one job is every running job's, so CPU is
+	// measured across the whole schedule, in the parallel report.
+	VariationalOnSchedule  bool          `json:"variationalOnSchedule"`
+	HostPlainImport        phaseTiming   `json:"hostPlainImport"`
+	HostPlainCheck         phaseTiming   `json:"hostPlainCheck"`
+	EveryBuildPlainImport  phaseTiming   `json:"everyBuildPlainImport"`
+	EveryBuildPlainCheck   phaseTiming   `json:"everyBuildPlainCheck"`
+	PlainCheckByBuild      []phaseTiming `json:"plainCheckByBuild"`
+	HostPlainDecodeSeconds float64       `json:"hostPlainDecodeSeconds"`
+	PlainDecodeSeconds     float64       `json:"plainDecodeSeconds"`
 }
 
 // parallelReport is ours checked in parallel along the import graph on the engine's schedule, one types.Checker a
 // package: the variational check the proof projects, and the host's plain check, each on its own run of the schedule.
 type parallelReport struct {
-	Workers     int         `json:"workers"`
+	Workers int `json:"workers"`
+	// Variational is the cold variational schedule, the proof's: each package not ours merged as its checks first
+	// read it, inside their jobs.
 	Variational parallelRun `json:"variational"`
-	HostPlain   parallelRun `json:"hostPlain"`
+	// VariationalWarmSeconds and VariationalWarmCpuSeconds are the warm-up before the warmed schedule, its wall and
+	// the process's CPU across it: every package not ours the schedule imports merged whole, on the same workers.
+	VariationalWarmSeconds    float64 `json:"variationalWarmSeconds"`
+	VariationalWarmCpuSeconds float64 `json:"variationalWarmCpuSeconds"`
+	// VariationalWarmed is the variational schedule again, on a fresh merging importer warmed first.
+	VariationalWarmed parallelRun `json:"variationalWarmed"`
+	// VariationalWarmedDecodeSeconds and VariationalWarmedMergeSeconds are the importer's decode and merge inside the
+	// warmed schedule, as Timing counts them: what the warm-up left the checks to read.
+	VariationalWarmedDecodeSeconds float64     `json:"variationalWarmedDecodeSeconds"`
+	VariationalWarmedMergeSeconds  float64     `json:"variationalWarmedMergeSeconds"`
+	HostPlain                      parallelRun `json:"hostPlain"`
 	// HostPlainWarmSeconds is the wall of reading whole, before the host plain schedule and outside its timing, every
 	// package the schedule imports, so the schedule reads only decoded types.
 	HostPlainWarmSeconds float64 `json:"hostPlainWarmSeconds"`
@@ -166,6 +182,9 @@ type differenceAtKey struct {
 var spikeNotes = []string{
 	"Bit b of a mask is build b, the host first and each --build after in the order given.",
 	"Ours are the packages any build's patterns matched; a file's mask is the builds whose go list compiles it.",
+	"A build that runs cgo checks a cgo package as cgo's generated Go files, which go list -compiled gives in the " +
+		"build's own place in the cache, so each holds that build's bit alone, as go/packages hands the oracle the " +
+		"same files; a build with cgo off checks the files its constraints keep.",
 	"An expression is keyed by file, start and end offsets, and its syntax node's kind; its answer is the census's " +
 		"spelling of its type and exact constant value.",
 	"Listing is two go list runs a build: the graph with -deps -compiled, which compiles nothing, then -export " +
@@ -185,6 +204,10 @@ var spikeNotes = []string{
 		"wall is the real critical path, and the process's CPU is measured across the whole schedule. The host's " +
 		"plain check runs the same way beside the serial baselines, through a fresh importer that reads each " +
 		"package whole at its import, so its checks read only decoded types.",
+	"With --check-workers, a second variational schedule runs after the cold one, on a fresh merging importer " +
+		"warmed first: every package not ours it imports merged whole, on the same workers, outside every unit. " +
+		"Warm against the warmed plain check compares the checker alone; the warm-up is the work the engine would " +
+		"have to overlap with listing and parsing; cold against the warmed plain check stays the upper bound.",
 	"With --check-workers, every package the host plain schedule imports is read whole before it, untimed by it " +
 		"and reported apart as the warm-up, so the plain wall holds no decode, while the variational wall holds " +
 		"its own lazy decode and merge. The walk's measured cost over the plain check is so an upper bound.",
@@ -225,26 +248,37 @@ func tableText(report *spikeReport) string {
 	rows := []struct {
 		name  string
 		phase phaseTiming
+		// onSchedule rows ran on the parallel schedule, so their CPU isn't measured by phase.
+		onSchedule bool
 	}{
-		{"listing: graph, nothing compiled", timing.ListingGraph},
-		{"listing: export data, not ours", timing.ListingExports},
-		{"parse (ours, once)", timing.Parse},
-		{"variational import", timing.VariationalImport},
-		{"variational check", timing.VariationalCheck},
-		{"baseline: host plain import", timing.HostPlainImport},
-		{"baseline: host plain check", timing.HostPlainCheck},
-		{"baseline: every build plain import", timing.EveryBuildPlainImport},
-		{"baseline: every build plain check", timing.EveryBuildPlainCheck},
+		{"listing: graph, nothing compiled", timing.ListingGraph, false},
+		{"listing: export data, not ours", timing.ListingExports, false},
+		{"parse (ours, once)", timing.Parse, false},
+		{"variational import", timing.VariationalImport, timing.VariationalOnSchedule},
+		{"variational check", timing.VariationalCheck, timing.VariationalOnSchedule},
+		{"baseline: host plain import", timing.HostPlainImport, false},
+		{"baseline: host plain check", timing.HostPlainCheck, false},
+		{"baseline: every build plain import", timing.EveryBuildPlainImport, false},
+		{"baseline: every build plain check", timing.EveryBuildPlainCheck, false},
 	}
 	for _, row := range rows {
+		if row.onSchedule {
+			fmt.Fprintf(output, "%-34s %9.3f %9s %9s\n", row.name, row.phase.WallSeconds, "n/a", "n/a")
+			continue
+		}
 		fmt.Fprintf(output, "%-34s %9.3f %9.3f %9.3f\n", row.name, row.phase.WallSeconds, row.phase.CpuSeconds(),
 			row.phase.ChildrenCpuSeconds)
+	}
+	if timing.VariationalOnSchedule {
+		fmt.Fprintf(output, "the variational rows ran on the parallel schedule: their wall sums each package's alone, "+
+			"and their cpu, not measured by phase, is the schedule's process cpu in the parallel table below\n")
 	}
 	fmt.Fprintf(output, "importer: variational decode %.3fs summed over builds, %.3fs waited on, merge %.3fs wall; "+
 		"host plain decode %.3fs; every build plain decode %.3fs\n", timing.VariationalDecodeSeconds,
 		timing.VariationalDecodeWaitSeconds, timing.VariationalMergeSeconds, timing.HostPlainDecodeSeconds,
 		timing.PlainDecodeSeconds)
-	if timing.HostPlainCheck.CpuSeconds() > 0 && timing.EveryBuildPlainCheck.CpuSeconds() > 0 {
+	if !timing.VariationalOnSchedule && timing.VariationalCheck.CpuSeconds() > 0 &&
+		timing.HostPlainCheck.CpuSeconds() > 0 && timing.EveryBuildPlainCheck.CpuSeconds() > 0 {
 		fmt.Fprintf(output, "variational check cpu over host plain check: %.2fx; over every build summed: %.2fx\n",
 			timing.VariationalCheck.CpuSeconds()/timing.HostPlainCheck.CpuSeconds(),
 			timing.VariationalCheck.CpuSeconds()/timing.EveryBuildPlainCheck.CpuSeconds())
@@ -399,8 +433,9 @@ func writeParallel(output *strings.Builder, parallel *parallelReport) {
 		name string
 		run  parallelRun
 	}{
-		{"variational check (the proof's)", parallel.Variational},
-		{"host plain check", parallel.HostPlain},
+		{"variational check, cold (the proof's)", parallel.Variational},
+		{"variational check, warmed", parallel.VariationalWarmed},
+		{"host plain check, warmed", parallel.HostPlain},
 	} {
 		jobs := 0.0
 		for _, seconds := range row.run.JobSeconds {
@@ -418,4 +453,26 @@ func writeParallel(output *strings.Builder, parallel *parallelReport) {
 		parallel.HostPlainWarmSeconds,
 		parallel.HostPlainDecodeSeconds,
 	)
+	fmt.Fprintf(output, "variational warm-up, every package not ours merged whole before the warmed schedule: %.3fs "+
+		"wall, %.3fs cpu; the warmed schedule still decoded %.3fs and merged %.3fs\n", parallel.VariationalWarmSeconds,
+		parallel.VariationalWarmCpuSeconds, parallel.VariationalWarmedDecodeSeconds,
+		parallel.VariationalWarmedMergeSeconds)
+	fmt.Fprintf(output, "warm against warm, the checker alone: the walk adds %+.3fs of wall over the host's plain "+
+		"check\n", parallel.VariationalWarmed.WallSeconds-parallel.HostPlain.WallSeconds)
+	writeCpuRatio(output, "variational schedule, cold,", parallel.Variational, parallel.HostPlain)
+	writeCpuRatio(output, "variational schedule, warmed,", parallel.VariationalWarmed, parallel.HostPlain)
+}
+
+// writeCpuRatio writes the process CPU of run over that of hostPlain, each across its whole schedule, or says it
+// wasn't measured, never a ratio of nothing.
+//
+// Mutates: output gets the line.
+func writeCpuRatio(output *strings.Builder, name string, run parallelRun, hostPlain parallelRun) {
+	if run.Process.CpuSeconds() <= 0 || hostPlain.Process.CpuSeconds() <= 0 {
+		fmt.Fprintf(output, "%s cpu over host plain schedule cpu: not measured, the platform gives no process cpu\n",
+			name)
+		return
+	}
+	fmt.Fprintf(output, "%s cpu over host plain schedule cpu: %.2fx\n", name,
+		run.Process.CpuSeconds()/hostPlain.Process.CpuSeconds())
 }
