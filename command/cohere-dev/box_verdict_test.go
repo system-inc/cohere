@@ -212,8 +212,8 @@ func TestALandingReadsItsBoxsVerdictAndNeverRunsItsTestsOnKirksMac(test *testing
 			// a passing one too.
 			name: "the box passes, with a skip and opt-in skips",
 			box: func(commit string) string {
-				return boxMarker + commit + " on linux/amd64\n" +
-					`{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n" +
+				return boxMarker + commit + " on linux/amd64\n" + boxStepMarker + "modules 41\n" +
+					`{"Action":"pass","Package":"example.com/fixture/alpha","Elapsed":12.5}` + "\n" +
 					`{"Action":"output","Package":"example.com/fixture/alpha","Test":"TestPlantedCensus",` +
 					`"Output":"    census_test.go:9: ` + needs.OptInPhrase + `COHERE_CENSUS set: a census\n"}` + "\n" +
 					`{"Action":"skip","Package":"example.com/fixture/alpha","Test":"TestPlantedCensus"}` + "\n" +
@@ -228,7 +228,8 @@ func TestALandingReadsItsBoxsVerdictAndNeverRunsItsTestsOnKirksMac(test *testing
 				"uid), 1 never compiled on linux/amd64 and run nowhere: TestPlantedDarwinOnly " +
 				"(example.com/fixture/alpha), 1 skipped on the stand-in and run nowhere: TestPlantedLinuxSkip " +
 				"(example.com/fixture/alpha); opt-in, which no gate runs: TestPlantedCensus " +
-				"(example.com/fixture/alpha), TestPlantedRows/measured (example.com/fixture/alpha)"},
+				"(example.com/fixture/alpha), TestPlantedRows/measured (example.com/fixture/alpha); its gate by step " +
+				"modules 41s; slowest test binaries example.com/fixture/alpha 12.5s"},
 		},
 		{
 			name: "the box passes, and its race run passes",

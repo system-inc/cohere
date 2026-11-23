@@ -594,6 +594,15 @@ func runModuleTests(
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", unlaid)
 		where += "; " + unlaid
 	}
+	// Where the gate's time went joins the landing's body too, so main's history holds it beside the gate's total.
+	if timing := verdict.timingReport(); timing != "" {
+		where += "; its gate " + timing
+	}
+	if verdict.race != nil {
+		if timing := verdict.race.timingReport(); timing != "" {
+			where += "; its -race run " + timing
+		}
+	}
 	return 0, where
 }
 
