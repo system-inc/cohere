@@ -110,9 +110,9 @@ const parallelFixturePackages = 9
 const parallelWorkers = 4
 
 // TestParallelPlainChecksAreSafe lists the parallel fixture for one build and checks it plainly on the engine's
-// schedule several times, each through a fresh whole-reading importer, as the parallel host baseline does. Under
-// `-race` a check reading what another job writes fails the test; without it the checks must still report no error
-// and time every package.
+// schedule several times, each through a fresh whole-reading importer warmed first, as the parallel host baseline
+// does. Under `-race` a check reading what another job writes fails the test; without it the checks must still report
+// no error, time every package and decode nothing, the warm-up having read every package they import.
 func TestParallelPlainChecksAreSafe(test *testing.T) {
 	test.Parallel()
 	root, rootError := filepath.Abs(parallelFixtureRoot)
@@ -150,8 +150,17 @@ func TestParallelPlainChecksAreSafe(test *testing.T) {
 	exports := []map[string]string{listed.exports()}
 	for range 3 {
 		importer := merged.New(fileSet, exportSources(fileSet, exports), 1)
-		counts, run := checkPlainlyInParallel(fileSet, ordered, ours, listed, importer.PlainWhole(0), 0, sizes,
+		hostPlainWhole := importer.PlainWhole(0)
+		warmPlainly(ordered, ours, listed, hostPlainWhole, 0)
+		warmDecode := importer.Timing().Decode
+		if warmDecode == 0 {
+			test.Fatal("the warm-up decoded nothing")
+		}
+		counts, run := checkPlainlyInParallel(fileSet, ordered, ours, listed, hostPlainWhole, 0, sizes,
 			parallelWorkers)
+		if scheduleDecode := importer.Timing().Decode - warmDecode; scheduleDecode != 0 {
+			test.Errorf("the schedule after the warm-up decoded for %s, want nothing", scheduleDecode)
+		}
 		if counts.errors != 0 {
 			test.Fatalf("the parallel plain check reported %d errors: %q", counts.errors, counts.firstErrors)
 		}
@@ -188,6 +197,9 @@ func TestParallelChecksProveOneBuild(test *testing.T) {
 	}
 	if report.Parallel == nil {
 		test.Fatal("--check-workers asked for a parallel check, and the report holds none")
+	}
+	if report.Parallel.HostPlainWarmSeconds <= 0 {
+		test.Errorf("the host plain warm-up took %vs, want some time", report.Parallel.HostPlainWarmSeconds)
 	}
 	if report.Parallel.Workers != parallelWorkers {
 		test.Errorf("%d workers reported, want %d", report.Parallel.Workers, parallelWorkers)
@@ -251,6 +263,9 @@ func TestParallelChecksProveEveryBuild(test *testing.T) {
 	}
 	if report.Parallel == nil {
 		test.Fatal("--check-workers asked for a parallel check, and the report holds none")
+	}
+	if report.Parallel.HostPlainWarmSeconds <= 0 {
+		test.Errorf("the host plain warm-up took %vs, want some time", report.Parallel.HostPlainWarmSeconds)
 	}
 	for _, row := range []struct {
 		name string

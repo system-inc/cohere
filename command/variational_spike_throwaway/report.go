@@ -96,8 +96,11 @@ type parallelReport struct {
 	Workers     int         `json:"workers"`
 	Variational parallelRun `json:"variational"`
 	HostPlain   parallelRun `json:"hostPlain"`
-	// HostPlainDecodeSeconds is the parallel host plain importer's decode, each package read whole at its import,
-	// where the serial baseline's host plain decode reads only what its checks look up.
+	// HostPlainWarmSeconds is the wall of reading whole, before the host plain schedule and outside its timing, every
+	// package the schedule imports, so the schedule reads only decoded types.
+	HostPlainWarmSeconds float64 `json:"hostPlainWarmSeconds"`
+	// HostPlainDecodeSeconds is the parallel host plain importer's decode, each package read whole at its import, all
+	// of it in the warm-up, where the serial baseline's host plain decode reads only what its checks look up.
 	HostPlainDecodeSeconds float64 `json:"hostPlainDecodeSeconds"`
 }
 
@@ -182,6 +185,9 @@ var spikeNotes = []string{
 		"wall is the real critical path, and the process's CPU is measured across the whole schedule. The host's " +
 		"plain check runs the same way beside the serial baselines, through a fresh importer that reads each " +
 		"package whole at its import, so its checks read only decoded types.",
+	"With --check-workers, every package the host plain schedule imports is read whole before it, untimed by it " +
+		"and reported apart as the warm-up, so the plain wall holds no decode, while the variational wall holds " +
+		"its own lazy decode and merge. The walk's measured cost over the plain check is so an upper bound.",
 	"The oracle loads each build with go/packages, every package checked from source with go/types, as the " +
 		"platform census does; its load time is not part of any price.",
 }
@@ -405,9 +411,11 @@ func writeParallel(output *strings.Builder, parallel *parallelReport) {
 	}
 	fmt.Fprintf(
 		output,
-		"critical path, measured: the walk adds %+.3fs of wall over the host's plain check; host plain "+
-			"decode, each package read whole: %.3fs\n",
+		"critical path, measured: the walk adds %+.3fs of wall over the host's plain check, an upper bound, "+
+			"since the variational wall holds its own decode and the plain wall none; host plain warm-up, each "+
+			"package read whole before its schedule: %.3fs wall, %.3fs decode\n",
 		parallel.Variational.WallSeconds-parallel.HostPlain.WallSeconds,
+		parallel.HostPlainWarmSeconds,
 		parallel.HostPlainDecodeSeconds,
 	)
 }

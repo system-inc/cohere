@@ -167,7 +167,12 @@ func runSpike(asked commandLine, progress io.Writer) (*spikeReport, error) {
 		// A fresh importer, as the baselines' is, read whole at each import: a plain universe read at once by checks
 		// that run at once would read its export data at once.
 		parallelImporter := merged.New(fileSet, exportSources(fileSet, exports), all)
-		counts, run := checkPlainlyInParallel(fileSet, ordered, ours, listed[0], parallelImporter.PlainWhole(0), 0,
+		hostPlainWhole := parallelImporter.PlainWhole(0)
+		// Outside the timed schedule: every package it imports is read whole first, so its wall holds no decode,
+		// while the variational schedule's holds its own. The comparison is an upper bound on the walk's cost.
+		warm := measure(func() { warmPlainly(ordered, ours, listed[0], hostPlainWhole, 0) })
+		report.Parallel.HostPlainWarmSeconds = warm.WallSeconds
+		counts, run := checkPlainlyInParallel(fileSet, ordered, ours, listed[0], hostPlainWhole, 0,
 			sizes, asked.checkWorkers)
 		report.Parallel.HostPlain = run
 		report.Parallel.HostPlainDecodeSeconds = parallelImporter.Timing().Decode.Seconds()

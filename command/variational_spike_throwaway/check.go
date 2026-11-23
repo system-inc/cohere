@@ -233,6 +233,38 @@ func checkPlainlyInParallel(
 	})
 }
 
+// warmPlainly imports through importer every package that checkPlainly's checks of ordered import from it in build:
+// each import of a package build compiles, as its build spells it, but ours checked from source, which the checks
+// import from one another. Through PlainWhole, which reads each package whole at its import and once, a schedule
+// checked after it reads no export data, so the plain side's timed wall holds none of the decode the variational
+// side's lazy imports pay inside theirs.
+func warmPlainly(
+	ordered []*ourPackage,
+	ours map[string]*ourPackage,
+	listed *listedBuild,
+	importer types.Importer,
+	build int,
+) {
+	for _, our := range ordered {
+		listedPackage := listed.packages[our.path]
+		if len(our.filesIn(build)) == 0 || listedPackage == nil {
+			continue
+		}
+		for _, imported := range listedPackage.Imports {
+			resolvedPath := imported
+			if resolved, mapped := listedPackage.ImportMap[imported]; mapped {
+				resolvedPath = resolved
+			}
+			if _, isOurs := ours[resolvedPath]; resolvedPath == "unsafe" ||
+				isOurs && !listed.oursFromExport[resolvedPath] {
+				continue
+			}
+			// Ignored: a package that can't be imported fails the same way in the timed check, which reports it.
+			_, _ = importer.Import(resolvedPath)
+		}
+	}
+}
+
 // checkOnePlainly is our checked as build compiles it, with its own counts, when build compiles it: its imports
 // first, then the check, and the checked package given to checked for the packages of ours that import it, unless a
 // package not ours imports it, which reads it from export data.

@@ -4,10 +4,11 @@ import (
 	"github.com/system-inc/go-types/types"
 )
 
-// wholeReading is what a whole plain importer has read whole so far, under its build's lock: every type it walked, so
-// a type reached again is walked once.
+// wholeReading is what a whole plain importer has read whole so far, under its build's lock: every package and every
+// type it walked, so a package imported again, or a type reached again, is walked once.
 type wholeReading struct {
-	walked map[types.Type]bool
+	packages map[*types.Package]bool
+	walked   map[types.Type]bool
 }
 
 // readPackage reads imported whole: every object of its scope, and every type each reaches, through to the
@@ -19,6 +20,11 @@ type wholeReading struct {
 //
 // Requires: the build's lock is held.
 func (whole *wholeReading) readPackage(imported *types.Package) {
+	// A package read whole once holds nothing more to read, so an import after a warm-up reads no export data.
+	if whole.packages[imported] {
+		return
+	}
+	whole.packages[imported] = true
 	scope := imported.Scope()
 	for _, name := range scope.Names() {
 		whole.readType(scope.Lookup(name).Type())
