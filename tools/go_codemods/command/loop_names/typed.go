@@ -41,7 +41,11 @@ var typeTable = map[string]string{
 	"go/types.Type":     "resolvedType",
 	"*go/types.Package": "typesPackage",
 	"*go/types.Struct":  "structType",
-	"error":             "",
+	// cohere's own code holds the fork's go/types (#cs9qm4x), named as the standard library's.
+	"github.com/system-inc/go-types/types.Type":     "resolvedType",
+	"*github.com/system-inc/go-types/types.Package": "typesPackage",
+	"*github.com/system-inc/go-types/types.Struct":  "structType",
+	"error": "",
 	"*github.com/microsoft/TypeScript/tsc/shim/checker.Type":     "subjectType",
 	"*github.com/microsoft/TypeScript/tsc/internal/checker.Type": "subjectType",
 	"*github.com/microsoft/TypeScript/tsc/shim/ast.SourceFile":   "sourceFile",

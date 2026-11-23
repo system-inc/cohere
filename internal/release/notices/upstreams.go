@@ -548,6 +548,7 @@ var moduleLicenses = map[string]string{
 	"github.com/BurntSushi/toml":        "MIT",
 	"golang.org/x/exp/typeparams":       "BSD-3-Clause",
 	"honnef.co/go/tools":                "MIT",
+	"github.com/system-inc/go-types":    "BSD-3-Clause",
 }
 
 // swiftLicense is a Swift package's license expression and its text under licenses/.

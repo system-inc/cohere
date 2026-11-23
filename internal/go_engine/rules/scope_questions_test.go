@@ -573,6 +573,9 @@ func isNamedPointer(typed types.Type, packagePath string, name string) bool {
 		named.Obj().Name() == name
 }
 
+// typesPath is the go/types every rule type-checks with, cohere's fork of it (#cs9qm4x).
+const typesPath = "github.com/system-inc/go-types/types"
+
 // isImportName reports whether call is `X.Name()` where X is a *types.PkgName, an import's own name: go/types'
 // (*PkgName).Name, which object declares and PkgName promotes.
 func (resolver *scopeNameResolver) isImportName(call *ast.CallExpr) bool {
@@ -582,8 +585,8 @@ func (resolver *scopeNameResolver) isImportName(call *ast.CallExpr) bool {
 	}
 	selection, isSelection := resolver.loaded.TypesInfo.Selections[selector]
 	return isSelection && selection.Kind() == types.MethodVal && selection.Obj().Pkg() != nil &&
-		selection.Obj().Pkg().Path() == "go/types" &&
-		isNamedPointer(resolver.loaded.TypesInfo.TypeOf(selector.X), "go/types", "PkgName")
+		selection.Obj().Pkg().Path() == typesPath &&
+		isNamedPointer(resolver.loaded.TypesInfo.TypeOf(selector.X), typesPath, "PkgName")
 }
 
 // isIdentifierName reports whether selector is `X.Name` where X is an *ast.Ident: go/ast's Ident.Name field, the name

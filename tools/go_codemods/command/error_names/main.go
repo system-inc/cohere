@@ -499,8 +499,11 @@ func literalBindings(info *types.Info, files []*ast.File) map[*ast.FuncLit]liter
 				}
 				bind(names, typed.Values)
 			case *ast.CompositeLit:
-				configuration := go_origin_names.TypeName{PackagePath: "go/types", Name: "Config"}
-				if go_origin_names.NamedTypeOf(info.TypeOf(typed)) != configuration {
+				// A go/types Config, the standard library's or cohere's fork's (#cs9qm4x), which cohere's own code
+				// holds.
+				named := go_origin_names.NamedTypeOf(info.TypeOf(typed))
+				if named.Name != "Config" || named.PackagePath != "go/types" &&
+					named.PackagePath != "github.com/system-inc/go-types/types" {
 					return true
 				}
 				for _, element := range typed.Elts {

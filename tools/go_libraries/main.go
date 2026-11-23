@@ -76,8 +76,9 @@ const (
 	testdataName = "testdata"
 )
 
-// rootFiles are the files of a module's root every copy keeps, whichever the module has.
-var rootFiles = []string{"go.mod", "go.sum", "LICENSE", "PATENTS"}
+// rootFiles are the files of a module's root every copy keeps, whichever the module has. LICENSE-THIRD-PARTY is
+// staticcheck's credit for the code it includes, which cohere's notices carry on.
+var rootFiles = []string{"go.mod", "go.sum", "LICENSE", "LICENSE-THIRD-PARTY", "PATENTS"}
 
 // standardTypesHandlers are imports that hand back the standard library's go/types values, which a copied file cannot
 // keep, since what they return is not the fork's: a copied package importing one fails the run with its file named.
