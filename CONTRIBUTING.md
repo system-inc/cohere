@@ -172,10 +172,13 @@ lays the root at that commit and deeafbf4 once, checks the pinned Go toolchain, 
 build, `CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'`, on a Go cache she keeps. Over an empty system store for
 that binary it runs the Go engine with a clean environment under `/usr/bin/time -l`: the cold row at the root, 2 fills
 and 3 rounds, deeafbf4's, 2 and 2, a warm run after one that fills the project store, and one `--timeline` run. It
-writes `Performance.jsonc` at the root of the tree that lands: medians and ranges in milliseconds, her cpu, cores and
-load before and after, that she was held quiet, the build, the timeline's wall areas, and a note against main's file
-before it. A row reads "slower by" or "faster by" so much only when its range clears the old one, otherwise "level",
-and another machine or build is a line of its own, never compared. The file is awareness, never a gate on speed: a
+writes `Performance.jsonc` at the root of the tree that lands: medians and ranges in milliseconds, what each row
+`checked` by the engine's own records (its lint record's files walked and its findings, which every round of the row
+must agree on, or the landing refuses), her cpu, cores and load before and after, that she was held quiet, the build,
+the timeline's wall areas, and a note against main's file before it. A row reads "slower by" or "faster by" so much
+only when its range clears the old one, otherwise "level", and another machine or build, or a row that checked other
+files or findings than main's, is a line of its own, never compared: a run that checks less reads faster. The file is
+awareness, never a gate on speed: a
 landing that makes cohere slower lands with its note saying so (Kirk, Nov 21). `cohere-dev measure [<commit>]` runs
 the measurement alone, landing nothing. The file is land's alone: never write or edit it, and nothing that
 builds or tests may read it, which `internal/guard` holds, since it is written after the gate. While another holds
