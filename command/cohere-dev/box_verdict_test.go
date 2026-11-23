@@ -55,6 +55,38 @@ func TestABoxsRunIsReadFromItsMarkerAndItsJson(test *testing.T) {
 	}
 }
 
+// A package whose test binary hit go test's -timeout reads as failed with its timeout kept whole: the panic, the tests
+// still running and every goroutine, though test2json gave that text to a test framed at the time, which never ended
+// with a pass or a fail. The report prints it once, under the package, so a timeout names what it was waiting on.
+func TestATimeoutIsReportedWithEveryGoroutine(test *testing.T) {
+	test.Parallel()
+	output := strings.Join([]string{
+		boxMarker + "0123456789abcdef on darwin/arm64",
+		`{"Action":"output","Package":"example.com/slow","Test":"TestQuick","Output":"--- PASS: TestQuick (0.01s)\n"}`,
+		`{"Action":"pass","Package":"example.com/slow","Test":"TestQuick"}`,
+		`{"Action":"output","Package":"example.com/slow","Test":"TestStuck","Output":"panic: test timed out after 30m0s\n"}`,
+		`{"Action":"output","Package":"example.com/slow","Test":"TestStuck","Output":"\trunning tests:\n"}`,
+		`{"Action":"output","Package":"example.com/slow","Test":"TestStuck","Output":"\t\tTestStuck (30m0s)\n"}`,
+		`{"Action":"output","Package":"example.com/slow","Test":"TestStuck","Output":"goroutine 7 [chan receive, 29 minutes]:\n"}`,
+		`{"Action":"output","Package":"example.com/slow","Output":"FAIL\texample.com/slow\t1800.301s\n"}`,
+		`{"Action":"fail","Package":"example.com/slow"}`,
+	}, "\n")
+	verdict := readTestJson([]byte(output))
+	if !reflect.DeepEqual(verdict.packagesFailed, []string{"example.com/slow"}) || len(verdict.failedTests) != 0 {
+		test.Errorf("results read as %v failed, tests %v", verdict.packagesFailed, verdict.failedTests)
+	}
+	report := verdict.failureReport()
+	for _, want := range []string{"panic: test timed out after 30m0s", "TestStuck (30m0s)",
+		"goroutine 7 [chan receive, 29 minutes]:", "1800.301s"} {
+		if strings.Count(report, want) != 1 {
+			test.Errorf("the report holds %q %d times, want once:\n%s", want, strings.Count(report, want), report)
+		}
+	}
+	if strings.Contains(report, "TestQuick") {
+		test.Errorf("the report names a test that passed:\n%s", report)
+	}
+}
+
 // Only gap's own refusal for a held box passes it over for the next: a Mac whose claim outlasted gap's wait on it, a
 // box another hand's gap holds, or one a hand job holds. A gap that ran, with no error, is not held (it printed
 // "cohere-dev: <nil>" on every landing Home took), and neither is another refusal or another failure, which are the
