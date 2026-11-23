@@ -71,8 +71,10 @@ func newCorpusFixtures(test *testing.T) corpusFixtures {
 }
 
 // layScriptHere is corpusLayScript with the pinned node replaced by a stand-in whose digest it is, so the script runs
-// on a machine without Loom's tools; the stand-in installs nothing, since the corpora here install with none.
-func layScriptHere(test *testing.T) string {
+// on a machine without Loom's tools; the stand-in installs nothing, since the corpora here install with none. Its free
+// disk floor is floor GiB rather than corpusFreeFloor, so a test never reads how full the machine it runs on is: a
+// land gate fills its box's disk with the Go cache it builds, and this test refused with 6 GiB free on Sun2 (Nov 23).
+func layScriptHere(test *testing.T, floor string) string {
 	test.Helper()
 	node := filepath.Join(test.TempDir(), "node")
 	writeFixtureFile(test, filepath.Join(node, "bin", "node"), "#!/bin/sh\nexit 1\n")
@@ -89,7 +91,11 @@ func layScriptHere(test *testing.T) string {
 	if script == corpusLayScript {
 		test.Fatal("the lay script's node line was not found to replace")
 	}
-	return script
+	floorLine := "\nfloor=" + corpusFreeFloor + "\n"
+	if strings.Count(script, floorLine) != 1 {
+		test.Fatal("the lay script's free disk floor was not found to replace")
+	}
+	return strings.Replace(script, floorLine, "\nfloor="+floor+"\n", 1)
 }
 
 // A carry, laid by the box's own script: ahra's tree without its data/, Structure filled in at the commit ahra records,
@@ -113,7 +119,7 @@ func TestTheCorporaAreLaidAsTheirPinsSay(test *testing.T) {
 			test.Errorf("giving the laid corpora write back: %v %s", chmodError, output)
 		}
 	})
-	script := layScriptHere(test)
+	script := layScriptHere(test, "0")
 	lay := func(corpora []gateCorpus) string {
 		test.Helper()
 		directory := test.TempDir()
@@ -188,6 +194,23 @@ func TestTheCorporaAreLaidAsTheirPinsSay(test *testing.T) {
 	if _, statError := os.Stat(filepath.Join(laid, filepath.FromSlash(corpora[1].place()), "source",
 		"first.ts")); statError != nil {
 		test.Errorf("Structure wasn't laid at its new pin: %v", statError)
+	}
+}
+
+// A box whose disk would be left under the floor refuses to lay, in the gate's refusal, naming what is free and the
+// floor, before it unpacks anything. No disk holds a billion GiB free.
+func TestALayRefusesADiskUnderItsFloor(test *testing.T) {
+	test.Parallel()
+	needs.Tool(test, "bash", "the lay script is a bash script")
+	needs.Tool(test, "sha256sum", "the lay script checks the node it installs with by its digest")
+	home := test.TempDir()
+	bash := exec.Command("bash", "-s", "--", filepath.Join(test.TempDir(), "never-read.tar.gz"))
+	bash.Dir, bash.Stdin = test.TempDir(), strings.NewReader(layScriptHere(test, "1000000000"))
+	bash.Env = append(os.Environ(), "HOME="+home, "TMPDIR="+test.TempDir())
+	output, bashError := bash.CombinedOutput()
+	if bashError == nil || !strings.Contains(string(output), sharedBoxRefusedMarker+"only ") ||
+		!strings.Contains(string(output), " GiB is free on this box, under the 1000000000 GiB the corpora leave") {
+		test.Errorf("a lay under its floor wasn't refused (%v):\n%s", bashError, output)
 	}
 }
 

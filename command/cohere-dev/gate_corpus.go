@@ -192,8 +192,8 @@ nodeFound=$(sha256sum "$node/bin/node" | cut -d' ' -f1)
 [ "$nodeFound" = "$nodeDigest" ] || refuse "the node at $node/bin/node digests to $nodeFound, not the pinned $nodeDigest"
 mkdir -p "$base"
 free=$(df -k "$base" | awk 'NR == 2 { print int($4 / 1048576) }')
-[ "$free" -ge ` + corpusFreeFloor + ` ] || refuse "only ${free} GiB is free on this box, under the ` +
-	corpusFreeFloor + ` GiB the corpora leave"
+floor=` + corpusFreeFloor + `
+[ "$free" -ge "$floor" ] || refuse "only ${free} GiB is free on this box, under the ${floor} GiB the corpora leave"
 unpacked=$(mktemp -d "${TMPDIR:-/tmp}/cohere-corpora.XXXXXX")
 trap 'chmod -R u+w "$unpacked" 2>/dev/null; rm -rf "$unpacked"' EXIT
 tar -x -z -f "$carry" -C "$unpacked"
