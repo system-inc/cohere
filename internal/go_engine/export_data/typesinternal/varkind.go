@@ -22,6 +22,7 @@
 
 package typesinternal
 
+// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
 import "github.com/system-inc/go-types/types"
 
 type VarKind = types.VarKind

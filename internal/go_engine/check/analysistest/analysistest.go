@@ -43,6 +43,10 @@ import (
 	"go/ast"
 	"go/format"
 	"go/token"
+
+	// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
+	"github.com/system-inc/go-types/types"
+
 	"log"
 	"maps"
 	"os"
@@ -56,7 +60,6 @@ import (
 	"testing"
 	"text/scanner"
 
-	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	// cohere: checker and internal are the copies imported below.
 	"golang.org/x/tools/go/packages"

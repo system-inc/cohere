@@ -23,6 +23,7 @@ package aliases
 import (
 	"go/token"
 
+	// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
 	"github.com/system-inc/go-types/types"
 )
 

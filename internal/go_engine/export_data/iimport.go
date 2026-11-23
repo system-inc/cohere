@@ -31,13 +31,16 @@ import (
 	"fmt"
 	"go/constant"
 	"go/token"
+
+	// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
+	"github.com/system-inc/go-types/types"
+
 	"io"
 	"math/big"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/types/objectpath"
 
 	// cohere: x/tools' internal aliases and typesinternal, copied beside this

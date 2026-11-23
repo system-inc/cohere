@@ -23,9 +23,10 @@ package export_data
 // cohere: upstream's package is gcimporter, named here for its folder.
 
 import (
-	"sync"
-
+	// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
 	"github.com/system-inc/go-types/types"
+
+	"sync"
 )
 
 // predecl is a cache for the predeclared types in types.Universe.

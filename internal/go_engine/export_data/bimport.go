@@ -28,9 +28,11 @@ package export_data
 import (
 	"fmt"
 	"go/token"
-	"sync"
 
+	// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
 	"github.com/system-inc/go-types/types"
+
+	"sync"
 )
 
 func errorf(format string, args ...any) {

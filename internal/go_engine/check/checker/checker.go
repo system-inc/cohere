@@ -326,6 +326,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+
+	// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
+	"github.com/system-inc/go-types/types"
+
 	"io"
 	"iter"
 	"log"
@@ -340,7 +344,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	// cohere: go/analysis/internal is the copy in check/internal, imported below.
 	"golang.org/x/tools/go/packages"

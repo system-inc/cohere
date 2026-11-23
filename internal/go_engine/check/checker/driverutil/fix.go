@@ -25,13 +25,16 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
+
+	// cohere: the fork of go/types, the engine's one universe (#cs9qm4x).
+	"github.com/system-inc/go-types/types"
+
 	"log"
 	"maps"
 	"os"
 	"sort"
 	"strconv"
 
-	"github.com/system-inc/go-types/types"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/astutil"
 
