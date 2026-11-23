@@ -11,10 +11,25 @@ import (
 	"github.com/system-inc/go-types/types"
 )
 
-// checkedPackage is one of ours after the variational check: its answers by build and the check's counts.
+// checkedPackage is one of ours after the variational check: its answers by build. Types' are in variation, and every
+// other Info map's are the host's in info, with each other build's differences in variation.Overlays.
 type checkedPackage struct {
 	our       *ourPackage
 	variation *types.Variation
+	info      *types.Info
+}
+
+// everyInfoMap is an Info with every map but Types: Defs, Uses, Implicits, Selections and Instances, the maps the
+// engine records beside Types, so every check pays for recording them alike. A variational check answers Types in its
+// Variation, and a plain check is given a Types map beside these.
+func everyInfoMap() *types.Info {
+	return &types.Info{
+		Defs:       map[*ast.Ident]types.Object{},
+		Uses:       map[*ast.Ident]types.Object{},
+		Implicits:  map[ast.Node]types.Object{},
+		Selections: map[*ast.SelectorExpr]*types.Selection{},
+		Instances:  map[*ast.Ident]types.Instance{},
+	}
 }
 
 // checkCounts is what one run of checks over ours reported: how long its imports and its checks took, and its errors.
@@ -233,21 +248,22 @@ func checkOneVariationally(
 		Error:     func(reported error) { counts.noteError(reported.Error()) },
 	}
 	var checkedTypes *types.Package
+	// No Types map: Variation.Types is the answer, and a plain map beside it would record every expression twice.
+	info := everyInfoMap()
 	counts.checks = timed(func() {
-		// Ignored: every error went to Error above. The Info holds no Types map: Variation.Types is the answer, and a
-		// plain map beside it would record every expression twice.
-		checkedTypes, _ = configuration.Check(our.path, fileSet, our.files, &types.Info{})
+		// Ignored: every error went to Error above.
+		checkedTypes, _ = configuration.Check(our.path, fileSet, our.files, info)
 	})
 	counts.checkSeconds[our.path] = counts.checks.WallSeconds
 	importer.Add(checkedTypes)
-	return &checkedPackage{our: our, variation: variation}, counts
+	return &checkedPackage{our: our, variation: variation, info: info}, counts
 }
 
 // checkPlainly checks each of ordered that build compiles the plain way, with only build's files: the baseline the
 // variational check is priced against, each phase of each package run through timed. Ours come from this run's own
 // checks, in dependency order, but those a package not ours imports, which come with everything else from build's own
 // export data, unmerged, as that package's export data reads them. Its answers go to a Types map, as a plain check's
-// must to be recorded at all.
+// must to be recorded at all, beside every other Info map, as the variational check records them.
 func checkPlainly(
 	fileSet *token.FileSet,
 	ordered []*ourPackage,
@@ -353,10 +369,11 @@ func checkOnePlainly(
 		Error:     func(reported error) { counts.noteError(reported.Error()) },
 	}
 	var checkedTypes *types.Package
+	info := everyInfoMap()
+	info.Types = map[ast.Expr]types.TypeAndValue{}
 	counts.checks = timed(func() {
 		// Ignored: every error went to Error above.
-		checkedTypes, _ = configuration.Check(our.path, fileSet, files,
-			&types.Info{Types: map[ast.Expr]types.TypeAndValue{}})
+		checkedTypes, _ = configuration.Check(our.path, fileSet, files, info)
 	})
 	counts.checkSeconds[our.path] = counts.checks.WallSeconds
 	if !listed.oursFromExport[our.path] {
