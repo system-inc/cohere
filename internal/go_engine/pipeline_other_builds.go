@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -26,6 +27,10 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/timeline"
 )
+
+// renderingCountsVariable, set to 1, has each extra build write to stderr how many of its verdicts' nodes took the
+// host's lines and how many it rendered (check.HostRestoreCounts.NodesReused, #r28e4nh), a census for the shape run.
+const renderingCountsVariable = "COHERE_RENDERING_COUNTS"
 
 // errorRefusedAtGate is the error a build refused at the share gate ends its load with, since a build before it in
 // start order failed (extraBuildRuns). It is never written: the notes and the failure are written only up to and
@@ -1058,6 +1063,12 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			record.Packs = summedPacks(nil, run.result.Cache.Packs)
 			record.DeclinedAtLoad = fromHost.DeclinedAtLoad
 			record.DeclinedAtCheck = fromHost.DeclinedAtCheck
+			if index > 0 && os.Getenv(renderingCountsVariable) == "1" {
+				// Ignored: a census that cannot reach stderr changes nothing of the run.
+				_, _ = fmt.Fprintf(engine.standardError, "cohere: %s rendering: %d nodes reused, %d rendered, %d of "+
+					"them unmatched\n", run.build.String(), fromHost.NodesReused, fromHost.NodesRendered,
+					fromHost.NodesUnmatched)
+			}
 			if len(fromHost.DeclinedBy) > 0 {
 				record.DeclinedBy = fromHost.DeclinedBy
 			}

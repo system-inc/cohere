@@ -275,7 +275,8 @@ func TestTheBuildIndexesThePackagesPastARestoredOne(test *testing.T) {
 	build := NewReadsBuild()
 	indexed := map[*types.Package]int{}
 	build.indexing = func(declaring *types.Package) { indexed[declaring]++ }
-	holds, why := TypesHold(restoring, closure, map[*types.Package]bool{buildKept: true}, NewReadsBuild(), build)
+	holds, why := TypesHold(restoring, closure, map[*types.Package]*types.Package{buildKept: nil}, NewReadsBuild(),
+		build)
 	want := "L lookup Method Close: " + pinnedFreshPath + ".Closer.Close is new in the build, of the subject's shape"
 	if holds || why != want {
 		test.Errorf("want false, %q, got %t, %q", want, holds, why)

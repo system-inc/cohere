@@ -1,6 +1,7 @@
 package check
 
 import (
+	"go/types"
 	"maps"
 	"reflect"
 	"sync"
@@ -30,9 +31,14 @@ import (
 //
 // compiledFiles are the package's CompiledGoFiles as the host compiled them, which the builds' inheritance indexes by
 // file (HostRun.holdersOf, #y6q1x2j).
+//
+// types are the package's types on the host's run, checked from source, which a build that restores the package takes
+// its nodes' lines from (typeGraph.hostLines), nil when the host had none. They live no longer for it: the reads of
+// every package kept hold the host's objects, and Release lets the entries go.
 type hostEntry struct {
 	restoring   Restoring
 	portable    cache.Key
+	types       *types.Package
 	contents    func() (body []byte, record entryRecord, readExportData func() ([]byte, error), readError error)
 	bodyAt      cache.Key
 	holdsBodyAt bool

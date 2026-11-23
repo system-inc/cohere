@@ -140,6 +140,20 @@ func (build *ReadsBuild) measureBy(sizes types.Sizes) {
 	}
 }
 
+// nodeCounts are how many nodes of the memo and its whole twin took the host's lines, how many were rendered, and how
+// many of those were of a restored package the host had no node of the same path and name for (typeGraph.nodeCounts).
+func (build *ReadsBuild) nodeCounts() (int, int, int) {
+	reused, rendered, unmatched := build.graph.nodeCounts()
+	build.lock.Lock()
+	whole := build.whole
+	build.lock.Unlock()
+	if whole != nil {
+		wholeReused, wholeRendered, wholeUnmatched := whole.graph.nodeCounts()
+		reused, rendered, unmatched = reused+wholeReused, rendered+wholeRendered, unmatched+wholeUnmatched
+	}
+	return reused, rendered, unmatched
+}
+
 // measuredSizes are the word size and the maximum alignment of the sizes the memo measures another package's unexported
 // fields by (measureBy), and false for a memo never told its build, which renders every field whole. The maximum
 // alignment is int64's, which the gc compiler's sizes, the only ones a load gives, cap at it, and which no target
@@ -556,12 +570,13 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 
 // TypesHold reports whether what restoring read of other packages' types on the host's run, in host, reads the same in
 // build, whose packages it reaches are closure, by path, restored those of them build restored from the host's run,
-// and when it does not, the first read that differs, named by its row: T for an object its type check reached, judged
-// by the kind of use it made of it, or a selection it made through another package's type, L for a rule's lookup of
-// the types, and never or unknown for reads that cannot hold at all. It is the load's half of the
-// verdict, decided once the package's imports are done in build and before anything of the package is read there
-// (load.Restored.Holds); FactsHold is check's. A package whose own inputs are the host's and whose reads hold may take
-// the host's results in build (#b2t9xmf).
+// each by the host's package it was restored from, nil when the host kept none, whose nodes build takes the host's
+// lines of rather than render them (typeGraph.hostLines), and when it does not, the first read that differs, named by
+// its row: T for an object its type check reached, judged by the kind of use it made of it, or a selection it made
+// through another package's type, L for a rule's lookup of the types, and never or unknown for reads that cannot hold
+// at all. It is the load's half of the verdict, decided once the package's imports are done in build and before
+// anything of the package is read there (load.Restored.Holds); FactsHold is check's. A package whose own inputs are the
+// host's and whose reads hold may take the host's results in build (#b2t9xmf).
 //
 // A package with assembly files is judged by the memos' whole twins (Restoring.Assembly), never by another package's
 // unexported field rendered by its properties, and every read of it by the read object's closure, as is every read of
@@ -573,7 +588,7 @@ var deprecatedFactType = reflect.TypeFor[*deprecated.IsDeprecated]()
 func TypesHold(
 	restoring Restoring,
 	closure map[string]*types.Package,
-	restored map[*types.Package]bool,
+	restored map[*types.Package]*types.Package,
 	host *ReadsBuild,
 	build *ReadsBuild,
 ) (bool, string) {
@@ -590,6 +605,7 @@ func TypesHold(
 	if restoring.Assembly {
 		judgedHost, judgedBuild = host.wholeTwin(), build.wholeTwin()
 	}
+	judgedBuild.graph.learnRestored(judgedHost.graph, restored)
 	judged := verdict{host: judgedHost, build: judgedBuild, closure: closureLookupOf(closure), restored: restored,
 		methods: &verdictClosures{host: map[*types.Package]*gatheredClosure{}}}
 	closureOnly := restoring.Assembly || restoring.Reads.ClosureOnly() != ""

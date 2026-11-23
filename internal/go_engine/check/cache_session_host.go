@@ -41,7 +41,9 @@ import (
 // D, A or unnamed.
 // Declined is why each package was declined, by ID, the last load's and check's over every load. Deciding is the time
 // TypesHold and FactsHold took over every load, summed across the goroutines that asked them, so it can exceed the
-// wall time it ran within.
+// wall time it ran within. NodesReused, NodesRendered and NodesUnmatched are the verdicts' nodes over every load: those
+// of a package restored from the host whose lines were the host's (typeGraph.hostLines), those rendered in the build,
+// and those of a restored package the host had no node of the same path and name for, rendered in the build too.
 type HostRestoreCounts struct {
 	Untouched       []string
 	Visited         int
@@ -52,6 +54,9 @@ type HostRestoreCounts struct {
 	DeclinedBy      map[string]int
 	Declined        map[string]string
 	Deciding        time.Duration
+	NodesReused     int
+	NodesRendered   int
+	NodesUnmatched  int
 }
 
 // hostRestore is one package an extra build restores from the host's run, and what deciding it has learned: the first
@@ -77,6 +82,12 @@ type hostState struct {
 	// deciding is the time TypesHold and FactsHold took over every load, in nanoseconds, summed across goroutines.
 	deciding atomic.Int64
 
+	// nodesReused, nodesRendered and nodesUnmatched are the nodes of every earlier load's renderings, taken from the
+	// host's graph, rendered, and rendered with no host node to take (ReadsBuild.nodeCounts).
+	nodesReused    int
+	nodesRendered  int
+	nodesUnmatched int
+
 	// restoring are this load's packages restored from the host's run and decided late, and renderings the verdicts'
 	// memo of this load's types. untouched are this load's packages restored from the host's run that the walk left
 	// untouched, never judged (untouchedOf), and visited counts the packages the host kept that the walk visited, each
@@ -85,6 +96,11 @@ type hostState struct {
 	renderings *ReadsBuild
 	untouched  map[*packages.Package]*hostRestore
 	visited    int
+
+	// below are, for each package a late decision of this load reaches, the packages below it restored from the host's
+	// run, a map[*types.Package]*types.Package by the *packages.Package, made once each from its imports' own
+	// (restoredReach).
+	below *sync.Map
 
 	// visitsEvery has the walk visit every package the host kept, leaving none untouched (VisitEvery).
 	visitsEvery bool
@@ -260,8 +276,16 @@ func (session *CacheSession) restoreFromHost(
 	// of its packages or types through it.
 	state.restoring = map[*packages.Package]*hostRestore{}
 	state.untouched = map[*packages.Package]*hostRestore{}
+	state.below = &sync.Map{}
 	state.visited = 0
 	state.writtenThrough = map[*packages.Package]bool{}
+	// The last load's renderings are counted before they go, so the counts cover every load.
+	if state.renderings != nil {
+		reused, rendered, unmatched := state.renderings.nodeCounts()
+		state.nodesReused += reused
+		state.nodesRendered += rendered
+		state.nodesUnmatched += unmatched
+	}
 	state.renderings = NewReadsBuild()
 	state.loadDeclines = map[string]int{}
 	state.loadReasons = map[string]string{}
@@ -552,41 +576,117 @@ func (session *CacheSession) judgedThrough(
 }
 
 // restoredBelow are the types of the packages of closure, what candidate reaches by path, that this load restored from
-// the host's run, decided late or left untouched. Each is done when candidate's restore is decided, its types set and
-// its decline, if any, counted (declineAtLoad), so a package still among the restores is one whose types were read from
-// the host's export data.
+// the host's run, decided late or left untouched, each by the types of the host's package it was restored from, the
+// entry of the same ID (hostEntry.types), whose nodes the verdict's build takes the host's lines of (typeGraph). Each
+// is done when candidate's restore is decided, since the loader decides a package only once its imports are done
+// (load's restoreTypes after every import's done), its types set and its decline, if any, counted (declineAtLoad), so a
+// package still among the restores is one whose own verdict held and whose types were read from the host's export
+// data; an untouched one was marked before the load began (Restore), and a decline at check loads the build again
+// with renderings of its own.
+//
+// They are what candidate reaches restored (restoredReach), less any of a path closure gives another package of, one
+// candidate's walk met after another of its path. Every package's types are made at its own path, by the loader's
+// check and by export_data.Read alike, so a reached package's types are closure's at their own path exactly when the
+// package is closure's. The map is shared with the memo when nothing is left out, and only read.
 func (session *CacheSession) restoredBelow(
 	candidate *packages.Package,
 	closure map[string]*types.Package,
-) map[*types.Package]bool {
-	// The load set every package's imports before it decided any, so the walk reads them without the lock; only
-	// whether each reached package is still among the restores is asked under it.
-	visited := map[*packages.Package]bool{}
-	var reached []*packages.Package
-	var collect func(importer *packages.Package)
-	collect = func(importer *packages.Package) {
-		for _, imported := range importer.Imports {
-			if visited[imported] {
-				continue
+) map[*types.Package]*types.Package {
+	reached := session.restoredReach(candidate)
+	for built := range reached {
+		if closure[built.Path()] != built {
+			restored := make(map[*types.Package]*types.Package, len(reached))
+			for kept, hostTypes := range reached {
+				if closure[kept.Path()] == kept {
+					restored[kept] = hostTypes
+				}
 			}
-			visited[imported] = true
-			reached = append(reached, imported)
-			collect(imported)
+			return restored
 		}
 	}
-	collect(candidate)
+	return reached
+}
+
+// restoredReach are the types of every package importer reaches through its imports that this load restored from the
+// host's run, decided late and held, or left untouched, each by the types of the host's package it was restored from,
+// made once a load (#r28e4nh): the union of each import's own and the imports themselves that are restored. A walk of
+// every import from each candidate made the same set again for every decision.
+//
+// It is exact, the set a walk of importer's imports finds, and final once made. It is asked only by a late decision,
+// whose package's imports are all done, and so every package below it: the loader needs every package below one
+// decided late, and a needed package is done only once its own imports are (load's needed and load). A package done is
+// in the restores or not for the rest of the load, since only its own decline drops it (declineAtLoad), within its own
+// restoreTypes, before it is done, and its types are set by then. So a set made of done packages never changes, and
+// one made from its imports' sets is theirs together.
+//
+// One import's set holding everything the others and the imports themselves add is shared rather than copied, as down
+// a chain of single imports, so the memo holds about one set per fork in the graph rather than one per package.
+func (session *CacheSession) restoredReach(importer *packages.Package) map[*types.Package]*types.Package {
 	state := session.host
-	restored := map[*types.Package]bool{}
-	state.lock.RLock()
-	defer state.lock.RUnlock()
-	for _, imported := range reached {
-		_, judged := state.restoring[imported]
-		_, untouched := state.untouched[imported]
-		if (judged || untouched) && imported.Types != nil && closure[imported.PkgPath] == imported.Types {
-			restored[imported.Types] = true
+	if known, isKnown := state.below.Load(importer); isKnown {
+		reached, isReached := known.(map[*types.Package]*types.Package)
+		if !isReached {
+			// Invariant: restoredReach stores only a map[*types.Package]*types.Package.
+			panic(fmt.Sprintf("check: the restores below %s are a %T", importer.ID, known))
+		}
+		return reached
+	}
+	// Each import's set first, with no lock held, since each may be made here, taking the lock itself.
+	importsReached := make([]map[*types.Package]*types.Package, 0, len(importer.Imports))
+	var largest map[*types.Package]*types.Package
+	for _, imported := range importer.Imports {
+		importReached := session.restoredReach(imported)
+		importsReached = append(importsReached, importReached)
+		if len(importReached) > len(largest) {
+			largest = importReached
 		}
 	}
-	return restored
+	// The imports themselves restored, whether each is still among the restores asked under the lock.
+	direct := map[*types.Package]*types.Package{}
+	state.lock.RLock()
+	for _, imported := range importer.Imports {
+		hosted, judged := state.restoring[imported]
+		if !judged {
+			hosted = state.untouched[imported]
+		}
+		if hosted != nil && imported.Types != nil {
+			direct[imported.Types] = hosted.kept.types
+		}
+	}
+	state.lock.RUnlock()
+	// A package's types are restored from one host package, so a set holding a package's types holds its entry.
+	importsReached = append(importsReached, direct)
+	reached := largest
+	for _, other := range importsReached {
+		if !holdsEvery(reached, other) {
+			reached = map[*types.Package]*types.Package{}
+			for _, each := range importsReached {
+				maps.Copy(reached, each)
+			}
+			break
+		}
+	}
+	if reached == nil {
+		reached = map[*types.Package]*types.Package{}
+	}
+	// Two decisions may make one package's set at once; both make the same set, so either may store it.
+	stored, _ := state.below.LoadOrStore(importer, reached)
+	storedReached, isReached := stored.(map[*types.Package]*types.Package)
+	if !isReached {
+		// Invariant: restoredReach stores only a map[*types.Package]*types.Package.
+		panic(fmt.Sprintf("check: the restores below %s are a %T", importer.ID, stored))
+	}
+	return storedReached
+}
+
+// holdsEvery reports whether every key of subset is a key of set.
+func holdsEvery(set map[*types.Package]*types.Package, subset map[*types.Package]*types.Package) bool {
+	for key := range subset {
+		if _, held := set[key]; !held {
+			return false
+		}
+	}
+	return true
 }
 
 // declineAtLoad drops candidate, which the load checks from source after all, from the hits restored from the host,
@@ -1010,6 +1110,15 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 		DeclinedBy:      map[string]int{},
 		Declined:        map[string]string{},
 		Deciding:        time.Duration(state.deciding.Load()),
+		NodesReused:     state.nodesReused,
+		NodesRendered:   state.nodesRendered,
+		NodesUnmatched:  state.nodesUnmatched,
+	}
+	if state.renderings != nil {
+		reused, rendered, unmatched := state.renderings.nodeCounts()
+		counts.NodesReused += reused
+		counts.NodesRendered += rendered
+		counts.NodesUnmatched += unmatched
 	}
 	for candidate, hosted := range state.restoring {
 		hosted.lock.Lock()
@@ -1100,7 +1209,8 @@ func (session *CacheSession) keepForBuilds(
 		if packageReads == nil || packageReads.Never() != "" || session.restored(keptPackage) {
 			continue
 		}
-		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage]}
+		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage],
+			types: keptPackage.Types}
 		if session.written[keptPackage] {
 			key := session.keys[keptPackage]
 			// The record the run wrote of it holds its body, which a build writing the package through names, in the
