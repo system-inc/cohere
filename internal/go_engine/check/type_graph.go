@@ -225,7 +225,10 @@ func (graph *typeGraph) hostLines(typeName *types.TypeName) ([]string, bool) {
 		return nil, false
 	}
 	from, _ := learned.(hostPackage)
-	// A local type is no package-level type name of the host's, though one of its name may be.
+	// A local type is no package-level type name of the host's, though one of its name may be. A restored package holds
+	// none today: its types are read from shallow export data, which carries the package-level objects and the types
+	// their declarations name, and no body, and a package-level declaration's type is written at package scope, where
+	// no function's local type is in scope. So no test can reach this, and it stays as the defense it is.
 	if from.types == nil || typeName.Parent() != typeName.Pkg().Scope() {
 		graph.unmatchedNodes.Add(1)
 		return nil, false
