@@ -737,6 +737,12 @@ func (session *CacheSession) dropShortHits(reachable []*packages.Package) bool {
 			}
 		}
 	}
+	// Only a given miss asks facts of what it imports, not an extra build's fact root, a package it checks from source
+	// though not given (factRootsOf, #xqbqcbt), whose fact analyzers reach what it imports too. Such a package is plain
+	// p beside a given "p [p.test]", which imports everything p does, so the host's run reached each of them with its
+	// fact analyzers and kept them with facts. Were one ever a hit short of a fact, it fails closed: the fact root's
+	// action on it errors ("the cache entry holds nothing of it", restore), which keeps the fact root from being saved
+	// (savable) and declines any restore that read a fact of it (buildFacts.factsHold).
 	for _, each := range reachable {
 		if _, hit := session.hits[each]; session.given[each] && !hit && session.earlier[each] == nil {
 			reach(each)

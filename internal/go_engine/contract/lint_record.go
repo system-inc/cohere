@@ -419,22 +419,23 @@ type DependenceCounts struct {
 // written entries left out because nothing outside their package can name their object, and FactsSkipped the restored
 // facts whose object the package's export data does not hold, once for each analyzer whose action restores them: a
 // build restores a package's facts only where a pass above it inherits them, so it counts only the facts of the
-// restores it makes. Waves counts the times the lint phase analyzed packages: at most two, those whose own inputs moved
-// and then the rest that missed, once the hits the early cutoff found among the packages above the first were restored.
-// FromSystemCache counts the standard-library packages restored from the system cache's tables (#syscache), the host's
-// build's and every other build's summed, which nothing analyzed, apart from hit; it is written only when it is not 0.
-// SystemCacheWritten counts the entries the run's builds added to their tables, summed, written only when not 0, and
-// SystemCacheOff is set under `--no-system-cache`, which neither reads nor writes the system cache. SystemCacheNotKept
-// is why the run kept no system cache though it was on, or could not keep it as it should, in one line, as a root it
-// could not find, a directory it could not write or a trim that failed; it is written only when there is one, and a run
-// under `--no-system-cache` has none. Reloads counts the packages the run loaded again from source, though the cache
-// held them, because a question of a fact computed on demand reached one restored with no answer stored (#w7zmvat
-// wave 3), and ReloadRounds how many times the run loaded and linted again for them; each is written only when it is
-// not 0. The timing record carries neither: a run under `--timing` reads no cache, so it restores nothing and never
-// reloads. Replays, beside them though no cache count, is how many questions of a fact computed on demand the lint
-// phase answered by replaying the push's walk of a package, which a cold run makes too; it is written only when it is
-// not 0. On is false under `--no-cache`, and every count 0 but FromSystemCache, which the system cache can still give,
-// FactsSkipped of what they restored, and Reloads of them.
+// restores it makes. The record's count is the host's run's alone, so that describes the extra builds' own counts,
+// which it does not carry. Waves counts the times the lint phase analyzed packages: at most two, those whose own inputs
+// moved and then the rest that missed, once the hits the early cutoff found among the packages above the first were
+// restored. FromSystemCache counts the standard-library packages restored from the system cache's tables (#syscache),
+// the host's build's and every other build's summed, which nothing analyzed, apart from hit; it is written only when it
+// is not 0. SystemCacheWritten counts the entries the run's builds added to their tables, summed, written only when not
+// 0, and SystemCacheOff is set under `--no-system-cache`, which neither reads nor writes the system cache.
+// SystemCacheNotKept is why the run kept no system cache though it was on, or could not keep it as it should, in one
+// line, as a root it could not find, a directory it could not write or a trim that failed; it is written only when
+// there is one, and a run under `--no-system-cache` has none. Reloads counts the packages the run loaded again from
+// source, though the cache held them, because a question of a fact computed on demand reached one restored with no
+// answer stored (#w7zmvat wave 3), and ReloadRounds how many times the run loaded and linted again for them; each is
+// written only when it is not 0. The timing record carries neither: a run under `--timing` reads no cache, so it
+// restores nothing and never reloads. Replays, beside them though no cache count, is how many questions of a fact
+// computed on demand the lint phase answered by replaying the push's walk of a package, which a cold run makes too; it
+// is written only when it is not 0. On is false under `--no-cache`, and every count 0 but FromSystemCache, which the
+// system cache can still give, FactsSkipped of what they restored, and Reloads of them.
 // Problems counts what kept the cache from being read or written, the host's build's and every other build's alike,
 // each of which the engine also notes on stderr, so a run read through `--json` alone still shows it (#27r8r24).
 // WriteFailed counts every miss whose entry could not be written, every build's, of which the engine notes only the

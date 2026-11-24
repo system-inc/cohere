@@ -11,7 +11,7 @@ import (
 // FactRoots), and which analyzers those are: the session's known.facts, every analyzer that learns facts among the
 // rules and what they require, on every package of the load below analyzed that the build checks from source, that no
 // wave restores (restoredInWave, which a package restored from the host's run is too), and that toAnalyze leaves out,
-// in the load's order (#xqbqcbt).
+// in the load's order (#xqbqcbt). withheld, nil but in a test (Options.withholdFactRoot), names packages left out.
 //
 // Such a package is no root of the build, yet the decide asks its facts from source: a package restored from the
 // host's run that read a fact of it is held only when the build's own facts there read alike, and with no action of a
@@ -27,6 +27,7 @@ func factRootsOf(
 	analyzed []*packages.Package,
 	toAnalyze []*packages.Package,
 	session *CacheSession,
+	withheld func(*packages.Package) bool,
 ) ([]*packages.Package, []*analysis.Analyzer) {
 	if session.host == nil || session.known == nil || len(session.known.facts) == 0 {
 		return nil, nil
@@ -37,7 +38,7 @@ func factRootsOf(
 	}
 	var factRoots []*packages.Package
 	packages.Visit(analyzed, nil, func(visited *packages.Package) {
-		if !rooted[visited] && !session.restoredInWave(visited) {
+		if !rooted[visited] && !session.restoredInWave(visited) && (withheld == nil || !withheld(visited)) {
 			factRoots = append(factRoots, visited)
 		}
 	})

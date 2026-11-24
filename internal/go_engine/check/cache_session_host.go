@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/bounded"
@@ -878,9 +879,13 @@ func (session *CacheSession) unsettledBelow() map[*packages.Package]bool {
 //
 // A package restored from the host's run has an action only where a pass above it reaches it, inheriting its facts
 // (#xqbqcbt), so every action on it is checked, but none is required. What an action's restore refused is refused here
-// without one: an entry holding another set of analyzers than the build would run (throughEntry), and a package the
-// load gave no types (session.restore's refusals). A failure below it reaches the restore's verdict instead, which
-// declines it when it read a fact the failed action would have exported (buildFacts.factsHold).
+// without one: an entry holding another set of analyzers than the build would run (throughEntry), a package the load
+// gave no types (session.restore's refusals), and a judged restore above an action of an analyzer that learns facts
+// that failed in the run (failedFactsBelow). That last is main's invariant, which an action on the restore once kept by
+// failing with its prerequisite: an entry is written only where the build's check from source would have finished
+// clean, and that check would have failed every rule on the package that requires the analyzer, which the restore,
+// held on what it read, never shows. Its verdict alone does not refuse it, since it declines a restore only for a fact
+// it read (buildFacts.factsHold). An untouched package is written as it was, on the walk's induction.
 //
 // The entry is exactly as sound as the restore, and no sounder. It persists a verdict that held because what the
 // package read of other packages read the same in this run: its types' reads at the load, its facts' and answers' at
@@ -908,6 +913,10 @@ func (session *CacheSession) writeThrough(
 	}
 	var through []*packages.Package
 	var throughHosted []*hostRestore
+	// Computed once for the save, as unsettled is, and read by a lookup for each candidate.
+	failedBelow := session.failedFactsBelow(actionsOf)
+	// The packages the build's packages to analyze reach, whose expected slots hold the analyzers that learn facts.
+	reached := session.givenReach()
 	// An untouched package is written through as a held one is, on the walk's induction (see above).
 	settledRestores := maps.Clone(session.host.restoring)
 	maps.Copy(settledRestores, session.host.untouched)
@@ -917,13 +926,16 @@ func (session *CacheSession) writeThrough(
 		hosted.lock.Unlock()
 		// A package pending a reload is checked from source by the next load, which writes its entry as a miss. One
 		// with no store, a project package under `--no-cache`, has no key either (keyStandardLibraryApart). A judged
-		// restore the load gave no types is one whose actions' restore refused it (session.restore); an untouched one
-		// has none whenever nothing checked from source reads them, and was never refused for it.
+		// restore always has types: the load needs every package whose restore it decides late (load's needed, which
+		// takes each with Restored.Holds), so it reads them from the host's export data or declines the restore at the
+		// load. The check of its types is the fail-closed answer to a case the load rules out, as session.restore
+		// refused it when an action on it restored. An untouched one has none whenever nothing checked from source
+		// reads them, and was never refused for it.
 		_, untouched := session.host.untouched[candidate]
 		if _, keyed := session.keys[candidate]; !held || !keyed || session.storeFor(candidate) == nil ||
 			unsettled[candidate] ||
 			session.host.writtenThrough[candidate] || session.stoodIn(candidate.ID) ||
-			session.reloading(candidate) || !untouched && candidate.Types == nil ||
+			session.reloading(candidate) || !untouched && (candidate.Types == nil || failedBelow[candidate]) ||
 			!finishedClean(actionsOf[candidate]) {
 			continue
 		}
@@ -937,7 +949,7 @@ func (session *CacheSession) writeThrough(
 		saved := through[index]
 		_, untouched := session.host.untouched[saved]
 		encoded[index], writable[index], writeErrors[index] = session.throughEntry(saved, throughHosted[index],
-			knownFiles, untouched)
+			knownFiles, untouched, reached)
 		if !writable[index] || writeErrors[index] != nil {
 			return nil
 		}
@@ -1015,10 +1027,11 @@ func (session *CacheSession) throughEntry(
 	hosted *hostRestore,
 	knownFiles *knownFiles,
 	untouched bool,
+	reached map[*packages.Package]bool,
 ) (encodedEntry, bool, error) {
 	// An untouched package is not compared. Its entry is the host's for the same rules, and an entry that falls short
 	// of what a later run asks is a miss there (dropShortHits), never a wrong hit.
-	slots := session.expectedSlots(saved)
+	slots := session.expectedSlots(saved, reached)
 	if !untouched && len(hosted.restored.slots) != len(slots) {
 		return encodedEntry{}, false, nil
 	}
@@ -1056,14 +1069,22 @@ func (session *CacheSession) throughEntry(
 
 // expectedSlots are the slots of the analyzers the build runs on saved when it checks it from source, which an entry
 // it writes holds: on a package given, every rule's and report's (known.rules) and every analyzer's that learns facts
-// (known.facts), since each rule's root requires those it reads; on any other, only those that learn facts, which
-// reach it from what imports it. They are what the build's actions on a package restored from the host's run were
-// once compared by, when every rule was rooted on it (#xqbqcbt); now it has few or none.
-func (session *CacheSession) expectedSlots(saved *packages.Package) map[string]bool {
+// (known.facts), since each rule's root requires those it reads; on any other the packages given reach (reached), only
+// those that learn facts, rooted on it or reaching it from what imports it (factRootsOf); and on a package nothing
+// given reaches, as plain p beside "p [p.test]" when nothing imports p, none, since no action runs on it and its own
+// entry holds no analysis. They are what the build's actions on a package restored from the host's run were once
+// compared by, when every rule was rooted on it (#xqbqcbt); now it has few or none.
+func (session *CacheSession) expectedSlots(
+	saved *packages.Package,
+	reached map[*packages.Package]bool,
+) map[string]bool {
 	expected := map[string]bool{}
-	analyzers := session.known.facts
-	if session.given[saved] {
-		analyzers = append(slices.Clone(session.known.rules), analyzers...)
+	var analyzers []*analysis.Analyzer
+	switch {
+	case session.given[saved]:
+		analyzers = append(slices.Clone(session.known.rules), session.known.facts...)
+	case reached[saved]:
+		analyzers = session.known.facts
 	}
 	for _, analyzer := range analyzers {
 		if slot, held := session.known.slot(analyzer); held {
@@ -1071,6 +1092,47 @@ func (session *CacheSession) expectedSlots(saved *packages.Package) map[string]b
 		}
 	}
 	return expected
+}
+
+// givenReach are the packages the session's packages to analyze reach through their imports, they themselves among
+// them: those a build checking them from source gives an action of every analyzer that learns facts.
+func (session *CacheSession) givenReach() map[*packages.Package]bool {
+	reached := map[*packages.Package]bool{}
+	var reach func(current *packages.Package)
+	reach = func(current *packages.Package) {
+		if reached[current] {
+			return
+		}
+		reached[current] = true
+		for _, imported := range current.Imports {
+			reach(imported)
+		}
+	}
+	for given := range session.given {
+		reach(given)
+	}
+	return reached
+}
+
+// failedFactsBelow are the packages the load reached that import, directly or not, or are, a package on which an action
+// of actionsOf, an analyzer's that learns facts, failed in the run, nil when none failed. A check from source of any of
+// them runs that analyzer on that package through its vertical edges, and fails there.
+func (session *CacheSession) failedFactsBelow(
+	actionsOf map[*packages.Package][]*checker.Action,
+) map[*packages.Package]bool {
+	var failed []*packages.Package
+	for owner, actions := range actionsOf {
+		for _, action := range actions {
+			if action.Err != nil && len(action.Analyzer.FactTypes) > 0 {
+				failed = append(failed, owner)
+				break
+			}
+		}
+	}
+	if len(failed) == 0 {
+		return nil
+	}
+	return session.packagesAbove(failed)
 }
 
 // hostBody is the body of hosted's entry, read from the host's run, for a build whose store does not hold it yet.

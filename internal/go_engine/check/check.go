@@ -204,6 +204,11 @@ type Options struct {
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
 
+	// withholdFactRoot, nil outside tests, names a package the run roots no analyzer that learns facts on though
+	// factRootsOf would (#xqbqcbt), so a test can see what the decide makes of a package checked from source that no
+	// action reaches.
+	withholdFactRoot func(*packages.Package) bool
+
 	// analyzedGraphs, nil outside tests, is handed every graph the run analyzed once the last has finished, so a test
 	// can read which actions the run made.
 	analyzedGraphs func(graphs []*checker.Graph)
@@ -556,7 +561,8 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		// root seeded over what it imports, ran actions nothing read (#xqbqcbt). It is still reached, restored, where
 		// a pass above it inherits its facts.
 		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
-		checkerOptions.FactRoots, checkerOptions.FactRootAnalyzers = factRootsOf(analyzed, toAnalyze, session)
+		checkerOptions.FactRoots, checkerOptions.FactRootAnalyzers = factRootsOf(analyzed, toAnalyze, session,
+			options.withholdFactRoot)
 		// A session without a store counts only what it restored from the system cache, as a run without the cache
 		// counts no wave.
 		if (len(toAnalyze) > 0 || len(checkerOptions.FactRoots) > 0) && session.HasStore() {
