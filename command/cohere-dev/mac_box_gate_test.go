@@ -27,11 +27,13 @@ type macBoxFixture struct {
 	// claim read held, in its words when it holds any, `<box>.run` is what her gap prints, with `COMMIT` the commit the
 	// remote names, and `<box>.exit` its exit. `<box>.passes`, `<plain seconds> <race seconds>`, makes her gap print a
 	// passing run of exactly the packages and race tokens her remote names in place of `<box>.run`, but for the package
-	// `<box>.omit` names, which it leaves out, `<box>.fails`, which fails, and `<box>.extra`, which it adds.
-	// `<box>.unlaid` is what her gap prints in place of `<box>.run` until a gap carrying corpora has laid them, which
-	// copies its carry to `<box>.carry` and its remote to `<box>.lay`, or prints `<box>.lay.fails` and exits 1 when
-	// that is there. The stand-in writes each call it took to `calls`, one line each, and each box's remote command
-	// whole to `<box>.remote`.
+	// `<box>.omit` names, which it leaves out, `<box>.fails`, which fails, and `<box>.extra`, which it adds; and
+	// `<box>.shards`, `<import path> <count> <test>...`, runs that package in that many shards as sharedBoxShards
+	// prints them, its middle shard the slowest, every test passing but the one `<box>.shardomit` names, which no
+	// shard ends. `<box>.unlaid` is what her gap prints in place of `<box>.run` until a gap carrying corpora has laid
+	// them, which copies its carry to `<box>.carry` and its remote to `<box>.lay`, or prints `<box>.lay.fails` and
+	// exits 1 when that is there. The stand-in writes each call it took to `calls`, one line each, and each box's
+	// remote command whole to `<box>.remote`.
 	replies string
 	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
@@ -65,6 +67,8 @@ gap)
   if [ -e "$replies/$box.passes" ]; then
     read -r plain race < "$replies/$box.passes"
     omit=$(cat "$replies/$box.omit" 2>/dev/null || true); fails=$(cat "$replies/$box.fails" 2>/dev/null || true)
+    shards=$(cat "$replies/$box.shards" 2>/dev/null || true)
+    shardomit=$(cat "$replies/$box.shardomit" 2>/dev/null || true)
     # The remote's arguments after its script, an empty one written - so each keeps its place, nothing globbed.
     set -f
     set -- $(printf '%s' "${10}" | sed "s/^.* bash -s -- //; s/''/-/g" | tr -d "'")
@@ -73,6 +77,26 @@ gap)
     failed=0
     for package in "$@"; do
       [ "$package" != "$omit" ] || continue
+      if [ -n "$shards" ] && [ "$package" = "${shards%% *}" ]; then
+        read -r sharded count names < "$replies/$box.shards"
+        echo "` + boxShardListingMarker + `$sharded $names"
+        shard=1
+        while [ "$shard" -le "$count" ]; do
+          dealt=""; index=0
+          for name in $names; do
+            if [ $((index % count + 1)) = "$shard" ]; then dealt="$dealt $name"; fi
+            index=$((index + 1))
+          done
+          echo "` + boxShardMarker + `$shard of $count $sharded$dealt"
+          for name in $dealt; do
+            [ "$name" = "$shardomit" ] || echo '{"Action":"pass","Package":"'"$sharded"'","Test":"'"$name"'"}'
+          done
+          elapsed=1; [ "$shard" != 2 ] || elapsed="$plain"
+          echo '{"Action":"pass","Package":"'"$sharded"'","Elapsed":'"$elapsed"'}'
+          shard=$((shard + 1))
+        done
+        continue
+      fi
       if [ "$package" = "$fails" ]; then
         echo '{"Action":"fail","Package":"'"$package"'","Test":"TestPlantedFailure"}'
         echo '{"Action":"fail","Package":"'"$package"'","Elapsed":'"$plain"'}'; failed=1; continue
@@ -371,13 +395,15 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	if found == nil {
 		test.Fatalf("the gap's remote is not the encoded script and its arguments:\n%s", remote)
 	}
-	commit, pin, races, corpora, patterns := string(found[2]), string(found[3]), string(found[4]), string(found[5]),
+	commit, pin, races, corpora, packages := string(found[2]), string(found[3]), string(found[4]), string(found[5]),
 		string(found[6])
+	// The whole gate hands its box every package it lists, by import path, so the box shards go_engine's tests.
 	if fixture.git(fixture.repository, "rev-parse", commit+"^{tree}") !=
 		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" ||
-		races != "./internal/go_engine@"+engine.run || corpora != "-" || patterns != "./..." {
-		test.Errorf("the script was handed commit %s, pin %q, races %q, corpora %q and patterns %q", commit, pin,
-			races, corpora, patterns)
+		races != "./internal/go_engine@"+engine.run || corpora != "-" ||
+		packages != "example.com/fixture/alpha example.com/fixture/internal/go_engine" {
+		test.Errorf("the script was handed commit %s, pin %q, races %q, corpora %q and packages %q", commit, pin,
+			races, corpora, packages)
 	}
 	for _, want := range []string{
 		"loom push --feed " + commit + " --repository cohere",

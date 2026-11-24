@@ -204,8 +204,8 @@ func feedGateCommit(worktree string, commit string) (string, string) {
 var macBoxCoreBudgets = map[string]int{"Marin": 10}
 
 // macBoxRemoteCommand is the command gap runs over ssh on the gate box named box: macBoxScript, given commit, its pin,
-// the race tokens, the corpora and the packages to test, which are the module's patterns for the whole gate and a
-// half's import paths for a split one (gate_split.go), with box's core budget when macBoxCoreBudgets names one.
+// the race tokens, the corpora and the packages to test, by import path, every package the gate lists for the whole
+// gate and a half's for a split one (gate_split.go), with box's core budget when macBoxCoreBudgets names one.
 func macBoxRemoteCommand(
 	box string,
 	commit string,
@@ -268,10 +268,10 @@ func runOnGateBox(
 	return output, gapHeld(runError, output), "", runError
 }
 
-// runOnGateBoxes runs the module's tests on the first of boxes that is free, through gap, the commit already in Loom's
-// feed with its pin (feedGateCommit), and returns everything gap printed, the box it ran on and how gap ended. It
-// returns why no box ran them instead, which refuses the landing: every box stayed held for wait, or a corpus a box
-// lacked couldn't be laid.
+// runOnGateBoxes runs the module's tests, packages by import path as the gate listed them, on the first of boxes that
+// is free, through gap, the commit already in Loom's feed with its pin (feedGateCommit), and returns everything gap
+// printed, the box it ran on and how gap ended. It returns why no box ran them instead, which refuses the landing:
+// every box stayed held for wait, or a corpus a box lacked couldn't be laid.
 //
 // A Mac's gap waits on another org's claim for as long as a claim may stand rather than refusing, so each box's claim
 // is read first, `gap --box <Mac>`, which exits 0 only while she is free, and a held one is passed over. A box taken
@@ -280,14 +280,14 @@ func runOnGateBoxes(
 	worktree string,
 	commit string,
 	pin string,
-	patterns []string,
+	packages []string,
 	races []string,
 	corpora []gateCorpus,
 	boxes []string,
 	wait time.Duration,
 ) ([]byte, string, string, error) {
 	// A whole gate's command is made for each box in turn, since each may hold her own core budget.
-	remoteFor := func(box string) string { return macBoxRemoteCommand(box, commit, pin, races, corpora, patterns) }
+	remoteFor := func(box string) string { return macBoxRemoteCommand(box, commit, pin, races, corpora, packages) }
 	lines := gateLines{lock: &sync.Mutex{}}
 	started := time.Now()
 	// asked is how many times every box has been asked. A land always asks twice before it refuses, so a wait shorter

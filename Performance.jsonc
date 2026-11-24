@@ -2,46 +2,46 @@
 // Git history is the series. Never edit it by hand. Times are integer milliseconds, the median of the rounds with their minimum and maximum.
 {
     "schema": 2,
-    "commit": "5e8ae52c3d18f295285a18729c93bd6322bfed8e",
-    "measuredAt": "2026-11-23T23:42:39Z",
+    "commit": "bf2ca05d5cb98a01ef34ad9dd0403c6c0855c4ab",
+    "measuredAt": "2026-11-24T00:35:02Z",
     "machine": {
         "name": "Shackler",
         "cpu": "Apple M3 Max",
         "cores": 16,
-        "loadBefore": [2.09, 2.6, 3.02],
-        "loadAfter": [7.58, 3.94, 3.49],
+        "loadBefore": [1.81, 1.93, 2.02],
+        "loadAfter": [6.16, 3.06, 2.43],
         "heldQuiet": true
     },
     "tools": {
-        "cohere": "5e8ae52c CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
+        "cohere": "bf2ca05d CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
         "go": "go1.27.1",
         "binary": "802dbf2c83a2bdc34046712e5f187dbae562b6d402760fa4f7e3c43ccee4a7b9"
     },
-    "note": "against eab03e37, the same binary (sha256 802dbf2c83a2), so no change to the engine and any difference is the box's: cold root wall level (3290 ms, was 3280), user level (37670 ms, was 37720); cold deeafbf4 wall level (1935 ms, was 1930), user level (18690 ms, was 18685); warm root wall level (710 ms, was 720), user level (1920 ms, was 1910)",
+    "note": "against 5e8ae52c, the same binary (sha256 802dbf2c83a2), so no change to the engine and any difference is the box's: cold root checked 5596 files and 0 findings, and main's 5594 and 0, so not compared; cold deeafbf4 wall drifted up by 15 ms, 1%, the box's ranges apart (1950 ms, was 1935), user level (18705 ms, was 18690); warm root checked 5596 files and 0 findings, and main's 5594 and 0, so not compared",
     "engine": {
         "rounds": { "cold": 3, "deeafbf4": 2, "warm": 3 },
         "cold": {
             "root": {
-                "wall": { "median": 3290, "minimum": 3290, "maximum": 3300 },
-                "user": { "median": 37670, "minimum": 37630, "maximum": 37770 },
-                "system": { "median": 5300, "minimum": 5270, "maximum": 5320 },
-                "checked": { "files": 5594, "findings": 0 }
+                "wall": { "median": 3290, "minimum": 3290, "maximum": 3310 },
+                "user": { "median": 37620, "minimum": 37600, "maximum": 37800 },
+                "system": { "median": 5320, "minimum": 5270, "maximum": 5370 },
+                "checked": { "files": 5596, "findings": 0 }
             },
             "deeafbf4": {
-                "wall": { "median": 1935, "minimum": 1930, "maximum": 1940 },
-                "user": { "median": 18690, "minimum": 18610, "maximum": 18770 },
-                "system": { "median": 3825, "minimum": 3790, "maximum": 3860 },
+                "wall": { "median": 1950, "minimum": 1950, "maximum": 1950 },
+                "user": { "median": 18705, "minimum": 18690, "maximum": 18720 },
+                "system": { "median": 3835, "minimum": 3780, "maximum": 3890 },
                 "checked": { "files": 3428, "findings": 1765 }
             }
         },
         "warm": {
             "root": {
-                "wall": { "median": 710, "minimum": 710, "maximum": 730 },
-                "user": { "median": 1920, "minimum": 1910, "maximum": 1920 },
-                "system": { "median": 4180, "minimum": 4080, "maximum": 4180 },
-                "checked": { "files": 5594, "findings": 0 }
+                "wall": { "median": 720, "minimum": 710, "maximum": 720 },
+                "user": { "median": 1900, "minimum": 1890, "maximum": 1900 },
+                "system": { "median": 4130, "minimum": 3990, "maximum": 4230 },
+                "checked": { "files": 5596, "findings": 0 }
             }
         },
-        "timeline": { "root": { "listing": 283, "handover": 1871, "builds": 3182, "run": 3244 } }
+        "timeline": { "root": { "listing": 289, "handover": 1886, "builds": 3194, "run": 3252 } }
     }
 }
