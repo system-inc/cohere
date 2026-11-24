@@ -58,7 +58,7 @@ func describeProject(request invocation) (described *describedProject, describeE
 	if workspaceError != nil {
 		return nil, fmt.Errorf("reading the workspace at %s: %w", root, workspaceError)
 	}
-	children := &load.Children{}
+	children := &load.Children{Answers: request.standardLibrary.goAnswers}
 	// contents are every readable file's bytes as readOurs read them, which the build constraints are judged from, so
 	// none is opened again. go env starts before they are read, and its build context opens a file through held, which
 	// reads them: load.constraintContext only stores held as the context's OpenFile and never calls it as it makes

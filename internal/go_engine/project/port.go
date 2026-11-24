@@ -25,6 +25,17 @@ func (port Port) String() string {
 // go.work selects, through `GOTOOLCHAIN`, is the one that answers; go env itself has no list of targets, so this is
 // the one more command a run asks.
 func ReadPorts(directory string, environment []string) ([]Port, error) {
+	output, listError := ListPorts(directory, environment)
+	if listError != nil {
+		return nil, listError
+	}
+	return ParsePorts(directory, output)
+}
+
+// ListPorts is what `go tool dist list -json` prints in directory under the current environment plus environment,
+// which ParsePorts reads (ReadPorts): apart, so a test that keeps the listing for its toolchain reads it again without
+// running the command.
+func ListPorts(directory string, environment []string) ([]byte, error) {
 	command := exec.Command("go", "tool", "dist", "list", "-json")
 	command.Dir = directory
 	command.Env = append(os.Environ(), environment...)
@@ -35,6 +46,11 @@ func ReadPorts(directory string, environment []string) ([]Port, error) {
 		return nil, fmt.Errorf("listing the toolchain's targets with go tool dist list in %s: %w: %s", directory,
 			runError, strings.TrimSpace(standardError.String()))
 	}
+	return output, nil
+}
+
+// ParsePorts is every target output, what `go tool dist list -json` printed in directory (ListPorts), names.
+func ParsePorts(directory string, output []byte) ([]Port, error) {
 	var listed []struct {
 		Goos         string `json:"GOOS"`
 		Goarch       string `json:"GOARCH"`

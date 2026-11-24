@@ -131,7 +131,9 @@ func ReadGoEnvironmentTelling(
 // runList does, so the go.mod and go.work it reports, and the modules a go.work uses below it, are spelled under
 // workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh): a run
 // through a linked root then names its inputs as a run at the real root does. The command is recorded in children, and
-// started, when it is not nil, is called once its child has started, or has failed to.
+// started, when it is not nil, is called once its child has started, or has failed to. A test's run whose children
+// keep answers (Children.Answers) reads one kept under the same key in place of starting the child, recorded and told
+// all the same, so every count and hook a test reads sees the ask.
 func askGoEnvironment(
 	workspace string,
 	environment []string,
@@ -142,6 +144,29 @@ func askGoEnvironment(
 	arguments := append([]string{"env", "-json"}, goEnvironmentNames...)
 	children.started(arguments)
 	defer children.ended()
+	answers := children.GoAnswers()
+	if answers == nil {
+		return runGoEnvironment(workspace, environment, arguments, started)
+	}
+	answer, askError := answers.goEnvironment(workspace, environment, func() (map[string]string, error) {
+		return runGoEnvironment(workspace, environment, arguments, started)
+	})
+	// A kept answer started no child, and is told as one that has: started may be called again, as the early start's
+	// is a once (ReadGoEnvironmentTelling).
+	if started != nil {
+		started()
+	}
+	return answer, askError
+}
+
+// runGoEnvironment runs go env with arguments in workspace under environment, the whole one, and reads its answer
+// (askGoEnvironment), calling started, when it is not nil, once its child has started, or has failed to.
+func runGoEnvironment(
+	workspace string,
+	environment []string,
+	arguments []string,
+	started func(),
+) (map[string]string, error) {
 	command := exec.Command("go", arguments...)
 	command.Dir = workspace
 	command.Env = append(slices.Clone(environment), "PWD="+workspace)

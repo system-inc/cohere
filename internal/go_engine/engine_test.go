@@ -1117,8 +1117,33 @@ func inputsInside(line string, root string) string {
 
 // copyFixture copies a fixture into a fresh directory named project, in a git repository of its own with the
 // fixture's gitlinks in its index, and returns the directory with every symbolic link above it resolved, so the
-// paths the engine writes are the ones the copy is replaced by.
+// paths the engine writes are the ones the copy is replaced by. The repository is written without git
+// (writeRepository) unless the fixture has gitlinks, whose index only git writes: each git child forks this process,
+// and on darwin a fork makes the whole heap fault again on its next write (#2htryg8).
 func copyFixture(test *testing.T, fixture string) string {
+	test.Helper()
+	root := copyFixtureFiles(test, fixture)
+	gitlinks, readError := os.ReadFile(filepath.Join(fixture, "gitlinks"))
+	if readError != nil && !errors.Is(readError, fs.ErrNotExist) {
+		test.Fatalf("reading %s's gitlinks: %v", fixture, readError)
+	}
+	if len(strings.Fields(string(gitlinks))) == 0 {
+		if writeError := writeRepository(root); writeError != nil {
+			test.Fatalf("writing %s's repository: %v", root, writeError)
+		}
+		return root
+	}
+	runGit(test, root, "init", "-q")
+	for _, gitlink := range strings.Fields(string(gitlinks)) {
+		runGit(test, root, "update-index", "--add", "--cacheinfo",
+			"160000,0123456789abcdef0123456789abcdef01234567,"+gitlink)
+	}
+	return root
+}
+
+// copyFixtureFiles copies a fixture's files into a fresh directory named project, in no repository, and returns the
+// directory with every symbolic link above it resolved (copyFixture).
+func copyFixtureFiles(test *testing.T, fixture string) string {
 	test.Helper()
 	base, resolveError := filepath.EvalSymlinks(test.TempDir())
 	if resolveError != nil {
@@ -1150,18 +1175,13 @@ func copyFixture(test *testing.T, fixture string) string {
 	if walkError != nil {
 		test.Fatalf("copying %s: %v", fixture, walkError)
 	}
-	runGit(test, root, "init", "-q")
-	gitlinks, readError := os.ReadFile(filepath.Join(fixture, "gitlinks"))
-	if readError != nil && !errors.Is(readError, fs.ErrNotExist) {
-		test.Fatalf("reading %s's gitlinks: %v", fixture, readError)
-	}
-	for _, gitlink := range strings.Fields(string(gitlinks)) {
-		runGit(test, root, "update-index", "--add", "--cacheinfo",
-			"160000,0123456789abcdef0123456789abcdef01234567,"+gitlink)
-	}
 	return root
 }
 
+// runGit runs git in directory, failing test when it fails. It reads no git config but the repository's own, as
+// every hermetic test of the house's runs git: the person's global config sets hooks and the default branch, which a
+// test must never read. TestMain seals that for every git child of the process (sealedGitEnvironment), this one
+// among them.
 func runGit(test *testing.T, directory string, arguments ...string) {
 	test.Helper()
 	command := exec.Command("git", arguments...)
