@@ -111,27 +111,22 @@ func gateSplitSetting(setting string) (bool, error) {
 	return false, fmt.Errorf("%s=%q is neither on nor %s", gateSplitVariable, setting, gateSplitOffSetting)
 }
 
-// runSplitGate runs the gate's tests as two halves at once on two of boxes, commit already in Loom's feed with its pin,
-// and returns their one verdict. With fewer than two packages to split, or with no second box free once one has been
-// waited for, or with every box held, it returns the boxes the whole gate runs on instead and why.
+// runSplitGate runs the gate's tests, listing's packages and races, as two halves at once on two of boxes, commit
+// already in Loom's feed with its pin, and returns their one verdict. With fewer than two packages to split, or with
+// no second box free once one has been waited for, or with every box held, it returns the boxes the whole gate runs on
+// instead and why.
 func runSplitGate(
 	worktree string,
 	commit string,
 	pin string,
-	patterns []string,
+	listing gateListing,
 	races []string,
 	corpora []gateCorpus,
 	boxes []string,
-	testing []string,
 ) gateSplit {
 	wait, waitError := waitSetting(gateSplitWaitVariable, os.Getenv(gateSplitWaitVariable), gateSplitWaitDefault)
 	if waitError != nil {
 		return gateSplit{unavailable: waitError.Error()}
-	}
-	listing, listError := listGatePackages(worktree, patterns, races, testing)
-	if listError != nil {
-		return gateSplit{unavailable: fmt.Sprintf("the gate's packages couldn't be listed, so no half was sent: %v; "+
-			"%s=%s runs the whole gate on one box", listError, gateSplitVariable, gateSplitOffSetting)}
 	}
 	if len(listing.packages) < 2 {
 		return gateSplit{whole: boxes, because: fmt.Sprintf("the gate lists %d packages, too few to split",
@@ -453,10 +448,11 @@ func racesNamed(half gateHalf) string {
 	return fmt.Sprintf(" and %d -race tokens", len(half.races))
 }
 
-// splitCoverageGaps is every way the halves' verdicts fail to cover the gate exactly once, each naming its package or
-// token: a half that never reported a package it was given, reported one it wasn't, or reported one twice, the same
-// of its -race run against its race tokens' packages when it ran one, and across both halves a listed package not
-// reported once or a race token not given to one half. A half whose plain run failed ran no -race run, and its
+// splitCoverageGaps is every way the halves' verdicts fail to cover the gate exactly once, each naming its package,
+// test or token: a half that never reported a package it was given, reported one it wasn't, or reported one twice, a
+// half whose shards didn't run each listed test exactly once (sharded_run.go), the same of its -race run against its
+// race tokens' packages when it ran one, and across both halves a listed package not reported once or a race token not
+// given to one half. A half whose plain run failed ran no -race run, and its
 // failure refuses the landing on its own.
 func splitCoverageGaps(listing gateListing, races []string, halves [2]gateHalf, verdicts [2]boxVerdict) []string {
 	gaps := []string{}
@@ -464,6 +460,9 @@ func splitCoverageGaps(listing gateListing, races []string, halves [2]gateHalf, 
 	for index, half := range halves {
 		verdict := verdicts[index]
 		gaps = append(gaps, reportGaps(half.box+"'s run", half.packages, verdict.packagesReported)...)
+		for _, gap := range verdict.shardGaps {
+			gaps = append(gaps, half.box+"'s shards: "+gap)
+		}
 		for _, importPath := range verdict.packagesReported {
 			reportedAcross[importPath]++
 		}
@@ -614,18 +613,22 @@ func mergeHalfVerdicts(halves [2]gateHalf, verdicts [2]boxVerdict) (boxVerdict, 
 func mergedVerdict(box string, parts []boxVerdict) boxVerdict {
 	merged := boxVerdict{box: box, failedOutput: map[string][]string{}, skipped: map[string][]string{},
 		optIn: map[string][]string{}, timeouts: map[string][]string{}, packageSeconds: map[string]float64{},
-		parts: slices.Clone(parts)}
+		shardedRuns: map[string]*shardedRun{}, shardCounts: map[string]int{}, parts: slices.Clone(parts)}
 	for _, part := range parts {
 		merged.packagesPassed += part.packagesPassed
 		merged.packagesFailed = append(merged.packagesFailed, part.packagesFailed...)
 		merged.failedTests = append(merged.failedTests, part.failedTests...)
 		merged.raceReports = append(merged.raceReports, part.raceReports...)
 		merged.packagesReported = append(merged.packagesReported, part.packagesReported...)
+		merged.shardedPackages = append(merged.shardedPackages, part.shardedPackages...)
+		merged.shardGaps = append(merged.shardGaps, part.shardGaps...)
 		maps.Copy(merged.failedOutput, part.failedOutput)
 		maps.Copy(merged.skipped, part.skipped)
 		maps.Copy(merged.optIn, part.optIn)
 		maps.Copy(merged.timeouts, part.timeouts)
 		maps.Copy(merged.packageSeconds, part.packageSeconds)
+		maps.Copy(merged.shardedRuns, part.shardedRuns)
+		maps.Copy(merged.shardCounts, part.shardCounts)
 	}
 	return merged
 }

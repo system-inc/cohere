@@ -126,6 +126,13 @@ type boxVerdict struct {
 	// wholeBecause is why a gate that would have split ran whole on one box, as the land line says it, empty when it
 	// split or was never to.
 	wholeBecause string
+	// shardedRuns is what the run said of each package it ran in shards (sharded_run.go), by import path, and
+	// shardedPackages those packages in the order their listings were said. shardCounts is each one's shards, for the
+	// timing report, and shardGaps every way their shards failed to run each listed test exactly once.
+	shardedRuns     map[string]*shardedRun
+	shardedPackages []string
+	shardCounts     map[string]int
+	shardGaps       []string
 }
 
 // timeoutPanic opens what a test binary prints when go test's -timeout ends it (testing's own words).
@@ -154,13 +161,17 @@ type testEvent struct {
 // ignored: a gap prints its own lines around the command's.
 func readTestJson(output []byte) boxVerdict {
 	verdict := boxVerdict{failedOutput: map[string][]string{}, skipped: map[string][]string{},
-		optIn: map[string][]string{}, timeouts: map[string][]string{}, packageSeconds: map[string]float64{}}
+		optIn: map[string][]string{}, timeouts: map[string][]string{}, packageSeconds: map[string]float64{},
+		shardedRuns: map[string]*shardedRun{}, shardCounts: map[string]int{}}
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	// reading is whether the stream is inside a race report, from its first line to the rule that ends it.
 	reading := false
 	// timedOut is each package whose timeout panic the stream is inside, from its panic's line to the package's end.
 	timedOut := map[string]bool{}
+	// shardPackage and shardIndex are the sharded package and the shard whose output the stream is in, from its
+	// marker on, empty and 0 before any.
+	shardPackage, shardIndex := "", 0
 	for scanner.Scan() {
 		line := scanner.Text()
 		if why, isRefusal := strings.CutPrefix(line, sharedBoxRefusedMarker); isRefusal {
@@ -179,6 +190,14 @@ func readTestJson(output []byte) boxVerdict {
 			verdict.steps = append(verdict.steps, name+" "+(time.Duration(spent)*time.Second).String())
 			continue
 		}
+		if listing, isListing := strings.CutPrefix(line, boxShardListingMarker); isListing {
+			verdict.readShardListing(listing)
+			continue
+		}
+		if shard, isShard := strings.CutPrefix(line, boxShardMarker); isShard {
+			shardPackage, shardIndex = verdict.readShardMarker(shard)
+			continue
+		}
 		if rest, isMarker := strings.CutPrefix(line, boxMarker); isMarker {
 			commit, platform, _ := strings.Cut(rest, " on ")
 			verdict.commit = strings.TrimSpace(commit)
@@ -190,6 +209,18 @@ func readTestJson(output []byte) boxVerdict {
 			continue
 		}
 		key := event.Package + " " + event.Test
+		// A sharded package's test binary ends once a shard, so its one result is read from them all once the stream
+		// ends (finishShardedRuns), and every top-level test's end is kept for the shards' coverage.
+		if run := verdict.shardedRuns[event.Package]; run != nil {
+			index := 0
+			if event.Package == shardPackage {
+				index = shardIndex
+			}
+			if run.readShardEvent(event, index) {
+				timedOut[event.Package] = false
+				continue
+			}
+		}
 		switch {
 		// A timeout's text is kept once, as the package's, never again as the output of the test it was framed in.
 		case event.Action == "output" && (timedOut[event.Package] ||
@@ -236,12 +267,87 @@ func readTestJson(output []byte) boxVerdict {
 			}
 		}
 	}
+	verdict.finishShardedRuns()
 	return verdict
 }
 
 // failed reports whether the verdict holds a failure: a failed package, which a build failure is too, or a test.
 func (verdict boxVerdict) failed() bool {
 	return len(verdict.packagesFailed) > 0 || len(verdict.failedTests) > 0
+}
+
+// readShardListing reads the line after boxShardListingMarker, a sharded package's listing (sharded_run.go), into
+// verdict. A run lists a package once, so a second listing of it is a gap, and the first is the one its shards are held
+// to.
+func (verdict *boxVerdict) readShardListing(line string) {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return
+	}
+	if verdict.shardedRuns[fields[0]] != nil {
+		verdict.shardGaps = append(verdict.shardGaps, fmt.Sprintf("%s's tests were listed twice", fields[0]))
+		return
+	}
+	verdict.shardedRuns[fields[0]] = &shardedRun{listed: fields[1:], shards: map[int][][]string{},
+		packageEnds: map[int]int{}, testEnds: map[string][]int{}}
+	verdict.shardedPackages = append(verdict.shardedPackages, fields[0])
+}
+
+// readShardMarker reads the line after boxShardMarker, a shard's (sharded_run.go), into verdict, and returns the
+// package it names and the shard's index, which the events after it belong to. A marker that doesn't read, or names a
+// package no listing named, is none: its events read as the stream's, and the shards' coverage finds its tests
+// missing.
+func (verdict *boxVerdict) readShardMarker(line string) (string, int) {
+	fields := strings.Fields(line)
+	if len(fields) < 4 || fields[1] != "of" {
+		return "", 0
+	}
+	index, indexError := strconv.Atoi(fields[0])
+	count, countError := strconv.Atoi(fields[2])
+	run := verdict.shardedRuns[fields[3]]
+	if indexError != nil || countError != nil || run == nil {
+		return "", 0
+	}
+	run.count = max(run.count, count)
+	run.shards[index] = append(run.shards[index], fields[4:])
+	return fields[3], index
+}
+
+// finishShardedRuns reads each sharded package's shards as one package result: passed only if every shard's test
+// binary passed, its seconds the slowest shard's, reported once. A package whose shards never ended is not reported,
+// and its tests' coverage names them. Each package's gaps join the verdict's.
+func (verdict *boxVerdict) finishShardedRuns() {
+	for _, importPath := range verdict.shardedPackages {
+		run := verdict.shardedRuns[importPath]
+		verdict.shardGaps = append(verdict.shardGaps, run.coverageGaps(importPath)...)
+		ended := 0
+		for _, ends := range run.packageEnds {
+			ended += ends
+		}
+		if ended == 0 {
+			continue
+		}
+		verdict.shardCounts[importPath] = run.count
+		verdict.packageSeconds[importPath] = run.slowest
+		verdict.packagesReported = append(verdict.packagesReported, importPath)
+		if run.failed {
+			verdict.packagesFailed = append(verdict.packagesFailed, importPath)
+			continue
+		}
+		verdict.packagesPassed++
+	}
+}
+
+// shardRefusal is why a run's shards give no verdict, every gap named, or empty: when they covered each listing
+// exactly once, and when the run refused or is red, since a refusal or a failing test is said first and a red run's
+// shards can be short of their listing without the gate being any less red.
+func (verdict boxVerdict) shardRefusal() string {
+	if len(verdict.shardGaps) == 0 || verdict.refused != "" || verdict.failed() ||
+		(verdict.race != nil && verdict.race.failed()) {
+		return ""
+	}
+	return fmt.Sprintf("%s's shards didn't run each listed test exactly once, so its verdict is none: %s",
+		verdict.box, strings.Join(verdict.shardGaps, "; "))
 }
 
 // testsNeverCompiledOn is every top-level test, by import path, in a file of modules that the lander's platform
@@ -349,7 +455,9 @@ func testsNamed(tests map[string][]string) []string {
 // runBoxGate runs the module's tests on a gate box, on the road setting names, and returns what the box said, or why
 // there is no verdict from it, which refuses the landing. A verdict about another tree than commit is no verdict.
 // setting is what gateVariable says, never gateOffSetting, which runModuleTests keeps on Kirk's Mac. testing is the
-// gate's environment, in which a split gate lists its packages here (gate_split.go).
+// gate's environment, in which a gate on the house Macs lists its packages here, so a whole gate hands its box import
+// paths as a split one hands each half (gate_split.go), and the box shards boxShardedPackage either way
+// (sharded_run.go). A run whose shards didn't run each listed test exactly once is no verdict.
 func runBoxGate(
 	worktree string,
 	commit string,
@@ -390,16 +498,24 @@ func runBoxGate(
 		if unavailable != "" {
 			return boxVerdict{}, unavailable
 		}
+		listing, listError := listGatePackages(worktree, patterns, races, testing)
+		if listError != nil {
+			return boxVerdict{}, fmt.Sprintf("the gate's packages couldn't be listed, so no box was sent them: %v",
+				listError)
+		}
+		if len(listing.packages) == 0 {
+			return boxVerdict{}, "the gate's patterns list no package, so no box was sent one"
+		}
 		if splitting && len(boxes) >= 2 {
-			split := runSplitGate(worktree, commit, pin, patterns, races, corpora, boxes, testing)
+			split := runSplitGate(worktree, commit, pin, listing, races, corpora, boxes)
 			if split.whole == nil {
 				split.verdict.corpora, split.verdict.unlaidCorpora = corporaLaid, unlaidCorpora
 				return split.verdict, split.unavailable
 			}
 			boxes, wholeBecause = split.whole, split.because
 		}
-		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, pin, patterns, races, corpora, boxes,
-			wait)
+		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, pin, listing.packages, races, corpora,
+			boxes, wait)
 		if unavailable != "" {
 			return boxVerdict{}, unavailable
 		}
@@ -427,6 +543,9 @@ func runBoxGate(
 	verdict, unavailable := readBoxRun(output, runError, box, commit, races)
 	if unavailable != "" {
 		return boxVerdict{}, unavailable
+	}
+	if refusal := verdict.shardRefusal(); refusal != "" {
+		return boxVerdict{}, refusal
 	}
 	verdict.job = job
 	verdict.corpora, verdict.unlaidCorpora = corporaLaid, unlaidCorpora
@@ -529,7 +648,12 @@ func (verdict boxVerdict) timingReport() string {
 	})
 	slowest := []string{}
 	for _, named := range packages[:min(slowestPackagesShown, len(packages))] {
-		slowest = append(slowest, fmt.Sprintf("%s %.1fs", named, verdict.packageSeconds[named]))
+		// A sharded package's seconds are its slowest shard's, said with how many shards ran it.
+		shards := ""
+		if count := verdict.shardCounts[named]; count > 0 {
+			shards = fmt.Sprintf(" (slowest of %d shards)", count)
+		}
+		slowest = append(slowest, fmt.Sprintf("%s %.1fs%s", named, verdict.packageSeconds[named], shards))
 	}
 	if len(slowest) > 0 {
 		parts = append(parts, "slowest test binaries "+strings.Join(slowest, ", "))

@@ -15,7 +15,7 @@ import (
 // newSplitFixture is a landing ready to split its gate across Sun2 and Marin: the mac box fixture's module with its
 // -race package, internal/edit, and two packages more, beta and internal/go_engine, the Square's starting half, which
 // is a race token too. Both boxes answer with a passing run of exactly what each is handed, 7.5s a package and 3.5s
-// under -race.
+// under -race, internal/go_engine in 3 shards of its 4 tests, as the box's script shards it (sharded_run.go).
 func newSplitFixture(test *testing.T) *macBoxFixture {
 	test.Helper()
 	fixture := newMacBoxFixture(test, true)
@@ -28,6 +28,10 @@ func newSplitFixture(test *testing.T) *macBoxFixture {
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("two packages more"))
 	fixture.reply("Sun2.passes", "7.5 3.5\n")
 	fixture.reply("Marin.passes", "7.5 3.5\n")
+	for _, box := range []string{"Sun2", "Marin"} {
+		fixture.reply(box+".shards", "example.com/fixture/internal/go_engine 3 TestEngine TestEngineAgain "+
+			"TestEngineOnceMore TestEngineAtLast\n")
+	}
 	return fixture
 }
 
@@ -71,7 +75,8 @@ var splitFixtureRaces = "./internal/edit,./internal/go_engine@" +
 // A landing with both gate boxes free splits its tests across them, both on the commit being landed (#bc8nf0r). With
 // no times kept yet it is the Square's starting split, internal/go_engine alone on Sun2 and every other package and
 // every race token on Marin, each handed as import paths; the halves' one verdict lands it, its land line naming which
-// box ran which half; and the gate's times are written from both halves, plain and -race. A second landing, with times
+// box ran which half, and its body names go_engine's shards, its time the slowest's; and the gate's times are written
+// from both halves, plain and -race. A second landing, with times
 // that make alpha the heaviest, still splits by the starting rule, since Elapsed is a binary's wall and not its CPU.
 // Neither runs a go test on Kirk's Mac.
 func TestASplitGateRunsHalfOnEachBoxAndLandsOnBothVerdicts(test *testing.T) {
@@ -110,8 +115,8 @@ func TestASplitGateRunsHalfOnEachBoxAndLandsOnBothVerdicts(test *testing.T) {
 	for _, want := range []string{
 		"go test of the module on Sun2 and Marin (darwin/arm64, 4 packages: Sun2 1, Marin 3 and 2 -race tokens, " +
 			"scratch box, shared uid), 2 of them again under -race, nothing it skipped",
-		"its gate Sun2 slowest test binaries example.com/fixture/internal/go_engine 7.5s; Marin slowest test " +
-			"binaries example.com/fixture/alpha 7.5s",
+		"its gate Sun2 slowest test binaries example.com/fixture/internal/go_engine 7.5s (slowest of 3 shards); " +
+			"Marin slowest test binaries example.com/fixture/alpha 7.5s",
 		"its -race run Marin slowest test binaries example.com/fixture/internal/edit 3.5s",
 	} {
 		if !strings.Contains(body, want) {
@@ -199,6 +204,13 @@ func TestASplitGateRefusesUnlessBothHalvesAreGreenAndWhole(test *testing.T) {
 				"example.com/fixture/planted was reported, which the gate doesn't list"},
 		},
 		{
+			name:    "a shard of Sun2's never ends a test it was dealt",
+			replies: map[string]string{"Sun2.shardomit": "TestEngineOnceMore"},
+			said: []string{"the split gate's halves didn't cover its packages exactly once each, so its verdict is " +
+				"none: Sun2's shards: TestEngineOnceMore (example.com/fixture/internal/go_engine) ended 0 times " +
+				"across its shards"},
+		},
+		{
 			name: "Marin's run says nothing of her -race run",
 			replies: map[string]string{"Marin.run": boxMarker + "COMMIT on darwin/arm64\n" +
 				`{"Action":"pass","Package":"example.com/fixture/alpha"}` + "\n"},
@@ -249,7 +261,8 @@ func TestASplitGateFallsBackToTheWholeGateNamingWhy(test *testing.T) {
 		lands       bool
 		said        []string
 		inBody      []string
-		// whole is the box whose remote is handed the module's patterns, and unasked prefixes of calls never taken.
+		// whole is the box whose remote is handed every package the gate lists, and unasked prefixes of calls never
+		// taken.
 		whole      string
 		unasked    []string
 		claimReads map[string]int
@@ -324,9 +337,10 @@ func TestASplitGateFallsBackToTheWholeGateNamingWhy(test *testing.T) {
 				}
 			}
 			if testCase.whole != "" {
-				if packages, races := fixture.remoteArguments(testCase.whole); packages != "./..." ||
-					races != splitFixtureRaces {
-					test.Errorf("%s was handed %q and races %q, want the whole gate's patterns and every token",
+				packages, races := fixture.remoteArguments(testCase.whole)
+				if packages != "example.com/fixture/alpha example.com/fixture/beta example.com/fixture/internal/edit "+
+					"example.com/fixture/internal/go_engine" || races != splitFixtureRaces {
+					test.Errorf("%s was handed %q and races %q, want every package the gate lists and every token",
 						testCase.whole, packages, races)
 				}
 			}
