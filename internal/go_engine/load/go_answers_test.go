@@ -32,7 +32,7 @@ var goAnswersModules = map[string]map[string]string{
 // another copy deeper below another directory. A field go env answers otherwise on each ask in one place, as
 // `GOGCCFLAGS`, which names a build directory of its own each time, is one the engine never asks (goEnvironmentNames),
 // and every other field matches. A copy whose go.mod differs keys apart.
-func TestAKeptGoEnvironmentMovedToAnotherWorkspaceIsWhatGoEnvAnswersThere(test *testing.T) {
+func TestAKeptGoEnvironmentMovedToAnotherWorkspaceIsWhatGoEnvironmentAnswersThere(test *testing.T) {
 	test.Parallel()
 
 	for name, files := range goAnswersModules {
@@ -63,7 +63,11 @@ func TestAKeptGoEnvironmentMovedToAnotherWorkspaceIsWhatGoEnvAnswersThere(test *
 				0o644); writeError != nil {
 				test.Fatal(writeError)
 			}
-			if editedKey, _ := goEnvironmentKey(edited, environment); editedKey == fromKey {
+			editedKey, editedKeyError := goEnvironmentKey(edited, environment)
+			if editedKeyError != nil {
+				test.Fatal(editedKeyError)
+			}
+			if editedKey == fromKey {
 				test.Error("a copy whose go.mod differs reads the same key")
 			}
 

@@ -69,7 +69,8 @@ func (answers *GoAnswers) goEnvironment(
 ) (map[string]string, error) {
 	key, keyError := goEnvironmentKey(workspace, environment)
 	if keyError != nil {
-		// Asked, and kept by no key: a workspace whose go.mod or go.work cannot be read is one go env reports on itself.
+		// Asked, and kept by no key: a workspace whose go.mod or go.work cannot be read is one go env reports on
+		// itself.
 		return ask()
 	}
 	answers.lock.Lock()

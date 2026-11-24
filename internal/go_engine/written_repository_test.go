@@ -68,7 +68,9 @@ func TestAWrittenRepositoryReadsAsTheOneGitInitMakes(test *testing.T) {
 	}
 	initialized := copyFixtureFiles(test, fixture)
 	runGit(test, initialized, "init", "-q")
-	for _, arguments := range [][]string{{"rev-parse", "--git-dir"}, {"status", "--porcelain"}, {"ls-files", "-s", "-z"}} {
+	for _, arguments := range [][]string{
+		{"rev-parse", "--git-dir"}, {"status", "--porcelain"}, {"ls-files", "-s", "-z"},
+	} {
 		runGit(test, written, arguments...)
 	}
 	streams := map[string]string{}

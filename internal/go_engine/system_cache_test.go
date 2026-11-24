@@ -64,6 +64,10 @@ func TestMain(suite *testing.M) {
 	os.Exit(code)
 }
 
+// testsGoAnswers are go env's and `go tool dist list`'s answers this test binary keeps (load.GoAnswers), which every
+// run isolatedSource gives a source reads under TestMain's environment (#2htryg8).
+var testsGoAnswers = load.NewGoAnswers()
+
 // isolatedSource is source with a new system cache of the run's own, seeded from the template (seededSystemCache),
 // unless source names one or the test set the variable to one of its own, which the run then reads. Each run of a test
 // that names none starts from the same system cache, the template's, whatever ran before, and writes what it computes
@@ -85,10 +89,6 @@ func isolatedSource(test *testing.T, source standardLibrarySource) standardLibra
 	}
 	return source
 }
-
-// testsGoAnswers are go env's and `go tool dist list`'s answers this test binary keeps (load.GoAnswers), which every
-// run isolatedSource gives a source reads under TestMain's environment (#2htryg8).
-var testsGoAnswers = load.NewGoAnswers()
 
 // coldTests are the tests every run of which that names no system cache reads a new, empty one of its own rather
 // than one seeded from the template (coldSystemCacheFor), each test by itself.
