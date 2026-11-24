@@ -39,6 +39,10 @@ var testsSystemCache string
 // filled under (seededSystemCache).
 var testsEnvironment []string
 
+// sealedGitEnvironment is what TestMain sets so that git reads no configuration but a repository's own: no global
+// file, and no system one.
+var sealedGitEnvironment = map[string]string{"GIT_CONFIG_GLOBAL": os.DevNull, "GIT_CONFIG_NOSYSTEM": "1"}
+
 func TestMain(suite *testing.M) {
 	if os.Getenv(timingMarginChildVariable) != "" {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
@@ -57,6 +61,15 @@ func TestMain(suite *testing.M) {
 	// asked for it (#sfjj2rh, the reader's S6). A test about the file sets one of its own.
 	if setError := os.Setenv("GOENV", "off"); setError != nil {
 		os.Exit(refuse(os.Stderr, setError))
+	}
+	// And no git child of this process or its runs, the engine's own `git ls-files` at a go.work's root among them,
+	// reads the machine's git configuration (#2htryg8): a person's global config signs, hooks and ignores as the
+	// person set it, and a test's git reads the repository's own alone. Set before testsEnvironment is taken, so
+	// the template and every guard that compares the environment with it hold these too.
+	for name, value := range sealedGitEnvironment {
+		if setError := os.Setenv(name, value); setError != nil {
+			os.Exit(refuse(os.Stderr, setError))
+		}
 	}
 	testsEnvironment = slices.Sorted(slices.Values(os.Environ()))
 	code := suite.Run()

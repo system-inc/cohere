@@ -1180,12 +1180,12 @@ func copyFixtureFiles(test *testing.T, fixture string) string {
 
 // runGit runs git in directory, failing test when it fails. It reads no git config but the repository's own, as
 // every hermetic test of the house's runs git: the person's global config sets hooks and the default branch, which a
-// test must never read.
+// test must never read. TestMain seals that for every git child of the process (sealedGitEnvironment), this one
+// among them.
 func runGit(test *testing.T, directory string, arguments ...string) {
 	test.Helper()
 	command := exec.Command("git", arguments...)
 	command.Dir = directory
-	command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
 	if output, runError := command.CombinedOutput(); runError != nil {
 		test.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), runError, output)
 	}

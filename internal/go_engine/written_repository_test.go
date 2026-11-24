@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -87,5 +89,41 @@ func TestAWrittenRepositoryReadsAsTheOneGitInitMakes(test *testing.T) {
 	if streams[written] != streams[initialized] {
 		test.Errorf("over the written repository the run wrote\n%s\nover the one git init made\n%s", streams[written],
 			streams[initialized])
+	}
+}
+
+// No git child of the package's tests reads the machine's git configuration (#2htryg8): TestMain seals the
+// environment every child inherits (sealedGitEnvironment), the engine's own `git ls-files` at a go.work's root among
+// them, which sets no environment of its own. A git started as the engine starts it, in a written repository, lists
+// configuration of the repository's scope alone, where a person's global file would list under its own scope.
+func TestNoGitChildOfTheTestsReadsTheMachinesConfiguration(test *testing.T) {
+	test.Parallel()
+
+	for name, value := range sealedGitEnvironment {
+		if os.Getenv(name) != value {
+			test.Errorf("%s is %q in the tests' environment, want %q, as TestMain sets it", name, os.Getenv(name),
+				value)
+		}
+	}
+	repository := test.TempDir()
+	if writeError := writeRepository(repository); writeError != nil {
+		test.Fatal(writeError)
+	}
+	// The environment as inherited, as the engine's own git child takes it.
+	list := exec.Command("git", "config", "--list", "--show-scope")
+	list.Dir = repository
+	output, listError := list.Output()
+	if listError != nil {
+		test.Fatalf("listing git's configuration in %s: %v", repository, listError)
+	}
+	listed := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(listed) != strings.Count(writtenRepositoryFiles["config"], " = ") {
+		test.Errorf("git lists %d values, want the written repository's own %d:\n%s", len(listed),
+			strings.Count(writtenRepositoryFiles["config"], " = "), output)
+	}
+	for _, line := range listed {
+		if !strings.HasPrefix(line, "local\t") {
+			test.Errorf("git reads %q, from outside the repository", line)
+		}
 	}
 }
