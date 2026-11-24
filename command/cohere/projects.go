@@ -309,8 +309,16 @@ func checkNarrowedProjectFolders(
 	if refuseError := refuseGoOnlySwitchesWithoutGo(found, given, flagValue); refuseError != nil {
 		return 0, false, refuseError
 	}
-	// The project's run is named by the directory and tsconfig runProject gives it, so this run's own go.
-	arguments := childArguments(withoutValuedFlags(flags, []string{"directory", "tsconfig"}), lintConfigFileName, false)
+	// The project's run is named by the directory and tsconfig runProject gives it, so this run's own go. A profiled
+	// run's project profiles itself to a file of its own, named `project` (engineProfilePath), since this process
+	// profiles itself to the file the caller named, and two processes writing one file leave neither profile whole
+	// (#r33n96f).
+	arguments := childArguments(withoutValuedFlags(flags, []string{"directory", "tsconfig", "profile"}),
+		lintConfigFileName, false)
+	if given["profile"] && flagValue("profile") != "" {
+		arguments = append(arguments, "--profile",
+			engineProfilePath(location.WorkingDirectory, flagValue("profile"), "project"))
+	}
 	return runProjects(found, arguments, streams.Output), true, nil
 }
 

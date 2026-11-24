@@ -60,6 +60,10 @@ require (
 	github.com/system-inc/cohere/mutation_aliasing v0.0.0
 	github.com/system-inc/cohere/static_single_assignment v0.0.0
 
+	// The CPU profile's reader, in a test only: a profiled run's files are each parsed as `go tool pprof` reads them,
+	// so a missing, empty or truncated profile fails (command/cohere/engine_profile_test.go, #r33n96f).
+	github.com/google/pprof v0.0.0-20230207041349-798e818bf904
+
 	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing
 	// Prettier means matching it byte for byte on an already-Prettier-formatted tree. typescript-go's
 	// own formatter cannot: FormatCodeSettings has no printWidth and no line-breaking engine, and
@@ -97,7 +101,6 @@ require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
-	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )

@@ -97,7 +97,7 @@
         {
             "name": "profile",
             "argument": "file",
-            "usage": "write a Go CPU profile of the run to file, for go tool pprof"
+            "usage": "write a Go CPU profile of the run to file, for go tool pprof, and the Go engine's beside it, named go"
         },
         {
             "name": "rules",

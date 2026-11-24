@@ -11,6 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 )
 
@@ -56,6 +57,14 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	)
 	if engineArgumentsError != nil {
 		return 1, engineArgumentsError
+	}
+	// The front door profiles its own process to the file, and the Swift engine takes no `--profile` (swiftFlags has
+	// no ProfileName), so the run says no Swift profile was written rather than leave the caller to find none, or an
+	// empty file that reads as a profile of nothing (#r33n96f).
+	if given["profile"] && flagValue("profile") != "" {
+		fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.Of(fmt.Sprintf(
+			"the Swift engine takes no --profile, so %s profiles the front door's process alone, and no Swift "+
+				"profile was written", flagValue("profile"))))
 	}
 
 	// Before the engine is resolved, so a run with nothing changed replays here and exits having hashed no engine

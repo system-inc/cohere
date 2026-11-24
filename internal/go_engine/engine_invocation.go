@@ -1,6 +1,7 @@
 package go_engine
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -52,7 +53,11 @@ var notImplementedFlags = []string{"unused", "unused-all", "unused-deep", "expla
 //
 // `stdin-filepath` is the editor's save (#qtna8m4): the path of one file whose bytes are the buffer on standard input,
 // for which the run prints on standard output what `--fix` would write, and writes nothing (pipeline.runStdin).
-var valuedFlags = []string{"contract", "root", "lint-config", "stdin-filepath"}
+//
+// `profile` is the file the process writes its CPU profile to (Main), which the front door names beside its own when
+// its run is profiled, and release's training script names when it runs the engine directly (#r33n96f). It changes
+// nothing of the run.
+var valuedFlags = []string{"contract", "root", "lint-config", "stdin-filepath", "profile"}
 
 // refusedTogether are the combinations the contract refuses, each switch with the switches it cannot be named
 // beside. `--format-only` asks for formatting alone, so asking it for a phase or for no formatting asks two
@@ -132,6 +137,13 @@ func parseInvocation(arguments []string) (invocation, error) {
 			case "stdin-filepath":
 				// Clean, as the census names every file, so the one path matches the file it names.
 				request.stdinPath = filepath.Clean(value)
+			case "profile":
+				// Refused rather than read as no profile, since a caller that asked for one would find none.
+				if value == "" {
+					refuseOnce(errors.New("--profile names no file to write the profile to"))
+					continue
+				}
+				request.profilePath = value
 			}
 		case slices.Contains(switchNames, name):
 			switch {

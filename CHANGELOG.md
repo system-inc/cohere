@@ -137,6 +137,12 @@ changed in cohere outside the sets is written under the same heading.
   holds a type error, a run holds the wrap and the save makes it, ahead of the gate and never against it. An
   ignored file, one no package holds, and a buffer that does not parse come back as typed, the reason on
   stderr. The VS Code extension now formats `.go` on save.
+- `--profile <file>` profiles a Go run's engine too (#r33n96f): the front door writes its own CPU profile to the
+  file, as before, and the Go engine, which does the run's work, writes its own beside it, `go` before the
+  extension (`run.pprof` gives `run.go.pprof`). The engine takes `--profile` itself, so release's training script
+  profiles it run directly. The Swift engine takes none, and a profiled Swift run says no Swift profile was
+  written. A narrowed run whose folder check sends its project to a run of its own profiles that run to
+  `run.project.pprof`, where both processes once wrote one file and left neither whole.
 
 ### Changed
 

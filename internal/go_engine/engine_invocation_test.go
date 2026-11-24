@@ -92,6 +92,12 @@ func TestParseInvocationRefuses(test *testing.T) {
 				"--stdin-filepath", "/project/value.go"),
 			"this run is the editor's save, which prints one file's text, so it was refused",
 		},
+		// A caller that asked for a profile would find none, so an empty file name is refused, never read as no profile
+		// (#r33n96f).
+		{
+			"a profile naming no file", append(slices.Clone(contractArguments), "--profile="),
+			"--profile names no file to write the profile to",
+		},
 	}
 	for _, refused := range cases {
 		test.Run(refused.name, func(test *testing.T) {
@@ -167,6 +173,32 @@ func TestParseInvocationReads(test *testing.T) {
 				test.Errorf("paths %q, want %q", request.paths, read.paths)
 			}
 		})
+	}
+}
+
+// `--profile` names the file the process's CPU profile goes to, in either spelling, and nothing else (#r33n96f): the
+// file is no path the run narrows to, the run asks the phases it would without it, and a run without one names none.
+func TestTheProfileNamesAFileAndNoPath(test *testing.T) {
+	test.Parallel()
+	for name, arguments := range map[string][]string{
+		"a separate value": append(slices.Clone(contractArguments), "--profile", "/tmp/run.go.pprof", "--no-fix"),
+		"a joined value":   append(slices.Clone(contractArguments), "--profile=/tmp/run.go.pprof", "--no-fix"),
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			request, parseError := parseInvocation(arguments)
+			if parseError != nil {
+				test.Fatalf("refused: %v", parseError)
+			}
+			if request.profilePath != "/tmp/run.go.pprof" || len(request.paths) != 0 || request.mode() != modeCheck {
+				test.Errorf("profile %q, paths %q, mode %s, want the file, no path and a check", request.profilePath,
+					request.paths, request.mode())
+			}
+		})
+	}
+	request, parseError := parseInvocation(append(slices.Clone(contractArguments), "--no-fix"))
+	if parseError != nil || request.profilePath != "" {
+		test.Errorf("a run without --profile names %q (refusal %v), want none", request.profilePath, parseError)
 	}
 }
 
