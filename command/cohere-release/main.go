@@ -176,6 +176,8 @@ func printSummary(result release.Result, requested []release.Target, signing rel
 			staged.Name, float64(staged.SizeInBytes)/(1<<20), staged.Directory)
 	}
 	fmt.Fprintf(summary, "\nsizes are stripped release builds: %s\n", release.DescribeBuild())
+	// Said either way, since a release without the profile is a slower binary that looks the same (#r6sqd2c).
+	fmt.Fprintf(summary, "%s.\n", result.Profile.Describe())
 
 	platformCount := len(requested)
 	if platformCount == 0 {

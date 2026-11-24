@@ -32,6 +32,19 @@ func (target Target) String() string {
 	return target.GoOperatingSystem + "/" + target.GoArchitecture
 }
 
+// GoArm64Level is the arm64 feature level this target compiles for, as `GOARM64`, or "" for Go's default, v8.0.
+//
+// v8.4 on darwin/arm64 alone: every Apple silicon Mac implements it, and it took 0.34 user-s off the Go engine's
+// bar row at cohere's root on Shackler, findings identical (#b2t9xmf, #r6sqd2c). Linux and Windows on arm64 run
+// on v8.0 cores still in service, a Raspberry Pi 4 and the first Graviton among them, where a v8.4 binary would
+// die on an illegal instruction, so they keep the default.
+func (target Target) GoArm64Level() string {
+	if target.GoOperatingSystem == "darwin" && target.GoArchitecture == "arm64" {
+		return "v8.4"
+	}
+	return ""
+}
+
 // IsMacOs reports whether this target needs signing and notarization.
 //
 // Gatekeeper blocks an unsigned binary downloaded from the network, and an npm tarball counts. It

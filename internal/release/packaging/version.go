@@ -60,6 +60,11 @@ var (
 	// for the binary's cached name and for this stamp, so the binary reports the state its name holds
 	// (dispatch.ResolveWorkingTree, #50wtb2s). Empty otherwise, and Go's own `vcs.modified` is read.
 	sourceTreeModified = ""
+
+	// profileDigest is the sha256, in hex, of the CPU profile a release was built with (ProfilePath),
+	// stamped by Build beside the `-pgo` it passes. Go records only the profile's file name, and every
+	// profile is named default.pgo, so the digest is what says which one. Empty for a build nobody stamped.
+	profileDigest = ""
 )
 
 // Current returns this binary's provenance.
@@ -72,8 +77,33 @@ func Current() Provenance {
 		GoToolchain:        resolveGoToolchain(),
 		SourceTreeModified: resolveSourceTreeModified(),
 		FormatterIdentity:  formatterIdentity,
+		Profile:            resolveProfile(),
+		ProfileDigest:      profileDigest,
 		Platform:           runtime.GOOS + "/" + runtime.GOARCH,
 	}
+}
+
+// resolveProfile reads the profile this binary was compiled with from the build info Go's linker writes.
+//
+// Read rather than stamped, for the reason the toolchain is: the linker records the `-pgo` it was given,
+// so the answer cannot disagree with the build, where a stamp is only what a pipeline meant to pass.
+func resolveProfile() string {
+	information, available := debug.ReadBuildInfo()
+	if !available {
+		return ""
+	}
+	return profileFromSettings(information.Settings)
+}
+
+// profileFromSettings is the profile a build's settings name, its file name like "default.pgo", or "" when
+// the build carried none: Go writes a `-pgo` setting only for a profile-guided build, and none for -pgo=off.
+func profileFromSettings(settings []debug.BuildSetting) string {
+	for _, setting := range settings {
+		if setting.Key == "-pgo" {
+			return setting.Value
+		}
+	}
+	return ""
 }
 
 // resolveGoToolchain prefers the toolchain recorded in the binary over the stamped value.
@@ -174,4 +204,14 @@ func ShortCommit(commit string) string {
 		return commit
 	}
 	return commit[:shortLength]
+}
+
+// ShortDigest trims a sha256 in hex to the prefix `--version` and the release's summary print, the one home
+// for that length, so the two can be compared by eye.
+func ShortDigest(digest string) string {
+	const shortLength = 12
+	if len(digest) <= shortLength {
+		return digest
+	}
+	return digest[:shortLength]
 }

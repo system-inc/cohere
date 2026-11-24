@@ -1,6 +1,7 @@
 package release
 
 import (
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -198,5 +199,65 @@ func TestVersionNamesItsOwnCommit(test *testing.T) {
 	}.String()
 	if strings.Contains(withoutCommit, "commit:") {
 		test.Errorf("an unstamped build grew a commit line it cannot support:\n%s", withoutCommit)
+	}
+}
+
+// `--version` says whether the build was profile-guided and by which profile (#r6sqd2c): every profile is named
+// default.pgo, so the name alone can't tell two releases apart, and the digest the release stamps does.
+func TestVersionNamesTheProfileTheBuildCarried(test *testing.T) {
+	test.Parallel()
+
+	base := Provenance{Version: "0.2.0", Platform: "darwin/arm64", GoToolchain: "go1.27.1", CompilerCommit: "abc123"}
+
+	guided := base
+	guided.Profile = "default.pgo"
+	guided.ProfileDigest = "08e8fbf79c3b51d2a1c4e2f0b9d3a7c6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0"
+	if profileLine(guided) != "  profile:        default.pgo, sha256 08e8fbf79c3b" {
+		test.Errorf("a profile-guided release doesn't name its profile by name and digest:\n%s", guided.String())
+	}
+
+	none := base
+	if profileLine(none) != "  profile:        none" {
+		test.Errorf("a build with no profile doesn't say so:\n%s", none.String())
+	}
+
+	// A digest with no profile in the build info describes nothing this binary was compiled with.
+	stampedOnly := base
+	stampedOnly.ProfileDigest = guided.ProfileDigest
+	if profileLine(stampedOnly) != "  profile:        none" {
+		test.Errorf("a stamped digest with no profile in the build reads as a profile:\n%s", stampedOnly.String())
+	}
+
+	// A local `go build` picks default.pgo up by Go's default and stamps nothing.
+	unstamped := base
+	unstamped.Profile = "default.pgo"
+	if !strings.HasPrefix(profileLine(unstamped), "  profile:        default.pgo, its digest not stamped") {
+		test.Errorf("a profile-guided build with no stamp doesn't say which profile is unknown:\n%s",
+			unstamped.String())
+	}
+}
+
+// profileLine is the one line of a provenance's rendering that names the profile, or "" when there is none.
+func profileLine(provenance Provenance) string {
+	for line := range strings.SplitSeq(provenance.String(), "\n") {
+		if strings.HasPrefix(line, "  profile:") {
+			return line
+		}
+	}
+	return ""
+}
+
+func TestProfileIsReadFromTheBuildsPgoSetting(test *testing.T) {
+	test.Parallel()
+
+	if read := profileFromSettings([]debug.BuildSetting{
+		{Key: "-trimpath", Value: "true"},
+		{Key: "-pgo", Value: "default.pgo"},
+		{Key: "GOARM64", Value: "v8.4"},
+	}); read != "default.pgo" {
+		test.Errorf("the settings of a profile-guided build read as profile %q", read)
+	}
+	if read := profileFromSettings([]debug.BuildSetting{{Key: "-trimpath", Value: "true"}}); read != "" {
+		test.Errorf("the settings of a build with no profile read as profile %q", read)
 	}
 }
