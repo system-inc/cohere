@@ -96,8 +96,19 @@ func Main(
 	// A save writes no file, refused where every write of a source file passes (format.RefuseWrites), so no phase, one
 	// added later included, can write over a file the editor holds unsaved. Here rather than in run, as the memory
 	// limit is, since the refusal is process-wide, and a test running the engine in process writes files beside it.
-	if request, parseError := parseInvocation(arguments); parseError == nil && request.mode() == modeStdin {
+	request, parseError := parseInvocation(arguments)
+	if parseError == nil && request.mode() == modeStdin {
 		format.RefuseWrites()
+	}
+	// Here rather than in run, as the memory limit is, since a profile is the whole process's, and a test running the
+	// engine in process runs beside others. Begun before the run reads anything, so it holds the whole run, and a
+	// command line the run would refuse is refused there, as ever, with the profile written but holding nothing.
+	if parseError == nil && request.profilePath != "" {
+		stopProfile, startProfileError := startProfile(request.profilePath)
+		if startProfileError != nil {
+			return refuse(standardError, startProfileError)
+		}
+		defer stopProfile(standardError)
 	}
 	return runOverlapping(arguments, standardInput, standardOutput, standardError, rules.All(), &memory,
 		standardLibrarySource{}, true, nil)

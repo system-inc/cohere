@@ -241,9 +241,11 @@ func run() error {
 	stdinFilePath := flag.String("stdin-filepath", "",
 		"with --fix, read one file's text from stdin and print what --fix (and --format, if named) would write for the file at this path, writing nothing to disk")
 	// A profile of a cold run: a profiled run is never one the run cache replays, since only a bare run
-	// or `--no-fix` is.
+	// or `--no-fix` is. A Go engine child writes its own beside it, its engine's name before the extension
+	// (engineProfilePath), since a Go run's work is the child's (#r33n96f).
 	// The backquoted word is the argument's name in the help, which is how the flag package spells one.
-	profilePath := flag.String("profile", "", "write a Go CPU profile of the run to `file`, for go tool pprof")
+	profilePath := flag.String("profile", "",
+		"write a Go CPU profile of the run to `file`, for go tool pprof, and the Go engine's beside it, named go")
 	// The view. A run prints the files it rewrote, its findings and one footer line; these widen it.
 	verbose := flag.Bool("verbose", false,
 		"print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total")

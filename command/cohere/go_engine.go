@@ -65,6 +65,10 @@ func runGoEngineVerb(
 //
 // `stdin-filepath` is the editor's save (#qtna8m4), forwarded with its absolute path, and run by runGoStdin rather
 // than as a check: the engine reads the buffer on stdin and writes the file's text where a check writes records.
+//
+// `profile` is the front door's CPU profile of its own process, and the engine writes its own beside it, named `go`
+// (engineProfilePath), since the run's work is the engine's and a profile of the front door alone shows it waiting
+// (#r33n96f). The run cache never admits it, so a profiled run is always one the engine ran.
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
@@ -74,6 +78,7 @@ var goFlags = engineFlags{
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open", "stdin-filepath",
 	},
+	ProfileName: "go",
 }
 
 // runGoEngine checks a Go workspace or module by running this binary as the Go engine on it and rendering

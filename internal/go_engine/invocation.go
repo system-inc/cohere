@@ -36,6 +36,11 @@ type invocation struct {
 	stdinPath string
 	buffer    []byte
 
+	// profilePath is the file `--profile` names, where Main writes this process's CPU profile for `go tool pprof`, as
+	// given, or empty for a run that writes none (#r33n96f). Main's rather than the run's, since a profile is the
+	// whole process's, and a test runs the engine in process beside others.
+	profilePath string
+
 	// standardLibrary is where the run's standard-library entries come from and go (see lintCache), never read from
 	// the command line.
 	standardLibrary standardLibrarySource

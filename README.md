@@ -233,7 +233,7 @@ is an engine check, so it is configurable without being an entry in `cohere --ru
 | `--timing`              | report what building the graph cost and the CPU each rule cost, most expensive rule first, for TypeScript and Go                                                               |
 | `--timeline`            | in a Go project, report when each phase and each build began and ended on the run's clock, with the cores busy between                                                         |
 | `--single-threaded`     | use one type checker instead of several                                                                                                                                        |
-| `--profile FILE`        | write a Go CPU profile of the run to FILE                                                                                                                                      |
+| `--profile FILE`        | write a Go CPU profile of the run to FILE, and in a Go project the engine's beside it (`run.pprof` gives `run.go.pprof`)                                                       |
 | `--cache-dump`          | print what this project's cache holds, and exit                                                                                                                                |
 | `--version`             | print the version, what this binary was built from, and the Swift contract it speaks, and exit                                                                                 |
 
