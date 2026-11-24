@@ -417,7 +417,9 @@ type DependenceCounts struct {
 // the early cutoff restored it by its second key, or missed, checked and analyzed from source.
 // Of the misses, written got an entry and unstorable held what no entry can hold. FactsDropped counts the facts the
 // written entries left out because nothing outside their package can name their object, and FactsSkipped the
-// restored facts whose object the package's export data does not hold. Waves counts the times the lint phase analyzed
+// restored facts whose object the package's export data does not hold, once for each analyzer whose action restores
+// them: a build restores a package's facts only where a pass above it inherits them, so it counts only the facts of the
+// restores it makes. Waves counts the times the lint phase analyzed
 // packages: at most two, those whose own inputs moved and then the rest that missed, once the hits the early cutoff
 // found among the packages above the first were restored. FromSystemCache counts the standard-library packages
 // restored from the system cache's tables (#syscache), the host's build's and every other build's summed, which

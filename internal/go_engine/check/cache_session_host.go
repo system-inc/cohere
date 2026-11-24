@@ -869,11 +869,18 @@ func (session *CacheSession) unsettledBelow() map[*packages.Package]bool {
 
 // writeThrough writes, under the build's own first key, the entry of each package restored from the host's run whose
 // restore has settled and held, with nothing declined below it (outside unsettled), no reload pending, nothing that
-// stood in it in any load (stoodIn), every action on it restored without an error and an entry the build would write
-// (throughEntry), so the build's next run hits it in its own store rather than check it from source once the host,
-// hitting its own, keeps nothing to restore from (#b2t9xmf). It returns whether each package written has a finding that
-// names a file outside it (see positionDependent), which keeps its second key from an alias. actionsOf are the actions
-// of the run's graphs on each package and knownFiles every file the load reached.
+// stood in it in any load (stoodIn), types the load gave it when its restore was judged, every action on it restored
+// without an error and an entry the build would write (throughEntry), so the build's next run hits it in its own store
+// rather than check it from source once the host, hitting its own, keeps nothing to restore from (#b2t9xmf). It returns
+// whether each package written has a finding that names a file outside it (see positionDependent), which keeps its
+// second key from an alias. actionsOf are the actions of the run's graphs on each package and knownFiles every file the
+// load reached.
+//
+// A package restored from the host's run has an action only where a pass above it reaches it, inheriting its facts
+// (#xqbqcbt), so every action on it is checked, but none is required. What an action's restore refused is refused here
+// without one: an entry holding another set of analyzers than the build would run (throughEntry), and a package the
+// load gave no types (session.restore's refusals). A failure below it reaches the restore's verdict instead, which
+// declines it when it read a fact the failed action would have exported (buildFacts.factsHold).
 //
 // The entry is exactly as sound as the restore, and no sounder. It persists a verdict that held because what the
 // package read of other packages read the same in this run: its types' reads at the load, its facts' and answers' at
@@ -909,11 +916,15 @@ func (session *CacheSession) writeThrough(
 		held := hosted.settled && hosted.declined == ""
 		hosted.lock.Unlock()
 		// A package pending a reload is checked from source by the next load, which writes its entry as a miss. One
-		// with no store, a project package under `--no-cache`, has no key either (keyStandardLibraryApart).
+		// with no store, a project package under `--no-cache`, has no key either (keyStandardLibraryApart). A judged
+		// restore the load gave no types is one whose actions' restore refused it (session.restore); an untouched one
+		// has none whenever nothing checked from source reads them, and was never refused for it.
+		_, untouched := session.host.untouched[candidate]
 		if _, keyed := session.keys[candidate]; !held || !keyed || session.storeFor(candidate) == nil ||
 			unsettled[candidate] ||
 			session.host.writtenThrough[candidate] || session.stoodIn(candidate.ID) ||
-			session.reloading(candidate) || !finishedClean(actionsOf[candidate]) {
+			session.reloading(candidate) || !untouched && candidate.Types == nil ||
+			!finishedClean(actionsOf[candidate]) {
 			continue
 		}
 		through = append(through, candidate)
@@ -926,7 +937,7 @@ func (session *CacheSession) writeThrough(
 		saved := through[index]
 		_, untouched := session.host.untouched[saved]
 		encoded[index], writable[index], writeErrors[index] = session.throughEntry(saved, throughHosted[index],
-			actionsOf[saved], knownFiles, untouched)
+			knownFiles, untouched)
 		if !writable[index] || writeErrors[index] != nil {
 			return nil
 		}
@@ -990,30 +1001,24 @@ func (session *CacheSession) writeThrough(
 // unsafe, as the build would write it had it checked the package itself. Its reads name each owner by its first key
 // in this build, which every read held against when the restore settled.
 //
-// The output digest is the host's, which is the build's own only while the entry holds exactly the analyzers of the
-// build's actions on saved, as encodeEntry's would, since the digest names every one of them; an entry that holds
-// another set is not written. With that set the two are the same by construction: the digest is of the package's API
-// by value, rendered from its types checked from source (exportDigest), and of its facts by value, and the restore
-// holding is the verdict that the build's check from source would give the package the host's types and facts. It
-// cannot be computed again from the types the build read, since export data drops the package's Go version, which the
-// rendering holds, so a digest of those would differ from the build's own and have importers flap between a hit and a
-// miss across runs. An untouched package (untouched), which no action of the build's ran on, is written with the host's
-// analyzers, those of the same rules.
+// The output digest is the host's, which is the build's own only while the entry holds exactly the analyzers the build
+// would run on saved checked from source (expectedSlots), as encodeEntry's would, since the digest names every one of
+// them; an entry that holds another set is not written. With that set the two are the same by construction: the digest
+// is of the package's API by value, rendered from its types checked from source (exportDigest), and of its facts by
+// value, and the restore holding is the verdict that the build's check from source would give the package the host's
+// types and facts. It cannot be computed again from the types the build read, since export data drops the package's Go
+// version, which the rendering holds, so a digest of those would differ from the build's own and have importers flap
+// between a hit and a miss across runs. An untouched package (untouched), which no verdict judged, is written with the
+// host's analyzers, those of the same rules.
 func (session *CacheSession) throughEntry(
 	saved *packages.Package,
 	hosted *hostRestore,
-	actions []*checker.Action,
 	knownFiles *knownFiles,
 	untouched bool,
 ) (encodedEntry, bool, error) {
-	slots := map[string]bool{}
-	for _, action := range actions {
-		if slot, held := session.known.slot(action.Analyzer); held {
-			slots[slot] = true
-		}
-	}
-	// An untouched package had no action of its own to compare by. Its entry is the host's for the same rules, and an
-	// entry that falls short of what a later run asks is a miss there (dropShortHits), never a wrong hit.
+	// An untouched package is not compared. Its entry is the host's for the same rules, and an entry that falls short
+	// of what a later run asks is a miss there (dropShortHits), never a wrong hit.
+	slots := session.expectedSlots(saved)
 	if !untouched && len(hosted.restored.slots) != len(slots) {
 		return encodedEntry{}, false, nil
 	}
@@ -1047,6 +1052,25 @@ func (session *CacheSession) throughEntry(
 	}
 	encoded.positionDependent = judgedPosition(restoredPositionDependent(saved, hosted.restored, knownFiles))
 	return encoded, true, nil
+}
+
+// expectedSlots are the slots of the analyzers the build runs on saved when it checks it from source, which an entry
+// it writes holds: on a package given, every rule's and report's (known.rules) and every analyzer's that learns facts
+// (known.facts), since each rule's root requires those it reads; on any other, only those that learn facts, which
+// reach it from what imports it. They are what the build's actions on a package restored from the host's run were
+// once compared by, when every rule was rooted on it (#xqbqcbt); now it has few or none.
+func (session *CacheSession) expectedSlots(saved *packages.Package) map[string]bool {
+	expected := map[string]bool{}
+	analyzers := session.known.facts
+	if session.given[saved] {
+		analyzers = append(slices.Clone(session.known.rules), analyzers...)
+	}
+	for _, analyzer := range analyzers {
+		if slot, held := session.known.slot(analyzer); held {
+			expected[slot] = true
+		}
+	}
+	return expected
 }
 
 // hostBody is the body of hosted's entry, read from the host's run, for a build whose store does not hold it yet.

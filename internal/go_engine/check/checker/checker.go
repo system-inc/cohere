@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are nineteen.
+// The changes are twenty.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -280,6 +280,15 @@
 // ResultOf of every pass, as Options.Resolved keys the resolver. The
 // checker never reads it. Unset, ResultOf holds no ask.
 //
+// The twentieth is Options.FactRoots, the seam an extra build has the
+// analyzers that learn facts run through on a package it checks from
+// source but was not given (#xqbqcbt). Options.FactRootAnalyzers are
+// rooted on each of them, as Options.Beside is rooted on a package
+// given, and kept apart in Graph.FactRoots, which Graph.All walks after
+// Roots, so the actions are scheduled, released and read as a
+// dependency's are, and a reader of the roots never meets them. Unset,
+// nothing is rooted there, and Graph.FactRoots is empty.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -387,16 +396,6 @@ type Options struct {
 	Restored func(*packages.Package) bool
 	Restore  func(*Action) error
 
-	// cohere: FactsBelowRestored, when set, names restored packages whose
-	// actions still depend on the actions, on the same package, of every
-	// analyzer that learns facts among what they require, transitively,
-	// though nothing on the package runs: those are restored too, and
-	// their vertical edges have the analyzers run on what the package
-	// imports, so what it imports exports every fact the package's own
-	// analysis read. An extra build asks it of a package restored from the
-	// host's run, to judge those reads once the analysis is over.
-	FactsBelowRestored func(*packages.Package) bool
-
 	// cohere: Finished, when set, is called with a package Analyze was
 	// given once the last action on it has finished, and the package's
 	// syntax and type information are then let go of as a dependency's
@@ -502,6 +501,15 @@ type Options struct {
 	// none of the analyzers, whose root action on a package it would
 	// otherwise share.
 	Beside *analysis.Analyzer
+
+	// cohere: FactRoots, when set, are packages Analyze was not given on
+	// each of which every one of FactRootAnalyzers is rooted, as Beside is
+	// rooted on a package given, and kept in Graph.FactRoots rather than
+	// Graph.Roots. Their actions are no roots: their Results go as a
+	// dependency's do, and their facts are read by whoever reads the
+	// graph's actions (Graph.All). Restored must not name any of them.
+	FactRoots         []*packages.Package
+	FactRootAnalyzers []*analysis.Analyzer
 
 	// cohere: StandingBodies, when set, answers for a package's ID the
 	// function bodies an extra build leaves to the host there, whose
@@ -632,10 +640,9 @@ type Graph struct {
 	// which neither Roots nor All holds.
 	Beside []*Action
 
-	// cohere: requiredFacts is what this graph's construction read of
-	// factAnalyzersRequired, kept so a test reads that each analyzer's was
-	// computed once.
-	requiredFacts *factRequirements
+	// cohere: FactRoots holds Options.FactRootAnalyzers' action on each of
+	// Options.FactRoots, which All walks after Roots and Roots never holds.
+	FactRoots []*Action
 
 	// cohere: actions is how many actions Analyze made for this graph,
 	// every one All can reach and the roots beside too, so All's walk
@@ -653,8 +660,10 @@ type Graph struct {
 //	}
 func (g *Graph) All() iter.Seq[*Action] {
 	return func(yield func(*Action) bool) {
-		// cohere: sized by the graph's count of actions (see forEach).
-		forEach(g.Roots, g.actions, func(act *Action) error {
+		// cohere: sized by the graph's count of actions (see forEach), and
+		// from Graph.FactRoots after Roots.
+		walked := append(g.Roots[:len(g.Roots):len(g.Roots)], g.FactRoots...)
+		forEach(walked, g.actions, func(act *Action) error {
 			if !yield(act) {
 				return io.EOF // any error will do
 			}
@@ -753,52 +762,6 @@ type syntaxReaders struct {
 	standing      rule.StandingBodies
 }
 
-// cohere: factAnalyzersRequired are the analyzers that learn facts among
-// everything a requires, transitively, a itself left out, in a fixed order.
-func factAnalyzersRequired(a *analysis.Analyzer) []*analysis.Analyzer {
-	var found []*analysis.Analyzer
-	seen := map[*analysis.Analyzer]bool{a: true}
-	var visit func(required []*analysis.Analyzer)
-	visit = func(required []*analysis.Analyzer) {
-		for _, req := range required {
-			if seen[req] {
-				continue
-			}
-			seen[req] = true
-			if len(req.FactTypes) > 0 {
-				found = append(found, req)
-			}
-			visit(req.Requires)
-		}
-	}
-	visit(a.Requires)
-	return found
-}
-
-// cohere: factRequirements is factAnalyzersRequired of each analyzer one
-// Analyze asks, computed on the first ask and read after (#tb538na): an
-// action on a package restored from the host's run asks it of its analyzer,
-// and an extra build has thousands of such actions over a few dozen
-// analyzers, which computed it again for every one, 0.3 to 0.6 CPU-s a run at
-// cohere's root. The answer is of the analyzer's requirements alone, the same
-// for every package. Only mkAction reads it, on one goroutine, so it needs no
-// lock. computed counts the analyzers computed, which a test reads.
-type factRequirements struct {
-	of       map[*analysis.Analyzer][]*analysis.Analyzer
-	computed int
-}
-
-// cohere: required is factAnalyzersRequired(a), computed once for requirements.
-func (requirements *factRequirements) required(a *analysis.Analyzer) []*analysis.Analyzer {
-	found, known := requirements.of[a]
-	if !known {
-		found = factAnalyzersRequired(a)
-		requirements.of[a] = found
-		requirements.computed++
-	}
-	return found
-}
-
 func (act *Action) String() string {
 	return fmt.Sprintf("%s@%s", act.Analyzer, act.Package)
 }
@@ -848,9 +811,6 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		pkg *packages.Package
 	}
 	actions := make(map[key]*Action)
-	// cohere: each analyzer's required fact analyzers, computed once for the
-	// whole graph rather than once for each action that asks (factRequirements).
-	requiredFacts := &factRequirements{of: map[*analysis.Analyzer][]*analysis.Analyzer{}}
 	// cohere: actions are made actionsPerBlock at a time, one allocation for
 	// a block rather than one for each action, a graph holding thousands. A
 	// block lives while any action in it does, which costs nothing: actions
@@ -879,11 +839,6 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 			// cohere: unless the package is restored, since then nothing on it runs.
 			if opts.Restored == nil || !opts.Restored(pkg) {
 				for _, req := range a.Requires {
-					act.Deps = append(act.Deps, mkAction(req, pkg))
-				}
-			} else if opts.FactsBelowRestored != nil && opts.FactsBelowRestored(pkg) {
-				// cohere: read through requiredFacts, computed once per analyzer.
-				for _, req := range requiredFacts.required(a) {
 					act.Deps = append(act.Deps, mkAction(req, pkg))
 				}
 			}
@@ -930,7 +885,17 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 			}
 		}
 	}
+	// cohere: Options.FactRootAnalyzers on each of Options.FactRoots, no
+	// roots (IsRoot stays false), which start the walks below as the roots
+	// beside do.
+	var factRoots []*Action
+	for _, pkg := range opts.FactRoots {
+		for _, a := range opts.FactRootAnalyzers {
+			factRoots = append(factRoots, mkAction(a, pkg))
+		}
+	}
 	allRoots := append(roots[:len(roots):len(roots)], beside...)
+	allRoots = append(allRoots, factRoots...)
 
 	// cohere: Options.ForDependents, which drops the edges an analyzer
 	// holds only for dependents that are not in this graph, and then the
@@ -1041,9 +1006,9 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		}
 	}
 
-	// cohere: the graph keeps requiredFacts for a test to read, the
-	// roots beside apart from Roots, and its count of actions for All.
-	return &Graph{Roots: roots, Beside: beside, requiredFacts: requiredFacts, actions: len(actions)}, nil
+	// cohere: the graph keeps the roots beside and the fact roots apart
+	// from Roots, and its count of actions for All.
+	return &Graph{Roots: roots, Beside: beside, FactRoots: factRoots, actions: len(actions)}, nil
 }
 
 func init() {

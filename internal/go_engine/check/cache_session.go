@@ -127,7 +127,9 @@ type CacheCounts struct {
 	// object, which has no objectpath (see encodeEntry).
 	FactsDropped int
 
-	// FactsSkipped is the restored facts whose object the package's export data does not hold (see restore).
+	// FactsSkipped is the restored facts whose object the package's export data does not hold (see restore), once for
+	// each action that restores them: a build restores a package's facts only where a pass above it inherits them, so
+	// it counts only the facts of the restores it makes (#xqbqcbt).
 	FactsSkipped int
 
 	// WriteFailed is the misses whose entry could not be written, or whose dependence record could not be written
