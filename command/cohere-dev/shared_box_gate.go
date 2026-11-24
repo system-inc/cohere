@@ -88,18 +88,21 @@ found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha
 [ "$found" = "$digest" ] || refuse "the Go toolchain at $goroot digests to $found, not the pinned $digest"
 `
 
-// sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
-// goroot, digest, node, nodeDigest and races (racePatterns' tokens, comma-separated) as variables, and the module's
-// test patterns as its arguments. It prints boxMarker before the tests, boxRaceMarker before the -race run once the
-// module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box. The -race run is one go
-// test of the plain tokens, then one of each token's package with its run, every one through the same filter so the
-// run after the marker reads as one stream, and a failure of any is the run's, after the rest have run.
 // boxCoreBudgetVariable carries a gate box's core budget (macBoxCoreBudgets) to her script, unset for a box with none.
 const boxCoreBudgetVariable = "COHERE_DEV_GATE_CORES"
 
 // boxBudgetMarker opens the line a gate box's run prints when it kept to a core budget, the budget after it.
 const boxBudgetMarker = "cohere-dev-gate: budget "
 
+// sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
+// goroot, digest, node, nodeDigest and races (racePatterns' tokens, comma-separated) as variables, and the packages
+// to test as its arguments: the module's patterns, or import paths, which a gate Mac is handed. It prints boxMarker
+// before the tests, boxRaceMarker before the -race run once the module passes, and sharedBoxRefusedMarker, ending the
+// run, when it won't trust the box. When boxShardedPackage is among its arguments, the plain go test runs the rest,
+// and that package runs after it in shards (sharedBoxShards), the run failing once both have when either failed. The
+// -race run is one go test of the plain tokens, then one of each token's package with its run, every one through the
+// same filter so the run after the marker reads as one stream, and a failure of any is the run's, after the rest
+// have run.
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 # step says how many seconds the step it names took, from the end of the one before it (#bc8nf0r).
 stepStarted=$(date +%s)
@@ -124,16 +127,36 @@ if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
   echo "` + boxBudgetMarker + `${` + boxCoreBudgetVariable + `} cores, go test -p $budgetPackages on 2 threads each"
 fi
 gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
-# The run's own temporary directory, when the script before this made one, goes with the cache.
-trap 'rm -rf "$gocache"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
+# The shards' outputs and the run's own temporary directory, when the script before this made one, go with the
+# cache.
+trap 'rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
 export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 step toolchain
 downloaded=$(go mod download 2>&1) || refuse "go mod download failed: $(echo "$downloaded" | tail -n 1)"
 verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verified" | tail -n 1)"
 step modules
-go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"'
+# boxShardedPackage, when it is among the arguments, runs apart from the rest, in shards (sharedBoxShards).
+sharded=""; others=""
+for package in "$@"; do
+  if [ "$package" = "` + boxShardedPackage + `" ]; then sharded="$package"; else others="$others $package"; fi
+done
+# A failing go test is remembered rather than ending the script under set -e, so the shards still run after a plain
+# run that failed, as one go test of every package would have run them, and the run ends failed once both have.
+testsFailed=0
+if [ -z "$sharded" ]; then
+  go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"' ||
+    testsFailed=1
+elif [ -n "$others" ]; then
+  # Unquoted, so each package is its own argument: an import path, which holds no space or glob.
+  go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json $others |
+    grep -vE '"Action":"(start|run|pause|cont)"' || testsFailed=1
+fi
 step tests
+if [ -n "$sharded" ]; then
+` + sharedBoxShards + `step sharded
+fi
+[ "$testsFailed" = 0 ] || exit 1
 if [ -n "$races" ]; then
   echo "` + boxRaceMarker + `"
   # Split on commas alone, never on a run's characters, and each run quoted, so nothing of it globs.

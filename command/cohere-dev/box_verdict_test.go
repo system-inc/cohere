@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -275,6 +276,28 @@ func TestALandingReadsItsBoxsVerdictAndNeverRunsItsTestsOnKirksMac(test *testing
 			refusal: []string{"never fall back to Kirk's Mac", "the stand-in's run said nothing of its -race run"},
 		},
 		{
+			// A package run in shards reads as one, so a red shard refuses naming its failing test, said before the
+			// test its shard never ended.
+			name: "a shard fails a test",
+			box: func(commit string) string {
+				return boxMarker + commit + " on linux/amd64\n" + plantedShards(
+					`{"Action":"fail","Package":"example.com/fixture/alpha","Test":"TestPlantedShardFailure"}`,
+					`{"Action":"fail","Package":"example.com/fixture/alpha","Elapsed":3}`)
+			},
+			refusal: []string{"the stand-in's tests on linux/amd64 failed, so nothing landed",
+				"example.com/fixture/alpha TestPlantedShardFailure"},
+		},
+		{
+			name: "a shard's JSON misses a listed test",
+			box: func(commit string) string {
+				return boxMarker + commit + " on linux/amd64\n" + plantedShards(
+					`{"Action":"pass","Package":"example.com/fixture/alpha","Elapsed":3}`)
+			},
+			refusal: []string{"no verdict from a gate box, so nothing landed, and its tests never fall back to " +
+				"Kirk's Mac: the stand-in's shards didn't run each listed test exactly once, so its verdict is none: " +
+				"TestPlantedShardFailure (example.com/fixture/alpha) ended 0 times across its shards"},
+		},
+		{
 			name: "the box is unreachable",
 			box:  func(string) string { return "ssh: connect to host sun2: Connection refused\n" },
 			refusal: []string{"never fall back to Kirk's Mac", "the stand-in's run never said what it tested (ssh: " +
@@ -375,6 +398,18 @@ func TestALandingReadsItsBoxsVerdictAndNeverRunsItsTestsOnKirksMac(test *testing
 			}
 		})
 	}
+}
+
+// plantedShards is a box's run of example.com/fixture/alpha in two shards, its listing TestPlantedShardPass and
+// TestPlantedShardFailure: the first shard passes its test, and the second prints second, the second's JSON.
+func plantedShards(second ...string) string {
+	return strings.Join(slices.Concat([]string{
+		boxShardListingMarker + "example.com/fixture/alpha TestPlantedShardPass TestPlantedShardFailure",
+		boxShardMarker + "1 of 2 example.com/fixture/alpha TestPlantedShardPass",
+		`{"Action":"pass","Package":"example.com/fixture/alpha","Test":"TestPlantedShardPass"}`,
+		`{"Action":"pass","Package":"example.com/fixture/alpha","Elapsed":2}`,
+		boxShardMarker + "2 of 2 example.com/fixture/alpha TestPlantedShardFailure",
+	}, second), "\n") + "\n"
 }
 
 // raceReportEvent is one line of a race report as test2json gives it, to a test that passed, as a JSON line.
