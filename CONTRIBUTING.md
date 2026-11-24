@@ -504,6 +504,17 @@ publishes. It refuses a release it cannot complete: a target that fails to build
 run, because a version missing one platform resolves to nothing there and gets reported as a bug
 against a release that looked fine everywhere else.
 
+The release is profile-guided (#r6sqd2c): every target compiles with `-pgo=command/cohere/default.pgo`, and
+darwin/arm64 alone with `GOARM64=v8.4`, which every Apple silicon Mac meets. Together they took about 2% of the Go
+engine's CPU off the bar row at cohere's root (#b2t9xmf). The profile is committed, so a build from a commit
+reproduces, and it is never made by hand: `internal/release/tools/train_profile.sh`, run on a box from a cohere
+checkout, builds that commit with no profile, profiles the Go engine on deeafbf4, Adamic and Loom at the commits it
+names (two `--no-cache` runs and one cold run each), merges them into `command/cohere/default.pgo` and prints the
+digest, and the profile lands in a commit of its own that quotes what it printed. It never trains on cohere's root
+or a tree bench/ measures, since a profile from the benchmark's own tree fits the binary to the benchmark. A
+checkout without the file builds with `-pgo=off` and its summary says so, and `cohere --version` names the profile
+by its sha256 prefix, or says `none`.
+
 The launcher is Node rather than Go, which is the one surprising choice. A Go dispatcher would have
 to be cross-compiled per platform, making it a seventh platform package and defeating the point of
 installing one thing. Node is present by construction in an npm install, and `require.resolve` asks
