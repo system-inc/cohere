@@ -396,17 +396,38 @@ func TestAnEntryWhoseAnalysesAreOutOfOrderIsRefused(test *testing.T) {
 	if _, restoreError := restoredOf(known, saved, written, nil, false); restoreError != nil {
 		test.Fatalf("the entry as written is refused: %v", restoreError)
 	}
-	swapped := written
-	swapped.Analyzers = slices.Clone(written.Analyzers)
-	swapped.Analyzers[2], swapped.Analyzers[5] = swapped.Analyzers[5], swapped.Analyzers[2]
-	if _, restoreError := restoredOf(known, saved, swapped, nil, false); restoreError == nil {
-		test.Error("an entry with two analyses out of order is read")
+	last := len(written.Analyzers) - 1
+	// Each is out of order at one place, the list's two ends among them, so no pair of neighbors goes unread.
+	for name, disorder := range map[string]func(analyses []storedSlotAnalysis){
+		"its first two swapped": func(analyses []storedSlotAnalysis) {
+			analyses[0], analyses[1] = analyses[1], analyses[0]
+		},
+		"two in its middle swapped": func(analyses []storedSlotAnalysis) {
+			analyses[2], analyses[5] = analyses[5], analyses[2]
+		},
+		"its last two swapped": func(analyses []storedSlotAnalysis) {
+			analyses[last-1], analyses[last] = analyses[last], analyses[last-1]
+		},
+		"its first slot twice":  func(analyses []storedSlotAnalysis) { analyses[1].Slot = analyses[0].Slot },
+		"a middle slot twice":   func(analyses []storedSlotAnalysis) { analyses[4].Slot = analyses[3].Slot },
+		"its last slot twice":   func(analyses []storedSlotAnalysis) { analyses[last].Slot = analyses[last-1].Slot },
+		"its last before first": func(analyses []storedSlotAnalysis) { analyses[last].Slot = "" },
+	} {
+		disordered := written
+		disordered.Analyzers = slices.Clone(written.Analyzers)
+		disorder(disordered.Analyzers)
+		if _, restoreError := restoredOf(known, saved, disordered, nil, false); restoreError == nil {
+			test.Errorf("an entry with %s is read", name)
+		}
 	}
-	twice := written
-	twice.Analyzers = slices.Clone(written.Analyzers)
-	twice.Analyzers[4].Slot = twice.Analyzers[3].Slot
-	if _, restoreError := restoredOf(known, saved, twice, nil, false); restoreError == nil {
-		test.Error("an entry holding one slot twice is read")
+	// A list of one analysis and a list of none have no pair to be out of order, and read.
+	for _, kept := range []int{1, 0} {
+		short := written
+		short.Analyzers = slices.Clone(written.Analyzers[:kept])
+		restored, restoreError := restoredOf(known, saved, short, nil, false)
+		if restoreError != nil || len(restored.slots) != kept {
+			test.Errorf("an entry of %d analyses reads %v, want its %d slots", kept, restoreError, kept)
+		}
 	}
 }
 
