@@ -3,7 +3,7 @@
 # with, made here from fixed training trees and never by hand. A profile from a tree the benchmarks time fits the
 # binary to the benchmark and writes a fitted gain into the record, so it trains on Adamic and Loom alone, named with
 # their commits below. Excluded, because they are timed: cohere's root, which the bar row and bench/ measure;
-# deeafbf4, which every landing's Performance.jsonc times; and ahra, which bench/ measures. A third held-out tree may
+# deeafbf4, which every landing's performance record times; and ahra, which bench/ measures. A third held-out tree may
 # be added beside the two, a pin of its own, once one is chosen that nothing times. #b2t9xmf measured a held-out
 # profile, B2, against one fitted to the root's own bar row: the held-out one took as much off the root, 0.85 user-s
 # of 38.3 (p < 0.001).
@@ -40,12 +40,12 @@ fail() {
 
 # The training trees, at the commits cohere-pairs measures every pair on (command/cohere-pairs/corpus_pins.go), so a
 # box laid for a pair holds them. A pair builds both of its sides with the same profile, so it compares like with
-# like; the bar row, bench/ and Performance.jsonc time absolute numbers, which is why their trees are never trained
-# on. Moving a pin, or adding a tree, is a decision of its own, made here and said in the commit that makes it, since
-# it changes every profile made after it.
+# like; the bar row, bench/ and land's performance record time absolute numbers, which is why their trees are never
+# trained on. Moving a pin, or adding a tree, is a decision of its own, made here and said in the commit that makes
+# it, since it changes every profile made after it.
 adamicCommit=217863c10426a4a9e03f74cefb9d789721d45d3f
 loomCommit=9510c6baddda7b04f1ac4fa5f927d627f9a01cb3
-# deeafbf4, the tree every landing's Performance.jsonc times (command/cohere-dev/land_performance.go), refused as the
+# deeafbf4, the tree every landing's performance record times (command/cohere-dev/land_performance.go), refused as the
 # commit trained, since cohere at that commit would be the root the record times.
 deeafbf4Commit=deeafbf43e5dfb39c7bacdcdc3f165b571b97276
 
@@ -70,7 +70,7 @@ checkout=$(pwd -P)
 [ "$(git rev-parse --show-toplevel 2>/dev/null)" = "$checkout" ] && [ -d command/cohere ] ||
   fail "run it from the root of a cohere checkout, which $checkout is not"
 trained=$(git rev-parse --verify --quiet "$commit^{commit}") || fail "this checkout holds no commit $commit"
-[ "$trained" != "$deeafbf4Commit" ] || fail "$commit is deeafbf4, which Performance.jsonc times, so it is never trained"
+[ "$trained" != "$deeafbf4Commit" ] || fail "$commit is deeafbf4, which land times, so it is never trained"
 
 # requireAt refuses unless the directory $1 is a checkout of its own at the commit $2, with no tracked file changed,
 # and each submodule in it a checkout at the commit its tree records, all the way down. $3 names it in a refusal.
