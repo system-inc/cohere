@@ -1012,12 +1012,13 @@ entries left out because nothing outside their package can name their object, su
 closure printf marks: no importer can look such a fact up, so leaving it out changes no finding.
 `factsSkipped` counts the restored facts whose object the package's export data does not hold, which
 no importer can name either, once for each analyzer whose action restores them. A build restores a
-package's facts only where a pass above it inherits them, so it counts only the facts of the restores
-it makes, never those of a package it restored that nothing it analyzed imports. The entries live in `<root>/.cache/cohere/go/`, beside the front door's
-own cache. The cache changes no finding and no other field of any record: a run with it and a run
-under `--no-cache` write the same stream but for this field and the elapsed times. Under `--no-cache`
-the engine reads and writes no entry, and every count is 0 with `"on":false`. A project with cgo of
-its own is cached the same way, its packages with cgo files keyed on the cgo tool's outputs.
+package's facts only where a pass above it inherits them, so it counts only the facts of the
+restores it makes, never those of a package it restored that nothing it analyzed imports. The
+entries live in `<root>/.cache/cohere/go/`, beside the front door's own cache. The cache changes no
+finding and no other field of any record: a run with it and a run under `--no-cache` write the same
+stream but for this field and the elapsed times. Under `--no-cache` the engine reads and writes no
+entry, and every count is 0 with `"on":false`. A project with cgo of its own is cached the same way,
+its packages with cgo files keyed on the cgo tool's outputs.
 
 The Go engine also keeps a system cache: the Go standard library's entries, one table for each build
 context, in the user's cache directory (`$COHERE_SYSTEM_CACHE` when set, an absolute directory, and
