@@ -52,6 +52,14 @@ type Provenance struct {
 	// record valid. Empty when the build was not stamped, and then the record keys by the binary.
 	FormatterIdentity string
 
+	// Profile is the CPU profile the Go compiler was guided by, as Go's build info names it, like
+	// "default.pgo", or "" for a build that carried none (#r6sqd2c).
+	Profile string
+
+	// ProfileDigest is that profile's sha256 in hex, stamped by the release, or "" when nobody stamped it,
+	// as on a local `go build` that picked command/cohere/default.pgo up by Go's default.
+	ProfileDigest string
+
 	// Platform is the operating system and architecture this binary was built for, as "os/arch".
 	//
 	// It is read from the runtime rather than stamped, because the runtime cannot be wrong about it
@@ -79,6 +87,7 @@ func (provenance Provenance) String() string {
 		"  platform:       " + provenance.Platform,
 		"  go:             " + provenance.GoToolchain,
 		"  compiler:       " + provenance.describeCompiler(),
+		"  profile:        " + provenance.describeProfile(),
 	}
 	// Printed whenever the build carried a stamp, including a release, because a published version
 	// still does not say which commit produced it and a bug report quoting both is easier to chase.
@@ -125,4 +134,20 @@ func (provenance Provenance) describeCompiler() string {
 		return provenance.CompilerCommit
 	}
 	return provenance.CompilerUpstream + "@" + provenance.CompilerCommit
+}
+
+// describeProfile renders the profile the build carried: none, or its name and which one by its digest.
+//
+// Printed on every build, "none" included, since a release without a profile is a different binary from one
+// with it, by about 2% of the Go engine's CPU (#b2t9xmf), and a report should say which it came from. The
+// build info is the authority on whether there was one; a digest with no `-pgo` beside it is a stamp that
+// describes nothing this binary was compiled with, so it is not printed.
+func (provenance Provenance) describeProfile() string {
+	switch {
+	case provenance.Profile == "":
+		return "none"
+	case provenance.ProfileDigest == "":
+		return provenance.Profile + ", its digest not stamped"
+	}
+	return provenance.Profile + ", sha256 " + ShortDigest(provenance.ProfileDigest)
 }

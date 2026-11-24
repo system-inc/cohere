@@ -78,6 +78,9 @@ type Options struct {
 type Result struct {
 	// Packages are the staged package directories, in the order they were built.
 	Packages []StagedPackage
+
+	// Profile is the CPU profile every binary was built with, or none.
+	Profile Profile
 }
 
 // StagedPackage is one built package on disk.
@@ -165,13 +168,18 @@ func Build(options Options) (Result, error) {
 		return Result{}, readGoToolchainError
 	}
 
-	linkerFlags := releaseLinkerFlags(options.Version, pin, goToolchain)
+	profile, readProfileError := ReadProfile(options.ModuleDirectory)
+	if readProfileError != nil {
+		return Result{}, readProfileError
+	}
 
-	result := Result{}
+	linkerFlags := releaseLinkerFlags(options.Version, pin, goToolchain, profile)
+
+	result := Result{Profile: profile}
 
 	packageDirectoryNames := []string{}
 	for _, target := range targets {
-		staged, buildPlatformPackageError := buildPlatformPackage(options, target, linkerFlags)
+		staged, buildPlatformPackageError := buildPlatformPackage(options, target, linkerFlags, profile)
 		if buildPlatformPackageError != nil {
 			return Result{}, fmt.Errorf("building %s: %w", target, buildPlatformPackageError)
 		}
@@ -259,6 +267,7 @@ func buildPlatformPackage(
 	options Options,
 	target Target,
 	linkerFlags string,
+	profile Profile,
 ) (StagedPackage, error) {
 	directory := filepath.Join(options.OutputDirectory, target.DirectoryName())
 	binaryPath := filepath.Join(directory, "bin", target.BinaryFileName())
@@ -271,6 +280,7 @@ func buildPlatformPackage(
 		options.ModuleDirectory,
 		target,
 		linkerFlags,
+		profile,
 		binaryPath,
 	); compileError != nil {
 		return StagedPackage{}, compileError
@@ -509,7 +519,7 @@ func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error
 }
 
 // releaseLinkerFlags are the `-ldflags` of every binary a release builds, stamping the provenance in.
-func releaseLinkerFlags(version string, pin compilerPin, goToolchain string) string {
+func releaseLinkerFlags(version string, pin compilerPin, goToolchain string, profile Profile) string {
 	const packagePath = "github.com/system-inc/cohere/internal/release/packaging"
 
 	// Strip the symbol table and `DWARF`. Measured on a comparable binary: marginally faster to link
@@ -521,12 +531,15 @@ func releaseLinkerFlags(version string, pin compilerPin, goToolchain string) str
 		"-X", packagePath+".compilerUpstream="+pin.Upstream,
 		"-X", packagePath+".goToolchain="+goToolchain,
 	)
+	if profile.Path != "" {
+		stamps = append(stamps, "-X", packagePath+".profileDigest="+profile.Digest)
+	}
 	return strings.Join(stamps, " ")
 }
 
-// compile builds one target with linkerFlags into binaryPath.
-func compile(moduleDirectory string, target Target, linkerFlags string, binaryPath string) error {
-	command := GoBuildCommand(moduleDirectory, target, linkerFlags, binaryPath)
+// compile builds one target with linkerFlags and profile into binaryPath.
+func compile(moduleDirectory string, target Target, linkerFlags string, profile Profile, binaryPath string) error {
+	command := GoBuildCommand(moduleDirectory, target, linkerFlags, profile, binaryPath)
 	command.Stderr = os.Stderr
 
 	if runError := command.Run(); runError != nil {
@@ -545,14 +558,16 @@ func GoBuildCommand(
 	moduleDirectory string,
 	target Target,
 	linkerFlags string,
+	profile Profile,
 	binaryPath string,
 ) *exec.Cmd {
 	arguments := append([]string{"build"}, BuildFlags...)
-	arguments = append(arguments, "-ldflags="+linkerFlags, "-o", binaryPath, "./command/cohere")
+	arguments = append(arguments, profile.buildFlag(), "-ldflags="+linkerFlags, "-o", binaryPath, "./command/cohere")
 
 	command := exec.Command("go", arguments...)
 	command.Dir = moduleDirectory
-	command.Env = append(os.Environ(),
+	// An inherited GOARM64 is taken out, so only the target that names a level is built at one.
+	command.Env = append(WithoutVariable(os.Environ(), "GOARM64"),
 		"GOOS="+target.GoOperatingSystem,
 		"GOARCH="+target.GoArchitecture,
 		// Nothing here needs cgo, and disabling it is what makes the Linux binaries statically
@@ -561,6 +576,9 @@ func GoBuildCommand(
 		// else's CI.
 		"CGO_ENABLED=0",
 	)
+	if level := target.GoArm64Level(); level != "" {
+		command.Env = append(command.Env, "GOARM64="+level)
+	}
 	return command
 }
 

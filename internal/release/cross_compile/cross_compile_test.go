@@ -81,10 +81,15 @@ func TestEveryReleaseTargetCompiles(test *testing.T) {
 				}
 				return
 			}
+			profile, readProfileError := release.ReadProfile(moduleDirectory)
+			if readProfileError != nil {
+				test.Fatal(readProfileError)
+			}
 			command := release.GoBuildCommand(
 				moduleDirectory,
 				target,
 				strings.Join(release.StripFlags, " "),
+				profile,
 				filepath.Join(test.TempDir(), target.BinaryFileName()),
 			)
 			if output, outputError := command.CombinedOutput(); outputError != nil {
@@ -267,6 +272,7 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(test *testing.T) {
 		directory,
 		darwin,
 		"",
+		release.Profile{},
 		filepath.Join(test.TempDir(), "cohere"),
 	).CombinedOutput(); outputError != nil {
 		test.Fatalf(
@@ -281,6 +287,7 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(test *testing.T) {
 		directory,
 		windows,
 		"",
+		release.Profile{},
 		filepath.Join(test.TempDir(), "cohere.exe"),
 	).CombinedOutput()
 	if outputError == nil {
