@@ -2,6 +2,7 @@ package check
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/sha256"
 	"encoding/gob"
 	"errors"
@@ -42,8 +43,10 @@ import (
 // export data is shallow (export_data.Write), each package's own declarations only, which no reader of 13's deep
 // export data can read (#z4arggw). At 15, an entry holds by place every answer the run held about its package's
 // declared functions and their parameters (Placed), each file's and kind's name once (storedPlaced), which an entry of
-// 14 has none of (#k7k3wwc).
-const CacheFormatVersion = "go-engine-cache-15"
+// 14 has none of (#k7k3wwc). At 16, an entry holds its analyses as a list in order of slot (storedSlotAnalysis), each
+// one's facts in order too, where an entry of 15 held a map by slot, which gob wrote in another order every time
+// (#g9kaytv).
+const CacheFormatVersion = "go-engine-cache-16"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.
@@ -60,7 +63,11 @@ type cacheEntry struct {
 	// Version is CacheFormatVersion as it was when the entry was written, read back as a check on the key's.
 	Version string
 
-	Analyzers map[string]storedAnalysis
+	// Analyzers are the analyses the entry holds, one to a slot, in order of slot (storedSlotAnalyses), and read by
+	// slot through storedAnalysisAt; restoredOf refuses a list that is not. They are a list, never a map: gob writes a
+	// map in the order it ranges it, another every time, and the body's bytes are what a record of another build names
+	// the body by (entryRecord.Body), so the same analyses must encode to the same bytes (#g9kaytv).
+	Analyzers []storedSlotAnalysis
 
 	// Imports and Withheld are the load's, as load.Restored names them.
 	Imports  []string
@@ -161,6 +168,48 @@ type storedAnalysis struct {
 	ObjectFacts  []storedObjectFact
 	PackageFacts []storedFact
 	Report       []byte
+}
+
+// storedSlotAnalysis is one analyzer's analysis as an entry holds it, under the analyzer's slot.
+type storedSlotAnalysis struct {
+	Slot     string
+	Analysis storedAnalysis
+}
+
+// storedSlotAnalyses is analyses, each by its slot, as an entry holds them: one to a slot, in order of slot.
+func storedSlotAnalyses(analyses map[string]storedAnalysis) []storedSlotAnalysis {
+	ordered := make([]storedSlotAnalysis, 0, len(analyses))
+	for _, slot := range slices.Sorted(maps.Keys(analyses)) {
+		ordered = append(ordered, storedSlotAnalysis{Slot: slot, Analysis: analyses[slot]})
+	}
+	return ordered
+}
+
+// storedAnalysisAt is the analysis ordered holds under slot, and whether it holds one. ordered is an entry's
+// Analyzers, in order of slot, so the slot is found by a binary search, with no map built of each entry decoded. The
+// search answers only for a slot it finds by name, so a slot the list lacks reads as not held, never as a
+// neighbor's. A list out of order could read as not holding a slot it holds, so restoredOf refuses one before any
+// search of it.
+func storedAnalysisAt(ordered []storedSlotAnalysis, slot string) (storedAnalysis, bool) {
+	index, held := slices.BinarySearchFunc(ordered, slot, func(each storedSlotAnalysis, sought string) int {
+		return cmp.Compare(each.Slot, sought)
+	})
+	if !held {
+		return storedAnalysis{}, false
+	}
+	return ordered[index].Analysis, true
+}
+
+// compareStoredObjectFacts orders two facts about a package's objects by objectpath, then as compareStoredFacts orders
+// their facts.
+func compareStoredObjectFacts(left storedObjectFact, right storedObjectFact) int {
+	return cmp.Or(cmp.Compare(left.Path, right.Path), compareStoredFacts(left.Fact, right.Fact))
+}
+
+// compareStoredFacts orders two facts by their type's name, then by their bytes, so the order is whole even for two
+// facts of one type about one object, which no action holds: it keeps one fact to an object and a type.
+func compareStoredFacts(left storedFact, right storedFact) int {
+	return cmp.Or(cmp.Compare(left.Type, right.Type), bytes.Compare(left.Encoded, right.Encoded))
 }
 
 // storedObjectFact is a fact about one object of the package: the object as its objectpath within the package, and
@@ -277,7 +326,6 @@ func encodeEntry(
 ) (encodedEntry, error) {
 	entry := cacheEntry{
 		Version:        CacheFormatVersion,
-		Analyzers:      map[string]storedAnalysis{},
 		Withheld:       withheld,
 		Files:          files,
 		Answers:        demanded.answers,
@@ -286,6 +334,9 @@ func encodeEntry(
 		BodiesRecorded: demanded.bodiesRecorded,
 	}
 	encoded := encodedEntry{}
+	// The analyses are gathered by slot, a later action's taking the place of an earlier one's in its slot, and the
+	// entry holds them in order of slot (storedSlotAnalyses).
+	analyses := map[string]storedAnalysis{}
 	digested := map[string]analysisFacts{}
 	var encoder objectpath.Encoder
 	for _, action := range actions {
@@ -346,9 +397,15 @@ func encodeEntry(
 			stored.PackageFacts = append(stored.PackageFacts, fact)
 			facts.packageFacts = append(facts.packageFacts, value)
 		}
-		entry.Analyzers[slot] = stored
+		// ExportedFacts ranges the action's maps of facts, so the facts come in another order every run, and the entry
+		// holds them in one: its bytes are the same for the same facts (#g9kaytv). Nothing reads their order, since a
+		// restore puts them back into the action's maps, and outputDigest sorts its own copy by value.
+		slices.SortFunc(stored.ObjectFacts, compareStoredObjectFacts)
+		slices.SortFunc(stored.PackageFacts, compareStoredFacts)
+		analyses[slot] = stored
 		digested[slot] = facts
 	}
+	entry.Analyzers = storedSlotAnalyses(analyses)
 	if writesExportData {
 		exportData, exportError := writeExportData(saved)
 		if exportError != nil {
@@ -361,12 +418,12 @@ func encodeEntry(
 			entry.Imports = append(entry.Imports, imported.Path())
 		}
 	}
-	if holdsFacts(known, entry.Analyzers) {
+	if holdsFacts(known, analyses) {
 		encoded.output, encoded.hasOutput = outputDigest(exportDigest(saved.Types), digested), true
 		entry.Output = encoded.output[:]
 	}
 	if loadFiles != nil {
-		encoded.positionDependent = judgedPosition(positionDependent(saved, entry.Analyzers, loadFiles))
+		encoded.positionDependent = judgedPosition(positionDependent(saved, analyses, loadFiles))
 	}
 	body, bodyError := encodeBody(entry)
 	if bodyError != nil {
@@ -614,14 +671,23 @@ func restoredOf(
 		readsIncomplete: entry.ReadsIncomplete,
 		bodiless:        entry.Bodiless,
 		bodiesRecorded:  entry.BodiesRecorded,
-		slots:           slices.Sorted(maps.Keys(entry.Analyzers)),
+		slots:           make([]string, 0, len(entry.Analyzers)),
+	}
+	for index, held := range entry.Analyzers {
+		// Each slot once, in order, as storedSlotAnalyses writes them and storedAnalysisAt's search needs. A list that
+		// is not is no entry this format wrote, and is refused, a miss, rather than searched and half found.
+		if index > 0 && held.Slot <= entry.Analyzers[index-1].Slot {
+			return nil, fmt.Errorf("reading the entry of %s: its analyses are not in order of slot, each once, at %q",
+				restoring.ID, held.Slot)
+		}
+		restored.slots = append(restored.slots, held.Slot)
 	}
 	if len(entry.Output) == len(restored.output) {
 		copy(restored.output[:], entry.Output)
 		restored.hasOutput = true
 	}
 	for analyzer, slot := range known.slots {
-		stored, held := entry.Analyzers[slot]
+		stored, held := storedAnalysisAt(entry.Analyzers, slot)
 		if !held {
 			continue
 		}
