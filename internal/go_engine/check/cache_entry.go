@@ -64,9 +64,9 @@ type cacheEntry struct {
 	Version string
 
 	// Analyzers are the analyses the entry holds, one to a slot, in order of slot (storedSlotAnalyses), and read by
-	// slot through storedAnalysisAt. They are a list, never a map: gob writes a map in the order it ranges it, another
-	// every time, and the body's bytes are what a record of another build names the body by (entryRecord.Body), so the
-	// same analyses must encode to the same bytes (#g9kaytv).
+	// slot through storedAnalysisAt; restoredOf refuses a list that is not. They are a list, never a map: gob writes a
+	// map in the order it ranges it, another every time, and the body's bytes are what a record of another build names
+	// the body by (entryRecord.Body), so the same analyses must encode to the same bytes (#g9kaytv).
 	Analyzers []storedSlotAnalysis
 
 	// Imports and Withheld are the load's, as load.Restored names them.
@@ -186,9 +186,10 @@ func storedSlotAnalyses(analyses map[string]storedAnalysis) []storedSlotAnalysis
 }
 
 // storedAnalysisAt is the analysis ordered holds under slot, and whether it holds one. ordered is an entry's
-// Analyzers, in order of slot, so the slot is found by a binary search, with no map built of each entry decoded. A
-// list out of order, which no entry this format's encodeEntry wrote is, may read as not holding a slot it holds, and
-// its package is then checked from source: a miss, never another slot's analysis.
+// Analyzers, in order of slot, so the slot is found by a binary search, with no map built of each entry decoded. The
+// search answers only for a slot it finds by name, so a slot the list lacks reads as not held, never as a
+// neighbor's. A list out of order could read as not holding a slot it holds, so restoredOf refuses one before any
+// search of it.
 func storedAnalysisAt(ordered []storedSlotAnalysis, slot string) (storedAnalysis, bool) {
 	index, held := slices.BinarySearchFunc(ordered, slot, func(each storedSlotAnalysis, sought string) int {
 		return cmp.Compare(each.Slot, sought)
@@ -672,7 +673,13 @@ func restoredOf(
 		bodiesRecorded:  entry.BodiesRecorded,
 		slots:           make([]string, 0, len(entry.Analyzers)),
 	}
-	for _, held := range entry.Analyzers {
+	for index, held := range entry.Analyzers {
+		// Each slot once, in order, as storedSlotAnalyses writes them and storedAnalysisAt's search needs. A list that
+		// is not is no entry this format wrote, and is refused, a miss, rather than searched and half found.
+		if index > 0 && held.Slot <= entry.Analyzers[index-1].Slot {
+			return nil, fmt.Errorf("reading the entry of %s: its analyses are not in order of slot, each once, at %q",
+				restoring.ID, held.Slot)
+		}
 		restored.slots = append(restored.slots, held.Slot)
 	}
 	if len(entry.Output) == len(restored.output) {

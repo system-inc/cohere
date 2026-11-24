@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"golang.org/x/tools/go/gcexportdata"
@@ -123,6 +124,8 @@ func TestAStoredFactOnAnObjectTheExportDataLacksIsSkipped(test *testing.T) {
 		gone := planted.ObjectFacts[0]
 		gone.Path = "NoSuchObject"
 		planted.ObjectFacts = append(planted.ObjectFacts, gone)
+		// In the order an entry holds its facts, as encodeEntry would have written the two.
+		slices.SortFunc(planted.ObjectFacts, compareStoredObjectFacts)
 		// The analysis goes back into its own slot, every other slot's left as it was.
 		for index, each := range entry.Analyzers {
 			if each.Slot == slot {

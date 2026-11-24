@@ -2,6 +2,8 @@ package check
 
 import (
 	"bytes"
+	"encoding"
+	"encoding/gob"
 	"fmt"
 	"go/ast"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
@@ -284,17 +287,29 @@ func TestAnEntryRestoresEachAnalysisByItsSlot(test *testing.T) {
 	}
 }
 
-// mapsReachedFrom is where a value of holder holds a map, each by the path of fields to it: gob writes a map in the
-// order it ranges it, so a map anywhere in what an entry encodes gives the same entry other bytes.
+// mapsReachedFrom is where a value of holder holds a map, or what could hide one, an interface or a type that encodes
+// itself, each by the path of fields to it: gob writes a map in the order it ranges it, so a map anywhere in what an
+// entry encodes gives the same entry other bytes.
 func mapsReachedFrom(holder reflect.Type) []string {
 	var reached []string
 	// A struct type is read once, so a type that holds itself ends the walk.
 	seen := map[reflect.Type]bool{}
 	var walk func(held reflect.Type, path string)
 	walk = func(held reflect.Type, path string) {
+		// A type that encodes itself writes whatever its method does, a map among them, where this walk cannot read.
+		for _, encodesItself := range []reflect.Type{reflect.TypeFor[gob.GobEncoder](),
+			reflect.TypeFor[encoding.BinaryMarshaler]()} {
+			if held.Implements(encodesItself) || reflect.PointerTo(held).Implements(encodesItself) {
+				reached = append(reached, path+" (encodes itself)")
+				return
+			}
+		}
 		switch held.Kind() {
 		case reflect.Map:
 			reached = append(reached, path)
+		case reflect.Interface:
+			// An interface holds any type at all, so what it encodes is not read from the entry's own type.
+			reached = append(reached, path+" (an interface)")
 		case reflect.Pointer, reflect.Slice, reflect.Array:
 			walk(held.Elem(), path+"[]")
 		case reflect.Struct:
@@ -322,6 +337,120 @@ func TestAnEntryHoldsNoMap(test *testing.T) {
 	for _, holder := range []reflect.Type{reflect.TypeFor[cacheEntry](), reflect.TypeFor[entryRecord]()} {
 		if reached := mapsReachedFrom(holder); len(reached) > 0 {
 			test.Errorf("%s holds a map, which gob writes in no one order, at %v", holder.Name(), reached)
+		}
+	}
+	// The walk itself finds each thing it is for, so a clean read above is one that looked.
+	for name, holder := range map[string]reflect.Type{
+		"a map":                      reflect.TypeFor[struct{ Held []map[string]int }](),
+		"an interface":               reflect.TypeFor[struct{ Held *struct{ Inner any } }](),
+		"a type that encodes itself": reflect.TypeFor[struct{ Held [2]time.Time }](),
+	} {
+		if reached := mapsReachedFrom(holder); len(reached) != 1 {
+			test.Errorf("over a type holding %s, the walk reached %v, want the one place", name, reached)
+		}
+	}
+}
+
+// formerEntry is an entry as format 15 held one, as far as gob reads it: its analyses a map by slot.
+type formerEntry struct {
+	Version   string
+	Analyzers map[string]storedAnalysis
+}
+
+// A slot the entry does not hold reads as not held, wherever it would sort, and a held one reads as its own
+// (#g9kaytv): the search answers only for a name it finds, since a slot found by its place would hand one rule
+// another's findings, a hit where a miss was the truth.
+func TestAnAbsentSlotReadsAsNotHeldWhereverItSorts(test *testing.T) {
+	test.Parallel()
+
+	ordered := storedSlotAnalyses(map[string]storedAnalysis{
+		"b": {Report: []byte("b")}, "d": {Report: []byte("d")}, "f": {Report: []byte("f")},
+	})
+	for _, absent := range []string{"a", "c", "e", "g", "", "bb", "B"} {
+		if found, held := storedAnalysisAt(ordered, absent); held {
+			test.Errorf("the absent slot %q reads as held, with %q's analysis", absent, found.Report)
+		}
+	}
+	for _, slot := range []string{"b", "d", "f"} {
+		if found, held := storedAnalysisAt(ordered, slot); !held || string(found.Report) != slot {
+			test.Errorf("the slot %q reads held %t with %q, want its own", slot, held, found.Report)
+		}
+	}
+	if _, held := storedAnalysisAt(nil, "b"); held {
+		test.Error("an entry of no analyses holds a slot")
+	}
+}
+
+// An entry whose analyses are out of order of slot, or hold a slot twice, is refused, a miss, rather than searched
+// (#g9kaytv): the search finds a slot only in an ordered list, so a list that is not could lose a rule's findings on a
+// package nothing else would recheck. The same entry as encodeEntry wrote it reads.
+func TestAnEntryWhoseAnalysesAreOutOfOrderIsRefused(test *testing.T) {
+	test.Parallel()
+
+	known, ruleOf, saved, actions := analyzedForEntry(test, eightRules())
+	encoded := encodeAnalyzed(test, known, ruleOf, saved, actions)
+	written, decodeError := entryOf(encoded.body, encoded.record)
+	if decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	if _, restoreError := restoredOf(known, saved, written, nil, false); restoreError != nil {
+		test.Fatalf("the entry as written is refused: %v", restoreError)
+	}
+	swapped := written
+	swapped.Analyzers = slices.Clone(written.Analyzers)
+	swapped.Analyzers[2], swapped.Analyzers[5] = swapped.Analyzers[5], swapped.Analyzers[2]
+	if _, restoreError := restoredOf(known, saved, swapped, nil, false); restoreError == nil {
+		test.Error("an entry with two analyses out of order is read")
+	}
+	twice := written
+	twice.Analyzers = slices.Clone(written.Analyzers)
+	twice.Analyzers[4].Slot = twice.Analyzers[3].Slot
+	if _, restoreError := restoredOf(known, saved, twice, nil, false); restoreError == nil {
+		test.Error("an entry holding one slot twice is read")
+	}
+}
+
+// An entry of the format before this one is a miss, by its version and by its shape (#g9kaytv). By version: an entry
+// in today's shape that says it is format 15 is refused. By shape: a body whose analyses are a map by slot, as format
+// 15 wrote them, does not decode into the list even when it claims today's version, so it can never read as an entry
+// that holds no analysis.
+func TestAnEntryOfTheFormerFormatIsAMiss(test *testing.T) {
+	test.Parallel()
+
+	const former = "go-engine-cache-15"
+	if former == CacheFormatVersion {
+		test.Fatalf("the format is still %s, which held its analyses as a map", former)
+	}
+	known, ruleOf, saved, actions := analyzedForEntry(test, eightRules())
+	encoded := encodeAnalyzed(test, known, ruleOf, saved, actions)
+	written, decodeError := entryOf(encoded.body, encoded.record)
+	if decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	versioned := written
+	versioned.Version = former
+	body, encodeError := encodeBody(versioned)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	record := encoded.record
+	record.Version = former
+	if _, readError := decodeEntry(known, saved, body, record, nil, false); readError == nil {
+		test.Errorf("an entry that says it is format %s is read", former)
+	}
+	analyses := map[string]storedAnalysis{}
+	for _, held := range written.Analyzers {
+		analyses[held.Slot] = held.Analysis
+	}
+	for _, version := range []string{former, CacheFormatVersion} {
+		var shaped bytes.Buffer
+		shapedEntry := formerEntry{Version: version, Analyzers: analyses}
+		if gobError := gob.NewEncoder(&shaped).Encode(shapedEntry); gobError != nil {
+			test.Fatal(gobError)
+		}
+		record.Version = version
+		if _, readError := decodeEntry(known, saved, shaped.Bytes(), record, nil, false); readError == nil {
+			test.Errorf("a body whose analyses are a map by slot, saying it is format %s, is read", version)
 		}
 	}
 }
