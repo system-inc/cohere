@@ -37,6 +37,9 @@ type systemCacheTemplate struct {
 const templateRefusal = "the system cache's template is filled under TestMain's environment alone, and this test " +
 	"changed it"
 
+// templateFilledThoughRefused is what the refusal's child says when the template was filled all the same.
+const templateFilledThoughRefused = "the template was filled under the environment templateFilled refused"
+
 // templateRefusalChildVariable marks a test binary TestTheTemplateRefusesAChangedEnvironment started on itself as the
 // child that changes the environment and asks for the template.
 const templateRefusalChildVariable = "COHERE_TEST_TEMPLATE_REFUSAL_CHILD"
@@ -171,7 +174,8 @@ func templateFilled(test *testing.T) systemCacheTemplate {
 // A test that changed the environment and then asks for the template fails, refused, and never fills it under keys of
 // an environment other than TestMain's (templateFilled). A test that must fail would fail this one, so the asker runs
 // in a child, this test binary run on this test alone, as the timing margin's run is (TestMain): the child sets a
-// variable and asks, and must exit failing with the refusal.
+// variable and asks, and must exit failing with the refusal, having made no template: a refusal that only marked
+// the test failed and went on to fill would pass the first half alone.
 //
 // Not parallel: its child sets a variable with test.Setenv, which a parallel test refuses; the parent calls Parallel
 // first thing on its own branch.
@@ -179,6 +183,12 @@ func TestTheTemplateRefusesAChangedEnvironment(test *testing.T) {
 	if os.Getenv(templateRefusalChildVariable) != "" {
 		// The child, not parallel, since test.Setenv refuses a parallel test.
 		test.Setenv(templateRefusalChildVariable, "changed")
+		// Deferred, since the refusal ends this goroutine: the fill alone makes the template's directory.
+		defer func() {
+			if _, statError := os.Stat(filepath.Join(testsSystemCache, "template")); statError == nil {
+				test.Error(templateFilledThoughRefused)
+			}
+		}()
 		templateFilled(test)
 		return
 	}
@@ -191,8 +201,10 @@ func TestTheTemplateRefusesAChangedEnvironment(test *testing.T) {
 	command.Env = append(os.Environ(), templateRefusalChildVariable+"=1")
 	output, runError := command.CombinedOutput()
 	var exitError *exec.ExitError
-	if !errors.As(runError, &exitError) || !strings.Contains(string(output), templateRefusal) {
-		test.Errorf("want the child to fail with %q, got %v:\n%s", templateRefusal, runError, output)
+	if !errors.As(runError, &exitError) || !strings.Contains(string(output), templateRefusal) ||
+		strings.Contains(string(output), templateFilledThoughRefused) {
+		test.Errorf("want the child to fail with %q and fill nothing, got %v:\n%s", templateRefusal, runError,
+			output)
 	}
 }
 

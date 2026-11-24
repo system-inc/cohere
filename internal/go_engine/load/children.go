@@ -103,8 +103,8 @@ func (children *Children) ended() {
 	children.running--
 }
 
-// answers are the run's kept answers (Answers), nil for a nil Children.
-func (children *Children) answers() *GoAnswers {
+// GoAnswers are the run's kept answers (Answers), nil for a nil Children.
+func (children *Children) GoAnswers() *GoAnswers {
 	if children == nil {
 		return nil
 	}

@@ -92,8 +92,9 @@ func (answers *GoAnswers) goEnvironment(
 // goEnvironmentKey is everything go env's answer in workspace under environment, the whole one, turns on but where the
 // workspace is: the environment but `PWD`, which askGoEnvironment sets to workspace, in its order, since a later entry
 // of a name wins; and the bytes of the go.work and the go.mod go finds there, and of each module's go.mod the go.work
-// uses, which `GOTOOLCHAIN`, `GODEBUG`, `GOMOD` and `GOWORK` are read from. Each such file is named by its path below
-// workspace, so the answer moves to any workspace holding the same files at the same paths. A file go would find above
+// uses, each found from the go.work's own directory as go finds it, which `GOTOOLCHAIN`, `GODEBUG`, `GOMOD` and
+// `GOWORK` are read from. Each such file is named by its path below workspace, so the answer moves to any workspace
+// holding the same files at the same paths. A file go would find above
 // the workspace, or a module the go.work uses outside it, is named by its absolute path, so its answer moves nowhere.
 // The environment must turn off the person's go env file (`GOENV=off`, as TestMain sets), and name no go.work of its
 // own (`GOWORK`) and no -modfile in `GOFLAGS`, files elsewhere whose bytes the key does not hold; any other environment
@@ -122,11 +123,11 @@ func goEnvironmentKey(workspace string, environment []string) (string, error) {
 	if strings.Contains(variables["GOFLAGS"], "-modfile") {
 		return "", errors.New("the go flags name a go.mod of their own, whose bytes no key holds")
 	}
-	goWork, goWorkError := keyFile(&key, workspace, "go.work")
+	goWork, goWorkDirectory, goWorkError := keyFile(&key, workspace, "go.work")
 	if goWorkError != nil {
 		return "", goWorkError
 	}
-	if _, goModError := keyFile(&key, workspace, "go.mod"); goModError != nil {
+	if _, _, goModError := keyFile(&key, workspace, "go.mod"); goModError != nil {
 		return "", goModError
 	}
 	if goWork == nil {
@@ -137,9 +138,10 @@ func goEnvironmentKey(workspace string, environment []string) (string, error) {
 		return "", parseError
 	}
 	for _, use := range work.Use {
+		// From the go.work's own directory, which is above the workspace when go found it there, as go resolves a use.
 		directory := use.Path
 		if !filepath.IsAbs(directory) {
-			directory = filepath.Join(workspace, directory)
+			directory = filepath.Join(goWorkDirectory, directory)
 		}
 		used, readError := os.ReadFile(filepath.Join(directory, "go.mod"))
 		if readError != nil && !errors.Is(readError, fs.ErrNotExist) {
@@ -153,22 +155,23 @@ func goEnvironmentKey(workspace string, environment []string) (string, error) {
 }
 
 // keyFile writes to key the file named name go finds in workspace, the nearest at or above it, by its path
-// (keyPath) and bytes, or that it finds none, and returns its bytes, nil for none.
-func keyFile(key *strings.Builder, workspace string, name string) ([]byte, error) {
+// (keyPath) and bytes, or that it finds none, and returns its bytes and the directory holding it, nil and empty for
+// none.
+func keyFile(key *strings.Builder, workspace string, name string) ([]byte, string, error) {
 	for directory := workspace; ; directory = filepath.Dir(directory) {
 		contents, readError := os.ReadFile(filepath.Join(directory, name))
 		if readError == nil {
 			key.WriteString(name + "\x00" + keyPath(workspace, directory) + "\x00")
 			key.Write(contents)
 			key.WriteByte(0)
-			return contents, nil
+			return contents, directory, nil
 		}
 		if !errors.Is(readError, fs.ErrNotExist) {
-			return nil, readError
+			return nil, "", readError
 		}
 		if filepath.Dir(directory) == directory {
 			key.WriteString(name + "\x00none\x00")
-			return nil, nil
+			return nil, "", nil
 		}
 	}
 }
@@ -182,17 +185,25 @@ func keyPath(workspace string, directory string) string {
 	return "below " + filepath.ToSlash(relative)
 }
 
-// relocated is answer, asked in from, as go env answers in to: each value that is from or a path below it, as `GOMOD`
-// and `GOWORK` are, names the same path below to. A copy, so the kept answer is never changed.
+// relocatedNames are the go env values go makes from where the workspace is, the go.mod and the go.work it found
+// there, which relocated moves. Every other value is the environment's or the toolchain's, the same wherever it is
+// asked: a `GOCACHE` the environment points below one workspace is that path for every asker under the same key.
+var relocatedNames = []string{"GOMOD", "GOWORK"}
+
+// relocated is answer, asked in from, as go env answers in to: `GOMOD` and `GOWORK` (relocatedNames), where each is
+// from or a path below it, name the same path below to. A copy, so the kept answer is never changed.
 func relocated(answer map[string]string, from string, to string) map[string]string {
-	moved := make(map[string]string, len(answer))
-	for name, value := range answer {
-		if value == from {
-			value = to
-		} else if below, isBelow := strings.CutPrefix(value, from+string(filepath.Separator)); isBelow {
-			value = filepath.Join(to, below)
+	moved := maps.Clone(answer)
+	for _, name := range relocatedNames {
+		value, answered := moved[name]
+		if !answered {
+			continue
 		}
-		moved[name] = value
+		if value == from {
+			moved[name] = to
+		} else if below, isBelow := strings.CutPrefix(value, from+string(filepath.Separator)); isBelow {
+			moved[name] = filepath.Join(to, below)
+		}
 	}
 	return moved
 }

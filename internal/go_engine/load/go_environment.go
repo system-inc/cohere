@@ -144,7 +144,7 @@ func askGoEnvironment(
 	arguments := append([]string{"env", "-json"}, goEnvironmentNames...)
 	children.started(arguments)
 	defer children.ended()
-	answers := children.answers()
+	answers := children.GoAnswers()
 	if answers == nil {
 		return runGoEnvironment(workspace, environment, arguments, started)
 	}

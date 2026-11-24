@@ -109,7 +109,7 @@ func startEarly(
 		early.portsAnswered.Add(1)
 		early.goAwaited(func() {
 			defer early.portsAnswered.Done()
-			early.ports, early.portsError = early.readPortsOf(workspace, children.Answers)
+			early.ports, early.portsError = early.readPortsOf(workspace, children.GoAnswers())
 		})
 	}
 	return early
@@ -128,20 +128,26 @@ func (early *earlyStart) readPortsOf(workspace project.Workspace, answers *load.
 	if goEnvironmentError != nil {
 		return project.ReadPorts(workspace.Root, workspace.Environment())
 	}
-	values := goEnvironment.Values()
-	key := []string{values["GOROOT"], values["GOVERSION"]}
-	for _, variable := range append(os.Environ(), workspace.Environment()...) {
-		if !strings.HasPrefix(variable, "PWD=") {
-			key = append(key, variable)
-		}
-	}
-	output, listError := answers.Ports(strings.Join(key, "\x00"), func() ([]byte, error) {
+	key := portsKey(goEnvironment.Values(), append(os.Environ(), workspace.Environment()...))
+	output, listError := answers.Ports(key, func() ([]byte, error) {
 		return project.ListPorts(workspace.Root, workspace.Environment())
 	})
 	if listError != nil {
 		return nil, listError
 	}
 	return project.ParsePorts(workspace.Root, output)
+}
+
+// portsKey is what a toolchain's ports are kept under (readPortsOf): the toolchain goEnvironment, the host's go env,
+// names, its `GOROOT` and `GOVERSION`, and environment, every variable but `PWD`, which moves with the asker.
+func portsKey(goEnvironment map[string]string, environment []string) string {
+	key := []string{goEnvironment["GOROOT"], goEnvironment["GOVERSION"]}
+	for _, variable := range environment {
+		if !strings.HasPrefix(variable, "PWD=") {
+			key = append(key, variable)
+		}
+	}
+	return strings.Join(key, "\x00")
 }
 
 // hostGoEnvironment is the host's go env, and how reading it failed, once it has answered and the early start has done
