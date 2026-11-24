@@ -116,14 +116,19 @@ func TestAStoredFactOnAnObjectTheExportDataLacksIsSkipped(test *testing.T) {
 	baseKey := sessionKey(test, cold.session, "example.com/fixture/base")
 	slot := rule.Namespace + "test-marked"
 	rewriteStoredEntry(test, caching.Store, baseKey, func(entry *cacheEntry) {
-		planted := entry.Analyzers[slot]
-		if len(planted.ObjectFacts) != 1 {
+		planted, held := storedAnalysisAt(entry.Analyzers, slot)
+		if !held || len(planted.ObjectFacts) != 1 {
 			test.Fatalf("want base's one fact on Marked stored, got %+v", planted.ObjectFacts)
 		}
 		gone := planted.ObjectFacts[0]
 		gone.Path = "NoSuchObject"
 		planted.ObjectFacts = append(planted.ObjectFacts, gone)
-		entry.Analyzers[slot] = planted
+		// The analysis goes back into its own slot, every other slot's left as it was.
+		for index, each := range entry.Analyzers {
+			if each.Slot == slot {
+				entry.Analyzers[index].Analysis = planted
+			}
+		}
 	})
 	userKey := sessionKey(test, cold.session, "example.com/fixture/user")
 	if putError := caching.Store.Put(userKey, []byte("corrupt")); putError != nil {
