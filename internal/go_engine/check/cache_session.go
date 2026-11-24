@@ -127,7 +127,9 @@ type CacheCounts struct {
 	// object, which has no objectpath (see encodeEntry).
 	FactsDropped int
 
-	// FactsSkipped is the restored facts whose object the package's export data does not hold (see restore).
+	// FactsSkipped is the restored facts whose object the package's export data does not hold (see restore), once for
+	// each action that restores them: a build restores a package's facts only where a pass above it inherits them, so
+	// it counts only the facts of the restores it makes (#xqbqcbt).
 	FactsSkipped int
 
 	// WriteFailed is the misses whose entry could not be written, or whose dependence record could not be written
@@ -735,6 +737,12 @@ func (session *CacheSession) dropShortHits(reachable []*packages.Package) bool {
 			}
 		}
 	}
+	// Only a given miss asks facts of what it imports, not an extra build's fact root, a package it checks from source
+	// though not given (factRootsOf, #xqbqcbt), whose fact analyzers reach what it imports too. Such a package is plain
+	// p beside a given "p [p.test]", which imports everything p does, so the host's run reached each of them with its
+	// fact analyzers and kept them with facts. Were one ever a hit short of a fact, it fails closed: the fact root's
+	// action on it errors ("the cache entry holds nothing of it", restore), which keeps the fact root from being saved
+	// (savable) and declines any restore that read a fact of it (buildFacts.factsHold).
 	for _, each := range reachable {
 		if _, hit := session.hits[each]; session.given[each] && !hit && session.earlier[each] == nil {
 			reach(each)

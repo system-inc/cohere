@@ -12,13 +12,13 @@ import (
 )
 
 // An action on a restored package makes no inputs, since it runs no pass, and still inherits its prerequisites' facts
-// before it restores: over a chain of packages, each importing the one before it, every other one restored, with
-// Options.FactsBelowRestored giving each restored action the same-package edge to the analyzer that learns facts below
-// it, and every key a pass holds set (Dependents, Failed under Tolerant), the graph finishes with no action failed,
-// every action on a restored package restored once with no pass, holding as it restores the package fact of every
-// package below it, and every action on the others run as a pass that holds what it requires and every key. A
-// restored action that wrote its prerequisite's result or a key into the inputs it never made would panic on the nil
-// map, and one that restored before it inherited would hold none of the facts below it, which its importers then lose.
+// before it restores: over a chain of packages, each importing the one before it, the middle two restored, so the
+// analyzer that learns facts reaches each of them from the pass above it, and every key a pass holds set (Dependents,
+// Failed under Tolerant), the graph finishes with no action failed, every action on a restored package restored once
+// with no pass, holding as it restores the package fact of every package below it, and every action on the others run
+// as a pass that holds what it requires and every key. A restored action that wrote its prerequisite's result or a key
+// into the inputs it never made would panic on the nil map, and one that restored before it inherited would hold none
+// of the facts below it, which its importers then lose.
 func TestARestoredActionRestoresWithNoInputs(test *testing.T) {
 	test.Parallel()
 	// p0 to p3, each but p0 importing and calling the one before it, so a package's facts reach every one above it.
@@ -40,7 +40,7 @@ func TestARestoredActionRestoresWithNoInputs(test *testing.T) {
 		identifiers = append(identifiers, root.ID)
 	}
 	slices.Sort(identifiers)
-	restoredPackages := map[string]bool{identifiers[1]: true, identifiers[3]: true}
+	restoredPackages := map[string]bool{identifiers[1]: true, identifiers[2]: true}
 	learner := &analysis.Analyzer{
 		Name:      "learner",
 		Doc:       "learner exports a package fact on each package it runs on and does nothing else",
@@ -71,8 +71,7 @@ func TestARestoredActionRestoresWithNoInputs(test *testing.T) {
 	// The path of each package whose fact learner's action on a restored package held as it restored, by package.
 	inherited := map[string][]string{}
 	graph, analyzeError := Analyze([]*analysis.Analyzer{requiring}, roots, &Options{
-		Restored:           func(restoring *packages.Package) bool { return restoredPackages[restoring.ID] },
-		FactsBelowRestored: func(restoring *packages.Package) bool { return restoredPackages[restoring.ID] },
+		Restored: func(restoring *packages.Package) bool { return restoredPackages[restoring.ID] },
 		Restore: func(restoring *Action) error {
 			restoresMutex.Lock()
 			defer restoresMutex.Unlock()

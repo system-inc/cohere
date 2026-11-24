@@ -204,6 +204,15 @@ type Options struct {
 	// build_reads.Walks), so a test can read Result.Reads while a walk is held.
 	holdWalk func(owner *packages.Package)
 
+	// withholdFactRoot, nil outside tests, names a package the run roots no analyzer that learns facts on though
+	// factRootsOf would (#xqbqcbt), so a test can see what the decide makes of a package checked from source that no
+	// action reaches.
+	withholdFactRoot func(*packages.Package) bool
+
+	// analyzedGraphs, nil outside tests, is handed every graph the run analyzed once the last has finished, so a test
+	// can read which actions the run made.
+	analyzedGraphs func(graphs []*checker.Graph)
+
 	// KeptDependence and DependenceJoining, nil outside tests, are told of each package the host kept, with what its
 	// set is computed from, as the host's pass asks its dependence set (HostRun.computeDependence), and of a reader
 	// starting to wait for that pass (HostRun.DependenceComputed), so a test can hold a set and see who waits for it.
@@ -445,6 +454,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, errors.New("handing on the packages' declarations: the run records no reads, whose packages are " +
 			"every one a walk reaches, so a package no action reached would be handed on by none")
 	}
+	if hostError := restoringFromHostRefuses(options); hostError != nil {
+		return nil, hostError
+	}
 	if options.Ready != nil && options.Cache != nil && options.Cache.HasStore() {
 		return nil, errors.New("running the rules beside the load: the findings cache's store restores packages the " +
 			"load never checks and analyzes in waves, so a run with it waits for the load")
@@ -533,11 +545,6 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
 		}
 		checkerOptions.Restored, checkerOptions.Restore = session.restoredInWave, session.restore
-		// A package restored from the host's run has the analyzers that learn facts run on what it imports, as one
-		// analyzed here would, so its fact reads can be asked of what those exported (decideHostRestores).
-		checkerOptions.FactsBelowRestored = func(restoring *packages.Package) bool {
-			return session.fromHost(restoring) != nil
-		}
 		// The first wave is analysis too, of the misses with no miss below them, and the save of what it analyzed, so
 		// the check's analysis begins before it.
 		timeline.Tell(options.Timeline, "check.analyze.begin")
@@ -548,15 +555,17 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		if firstGraph != nil {
 			graphs = append(graphs, firstGraph)
 		}
-		// A package to analyze restored from the host's run is analyzed by restoring, so the actions of the analyzers
-		// that learn facts run on what it imports, and its fact reads can be asked of what those exported
-		// (decideHostRestores).
-		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), func(restoring *packages.Package) bool {
-			return session.restoredInWave(restoring) && session.fromHost(restoring) == nil
-		})
+		// Every package to analyze that a wave restores is left out of the graph, one restored from the host's run
+		// too: its findings, report and files come from its entry (gatheredPackage, reportsOf, analyzedFiles), and the
+		// decide reads its facts from its entry (buildFacts), so a root on it, and the chain of fact analyzers such a
+		// root seeded over what it imports, ran actions nothing read (#xqbqcbt). It is still reached, restored, where
+		// a pass above it inherits its facts.
+		toAnalyze = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
+		checkerOptions.FactRoots, checkerOptions.FactRootAnalyzers = factRootsOf(analyzed, toAnalyze, session,
+			options.withholdFactRoot)
 		// A session without a store counts only what it restored from the system cache, as a run without the cache
 		// counts no wave.
-		if len(toAnalyze) > 0 && session.HasStore() {
+		if (len(toAnalyze) > 0 || len(checkerOptions.FactRoots) > 0) && session.HasStore() {
 			session.counts.Waves++
 		}
 	}
@@ -572,6 +581,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, ErrAbandoned
 	}
 	graphs = append(graphs, graph)
+	if options.analyzedGraphs != nil {
+		options.analyzedGraphs(graphs)
+	}
 	recordUnreachedTypes(options.Reads, options.Ready, walks, options.Declarations)
 	// What the packages restored from the host's run read of other packages' answers is decided now, with no pass
 	// running, before anything is saved over them.

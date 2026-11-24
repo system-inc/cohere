@@ -648,7 +648,7 @@
                         },
                         "factsSkipped": {
                             "type": "integer",
-                            "description": "Restored facts skipped, whose object the package's export data does not hold."
+                            "description": "Restored facts skipped, whose object the package's export data does not hold, once for each analyzer whose action restores them: a build counts only the facts of the restores it makes, where a pass above the package inherits them."
                         },
                         "waves": {
                             "type": "integer",
