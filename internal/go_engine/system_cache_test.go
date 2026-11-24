@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/system_cache_testing"
@@ -38,6 +39,10 @@ var testsSystemCache string
 // filled under (seededSystemCache).
 var testsEnvironment []string
 
+// sealedGitEnvironment is what TestMain sets so that git reads no configuration but a repository's own: no global
+// file, and no system one.
+var sealedGitEnvironment = map[string]string{"GIT_CONFIG_GLOBAL": os.DevNull, "GIT_CONFIG_NOSYSTEM": "1"}
+
 func TestMain(suite *testing.M) {
 	if os.Getenv(timingMarginChildVariable) != "" {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
@@ -57,11 +62,24 @@ func TestMain(suite *testing.M) {
 	if setError := os.Setenv("GOENV", "off"); setError != nil {
 		os.Exit(refuse(os.Stderr, setError))
 	}
+	// And no git child of this process or its runs, the engine's own `git ls-files` at a go.work's root among them,
+	// reads the machine's git configuration (#2htryg8): a person's global config signs, hooks and ignores as the
+	// person set it, and a test's git reads the repository's own alone. Set before testsEnvironment is taken, so
+	// the template and every guard that compares the environment with it hold these too.
+	for name, value := range sealedGitEnvironment {
+		if setError := os.Setenv(name, value); setError != nil {
+			os.Exit(refuse(os.Stderr, setError))
+		}
+	}
 	testsEnvironment = slices.Sorted(slices.Values(os.Environ()))
 	code := suite.Run()
 	removeSystemCache()
 	os.Exit(code)
 }
+
+// testsGoAnswers are go env's and `go tool dist list`'s answers this test binary keeps (load.GoAnswers), which every
+// run isolatedSource gives a source reads under TestMain's environment (#2htryg8).
+var testsGoAnswers = load.NewGoAnswers()
 
 // isolatedSource is source with a new system cache of the run's own, seeded from the template (seededSystemCache),
 // unless source names one or the test set the variable to one of its own, which the run then reads. Each run of a test
@@ -69,11 +87,18 @@ func TestMain(suite *testing.M) {
 // where no other run reads it: tests run side by side, and a test that compares two of its own runs, or counts what one
 // restored, would otherwise read tables another run wrote, its counts turning on which ran first (#2htryg8). A test of
 // what a cold system cache does has every run of it read an empty one of its own (coldSystemCacheFor), and a test of
-// what a warm one does names one shared by the runs it compares (sharingSystemCache).
+// what a warm one does names one shared by the runs it compares (sharingSystemCache). The source also reads the go
+// answers the process keeps (testsGoAnswers), so a run under what decided an answer before forks no go env or
+// `go tool dist list` for it.
 func isolatedSource(test *testing.T, source standardLibrarySource) standardLibrarySource {
 	test.Helper()
 	if source.systemCacheRoot == "" && os.Getenv(system_cache_testing.Variable) == testsSystemCache {
 		source.systemCacheRoot = seededSystemCache(test)
+	}
+	// Under TestMain's environment alone, as the template is: a test that sets `GOROOT` or `PATH` may change the
+	// toolchain's files below the same paths between its runs, which no key holds.
+	if source.goAnswers == nil && slices.Equal(slices.Sorted(slices.Values(os.Environ())), testsEnvironment) {
+		source.goAnswers = testsGoAnswers
 	}
 	return source
 }

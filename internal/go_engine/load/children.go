@@ -26,6 +26,11 @@ type Children struct {
 
 	// watchStarted is a test's look at each go command started, nil outside a test (WatchStarted), under lock.
 	watchStarted func(name string)
+
+	// Answers are what go env and `go tool dist list` answered the test process before, which the run's go env and its
+	// read of the toolchain's ports read in place of starting a child when one was kept under the same key
+	// (GoAnswers), nil in every run but a test's. Set before the run's first go command, and only read after.
+	Answers *GoAnswers
 }
 
 // LoadBegins marks the run's first load as begun, so every go command started after it is late. A later call changes
@@ -96,6 +101,14 @@ func (children *Children) ended() {
 	children.lock.Lock()
 	defer children.lock.Unlock()
 	children.running--
+}
+
+// GoAnswers are the run's kept answers (Answers), nil for a nil Children.
+func (children *Children) GoAnswers() *GoAnswers {
+	if children == nil {
+		return nil
+	}
+	return children.Answers
 }
 
 // childName is a go command named short: go and its first childNameArguments arguments, each up to any `=`, so
