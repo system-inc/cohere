@@ -123,3 +123,34 @@ func TestTestsAreCheckedAsGoTestBuildsThem(test *testing.T) {
 		}
 	}
 }
+
+// A command holding a default.pgo is checked once, against the packages every other package sees. Under go's
+// default -pgo=auto, go list prints each package the command imports a second time, as
+// `testing [example.com/profiled/command]`, and the command's tests resolved against those copies: a *testing.T
+// from one was not a testing.TB of the other (#r6sqd2c, cohere's own release profile). The profile's bytes are
+// never parsed by a listing, which is why any bytes stand in for one here.
+func TestACommandWithAProfileIsCheckedAgainstOnePackageGraph(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	writeFiles(test, directory, map[string]string{
+		"go.mod":               "module example.com/profiled\n\ngo 1.21\n",
+		"command/default.pgo":  "not read by a listing\n",
+		"command/main.go":      "package main\n\nimport \"example.com/profiled/library\"\n\nfunc main() { _ = library.Name() }\n",
+		"command/main_test.go": "package main\n\nimport (\n\t\"testing\"\n\n\t\"example.com/profiled/helper\"\n)\n\nfunc TestName(t *testing.T) { helper.Expect(t) }\n",
+		"library/library.go":   "package library\n\nimport \"testing\"\n\nvar _ = testing.Short\n\nfunc Name() string { return \"name\" }\n",
+		"helper/helper.go":     "package helper\n\nimport \"testing\"\n\nfunc Expect(test testing.TB) { test.Helper() }\n",
+	})
+	loaded, loadError := Load(Configuration{Directory: directory, Tests: true}, "./...")
+	if loadError != nil {
+		test.Fatal(loadError)
+	}
+	if problems := loaded.ErrorsAnywhere(); len(problems) > 0 {
+		test.Fatalf("a command with a default.pgo did not check clean: %v", problems)
+	}
+	for _, loadedPackage := range loaded.Source {
+		if strings.Contains(loadedPackage.ImportPath, "[example.com/profiled/command]") {
+			test.Fatalf("%s is a profiled copy, so the load listed the graph twice", loadedPackage.ImportPath)
+		}
+	}
+}
