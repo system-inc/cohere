@@ -24,9 +24,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -125,7 +125,7 @@ func run(root string, skips []string, abbreviationsFile string, dryRun bool) int
 		return 1
 	}
 
-	var allEdits []rename.Edit
+	var allEdits []local_rename.Edit
 	var allRenames []receiverRename
 	var allDropped []droppedType
 	var allMixed []mixedType
@@ -145,11 +145,11 @@ func run(root string, skips []string, abbreviationsFile string, dryRun bool) int
 		for _, unresolved := range plan.unresolved {
 			allUnresolved = append(allUnresolved, analyzedPackage.ID+": "+unresolved)
 		}
-		allEdits = append(allEdits, rename.Edits(renamePackage, plan.accepted)...)
+		allEdits = append(allEdits, local_rename.Edits(renamePackage, plan.accepted)...)
 	}
 
-	edits, disagreements := rename.Deduplicate(allEdits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(allEdits)
+	editsByFile := local_rename.GroupByFile(edits)
 
 	renamesByKind := map[string]int{}
 	for _, receiver := range allRenames {
@@ -367,7 +367,7 @@ func (group *receiverGroup) drop(class string, reason string) {
 // planReceivers proposes receiver names for every type of one package variant and runs global_rename until every
 // type's receivers either all moved or all stayed. renamePackage.Files are the editable files; allFiles is
 // every file of the variant, so a type with a receiver to rename in a skipped file can be left whole.
-func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabulary map[string]bool) receiverPlan {
+func planReceivers(renamePackage local_rename.Package, allFiles []*ast.File, vocabulary map[string]bool) receiverPlan {
 	plan := receiverPlan{accepted: map[types.Object]string{}, threeLetterNames: map[string]int{}}
 	editable := map[*ast.File]bool{}
 	for _, file := range renamePackage.Files {
@@ -435,9 +435,9 @@ func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabular
 	// Fixpoint: a type with any rejected receiver falls back one step for all its receivers (one word, then
 	// two words, then left alone), and global_rename judges the whole set again, until a pass rejects nothing.
 	// Each type only moves forward, so this ends.
-	var renamingPlan rename.Plan
+	var renamingPlan local_rename.Plan
 	for {
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		groupOf := map[types.Object]*receiverGroup{}
 		for _, group := range active {
 			if group.state == droppedState {
@@ -445,12 +445,15 @@ func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabular
 			}
 			for _, member := range group.members {
 				if member.eligible && member.variable.Name() != group.candidate() {
-					proposals = append(proposals, rename.Proposal{Object: member.variable, NewName: group.candidate()})
+					proposals = append(
+						proposals,
+						local_rename.Proposal{Object: member.variable, NewName: group.candidate()},
+					)
 					groupOf[member.variable] = group
 				}
 			}
 		}
-		renamingPlan = rename.Check(renamePackage, proposals)
+		renamingPlan = local_rename.Check(renamePackage, proposals)
 		firstRejection := map[*receiverGroup]string{}
 		for _, rejection := range renamingPlan.Rejections {
 			group := groupOf[rejection.Object]
@@ -491,7 +494,7 @@ func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabular
 
 	plan.accepted = renamingPlan.Accepted
 	plan.unresolved = renamingPlan.Unresolved
-	editsByFile := rename.GroupByFile(rename.Edits(renamePackage, plan.accepted))
+	editsByFile := local_rename.GroupByFile(local_rename.Edits(renamePackage, plan.accepted))
 	for _, group := range order {
 		groupPosition := renamePackage.FileSet.Position(group.typeName.Pos())
 		if group.state == droppedState && group.dropClass != "" {
@@ -542,7 +545,7 @@ func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabular
 // group has anything to propose; a group with eligible receivers but no usable name is dropped and kept for
 // the report.
 // Mutates: group preparing a group is setting its names, its notes and its starting state
-func prepareGroup(renamePackage rename.Package, group *receiverGroup, vocabulary map[string]bool) bool {
+func prepareGroup(renamePackage local_rename.Package, group *receiverGroup, vocabulary map[string]bool) bool {
 	eligibleFiles := map[*ast.File]bool{}
 	anyEligible := false
 	for _, member := range group.members {
@@ -789,7 +792,7 @@ func lowerCamel(words []string) string {
 // every edit that falls on it, so a use on the same line shows renamed too.
 func describeRename(
 	fileSet *token.FileSet,
-	editsByFile map[string][]rename.Edit,
+	editsByFile map[string][]local_rename.Edit,
 	group *receiverGroup,
 	member receiverMember,
 	newName string,
@@ -841,8 +844,8 @@ func apply(
 	loaded *workspace.Workspace,
 	root string,
 	skips []string,
-	edits []rename.Edit,
-	editsByFile map[string][]rename.Edit,
+	edits []local_rename.Edit,
+	editsByFile map[string][]local_rename.Edit,
 ) int {
 	return workspace.ApplyVerified(
 		loaded,

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // stagedHash names the binary writeFrozenModule stages, so the announcement can be read for it.

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A run with `HOME` set to a scratch directory still uses the machine's pool, the one under the account's own

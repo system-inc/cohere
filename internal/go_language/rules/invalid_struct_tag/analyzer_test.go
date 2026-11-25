@@ -43,7 +43,7 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 
 // escapedSource is the escaped fixture's one Go file, escaped.go. It imports go-flags spelled with an escape,
 // `go\x2dflags`, and the escape is what the fixture tests, so the file is never kept in testdata: gofmt canonicalizes
-// an import path, rewriting it to `go-flags`, and internal/guard holds every Go file the module owns, testdata
+// an import path, rewriting it to `go-flags`, and internal/testing/guard holds every Go file the module owns, testdata
 // included, to gofmt, as the release's first step does.
 const escapedSource = `// Package escaped imports go-flags spelled with an escape, which names the same path, so the
 // keys go-flags repeats are left alone in it, and every other key repeated is still found.

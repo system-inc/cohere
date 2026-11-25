@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 func TestUnionWriteRefused(test *testing.T) {

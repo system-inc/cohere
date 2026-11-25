@@ -22,7 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/project"
 	"github.com/system-inc/cohere/internal/go_language/rules/return_nil_ness"
 	"github.com/system-inc/cohere/internal/go_language/rules/typed_nil_interface_comparison"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // demandDifferentialVariable names the tree the demand differential runs over: root for cohere's own module, or a

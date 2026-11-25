@@ -11,12 +11,12 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/system-inc/cohere/conformance/text_rules"
 	"github.com/system-inc/cohere/internal/go_language/check"
 	"github.com/system-inc/cohere/internal/go_language/load"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_utils_folder"
 	"github.com/system-inc/cohere/internal/go_language/settings"
+	"github.com/system-inc/cohere/internal/text_rules/conformance"
 )
 
 // utilsModuleFindings runs the utils-folder rule over the module in directory as runTextRulesCase runs a case, and
@@ -71,7 +71,7 @@ func TestUtilsFolderJudgesBelowTheModuleRoot(test *testing.T) {
 	writeTextRulesFile(test, directory, "go.mod", fmt.Appendf(nil, "module example.com/utils\n\ngo %s\n",
 		textRulesGoVersion(test)))
 	writeTextRulesFile(test, directory, textRulesSettingsFileName,
-		textRulesSettings(test, []string{consistency_no_utils_folder.Name}, text_rules.Case{}))
+		textRulesSettings(test, []string{consistency_no_utils_folder.Name}, conformance.Case{}))
 	writeTextRulesFile(test, directory, "root.go", []byte("package root\n\nconst Root = 1\n"))
 	writeTextRulesFile(test, directory, "helpers/helpers.go", []byte("package helpers\n\nconst Helper = 1\n"))
 

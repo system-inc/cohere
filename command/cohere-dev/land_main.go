@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // Every landing runs main's own land, whatever the lander's worktree carries (#8wpk5tp). land runs from the

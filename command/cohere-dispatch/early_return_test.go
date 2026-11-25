@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A run that returns early gives its caller exactly what a run that waits gives: every byte of stdout and

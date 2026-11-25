@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/sql_text"
+	"github.com/system-inc/cohere/internal/text_rules/sql_text"
 	"github.com/system-inc/cohere/policy"
 )
 

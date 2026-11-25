@@ -18,10 +18,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -274,7 +274,7 @@ func findGlobalCandidates(loaded *workspace.Workspace, vocabulary *vocabulary, e
 					list("type switch guard", reasonTypeSwitch)
 					return true
 				}
-				local := rename.IsLocal(object, analyzedPackage.Types)
+				local := local_rename.IsLocal(object, analyzedPackage.Types)
 				kind := nonLocalKind(object, analyzedPackage.Types)
 				if local {
 					kind = "local"

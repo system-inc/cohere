@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The records' wide run's variables (#6a3kjvz): the tree it loads, and the builds it judges, by name (wideBuilds),

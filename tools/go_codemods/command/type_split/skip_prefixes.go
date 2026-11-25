@@ -7,8 +7,8 @@ import (
 )
 
 // skipPrefixes is the repeatable -skip flag: paths from the root that other work owns. A prefix matches
-// a path equal to it or under it, at a path element boundary, so internal/sentence does not take
-// internal/sentences. A directory it matches is skipped whole; a file it matches is pinned, which keeps
+// a path equal to it or under it, at a path element boundary, so internal/command_line/sentence does not take
+// internal/command_line/sentences. A directory it matches is skipped whole; a file it matches is pinned, which keeps
 // it part of its package while nothing moves into or out of it.
 type skipPrefixes []string
 

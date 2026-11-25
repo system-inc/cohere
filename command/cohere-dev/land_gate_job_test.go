@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // landGateJobFixture is a landing ready to gate as a land-gate job: a module with one package and one test, ahra stood

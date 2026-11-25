@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	release "github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // resetProgramBuilds empties this process's record of builds, and restores it when the test ends.

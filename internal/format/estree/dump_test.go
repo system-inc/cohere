@@ -13,9 +13,9 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/json_value"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // prettierParseScript is the oracle: the fork's own parse (parser "typescript", with the file path, so

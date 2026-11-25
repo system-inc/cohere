@@ -62,7 +62,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
-	"github.com/system-inc/cohere/internal/sql_text"
+	"github.com/system-inc/cohere/internal/text_rules/sql_text"
 	"github.com/system-inc/cohere/policy"
 )
 

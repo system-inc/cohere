@@ -20,7 +20,7 @@ import (
 
 	copiedbuild "github.com/system-inc/cohere/internal/go_language/load/build"
 	"github.com/system-inc/cohere/internal/go_language/timing"
-	"github.com/system-inc/cohere/internal/listed_directories"
+	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
 // inProcessLister lists a workspace's packages the way `go list -e -deps -json` lists them, by reading what go list

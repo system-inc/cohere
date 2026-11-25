@@ -14,9 +14,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 )
 
 // maximumColumns is the house's line limit, a tab counted as tabColumns.
@@ -30,7 +30,7 @@ const (
 // lines left long, a single word wider than the limit.
 // Mutates: result the reflowed paragraphs replace their edits in the result's comment edits, which the write reads
 func reflowLongComments(loaded *workspace.Workspace, result *global_rename.Result) (int, int) {
-	editsByFile := rename.GroupByFile(result.CommentEdits)
+	editsByFile := local_rename.GroupByFile(result.CommentEdits)
 	type parsed struct {
 		file    *ast.File
 		fileSet *token.FileSet
@@ -45,7 +45,7 @@ func reflowLongComments(loaded *workspace.Workspace, result *global_rename.Resul
 		}
 	}
 	reflowed, leftLong := 0, 0
-	var kept []rename.Edit
+	var kept []local_rename.Edit
 	for _, filename := range sortedKeys(editsByFile) {
 		fileEdits := editsByFile[filename]
 		found, known := files[filename]
@@ -54,8 +54,8 @@ func reflowLongComments(loaded *workspace.Workspace, result *global_rename.Resul
 			kept = append(kept, fileEdits...)
 			continue
 		}
-		replaced := map[rename.EditKey]bool{}
-		var reflows []rename.Edit
+		replaced := map[local_rename.EditKey]bool{}
+		var reflows []local_rename.Edit
 		for _, group := range found.file.Comments {
 			offset := func(position token.Pos) int { return found.fileSet.PositionFor(position, false).Offset }
 			lines := commentLines(group, offset, source, fileEdits)
@@ -77,7 +77,7 @@ func reflowLongComments(loaded *workspace.Workspace, result *global_rename.Resul
 					leftLong++
 				}
 				span := source[lines[index].start:lines[end].end]
-				reflows = append(reflows, rename.Edit{
+				reflows = append(reflows, local_rename.Edit{
 					Filename: filename,
 					Offset:   lines[index].start,
 					OldText:  string(span),
@@ -85,7 +85,7 @@ func reflowLongComments(loaded *workspace.Workspace, result *global_rename.Resul
 				})
 				for _, line := range lines[index : end+1] {
 					for _, edit := range line.edits {
-						replaced[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = true
+						replaced[local_rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = true
 					}
 				}
 				reflowed++
@@ -93,7 +93,7 @@ func reflowLongComments(loaded *workspace.Workspace, result *global_rename.Resul
 			}
 		}
 		for _, edit := range fileEdits {
-			if !replaced[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] {
+			if !replaced[local_rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] {
 				kept = append(kept, edit)
 			}
 		}
@@ -114,7 +114,7 @@ func commentLines(
 	group *ast.CommentGroup,
 	offset func(token.Pos) int,
 	source []byte,
-	fileEdits []rename.Edit,
+	fileEdits []local_rename.Edit,
 ) []commentLine {
 	var lines []commentLine
 	for _, comment := range group.List {
@@ -123,7 +123,7 @@ func commentLines(
 		}
 		line := commentLine{start: offset(comment.Pos()), end: offset(comment.End())}
 		line.indentation = string(source[lineStart(source, line.start):line.start])
-		var onLine []rename.Edit
+		var onLine []local_rename.Edit
 		for _, edit := range fileEdits {
 			if edit.Offset >= line.start && edit.Offset < line.end {
 				onLine = append(onLine, edit)

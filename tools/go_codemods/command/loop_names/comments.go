@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // docCommentEdits respells a renamed receiver, parameter or named result where its function's doc comment
@@ -15,8 +15,8 @@ import (
 // and plain where brackets or parentheses already make it code (`pattern[index]`).
 // A letter inside a code span is left: there it is code the comment quotes, an upstream expression or a regular
 // expression's flag, not the parameter. A Mutates line is rename.Edits' own and respelled there.
-func docCommentEdits(loadedPackage rename.Package, accepted map[types.Object]string) []rename.Edit {
-	var edits []rename.Edit
+func docCommentEdits(loadedPackage local_rename.Package, accepted map[types.Object]string) []local_rename.Edit {
+	var edits []local_rename.Edit
 	for _, file := range loadedPackage.Files {
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
@@ -51,7 +51,7 @@ func docCommentEdits(loadedPackage rename.Package, accepted map[types.Object]str
 					if isBetweenCodePunctuation(comment.Text, offset) {
 						newText = renamed[letter]
 					}
-					edits = append(edits, rename.Edit{
+					edits = append(edits, local_rename.Edit{
 						Filename: commentPosition.Filename,
 						Offset:   commentPosition.Offset + offset,
 						OldText:  letter,

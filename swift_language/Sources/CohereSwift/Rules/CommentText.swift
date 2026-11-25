@@ -1,9 +1,9 @@
 import SwiftSyntax
 
 /*
- The comments of a file as the text rules read them (#4b337jk, `conformance/text_rules`): every comment, leading
- trivia and trailing alike, and the texts they make, where a run of `//` lines, each on the line after the last, is
- one text. So a fence or a backtick span opened on one line and closed on a later one masks what it holds, in every
+ The comments of a file as the text rules read them (#4b337jk, `internal/text_rules/conformance`): every comment,
+ leading trivia and trailing alike, and the texts they make, where a run of `//` lines, each on the line after the last,
+ is one text. So a fence or a backtick span opened on one line and closed on a later one masks what it holds, in every
  rule that reads comments. Shared by `Todo` and `ConsistencyNoShouting`, which judge different words in the same
  texts.
 

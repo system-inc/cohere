@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A test that builds a binary and judges it reruns after an edit only that binary reaches, under cohere-dev
@@ -19,12 +19,14 @@ import (
 //
 // The fixture is a module of three packages: a tool that prints a word, the word, which only the tool imports,
 // and a check whose test builds the tool, runs it and wants the word. The check records the tool's build through
-// a copy of internal/build_inputs, read from the real file, so a mutant of the real file is a mutant here. It
+// a copy of internal/testing/build_inputs, read from the real file, so a mutant of the real file is a mutant here. It
 // reads go list through the go_listing module, copied beside it from the real files and required by replace as
 // cohere's root module requires it.
 func TestAnEditOnlyABuiltBinaryReachesMissesTheTestCache(test *testing.T) {
 	test.Parallel()
-	recorder, readError := os.ReadFile(filepath.Join("..", "..", "internal", "build_inputs", "build_inputs.go"))
+	recorder, readError := os.ReadFile(
+		filepath.Join("..", "..", "internal", "testing", "build_inputs", "build_inputs.go"),
+	)
 	if readError != nil {
 		test.Fatal(readError)
 	}

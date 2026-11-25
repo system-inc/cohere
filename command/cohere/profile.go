@@ -5,8 +5,8 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/system-inc/cohere/internal/sentence"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/sentence"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // profileFile is the open `--profile` file while the CPU profile is running, nil otherwise.

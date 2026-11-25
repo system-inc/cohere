@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The live table is verified against Tailwind, not against itself.
@@ -24,7 +24,7 @@ import (
 //	node internal/lint/rules/tailwind/tools/generate_descriptor_table/fixtures.mjs \
 //	    connected:app/_theme/styles/theme.css > /tmp/connected_fixtures.json
 //
-// The corpus repositories are read through internal/corpus. When one is unset the test skips naming
+// The corpus repositories are read through internal/testing/corpus. When one is unset the test skips naming
 // its variable rather than passing, since a silent pass is what a broken lookup looks like, and when
 // one is set but lacks its stylesheet or tailwindcss the test fails.
 

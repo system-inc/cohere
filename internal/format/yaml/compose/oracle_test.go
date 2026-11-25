@@ -15,9 +15,9 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The composer oracle: the fork's own eemeli/yaml, run by Node, parsing each input with
@@ -34,7 +34,7 @@ import (
 // the same depth-first order, and a node's srcToken is written as that number with its type and offset.
 // A number is written as its IEEE 754 bits, so -0, the infinities and every last bit compare exactly.
 
-// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/testing/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks
 // node_modules/yaml/dist/compose/composer.js.
 func forkRoot(test *testing.T) string {

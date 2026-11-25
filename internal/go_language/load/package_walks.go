@@ -4,7 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/system-inc/cohere/internal/listed_directories"
+	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
 // PackageWalks is the package directories one run's loads share, the host's and each extra build's (#tb538na,

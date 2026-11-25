@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // TestFormatIsIdempotent checks that formatting formatted output changes nothing.

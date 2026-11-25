@@ -1,6 +1,6 @@
 // Package go_listing is what `go list -json` says of a build's packages, read once for the programs
-// that each read it their own way today. In cohere: internal/build_inputs (the files a test's go build
-// reads), internal/go_types (list.go's listing and product.go's key and export build), the release
+// that each read it their own way today. In cohere: internal/testing/build_inputs (the files a test's go build
+// reads), internal/testing/go_types (list.go's listing and product.go's key and export build), the release
 // dispatch's `--dev` hash, and the go_language load's listings. In Adamic: internal/buildcache's gobuild.go
 // (keyInputs), settle.go (recipeEntries) and make_go.go, and internal/lowered. In Loom: the planner's
 // closure, its cold reads, executed sources and phases, the resident builder and hot's closures.

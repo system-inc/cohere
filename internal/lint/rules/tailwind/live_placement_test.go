@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The corpus placement measurement for the rules moved onto the live design system.

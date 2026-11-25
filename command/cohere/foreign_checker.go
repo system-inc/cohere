@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 

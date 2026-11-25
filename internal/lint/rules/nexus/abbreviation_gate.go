@@ -1,6 +1,6 @@
 package nexus
 
-import "github.com/system-inc/cohere/internal/naming/abbreviation"
+import "github.com/system-inc/cohere/internal/text_rules/abbreviation"
 
 // The candidate gate, expressed as lookups rather than as a regular expression.
 //

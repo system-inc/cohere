@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/check/parity"
 	"github.com/system-inc/cohere/internal/go_language/load"
 	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // factsDifferentialVariable names the tree the fact differential runs over: root for cohere's own module, or a

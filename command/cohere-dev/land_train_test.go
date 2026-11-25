@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // trainTask is the task every test's train names, and unitTasks each fixture worktree's own, as its unit names it.

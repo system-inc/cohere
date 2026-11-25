@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/release/dispatch"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // Swift coverage is how a repository with several Swift packages gets each package's files in one report

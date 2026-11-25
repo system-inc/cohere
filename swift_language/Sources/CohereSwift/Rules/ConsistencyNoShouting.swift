@@ -6,7 +6,7 @@ import SwiftSyntax
  come in braced and a little louder, until emphasis means nothing because everything has it, and "NEVER cache this"
  is usually a sentence hoping volume will carry a claim its reason should. The Swift form of
  `nexus/consistency-no-shouting`, held by the text rules corpus to one verdict in every language (#4b337jk,
- `conformance/text_rules`, family `shouting`; #y8whqbe):
+ `internal/text_rules/conformance`, family `shouting`; #y8whqbe):
    - which words are acronyms is `policy/Shouting.json`, the one list every language reads (`ShoutingVocabulary`);
    - what counts as code is the TypeScript and Go rules' masks, ported here byte for byte: fences, indented code
      blocks, backticks, double-quoted text and a quote that wraps a line, single-quoted tokens and capital phrases,

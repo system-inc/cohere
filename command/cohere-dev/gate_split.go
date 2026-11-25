@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // The landing gate split across two house Macs (#bc8nf0r). One gate on Sun2 took 41m48s: its plain tests 26m45s, nearly

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A quiet window holds until it ends and not after, so a holder that never says off cannot switch the trim

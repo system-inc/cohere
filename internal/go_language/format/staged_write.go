@@ -7,7 +7,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/system-inc/cohere/internal/write_root"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 )
 
 // WriteAllAtomically replaces each file of files with its contents as one set, for files that only make sense

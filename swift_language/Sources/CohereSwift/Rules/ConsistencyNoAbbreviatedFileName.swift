@@ -5,7 +5,7 @@ import Foundation
  cohere's `policy/Abbreviations.json`: `Cfg.swift` and `MsgPrinter.swift` are each reported once (#2xt6v5r, the text
  rules family `abbreviated-file-name`). A file's name is read on every path, so it is held to the words an identifier
  is. The Swift form of `nexus/consistency-no-abbreviated-file-name` and `cohere-go/consistency-no-abbreviated-file-name`,
- which read cohere's `internal/file_name_words`.
+ which read cohere's `internal/text_rules/file_name_words`.
 
  The name's words are `FileNameWords`', read as the one camelCase identifier they spell, so `MsgPrinter.swift` is
  judged as `msgPrinter` would be, and the message names the word and how to spell it out, never a rewritten name. The

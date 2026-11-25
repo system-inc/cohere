@@ -575,22 +575,35 @@ func TestTheBalancerSplitsTheGatesOwnShapeEvenly(test *testing.T) {
 	plain := map[string]float64{"command/cohere": 350, "command/cohere-dev": 185.1, "internal/go_language/check": 118.2,
 		"internal/go_language/load": 90.5, "internal/go_language": 87.9, "internal/release/cross_compile": 22.5,
 		"internal/release/dispatch": 17.9, "internal/lint/ecmascript/high_level_intermediate_representation": 16.4,
-		"internal/lint/ecmascript/regexp": 15.9, "internal/lint/registry": 12.6, "internal/guard": 11.2,
-		"internal/lint/rules/typescript": 10.5, "internal/go_rename/global_rename": 10.5,
-		"internal/naming/abbreviation": 10.1, "internal/types/program": 9.6}
+		"internal/lint/ecmascript/regexp": 15.9, "internal/lint/registry": 12.6, "internal/testing/guard": 11.2,
+		"internal/lint/rules/typescript": 10.5, "internal/go_language/rename/global_rename": 10.5,
+		"internal/text_rules/abbreviation": 10.1, "internal/types/program": 9.6}
 	// The other 422 packages, 0.2s to 1.82s each, about 426s in all.
 	for index := range 422 {
 		plain[fmt.Sprintf("internal/small/package_%03d", index)] = 0.2 + float64(index%10)*0.18
 	}
-	race := map[string]float64{"internal/go_language/check": 443.7, "internal/go_language/load": 334.5,
-		"command/cohere-dev": 179.6, "internal/go_language": 166, "command/cohere": 93.4,
-		"internal/types/program": 63.6, "internal/go_language/fact_resolver": 33.8,
-		"internal/lint/rules/typescript": 20.6, "internal/go_language/build_reads": 18.6,
-		"internal/go_language/build_dependence": 18.5, "internal/release/dispatch": 18.5,
-		"internal/go_language/cache": 12.5, "internal/go_language/intermediate_representation": 10.6,
-		"internal/edit": 3.8, "internal/go_language/check/checker": 3.4, "internal/go_language/bounded": 3.2,
-		"internal/go_language/rules/marker": 2.8, "internal/executable_testing": 2.2, "internal/write_root": 1.1,
-		"internal/go_language/suppression": 1.1}
+	race := map[string]float64{
+		"internal/go_language/check":                       443.7,
+		"internal/go_language/load":                        334.5,
+		"command/cohere-dev":                               179.6,
+		"internal/go_language":                             166,
+		"command/cohere":                                   93.4,
+		"internal/types/program":                           63.6,
+		"internal/go_language/fact_resolver":               33.8,
+		"internal/lint/rules/typescript":                   20.6,
+		"internal/go_language/build_reads":                 18.6,
+		"internal/go_language/build_dependence":            18.5,
+		"internal/release/dispatch":                        18.5,
+		"internal/go_language/cache":                       12.5,
+		"internal/go_language/intermediate_representation": 10.6,
+		"internal/edit":                                    3.8,
+		"internal/go_language/check/checker":               3.4,
+		"internal/go_language/bounded":                     3.2,
+		"internal/go_language/rules/marker":                2.8,
+		"internal/testing/executable_testing":              2.2,
+		"internal/edit/write_root":                         1.1,
+		"internal/go_language/suppression":                 1.1,
+	}
 	listing := gateListing{racePackages: map[string]string{}, shardedPackage: "m/internal/go_language"}
 	times := gateTimes{Plain: map[string]float64{}, Race: map[string]float64{},
 		Halves: map[string]gateHalfRecord{"Sun2": {Sharded: 88, Wall: 95}, "Marin": {Weight: 2760, Wall: 1290}}}
