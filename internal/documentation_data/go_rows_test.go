@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	goenginerule "github.com/system-inc/cohere/internal/go_engine/rule"
+	goenginerule "github.com/system-inc/cohere/internal/go_language/rule"
 )
 
 // placeholderAnalyzer stands in for a rule's analyzer: the rows read a rule's naming and provenance, never

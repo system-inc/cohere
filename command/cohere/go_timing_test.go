@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_language/contract"
 )
 
 // longestRule is the longest rule name in GoTiming.jsonl, past timingNameWidth, so the name column widens to it.

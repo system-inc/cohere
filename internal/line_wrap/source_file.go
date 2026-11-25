@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 )
 
 // Category says whether a long line is a violation the tool should fix, or why it is not one.

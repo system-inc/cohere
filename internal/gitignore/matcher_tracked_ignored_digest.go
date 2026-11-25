@@ -31,7 +31,7 @@ var ErrNoTrackedIgnoredDigest = errors.New("no digest of what the index tracks")
 // The index decides two things for a walk. A path the ignore rules exclude is checked when the index tracks it
 // (gitignore(5): "Files already tracked by Git are not affected"), so the entries the rules exclude are the ones
 // whose tracking decides anything. And a go.work root reads its submodules from the index's gitlinks
-// (internal/go_engine/project), so every gitlink is in too. Every other entry is a file the walk finds by listing
+// (internal/go_language/project), so every gitlink is in too. Every other entry is a file the walk finds by listing
 // its directory, decided by the rules alone and read as an input of its own, so its tracking decides nothing. Each
 // entry is digested by its path and its mode: every stage of a conflict, an intent-to-add entry and a gitlink alike,
 // and a file swapped for a gitlink at one path, which a `dir/` pattern matches as a directory, reads as a change.

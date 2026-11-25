@@ -1,0 +1,214 @@
+// Package typed_nil_interface_comparison is staticcheck's SA4023, an interface value compared with untyped nil where
+// the comparison can never come out true or always does: the value was made from a concrete value, or it is a result
+// of a function that never returns a nil interface but may return one holding a typed nil. It is ported onto the
+// engine's own intermediate representation and reports through the kit every port of staticcheck shares.
+//
+// It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4023/sa4023.go, whose logic it keeps and
+// whose messages and related places it reports word for word, through staticcheck_report.Report and Related at the
+// comparison's syntax, asking staticcheck_report.HasRange and Ordinal and staticcheck_code.IsInTest where the original
+// asks report.HasRange, report.Ordinal and code.IsInTest, each the port of the one the original calls, proven against
+// it beside it. It reads what each function returns from return_nil_ness, the port of staticcheck's nilness facts,
+// which cross from every dependency, through the context, its listener requiring return_nil_ness, asks Flatten of the
+// engine's intermediate representation where the original asks irutil's, and asks golang.org/x/exp/typeparams and
+// honnef.co/go/tools/go/types/typeutil what the original asks them, public packages and not framework. Where the
+// original asks irutil.IsTrivial of the function a value came from, the port asks function_triviality, which answers
+// with the engine's IsTrivial through the fact resolver, so the answer is recorded with the bodies it read and the
+// rule itself reads the body of no function but the one it judges.
+//
+// The original walks every source function of a package in one run but keeps nothing from one comparison to the next,
+// so the port judges one function at a time and finds what the original finds. Like the original, it judges only a
+// comparison whose left side is the interface and whose right side is nil, so `nil == value` is never flagged, a gap
+// the original names as work left (parity's `nil == typedNil()`), and generic code is judged without its
+// instantiations, so `any(value)` of a type parameter is flagged only when every type the parameter allows is
+// concrete (parity's genericAny and genericConcrete), and a generic function returning it is judged the same for
+// every instantiation (parity's generic). The original's second message, for a value made into the interface that
+// has no syntax to point a related place at, is kept, but no fixture reaches it: the engine's intermediate
+// representation, like staticcheck's, gives every value it builds from source code a source, zero values, comma-ok
+// forms and range variables included (parity's zeroValues and madeFromOtherValues). The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, related places included, and the two differ nowhere they hold.
+package typed_nil_interface_comparison
+
+import (
+	"fmt"
+	"go/token"
+	"go/types"
+
+	"golang.org/x/exp/typeparams"
+	"golang.org/x/tools/go/analysis"
+	"honnef.co/go/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_language/rule"
+	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_language/rules/function_triviality"
+	"github.com/system-inc/cohere/internal/go_language/rules/return_nil_ness"
+	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_code"
+	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
+)
+
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own with the nilness facts and the triviality of the package. It
+// requires return_nil_ness and function_triviality, whose results it reads.
+var Listener = rule.Listener{
+	FileLocal: true,
+	Requires:  []*analysis.Analyzer{return_nil_ness.Analyzer, function_triviality.Analyzer},
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+		Function: func(context *rule.Context, function *intermediate_representation.Function) {
+			nilnesses, isNilnesses := context.ResultOf(return_nil_ness.Analyzer).(*return_nil_ness.Result)
+			if !isNilnesses {
+				// Invariant: the listener requires return_nil_ness, and the dispatcher hands over its result, of
+				// the type it declares.
+				panic("typed_nil_interface_comparison: return_nil_ness's result is missing")
+			}
+			trivialities, isTrivialities := context.ResultOf(function_triviality.Analyzer).(*function_triviality.Result)
+			if !isTrivialities {
+				// Invariant: the listener requires function_triviality, and the dispatcher hands over its result, of
+				// the type it declares.
+				panic("typed_nil_interface_comparison: function_triviality's result is missing")
+			}
+			Check(context, nilnesses.Asking(context.RuleName()).For(function),
+				trivialities.Asking(context.RuleName()).For(function), function)
+		},
+	},
+}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4023",
+	"SA4023",
+	"Flags a comparison of an interface value with untyped nil that can never be true or is always true: "+
+		"staticcheck's SA4023, ported onto the engine's own intermediate representation.",
+	&Listener,
+)
+
+// Check judges one function: each comparison by == or != of an interface value with untyped nil, where the value was
+// made from a concrete value, or is a result of a function nilnesses says never returns a nil interface but may
+// return one holding a typed nil, and that trivialities does not say is trivial, is reported.
+func Check(
+	context *rule.Context,
+	nilnesses *return_nil_ness.Result,
+	trivialities *function_triviality.Result,
+	function *intermediate_representation.Function,
+) {
+	for _, block := range function.Blocks {
+		for _, instruction := range block.Instructions {
+			comparison, isBinary := instruction.(*intermediate_representation.BinaryOperation)
+			if !isBinary || comparison.Operator != token.EQL && comparison.Operator != token.NEQ {
+				continue
+			}
+			checkComparison(context, nilnesses, trivialities, comparison)
+		}
+	}
+}
+
+// checkComparison reports comparison when its left side is an interface value that can never be nil, as Check says.
+func checkComparison(
+	context *rule.Context,
+	nilnesses *return_nil_ness.Result,
+	trivialities *function_triviality.Result,
+	comparison *intermediate_representation.BinaryOperation,
+) {
+	// A type parameter's core may be an interface, but a value of it is no interface value.
+	if !types.IsInterface(comparison.X.Type()) || typeparams.IsTypeParam(comparison.X.Type()) {
+		return
+	}
+	// With an interface on the left, a constant on the right is untyped: a typed nil would first have been made into
+	// an interface value, which is no constant.
+	constant, isConstant := comparison.Y.(*intermediate_representation.Constant)
+	if !isConstant || !constant.IsNil() {
+		return
+	}
+	qualifier := "always"
+	if comparison.Operator == token.EQL {
+		qualifier = "never"
+	}
+
+	var callee *types.Func
+	resultIndex := 0
+	switch value := intermediate_representation.Flatten(comparison.X).(type) {
+	case *intermediate_representation.Call:
+		callee = staticCalleeObject(value)
+	case *intermediate_representation.Extract:
+		call, isCall := intermediate_representation.Flatten(value.Tuple).(*intermediate_representation.Call)
+		if !isCall {
+			return
+		}
+		callee = staticCalleeObject(call)
+		resultIndex = value.Index
+	case *intermediate_representation.MakeInterface:
+		terms, termsError := typeparams.NormalTerms(value.X.Type())
+		if len(terms) == 0 || termsError != nil {
+			// A type parameter with no terms, or whose terms cannot be told, may be an interface type, whose nil
+			// value makes a nil interface.
+			return
+		}
+		if staticcheck_report.HasRange(value.X) {
+			staticcheck_report.Report(context, comparison, fmt.Sprintf("this comparison is %s true", qualifier),
+				staticcheck_report.Related(value.X,
+					"the lhs of the comparison gets its value from here and has a concrete type"))
+			return
+		}
+		// With no syntax to point the related place at, the message itself says where the value came from.
+		staticcheck_report.Report(context, comparison, fmt.Sprintf(
+			"this comparison is %s true; the lhs of the comparison has been assigned a concretely typed value",
+			qualifier))
+		return
+	}
+	if callee == nil {
+		return
+	}
+	// A test may be enforcing on purpose that a value is not nil. Asked before the nilness, which judges the callee and
+	// everything it calls: a comparison in a test file is never reported whatever the answer, and the file's name is
+	// all this reads, so no finding can change, and a question never asked records no read for a cached reader.
+	if staticcheck_code.IsInTest(context, comparison) {
+		return
+	}
+
+	returned := nilnesses.Nilness(callee, resultIndex)
+	// Flagged: an interface value never nil itself that may hold, or always holds, a typed nil, which points to a bug
+	// in the function returning it. A value never nil that holds no nil either, as errors.New returns, is left alone:
+	// comparing it is more likely defensive, guarding against a future untyped nil.
+	if returned.Outer != return_nil_ness.NeverNil || returned.Inner != return_nil_ness.MaybeNil &&
+		returned.Inner != return_nil_ness.AlwaysNil {
+		return
+	}
+	// Asked last, and only of a callee the nilness leaves flagged: a question never asked records no answer.
+	if calleeIsTrivial(context, trivialities, callee) {
+		return
+	}
+	staticcheck_report.Report(context, comparison, fmt.Sprintf("this comparison is %s true", qualifier),
+		staticcheck_report.Related(comparison.X, fmt.Sprintf(
+			"the lhs of the comparison is the %s return value of this function call",
+			staticcheck_report.Ordinal(resultIndex+1))),
+		staticcheck_report.Related(callee,
+			fmt.Sprintf("%s never returns a nil interface value", typeutil.FuncName(callee))))
+}
+
+// calleeIsTrivial is whether callee, the function a comparison's value came from, does no real work, as
+// intermediate_representation.IsTrivial judges it. A function or method the package itself declares is asked of
+// trivialities, whose answer the fact resolver records with the bodies it read, so the rule reads no function's body
+// itself, and calls IsTrivial nowhere.
+//
+// A function another package declares is never read, and is not trivial. In the program the engine hands a rule,
+// another package's function is made from its types alone and has no syntax, which IsTrivial answers not trivial, and
+// function_triviality refuses at the same boundary where other packages do have their syntax, so the rule and the
+// kind agree in every program. A method of a type from a package this one never imports has no function in that
+// program at all, since it creates a package's direct imports only, and is answered the same without being looked
+// up.
+func calleeIsTrivial(context *rule.Context, trivialities *function_triviality.Result, callee *types.Func) bool {
+	return callee.Pkg() == context.Package && trivialities.IsTrivial(callee)
+}
+
+// staticCalleeObject is the function call statically calls, or nil for a dynamic call or a callee with no function
+// object, such as a function literal or a wrapper staticcheck synthesizes.
+func staticCalleeObject(call *intermediate_representation.Call) *types.Func {
+	callee := call.Call.StaticCallee()
+	if callee == nil {
+		return nil
+	}
+	object, _ := callee.Object().(*types.Func) // Ignored: a callee whose object is no function is judged as none.
+	return object
+}

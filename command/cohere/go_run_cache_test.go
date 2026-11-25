@@ -260,7 +260,7 @@ func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
 // the fix record counts with the formatter's.
 // Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary.
 func TestARenamingGoRunIsNeverRecorded(test *testing.T) {
-	golden := filepath.Join("..", "..", "internal", "go_engine", "testdata", "rename-rewritten", "expected.jsonl")
+	golden := filepath.Join("..", "..", "internal", "go_language", "testdata", "rename-rewritten", "expected.jsonl")
 	contents, readError := os.ReadFile(golden)
 	if readError != nil {
 		test.Fatal(readError)

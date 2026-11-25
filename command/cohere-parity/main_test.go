@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/tools/go/analysis/passes/nilness"
 
-	"github.com/system-inc/cohere/internal/go_engine/check/parity"
-	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
+	"github.com/system-inc/cohere/internal/go_language/check/parity"
+	"github.com/system-inc/cohere/internal/go_language/rules/nil_ness"
 )
 
 // moduleRoot is cohere's root, from this package's directory, where the tests run.
@@ -17,12 +17,12 @@ const moduleRoot = "../.."
 // nilnessFixtures are the nilness port's fixture packages, loaded as packages of cohere's module, as the census loads
 // a tree. Each is named, since a wildcard never matches a package below testdata.
 var nilnessFixtures = []string{
-	"./internal/go_engine/rules/nil_ness/testdata/src/a",
-	"./internal/go_engine/rules/nil_ness/testdata/src/b",
-	"./internal/go_engine/rules/nil_ness/testdata/src/c",
-	"./internal/go_engine/rules/nil_ness/testdata/src/d",
-	"./internal/go_engine/rules/nil_ness/testdata/src/parity",
-	"./internal/go_engine/rules/nil_ness/testdata/src/differences",
+	"./internal/go_language/rules/nil_ness/testdata/src/a",
+	"./internal/go_language/rules/nil_ness/testdata/src/b",
+	"./internal/go_language/rules/nil_ness/testdata/src/c",
+	"./internal/go_language/rules/nil_ness/testdata/src/d",
+	"./internal/go_language/rules/nil_ness/testdata/src/parity",
+	"./internal/go_language/rules/nil_ness/testdata/src/differences",
 }
 
 // nilnessPair is the census's nilness pair with the gains file at gains, relative to cohere's root.
@@ -32,7 +32,7 @@ func nilnessPair(gains string) []censusPair {
 }
 
 // differencesFixture is the nilness port's differences fixture, as a tree's one package.
-var differencesFixture = []string{"./internal/go_engine/rules/nil_ness/testdata/src/differences"}
+var differencesFixture = []string{"./internal/go_language/rules/nil_ness/testdata/src/differences"}
 
 // Over the nilness port's fixtures the census finds what the port's tests find: x/tools' fixtures and parity's
 // agree, 133 against 133, and the differences fixture's six are the port's alone. Its gains file records none of
@@ -52,7 +52,7 @@ func TestCensusOverTheFixturesFindsWhatTheTestsFind(test *testing.T) {
 	for _, wanted := range []string{
 		"0 analyzed packages did not load clean\n",
 		"nilness: original 133, port 139, gains 0, unexplained 6\n",
-		"  unexplained gain: internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:15:9: ",
+		"  unexplained gain: internal/go_language/rules/nil_ness/testdata/src/differences/differences.go:15:9: ",
 		"  gain not seen: go/printer/nodes.go:613:13: impossible condition: nil != nil\n",
 		"  the original did not run on 0 packages\n",
 		"  the port did not run on 0 packages\n",
@@ -86,7 +86,7 @@ func TestCensusExitsOnAFindingTheOriginalMakesAlone(test *testing.T) {
 	}
 	for _, wanted := range []string{
 		"swapped: original 6, port 0, gains 0, unexplained 0\n",
-		"  the original alone: internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:15:",
+		"  the original alone: internal/go_language/rules/nil_ness/testdata/src/differences/differences.go:15:",
 		"the originals found 6 findings the ports did not\n",
 	} {
 		if !strings.Contains(report, wanted) {
@@ -110,7 +110,7 @@ func TestCensusRefusesPatternsThatMatchNothing(test *testing.T) {
 func TestCensusNamesAPackageThatDoesNotLoadClean(test *testing.T) {
 	test.Parallel()
 	result, censusError := census(pairs, moduleRoot, moduleRoot,
-		[]string{"./internal/go_engine/check/parity/testdata/src/illtyped"})
+		[]string{"./internal/go_language/check/parity/testdata/src/illtyped"})
 	if censusError != nil {
 		test.Fatal(censusError)
 	}
@@ -120,7 +120,7 @@ func TestCensusNamesAPackageThatDoesNotLoadClean(test *testing.T) {
 	}
 	for _, wanted := range []string{
 		"1 analyzed packages did not load clean\n",
-		"  github.com/system-inc/cohere/internal/go_engine/check/parity/testdata/src/illtyped: ",
+		"  github.com/system-inc/cohere/internal/go_language/check/parity/testdata/src/illtyped: ",
 		"illtyped.go:11",
 		"  the original did not run on 1 packages\n",
 		"  the port did not run on 1 packages\n",
@@ -145,7 +145,7 @@ func TestCensusPassesRecordedGains(test *testing.T) {
 	}
 	for _, wanted := range []string{
 		"nilness: original 0, port 6, gains 6, unexplained 0\n",
-		"  gain: internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:55:15: impossible " +
+		"  gain: internal/go_language/rules/nil_ness/testdata/src/differences/differences.go:55:15: impossible " +
 			"condition: nil != nil\n    because onlyEverNil: staticcheck merges",
 		"  gain not seen: elsewhere/elsewhere.go:1:1: impossible condition: nil != nil\n",
 	} {

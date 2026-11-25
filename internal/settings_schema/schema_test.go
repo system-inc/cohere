@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/go_engine/settings"
+	"github.com/system-inc/cohere/internal/go_language/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/option_schema"
 	"github.com/system-inc/cohere/internal/lint/registry"
@@ -236,7 +236,7 @@ var goBlocks = []string{
 }
 
 // TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts: every go block above is read by
-// internal/go_engine/settings and validated against the go block of the published schema, and the two
+// internal/go_language/settings and validated against the go block of the published schema, and the two
 // verdicts must agree in both directions, so an editor never passes a block the engine refuses (`{}` once
 // did, before the schema required rules) or flags one it reads.
 func TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts(test *testing.T) {

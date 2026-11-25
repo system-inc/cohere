@@ -5,8 +5,8 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
-	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_useless_concatenation"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_useless_concatenation"
 )
 
 // Shape names the construct a plan breaks, and labels residue.

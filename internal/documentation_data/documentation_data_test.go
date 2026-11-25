@@ -14,7 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/documentation_data/capture"
-	goenginerules "github.com/system-inc/cohere/internal/go_engine/rules"
+	goenginerules "github.com/system-inc/cohere/internal/go_language/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"

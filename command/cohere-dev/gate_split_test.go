@@ -13,23 +13,23 @@ import (
 )
 
 // newSplitFixture is a landing ready to split its gate across Sun2 and Marin: the mac box fixture's module with its
-// -race package, internal/edit, and two packages more, beta and internal/go_engine, the Square's starting half, which
+// -race package, internal/edit, and two packages more, beta and internal/go_language, the Square's starting half, which
 // is a race token too. Both boxes answer with a passing run of exactly what each is handed, 7.5s a package and 3.5s
-// under -race, internal/go_engine in 3 shards of its 4 tests, as the box's script shards it (sharded_run.go).
+// under -race, internal/go_language in 3 shards of its 4 tests, as the box's script shards it (sharded_run.go).
 func newSplitFixture(test *testing.T) *macBoxFixture {
 	test.Helper()
 	fixture := newMacBoxFixture(test, true)
 	worktree := fixture.worktree("a")
 	writeFixtureFile(test, filepath.Join(worktree, "beta", "beta_test.go"),
 		"package beta\n\nimport \"testing\"\n\nfunc TestBeta(test *testing.T) {}\n")
-	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_engine", "engine_test.go"),
+	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_language", "main_test.go"),
 		"package go_engine\n\nimport \"testing\"\n\nfunc TestEngine(test *testing.T) {}\n")
 	fixture.git(worktree, "add", ".")
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("two packages more"))
 	fixture.reply("Sun2.passes", "7.5 3.5\n")
 	fixture.reply("Marin.passes", "7.5 3.5\n")
 	for _, box := range []string{"Sun2", "Marin"} {
-		fixture.reply(box+".shards", "example.com/fixture/internal/go_engine 3 TestEngine TestEngineAgain "+
+		fixture.reply(box+".shards", "example.com/fixture/internal/go_language 3 TestEngine TestEngineAgain "+
 			"TestEngineOnceMore TestEngineAtLast\n")
 	}
 	return fixture
@@ -69,11 +69,11 @@ func (fixture *macBoxFixture) remoteArguments(box string) (string, string) {
 }
 
 // The fixture's race tokens, as racePatterns writes them for its tree.
-var splitFixtureRaces = "./internal/edit,./internal/go_engine@" +
+var splitFixtureRaces = "./internal/edit,./internal/go_language@" +
 	"Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad"
 
 // A landing with both gate boxes free splits its tests across them, both on the commit being landed (#bc8nf0r). With
-// no times kept yet it is the Square's starting split, internal/go_engine alone on Sun2 and every other package and
+// no times kept yet it is the Square's starting split, internal/go_language alone on Sun2 and every other package and
 // every race token on Marin, each handed as import paths; the halves' one verdict lands it, its land line naming which
 // box ran which half, and its body names go_engine's shards, its time the slowest's; and the gate's times are written
 // from both halves, plain and -race. A second landing, with times
@@ -102,8 +102,8 @@ func TestASplitGateRunsHalfOnEachBoxAndLandsOnBothVerdicts(test *testing.T) {
 		}
 	}
 	packages, races := fixture.remoteArguments("Sun2")
-	if packages != "example.com/fixture/internal/go_engine" || races != "" {
-		test.Errorf("Sun2 was handed %q and races %q, want internal/go_engine alone", packages, races)
+	if packages != "example.com/fixture/internal/go_language" || races != "" {
+		test.Errorf("Sun2 was handed %q and races %q, want internal/go_language alone", packages, races)
 	}
 	packages, races = fixture.remoteArguments("Marin")
 	if packages != "example.com/fixture/alpha example.com/fixture/beta example.com/fixture/internal/edit" ||
@@ -115,7 +115,7 @@ func TestASplitGateRunsHalfOnEachBoxAndLandsOnBothVerdicts(test *testing.T) {
 	for _, want := range []string{
 		"go test of the module on Sun2 and Marin (darwin/arm64, 4 packages: Sun2 1, Marin 3 and 2 -race tokens, " +
 			"scratch box, shared uid), 2 of them again under -race, nothing it skipped",
-		"its gate Sun2 slowest test binaries example.com/fixture/internal/go_engine 7.5s (slowest of 3 shards); " +
+		"its gate Sun2 slowest test binaries example.com/fixture/internal/go_language 7.5s (slowest of 3 shards); " +
 			"Marin slowest test binaries example.com/fixture/alpha 7.5s",
 		"its -race run Marin slowest test binaries example.com/fixture/internal/edit 3.5s",
 	} {
@@ -133,15 +133,15 @@ func TestASplitGateRunsHalfOnEachBoxAndLandsOnBothVerdicts(test *testing.T) {
 	}
 	want := gateTimes{
 		Plain: map[string]float64{"example.com/fixture/alpha": 7.5, "example.com/fixture/beta": 7.5,
-			"example.com/fixture/internal/edit": 7.5, "example.com/fixture/internal/go_engine": 7.5},
+			"example.com/fixture/internal/edit": 7.5, "example.com/fixture/internal/go_language": 7.5},
 		Race: map[string]float64{"example.com/fixture/internal/edit": 3.5,
-			"example.com/fixture/internal/go_engine": 3.5},
+			"example.com/fixture/internal/go_language": 3.5},
 	}
 	if !reflect.DeepEqual(times, want) {
 		test.Errorf("the gate's times read %+v, want %+v", times, want)
 	}
 
-	// With times that make alpha the heaviest, the next landing still gives internal/go_engine a half alone.
+	// With times that make alpha the heaviest, the next landing still gives internal/go_language a half alone.
 	written, marshalError := json.Marshal(gateTimes{Plain: map[string]float64{"example.com/fixture/alpha": 900}})
 	if marshalError != nil {
 		test.Fatal(marshalError)
@@ -156,9 +156,9 @@ func TestASplitGateRunsHalfOnEachBoxAndLandsOnBothVerdicts(test *testing.T) {
 	if !landed {
 		test.Fatalf("the landing with times did not land:\n%s", output)
 	}
-	if packages, races := fixture.remoteArguments("Sun2"); packages != "example.com/fixture/internal/go_engine" ||
+	if packages, races := fixture.remoteArguments("Sun2"); packages != "example.com/fixture/internal/go_language" ||
 		races != "" {
-		test.Errorf("with times, Sun2 was handed %q and races %q, want internal/go_engine alone", packages, races)
+		test.Errorf("with times, Sun2 was handed %q and races %q, want internal/go_language alone", packages, races)
 	}
 }
 
@@ -207,7 +207,7 @@ func TestASplitGateRefusesUnlessBothHalvesAreGreenAndWhole(test *testing.T) {
 			name:    "a shard of Sun2's never ends a test it was dealt",
 			replies: map[string]string{"Sun2.shardomit": "TestEngineOnceMore"},
 			said: []string{"the split gate's halves didn't cover its packages exactly once each, so its verdict is " +
-				"none: Sun2's shards: TestEngineOnceMore (example.com/fixture/internal/go_engine) ended 0 times " +
+				"none: Sun2's shards: TestEngineOnceMore (example.com/fixture/internal/go_language) ended 0 times " +
 				"across its shards"},
 		},
 		{
@@ -339,7 +339,7 @@ func TestASplitGateFallsBackToTheWholeGateNamingWhy(test *testing.T) {
 			if testCase.whole != "" {
 				packages, races := fixture.remoteArguments(testCase.whole)
 				if packages != "example.com/fixture/alpha example.com/fixture/beta example.com/fixture/internal/edit "+
-					"example.com/fixture/internal/go_engine" || races != splitFixtureRaces {
+					"example.com/fixture/internal/go_language" || races != splitFixtureRaces {
 					test.Errorf("%s was handed %q and races %q, want every package the gate lists and every token",
 						testCase.whole, packages, races)
 				}
@@ -357,19 +357,19 @@ func TestASplitGateFallsBackToTheWholeGateNamingWhy(test *testing.T) {
 	}
 }
 
-// The split is the Square's: with internal/go_engine listed, its plain run alone on one half and everything else on
+// The split is the Square's: with internal/go_language listed, its plain run alone on one half and everything else on
 // the other, times or none, since Elapsed is a binary's wall and not its CPU; with no package there, heaviest first
 // onto the lighter half, anything untimed weighing a second; and never a half with no package, which would test the
 // directory its go test runs in.
 func TestTheGatesHalvesSplitByTheirLastTimes(test *testing.T) {
 	test.Parallel()
 	starting := gateListing{
-		packages:        []string{"m/a", "m/b", "m/c", "m/internal/go_engine"},
-		racePackages:    map[string]string{"./a": "m/a", "./internal/go_engine@Concurrent": "m/internal/go_engine"},
-		startingPackage: "m/internal/go_engine",
+		packages:        []string{"m/a", "m/b", "m/c", "m/internal/go_language"},
+		racePackages:    map[string]string{"./a": "m/a", "./internal/go_language@Concurrent": "m/internal/go_language"},
+		startingPackage: "m/internal/go_language",
 	}
-	startingRaces := []string{"./a", "./internal/go_engine@Concurrent"}
-	// A listing with no package at internal/go_engine, which the halves split greedily.
+	startingRaces := []string{"./a", "./internal/go_language@Concurrent"}
+	// A listing with no package at internal/go_language, which the halves split greedily.
 	greedy := gateListing{
 		packages:     []string{"m/a", "m/b", "m/c", "m/d"},
 		racePackages: map[string]string{"./a": "m/a", "./d@Concurrent": "m/d"},
@@ -383,14 +383,14 @@ func TestTheGatesHalvesSplitByTheirLastTimes(test *testing.T) {
 		want    [2]gateHalf
 	}{
 		{"no times", starting, startingRaces, nil, [2]gateHalf{
-			{packages: []string{"m/internal/go_engine"}, races: []string{}},
+			{packages: []string{"m/internal/go_language"}, races: []string{}},
 			{packages: []string{"m/a", "m/b", "m/c"}, races: startingRaces},
 		}},
-		{"times, and internal/go_engine listed", starting, startingRaces, &gateTimes{
-			Plain: map[string]float64{"m/a": 100, "m/b": 10, "m/c": 10, "m/internal/go_engine": 5},
+		{"times, and internal/go_language listed", starting, startingRaces, &gateTimes{
+			Plain: map[string]float64{"m/a": 100, "m/b": 10, "m/c": 10, "m/internal/go_language": 5},
 			Race:  map[string]float64{"m/a": 50},
 		}, [2]gateHalf{
-			{packages: []string{"m/internal/go_engine"}, races: []string{}},
+			{packages: []string{"m/internal/go_language"}, races: []string{}},
 			{packages: []string{"m/a", "m/b", "m/c"}, races: startingRaces},
 		}},
 		{"no times and no starting package", greedy, greedyRaces, nil, [2]gateHalf{

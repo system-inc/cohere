@@ -251,10 +251,10 @@ func TestConcurrencyTestsAreFoundByNameAndFile(test *testing.T) {
 		}
 	}
 	for directory, home := range map[string]string{
-		"internal/go_engine/check": "TestDependenceSetsComputedAtOnceOverOneHostAgree",
+		"internal/go_language/check": "TestDependenceSetsComputedAtOnceOverOneHostAgree",
 		// Its test of the early start's handoff can fail only under -race (#e8w514b), and the package's entry runs
 		// only the tests the guard calls concurrent, so the test's name says it runs code at once.
-		"internal/go_engine": "TestTheHostsGoEnvironmentIsWholeWhenALoadReadsItAtOnceWithTheEarlyStart",
+		"internal/go_language": "TestTheHostsGoEnvironmentIsWholeWhenALoadReadsItAtOnceWithTheEarlyStart",
 	} {
 		index := slices.IndexFunc(raceGated, func(entry raceEntry) bool { return entry.directory == directory })
 		if index < 0 {

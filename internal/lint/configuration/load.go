@@ -955,7 +955,7 @@ var ignoredTopLevelKeys = map[string]string{
 	"output": "how a run prints, read by the command (command/cohere/output_settings.go) from the file cohere " +
 		"reads first. It decides nothing a rule does, so the linter leaves it alone on purpose.",
 
-	"go": "the Go engine's rules, read by internal/go_engine/settings. A repository that holds both a tsconfig and " +
+	"go": "the Go engine's rules, read by internal/go_language/settings. A repository that holds both a tsconfig and " +
 		"a go.mod keeps one CohereSettings.json for both engines, so the TypeScript linter leaves the key alone on " +
 		"purpose: its rules are the Go engine's, not this linter's.",
 

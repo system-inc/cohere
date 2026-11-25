@@ -1,0 +1,166 @@
+package fact_resolver
+
+import (
+	"fmt"
+	"go/ast"
+	"go/token"
+	"go/types"
+	"sync"
+	"sync/atomic"
+
+	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_language/rules/build_intermediate_representation"
+)
+
+// Package is one package as the resolver holds it: its types and what its functions build from, kept from the moment
+// ctrlflow finished on it.
+type Package struct {
+	resolver *Resolver
+	Types    *types.Package
+
+	// imports is the package's direct imports, by their types, which a fact on another package's exported function
+	// crosses into it from (see Visible).
+	imports map[*types.Package]bool
+
+	fileSet  *token.FileSet
+	files    []*ast.File
+	info     *types.Info
+	noReturn func(*types.Func) bool
+
+	// forReaders is whether build_intermediate_representation runs on the package in the graph ctrlflow finished in,
+	// so its functions build in the readers' package (see ReadersPackage), and readsExpressions whether that
+	// package records the expression map. Both are set before the package is stored, and only read after.
+	forReaders       bool
+	readsExpressions bool
+
+	// irPackage is the package its functions build in, nil until a question or the readers first reach it: the
+	// readers' package, for a package forReaders, and otherwise the package in the resolver's program, created with
+	// each of its direct imports. Set under the resolver's mutex.
+	irPackage atomic.Pointer[intermediate_representation.Package]
+
+	// lock is held while a fact kind computes in the package (see Lock).
+	lock sync.Mutex
+
+	// states is each kind's state in the package, a pointer to the kind's own type by its *Kind (see StateOf).
+	states sync.Map
+
+	// answered is the key of every answer the run memoized or kept about the package's objects, under answeredLock,
+	// so PlacedIn reads the package's own answers without walking the whole run's (see noteAnswered).
+	answeredLock sync.Mutex
+	answered     map[answerKey]bool
+
+	// storeAnswered is whether the store gave an answer about one of the package's objects (see AnsweredFromStore),
+	// set by whichever question took it, from any goroutine.
+	storeAnswered atomic.Bool
+}
+
+// Lock takes the package's lock, under which a kind computes in it. A computation holding it takes another package's
+// only for a package below it, one it imports, so no two ever wait on each other.
+func (resolved *Package) Lock() {
+	resolved.lock.Lock()
+}
+
+// Unlock gives the package's lock back.
+func (resolved *Package) Unlock() {
+	resolved.lock.Unlock()
+}
+
+// Files is the package's syntax, as the load parsed it, kept past the checker's release.
+func (resolved *Package) Files() []*ast.File {
+	return resolved.files
+}
+
+// Info is the package's type information, kept past the checker's release.
+func (resolved *Package) Info() *types.Info {
+	return resolved.info
+}
+
+// NoReturn reports whether ctrlflow found that function never returns, as the package's analysis read it: a function
+// the package declares, or one of another package that the package calls statically, whose fact ctrlflow imported. Any
+// other function is false. The read is safe from any goroutine: ctrlflow filled the predicate's map during its own
+// pass, which ended before the checker told the resolver of the package, and the package was stored (Finished) only
+// after its predicate was set, so nothing writes it once the package can be read.
+func (resolved *Package) NoReturn(function *types.Func) bool {
+	return resolved.noReturn(function)
+}
+
+// AnsweredFromStore reports whether the store gave the run an answer about one of the package's objects, a package
+// the run learned (answerOf): one loaded from source to answer a question, whose entry held answers an earlier run
+// computed. Such an answer was judged in that run, so nothing of what it rests on was judged in this one, and a
+// function of the package the resolver holds no answer about may be one it rests on (Kind.RecordsEveryJudgment).
+func (resolved *Package) AnsweredFromStore() bool {
+	return resolved.storeAnswered.Load()
+}
+
+// Function is the package's declared function or method whose object is function, built, or nil when function is no
+// declared function of the package, as an instantiated method's object never is.
+func (resolved *Package) Function(function *types.Func) *intermediate_representation.Function {
+	irPackage := resolved.created()
+	declared := irPackage.Program.FunctionValue(function)
+	if declared == nil || declared.Package != irPackage || declared.Object() != types.Object(function) {
+		return nil
+	}
+	resolved.resolver.Build(declared)
+	return declared
+}
+
+// IntermediateRepresentation is the package its functions build in, the readers' or the one in the resolver's program,
+// created if it was not.
+func (resolved *Package) IntermediateRepresentation() *intermediate_representation.Package {
+	return resolved.created()
+}
+
+// SourceFunctions is the package's declared functions and methods, its synthetic initializer first, each built, in the
+// order buildir's SrcFuncs lists them, without the anonymous ones.
+func (resolved *Package) SourceFunctions() []*intermediate_representation.Function {
+	irPackage := resolved.created()
+	for _, function := range irPackage.Functions {
+		resolved.resolver.Build(function)
+	}
+	return irPackage.Functions
+}
+
+// created is the package its functions build in, created on the first call. For a package forReaders it is the
+// readers' package, as build_intermediate_representation creates it, in a program of its own with each import from its
+// types alone: a judgment there reaches a callee in another package only by its object, through Ask. Its creation is
+// billed with whatever created it, the analyzer's run or a question, as the analyzer's own was. Otherwise it is the
+// package in the resolver's program, created with every package it imports, each from its syntax where ctrlflow
+// finished on it, as a build of its functions requires.
+func (resolved *Package) created() *intermediate_representation.Package {
+	if irPackage := resolved.irPackage.Load(); irPackage != nil {
+		return irPackage
+	}
+	resolver := resolved.resolver
+	resolver.mutex.Lock()
+	defer resolver.mutex.Unlock()
+	if irPackage := resolved.irPackage.Load(); irPackage != nil {
+		return irPackage
+	}
+	if resolved.forReaders {
+		irPackage := build_intermediate_representation.NewPackage(resolved.fileSet, resolved.Types, resolved.files,
+			resolved.info, resolved.noReturn, resolved.readsExpressions)
+		resolved.irPackage.Store(irPackage)
+		return irPackage
+	}
+	var irPackage *intermediate_representation.Package
+	resolver.measureBuild(func() {
+		for _, imported := range resolved.Types.Imports() {
+			resolver.createLocked(imported)
+		}
+		irPackage = resolver.createLocked(resolved.Types)
+	})
+	resolved.irPackage.Store(irPackage)
+	return irPackage
+}
+
+// StateOf is kind's state in resolved, a new State on the first call, which the kind fills as it computes under the
+// package's lock. Every call for one kind names the same State.
+func StateOf[State any](resolved *Package, kind *Kind) *State {
+	state, _ := resolved.states.LoadOrStore(kind, new(State))
+	held, isState := state.(*State)
+	if !isState {
+		// Invariant: a kind's state is made only here, as the one State its every call names.
+		panic(fmt.Sprintf("fact_resolver: %s's state in %s is a %T", kind.Name, resolved.Types.Path(), state))
+	}
+	return held
+}

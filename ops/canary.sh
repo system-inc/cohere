@@ -52,18 +52,18 @@ if ! command -v go > /dev/null; then
 fi
 pass "toolchain: $(go version)"
 
-if go list -deps -test ./internal/go_engine/... ./command/cohere-pairs > /dev/null 2> "$work/modules.log"; then
+if go list -deps -test ./internal/go_language/... ./command/cohere-pairs > /dev/null 2> "$work/modules.log"; then
   pass modules
 else
   gap modules "the module cache can't build them offline: $(lastLine "$work/modules.log")"
   exit "$status"
 fi
 
-packages="./internal/go_engine/load ./internal/go_engine/intermediate_representation"
-packages="$packages ./internal/go_engine/check/checker ./internal/go_engine/rules/staticcheck_code"
-packages="$packages ./internal/go_engine/build_dependence ./internal/go_engine/check/parity ./internal/go_engine/cache"
+packages="./internal/go_language/load ./internal/go_language/intermediate_representation"
+packages="$packages ./internal/go_language/check/checker ./internal/go_language/rules/staticcheck_code"
+packages="$packages ./internal/go_language/build_dependence ./internal/go_language/check/parity ./internal/go_language/cache"
 if command -v git > /dev/null; then
-  packages="./internal/go_engine $packages"
+  packages="./internal/go_language $packages"
 else
   gap engine-root "there is no git on the path, and the root package's tests build repositories with it"
 fi

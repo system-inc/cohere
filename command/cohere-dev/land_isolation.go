@@ -39,7 +39,7 @@ import (
 // rulesDirectory is where the Go engine's rules live, relative to the module's root, each in a directory of its own;
 // the directory itself holds the registry, registryFile, and the table of every rule's inputs, ruleInputsFile.
 const (
-	rulesDirectory = "internal/go_engine/rules"
+	rulesDirectory = "internal/go_language/rules"
 	ruleInputsFile = rulesDirectory + "/rule_inputs.txt"
 	registryFile   = rulesDirectory + "/registry.go"
 )
@@ -48,7 +48,7 @@ const (
 // names no test runs none and passes, so TestTheGateRunsTheIsolationTestThatExists holds the file to this name.
 const (
 	unitIsolationTest    = "TestEveryIsolatedRuleFindsTheSameInTheUnitsAVariantKeeps"
-	unitIsolationPackage = "internal/go_engine/check"
+	unitIsolationPackage = "internal/go_language/check"
 	unitIsolationFile    = unitIsolationPackage + "/unit_isolation_test.go"
 )
 

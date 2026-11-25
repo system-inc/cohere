@@ -719,7 +719,7 @@ SOFTWARE.
 - Source: https://pkg.go.dev/golang.org/x/tools@v0.50.0/go/analysis/checker
 - Version: v0.50.0
 - License: `BSD-3-Clause`
-- In cohere: The analysis driver copied into internal/go_engine/check/checker, with the helpers it calls from internal/analysis/driverutil, and the analyzers' test driver go/analysis/analysistest copied into internal/go_engine/check/analysistest, with what it calls: go/analysis/internal in internal/go_engine/check/internal, driverutil's fix.go beside the checker's, and internal/diff, internal/diff/lcs and internal/astutil/free in internal/go_engine/check/diff and internal/go_engine/check/astutil/free; and the shallow export and import of internal/gcimporter copied into internal/go_engine/export_data, iexport.go, iimport.go, predeclared.go and the vestiges of bimport.go they call, with internal/aliases and the parts of internal/typesinternal they call in its subpackages aliases and typesinternal.
+- In cohere: The analysis driver copied into internal/go_language/check/checker, with the helpers it calls from internal/analysis/driverutil, and the analyzers' test driver go/analysis/analysistest copied into internal/go_language/check/analysistest, with what it calls: go/analysis/internal in internal/go_language/check/internal, driverutil's fix.go beside the checker's, and internal/diff, internal/diff/lcs and internal/astutil/free in internal/go_language/check/diff and internal/go_language/check/astutil/free; and the shallow export and import of internal/gcimporter copied into internal/go_language/export_data, iexport.go, iimport.go, predeclared.go and the vestiges of bimport.go they call, with internal/aliases and the parts of internal/typesinternal they call in its subpackages aliases and typesinternal.
 
 ```text
 Copyright 2009 The Go Authors.
@@ -756,7 +756,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - Source: https://pkg.go.dev/go/build@go1.27.0
 - Version: go1.27.0
 - License: `BSD-3-Clause`
-- In cohere: go/build's reading of a package directory, the part of Context.Import after the package is found and the header reads it calls, copied into internal/go_engine/load/build, with internal/syslist, which it reads, in internal/go_engine/load/build/syslist.
+- In cohere: go/build's reading of a package directory, the part of Context.Import after the package is found and the header reads it calls, copied into internal/go_language/load/build, with internal/syslist, which it reads, in internal/go_language/load/build/syslist.
 
 ```text
 Copyright 2009 The Go Authors.
@@ -793,7 +793,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - Source: https://pkg.go.dev/honnef.co/go/tools@v0.8.1/go/ir
 - Version: v0.8.1
 - License: `MIT AND BSD-3-Clause`
-- In cohere: The Go IR builder in internal/go_engine/intermediate_representation, copied from go/ir and renamed to cohere's words: builder.go, emit.go, func.go, ssa.go, const.go, lvalue.go, util.go, blockopt.go, dom.go, create.go, methods.go, wrappers.go, typeset.go, block.go, scc.go, source.go, task.go and instantiate.go, with the parts of lift.go and print.go the builder needs, x/tools' internal typesinternal.ZeroString as go/ir vendors it, and go/ir's builder tests that need neither lifting nor printing, with their fixed-bug programs in testdata.
+- In cohere: The Go IR builder in internal/go_language/intermediate_representation, copied from go/ir and renamed to cohere's words: builder.go, emit.go, func.go, ssa.go, const.go, lvalue.go, util.go, blockopt.go, dom.go, create.go, methods.go, wrappers.go, typeset.go, block.go, scc.go, source.go, task.go and instantiate.go, with the parts of lift.go and print.go the builder needs, x/tools' internal typesinternal.ZeroString as go/ir vendors it, and go/ir's builder tests that need neither lifting nor printing, with their fixed-bug programs in testdata.
 
 ```text
 go/ir

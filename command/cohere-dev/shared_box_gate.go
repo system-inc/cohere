@@ -66,7 +66,7 @@ const (
 )
 
 // sharedBoxTestTimeout is how long one package's tests may run on a shared box, past go test's default of 10 minutes:
-// there every package builds and runs on an empty cache beside every other, and internal/go_engine alone took 484s on
+// there every package builds and runs on an empty cache beside every other, and internal/go_language alone took 484s on
 // an idle Sun2, so in the whole run it crossed 600s and failed a landing that changed none of it (#er5mbvc, Nov 16).
 // The gap's own bound, gateGapBound, still ends a run that hangs.
 const sharedBoxTestTimeout = "30m"

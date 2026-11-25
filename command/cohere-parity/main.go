@@ -1,5 +1,5 @@
 // Command cohere-parity is the census of the Go engine's ports against their originals over a real tree. A port's
-// tests hold it to its original over fixtures (internal/go_engine/check/parity); this holds it over code nobody wrote
+// tests hold it to its original over fixtures (internal/go_language/check/parity); this holds it over code nobody wrote
 // for the comparison, as the engine loads it, tests included, and prints where the two disagree.
 //
 //	cohere-parity <directory>                     every pair over ./... of directory
@@ -41,21 +41,21 @@ import (
 	"honnef.co/go/tools/stylecheck/st1018"
 	"honnef.co/go/tools/stylecheck/st1019"
 
-	"github.com/system-inc/cohere/internal/go_engine/check/parity"
-	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/project"
-	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
-	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_import"
-	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
-	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
-	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
-	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
-	"github.com/system-inc/cohere/internal/go_engine/rules/invisible_character"
-	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
-	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
-	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
-	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
-	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
+	"github.com/system-inc/cohere/internal/go_language/check/parity"
+	"github.com/system-inc/cohere/internal/go_language/load"
+	"github.com/system-inc/cohere/internal/go_language/project"
+	"github.com/system-inc/cohere/internal/go_language/rules/dot_import"
+	"github.com/system-inc/cohere/internal/go_language/rules/duplicate_import"
+	"github.com/system-inc/cohere/internal/go_language/rules/duration_unit_suffix"
+	"github.com/system-inc/cohere/internal/go_language/rules/error_variable_name"
+	"github.com/system-inc/cohere/internal/go_language/rules/http_status_literal"
+	"github.com/system-inc/cohere/internal/go_language/rules/inconsistent_receiver_name"
+	"github.com/system-inc/cohere/internal/go_language/rules/invisible_character"
+	"github.com/system-inc/cohere/internal/go_language/rules/misplaced_error_result"
+	"github.com/system-inc/cohere/internal/go_language/rules/nil_ness"
+	"github.com/system-inc/cohere/internal/go_language/rules/receiver_name"
+	"github.com/system-inc/cohere/internal/go_language/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_language/rules/yoda_condition"
 )
 
 // censusPair is a pair as the census runs it, with its port's gains file, relative to cohere's root, or empty for a
@@ -71,7 +71,7 @@ type censusPair struct {
 var pairs = []censusPair{
 	{
 		pair:  parity.Pair{Name: "nilness", Original: nilness.Analyzer, Port: nil_ness.Analyzer},
-		gains: "internal/go_engine/rules/nil_ness/testdata/gains.txt",
+		gains: "internal/go_language/rules/nil_ness/testdata/gains.txt",
 	},
 	{pair: parity.Pair{Name: "unusedwrite", Original: unusedwrite.Analyzer, Port: unused_write.Analyzer}},
 	{pair: parity.Pair{Name: "ST1006", Original: st1006.Analyzer, Port: receiver_name.Analyzer}},

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 

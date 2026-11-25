@@ -1,0 +1,152 @@
+package dispatch
+
+import (
+	"go/ast"
+	"go/token"
+	"reflect"
+	"slices"
+
+	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_language/rule"
+)
+
+// syntaxWalk is the walk of one package's files, which keeps the ancestors of the node it visits as it goes.
+type syntaxWalk struct {
+	started *startedRuns
+	// byNodeKind is started's byKind for each kind nodeKindOf numbers, at its number, so a node visited finds its
+	// listeners by a type switch and an index. A kind it numbers 0 is found in byKind itself.
+	byNodeKind [nodeKindCount][]*listenerRun
+	// spine is the cursors from the file down to the node last visited, that node included, and ancestors is their
+	// nodes, the slice a listener is handed with the last left out. Both are reused across the whole walk.
+	spine     []inspector.Cursor
+	ancestors []ast.Node
+	// standing is the standing spans of the file the walk is in, sorted by where each starts, when some run is
+	// confined on that file, and nil otherwise, when no node's position is tested. standingNext is the first of them
+	// the walk has not passed the end of (see inStandingBody).
+	standing     []rule.StandingSpan
+	standingNext int
+}
+
+// newSyntaxWalk is the walk calling started's listeners, each kind they list found by its number where nodeKindOf
+// numbers it.
+func newSyntaxWalk(started *startedRuns) *syntaxWalk {
+	walk := &syntaxWalk{started: started}
+	for kind, runs := range started.byKind {
+		// Every kind a syntax listener lists is the type of one of its Nodes, so its zero value is an ast.Node too,
+		// whose kind nodeKindOf reads off its type alone.
+		if zero, isNode := reflect.Zero(kind).Interface().(ast.Node); isNode && nodeKindOf(zero) != 0 {
+			walk.byNodeKind[nodeKindOf(zero)] = runs
+		}
+	}
+	return walk
+}
+
+// visit calls every started listener that lists cursor's node's kind, with the node, its ancestors and its cursor,
+// and descends into it.
+func (walk *syntaxWalk) visit(cursor inspector.Cursor) bool {
+	walk.descendTo(cursor)
+	node := cursor.Node()
+	// Capped at the ancestors, so a listener that appends to its stack makes a copy rather than overwriting the node
+	// in the slice the walk goes on handing its descendants.
+	ancestors := walk.ancestors[: len(walk.ancestors)-1 : len(walk.ancestors)-1]
+	// The same listeners byKind holds for the kind, in the same order, found without hashing it.
+	number := nodeKindOf(node)
+	runs := walk.byNodeKind[number]
+	if number == 0 {
+		runs = walk.started.byKind[reflect.TypeOf(node)]
+	}
+	// Tested once for every run the node reaches, and never in a file no run is confined on (#e4rd5dw). The walk
+	// descends into a standing body all the same, since a run that is not confined hears every node of it.
+	deaf := walk.standing != nil && walk.inStandingBody(node.Pos())
+	for called := 0; called < len(runs); {
+		called = walk.callNodes(runs, called, cursor, node, ancestors, deaf)
+	}
+	return true
+}
+
+// inStandingBody is whether position, a node's the walk is visiting, lies in a standing body of the file the walk is
+// in: from a standing span's opening brace to its end. A standing declaration's own node, at its `func`, and its
+// receiver, name and type lie before the brace, so every run hears them.
+//
+// The spans are sorted and the walk goes through the file's declarations in source order, so it passes each span's
+// end once and tests a position against one span, the first it has not passed. A node of a declaration lies inside
+// that declaration, its doc comment aside, which lies before it, so no node of a span follows one past the span's
+// end. Were one to, the walk would only call a confined run for a node in a standing body, as it does on the host,
+// and the rule's action drops what the run finds there (rule.OutsideStanding).
+func (walk *syntaxWalk) inStandingBody(position token.Pos) bool {
+	for walk.standingNext < len(walk.standing) && walk.standing[walk.standingNext].End < position {
+		walk.standingNext++
+	}
+	return walk.standingNext < len(walk.standing) && position >= walk.standing[walk.standingNext].Body
+}
+
+// callNodes calls the Node of each of runs from the one at from on, in order, on node with its ancestors, each
+// listener's context handing it cursor for the length of its call, and returns how far it got: past the last run, or
+// past the one whose listener panicked, which it records as that run's crash, so the caller goes on with the rest.
+//
+// One recover serves every call on the node, where a call of its own each cost a deferred call and a recover for every
+// listener a node reaches, about ten per node visited (#fex6s0v). It cannot change a finding: each listener is called
+// in the same order with what it was handed before, and one that panics is the same crash, spelled from the same
+// frames, and is called no more on the package. A Node that panics leaves its context's cursor held, which is
+// harmless: the run has crashed, and nothing calls it again.
+//
+// deaf is whether node lies in a standing body, when a run confined on the file is not called for it: the host's
+// findings there are the rule's (rule.StandingFiles). Every other run is called for it as for any node.
+func (walk *syntaxWalk) callNodes(
+	runs []*listenerRun,
+	from int,
+	cursor inspector.Cursor,
+	node ast.Node,
+	ancestors []ast.Node,
+	deaf bool,
+) (next int) {
+	calling := from
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			runs[calling].crashed(recovered)
+			next = calling + 1
+		}
+	}()
+	for ; calling < len(runs); calling++ {
+		run := runs[calling]
+		// A run whose rule inherits the file the walk is in hears none of its nodes (#y6q1x2j), and one confined on
+		// it none inside a standing body (#e4rd5dw).
+		if run.crash != nil || run.skipping || (deaf && run.confined) {
+			continue
+		}
+		run.context.EnterNode(cursor)
+		if run.timing != nil {
+			run.measured(func() { run.registered.listener.Node(run.context, node, ancestors) })
+		} else {
+			run.registered.listener.Node(run.context, node, ancestors)
+		}
+		run.context.LeaveNode()
+	}
+	return calling
+}
+
+// descendTo makes the spine end at cursor. The walk is in preorder, so of the spine of the node visited last, the
+// part that encloses cursor is a prefix, and cursor's ancestors past it are the nodes between, which the inspector
+// skipped as kinds no listener lists. It pops the rest and climbs from cursor to that prefix, so each node is pushed
+// once as the walk first reaches it and popped once after, as the inspector's own stack keeps them, rather than
+// every node's ancestors read again for every node visited.
+func (walk *syntaxWalk) descendTo(cursor inspector.Cursor) {
+	kept := len(walk.spine)
+	for kept > 0 && !walk.spine[kept-1].Contains(cursor) {
+		kept--
+	}
+	walk.spine = walk.spine[:kept]
+	walk.ancestors = walk.ancestors[:kept]
+	// Climbing ends at the deepest node kept, or for a file, whose parent is the root, at the root, the one cursor
+	// with no node.
+	for climbed := cursor; climbed.Node() != nil; climbed = climbed.Parent() {
+		if kept > 0 && climbed == walk.spine[kept-1] {
+			break
+		}
+		walk.spine = append(walk.spine, climbed)
+		walk.ancestors = append(walk.ancestors, climbed.Node())
+	}
+	slices.Reverse(walk.spine[kept:])
+	slices.Reverse(walk.ancestors[kept:])
+}

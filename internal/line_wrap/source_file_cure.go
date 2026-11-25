@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 )
 
 // keptSpan is the kept bytes of one line, from start up to, not including, end, counted from the source's start.
