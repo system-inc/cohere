@@ -9,6 +9,14 @@ import (
 	"testing"
 )
 
+// moduleShelf is the folder every module of the repository's own, other than the root, sits directly under.
+const moduleShelf = "modules"
+
+// typeScriptModules are the TypeScript fork, a submodule holding upstream's modules, and the shims generated over
+// it, each a module of its own, which keep their go.mod files outside the shelf. The libraries move (#j2k92bh)
+// replaces both entries with libraries/, and since each must exist, that move has to edit this list.
+var typeScriptModules = []string{"TypeScript", "TypeScript-shim"}
+
 // The Go modules other repositories pin by tag live in modules/, and the rule is mechanical: a folder is in modules/
 // if and only if it has its own go.mod (#gcdfx7v). What they share is that each is versioned on its own and tagged
 // modules/<name>/v..., so a module anywhere else has a tag prefix that names the wrong path, and a folder on the shelf
@@ -83,14 +91,6 @@ func TestTheModuleShelfGuardSeesAStrayAndAMissingModule(test *testing.T) {
 		test.Errorf("the stray modules are %q, want %q", shelf.stray, want)
 	}
 }
-
-// moduleShelf is the folder every module of the repository's own, other than the root, sits directly under.
-const moduleShelf = "modules"
-
-// typeScriptModules are the TypeScript fork, a submodule holding upstream's modules, and the shims generated over
-// it, each a module of its own, which keep their go.mod files outside the shelf. The libraries move (#j2k92bh)
-// replaces both entries with libraries/, and since each must exist, that move has to edit this list.
-var typeScriptModules = []string{"TypeScript", "TypeScript-shim"}
 
 // moduleShelfReading is what readModuleShelf found, each folder slash-separated and relative to the root, sorted.
 type moduleShelfReading struct {
