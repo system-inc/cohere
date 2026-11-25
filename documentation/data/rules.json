@@ -14,7 +14,7 @@
         "typeScriptRules": "swift_language/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift_language/Rules.json); for Go, the analyzer or check a ported rule names (internal/go_language/rules)"
     },
-    "count": 799,
+    "count": 800,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -6493,6 +6493,14 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-foreign-suppression",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
         },
         {
             "name": "cohere-go/consistency-no-grouped-var",

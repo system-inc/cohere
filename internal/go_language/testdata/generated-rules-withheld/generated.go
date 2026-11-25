@@ -29,6 +29,8 @@ var q = 2
 var banner = "a generated line that runs on past the house limit of one hundred and twenty columns, as generators write" + cfg
 
 // NEVER edit this by hand.
+//
+//nolint:gocritic
 func generatedHook() {}
 
 func generatedScan(values []int) int {

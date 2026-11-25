@@ -30,6 +30,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_dash_punctuation"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_else_return"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_empty_function"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_foreign_suppression"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_grouped_var"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_label"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_lone_block"
@@ -611,6 +612,7 @@ func House() []rule.Rule {
 		consistency_no_dash_punctuation.Rule,
 		consistency_no_else_return.Rule,
 		consistency_no_empty_function.Rule,
+		consistency_no_foreign_suppression.Rule,
 		consistency_no_grouped_var.Rule,
 		consistency_no_label.Rule,
 		consistency_no_lone_block.Rule,

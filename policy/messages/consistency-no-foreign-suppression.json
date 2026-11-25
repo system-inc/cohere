@@ -1,0 +1,10 @@
+{
+    "rules": {
+        "Go": "cohere-go/consistency-no-foreign-suppression"
+    },
+    "messages": {
+        "foreignSuppression": {
+            "text": "`{{directive}}` is {{tool}}'s suppression, and cohere checks neither its reason nor whether it still silences anything, so it can hide a finding on an unread reason and outlive it unnoticed. Write `//cohere:ignore <rule> <reason>` instead, which cohere holds to both, or fix what it hides."
+        }
+    }
+}

@@ -335,6 +335,7 @@ var names = []string{
 	"cohere-go/consistency-no-dash-punctuation",
 	"cohere-go/consistency-no-else-return",
 	"cohere-go/consistency-no-empty-function",
+	"cohere-go/consistency-no-foreign-suppression",
 	"cohere-go/consistency-no-grouped-var",
 	"cohere-go/consistency-no-label",
 	"cohere-go/consistency-no-lone-block",

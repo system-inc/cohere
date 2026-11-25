@@ -159,6 +159,7 @@
 {"kind":"rule","name":"cohere-go/consistency-no-dash-punctuation","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-else-return","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-empty-function","severity":"error"}
+{"kind":"rule","name":"cohere-go/consistency-no-foreign-suppression","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-grouped-var","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-label","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-no-lone-block","severity":"error"}

@@ -138,16 +138,16 @@ func TestAMarkedSyntaxOnlyWalkIsHandedOnlyTheFilesItDoesNotInherit(test *testing
 
 // Each rule syntaxOnlyWalks names is run by the registry through rule.SyntaxOnlyRun (#y6q1x2j): second.go holds what
 // every marked rule reports, a build line with a malformed Go version, a go:debug directive outside package main, a
-// long line of shouting with a deferred task in it, and more lines than a file may hold, so each rule's registered
-// analyzer, under an inheritance that says the rule inherits second.go, reports the host's finding there and nothing of
-// its own, which only the wrap can do, and inheriting nothing it reports its own there, which shows second.go provokes
-// it.
+// long line of shouting with a deferred task in it, golangci-lint's suppression, and more lines than a file may hold,
+// so each rule's registered analyzer, under an inheritance that says the rule inherits second.go, reports the host's
+// finding there and nothing of its own, which only the wrap can do, and inheriting nothing it reports its own there,
+// which shows second.go provokes it.
 func TestTheRegistrysSyntaxOnlyWalksAreWrapped(test *testing.T) {
 	test.Parallel()
 	sources := map[string]string{
 		"first.go": "package walked\n",
 		"second.go": "//go:build go1.x\n//go:debug panicnil=1\n\npackage walked\n\n// A LOUD comment, TODO " +
-			strings.Repeat("that runs on ", 10) + "past the limit.\n" + strings.Repeat("\n", 2001),
+			strings.Repeat("that runs on ", 10) + "past the limit.\n\n//nolint:all\n" + strings.Repeat("\n", 2001),
 	}
 	registered := All()
 	for name := range syntaxOnlyWalks {

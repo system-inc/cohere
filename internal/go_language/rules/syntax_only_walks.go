@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/system-inc/cohere/internal/go_language/rule"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_foreign_suppression"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_file"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_shouting"
@@ -37,6 +38,9 @@ var syntaxOnlyWalks = map[string]bool{
 	// consistency-no-long-file reads of a pass only its files and their line tables, and its limit from its own max
 	// option, which the settings set once for every build of a run.
 	consistency_no_long_file.Name: true,
+	// consistency-no-foreign-suppression reads of a pass only its files' comments and judges each comment on its own
+	// text, with no settings.
+	consistency_no_foreign_suppression.Name: true,
 	// buildtag and directive judge each Go file of pass.Files by its own comments, its own name and its own package
 	// clause. They also judge the package's other and ignored files, which SyntaxOnlyRun hands them in every build:
 	// only a file a build compiles is ever inherited, so those are judged again wherever they appear.

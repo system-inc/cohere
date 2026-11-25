@@ -210,6 +210,7 @@ cohere-go/consistency-no-console PerUnit
 cohere-go/consistency-no-dash-punctuation FileSyntax
 cohere-go/consistency-no-else-return PerUnit
 cohere-go/consistency-no-empty-function Composes FullKind
+cohere-go/consistency-no-foreign-suppression FileSyntax
 cohere-go/consistency-no-grouped-var PerUnit
 cohere-go/consistency-no-label PerUnit
 cohere-go/consistency-no-lone-block PerUnit
