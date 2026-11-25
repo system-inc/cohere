@@ -46,7 +46,7 @@ import (
 // replayed over.
 
 // folderCheckLabel labels the folder check's summary under `--json`, beside each project's, as the format project at
-// the root is labelled `. (Folder)`: no directory's label can be it.
+// the root is labelled `. (Formats)`: no directory's label can be it.
 const folderCheckLabel = ". (folders)"
 
 // folderFinding is one folder whose name abbreviates a word the house spells out.

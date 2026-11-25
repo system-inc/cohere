@@ -3,8 +3,8 @@ import Foundation
 import Testing
 
 /*
- The contract fixtures in `swift_language/Contract/` are read by this test and by the Go renderer's, so an encoder
- change that would break the front door breaks here first.
+ The contract fixtures in `documentation/contract/fixtures/` are read by this test and by the Go renderer's, so an
+ encoder change that would break the front door breaks here first.
 
  Every record in every fixture is decoded into cohere-swift's own type and encoded back, and the result must
  equal the original as JSON. A field the fixture has and the type lacks, a renamed key, or a wrong value
@@ -15,7 +15,8 @@ struct ContractFixtureTests {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-        .appendingPathComponent("Contract", isDirectory: true)
+        .deletingLastPathComponent()
+        .appendingPathComponent("documentation/contract/fixtures", isDirectory: true)
 
     static let fixtureNames = [
         "Clean", "Findings", "TypesBail", "CrashWithoutSummary", "Unreadable", "Unused", "LintOnly", "FormatOnly",

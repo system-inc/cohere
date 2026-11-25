@@ -993,7 +993,7 @@ func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 			test.Fatalf("running cohere: %v\n%s", runError, output)
 		}
 		found := map[string]string{}
-		heading := regexp.MustCompile(`(?m)^== (\S+) \((Go|Folder)\) ==\n`)
+		heading := regexp.MustCompile(`(?m)^== (\S+) \((Go|Formats)\) ==\n`)
 		bounds := heading.FindAllStringSubmatchIndex(string(output), -1)
 		for index, bound := range bounds {
 			end := len(output)
@@ -1009,7 +1009,7 @@ func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 		test.Fatalf("the root was not checked as the module and its format project:\n%v", first)
 	}
 	second := run()
-	for _, kind := range []string{"Go", "Folder"} {
+	for _, kind := range []string{"Go", "Formats"} {
 		if section := second[kind]; !strings.HasPrefix(section, "cached: ") {
 			test.Errorf("the %s project ran again rather than replaying:\n%s", kind, section)
 		}

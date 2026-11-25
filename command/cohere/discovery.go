@@ -678,7 +678,7 @@ func nearestWorkspace(directory string, workspaces []string) (string, bool) {
 const xcodeProjectSpecification = "project.yml"
 
 // xcodeMarker is the entry that makes a directory a candidate Xcode root, by the child's own rule
-// (swift_language/Contract.md): its project.yml, or else its one .xcodeproj, or "" when it is no candidate. A
+// (documentation/contract/Contract.md): its project.yml, or else its one .xcodeproj, or "" when it is no candidate. A
 // Package.swift wins beside either, and two .xcodeproj, or a workspace and no project, the child refuses, so
 // none of those is a candidate. names are the listing's entries that are not directories, as the walk keeps
 // them for its other markers; a .xcodeproj is a bundle, a directory, and is counted whatever its type, as the

@@ -1,6 +1,6 @@
 // Package go_language is cohere-go: a hidden mode of the cohere binary, `cohere go-language --contract 4 --root
 // <dir> [switches] [--lint-config <file>] [paths]`, that the front door runs as a child the way it runs
-// cohere-swift, and whose stdout is swift_language/Contract.md's record stream.
+// cohere-swift, and whose stdout is documentation/contract/Contract.md's record stream.
 //
 // The pipeline is the contract's: describe the project, then fix and format, then load and type-check, then
 // lint, then the unused report, each phase recorded exactly once whether it ran or not, and a summary whose

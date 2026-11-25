@@ -2,46 +2,46 @@
 // Git history is the series. Never edit it by hand. Times are integer milliseconds, the median of the rounds with their minimum and maximum.
 {
     "schema": 3,
-    "commit": "65102a95e97f3a1be3bbcba4d600a1c4e76e819e",
-    "measuredAt": "2026-11-25T16:36:56Z",
+    "commit": "e4240f1c557475e5a84790ad3a295a3c93773d4e",
+    "measuredAt": "2026-11-25T17:34:08Z",
     "machine": {
         "name": "Shackler",
         "cpu": "Apple M3 Max",
         "cores": 16,
-        "loadBefore": [2.05, 2.62, 2.33],
-        "loadAfter": [8.26, 4.12, 2.89],
+        "loadBefore": [1.88, 1.96, 1.98],
+        "loadAfter": [7.27, 3.31, 2.48],
         "heldQuiet": true
     },
     "tools": {
-        "cohere": "65102a95 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
+        "cohere": "e4240f1c CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box kept",
         "go": "go1.27.1",
-        "binary": "b0f8dfc60aa2953bbe86be3923c58090bf7c36fde7604a6c4117dc9ff62b3232"
+        "binary": "99f91bf3902e22274441718b569f736967bebe35d5e41305eea4e1e981d22110"
     },
-    "note": "against 681b5c8a, the same binary (sha256 b0f8dfc60aa2), so no change to cohere and any difference is the box's: cold root wall level (3060 ms, was 3060), user drifted up by 110 ms, 0%, the box's ranges apart (36330 ms, was 36220); cold deeafbf4 wall level (1885 ms, was 1865), user level (18205 ms, was 18145); warm root wall level (720 ms, was 710), user level (1890 ms, was 1860)",
+    "note": "against 65102a95: cold root checked 5613 files and 0 findings, and main's 5616 and 0, so not compared; cold deeafbf4 wall faster by 15 ms, 1%, ranges apart (1870 ms, was 1885), user faster by 50 ms, 0%, ranges apart (18155 ms, was 18205); warm root checked 5613 files and 0 findings, and main's 5616 and 0, so not compared",
     "checks": {
         "rounds": { "cold": 3, "deeafbf4": 2, "warm": 3 },
         "cold": {
             "root": {
-                "wall": { "median": 3060, "minimum": 3050, "maximum": 3060 },
-                "user": { "median": 36330, "minimum": 36300, "maximum": 36340 },
-                "system": { "median": 4980, "minimum": 4970, "maximum": 5080 },
-                "checked": { "files": 5616, "findings": 0 }
+                "wall": { "median": 3040, "minimum": 3040, "maximum": 3050 },
+                "user": { "median": 36150, "minimum": 36090, "maximum": 36300 },
+                "system": { "median": 4970, "minimum": 4960, "maximum": 5030 },
+                "checked": { "files": 5613, "findings": 0 }
             },
             "deeafbf4": {
-                "wall": { "median": 1885, "minimum": 1880, "maximum": 1890 },
-                "user": { "median": 18205, "minimum": 18180, "maximum": 18230 },
-                "system": { "median": 3835, "minimum": 3800, "maximum": 3870 },
+                "wall": { "median": 1870, "minimum": 1870, "maximum": 1870 },
+                "user": { "median": 18155, "minimum": 18150, "maximum": 18160 },
+                "system": { "median": 3825, "minimum": 3760, "maximum": 3890 },
                 "checked": { "files": 3428, "findings": 1765 }
             }
         },
         "warm": {
             "root": {
-                "wall": { "median": 720, "minimum": 720, "maximum": 720 },
-                "user": { "median": 1890, "minimum": 1860, "maximum": 1890 },
-                "system": { "median": 4210, "minimum": 4070, "maximum": 4300 },
-                "checked": { "files": 5616, "findings": 0 }
+                "wall": { "median": 710, "minimum": 710, "maximum": 720 },
+                "user": { "median": 1860, "minimum": 1860, "maximum": 1870 },
+                "system": { "median": 4180, "minimum": 4040, "maximum": 4190 },
+                "checked": { "files": 5613, "findings": 0 }
             }
         },
-        "timeline": { "root": { "listing": 324, "handover": 1881, "builds": 2962, "run": 3018 } }
+        "timeline": { "root": { "listing": 269, "handover": 1854, "builds": 2939, "run": 2996 } }
     }
 }
