@@ -104,7 +104,9 @@ func swiftSource(name string, typeName string, contents []byte) ([]byte, error) 
 		"/*\n Generated from cohere's policy/%s by `go run ./policy/tools/generate`. Do not edit it here:\n",
 		name,
 	)
-	source.WriteString(" edit the file and run that again. While the two differ, a test in Go and one in Swift fail.\n */\n")
+	source.WriteString(
+		" edit the file and run that again. While the two differ, a test in Go and one in Swift fail.\n */\n",
+	)
 	fmt.Fprintf(&source, "enum %s {\n", typeName)
 	fmt.Fprintf(&source, "    /* policy/%s, byte for byte. */\n", name)
 	fmt.Fprintf(&source, "    static let file = %s\"\"\"\n", delimiter)

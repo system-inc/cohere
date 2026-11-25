@@ -392,7 +392,11 @@ func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
 		{"provenance not first", without(findings, 0), 1, "provenance is always first"},
 		{
 			"a contract the front door does not speak",
-			replace(findings, 0, strings.Replace(findings[0], fmt.Sprintf(`"contract":%d`, contractVersion), `"contract":2`, 1)),
+			replace(
+				findings,
+				0,
+				strings.Replace(findings[0], fmt.Sprintf(`"contract":%d`, contractVersion), `"contract":2`, 1),
+			),
 			1,
 			"contract 2",
 		},
@@ -581,8 +585,9 @@ type excludedFile struct {
 }
 
 // declarationsOnlyReason is the child's reason for a file no target compiles that holds only declarations, so
-// it is no standalone script to check alone (swift_language/Sources/CohereSwift/Project/FileSet.swift, #13nbb1s). A script
-// is checked, and the bare `no target of this package compiles it` is left for a file below a project of its own.
+// it is no standalone script to check alone (swift_language/Sources/CohereSwift/Project/FileSet.swift, #13nbb1s). A
+// script is checked, and the bare `no target of this package compiles it` is left for a file below a project of its
+// own.
 const declarationsOnlyReason = "no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
 
 // projectRecordAt is a contract fixture's project record moved to root, its excluded files replaced, so a

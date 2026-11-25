@@ -82,8 +82,8 @@ var ruleSourceNotes = map[string]string{
 		"for Swift, the id a ported rule declares (swift_language/Rules.json); " +
 		"for Go, the analyzer or check a ported rule names (internal/go_language/rules)",
 	"category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
-	"typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift_language/Rules.json declares, " +
-		"or for Go the TypeAware its registration declares",
+	"typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware " +
+		"swift_language/Rules.json declares, or for Go the TypeAware its registration declares",
 	"options":    "the rule's registration: which decoder it carries and whether it requires options",
 	"messageIds": "the message ids the rule's own tests assert (examples/<rule>.json)",
 	"fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json); for Go, " +

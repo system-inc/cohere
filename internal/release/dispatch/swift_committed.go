@@ -38,7 +38,11 @@ import (
 // swiftPackageInputs are what decide cohere-swift, as `commit:path` objects: the same three the
 // working-tree hash reads, so a commit that changes only tests reuses the binary. They are also the
 // pathspecs a development binary's `sourceTreeModified` is read under (ResolveSwiftBinary).
-var swiftPackageInputs = []string{"swift_language/Package.swift", "swift_language/Package.resolved", "swift_language/Sources"}
+var swiftPackageInputs = []string{
+	"swift_language/Package.swift",
+	"swift_language/Package.resolved",
+	"swift_language/Sources",
+}
 
 // resolveCommittedSwiftBinary returns cohere-swift for commit, building it when the cache has none.
 func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, contract int) (string, bool, error) {

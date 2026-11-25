@@ -245,7 +245,8 @@ func (report *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, rea
 		}
 		// An opt-in phase nobody named was not deprived of anything by the bail.
 		if optInPhases[name] && !requested[name] {
-			// The dash is escaped, not changed: swift_language/Contract.md fixes this detail's spelling for both languages.
+			// The dash is escaped, not changed: swift_language/Contract.md fixes this detail's spelling for both
+			// languages.
 			report.record(name, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 			continue
 		}

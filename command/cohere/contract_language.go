@@ -120,8 +120,11 @@ func swiftVersionLines(provenance *contractProvenanceRecord, swiftSourceCommit s
 		provenance.Program, provenance.Version, provenance.Commit,
 		provenance.Toolchain, provenance.SwiftSyntax, provenance.SwiftFormat)}
 	if provenance.SourceTreeModified {
-		lines = append(lines, "  cohere-swift was built from uncommitted changes to its own sources under swift_language/, "+
-			"so no commit reproduces it")
+		lines = append(
+			lines,
+			"  cohere-swift was built from uncommitted changes to its own sources under swift_language/, "+
+				"so no commit reproduces it",
+		)
 	}
 	if swiftSourceCommit != "" {
 		lines = append(lines, fmt.Sprintf("  cohere-swift was built from Swift sources identical to commit %s, "+

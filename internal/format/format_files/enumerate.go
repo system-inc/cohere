@@ -313,8 +313,8 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 				return filepath.SkipDir
 			}
 			// A directory named Vendor at any depth holds someone else's code, as cohere-swift reads it
-			// (swift_language/Sources/CohereSwift/Project/FileSet.swift, "vendored under Vendor/"), so the Format project
-			// at the same root never judges what the Swift run there calls not ours (#fe4vr5s).
+			// (swift_language/Sources/CohereSwift/Project/FileSet.swift, "vendored under Vendor/"), so the Format
+			// project at the same root never judges what the Swift run there calls not ours (#fe4vr5s).
 			if info.Name() == VendoredLayer {
 				enumeration.IgnoredByLayer[VendoredLayer]++
 				return filepath.SkipDir

@@ -100,7 +100,10 @@ func TestEveryHouseRuleHasOneSwiftVerdict(test *testing.T) {
 		test.Fatal(problemsError)
 	}
 	for _, problem := range problems {
-		test.Errorf("swift_language/HouseRuleVerdicts.json: %s; give it a row, or say why it has none in Swift", problem)
+		test.Errorf(
+			"swift_language/HouseRuleVerdicts.json: %s; give it a row, or say why it has none in Swift",
+			problem,
+		)
 	}
 }
 

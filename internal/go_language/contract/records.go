@@ -67,8 +67,8 @@ type ExcludedFile struct {
 	File   string `json:"file"`
 	Reason string `json:"reason"`
 
-	// Source is additive within contract 3 (swift_language/Contract.md): the rule that decided, as `path:line` relative to
-	// the root, such as `.gitignore:1`, and left out where no rule of a file and line decided.
+	// Source is additive within contract 3 (swift_language/Contract.md): the rule that decided, as `path:line` relative
+	// to the root, such as `.gitignore:1`, and left out where no rule of a file and line decided.
 	Source string `json:"source,omitempty"`
 }
 

@@ -284,7 +284,9 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 		},
 		{
 			"a family-level row with a kind",
-			withMissingSwift(`[{"language": "swift", "family": "words", "kind": "verdict", "task": "t", "reason": "r"}]`),
+			withMissingSwift(
+				`[{"language": "swift", "family": "words", "kind": "verdict", "task": "t", "reason": "r"}]`,
+			),
 			"family-level row with a kind",
 		},
 		{

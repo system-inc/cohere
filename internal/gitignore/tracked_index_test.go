@@ -50,8 +50,8 @@ func placeIndex(test *testing.T, gitDirectory string, contents []byte) {
 
 // swiftSamples is cohere-swift's git index samples, which hold what the shared fixtures in testdata/index lack: a
 // SHA-256 repository at each version, a sparse index and a split index, each written by git 2.54. How git made them
-// is in swift_language/Tests/CohereSwiftTests/GitIndexTests.swift. They are read where they live, never copied, so the two
-// readers meet the same bytes.
+// is in swift_language/Tests/CohereSwiftTests/GitIndexTests.swift. They are read where they live, never copied, so the
+// two readers meet the same bytes.
 var swiftSamples = filepath.Join("..", "..", "swift_language", "Tests", "GitIndexSamples")
 
 // swiftSampleTracked is every path each SHA-256 sample tracks, in the index's order: a repository whose `.gitignore`

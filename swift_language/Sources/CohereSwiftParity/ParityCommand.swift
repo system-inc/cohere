@@ -85,7 +85,9 @@ struct ParityCommand {
         let package = try PackageModel.load(root: root, scratchPath: Pipeline.scratchPath(for: root), runner: runner)
         let files = try FileSet.build(package: package).owned.map(\.url)
         guard !files.isEmpty else {
-            throw UsageFailure(description: "cohere-swift owns no files in \(root.path), so there is nothing to compare")
+            throw UsageFailure(
+                description: "cohere-swift owns no files in \(root.path), so there is nothing to compare"
+            )
         }
 
         let swiftLintRun = SwiftLintRun(executable: swiftLint, root: root, files: files, runner: runner)

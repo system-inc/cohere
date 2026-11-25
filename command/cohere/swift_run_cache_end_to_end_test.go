@@ -25,9 +25,9 @@ import (
 // the override and a stand-in `swift` first on PATH, so the front door's half of the replay is proved without building
 // the child: which runs replay, what a replay prints, and that every input the front door names, the toolchain and the
 // child among them, moves the replay when it changes. Which files the real cohere-swift names is proved by its own
-// tests (swift_language/Tests/CohereSwiftTests/RunInputsTests.swift); this stand-in names every file and directory below the
-// root, as the real cohere-swift's walk does. Each test has its own, so they run in parallel and none sees another's
-// table.
+// tests (swift_language/Tests/CohereSwiftTests/RunInputsTests.swift); this stand-in names every file and directory
+// below the root, as the real cohere-swift's walk does. Each test has its own, so they run in parallel and none sees
+// another's table.
 type swiftReplayFixture struct {
 	test   *testing.T
 	binary string
@@ -506,9 +506,10 @@ func TestEveryProjectOfARootWithGoAndSwiftReplays(test *testing.T) {
 
 // swiftScriptsRootBinary is the stand-in cohere-swift at a scripts-only root (#wpd36zj): a check over `--root`'s Swift
 // files, one rule finding at each that holds `forced`, whose inputs record names what the real cohere-swift's names
-// there (swift_language/Tests/CohereSwiftTests/StandaloneScriptTests.swift, aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict):
-// each Swift file and each directory its walk listed, and nothing under node_modules, .cache or .git, which the walk
-// never enters. COHERE_TEST_WALK_DEPENDENCIES names node_modules too, the walk a mutant would make.
+// there (swift_language/Tests/CohereSwiftTests/StandaloneScriptTests.swift,
+// aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict): each Swift file and each directory its walk listed, and nothing
+// under node_modules, .cache or .git, which the walk never enters. COHERE_TEST_WALK_DEPENDENCIES names node_modules
+// too, the walk a mutant would make.
 const swiftScriptsRootBinary = `echo started >> "$COHERE_TEST_SWIFT_STARTS"
 root=""
 while [ $# -gt 0 ]; do
