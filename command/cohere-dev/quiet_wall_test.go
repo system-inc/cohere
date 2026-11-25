@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A quiet window refuses every job that starts inside it but the run it is for, and says how long and how to

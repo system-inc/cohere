@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // scratchFixtures are the fixtures whose packages the scratch's tests add, every one block 1's tests load.

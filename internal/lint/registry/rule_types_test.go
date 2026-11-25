@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_types"
+	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 // ruleTypes is the export data of every package outside cohere that the option walks import: the standard

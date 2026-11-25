@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/cache_directory"
-	"github.com/system-inc/cohere/internal/replace"
+	"github.com/system-inc/cohere/internal/edit/replace"
 )
 
 // The cache table: everything cohere keeps between runs for one project root, in one directory.

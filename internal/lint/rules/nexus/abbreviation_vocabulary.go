@@ -4,12 +4,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 	"github.com/system-inc/cohere/policy"
 )
 
 // The abbreviation vocabulary, policy/Abbreviations.json, is read and interpreted in
-// internal/naming/abbreviation, which cohere-go's twin of this rule reads too, so the words, their
+// internal/text_rules/abbreviation, which cohere-go's twin of this rule reads too, so the words, their
 // forms and the order they are judged in live once for every language (#2cqemcd for the file itself).
 //
 // What stays here is this rule's own policy: the framework exemptions in the rule's listener, and its

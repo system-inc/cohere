@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // The census of a workspace is every `.go` file go would see in its owned modules, as absolute paths: inner

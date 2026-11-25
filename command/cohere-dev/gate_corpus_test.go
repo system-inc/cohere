@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // corpusFixtureGit runs git in directory with no configuration of the machine's, failing the test on an error.

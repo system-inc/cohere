@@ -20,7 +20,8 @@ const plantedInputs = "# The planted inventory.\n" +
 // plantedRules is a module's rules as the isolation step reads them: alpha and beta import shared, which imports
 // deep; gamma imports nothing; delta's fixture is a module of its own; registry.go sits in the rules directory itself,
 // importing gamma and delta for its ports table, with the inventory's table and a fixture of its own in its testdata,
-// and other.go outside it. Each rule directory has a testdata directory, and shared and deep have none.
+// and other.go outside it. Each rule directory has a testdata directory, and shared and deep have none. notes is a
+// helper whose testdata holds data for its own tests, no fixture, as staticcheck_wants' does.
 var plantedRules = map[string]string{
 	"internal/go_language/rules/rule_inputs.txt":                              plantedInputs,
 	"internal/go_language/rules/testdata/src/unused_fixture/fixture.go":       "package unused_fixture\n",
@@ -43,7 +44,9 @@ var plantedRules = map[string]string{
 	"internal/go_language/rules/vet/delta/testdata/parity/parity.go":   "package parity\n",
 	"internal/go_language/rules/shared/shared.go": "package shared\n\n" +
 		"import _ \"example.com/planted/internal/go_language/rules/deep\"\n",
-	"internal/go_language/rules/deep/deep.go": "package deep\n",
+	"internal/go_language/rules/deep/deep.go":                 "package deep\n",
+	"internal/go_language/rules/notes/notes.go":               "package notes\n",
+	"internal/go_language/rules/notes/testdata/read/case.txt": "a note\n",
 	"internal/go_language/rules/registry.go": "package rules\n\nimport (\n" +
 		"\t\"example.com/planted/internal/go_language/rules/gamma\"\n" +
 		"\t\"example.com/planted/internal/go_language/rules/vet/delta\"\n)\n\n" +
@@ -116,6 +119,8 @@ func TestALandIsolatesTheRuleDirectoriesItsDiffTouches(test *testing.T) {
 		{"a shared helper", changed(rules + "shared/shared.go"), []string{rules + "alpha", rules + "beta"}},
 		{"a helper's helper", changed(rules + "deep/deep.go"), []string{rules + "alpha", rules + "beta"}},
 		{"the registry", changed(rules + "registry.go"), nil},
+		{"a helper whose testdata is no fixture", changed(rules + "notes/notes.go"), nil},
+		{"that helper's test data", changed(rules + "notes/testdata/read/case.txt"), nil},
 		{"a file outside the rules", changed("internal/other/other.go"), nil},
 		{"a port flipped to PerUnit", flipped("SA0001 Composes", "SA0001 PerUnit"), []string{rules + "gamma"}},
 		{"a port flipped to FileSyntax", flipped("delta Composes", "delta FileSyntax"), []string{rules + "vet/delta"}},

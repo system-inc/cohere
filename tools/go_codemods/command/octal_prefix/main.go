@@ -24,10 +24,10 @@ import (
 	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_require_octal_prefix"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // passName is what the verified apply calls this pass in a refusal.
@@ -43,9 +43,9 @@ type declinedLiteral struct {
 // planned is what plan finds: an edit for each literal to rewrite, possibly twice when two variants read its file,
 // with its position for the report, and each literal left as written, keyed by its place.
 type planned struct {
-	edits     []rename.Edit
-	positions map[rename.EditKey]token.Position
-	declined  map[rename.EditKey]declinedLiteral
+	edits     []local_rename.Edit
+	positions map[local_rename.EditKey]token.Position
+	declined  map[local_rename.EditKey]declinedLiteral
 }
 
 // literalRecord is one literal of a rewritten file as a load reads it: its spelling, whether the rewrite spells it,
@@ -122,8 +122,8 @@ func rewrite(root string, skips []string, dryRun bool, output *bufio.Writer, err
 		fmt.Fprintf(errorOutput, "%s: %v\n", passName, planError)
 		return 1
 	}
-	edits, disagreements := rename.Deduplicate(found.edits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(found.edits)
+	editsByFile := local_rename.GroupByFile(edits)
 	report(loaded, edits, editsByFile, found, output)
 	for _, disagreement := range disagreements {
 		fmt.Fprintln(output, "  disagreement: "+disagreement)
@@ -162,8 +162,8 @@ func rewrite(root string, skips []string, dryRun bool, output *bufio.Writer, err
 // prove, and a reason it is left as written otherwise. A literal one variant edits is not declined by another.
 func plan(loaded *workspace.Workspace) (planned, error) {
 	result := planned{
-		positions: map[rename.EditKey]token.Position{},
-		declined:  map[rename.EditKey]declinedLiteral{},
+		positions: map[local_rename.EditKey]token.Position{},
+		declined:  map[local_rename.EditKey]declinedLiteral{},
 	}
 	for _, analyzedPackage := range loaded.Analyzed {
 		diagnostics, findError := findings(analyzedPackage)
@@ -183,7 +183,7 @@ func plan(loaded *workspace.Workspace) (planned, error) {
 		}
 		for _, diagnostic := range diagnostics {
 			position := analyzedPackage.Fset.PositionFor(diagnostic.Pos, false)
-			key := rename.EditKey{Filename: position.Filename, Offset: position.Offset}
+			key := local_rename.EditKey{Filename: position.Filename, Offset: position.Offset}
 			literal := literalAt[diagnostic.Pos]
 			file := fileOf[analyzedPackage.Fset.File(diagnostic.Pos)]
 			if literal == nil || file == nil {
@@ -203,7 +203,7 @@ func plan(loaded *workspace.Workspace) (planned, error) {
 				continue
 			}
 			result.positions[key] = position
-			result.edits = append(result.edits, rename.Edit{
+			result.edits = append(result.edits, local_rename.Edit{
 				Filename: position.Filename,
 				Offset:   position.Offset,
 				OldText:  literal.Value,
@@ -246,8 +246,8 @@ func onlyFix(diagnostic analysis.Diagnostic, literal *ast.BasicLit) (string, boo
 // report prints the counts, every literal to rewrite and every literal left as written with its reason.
 func report(
 	loaded *workspace.Workspace,
-	edits []rename.Edit,
-	editsByFile map[string][]rename.Edit,
+	edits []local_rename.Edit,
+	editsByFile map[string][]local_rename.Edit,
 	found planned,
 	output *bufio.Writer,
 ) {
@@ -277,7 +277,7 @@ func report(
 		fmt.Fprintf(output, "rejected, %s: %d\n", reason, reasons[reason])
 	}
 	for _, edit := range edits {
-		position := found.positions[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}]
+		position := found.positions[local_rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}]
 		fmt.Fprintf(output, "  rewrite: %s %s -> %s\n", place(position), edit.OldText, edit.NewText)
 	}
 	for _, line := range declinedLines {
@@ -289,11 +289,11 @@ func report(
 // variant that compiles the file, in source order, which a rewrite of spellings does not change. Each must keep the
 // type and constant value the type checker gave it before, and each rewritten one must read as the rule suggested.
 // Any other literal is held to its value alone, since gofmt may respell one, `0X1F` as `0x1F`, without changing it.
-func literalCheck(loaded *workspace.Workspace, edits []rename.Edit) workspace.Verify {
-	newTextAt := map[rename.EditKey]string{}
+func literalCheck(loaded *workspace.Workspace, edits []local_rename.Edit) workspace.Verify {
+	newTextAt := map[local_rename.EditKey]string{}
 	files := map[string]bool{}
 	for _, edit := range edits {
-		newTextAt[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = edit.NewText
+		newTextAt[local_rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = edit.NewText
 		files[edit.Filename] = true
 	}
 	expected := literalsOf(loaded.Roots, files, newTextAt)
@@ -345,7 +345,7 @@ func literalCheck(loaded *workspace.Workspace, edits []rename.Edit) workspace.Ve
 func literalsOf(
 	roots []*packages.Package,
 	files map[string]bool,
-	newTextAt map[rename.EditKey]string,
+	newTextAt map[local_rename.EditKey]string,
 ) map[string][]literalRecord {
 	records := map[string][]literalRecord{}
 	for _, rootsPackage := range roots {
@@ -363,7 +363,10 @@ func literalsOf(
 				}
 				record := literalRecord{text: literal.Value, value: valueOf(rootsPackage.TypesInfo, literal)}
 				offset := rootsPackage.Fset.PositionFor(literal.Pos(), false).Offset
-				if newText, isRewritten := newTextAt[rename.EditKey{Filename: filename, Offset: offset}]; isRewritten {
+				if newText, isRewritten := newTextAt[local_rename.EditKey{
+					Filename: filename,
+					Offset:   offset,
+				}]; isRewritten {
 					record.text, record.rewritten = newText, true
 				}
 				records[key] = append(records[key], record)

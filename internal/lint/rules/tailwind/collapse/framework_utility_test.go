@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 type wave1Fixture struct {

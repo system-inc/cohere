@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/naming/go_origin_names"
+	"github.com/system-inc/cohere/internal/go_language/origin_names"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
@@ -80,7 +80,7 @@ func typeCheck(test *testing.T, source string) fixture {
 	return fixture{fileSet: fileSet, packageTypes: packageTypes, info: info, files: []*ast.File{file}}
 }
 
-func fixtureWords(test *testing.T) go_origin_names.Vocabulary {
+func fixtureWords(test *testing.T) origin_names.Vocabulary {
 	test.Helper()
 	words, vocabularyError := parseVocabulary([]byte(fixtureVocabulary))
 	if vocabularyError != nil {
@@ -352,7 +352,7 @@ func sibling() {
 		false,
 		nil,
 	)
-	var proposals []rename.Proposal
+	var proposals []local_rename.Proposal
 	for _, decided := range candidates {
 		if decided.newName != "readError" {
 			test.Fatalf(
@@ -362,13 +362,18 @@ func sibling() {
 				decided.category,
 			)
 		}
-		proposals = append(proposals, rename.Proposal{Object: decided.variable, NewName: decided.newName})
+		proposals = append(proposals, local_rename.Proposal{Object: decided.variable, NewName: decided.newName})
 	}
 	if len(proposals) != 4 {
 		test.Fatalf("got %d proposals, want 4", len(proposals))
 	}
-	plan := rename.Check(
-		rename.Package{FileSet: checked.fileSet, Types: checked.packageTypes, Info: checked.info, Files: checked.files},
+	plan := local_rename.Check(
+		local_rename.Package{
+			FileSet: checked.fileSet,
+			Types:   checked.packageTypes,
+			Info:    checked.info,
+			Files:   checked.files,
+		},
 		proposals,
 	)
 	acceptedLines := map[int]bool{}
@@ -424,7 +429,7 @@ func TestQualifierWords(test *testing.T) {
 			false,
 		)
 		function := types.NewFunc(token.NoPos, packageTypes, testCase.functionName, signature)
-		newName, category := go_origin_names.QualifiedErrorName(function, words)
+		newName, category := origin_names.QualifiedErrorName(function, words)
 		if newName != testCase.newName || category != "" {
 			test.Errorf(
 				"%s.%s: got name %q category %q, want %q",

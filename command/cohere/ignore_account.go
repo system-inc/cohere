@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // Every ignore says what it kept out of the run (#cxeq6jw). Discovery reads the root's ignorePatterns whole and

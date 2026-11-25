@@ -3,7 +3,7 @@
 //
 // A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call
 // site by a reader who has to expand the abbreviation and hope they expanded it the way the author meant. The words
-// and the forms they are judged in are policy/Abbreviations.json, read through internal/naming/abbreviation, so the
+// and the forms they are judged in are policy/Abbreviations.json, read through internal/text_rules/abbreviation, so the
 // house keeps one vocabulary across every language.
 //
 // Only names this package declares are judged. A name that is someone else's, a use, an imported package's name, an
@@ -11,7 +11,7 @@
 // and is decided by types rather than by spelling.
 //
 // A whole word whose expansion Go already uses, as `err`'s `error` and `ctx`'s `context` are, asks for a descriptive
-// name. Where the value came from gives one (internal/naming/go_origin_names, which the errornames and contextnames
+// name. Where the value came from gives one (internal/go_language/origin_names, which the errornames and contextnames
 // codemods name by too). A local error written once, by a single call, takes the call's name, so `data, err :=
 // os.ReadFile(path)` is told to use readError, and offered it. A context.Context parameter is the caller's,
 // callerContext, and a local context written once takes the name of the call that made it, as context.WithCancel
@@ -31,7 +31,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_language/rules/load_memo"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 	"github.com/system-inc/cohere/policy"
 )
 

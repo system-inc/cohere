@@ -4,10 +4,10 @@
 // A file named for nothing in particular collects whatever has no other home, which is what a folder of that name
 // does, one level down, and Go's own guidance says of a util package what holds of a util file. This is the Go form of
 // nexus/consistency-no-utils-file-name and cohere-swift's rule of the same name, and reads a file name's words through
-// internal/file_name_words, the judgment the TypeScript rule reads too (the text rules family `utils-file-name`): the
-// name is cut at its underscores, go/build's `_test` and build-constraint suffixes are no words, and each word is held
-// whole to file_name_words.IsUtils, the reading cohere-go/consistency-no-utils-folder gives a folder, so utilities.go
-// and stringutils.go pass.
+// internal/text_rules/file_name_words, the judgment the TypeScript rule reads too (the text rules family
+// `utils-file-name`): the name is cut at its underscores, go/build's `_test` and build-constraint suffixes are no
+// words, and each word is held whole to file_name_words.IsUtils, the reading cohere-go/consistency-no-utils-folder
+// gives a folder, so utilities.go and stringutils.go pass.
 //
 // A generated file's name is its generator's, so a file go/ast.IsGenerated accepts is not judged, and neither is
 // doc.go, whose name the Go project's convention fixes, nor a file of a package under a folder whose files are someone
@@ -20,8 +20,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/go_language/rule"
+	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
 	"github.com/system-inc/cohere/policy"
 )
 

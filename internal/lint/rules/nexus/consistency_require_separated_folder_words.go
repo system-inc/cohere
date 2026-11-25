@@ -4,9 +4,9 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/folder_words"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text_rules/folder_words"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -32,9 +32,9 @@ const nodeModulesFolder = "node_modules"
 // ConsistencyRequireSeparatedFolderWords reports a folder inside the project whose name runs words together:
 // profileimages, not profile-images (#narw7aq, the text rules family `separated-folder-words`). It is the
 // TypeScript twin of cohere-go/consistency-require-separated-folder-words, and both read one judgment,
-// internal/folder_words: a name is cut into parts at its hyphens and underscores and at its case boundaries, a part
-// that is a word passes, and a part that splits into two or more words is the finding, with the split as the name it
-// asks for.
+// internal/text_rules/folder_words: a name is cut into parts at its hyphens and underscores and at its case boundaries,
+// a part that is a word passes, and a part that splits into two or more words is the finding, with the split as the
+// name it asks for.
 //
 // A mind reading cold reads `format-options` at a glance and has to stop and parse `formatoptions`, and a folder's
 // name is read before anything in it, on every import line and every path.

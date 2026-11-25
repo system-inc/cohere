@@ -47,7 +47,7 @@ func (options Given[Options]) Read() (Options, bool) {
 // rule's own decisions. The docs capture records the options each asserted case ran with, and that is the
 // harness reading what it handed the rule, not the rule reaching its options: counted, it moved
 // OptionsReads for a rule that never read them, so the registry's reach check failed under capture
-// (TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions). internal/guard keeps every caller in this
+// (TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions). internal/testing/guard keeps every caller in this
 // package or the test harness, so a rule cannot read through it and dodge the count.
 func (options Given[Options]) ForDisplay() (Options, bool) {
 	return options.value, options.configured

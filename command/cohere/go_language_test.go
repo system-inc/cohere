@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // typedTrue reads every flag as given and true, the way a caller who typed it would.
@@ -379,7 +379,7 @@ func runFakeGoChild(test *testing.T, body string) (string, int, error) {
 // Not parallel: its subtests drive check runs through contractRun, whose record acceptors set the
 // package-level activeSummary.
 func TestAGoChildThatDoesNotFinishChecksNothing(test *testing.T) {
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "GoClean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "GoClean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}

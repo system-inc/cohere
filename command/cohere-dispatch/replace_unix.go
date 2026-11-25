@@ -7,7 +7,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // replaceProcess replaces this process with the cohere binary, so the binary inherits the terminal

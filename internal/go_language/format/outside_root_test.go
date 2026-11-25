@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/write_root"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 )
 
 // linkedTree is a project directory and, beside it, a shared directory the project reaches through links, both in

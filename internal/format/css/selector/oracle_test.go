@@ -20,9 +20,9 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // selectorParseScript is the oracle: postcss-selector-parser 2.2.3 from the fork's node_modules, called

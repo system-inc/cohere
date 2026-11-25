@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // shardGo stands in for go in the shards' block. It records each call with its `GOMAXPROCS` to `$SHARD_CALLS`, answers

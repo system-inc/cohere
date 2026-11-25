@@ -112,7 +112,7 @@ func chooseKeeper(file *sourceFile, parts []*part) *part {
 }
 
 // programReadReason is why a part that readsRuleProgram stays.
-const programReadReason = "it reads the program through a rule.Context, which internal/guard's " +
+const programReadReason = "it reads the program through a rule.Context, which internal/testing/guard's " +
 	"TestRulesDeclareExactlyWhatTheyReadOfTheProgram keeps in the file that defines the rule"
 
 // planGroup makes every file of a group serve at most one type. In a file serving several, one part

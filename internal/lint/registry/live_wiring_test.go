@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The live config, which is the only thing that decides whether a registered rule ever runs.

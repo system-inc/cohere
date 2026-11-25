@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
 	"github.com/system-inc/cohere/policy"
 )
 

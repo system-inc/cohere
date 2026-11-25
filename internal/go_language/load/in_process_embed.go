@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/mod/module"
 
-	"github.com/system-inc/cohere/internal/listed_directories"
+	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
 // resolveEmbedPatterns is the files a package's `//go:embed` patterns match, relative to its directory,

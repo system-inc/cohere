@@ -43,8 +43,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 func main() {

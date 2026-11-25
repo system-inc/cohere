@@ -36,6 +36,10 @@ replace (
 
 	// Go's build cache layout and how to delete from it safely, shared with Loom the same way (#xwfdr3d).
 	github.com/system-inc/cohere/go_cache => ./go_cache
+
+	// What `go list -json` says of a build's packages and the files it names, shared with Loom and Adamic the same
+	// way (#qqg66c7).
+	github.com/system-inc/cohere/go_listing => ./go_listing
 )
 
 require (
@@ -56,6 +60,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
 	github.com/system-inc/cohere/git_tree v0.0.0
 	github.com/system-inc/cohere/go_cache v0.0.0
+	github.com/system-inc/cohere/go_listing v0.0.0
 	github.com/system-inc/cohere/memory_limit v0.0.0
 	github.com/system-inc/cohere/mutation_aliasing v0.0.0
 	github.com/system-inc/cohere/static_single_assignment v0.0.0

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // steppedGate is a land fixture whose go stands in for the gate's commands: each logs the share it was

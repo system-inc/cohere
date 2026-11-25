@@ -3,12 +3,12 @@
  *
  * A fixture that records a path inside a private checkout spells it "<corpus>:<path in it>", as in
  * "ahra:app/_theme/styles/theme.css", so the committed file reads the same on every machine and the
- * tests resolve it through internal/corpus. A generator takes the same spelling as input and records it
- * as given, so a regenerated fixture stays portable. This is internal/corpus's Locate for the Node
+ * tests resolve it through internal/testing/corpus. A generator takes the same spelling as input and records it
+ * as given, so a regenerated fixture stays portable. This is internal/testing/corpus's Locate for the Node
  * side: the corpus's variable, or else the user's corpora file, gives its root.
  *
  * A path inside this repository, such as a public design system under testdata, is recorded relative to
- * the repository's root, which internal/corpus's Resolve reads the same way (#f598zk0). Only a path
+ * the repository's root, which internal/testing/corpus's Resolve reads the same way (#f598zk0). Only a path
  * outside both is recorded absolute, and Resolve refuses that one.
  */
 
@@ -18,7 +18,7 @@ import * as NodePath from 'node:path';
 import * as NodeUrl from 'node:url';
 
 /*
- * Each corpus's name and the variable that holds its root, a copy of internal/corpus's All, held to it
+ * Each corpus's name and the variable that holds its root, a copy of internal/testing/corpus's All, held to it
  * by that package's TestTheGeneratorsNameTheSameCorpora.
  */
 const corpusVariables = {
@@ -32,7 +32,7 @@ const spellingPattern = /^([a-z][a-z0-9-]+):(.*)$/;
 
 /*
  * This repository's root: the nearest directory above this file whose go.mod declares the module, as
- * internal/corpus's RepositoryRoot finds it from a test's directory.
+ * internal/testing/corpus's RepositoryRoot finds it from a test's directory.
  */
 const repositoryRoot = (function() {
     let directory = NodePath.dirname(NodeUrl.fileURLToPath(import.meta.url));

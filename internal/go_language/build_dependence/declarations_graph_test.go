@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // declarationsTreesVariable names the trees the declarations-only graph's wide run loads (#w72zxtq), comma-separated,

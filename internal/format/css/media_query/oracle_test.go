@@ -15,10 +15,10 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // mediaQueryScript is the oracle: postcss-media-query-parser 0.2.3 from the fork's node_modules. Each

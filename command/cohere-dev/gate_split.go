@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // The landing gate split across two house Macs (#bc8nf0r). One gate on Sun2 took 41m48s: its plain tests 26m45s, nearly
@@ -25,11 +25,13 @@ import (
 //
 //   - The gate's packages are listed here, `go list` of the module's patterns at the commit in the gate's environment,
 //     and each half is handed its packages as import paths in place of the patterns, with its share of the race tokens.
-//     The split is the Square's starting one, internal/go_language alone on one half and everything else on the other.
-//     A package's Elapsed is its test binary's wall, not its CPU, and the box is CPU-bound: go_language fills every
-// core
-//     while most binaries use one or two, so balancing summed Elapsed would load go_language's half with more. The
-//     halves' times are still kept (gateTimesFile), for a balancer built from the halves' own walls.
+//   - The split is by measured time, not by name (the Square's ruling, #q1mvjgg). The starting split put
+//     internal/go_language alone on one half, which was right while that package took 26 minutes; sharding cut it to
+//     about 100s and the split never moved, so Sun2's half ended in 1m35s while Marin's ran about 21.5 minutes (Nov
+//     25, the last six landings). Now every package and race token is placed by its last time (gateTimesFile), and
+//     each half's estimate is calibrated by its box's last measured wall (gateHalfRecord), since a package's Elapsed
+//     is its own wall under its box's contention and a half's wall is not the sum of its items: about 1,290s of wall
+//     for 2,760s of summed times on Marin. The starting split stays for a pool with no times to weigh by.
 //   - Coverage is proven, never assumed: each half's report names exactly the packages it was given, its -race run
 //     exactly its race tokens' packages, and across both every listed package and every race token appears once. A
 //     package missing, doubled or unexpected refuses the landing, naming it.
@@ -54,22 +56,36 @@ const gateSplitWaitVariable = "COHERE_DEV_GATE_SPLIT_WAIT"
 const gateSplitWaitDefault = 10 * time.Minute
 
 // gateTimesFile is where, beside the pool's other state, the gate keeps the seconds each package's test binary took in
-// the last split gate, plain and under -race, which the next split weighs its halves by.
+// the last split gate, plain and under -race, and each box's last half, which the next split weighs its halves by.
 const gateTimesFile = "gate-times.json"
 
-// gateSplitStartingDirectory is the package the Square's starting split runs alone on one half, with every other
-// package and every race token on the other, until a split gate has written gateTimesFile: its test binary is most of
-// the gate's plain run.
-const gateSplitStartingDirectory = "internal/go_language"
+// gateShardedDirectory is the package the box runs in shards (boxShardedPackage), by its directory. It runs alone after
+// a half's plain run on all of her cores, so its weight counts at full value on either half rather than scaled by the
+// box's factor, and the Square's starting split runs it alone on one half until a split gate has written gateTimesFile.
+const gateShardedDirectory = "internal/go_language"
 
-// gateSplitUnweighed is the seconds a package or race token with no time in gateTimesFile weighs.
+// gateSplitUnweighed is the seconds a package or race token weighs when gateTimesFile holds no time of its kind at all.
 const gateSplitUnweighed = 1.0
 
+// gateSplitDefaultFactor is a box's factor, her half's wall over its summed item seconds, when neither box has a half
+// recorded: about what Marin measured, 1,290s of wall for 2,760s of summed times (Nov 25).
+const gateSplitDefaultFactor = 0.5
+
 // gateTimes is gateTimesFile: each package's last plain Elapsed and each race token's package's last -race Elapsed,
-// in seconds, by import path.
+// in seconds, by import path, and each box's last half, by her name. A file written before the halves were kept reads
+// with none.
 type gateTimes struct {
-	Plain map[string]float64 `json:"plain"`
-	Race  map[string]float64 `json:"race"`
+	Plain  map[string]float64        `json:"plain"`
+	Race   map[string]float64        `json:"race"`
+	Halves map[string]gateHalfRecord `json:"halves,omitempty"`
+}
+
+// gateHalfRecord is what a box's last half of a split gate measured, in seconds: its items' summed Elapsed, plain and
+// -race, the sharded package's apart, the sharded package's slowest shard, and its wall, the sum of its steps.
+type gateHalfRecord struct {
+	Weight  float64 `json:"weight"`
+	Sharded float64 `json:"sharded"`
+	Wall    float64 `json:"wall"`
 }
 
 // gateListing is what the gate tests, as `go list` read it here: every package of the module's patterns, by import
@@ -78,8 +94,8 @@ type gateListing struct {
 	packages []string
 	// racePackages is each race token's package, by the token.
 	racePackages map[string]string
-	// startingPackage is the import path at gateSplitStartingDirectory, empty when the tree has none there.
-	startingPackage string
+	// shardedPackage is the import path at gateShardedDirectory, empty when the tree has none there.
+	shardedPackage string
 }
 
 // gateHalf is one half of a split gate: the box that runs it, the packages it tests by import path, and its race
@@ -88,6 +104,10 @@ type gateHalf struct {
 	box      string
 	packages []string
 	races    []string
+	// weighed is whether the split placed the half by recorded times, and estimate then its wall as the split
+	// reckoned it; the starting split, with no times, reckons none.
+	weighed  bool
+	estimate time.Duration
 }
 
 // gateSplit is what a split gate came to: its verdict or why it gave none, which refuses the landing, or, when it
@@ -138,8 +158,7 @@ func runSplitGate(
 		return gateSplit{whole: whole, because: because}
 	}
 	times, timesFile := readGateTimes()
-	halves := splitGate(listing, races, times)
-	halves[0].box, halves[1].box = free[0], free[1]
+	halves := splitGate(listing, races, times, [2]string{free[0], free[1]})
 	verdict, unavailable := runGateHalves(worktree, commit, pin, corpora, listing, races, halves, timesFile, times)
 	return gateSplit{verdict: verdict, unavailable: unavailable}
 }
@@ -217,7 +236,7 @@ func listGatePackages(worktree string, patterns []string, races []string, testin
 		}
 		listing.racePackages[token] = importPath
 	}
-	listing.startingPackage = byDirectory[filepath.Join(root, filepath.FromSlash(gateSplitStartingDirectory))]
+	listing.shardedPackage = byDirectory[filepath.Join(root, filepath.FromSlash(gateShardedDirectory))]
 	return listing, nil
 }
 
@@ -266,46 +285,34 @@ func readGateTimes() (*gateTimes, string) {
 	return &times, path
 }
 
-// splitGate splits the listing's packages and the race tokens into two halves. With a package at
-// gateSplitStartingDirectory it is the Square's starting split, times or none: that package alone on the first half,
-// every other package and every race token on the second, since Elapsed is a binary's wall rather than its CPU, and
-// balancing walls on a CPU-bound box would put more beside go_language, which already fills every core. With no package
-// there, each package and token goes, heaviest first, onto the lighter half, weighing its last time or
-// gateSplitUnweighed, and a half left with no package takes the other's lightest, since a go test handed no package
-// tests the directory it runs in. The listing holds two packages at least.
-func splitGate(listing gateListing, races []string, times *gateTimes) [2]gateHalf {
-	halves := [2]gateHalf{}
-	if listing.startingPackage != "" {
-		halves[0].packages = []string{listing.startingPackage}
+// splitGate splits the listing's packages and the race tokens into two halves, the first run by boxes[0] and the second
+// by boxes[1]. With no times to weigh by and a package at gateShardedDirectory it is the Square's starting split: that
+// package alone on the first half, every other package and every race token on the second. Otherwise every package and
+// token (gateItems) goes, heaviest first, to the half whose estimate is lower once it holds it: the sum of its items'
+// weights, each scaled by its box's factor (boxFactors) but the sharded package's, at full value, since it runs alone
+// on all of her cores. A half left with no package takes the other's lightest, since a go test handed no package tests
+// the directory it runs in. The listing holds two packages at least.
+func splitGate(listing gateListing, races []string, times *gateTimes, boxes [2]string) [2]gateHalf {
+	halves := [2]gateHalf{{box: boxes[0]}, {box: boxes[1]}}
+	if times == nil && listing.shardedPackage != "" {
+		halves[0].packages = []string{listing.shardedPackage}
 		for _, importPath := range listing.packages {
-			if importPath != listing.startingPackage {
+			if importPath != listing.shardedPackage {
 				halves[1].packages = append(halves[1].packages, importPath)
 			}
 		}
 		halves[1].races = slices.Clone(races)
 		return halves
 	}
-	weighed := times
-	if weighed == nil {
-		weighed = &gateTimes{}
+	weighed := gateTimes{}
+	if times != nil {
+		weighed = *times
 	}
-	// item is one package or race token, with what it weighs.
-	type item struct {
-		name   string
-		race   bool
-		weight float64
-	}
-	items := []item{}
-	for _, importPath := range listing.packages {
-		items = append(items, item{name: importPath, weight: weightOf(weighed.Plain, importPath)})
-	}
-	for _, token := range races {
-		items = append(items, item{name: token, race: true,
-			weight: weightOf(weighed.Race, listing.racePackages[token])})
-	}
+	factors := boxFactors(boxes, weighed)
+	items := gateItems(listing, races, weighed)
 	// Heaviest first, then packages before tokens, then by name, so one listing and one file always split alike.
-	slices.SortFunc(items, func(one item, other item) int {
-		kind := func(each item) int {
+	slices.SortFunc(items, func(one gateItem, other gateItem) int {
+		kind := func(each gateItem) int {
 			if each.race {
 				return 1
 			}
@@ -314,14 +321,14 @@ func splitGate(listing gateListing, races []string, times *gateTimes) [2]gateHal
 		return cmp.Or(cmp.Compare(other.weight, one.weight), cmp.Compare(kind(one), kind(other)),
 			cmp.Compare(one.name, other.name))
 	})
-	// loads is the seconds each half holds so far.
-	loads := [2]float64{}
+	// estimates is the seconds each half is reckoned to take so far.
+	estimates := [2]float64{}
 	for _, each := range items {
 		target := 0
-		if loads[1] < loads[0] {
+		if estimates[1]+scaledWeight(each, factors[1]) < estimates[0]+scaledWeight(each, factors[0]) {
 			target = 1
 		}
-		loads[target] += each.weight
+		estimates[target] += scaledWeight(each, factors[target])
 		if each.race {
 			halves[target].races = append(halves[target].races, each.name)
 			continue
@@ -340,16 +347,117 @@ func splitGate(listing gateListing, races []string, times *gateTimes) [2]gateHal
 	for index := range halves {
 		halves[index].packages = inListingOrder(halves[index].packages, listing.packages)
 		halves[index].races = inListingOrder(halves[index].races, races)
+		// Reckoned again from what the half holds, since the move of a lightest package changed both halves.
+		seconds := 0.0
+		for _, each := range items {
+			given := halves[index].packages
+			if each.race {
+				given = halves[index].races
+			}
+			if slices.Contains(given, each.name) {
+				seconds += scaledWeight(each, factors[index])
+			}
+		}
+		halves[index].weighed = times != nil
+		if halves[index].weighed {
+			halves[index].estimate = time.Duration(seconds * float64(time.Second))
+		}
 	}
 	return halves
 }
 
-// weightOf is the seconds name weighs in times, gateSplitUnweighed when it has none there.
-func weightOf(times map[string]float64, name string) float64 {
+// gateItem is one package or race token a split places: its name, as a half is handed it, its weight in seconds, and
+// whether it counts at full value on either box, which the sharded package does, rather than scaled by her factor.
+type gateItem struct {
+	name   string
+	race   bool
+	weight float64
+	full   bool
+}
+
+// scaledWeight is the seconds item adds to the estimate of a half whose box's factor is factor.
+func scaledWeight(item gateItem, factor float64) float64 {
+	if item.full {
+		return item.weight
+	}
+	return item.weight * factor
+}
+
+// gateItems is every package the listing holds and every race token, each weighing its last time in times. One with no
+// time weighs the median of the recorded times of its kind among them, plain or -race, so a new package lands like an
+// ordinary one and is timed by its next gate, and gateSplitUnweighed when its kind has none recorded.
+func gateItems(listing gateListing, races []string, times gateTimes) []gateItem {
+	plainRecorded := []float64{}
+	for _, importPath := range listing.packages {
+		if seconds, timed := times.Plain[importPath]; timed {
+			plainRecorded = append(plainRecorded, seconds)
+		}
+	}
+	raceRecorded := []float64{}
+	for _, token := range races {
+		if seconds, timed := times.Race[listing.racePackages[token]]; timed {
+			raceRecorded = append(raceRecorded, seconds)
+		}
+	}
+	items := []gateItem{}
+	for _, importPath := range listing.packages {
+		items = append(items, gateItem{name: importPath, weight: weightOf(times.Plain, importPath, plainRecorded),
+			full: importPath == listing.shardedPackage})
+	}
+	for _, token := range races {
+		items = append(items, gateItem{name: token, race: true,
+			weight: weightOf(times.Race, listing.racePackages[token], raceRecorded)})
+	}
+	return items
+}
+
+// weightOf is the seconds name weighs in times, and when it has none there the median of recorded, the times of its
+// kind, or gateSplitUnweighed when recorded holds none.
+func weightOf(times map[string]float64, name string, recorded []float64) float64 {
 	if seconds, timed := times[name]; timed {
 		return seconds
 	}
-	return gateSplitUnweighed
+	if len(recorded) == 0 {
+		return gateSplitUnweighed
+	}
+	sorted := slices.Sorted(slices.Values(recorded))
+	middle := len(sorted) / 2
+	if len(sorted)%2 == 0 {
+		return (sorted[middle-1] + sorted[middle]) / 2
+	}
+	return sorted[middle]
+}
+
+// boxFactors is the factor of each of boxes, her half's wall over its summed item seconds, which scales an item's
+// weight into her half's estimate: her last half's (boxFactor), or with none the other box's, or with neither
+// gateSplitDefaultFactor.
+func boxFactors(boxes [2]string, times gateTimes) [2]float64 {
+	factors := [2]float64{}
+	recorded := [2]bool{}
+	for index, box := range boxes {
+		factors[index], recorded[index] = boxFactor(times.Halves[box])
+	}
+	for index := range factors {
+		if recorded[index] {
+			continue
+		}
+		factors[index] = gateSplitDefaultFactor
+		if recorded[1-index] {
+			factors[index] = factors[1-index]
+		}
+	}
+	return factors
+}
+
+// boxFactor is a box's factor from her last half, record, and whether it gives one: her wall, the sharded package's
+// seconds taken out, over her summed item seconds. The sharded package is taken out because a split counts it at full
+// value, so the factor reckons that half's own items back to its measured wall. A half with no item seconds or no wall
+// left gives none, as does the zero record of a box never recorded.
+func boxFactor(record gateHalfRecord) (float64, bool) {
+	if record.Weight <= 0 || record.Wall-record.Sharded <= 0 {
+		return 0, false
+	}
+	return (record.Wall - record.Sharded) / record.Weight, true
 }
 
 // inListingOrder is names in the order order holds them, so a half's arguments read as the listing does.
@@ -393,8 +501,9 @@ func runGateHalves(
 		group.Go(func() {
 			// Ignored: a line to the terminal that never arrives loses nothing the verdict needs, and the
 			// stream keeps its error for streams.Finish to report.
-			fmt.Fprintf(lines, "cohere-dev: testing %s's half on %s in her gap, %d packages%s; the land lock stays "+
-				"held while it runs\n", shortCommit(commit), half.box, len(half.packages), racesNamed(half))
+			fmt.Fprintf(lines, "cohere-dev: testing %s's half on %s in her gap, %d packages%s%s; the land lock "+
+				"stays held while it runs\n", shortCommit(commit), half.box, len(half.packages), racesNamed(half),
+				estimateNamed(half))
 			remote := macBoxRemoteCommand(half.box, commit, pin, half.races, corpora, half.packages)
 			output, stayedHeld, unavailable, runError := runOnGateBox(worktree, half.box, remote, corpora, lines)
 			runs[index] = halfRun{output: output, stayedHeld: stayedHeld, unavailable: unavailable, runError: runError}
@@ -424,7 +533,7 @@ func runGateHalves(
 		}
 		verdicts[index] = verdict
 	}
-	writeGateTimes(timesFile, times, listing, verdicts)
+	writeGateTimes(timesFile, times, listing, halves, verdicts)
 	merged, unavailable := mergeHalfVerdicts(halves, verdicts)
 	if unavailable != "" {
 		return boxVerdict{}, unavailable
@@ -447,6 +556,14 @@ func racesNamed(half gateHalf) string {
 		return ""
 	}
 	return fmt.Sprintf(" and %d -race tokens", len(half.races))
+}
+
+// estimateNamed is how a half's estimate is said after its counts, empty for a half the starting split placed.
+func estimateNamed(half gateHalf) string {
+	if !half.weighed {
+		return ""
+	}
+	return ", reckoned at " + half.estimate.Round(time.Second).String()
 }
 
 // splitCoverageGaps is every way the halves' verdicts fail to cover the gate exactly once, each naming its package,
@@ -534,12 +651,21 @@ func reportGaps(run string, given []string, reported []string) []string {
 
 // writeGateTimes rewrites the gate's times at path from both halves' verdicts: each package's plain Elapsed and each
 // -race package's, keeping a time the last file held for a package this landing lists but neither half timed, a half
-// whose plain run failed and so ran no -race run. A time it can't write is said, and the next split weighs as this one.
-func writeGateTimes(path string, previous *gateTimes, listing gateListing, verdicts [2]boxVerdict) {
+// whose plain run failed and so ran no -race run, and each half's record under its box's name (halfRecord), keeping the
+// last file's record of a box whose half measured none or who ran no half. A time it can't write is said, and the next
+// split weighs as this one.
+func writeGateTimes(
+	path string,
+	previous *gateTimes,
+	listing gateListing,
+	halves [2]gateHalf,
+	verdicts [2]boxVerdict,
+) {
 	if path == "" {
 		return
 	}
-	times := gateTimes{Plain: map[string]float64{}, Race: map[string]float64{}}
+	// Halves is written only once a half is recorded, since an empty map is omitted.
+	times := gateTimes{Plain: map[string]float64{}, Race: map[string]float64{}, Halves: map[string]gateHalfRecord{}}
 	for _, verdict := range verdicts {
 		maps.Copy(times.Plain, verdict.packageSeconds)
 		if verdict.race != nil {
@@ -562,6 +688,18 @@ func writeGateTimes(path string, previous *gateTimes, listing gateListing, verdi
 			}
 		}
 	}
+	for index, verdict := range verdicts {
+		if record, measured := halfRecord(verdict); measured {
+			times.Halves[halves[index].box] = record
+		}
+	}
+	if previous != nil {
+		for box, record := range previous.Halves {
+			if _, measured := times.Halves[box]; !measured {
+				times.Halves[box] = record
+			}
+		}
+	}
 	contents, marshalError := json.MarshalIndent(times, "", "  ")
 	if marshalError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: the gate's times weren't written: %v\n", marshalError)
@@ -578,9 +716,55 @@ func writeGateTimes(path string, previous *gateTimes, listing gateListing, verdi
 	}
 }
 
+// halfRecord is what a half's verdict measured, for its box's next factor (boxFactor): its items' summed seconds,
+// plain and -race, the sharded package's apart, and its wall, the sum of its steps, each summed in its names' order
+// so one verdict always records alike. A half that said no step measured no wall, and one whose plain run failed ran
+// no -race run, so its wall is short of a whole half's: neither gives a record.
+func halfRecord(verdict boxVerdict) (gateHalfRecord, bool) {
+	wall := verdict.halfWall()
+	if wall <= 0 || verdict.failed() {
+		return gateHalfRecord{}, false
+	}
+	record := gateHalfRecord{Wall: wall.Seconds()}
+	for _, importPath := range slices.Sorted(maps.Keys(verdict.packageSeconds)) {
+		if slices.Contains(verdict.shardedPackages, importPath) {
+			record.Sharded += verdict.packageSeconds[importPath]
+			continue
+		}
+		record.Weight += verdict.packageSeconds[importPath]
+	}
+	if verdict.race != nil {
+		for _, importPath := range slices.Sorted(maps.Keys(verdict.race.packageSeconds)) {
+			record.Weight += verdict.race.packageSeconds[importPath]
+		}
+	}
+	return record, true
+}
+
+// splitBalance is how the halves were placed and what each took, as the land line says it: each half's estimate beside
+// the wall its steps measured, or, for the starting split, which had no times to reckon by, each half's wall alone.
+func splitBalance(halves [2]gateHalf, verdicts [2]boxVerdict) string {
+	said := []string{}
+	for index, half := range halves {
+		ran := "said no steps"
+		if wall := verdicts[index].halfWall(); wall > 0 {
+			ran = "ran " + wall.String()
+		}
+		if half.weighed {
+			said = append(said, fmt.Sprintf("%s est %s, %s", half.box, half.estimate.Round(time.Second), ran))
+			continue
+		}
+		said = append(said, half.box+" "+ran)
+	}
+	if !halves[0].weighed {
+		return "its halves by the starting split, with no times kept: " + strings.Join(said, "; ")
+	}
+	return "its halves by their recorded times: " + strings.Join(said, "; ")
+}
+
 // mergeHalfVerdicts is the halves' one verdict: counts summed, maps and lists united, each half kept whole under its
-// box's name for its steps and its slowest binaries, and its -race runs merged alike. Halves that tested on two
-// platforms are no one gate, which refuses the landing.
+// box's name for its steps and its slowest binaries, and its -race runs merged alike, with how the halves were placed
+// and what each took (splitBalance). Halves that tested on two platforms are no one gate, which refuses the landing.
 func mergeHalfVerdicts(halves [2]gateHalf, verdicts [2]boxVerdict) (boxVerdict, string) {
 	first, second := verdicts[0], verdicts[1]
 	if first.operatingSystem != second.operatingSystem || first.architecture != second.architecture {
@@ -606,6 +790,7 @@ func mergeHalfVerdicts(halves [2]gateHalf, verdicts [2]boxVerdict) (boxVerdict, 
 		described = append(described, fmt.Sprintf("%s %d%s", half.box, len(half.packages), racesNamed(half)))
 	}
 	merged.halves = strings.Join(described, ", ")
+	merged.split = splitBalance(halves, verdicts)
 	return merged, ""
 }
 

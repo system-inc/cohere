@@ -22,7 +22,7 @@ const (
 )
 
 // label is how a reader sees the kind, in a project's heading and label and the summary's counts: the language
-// its files are written in, and Folder for the root's format-only project.
+// its files are written in, and Formats for the root's format-only project, the word its flag, `--formats`, uses.
 func (kind projectKind) label() string {
 	switch kind {
 	case projectKindTypeScriptProgram:
@@ -32,7 +32,7 @@ func (kind projectKind) label() string {
 	case projectKindGoModule:
 		return "Go"
 	case projectKindFolder:
-		return "Folder"
+		return "Formats"
 	}
 	return string(kind)
 }

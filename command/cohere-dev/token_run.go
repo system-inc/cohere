@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // tokenRun is a token's run and what it has borrowed, rebalanced before each of its go commands (#fvbwfvh).

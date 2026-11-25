@@ -10,7 +10,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 /*

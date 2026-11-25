@@ -2,8 +2,8 @@
 
 /*
  cohere-swift: the Swift checker behind the `cohere` front door. It fixes, formats, type-checks and lints
- a Swift package in one process and reports what it did as the records `Contract.md` defines. The Go
- front door renders those records exactly as it renders a TypeScript run.
+ a Swift package in one process and reports what it did as the records documentation/contract/Contract.md
+ defines. The Go front door renders those records exactly as it renders a TypeScript run.
 
  swift-syntax and swift-format are pinned to one exact release, the one matching the toolchain (604.x
  for Swift 6.4). They come from packages rather than from the toolchain's own `usr/lib/swift/host`
@@ -126,9 +126,9 @@ let package = Package(
             dependencies: ["CohereSwift"],
             swiftSettings: houseSettings,
             /*
-             The contract fixtures live beside Contract.md, outside this target, so the Go renderer's tests
-             read the same files. The tests find them by walking up from their own source path rather than
-             copying them in as resources, because a copy is a second agreement that can drift.
+             The contract fixtures live in documentation/contract/fixtures/, outside this package, so the Go
+             renderer's tests read the same files. The tests find them by walking up from their own source path
+             rather than copying them in as resources, because a copy is a second agreement that can drift.
              */
         ),
     ]

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // standInGoChild writes a cohere at a directory of its own whose Go child answers the probe with answer, a shell

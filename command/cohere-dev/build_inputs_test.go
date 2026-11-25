@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A test that builds a binary and judges it reruns after an edit only that binary reaches, under cohere-dev
@@ -19,10 +19,14 @@ import (
 //
 // The fixture is a module of three packages: a tool that prints a word, the word, which only the tool imports,
 // and a check whose test builds the tool, runs it and wants the word. The check records the tool's build through
-// a copy of internal/build_inputs, read from the real file, so a mutant of the real file is a mutant here.
+// a copy of internal/testing/build_inputs, read from the real file, so a mutant of the real file is a mutant here. It
+// reads go list through the go_listing module, copied beside it from the real files and required by replace as
+// cohere's root module requires it.
 func TestAnEditOnlyABuiltBinaryReachesMissesTheTestCache(test *testing.T) {
 	test.Parallel()
-	recorder, readError := os.ReadFile(filepath.Join("..", "..", "internal", "build_inputs", "build_inputs.go"))
+	recorder, readError := os.ReadFile(
+		filepath.Join("..", "..", "internal", "testing", "build_inputs", "build_inputs.go"),
+	)
 	if readError != nil {
 		test.Fatal(readError)
 	}
@@ -31,11 +35,30 @@ func TestAnEditOnlyABuiltBinaryReachesMissesTheTestCache(test *testing.T) {
 	// of one: with -trimpath the fixture's binary is otherwise the same in every temporary directory.
 	nonce := strconv.FormatInt(time.Now().UnixNano(), 10)
 	files := map[string]string{
-		"go.mod":                 "module probe\n\ngo 1.27\n",
+		"go.mod": "module probe\n\ngo 1.27\n\n" +
+			"require github.com/system-inc/cohere/go_listing v0.0.0\n\n" +
+			"replace github.com/system-inc/cohere/go_listing => ./go_listing\n",
 		"inputs/build_inputs.go": string(recorder),
 		"tool/main.go":           "package main\n\nimport (\n\t\"fmt\"\n\n\t\"probe/word\"\n)\n\nfunc main() {\n\tfmt.Print(word.Word)\n}\n",
 		"word/word.go":           "package word\n\nconst Word = \"before\"\n",
 		"check/check_test.go":    checkTest(nonce),
+	}
+	listingFiles, listingError := os.ReadDir(filepath.Join("..", "..", "go_listing"))
+	if listingError != nil {
+		test.Fatal(listingError)
+	}
+	for _, entry := range listingFiles {
+		name := entry.Name()
+		// The module's go.mod and its source, not its tests or their testdata.
+		isSource := strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")
+		if entry.IsDir() || name != "go.mod" && !isSource {
+			continue
+		}
+		content, readError := os.ReadFile(filepath.Join("..", "..", "go_listing", name))
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		files["go_listing/"+name] = string(content)
 	}
 	hourAgo := time.Now().Add(-time.Hour)
 	for name, content := range files {
@@ -43,7 +66,7 @@ func TestAnEditOnlyABuiltBinaryReachesMissesTheTestCache(test *testing.T) {
 	}
 	// Go caches no result that opened a file changed in the last two seconds (modTimeCutoff in
 	// cmd/go/internal/test), so the fixture's directories and files are an hour old.
-	for _, directory := range []string{".", "inputs", "tool", "word", "check"} {
+	for _, directory := range []string{".", "inputs", "go_listing", "tool", "word", "check"} {
 		if changeTimesError := os.Chtimes(filepath.Join(module, directory), hourAgo, hourAgo); changeTimesError != nil {
 			test.Fatal(changeTimesError)
 		}

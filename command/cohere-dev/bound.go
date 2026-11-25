@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // A bounded run (#fp1td9e): a mutant or probe in code that starts processes runs under a process limit and a

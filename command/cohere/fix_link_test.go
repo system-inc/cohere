@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // writeRootOf is root's WriteRoot, for a test that runs the fix phase over a fixture under root.

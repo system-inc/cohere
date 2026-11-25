@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // A train lands two to four accepted units under one gate: `cohere-dev land --train <head> <head> --task <id>`.

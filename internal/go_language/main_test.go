@@ -1195,7 +1195,7 @@ func runGit(test *testing.T, directory string, arguments ...string) {
 
 // unformattedFixtureSuffix ends the name of a fixture that must stay unformatted to test the fix phase. Such a
 // file lives on disk as `<name>.go.fixture` and becomes `<name>.go` only in a case's temporary copy, because
-// internal/guard's TestEveryGoFileCohereOwnsIsGofmtClean holds every .go file cohere owns to gofmt, testdata
+// internal/testing/guard's TestEveryGoFileCohereOwnsIsGofmtClean holds every .go file cohere owns to gofmt, testdata
 // included, as the release's own `gofmt -l ./command ./internal` does.
 const unformattedFixtureSuffix = ".go.fixture"
 
