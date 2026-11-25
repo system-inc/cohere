@@ -395,16 +395,16 @@ var activeProjectYield = sync.OnceValues(func() (projectYield, error) {
 // nestedProjectsLayer is the format walk's count of files it left to the projects below it.
 const nestedProjectsLayer = "nearer projects"
 
-// leftOutLanguagesLayer is the format walk's count of files in languages `--languages` did not name (#s7gt4bj).
-const leftOutLanguagesLayer = "languages left out by --languages"
+// leftOutLanguagesLayer is the format walk's count of files in languages the two flags did not name (#s7gt4bj).
+const leftOutLanguagesLayer = "kinds --languages and --formats left out"
 
 // namedRunLeftOutExtensions are the extensions a run that names its project, rather than one discovery started,
-// leaves out of its format walk under `--languages`, set by main; a project's run one of several reads its own from
+// leaves out of its format walk under the two flags, set by main; a project's run one of several reads its own from
 // its yield instead.
 var namedRunLeftOutExtensions []string
 
 // withoutYieldedDirectories is a format walk less the files under the directories this run yields, each the
-// run of the project there formats, and less the files in languages `--languages` did not name, each counted under
+// run of the project there formats, and less the files in languages the two flags did not name, each counted under
 // the layer that says why. A walk the run leaves nothing out of is returned as it is.
 func withoutYieldedDirectories(enumeration format_files.Enumeration) format_files.Enumeration {
 	yield, activeProjectYieldError := activeProjectYield()

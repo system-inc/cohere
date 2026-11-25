@@ -9,36 +9,48 @@ import (
 	"github.com/system-inc/cohere/internal/format/native"
 )
 
-// `--languages` reads a comma list without regard to case, once each, in its own order, and refuses a name it does
-// not take with every name it does, since a misspelled language read as none would check less than was asked
-// (#s7gt4bj).
-func TestLanguagesAreReadAsACommaListAndAnUnknownOneIsRefused(test *testing.T) {
+// `--languages` and `--formats` each read a comma list without regard to case, and together make one choice, in the
+// table's order; each refuses a name it does not take with every name it does, since a misspelled name read as none
+// would check less than was asked (#s7gt4bj). Adamic's files are TypeScript's, so `adamic` is no name either takes.
+func TestTheTwoFlagsMakeOneChoiceAndRefuseWhatTheyDoNotTake(test *testing.T) {
 	test.Parallel()
-	for value, want := range map[string]languageChoice{
-		"go":                       {"go"},
-		"TypeScript,Go":            {"go", "typescript"},
-		" markdown , json ":        {"json", "markdown"},
-		"typescript,go,typescript": {"go", "typescript"},
+	for _, read := range []struct {
+		languages, formats string
+		want               languageChoice
+	}{
+		{languages: "go", want: languageChoice{"go"}},
+		{formats: "json", want: languageChoice{"json"}},
+		{
+			languages: "TypeScript,Go",
+			formats:   " Markdown , json ",
+			want:      languageChoice{"go", "typescript", "json", "markdown"},
+		},
+		{languages: "typescript,go,typescript", want: languageChoice{"go", "typescript"}},
 	} {
-		choice, parseError := parseLanguageChoice(value)
-		if parseError != nil || !slices.Equal(choice, want) {
-			test.Errorf("--languages %q read %v (refusal %v), want %v", value, choice, parseError, want)
+		given := map[string]bool{languagesFlagName: read.languages != "", formatsFlagName: read.formats != ""}
+		choice, refusal := languageChoiceOf(given, read.languages, read.formats)
+		if refusal != nil || !slices.Equal(choice, read.want) {
+			test.Errorf("--languages %q --formats %q read %v (refusal %v), want %v", read.languages, read.formats,
+				choice, refusal, read.want)
 		}
 	}
-	every := "it takes go, typescript, swift, json, markdown, yaml, css and graphql"
-	for value, named := range map[string]string{
-		// Adamic's files are TypeScript's until Adamic has a checker of its own (the Square's ruling).
-		"adamic":  "names adamic,",
-		"rust":    "names rust,",
-		"go,rust": "names rust,",
-		"":        "names an empty name,",
-		"go,":     "names an empty name,",
+	if choice, refusal := languageChoiceOf(map[string]bool{}, "", ""); choice != nil || refusal != nil {
+		test.Errorf("a run naming neither flag chose %v (refusal %v), want nothing", choice, refusal)
+	}
+	for _, refused := range []struct{ flagName, value, said, takes string }{
+		{languagesFlagName, "json", "names json,", "it takes go, typescript and swift"},
+		{languagesFlagName, "adamic", "names adamic,", "it takes go, typescript and swift"},
+		{languagesFlagName, "go,", "names an empty name,", "it takes go, typescript and swift"},
+		{formatsFlagName, "go", "names go,", "it takes json, markdown, yaml, css and graphql"},
+		{formatsFlagName, "", "names an empty name,", "it takes json, markdown, yaml, css and graphql"},
 	} {
-		_, parseError := parseLanguageChoice(value)
-		if parseError == nil || !strings.Contains(parseError.Error(), named) ||
-			!strings.Contains(parseError.Error(), every) {
-			test.Errorf("--languages %q was refused with %v, want one saying it %s and naming every language", value,
-				parseError, named)
+		values := map[string]string{refused.flagName: refused.value}
+		_, refusal := languageChoiceOf(map[string]bool{refused.flagName: true}, values[languagesFlagName],
+			values[formatsFlagName])
+		if refusal == nil || !strings.Contains(refusal.Error(), "--"+refused.flagName+" "+refused.value+" "+
+			refused.said) || !strings.Contains(refusal.Error(), refused.takes) {
+			test.Errorf("--%s %q was refused with %v, want one saying it %s and %s", refused.flagName, refused.value,
+				refusal, refused.said, refused.takes)
 		}
 	}
 }
@@ -187,7 +199,7 @@ func TestANamedFileInALanguageNotNamedIsRefused(test *testing.T) {
 	for _, named := range []string{"README.md", "docs/NOTES.MD"} {
 		refusal := refuseNamedFilesLeftOut(choice, []string{"source/Tidy.ts", named})
 		if refusal == nil || !strings.Contains(refusal.Error(),
-			"--languages typescript does not name markdown, the language of "+named) {
+			"this run names typescript, and not markdown, the format of "+named) {
 			test.Errorf("naming %s was refused with %v", named, refusal)
 		}
 	}
@@ -200,7 +212,7 @@ func TestANamedFileInALanguageNotNamedIsRefused(test *testing.T) {
 // as a flag it does not take (#s7gt4bj).
 func TestAGoOrSwiftRunTakesLanguages(test *testing.T) {
 	test.Parallel()
-	given := map[string]bool{"languages": true}
+	given := map[string]bool{languagesFlagName: true, formatsFlagName: true}
 	value := func(string) string { return "go,swift" }
 	location := projectLocation{Root: "/project", ArgumentBase: "/project", WorkingDirectory: "/project"}
 	for name, flags := range map[string]engineFlags{"Go": goFlags, "Swift": swiftFlags} {
@@ -215,7 +227,7 @@ func TestTheSummaryLineNamesWhatLanguagesLeftOut(test *testing.T) {
 	test.Parallel()
 	found := discovery{LeftOutLanguages: []string{"swift", "markdown"}}
 	runs := []projectRun{{project: discoveredProject{Directory: ".", Engine: engineGo}, label: "."}}
-	if line := summaryLine(found, runs); !strings.Contains(line, "left out by --languages: swift, markdown") {
+	if line := summaryLine(found, runs); !strings.Contains(line, "left out: swift, markdown") {
 		test.Errorf("the summary line reads %q", line)
 	}
 }
@@ -229,6 +241,8 @@ func TestLanguagesNeverReachTheRunCacheOrAProjectsArguments(test *testing.T) {
 		{"--languages", "go"},
 		{"--no-fix", "--languages=go,typescript"},
 		{"-languages=go"},
+		{"--formats=json"},
+		{"--formats", "markdown", "--no-fix"},
 	} {
 		if runCacheAdmits(arguments) {
 			test.Errorf("the run cache admits %q", arguments)
@@ -240,7 +254,8 @@ func TestLanguagesNeverReachTheRunCacheOrAProjectsArguments(test *testing.T) {
 	for _, arguments := range [][]string{
 		{"--no-fix", "--languages", "go"},
 		{"--languages=go,swift", "--no-fix"},
-		{"--no-fix", "-languages", "json"},
+		{"--no-fix", "-languages", "typescript"},
+		{"--no-fix", "--formats", "json", "--languages=go"},
 	} {
 		if got := childArguments(arguments, "", false); !slices.Equal(got, []string{"--no-fix"}) {
 			test.Errorf("a project's run of %q is handed %q, want the plain run's --no-fix", arguments, got)
@@ -268,7 +283,7 @@ func TestTheLeftOutLanguagesMoveTheYieldsEncodingOnlyWhenNamed(test *testing.T) 
 // and a run that left out none says nothing of it (#s7gt4bj).
 func TestTheFootersNameWhatLanguagesLeftOut(test *testing.T) {
 	test.Parallel()
-	want := "⚠ left out by --languages: swift, markdown"
+	want := "⚠ left out: swift, markdown"
 	facts := overallFacts{ProjectsByEngine: map[string]int{"Go": 1}, LeftOut: []string{"swift", "markdown"}}
 	if line := overallFooter(facts, plain); !strings.Contains(line, want) || !strings.HasPrefix(line, "✓ 💎 ") {
 		test.Errorf("the overall footer reads %q, want a green naming %q", line, want)
@@ -289,7 +304,7 @@ func TestARunNamingAProjectWhoseLanguageIsNotNamedIsRefused(test *testing.T) {
 	location := projectLocation{Root: "/root/app", Engine: engineSwift}
 	refusal := refuseUnchosenLanguage(languageChoice{"go", "typescript"}, location, nil)
 	if refusal == nil || !strings.Contains(refusal.Error(),
-		"--languages go and typescript does not name swift, the language of the project at /root/app") {
+		"this run names go and typescript, and not swift, the language of the project at /root/app") {
 		test.Errorf("refusal %v", refusal)
 	}
 	if refuseUnchosenLanguage(languageChoice{"swift"}, location, nil) != nil ||

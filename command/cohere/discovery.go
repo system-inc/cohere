@@ -100,11 +100,11 @@ type discovery struct {
 	// a project for each, TypeScript's first, then Swift's, then Go's.
 	Projects []discoveredProject
 
-	// Choice is the languages `--languages` named, nil for every one (#s7gt4bj). LeftOut are the projects found that
+	// Choice is the languages the two flags named, nil for every one (#s7gt4bj). LeftOut are the projects found that
 	// do not run as themselves under it, in Projects' order, kept so what a run leaves to others still names them
 	// (everyProject): a TypeScript program whose language was not named, which runs as a format project of its
 	// directory when a language it formats was, is here too. LeftOutLanguages are the languages here that were not
-	// named, and NotFound those named that nothing here is in, each by the name `--languages` takes (chooseLanguages).
+	// named, and NotFound those named that nothing here is in, each by the name its flag takes (chooseLanguages).
 	Choice           languageChoice
 	LeftOut          []discoveredProject
 	LeftOutLanguages []string
@@ -155,8 +155,8 @@ type discovery struct {
 	// anything to format. Counted from the listings the walk already read, as the Swift files are.
 	Formattable map[string]int
 
-	// FormattableKinds counts the same files by directory and then extension, lowercase, for `--languages` to know
-	// which languages' files are here and where a format project would find any (chooseLanguages).
+	// FormattableKinds counts the same files by directory and then extension, lowercase, for `--languages` and
+	// `--formats` to know which kinds of file are here and where a format project would find any (chooseLanguages).
 	FormattableKinds map[string]map[string]int
 
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
@@ -1035,14 +1035,14 @@ func (found discovery) formatsAnythingAt(project discoveredProject, leftOutExten
 	return false
 }
 
-// everyProject is every project discovery found, those `--languages` left out included, for what a run leaves to
+// everyProject is every project discovery found, those the two flags left out included, for what a run leaves to
 // others: a program left out is still where its directory's files belong, so no run above takes them as its own.
 func (found discovery) everyProject() []discoveredProject {
 	return append(slices.Clone(found.Projects), found.LeftOut...)
 }
 
 // formatYield is what a format project's run leaves to others: the directory of every TypeScript program strictly
-// below its own, absolute, whose own run formats it, so two runs never write one file. A program `--languages` left
+// below its own, absolute, whose own run formats it, so two runs never write one file. A program the choice left
 // out is there too, since a format project of its directory formats what was named of it, if anything was. The
 // format project of a root no program holds is below none, so it leaves out every program's directory.
 func (found discovery) formatYield(project discoveredProject) projectYield {
@@ -1057,7 +1057,7 @@ func (found discovery) formatYield(project discoveredProject) projectYield {
 		}
 	}
 	slices.Sort(yield.Directories)
-	// Under `--languages` alone, where a left-out program's directory can appear beside the program's own: a plain
+	// Under a choice alone, where a left-out program's directory can appear beside the program's own: a plain
 	// run lists one directory twice when two programs share it, as it always did, so its yield, and its key, are the
 	// ones it had (#s7gt4bj).
 	if found.Choice != nil {

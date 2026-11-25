@@ -77,7 +77,7 @@ var goFlags = engineFlags{
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open", "stdin-filepath",
-		"languages",
+		"languages", "formats",
 	},
 	ProfileName: "go",
 }

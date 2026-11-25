@@ -14,7 +14,7 @@ type projectYield struct {
 	Directories []string `json:"directories"`
 
 	// LeftOutExtensions are the extensions of the files the run's format walk leaves out, those of the languages
-	// `--languages` did not name (#s7gt4bj), lowercase and sorted. Left out of the encoding when empty, so a run that
+	// the two flags did not name (#s7gt4bj), lowercase and sorted. Left out of the encoding when empty, so a run that
 	// named no languages keeps the replay key it had.
 	LeftOutExtensions []string `json:"leftOutExtensions,omitempty"`
 }

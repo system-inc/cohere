@@ -402,7 +402,7 @@ type overallFacts struct {
 	// warnings, which never fail the run (see folder_names.go).
 	FolderFindings int
 	FolderWarnings int
-	// LeftOut are the languages here that `--languages` did not name, named on the line so a run that checked some
+	// LeftOut are the languages here that the two flags did not name, named on the line so a run that checked some
 	// languages never reads as a green over all of them (#s7gt4bj).
 	LeftOut []string
 }

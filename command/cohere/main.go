@@ -81,8 +81,6 @@ func run() error {
 		"the tsconfig that defines the program, relative to --directory or else to where you typed it; unnamed, the file of this name in --directory, or else the nearest one at or above the working directory")
 	directory := flag.String("directory", "",
 		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
-	languages := flag.String("languages", "",
-		"check only these languages, wherever their files live: a comma list of go, typescript (JavaScript and Adamic included), swift, json, markdown, yaml, css and graphql, naming the rest as left out (default: every language found)")
 	typesOnly := flag.Bool(
 		"types",
 		false,
@@ -298,7 +296,7 @@ func run() error {
 	}
 	given := map[string]bool{}
 	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
-	choice, languageChoiceError := languageChoiceOf(given, *languages)
+	choice, languageChoiceError := languageChoiceOf(given, *languagesFlag, *formatsFlag)
 	if languageChoiceError != nil {
 		return languageChoiceError
 	}

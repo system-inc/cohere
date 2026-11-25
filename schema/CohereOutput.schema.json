@@ -9,6 +9,7 @@
         { "$ref": "#/$defs/engineBuild" },
         { "$ref": "#/$defs/ignorePatterns" },
         { "$ref": "#/$defs/languages" },
+        { "$ref": "#/$defs/formats" },
         { "$ref": "#/$defs/duplicate" },
         { "$ref": "#/$defs/duplicateRefused" },
         { "$ref": "#/$defs/duplicateCoverage" },
@@ -152,7 +153,7 @@
             }
         },
         "languages": {
-            "description": "What `--languages` chose, in a run that discovered its projects and named languages: written once, before the projects' lines. Each language by the name `--languages` takes.",
+            "description": "What `--languages` chose, in a run that discovered its projects and named `--languages` or `--formats`: written once, before the projects' lines, beside the other flag's record. A flag the command line did not name names none, and everything here of its kind is left out.",
             "type": "object",
             "additionalProperties": false,
             "required": ["kind", "named", "checked", "leftOut", "notFound"],
@@ -176,13 +177,41 @@
                 "notFound": {
                     "type": "array",
                     "items": { "$ref": "#/$defs/languageName" },
-                    "description": "The languages named that no project here is in."
+                    "description": "The languages named that nothing here is."
                 }
             }
         },
-        "languageName": {
-            "enum": ["go", "typescript", "swift", "json", "markdown", "yaml", "css", "graphql"]
+        "formats": {
+            "description": "What `--formats` chose, in a run that discovered its projects and named `--languages` or `--formats`: written once, before the projects' lines, beside the other flag's record. A flag the command line did not name names none, and everything here of its kind is left out.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "named", "checked", "leftOut", "notFound"],
+            "properties": {
+                "kind": { "const": "formats" },
+                "named": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/formatName" },
+                    "description": "The formats the command line named."
+                },
+                "checked": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/formatName" },
+                    "description": "The formats named that are here, which this run checked wherever their files live."
+                },
+                "leftOut": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/formatName" },
+                    "description": "The formats here that the command line did not name: nothing of them was checked."
+                },
+                "notFound": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/formatName" },
+                    "description": "The formats named that nothing here is."
+                }
+            }
         },
+        "languageName": { "enum": ["go", "typescript", "swift"] },
+        "formatName": { "enum": ["json", "markdown", "yaml", "css", "graphql"] },
         "crash": {
             "description": "A rule that could not finish a file, or a file nothing could check, because cohere crashed. A bug in cohere, not in the code checked, and it fails the run.",
             "type": "object",
