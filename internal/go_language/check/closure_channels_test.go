@@ -95,6 +95,7 @@ var factLearners = []string{"ctrlflow", "fact_deprecated", "printf"}
 var packageStateWriters = []string{
 	"fact_resolver",
 	"intermediate_representation",
+	"origin_names",
 	"rules/dispatch",
 	"rules/load_memo",
 	"rules/return_nil_ness",
