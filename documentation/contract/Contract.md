@@ -599,8 +599,10 @@ raised (#jrr6a5x). `source` is `Available` then; `Environment` when the user's `
 `GOMEMLIMIT` decided, with `environment` naming them and `limitBytes` the limit they left, `0` for none; or
 `Unreadable` when available memory could not be read, and the child set 8 GiB as a bound alone. The front door prints
 it in the account `--verbose` prints, once the lint record says how many builds ran at once under it, as
-`memory limit 5.4 GiB, half of the 11.5 GB available: 3 builds at once`. It is left out of a run the child was not
-started for as a process of its own.
+`memory limit 5.4 GiB, half of the 11.5 GB available: 3 builds at once`. When one cohere run checks several
+projects, the project children it runs at once share its half, and `"sharedBy":4` says how many, so the limit is that
+half divided by it, said as `half of the 73.3 GB available shared by 4 projects at once`; it is absent for a run alone.
+It is left out of a run the child was not started for as a process of its own.
 
 cohere-go's types record also carries `headersUnshared`, additive within contract 3 (#tb538na), only when its
 listings did not share each Go file's header. Every build of a run lists its packages in process through go/build's

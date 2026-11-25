@@ -54,11 +54,14 @@ var collectorVariables = []string{"GOGC", "GOMEMLIMIT"}
 // whoever set either has decided about the collector, and cohere-go steps aside.
 //
 // lookupEnvironment is os.LookupEnv and setMemoryLimit is debug.SetMemoryLimit outside a test. availableBytes is
-// the memory the front door's policy read as available in this process, 0 when it could not.
+// the memory the front door's policy read as available in this process, 0 when it could not, and share how many
+// project children of one cohere run divide its half, which the policy has already divided the limit by, 1 for a run
+// of one project (command/cohere's memoryShareVariable).
 func decideMemory(
 	lookupEnvironment func(string) (string, bool),
 	setMemoryLimit func(int64) int64,
 	availableBytes uint64,
+	share uint64,
 ) contract.Memory {
 	// A negative limit reads the current one without changing it.
 	current := setMemoryLimit(-1)
@@ -91,5 +94,14 @@ func decideMemory(
 		LimitBytes:     current,
 		Source:         contract.MemorySourceAvailable,
 		AvailableBytes: availableBytes,
+		SharedBy:       sharedBy(share),
 	}
+}
+
+// sharedBy is share as the record writes it: absent, 0, for a process alone.
+func sharedBy(share uint64) uint64 {
+	if share <= 1 {
+		return 0
+	}
+	return share
 }

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -562,8 +563,10 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		launches = append(launches, projectLaunch{index, project, projectArguments, yieldFile, openPath, summaryPath})
 	}
 	makeProjectCacheDirectories(found.Root, launches)
+	runsAtOnce := projectRunsAtOnce()
+	share := projectMemoryShare(len(launches), runsAtOnce)
 	var group sync.WaitGroup
-	running := make(chan struct{}, projectRunsAtOnce())
+	running := make(chan struct{}, runsAtOnce)
 	for _, launch := range launches {
 		group.Add(1)
 		go func() {
@@ -571,7 +574,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			running <- struct{}{}
 			defer func() { <-running }()
 			runs[launch.index] = runProject(executable, found.Root, launch.project, labels[launch.index],
-				launch.arguments, launch.yieldFile, launch.openPath, launch.summaryPath, children,
+				launch.arguments, launch.yieldFile, launch.openPath, launch.summaryPath, share, children,
 				activeOutput.Mode == outputJson)
 		}()
 	}
@@ -749,9 +752,55 @@ func projectRunsAtOnce() int {
 	return max(1, runtime.NumCPU()/4)
 }
 
+// projectMemoryShare is how many project children of launches share the run's half of available memory: as many as
+// run at once, runsAtOnce, or fewer when there are fewer projects (memoryShareVariable). The run itself checks nothing
+// in process while they run, so it takes no share.
+func projectMemoryShare(launches int, runsAtOnce int) int {
+	return max(1, min(launches, runsAtOnce))
+}
+
+// projectChildEnvironment is the environment runProject starts a project's child with: environment, this process's,
+// with what this run tells the child set and what it must not inherit taken out, each argument as runProject's.
+func projectChildEnvironment(
+	environment []string,
+	project discoveredProject,
+	label string,
+	yieldFile string,
+	openPath string,
+	summaryPath string,
+	memoryShare int,
+) []string {
+	// The verdict descriptor is this run's: a child's verdict reaches this process as its exit code, and
+	// only the merged one may answer the caller.
+	child := append(withoutVariable(withoutVariable(environment, VerdictVariable), projectYieldVariable),
+		projectKindVariable+"="+string(project.Kind), projectLabelVariable+"="+label, runDepthVariable+"=1")
+	if yieldFile != "" {
+		child = append(child, projectYieldVariable+"="+yieldFile)
+	}
+	if openPath != "" {
+		child = append(withoutVariable(child, openReportVariable), openReportVariable+"="+openPath)
+	}
+	child = withMemoryShare(withoutVariable(child, projectSummaryVariable), memoryShare)
+	if summaryPath != "" {
+		child = append(child, projectSummaryVariable+"="+summaryPath)
+	}
+	return child
+}
+
+// withMemoryShare is environment with memoryShareVariable set to share, or removed when share is 1, so a child alone
+// takes the whole half and a child of a child is never divided twice by a value it inherited.
+func withMemoryShare(environment []string, share int) []string {
+	without := withoutVariable(environment, memoryShareVariable)
+	if share <= 1 {
+		return without
+	}
+	return append(without, memoryShareVariable+"="+strconv.Itoa(share))
+}
+
 // runProject runs one project's check as a child and keeps everything it printed. yieldFile, when set,
-// names what it yields to nearer projects (see ownership.go). The child is held in children while it runs,
-// so a signal to this run reaches it.
+// names what it yields to nearer projects (see ownership.go). memoryShare is how many project children share the
+// run's half of available memory (projectMemoryShare). The child is held in children while it runs, so a signal to
+// this run reaches it.
 //
 // separateStandardError keeps the child's stderr apart from its stdout, for `--json`, whose stdout a program
 // reads one record per line. The human views keep the two together, in the order the child wrote them.
@@ -764,6 +813,7 @@ func runProject(
 	yieldFile string,
 	openPath string,
 	summaryPath string,
+	memoryShare int,
 	children *projectChildren,
 	separateStandardError bool,
 ) projectRun {
@@ -776,20 +826,7 @@ func runProject(
 	// Started in the project, so its report does not add that it checked somewhere other than where it
 	// started: the section's heading already says which project it is.
 	child.Dir = directory
-	// The verdict descriptor is this run's: a child's verdict reaches this process as its exit code, and
-	// only the merged one may answer the caller.
-	child.Env = append(withoutVariable(withoutVariable(os.Environ(), VerdictVariable), projectYieldVariable),
-		projectKindVariable+"="+string(project.Kind), projectLabelVariable+"="+label, runDepthVariable+"=1")
-	if yieldFile != "" {
-		child.Env = append(child.Env, projectYieldVariable+"="+yieldFile)
-	}
-	if openPath != "" {
-		child.Env = append(withoutVariable(child.Env, openReportVariable), openReportVariable+"="+openPath)
-	}
-	child.Env = withoutVariable(child.Env, projectSummaryVariable)
-	if summaryPath != "" {
-		child.Env = append(child.Env, projectSummaryVariable+"="+summaryPath)
-	}
+	child.Env = projectChildEnvironment(os.Environ(), project, label, yieldFile, openPath, summaryPath, memoryShare)
 	var output bytes.Buffer
 	var standardError bytes.Buffer
 	child.Stdout = &output

@@ -25,6 +25,13 @@ func TestGoMemoryLine(test *testing.T) {
 			want:   "memory limit 116.4 GiB, half of the 250.0 GB available",
 		},
 		{
+			name: "one of 4 projects at once",
+			record: `{"limitBytes":9160000000,"source":"Available","availableBytes":73300000000,` +
+				`"sharedBy":4}`,
+			buildsAtOnce: 2,
+			want:         "memory limit 8.5 GiB, half of the 73.3 GB available shared by 4 projects at once: 2 builds at once",
+		},
+		{
 			name:         "one build at once",
 			record:       `{"limitBytes":2000000000,"source":"Available","availableBytes":4000000000}`,
 			buildsAtOnce: 1,

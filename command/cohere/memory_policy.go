@@ -10,9 +10,11 @@ import (
 type memoryPolicy struct {
 	// environment names the variables that set the collector, when any did, and then nothing else applies.
 	environment string
-	// available is the memory free for this run when it started, ceiling the limit set from it.
+	// available is the memory free for this run when it started, ceiling the limit set from it, and share how many
+	// processes of one run divide its half (memoryShareVariable), 1 for a process alone.
 	available uint64
 	ceiling   uint64
+	share     uint64
 	// unreadable is why available memory could not be read, which leaves the runtime's defaults.
 	unreadable error
 	// testBinary is a `go test` process, which keeps the runtime's defaults.
@@ -40,6 +42,14 @@ func (policy memoryPolicy) line() string {
 		return fmt.Sprintf(
 			"memory: the collector runs at Go's default, since available memory could not be read (%v)",
 			policy.unreadable,
+		)
+	}
+	if policy.share > 1 {
+		return fmt.Sprintf(
+			"memory: collector off, ceiling %s (half of %s available, shared by %d projects at once)",
+			gigabytes(policy.ceiling),
+			gigabytes(policy.available),
+			policy.share,
 		)
 	}
 	return fmt.Sprintf(
