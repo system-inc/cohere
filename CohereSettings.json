@@ -1,5 +1,16 @@
 {
-    "ignorePatterns": ["TypeScript/**", "internal/format/prettier/bundles/**"],
+    "ignorePatterns": [
+        {
+            "pattern": "TypeScript/**",
+            "reason": "The TypeScript submodule, system-inc/TypeScript on its adamic branch: upstream's typescript-go with the house's patches, tested upstream, and in go.work, so the Go engine would lint it without this entry.",
+            "kind": "thirdParty"
+        },
+        {
+            "pattern": "internal/format/prettier/bundles/**",
+            "reason": "Prettier's built standalone bundle and plugins, with their license and notices, vendored as Prettier builds them for the formatter's tests to compare against, so their shape is Prettier's to keep.",
+            "kind": "thirdParty"
+        }
+    ],
     "go": {
         "rules": {},
         "targets": ["freebsd/arm64"]
