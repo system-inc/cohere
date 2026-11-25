@@ -1,6 +1,6 @@
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // temporaries maps a value to the access path it holds, so `t = props.a; t.b` reads as `props.a.b`.
 //

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/system-inc/cohere/go_listing"
+	"github.com/system-inc/cohere/modules/go_listing"
 )
 
 // buildVariables are the environment variables that change what a go build of our code produces. Each is read

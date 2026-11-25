@@ -1,6 +1,6 @@
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/mutation_aliasing"
+import "github.com/system-inc/cohere/modules/mutation_aliasing"
 
 // MergedScopeIdentity resolves scope identity through an align-then-merge result.
 //

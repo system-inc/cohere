@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // TestMintGrowsTheTableTheResolveIsSizedBy mints identifiers past the declarations a function starts with, and

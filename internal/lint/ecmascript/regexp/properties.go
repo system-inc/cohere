@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/unicode_properties"
+	"github.com/system-inc/cohere/modules/unicode_properties"
 )
 
 // propertyAtom remains one set atom even though it contains many intervals. Expanding it into

@@ -30,7 +30,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // liftingOptions are how a test asks a Program's functions to be built. The zero value lifts, as cohere-go does.

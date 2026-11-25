@@ -24,7 +24,7 @@ package high_level_intermediate_representation
 
 import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // PruneNonEscapingScopesResult reports what the pass did, and what it could not decide.

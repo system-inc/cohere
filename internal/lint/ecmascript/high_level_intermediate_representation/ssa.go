@@ -46,7 +46,7 @@
 // reads `InstructionKind` yet and a reclassification no pass consumes is untested by construction.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // Construct converts a function to single static assignment form, in place, and recursively for
 // every nested function.

@@ -1,7 +1,7 @@
 package high_level_intermediate_representation
 
 import (
-	"github.com/system-inc/cohere/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
 	"strings"
 	"testing"
 )

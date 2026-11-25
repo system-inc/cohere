@@ -2,7 +2,7 @@ package react
 
 import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // immutabilityState is the abstract interpretation's state.

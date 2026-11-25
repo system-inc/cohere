@@ -29,7 +29,7 @@
 // direction, and it is the reason `updateScopeDeclarations` stopped being optional.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // PruneAlwaysInvalidatingScopes marks scopes whose dependencies can never compare equal.
 //

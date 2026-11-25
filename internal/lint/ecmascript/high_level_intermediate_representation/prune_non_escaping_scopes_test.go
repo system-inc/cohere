@@ -9,7 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/react/conformance"
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // TestPruneNonEscapingScopesPrunesAndKeeps is the baseline, and it guards two opposite failures.

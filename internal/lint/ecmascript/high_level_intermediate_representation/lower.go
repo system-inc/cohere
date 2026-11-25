@@ -93,7 +93,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // Lower lowers one function to `HIR`.

@@ -3,8 +3,8 @@ package high_level_intermediate_representation
 import (
 	"sort"
 
-	"github.com/system-inc/cohere/mutation_aliasing"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // mergeSweepState is the sweep's working state, matching upstream's `{joined, activeScopes}`.

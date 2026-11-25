@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // exportGraphs names the directory TestExportGraphsForAdamic writes to. Only a test flag sets it, so

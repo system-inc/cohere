@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/git_tree"
+	"github.com/system-inc/cohere/internal/git_tree"
 	"golang.org/x/mod/modfile"
 )
 

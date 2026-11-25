@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // TestPruneUnusedScopesPrunesSomethingAndKeepsSomething is the baseline before any specific claim.

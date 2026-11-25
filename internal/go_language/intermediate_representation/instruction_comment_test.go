@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // instructionCommentSource makes each labeled kind once, lifted: the phi of a `&&` value, the closure a range over a

@@ -16,7 +16,7 @@
 // The roles are visitor.go's and mean the same thing here.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // EachPlacePointer calls visit for every place the instruction value touches, with the role it
 // plays, handing each one out by pointer so the caller can rename it in place.

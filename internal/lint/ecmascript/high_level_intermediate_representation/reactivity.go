@@ -140,7 +140,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // maximumReactiveRounds bounds the fixpoint. See the reason at the loop.

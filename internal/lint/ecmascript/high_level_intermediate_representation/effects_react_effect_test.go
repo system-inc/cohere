@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
 )
 
 const effectHookDeclarations = `declare module 'react' {

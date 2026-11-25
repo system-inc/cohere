@@ -36,7 +36,7 @@
 // through ssaGraph.ContextStoreDefines.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // VerifySsa checks that a function is in single static assignment form and returns every violation.
 //

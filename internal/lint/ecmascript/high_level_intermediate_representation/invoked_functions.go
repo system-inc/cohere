@@ -28,7 +28,7 @@
 // values handed to JSX.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // AssumedInvokedFunctions returns the nested functions this one is assumed to invoke.
 //

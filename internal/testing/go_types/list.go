@@ -23,8 +23,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/go_listing"
 	"github.com/system-inc/cohere/internal/testing/listed_directories"
+	"github.com/system-inc/cohere/modules/go_listing"
 )
 
 // listedFields are the go_listing.Package fields the loader reads, asked of go list so it computes nothing else.

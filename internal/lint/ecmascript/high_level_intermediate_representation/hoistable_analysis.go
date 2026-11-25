@@ -1,6 +1,6 @@
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // HoistableAnalysis is what this pass produces: the non-null accesses at every block, and whether
 // the analysis actually converged.

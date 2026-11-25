@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/memory_limit"
+	"github.com/system-inc/cohere/modules/memory_limit"
 )
 
 // cohere runs and dies, so the collector mostly buys nothing: memory it frees is handed back to an

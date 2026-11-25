@@ -3,7 +3,7 @@ package regexp
 import (
 	"slices"
 
-	"github.com/system-inc/cohere/unicode_properties"
+	"github.com/system-inc/cohere/modules/unicode_properties"
 )
 
 type classAtom struct {

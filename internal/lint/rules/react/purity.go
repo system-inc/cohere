@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // messagePurityImpureCallId is the finding's id, and messagePurityImpureCallReason is everything

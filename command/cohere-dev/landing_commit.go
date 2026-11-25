@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/system-inc/cohere/git_tree"
+	"github.com/system-inc/cohere/internal/git_tree"
 )
 
 // A landing is one merge commit onto main, `Land #<task>: <what landed>`, whose first parent is main and whose

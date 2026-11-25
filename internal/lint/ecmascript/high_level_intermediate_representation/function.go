@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // Function is one lowered function: its control-flow graph, its instruction table, and the tables
