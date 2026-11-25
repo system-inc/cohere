@@ -1,6 +1,6 @@
 // Package system_cache_testing keeps a test binary, and every process it starts, out of the person's own system cache
 // (#syscache): cohere-go's standard-library tables, which a run reads from the directory `COHERE_SYSTEM_CACHE`
-// names, or else from the user's cache directory. A package whose tests run the engine, in process or as a binary,
+// names, or else from the user's cache directory. A package whose tests run cohere-go, in process or as a binary,
 // calls Isolate from its TestMain and ExpectIsolated from a test of its own, so a TestMain that lost the call fails
 // rather than reads, trims or writes the person's cache.
 package system_cache_testing

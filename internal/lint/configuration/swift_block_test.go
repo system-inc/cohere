@@ -8,7 +8,7 @@ import (
 )
 
 // The `swift` block is cohere-swift's (RuleConfiguration.swift): one settings file configures every
-// linter, so this loader accepts the block, leaves its insides to that engine, and refuses a block no Swift
+// linter, so this loader accepts the block, leaves its insides to cohere-swift, and refuses a block no Swift
 // run reads, naming the file.
 
 const swiftBlock = `"swift": {"rules": {"cohere-swift/file-length": ["error", {"max": 1}]}}`

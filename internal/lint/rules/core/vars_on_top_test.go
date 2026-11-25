@@ -350,7 +350,7 @@ func TestVarDeclarationsOnTopIgnoresBlockScopedDeclarations(test *testing.T) {
 // state. Found by a surviving mutant and then measured against the installed build at 10.8.1.
 //
 // The tempting reading is that a template with no substitutions is a string and should count. It
-// does not, in the rule or in any engine, so accepting it would silently make a reporting input
+// does not, in the rule or in any linter, so accepting it would silently make a reporting input
 // clean. The pair below differs only in the quote character.
 func TestVarDeclarationsOnTopTemplateIsNotADirective(test *testing.T) {
 	test.Parallel()
