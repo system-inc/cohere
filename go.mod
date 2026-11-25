@@ -61,12 +61,12 @@ require (
 	github.com/system-inc/cohere/static_single_assignment v0.0.0
 
 	// The CPU profile's reader, in a test only: a profiled run's files are each parsed as `go tool pprof` reads them,
-	// so a missing, empty or truncated profile fails (command/cohere/engine_profile_test.go, #r33n96f).
+	// so a missing, empty or truncated profile fails (command/cohere/contract_profile_test.go, #r33n96f).
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904
 
 	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing
 	// Prettier means matching it byte for byte on an already-Prettier-formatted tree. typescript-go's
-	// own formatter cannot: FormatCodeSettings has no printWidth and no line-breaking engine, and
+	// own formatter cannot: FormatCodeSettings has no printWidth and no line-breaking logic, and
 	// 21.8% of tracked files diverge from our fork after every settings-reachable fix. The only thing
 	// that reproduces our formatter is our formatter, and goja is what runs it in-process.
 	github.com/dop251/goja v0.0.0-20260822123354-58e940e0d230
@@ -80,8 +80,8 @@ require (
 	golang.org/x/mod v0.41.0
 	golang.org/x/sys v0.48.0
 
-	// The Go engine's analysis framework: every Go rule is a go/analysis analyzer (internal/go_language/rule),
-	// so vet's own suite, analysistest and facts across packages work unchanged, and the engine loads with
+	// cohere-go's analysis framework: every Go rule is a go/analysis analyzer (internal/go_language/rule),
+	// so vet's own suite, analysistest and facts across packages work unchanged, and cohere-go loads with
 	// go/packages and runs the rules with go/analysis/checker. Tests use it too: the registry's
 	// option-decoding guard loads the rules tree with type information, because whether a decode is strict
 	// depends on the type it decodes into, which a regex over the source cannot see.
