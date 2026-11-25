@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // StaticComponents flags a component value created during render and then used as a JSX tag.

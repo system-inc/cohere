@@ -23,11 +23,12 @@ use (
 	./TypeScript-shim/vfs/cachedvfs
 	./TypeScript-shim/vfs/osvfs
 	./git_tree
-	./go_cache
-	./go_listing
-	./memory_limit
-	./mutation_aliasing
-	./product_store_manifest
-	./static_single_assignment
-	./strace_events
+	./modules/go_cache
+	./modules/go_listing
+	./modules/memory_limit
+	./modules/mutation_aliasing
+	./modules/product_store_manifest
+	./modules/static_single_assignment
+	./modules/strace_events
+	./modules/unicode_properties
 )

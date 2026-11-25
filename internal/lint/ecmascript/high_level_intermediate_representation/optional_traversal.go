@@ -18,7 +18,7 @@
 // `CompareManualMemoDependencies` compares the marker strictly against what the developer wrote.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // OptionalChainSidemap is what one traversal recovered, upstream's three outputs.
 type OptionalChainSidemap struct {

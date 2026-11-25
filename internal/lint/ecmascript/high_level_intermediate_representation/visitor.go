@@ -22,7 +22,7 @@
 // variant added without updating these goes red rather than silently contributing no places.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // PlaceRole is why an instruction touches a place.
 //

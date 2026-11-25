@@ -107,7 +107,7 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
 	if len(unformatted) > 0 {
 		sort.Strings(unformatted)
 		test.Fatalf(
-			"%d of %d Go files are not gofmt-clean, and any under command/ or internal/ would fail the release's first step; run `gofmt -w` on them:\n  %s",
+			"%d of %d Go files are not gofmt-clean, and any under command/, internal/ or modules/ would fail the release's first step; run `gofmt -w` on them:\n  %s",
 			len(unformatted),
 			len(files),
 			strings.Join(unformatted, "\n  "),

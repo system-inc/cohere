@@ -541,7 +541,7 @@ func sourceSnapshot(test *testing.T) string {
 	}
 	// Every directory holding source go builds: the module's own, and every module go.work names, read from go.work
 	// itself so a module added there is never one the snapshot names and cannot find (#wy3dbnz).
-	directories := []string{"command", "internal", "policy", "unicode_properties"}
+	directories := []string{"command", "internal", "policy"}
 	for _, directory := range goWorkModuleDirectories(test, filepath.Join(moduleRoot, "go.work")) {
 		if !slices.Contains(directories, directory) {
 			directories = append(directories, directory)

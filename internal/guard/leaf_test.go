@@ -33,7 +33,7 @@ var allowedRuleImports = map[string]bool{
 	// It imports only the standard library, and every rule package that names it reached it through
 	// the high-level IR already, which is under the shelf's prefix, so naming it directly adds no
 	// package to any rule edit's rebuild.
-	"github.com/system-inc/cohere/static_single_assignment": true,
+	"github.com/system-inc/cohere/modules/static_single_assignment": true,
 	// The house vocabularies both Go languages read: the abbreviation words' loader and finder, and the shouting
 	// safe list and masks. Each moved out of package nexus so cohere-go's rules could read the same data
 	// without linking the TypeScript checker (#ec8mvbg). internal/naming/abbreviation imports only the standard

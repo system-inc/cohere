@@ -3,7 +3,7 @@ package high_level_intermediate_representation
 import (
 	"sort"
 
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // DisjointSet is a union-find over values, keyed by IdentifierId.

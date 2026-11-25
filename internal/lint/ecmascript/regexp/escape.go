@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/unicode_properties"
+	"github.com/system-inc/cohere/modules/unicode_properties"
 )
 
 // escapeKind says what a backslash escape names, which is what decides how the

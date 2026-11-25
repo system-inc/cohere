@@ -14,7 +14,7 @@
 // Function, a BasicBlock and a Place.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // Finalize brings a freshly lowered function into the state every pass assumes.
 //

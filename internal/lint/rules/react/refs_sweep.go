@@ -5,7 +5,7 @@ import (
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/high_level_intermediate_representation"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // ---------------------------------------------------------------------------

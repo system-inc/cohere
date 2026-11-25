@@ -48,7 +48,7 @@ if [[ ! -f go.work || ! -d tools/go_codemods/command ]]; then
 fi
 root=$(pwd -P)
 only=0
-libraryExports=static_single_assignment,mutation_aliasing
+libraryExports=modules/static_single_assignment,modules/mutation_aliasing
 libraryExportsGiven=0
 usage="usage: house_names.sh [--root <path>] [--only <n>] [--rename-library-exports <package,package>] | --count"
 while (( $# > 0 )); do

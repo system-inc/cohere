@@ -27,7 +27,7 @@
 // not the only one: useMutationState's shape reported with a bare `useSyncExternalStore` import too.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // FlattenScopesWithHooksOrUse flattens every reactive scope a hook call or `use` sits in.
 //

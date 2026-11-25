@@ -73,6 +73,12 @@ go run ./command/cohere
 cohere-swift over `swift_language/`, and both read 0. Go's own toolchain gates it too: `gofmt -l .`,
 `go vet ./...`, `go test ./...`, `go build ./...`.
 
+Code another repository pins by tag lives in `modules/`, one folder per Go module, each with its own
+`go.mod` and tagged `modules/<name>/v...`. The rule is mechanical: a folder is in `modules/` if and only if
+it has its own `go.mod`. Every one is a `use` of `go.work`, so the gate tests it, and one cohere imports is
+a `replace` of the root `go.mod` too. `internal/guard` refuses a `go.mod` anywhere else outside `testdata/`
+and the TypeScript fork.
+
 Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go
 held to the token's share of the cores, niced (#qhg0ntb): `go run ./command/cohere-dev test ./...` for the
 landing gate, `test <package>` or `test --fast` while editing, `build` and `vet`, and `exec -- <command>`
@@ -419,7 +425,7 @@ for six platforms on every `go test ./...`, until `3dc6e70` made it type-check t
 `cohere-dev` holds the cache at a 64 GB cap (`command/cohere-dev/cache.go`): when a token's run ends,
 at most every ten minutes for the machine, it measures the cache in the background, and when it is over
 the cap it holds every token of the pool and trims the least recently used entries down to a 48 GB
-target. The layout and the delete live in the `go_cache` module, which Loom shares. What each look did
+target. The layout and the delete live in the `modules/go_cache` module, which Loom shares. What each look did
 is logged to `gocache-trim.log` beside the pool's tokens.
 
 **No trim removes an entry used in the last two hours**, so a burst can stand above the cap by what it

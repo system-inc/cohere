@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/mutation_aliasing"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 func customHookSignature(function *Function) effectSignature {

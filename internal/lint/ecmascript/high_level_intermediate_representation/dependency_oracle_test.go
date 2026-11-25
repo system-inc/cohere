@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/react/conformance"
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // The compiled output in a golden names upstream's inferred dependencies, verbatim.
