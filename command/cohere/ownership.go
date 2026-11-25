@@ -15,7 +15,7 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/format/format_files"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // Ownership is how a repository with many TypeScript programs gets one report with each file in it once

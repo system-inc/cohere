@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // The early format pass reads a file before the graph build does (#g3046x5). A file edited between the two

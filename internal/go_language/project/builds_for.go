@@ -228,9 +228,9 @@ func listedBuilds(host Build, extraTargets []Port) []Build {
 
 // forbiddenImport is why a file no build compiles could never be compiled in its module at all, when it imports an
 // internal package its own import path is outside the tree of: adamic's oracles import
-// github.com/system-inc/cohere/internal/lint/rule, so they are built only inside cohere's module, under an overlay
-// (adamic's docs/lint-registration.md), and no build of adamic's own compiles them (#pwnv9qe). go's rule is the
-// final `internal` element's parent: only a package at or under it may import. It reads the file's imports alone,
+// github.com/system-inc/cohere/internal/typescript_language/rule, so they are built only inside cohere's module, under
+// an overlay (adamic's docs/lint-registration.md), and no build of adamic's own compiles them (#pwnv9qe). go's rule is
+// the final `internal` element's parent: only a package at or under it may import. It reads the file's imports alone,
 // so it costs no load, and finds nothing for a file outside every module of the census.
 func forbiddenImport(read source, census Census) (string, bool) {
 	importer, inModule := importPathOf(filepath.Dir(read.file), census)

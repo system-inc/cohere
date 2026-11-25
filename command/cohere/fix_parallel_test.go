@@ -13,7 +13,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/native"
-	"github.com/system-inc/cohere/internal/lint/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
 )
 
 // The parallel format pass may only make the fix phase faster. So the phase runs twice over the same tree,

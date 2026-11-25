@@ -23,12 +23,12 @@ import (
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/types/program"
-	"github.com/system-inc/cohere/internal/unused_exports"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/unused_exports"
 )
 
 // cacheOff is `--no-cache`: no cache is read or written for the project. Package-level because the
@@ -448,7 +448,7 @@ func run() error {
 		if locateError == nil && usesHouseSets(location) {
 			return errorHouseSetsPerFile
 		}
-		lintConfiguration, loadForError := configuration.LoadFor(lintConfigPath, registeredRuleNames())
+		lintConfiguration, loadForError := settings.LoadFor(lintConfigPath, registeredRuleNames())
 		if loadForError != nil {
 			return fmt.Errorf("reading %s: %w", lintConfigPath, loadForError)
 		}
@@ -493,7 +493,7 @@ func run() error {
 		var enabled []enabledRule
 		unimplemented := 0
 		for name, setting := range resolved.Rules {
-			if setting.Severity == configuration.SeverityOff {
+			if setting.Severity == settings.SeverityOff {
 				continue
 			}
 			if !implemented[name] {
@@ -908,7 +908,7 @@ func run() error {
 	//
 	// The lint config is loaded here because fixing needs to know which rules apply to which files,
 	// and loading it once serves both this phase and lint below.
-	var lintConfiguration *configuration.Configuration
+	var lintConfiguration *settings.Configuration
 
 	// The fix phase's walk, kept when it is still valid for the lint phase to reuse.
 	//
@@ -1670,7 +1670,7 @@ func rebuildGraph(
 	configurationFileName string,
 	directory string,
 	singleThreaded bool,
-	lintConfiguration *configuration.Configuration,
+	lintConfiguration *settings.Configuration,
 	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
@@ -1712,11 +1712,11 @@ func configureLint(
 	graph *program.Graph,
 	location projectLocation,
 	ahead *lintConfigAhead,
-) (*configuration.Configuration, error) {
+) (*settings.Configuration, error) {
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
-	var lintConfiguration *configuration.Configuration
+	var lintConfiguration *settings.Configuration
 	var loadError error
 	if ahead != nil {
 		<-ahead.done
@@ -1731,7 +1731,7 @@ func configureLint(
 	// path discovers nothing. A file the command line named is cohere-swift's to read wherever it sits
 	// (see configuration.CheckSwiftBlockHasAReader), and a missing one is zero config, with no block.
 	if !location.LintConfigFileNameGiven && isRegularFile(location.LintConfigFileName) {
-		if checkSwiftBlockHasAReaderError := configuration.CheckSwiftBlockHasAReader(
+		if checkSwiftBlockHasAReaderError := settings.CheckSwiftBlockHasAReader(
 			location.LintConfigFileName,
 		); checkSwiftBlockHasAReaderError != nil {
 			return nil, fmt.Errorf("loading the lint config: %w", checkSwiftBlockHasAReaderError)
@@ -1770,7 +1770,7 @@ func configureLint(
 	return lintConfiguration, nil
 }
 
-func optionsBase(lintConfiguration *configuration.Configuration, projectRoot string) rule.OptionsBase {
+func optionsBase(lintConfiguration *settings.Configuration, projectRoot string) rule.OptionsBase {
 	base := rule.OptionsBase{ProjectRoot: projectRoot}
 	if lintConfiguration != nil {
 		base.ConfigDirectory = lintConfiguration.Root
@@ -1830,7 +1830,7 @@ func singleLineDescription(description string) string {
 func printRuleDiagnostic(
 	out *bufio.Writer,
 	diagnostic rule.Diagnostic,
-	lintConfiguration *configuration.Configuration,
+	lintConfiguration *settings.Configuration,
 ) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
@@ -1882,7 +1882,7 @@ func registeredRuleNames() []string {
 // so a run with an unreadable base is never recorded or replayed. It only keeps the callers here,
 // which name inputs, from naming none.
 func lintConfigSources(path string) []string {
-	sources, sourcesOfError := configuration.SourcesOf(path)
+	sources, sourcesOfError := settings.SourcesOf(path)
 	if sourcesOfError != nil || len(sources) == 0 {
 		return []string{path}
 	}

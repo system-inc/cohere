@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // Every crash names itself, on the terminal and in `--json`: a count with no reason is a gap nobody can act

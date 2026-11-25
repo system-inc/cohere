@@ -42,7 +42,7 @@ func loadTestVocabulary(test *testing.T) *vocabulary {
 // directories under lint, so a fixture needs no standard library.
 var fixturePackages = map[string]string{
 	"example.com/command": "package command\n\nconst Name = \"command\"\n",
-	"github.com/system-inc/cohere/internal/lint/rule": "package rule\n\n" +
+	"github.com/system-inc/cohere/internal/typescript_language/rule": "package rule\n\n" +
 		"func OptionsAs[Options any](options any) (Options, bool) { decoded, ok := options.(Options); return decoded, ok }\n",
 	"example.com/internal/lint/configuration": "package configuration\n\ntype Config struct{ Root string }\n",
 	"example.com/internal/gotypes":            "package gotypes\n\ntype Package struct{ Path string }\n",
@@ -202,7 +202,7 @@ func TestWordnamesRenamesLocalsAsTheFormsSay(test *testing.T) {
 		{"a renamed name writes its initialisms as words", `func f() bool { isURLArg := true; return isURLArg }`,
 			"isURLArg", "isUrlArgument", outcomeProposed},
 		{"opts beside a parameter named options are the rule's settings",
-			"import \"github.com/system-inc/cohere/internal/lint/rule\"\n\n" +
+			"import \"github.com/system-inc/cohere/internal/typescript_language/rule\"\n\n" +
 				"type noFloatingOptions struct{ all bool }\n\n" +
 				"func f(options any) bool { opts, ok := rule.OptionsAs[noFloatingOptions](options); return ok && opts.all }",
 			"opts", "settings", outcomeProposed},
@@ -459,7 +459,7 @@ func (cfg configuration) get() int { return cfg.value }`, "cfg", "", otherGenera
 
 // TestWordnamesFindAgreesWithTheRulesOwnCases runs the names the rule's own tests pin through this port's
 // find: TestAbbreviationSegmentsJudgeOnlyTheWholeWord and TestAbbreviationVocabularyOrderIsObservableWhereItMatters
-// in internal/lint/rules/nexus/abbreviation_vocabulary_test.go.
+// in internal/typescript_language/rules/nexus/abbreviation_vocabulary_test.go.
 func TestWordnamesFindAgreesWithTheRulesOwnCases(test *testing.T) {
 	test.Parallel()
 	loadedVocabulary := loadTestVocabulary(test)

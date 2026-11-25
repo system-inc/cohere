@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // outputBlock is the settings' "output" block: how a run prints, for this repository. It is the one output
@@ -21,7 +21,7 @@ type outputBlock struct {
 // file extending another may not carry one (the loader refuses it there, since this reads only here), and
 // a key the block does not know is refused, naming the file, rather than ignored.
 func readOutputBlock(settingsPath string) (outputBlock, error) {
-	contents, sourceContentsError := configuration.SourceContents(settingsPath)
+	contents, sourceContentsError := settings.SourceContents(settingsPath)
 	if errors.Is(sourceContentsError, fs.ErrNotExist) {
 		return outputBlock{}, nil
 	}

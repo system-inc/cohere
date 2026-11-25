@@ -7,10 +7,10 @@ import (
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/go_language"
 	"github.com/system-inc/cohere/internal/go_language/rules"
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/settings_schema"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/settings/schema"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // SourceInputs gathers every input but the binary's help from the module at root: the live registry
@@ -20,13 +20,13 @@ func SourceInputs(root string) (Inputs, error) {
 	names := registry.Names()
 	inputs := Inputs{
 		Registrations: rule.Registered(),
-		SetNames:      configuration.SetNames(),
+		SetNames:      settings.SetNames(),
 		LoadSet: func(
 			name string,
-		) (*configuration.Configuration, error) {
-			return configuration.LoadFor(name, names)
+		) (*settings.Configuration, error) {
+			return settings.LoadFor(name, names)
 		},
-		SetContents:   configuration.SourceContents,
+		SetContents:   settings.SourceContents,
 		GoRules:       rules.All(),
 		GoFixingRules: go_language.FixingRules(),
 	}
@@ -45,7 +45,7 @@ func SourceInputs(root string) (Inputs, error) {
 		return inputs, readError
 	}
 	var buildError error
-	if inputs.SettingsSchemas, buildError = settings_schema.Build(names); buildError != nil {
+	if inputs.SettingsSchemas, buildError = schema.Build(names); buildError != nil {
 		return inputs, buildError
 	}
 	if inputs.Benchmarks, readError = bench_results.Read(

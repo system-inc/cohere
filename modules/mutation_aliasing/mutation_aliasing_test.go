@@ -1,0 +1,524 @@
+package mutation_aliasing
+
+import (
+	"strings"
+	"testing"
+
+	ssa "github.com/system-inc/cohere/modules/static_single_assignment"
+)
+
+// The pass is tested here on an IR of the tests' own, as small as Graph allows, so the module proves
+// itself without either real IR. Functions are built already in single assignment form, one value
+// per id, and the effects are written by hand, which is what lets a test pin one seam at a time.
+// cohere's high-level IR tests the same pass through its adapter over lowered source, and Adamic's
+// suite through its own.
+
+type testPlace struct{ id ssa.IdentifierId }
+
+type testInstruction struct {
+	uses, defines []testPlace
+	effects       []AliasingEffect[testPlace]
+	// storedContext is the value a store into a captured binding stores, when this is one.
+	storedContext *ssa.IdentifierId
+	order         ssa.EvaluationOrder
+}
+
+func newTestFunction() *testFunction {
+	return &testFunction{table: map[ssa.BlockId]*testBlock{}, next: 1}
+}
+
+func place(id ssa.IdentifierId) testPlace { return testPlace{id: id} }
+
+type testGraph struct{}
+
+func (testGraph) Entry(function *testFunction) ssa.BlockId { return function.entry }
+func (testGraph) BlockBound(function *testFunction) int    { return int(function.next) }
+func (testGraph) Block(function *testFunction, id ssa.BlockId) (*testBlock, bool) {
+	block, ok := function.table[id]
+	return block, ok
+}
+func (testGraph) Blocks(function *testFunction) []*testBlock { return function.blocks }
+
+// Mutates: function the passes hand their new block order back through this setter, as through a real IR's
+func (testGraph) SetBlocks(function *testFunction, blocks []*testBlock) { function.blocks = blocks }
+func (testGraph) Retain(function *testFunction, keep func(ssa.BlockId) bool) {
+	for id := range function.table {
+		if !keep(id) {
+			delete(function.table, id)
+		}
+	}
+}
+func (testGraph) Placeholder(function *testFunction, block *testBlock) *testBlock { return block }
+func (testGraph) Id(block *testBlock) ssa.BlockId                                 { return block.id }
+func (testGraph) Predecessors(block *testBlock) []ssa.BlockId                     { return block.predecessors }
+
+// Mutates: block the passes record its recomputed predecessors through this setter, as through a real IR's
+func (testGraph) SetPredecessors(block *testBlock, predecessors []ssa.BlockId) {
+	block.predecessors = predecessors
+}
+func (testGraph) Phis(block *testBlock) []*ssa.Phi[testPlace] { return block.phis }
+
+// Mutates: block the passes record its phis through this setter, as through a real IR's
+func (testGraph) SetPhis(block *testBlock, phis []*ssa.Phi[testPlace]) { block.phis = phis }
+func (testGraph) EachEdge(block *testBlock, visit func(ssa.BlockId, ssa.Edge)) {
+	for _, successor := range block.successors {
+		visit(successor, ssa.Real)
+	}
+}
+func (testGraph) EndsInReturn(block *testBlock) bool { return block.returns != nil }
+func (testGraph) InstructionCount(function *testFunction, block *testBlock) int {
+	return len(block.instructions)
+}
+func (testGraph) EachInstructionPlace(
+	function *testFunction,
+	block *testBlock,
+	index int,
+	visit func(*testPlace, ssa.Role),
+) {
+	instruction := block.instructions[index]
+	for index := range instruction.uses {
+		visit(&instruction.uses[index], ssa.Use)
+	}
+	for index := range instruction.defines {
+		visit(&instruction.defines[index], ssa.Define)
+	}
+}
+func (testGraph) IsContextStore(function *testFunction, block *testBlock, index int) bool {
+	return false
+}
+func (testGraph) ThrowsAtLastInstruction(function *testFunction, block *testBlock) bool { return false }
+func (testGraph) ContextStoreDefines(function *testFunction, block *testBlock, index int, place testPlace) bool {
+	return false
+}
+func (testGraph) SetInstructionOrder(function *testFunction, block *testBlock, index int, order ssa.EvaluationOrder) {
+	block.instructions[index].order = order
+}
+func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.Role)) {
+	// Only construction and verification walk a terminal's places, and these tests build their functions
+	// already in single assignment form, so neither runs here.
+}
+
+// Mutates: block the passes record its terminal's evaluation order through this setter, as through a real IR's
+func (testGraph) SetTerminalOrder(block *testBlock, order ssa.EvaluationOrder) {
+	block.terminalOrder = order
+}
+func (testGraph) Parameters(
+	function *testFunction,
+) []testPlace {
+	return function.parameters
+}
+func (testGraph) Returns(function *testFunction) *testPlace                                 { return function.returns }
+func (testGraph) Declaration(function *testFunction, id ssa.IdentifierId) ssa.DeclarationId { return 0 }
+func (testGraph) Contextual(function *testFunction, declaration ssa.DeclarationId) bool     { return false }
+func (testGraph) Mint(function *testFunction, original ssa.IdentifierId) ssa.IdentifierId {
+	return original
+}
+func (testGraph) Named(function *testFunction, id ssa.IdentifierId) bool         { return true }
+func (testGraph) PlaceString(function *testFunction, id ssa.IdentifierId) string { return "" }
+func (testGraph) IdentifierOf(place testPlace) ssa.IdentifierId                  { return place.id }
+func (testGraph) WithIdentifier(place testPlace, id ssa.IdentifierId) testPlace {
+	return testPlace{id: id}
+}
+
+func (testGraph) InstructionOrder(function *testFunction, block *testBlock, index int) (ssa.EvaluationOrder, bool) {
+	return block.instructions[index].order, true
+}
+func (testGraph) TerminalOrder(block *testBlock) ssa.EvaluationOrder { return block.terminalOrder }
+func (testGraph) Effects(function *testFunction, block *testBlock, index int) []AliasingEffect[testPlace] {
+	return block.instructions[index].effects
+}
+func (testGraph) ParametersFrozen(function *testFunction) bool { return function.parametersFrozen }
+func (testGraph) Context(function *testFunction) []testPlace   { return function.context }
+func (testGraph) ReturnValue(block *testBlock) (testPlace, bool) {
+	if block.returns == nil {
+		return testPlace{}, false
+	}
+	return *block.returns, true
+}
+func (testGraph) StoredContextValue(function *testFunction, block *testBlock, index int) (ssa.IdentifierId, bool) {
+	if stored := block.instructions[index].storedContext; stored != nil {
+		return *stored, true
+	}
+	return 0, false
+}
+func (testGraph) Closure(function *testFunction, block *testBlock, index int, into ssa.IdentifierId,
+	kinds map[ssa.IdentifierId]EffectValueKind) ([]testPlace, bool) {
+	return nil, false
+}
+
+// finalize is the sequence both real IRs run before the pass: reverse postorder, predecessors, and
+// evaluation order from 1.
+func finalize(function *testFunction) {
+	ssa.ReversePostorder(testGraph{}, function)
+	ssa.MarkPredecessors(testGraph{}, function)
+	ssa.MarkEvaluationOrder(testGraph{}, function)
+}
+
+func ranges(function *testFunction, options Options) *MutableRanges {
+	finalize(function)
+	return InferMutableRanges(testGraph{}, function, options)
+}
+
+func expectRange(test *testing.T, table *MutableRanges, id ssa.IdentifierId, want MutableRange, why string) {
+	test.Helper()
+	if got := table.Get(id); got != want {
+		test.Errorf("value %d has range [%d,%d), want [%d,%d): %s", id, got.Start, got.End, want.Start, want.End, why)
+	}
+}
+
+// TestParametersDefinedOnEntryBothWays pins Options.ParametersDefinedOnEntry by exact range, both
+// ways, since until Adamic switches to this module it is the only gate on that option.
+//
+// The shape is the one that took Adamic's rule (its 4748a636): a parameter mutated through another
+// value before its first read. Here `mutated` is mutated at order 1 by an instruction that reads only
+// `readOnly` (as Adamic's escaped-values rule does for a write into an escaped container `readOnly` reaches),
+// read at 2, and mutated again at 3.
+//
+//   - Without the option, the widening takes the end of `mutated` to 4, and it first appears as an operand
+//     at order 2, where the operand loop opens its start: [2,4). The mutation at 1 is outside it.
+//   - With it, `mutated` is defined on entry: [1,4), and the mutation at 1 is inside. `untouched`, a
+//     parameter nothing touches, is unset without the option and is the first instruction alone with it, [1,2).
+func TestParametersDefinedOnEntryBothWays(test *testing.T) {
+	test.Parallel()
+	build := func() (*testFunction, ssa.IdentifierId, ssa.IdentifierId, ssa.IdentifierId) {
+		function := newTestFunction()
+		mutated, readOnly, untouched := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
+		function.parameters = []testPlace{place(mutated), place(readOnly), place(untouched)}
+		entry := function.block()
+		entry.add(&testInstruction{
+			uses: []testPlace{place(readOnly)},
+			effects: []AliasingEffect[testPlace]{
+				MutationEffect(AliasingEffectMutateTransitiveConditionally, place(mutated)),
+			},
+		})
+		entry.add(&testInstruction{uses: []testPlace{place(mutated)}})
+		entry.add(&testInstruction{uses: []testPlace{place(mutated)},
+			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(mutated))}})
+		return function, mutated, readOnly, untouched
+	}
+
+	function, mutated, readOnly, untouched := build()
+	without := ranges(function, Options{})
+	if order := function.blocks[0].instructions[0].order; order != 1 {
+		test.Fatalf("the first instruction is at order %d, so the ranges below would not mean what they say", order)
+	}
+	expectRange(test, without, mutated, MutableRange{Start: 2, End: 4},
+		"React's rule opens a parameter's range at its first read, after the mutation at order 1")
+	if without.Contains(mutated, 1) {
+		test.Error(
+			"without the option, the mutation at order 1 falls outside mutated's range: the hole the option closes",
+		)
+	}
+	expectRange(test, without, readOnly, MutableRange{}, "readOnly is read and never mutated")
+	expectRange(test, without, untouched, MutableRange{}, "untouched is never read or mutated")
+
+	function, mutated, readOnly, untouched = build()
+	with := ranges(function, Options{ParametersDefinedOnEntry: true})
+	expectRange(test, with, mutated, MutableRange{Start: 1, End: 4}, "a parameter is defined on entry")
+	if !with.Contains(mutated, 1) {
+		test.Error("with the option, the mutation at order 1 must be inside mutated's range")
+	}
+	expectRange(
+		test,
+		with,
+		readOnly,
+		MutableRange{Start: 1, End: 2},
+		"a parameter nothing widened is the first instruction alone",
+	)
+	expectRange(
+		test,
+		with,
+		untouched,
+		MutableRange{Start: 1, End: 2},
+		"a parameter nothing widened is the first instruction alone",
+	)
+}
+
+// TestAMutationReachesWhatItIsAnAliasOf: Alias is "mutating Into implies mutating From", so mutating
+// the alias widens the source to the mutation.
+func TestAMutationReachesWhatItIsAnAliasOf(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	source, alias := ssa.IdentifierId(1), ssa.IdentifierId(2)
+	entry := function.block()
+	entry.add(&testInstruction{defines: []testPlace{place(source)},
+		effects: []AliasingEffect[testPlace]{CreateEffect(place(source), EffectValueMutable)}})
+	entry.add(&testInstruction{uses: []testPlace{place(source)}, defines: []testPlace{place(alias)},
+		effects: []AliasingEffect[testPlace]{
+			CreateEffect(place(alias), EffectValueMutable),
+			FlowEffect(AliasingEffectAlias, place(source), place(alias)),
+		}})
+	entry.add(&testInstruction{uses: []testPlace{place(alias)},
+		effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(alias))}})
+
+	table := ranges(function, Options{})
+	expectRange(test, table, source, MutableRange{Start: 1, End: 4}, "the alias's mutation at 3 reaches its source")
+	expectRange(test, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
+}
+
+// TestAnAliasMadeAfterAMutationDoesNotWiden is the model of time: a mutation flows only through edges
+// that existed when it happened, so an alias made later does not reach back.
+func TestAnAliasMadeAfterAMutationDoesNotWiden(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	source, alias := ssa.IdentifierId(1), ssa.IdentifierId(2)
+	entry := function.block()
+	entry.add(&testInstruction{defines: []testPlace{place(source)},
+		effects: []AliasingEffect[testPlace]{CreateEffect(place(source), EffectValueMutable)}})
+	entry.add(&testInstruction{defines: []testPlace{place(alias)},
+		effects: []AliasingEffect[testPlace]{CreateEffect(place(alias), EffectValueMutable)}})
+	entry.add(&testInstruction{uses: []testPlace{place(alias)},
+		effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(alias))}})
+	entry.add(&testInstruction{uses: []testPlace{place(source), place(alias)},
+		effects: []AliasingEffect[testPlace]{FlowEffect(AliasingEffectAlias, place(source), place(alias))}})
+
+	table := ranges(function, Options{})
+	expectRange(
+		test,
+		table,
+		source,
+		MutableRange{Start: 1, End: 2},
+		"the alias came after the mutation, so the source is untouched",
+	)
+	expectRange(test, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
+}
+
+// TestFrozenParametersDropAConditionalMutation pins Graph.ParametersFrozen: React's component
+// parameters are Frozen, and a conditional mutation of a value that is not Mutable is dropped. The
+// same function with mutable parameters widens.
+func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
+	test.Parallel()
+	for _, frozen := range []bool{true, false} {
+		function := newTestFunction()
+		function.parametersFrozen = frozen
+		identifierId := ssa.IdentifierId(1)
+		function.parameters = []testPlace{place(identifierId)}
+		entry := function.block()
+		entry.add(&testInstruction{uses: []testPlace{place(identifierId)}})
+		entry.add(&testInstruction{uses: []testPlace{place(identifierId)},
+			effects: []AliasingEffect[testPlace]{
+				MutationEffect(AliasingEffectMutateConditionally, place(identifierId)),
+			}})
+
+		table := ranges(function, Options{})
+		want := MutableRange{Start: 1, End: 3}
+		if frozen {
+			want = MutableRange{}
+		}
+		expectRange(
+			test,
+			table,
+			identifierId,
+			want,
+			map[bool]string{true: "frozen parameters drop it", false: "mutable parameters widen"}[frozen],
+		)
+	}
+}
+
+// TestAStoreIntoACapturedBindingWidensFromItsShape pins Graph.StoredContextValue: the stored value's
+// range reaches past the store with no effect consulted.
+func TestAStoreIntoACapturedBindingWidensFromItsShape(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	value := ssa.IdentifierId(1)
+	entry := function.block()
+	entry.add(&testInstruction{defines: []testPlace{place(value)}})
+	entry.add(&testInstruction{uses: []testPlace{place(value)}})
+	stored := value
+	entry.add(&testInstruction{uses: []testPlace{place(value)}, storedContext: &stored})
+
+	table := ranges(function, Options{})
+	expectRange(test, table, value, MutableRange{Start: 1, End: 4}, "the store at 3 keeps it live past 3")
+}
+
+// TestMutatingAReturnedValueReachesTheReturnsPlace pins Graph.ReturnValue: a return aliases its value
+// into the Returns place, and an IR without one skips both the node and the edge.
+func TestMutatingAReturnedValueReachesTheReturnsPlace(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	value, returned := ssa.IdentifierId(1), ssa.IdentifierId(2)
+	returns := place(returned)
+	function.returns = &returns
+	entry := function.block()
+	entry.add(&testInstruction{defines: []testPlace{place(value)},
+		effects: []AliasingEffect[testPlace]{CreateEffect(place(value), EffectValueMutable)}})
+	entry.returns = &testPlace{id: value}
+
+	finalize(function)
+	graph := BuildAliasingGraph(testGraph{}, function, Options{})
+	if node := graph.state.nodes[returned]; node == nil ||
+		len(node.aliasesOrder) != 1 ||
+		node.aliasesOrder[0] != value {
+		test.Fatalf("the Returns place should alias the returned value, got %+v", node)
+	}
+
+	function.returns = nil
+	graph = BuildAliasingGraph(testGraph{}, function, Options{})
+	if _, ok := graph.state.nodes[returned]; ok {
+		test.Error("an IR with no Returns place has no Returns node")
+	}
+}
+
+// TestAMutationOfAPhiReachesItsOperands: a phi aliases each operand, so mutating the merge mutates
+// whichever value it may be. Operands are walked in ascending predecessor order.
+func TestAMutationOfAPhiReachesItsOperands(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	left, right, merged := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
+	entry, leftBlock, rightBlock, join := function.block(), function.block(), function.block(), function.block()
+	entry.successors = []ssa.BlockId{leftBlock.id, rightBlock.id}
+	leftBlock.successors = []ssa.BlockId{join.id}
+	rightBlock.successors = []ssa.BlockId{join.id}
+	leftBlock.add(&testInstruction{defines: []testPlace{place(left)},
+		effects: []AliasingEffect[testPlace]{CreateEffect(place(left), EffectValueMutable)}})
+	rightBlock.add(&testInstruction{defines: []testPlace{place(right)},
+		effects: []AliasingEffect[testPlace]{CreateEffect(place(right), EffectValueMutable)}})
+	phi := &ssa.Phi[testPlace]{Place: place(merged)}
+	phi.Operands.Set(leftBlock.id, place(left))
+	phi.Operands.Set(rightBlock.id, place(right))
+	join.phis = []*ssa.Phi[testPlace]{phi}
+	join.add(&testInstruction{uses: []testPlace{place(merged)},
+		effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(merged))}})
+
+	table := ranges(function, Options{})
+	mutation := join.instructions[0].order
+	for _, operand := range []ssa.IdentifierId{left, right} {
+		if got := table.Get(operand); got.End != mutation+1 {
+			test.Errorf("operand %d ends at %d, want %d, past the phi's mutation", operand, got.End, mutation+1)
+		}
+	}
+	if invalid := ValidateMutableRanges(table); len(invalid) != 0 {
+		test.Errorf("invalid ranges: %v", invalid)
+	}
+}
+
+// TestRangesPhiOpensBeforeItsBlockWhenWidened proves the phi branch works, by seeding the state
+// that only Stage 1 can produce today.
+//
+// `phiOpensBefore` is inert on this tree because its input is a widened `End` that only
+// `AliasingState.mutate` writes. The branch is kept live rather than deleted, so it needs a test
+// that does not depend on the missing input. Seeding the range by hand is what separates "this
+// branch is correct and waiting" from "this branch is untested".
+func TestRangesPhiOpensBeforeItsBlockWhenWidened(test *testing.T) {
+	test.Parallel()
+
+	if phiOpensBefore(MutableRange{}, 10) {
+		test.Error("an unset range must not open a phi early")
+	}
+	if phiOpensBefore(MutableRange{Start: 5, End: 10}, 10) {
+		test.Error("a range ending exactly at the block's first instruction is not mutated AFTER it; " +
+			"upstream's test is strictly greater")
+	}
+	if !phiOpensBefore(MutableRange{Start: 5, End: 11}, 10) {
+		test.Error("a range ending past the block's first instruction means the phi is mutated after " +
+			"creation, so it must open early. This is the branch Stage 1 will make reachable")
+	}
+	if phiOpensBefore(MutableRange{Start: 1, End: 99}, 0) {
+		test.Error("a block with no assigned order must not open a phi at a negative position")
+	}
+}
+
+// TestPhiOpensOneBeforeItsBlock pins the offset upstream uses.
+//
+// React writes `makeInstructionId(firstInstructionIdOfBlock - 1)`. The minus one is what puts the
+// merge point itself inside the range: a phi's value exists at the top of the block, before its
+// first instruction runs, so opening at the instruction would make `Contains` answer false at the
+// position the phi is definitionally live.
+//
+// Tested on the helper rather than through lowered source, because the branch only runs on a range
+// whose end Stage 1 widened. A mutation dropping the minus one survived every fixture over real
+// code for exactly that reason.
+func TestPhiOpensOneBeforeItsBlock(test *testing.T) {
+	test.Parallel()
+
+	widened := MutableRange{Start: 0, End: 20}
+	opened, moved := phiOpenedRange(widened, 10)
+	if !moved {
+		test.Fatal("a phi whose end is past its block's first instruction must open early")
+	}
+	if opened.Start != 9 {
+		test.Errorf("the phi opened at %d; upstream opens at the block's first instruction MINUS ONE, "+
+			"which is 9 here, so that the merge point itself is inside the range", opened.Start)
+	}
+	if !opened.Contains(9) || !opened.Contains(10) {
+		test.Error("both the merge point and the block's first instruction must be inside the range")
+	}
+
+	if _, moved := phiOpenedRange(MutableRange{Start: 5, End: 20}, 10); moved {
+		test.Error("a phi whose start is already set must not be reopened")
+	}
+	if _, moved := phiOpenedRange(MutableRange{}, 10); moved {
+		test.Error("an unset range must not open a phi early")
+	}
+}
+
+func TestPhiValueKindsPreserveMixedFrozenValues(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		name        string
+		left, right EffectValueKind
+		want        EffectValueKind
+		unseen      bool
+	}{
+		{"frozen mutable", EffectValueFrozen, EffectValueMutable, EffectValueMaybeFrozen, false},
+		{"mutable frozen", EffectValueMutable, EffectValueFrozen, EffectValueMaybeFrozen, false},
+		{"mixed primitive", EffectValueMaybeFrozen, EffectValuePrimitive, EffectValueMaybeFrozen, false},
+		{"mixed global", EffectValueMaybeFrozen, EffectValueGlobal, EffectValueMaybeFrozen, false},
+		{"mixed frozen", EffectValueMaybeFrozen, EffectValueFrozen, EffectValueMaybeFrozen, false},
+		{"frozen primitive", EffectValueFrozen, EffectValuePrimitive, EffectValueFrozen, false},
+		{"frozen global", EffectValueFrozen, EffectValueGlobal, EffectValueFrozen, false},
+		{"global primitive", EffectValueGlobal, EffectValuePrimitive, EffectValueGlobal, false},
+		{"global mutable", EffectValueGlobal, EffectValueMutable, EffectValueMutable, false},
+		{"primitive mutable", EffectValuePrimitive, EffectValueMutable, EffectValueMutable, false},
+		{"unvisited predecessor", EffectValueFrozen, EffectValueMutable, EffectValueMutable, true},
+	} {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			state := newAliasingState()
+			for index, kind := range []EffectValueKind{testCase.left, testCase.right} {
+				id := ssa.IdentifierId(index + 1)
+				state.create(id, aliasingNodeObject)
+				if kind != EffectValueMutable {
+					state.markImmutable(id, kind)
+				}
+			}
+			phi := &ssa.Phi[testPlace]{Place: place(3), Operands: ssa.PhiOperands[testPlace]{
+				{Predecessor: 1, Place: place(1)}, {Predecessor: 2, Place: place(2)},
+			}}
+			derivePhiImmutable(state, testGraph{}, phi, map[ssa.BlockId]bool{1: true, 2: !testCase.unseen})
+			if got := state.immutable[3]; got != testCase.want {
+				test.Fatalf("phi kind=%s, want %s", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestFreezeRetainsAlreadyImmutableKinds(test *testing.T) {
+	test.Parallel()
+	for _, kind := range []EffectValueKind{EffectValuePrimitive, EffectValueGlobal, EffectValueFrozen} {
+		test.Run(kind.String(), func(test *testing.T) {
+			test.Parallel()
+			state := newAliasingState()
+			id := ssa.IdentifierId(1)
+			state.create(id, aliasingNodeObject)
+			state.markImmutable(id, kind)
+			if state.freeze(id) || state.immutable[id] != kind {
+				test.Fatalf("freeze changed %s to %s", kind, state.immutable[id])
+			}
+		})
+	}
+}
+
+// TestTheVocabularyNamesEveryKind keeps the String methods total, since a kind printing "<unknown>"
+// in a test failure hides which effect was meant.
+func TestTheVocabularyNamesEveryKind(test *testing.T) {
+	test.Parallel()
+	for kind := AliasingEffectCreate; kind <= AliasingEffectApply; kind++ {
+		if name := kind.String(); name == "<unknown>" || strings.TrimSpace(name) == "" {
+			test.Errorf("effect kind %d has no name", kind)
+		}
+	}
+	if AliasingEffectKind(AliasingEffectApply+1).String() != "<unknown>" {
+		test.Error("a kind past the last should print <unknown>")
+	}
+}

@@ -9,7 +9,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 /*
@@ -140,12 +140,12 @@ func chainOf(path string) (Resolution, error) {
 		return entry.resolution, nil
 	}
 
-	sources, sourcesOfError := configuration.SourcesOf(path)
+	sources, sourcesOfError := settings.SourcesOf(path)
 	if sourcesOfError != nil {
 		return Resolution{}, sourcesOfError
 	}
 	files := map[string][]byte{}
-	for _, source := range configuration.SourcesOnDisk(sources) {
+	for _, source := range settings.SourcesOnDisk(sources) {
 		contents, readError := os.ReadFile(source)
 		if readError != nil {
 			return Resolution{}, readError
@@ -168,7 +168,7 @@ const NexusTierFileName = "NexusCohereSettings.json"
 
 // NexusTierSetName is the Nexus tier as the rule set cohere carries. Every set extends it, and its
 // format block is the house format, what zero config formats with.
-const NexusTierSetName = configuration.SetPrefix + "typescript"
+const NexusTierSetName = settings.SetPrefix + "typescript"
 
 // isNexusTier reports whether a chain source is the Nexus tier, the set every chain of ours reaches.
 func isNexusTier(source string) bool {
@@ -190,14 +190,14 @@ func isNexusTier(source string) bool {
 // The chain is read by the lint loader's own SourcesOf rather than by a second walk of `extends` here,
 // so the two readers cannot disagree about which files a configuration is made of.
 func resolveChain(path string) (Resolution, error) {
-	sources, sourcesOfError := configuration.SourcesOf(path)
+	sources, sourcesOfError := settings.SourcesOf(path)
 	if sourcesOfError != nil {
 		return Resolution{}, sourcesOfError
 	}
 
 	blocks := make([]json.RawMessage, len(sources))
 	for index, source := range sources {
-		contents, sourceContentsError := configuration.SourceContents(source)
+		contents, sourceContentsError := settings.SourceContents(source)
 		if sourceContentsError != nil {
 			return Resolution{}, sourceContentsError
 		}
@@ -209,7 +209,7 @@ func resolveChain(path string) (Resolution, error) {
 	}
 
 	var resolution Resolution
-	if configuration.InOurTiers(sources) {
+	if settings.InOurTiers(sources) {
 		var nexusTier string
 		var block json.RawMessage
 		for index, source := range sources {
@@ -273,7 +273,7 @@ func resolveChain(path string) (Resolution, error) {
 
 	resolution.Source = path
 	var ignorePatternsOfError error
-	resolution.IgnorePatterns, ignorePatternsOfError = configuration.IgnorePatternsOf(path)
+	resolution.IgnorePatterns, ignorePatternsOfError = settings.IgnorePatternsOf(path)
 	if ignorePatternsOfError != nil {
 		return Resolution{}, ignorePatternsOfError
 	}
@@ -293,7 +293,7 @@ func HouseOptions() (Options, error) {
 // houseResolution is the house format and ignore list, from the block cohere:typescript carries: what
 // zero config formats with. It names no Source, since no settings file chose it.
 func houseResolution() (Resolution, error) {
-	contents, sourceContentsError := configuration.SourceContents(NexusTierSetName)
+	contents, sourceContentsError := settings.SourceContents(NexusTierSetName)
 	if sourceContentsError != nil {
 		return Resolution{}, sourceContentsError
 	}
@@ -366,7 +366,7 @@ func prettierConfigIn(directory string) (string, bool, error) {
 }
 
 // BlockKey is one key the format block accepts. The table is the decoder itself, and the settings
-// schema (internal/settings_schema) is generated from it, so neither can learn a key the other lacks.
+// schema (internal/settings/schema) is generated from it, so neither can learn a key the other lacks.
 type BlockKey struct {
 	Name string
 

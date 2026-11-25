@@ -1,0 +1,105 @@
+package typescript
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+)
+
+/*
+ * The corpus is typescript-eslint 8.71.0's own no-misused-promises rows that set checksConditionals, all
+ * 34, as a boolean and as an object holding flagUnions, plus edge rows, each with the verdict the
+ * installed rule gave on the same bytes; no_misused_promises_conditionals_corpus_data_test.go says how
+ * it was built.
+ */
+
+func TestNoMisusedPromisesConditionalsUpstreamCorpus(test *testing.T) {
+	test.Parallel()
+
+	valid, invalid := 0, 0
+	for _, row := range noMisusedPromisesConditionalsCorpus {
+		if row.edge != "" {
+			continue
+		}
+		if row.valid {
+			valid++
+		} else {
+			invalid++
+		}
+	}
+	if valid != noMisusedPromisesConditionalsCorpusUpstreamValid ||
+		invalid != noMisusedPromisesConditionalsCorpusUpstreamInvalid {
+		test.Fatalf(
+			"the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
+			valid,
+			invalid,
+			noMisusedPromisesConditionalsCorpusUpstreamValid,
+			noMisusedPromisesConditionalsCorpusUpstreamInvalid,
+		)
+	}
+
+	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
+	for _, row := range noMisusedPromisesConditionalsCorpus {
+		name := fmt.Sprintf("upstream-%d", row.index)
+		if row.edge != "" {
+			name = row.edge
+		}
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			options, decodeError := decode([]byte(row.options))
+			if decodeError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeError)
+			}
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoMisusedPromises, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
+				func(directory string) {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(noMisusedPromisesConditionalsCorpusTsconfig),
+						0o644,
+					); writeError != nil {
+						test.Fatal(writeError)
+					}
+				})
+
+			diagnostics := result.Diagnostics
+			sort.SliceStable(diagnostics, func(first, second int) bool {
+				return diagnostics[first].Range.Pos() < diagnostics[second].Range.Pos()
+			})
+			reported := []noMisusedPromisesConditionalsCorpusFinding{}
+			for _, diagnostic := range diagnostics {
+				reported = append(reported, noMisusedPromisesConditionalsCorpusFinding{
+					id:   diagnostic.Message.Id,
+					text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()],
+				})
+			}
+			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
+				test.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+			}
+			rule_testing.RecordAssertedCase(test, result)
+		})
+	}
+}
+
+// The object spelling refuses what upstream's schema refuses, before any run: an unknown flagUnions
+// value, and a key beside flagUnions.
+func TestNoMisusedPromisesConditionalsObjectRefusesOtherShapes(test *testing.T) {
+	test.Parallel()
+
+	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
+	for _, raw := range []string{
+		`{"checksConditionals": {"flagUnions": "some"}}`,
+		`{"checksConditionals": {"flagUnion": "all"}}`,
+		`{"checksConditionals": "all"}`,
+	} {
+		if _, decodeError := decode([]byte(raw)); decodeError == nil {
+			test.Errorf("%s decoded, and upstream's schema refuses it", raw)
+		}
+	}
+}

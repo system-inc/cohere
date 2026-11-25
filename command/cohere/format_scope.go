@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/format_files"
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // formatScope is which files the format phase considers, and how that set was decided.

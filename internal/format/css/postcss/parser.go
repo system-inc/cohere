@@ -3,7 +3,7 @@ package postcss
 import (
 	"strings"
 
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // postcss 8.5.16, lib/parser.js.

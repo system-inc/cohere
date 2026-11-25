@@ -9,10 +9,10 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/rules/typescript"
-	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/typescript"
 )
 
 /*

@@ -165,7 +165,7 @@ func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
-	path := filepath.Join(root, "internal/lint/rules/typescript/no_shadow.go")
+	path := filepath.Join(root, "internal/typescript_language/rules/typescript/no_shadow.go")
 	original, readError := os.ReadFile(path)
 	if readError != nil {
 		test.Fatal(readError)
@@ -206,7 +206,7 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	}
 	slices.Sort(candidates)
 	target := candidates[0]
-	file := filepath.Join(root, "internal/lint/rules", baseline.reason[target])
+	file := filepath.Join(root, "internal/typescript_language/rules", baseline.reason[target])
 	original, readError := os.ReadFile(file)
 	if readError != nil {
 		test.Fatal(readError)
@@ -282,7 +282,7 @@ func TestAShapesClaimPlantsIntoEveryRuleFile(test *testing.T) {
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
-	files, globError := filepath.Glob(filepath.Join(root, "internal/lint/rules/*/*.go"))
+	files, globError := filepath.Glob(filepath.Join(root, "internal/typescript_language/rules/*/*.go"))
 	if globError != nil {
 		test.Fatal(globError)
 	}
@@ -368,7 +368,7 @@ func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(test *testing.T) {
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
-	target := filepath.Join(root, "internal/lint/rules/react/checked_requires_onchange_or_readonly.go")
+	target := filepath.Join(root, "internal/typescript_language/rules/react/checked_requires_onchange_or_readonly.go")
 	original, readError := os.ReadFile(target)
 	if readError != nil {
 		test.Fatal(readError)

@@ -695,9 +695,9 @@ func (run *contractRun) acceptUnusedCoverage(record *contractUnusedCoverageRecor
 	run.unusedPending = nil
 	run.unusedCoverage++
 
-	// The dashes here and in the items below are escaped, not changed: the report is in the TypeScript unused
-	// report's shape (internal/unused_exports/report.go, documentation/contract/Contract.md), so the two print the same
-	// bytes.
+	// The dashes here and in the items below are escaped, not changed: the report is in the TypeScript unused report's
+	// shape (internal/typescript_language/unused_exports/report.go, documentation/contract/Contract.md), so the two
+	// print the same bytes.
 	if !run.unusedHeadingPrinted {
 		run.unusedHeadingPrinted = true
 		fmt.Fprintf(run.out, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")

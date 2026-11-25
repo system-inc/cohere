@@ -2,7 +2,7 @@
 // test asserted, with the source it ran on and what the rule did there.
 //
 // It is a leaf, importing nothing of cohere's, because both ends need it and they cannot import each
-// other: the harness (internal/lint/testing) is imported by every rule package's tests, and the
+// other: the harness (internal/typescript_language/rule_testing) is imported by every rule package's tests, and the
 // generator (internal/documentation_data) imports every rule package through the registry.
 //
 // Nothing is written unless COHERE_DOCS_CAPTURE names a directory, so an ordinary test run pays one

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // proposal is a fixture shorthand: a rule name and the span it wants to replace.

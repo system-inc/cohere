@@ -145,10 +145,10 @@ func (irPackage *Package) build() {
 	irPackage.initVersion = nil
 }
 
-// parallelBuildThreshold is how many created functions a package needs before Build spreads them over several
-// workers. Below it the package builds on one goroutine as it always has: most packages are small, cohere-go
-// already builds many at once, and a worker costs more than it saves there. Above it, the one package a cold run
-// ends on (internal/lint/rules/core, command/cohere at cohere's root) no longer builds serially at the run's end
+// parallelBuildThreshold is how many created functions a package needs before Build spreads them over several workers.
+// Below it the package builds on one goroutine as it always has: most packages are small, cohere-go already builds many
+// at once, and a worker costs more than it saves there. Above it, the one package a cold run ends on
+// (internal/typescript_language/rules/core, command/cohere at cohere's root) no longer builds serially at the run's end
 // (#s2z79xj). Measured, not guessed; see the task.
 const parallelBuildThreshold = 128
 

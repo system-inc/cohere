@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/format_files"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 /*
@@ -183,7 +183,7 @@ func checkNestedRepositories(formatter fileFormatter, root string, formatAll boo
 	}
 	kept := pending[:0:0]
 	for _, relative := range pending {
-		if configuration.MatchAny(patterns, filepath.ToSlash(relative)) {
+		if settings.MatchAny(patterns, filepath.ToSlash(relative)) {
 			check.Notes = append(check.Notes, fmt.Sprintf(
 				"note: nested repository %s not read: the root's ignorePatterns match it",
 				filepath.ToSlash(relative),

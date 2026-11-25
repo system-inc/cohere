@@ -468,7 +468,7 @@ func swiftScratchDirectory(options Options) (string, error) {
 const SchemaDirectoryName = "schema"
 
 // SettingsSchemaFileNames are the JSON schemas the dispatcher package ships, one per settings tier.
-// They are generated from the loader (internal/settings_schema) and committed, and a test there fails when
+// They are generated from the loader (internal/settings/schema) and committed, and a test there fails when
 // they drift from it, so the release copies the committed files rather than generating its own.
 var SettingsSchemaFileNames = []string{"CohereSettings.schema.json", "NexusCohereSettings.schema.json"}
 

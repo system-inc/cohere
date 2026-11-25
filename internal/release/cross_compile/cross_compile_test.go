@@ -19,7 +19,7 @@ import (
 // as the release does, for whoever wants that proof from a test.
 //
 // Measured on private caches (#nkbfkvn), for all six targets: building costs 17.1 GB of Go cache cold,
-// and 5.5 GB more after one real line in internal/lint/rule, because every package that imports it
+// and 5.5 GB more after one real line in internal/typescript_language/rule, because every package that imports it
 // recompiles six times. Type-checking from source costs 12 MB cold and nothing after the same edit, in
 // about five seconds, since nothing is compiled. `go vet` per target was no better than building, at
 // 2.7 GB cold for one target: it compiles every dependency for its export data. Building on every

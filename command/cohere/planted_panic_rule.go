@@ -5,7 +5,7 @@ package main
 import (
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // plantedPanicMarker is the text that makes the planted rule panic on a file.

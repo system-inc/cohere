@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/pprof/profile"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
@@ -214,7 +214,7 @@ func TestAProfiledRunsProjectRunProfilesToAFileOfItsOwn(test *testing.T) {
 	writeTree(test, root, map[string]string{
 		".gitignore": ".cache/\n",
 		"apps/web/CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\",\n    \"rules\": {\n" +
-			"        \"" + configuration.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n",
+			"        \"" + settings.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n",
 		"apps/web/tsconfig.json": "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, " +
 			"\"include\": [\"source\"] }\n",
 		"apps/web/source/tidy.ts": "export const tidy = 1;\n",

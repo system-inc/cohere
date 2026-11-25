@@ -415,7 +415,7 @@ run_live_walks() {
   if (
     cd $repository &&
       COHERE_CORPUS_LIVE=1 go run ./command/cohere-dev test -count=1 -v -run $liveWalks \
-        ./internal/lint/ecmascript/comments ./internal/lint/ecmascript/high_level_intermediate_representation \
+        ./internal/typescript_language/ecmascript/comments ./internal/typescript_language/ecmascript/high_level_intermediate_representation \
         ./internal/text_rules/shouting
   ) > $log 2>&1; then
     # The head the walks read, from the corpora file cohere-dev filled the variable from, so a green night names

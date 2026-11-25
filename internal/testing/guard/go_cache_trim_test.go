@@ -13,7 +13,7 @@ import (
 )
 
 // goCacheImport is the go_cache module's import path, which a caller of its deletes imports.
-const goCacheImport = "github.com/system-inc/cohere/go_cache"
+const goCacheImport = "github.com/system-inc/cohere/modules/go_cache"
 
 // goCacheDeletes are go_cache's functions that remove from a cache.
 var goCacheDeletes = map[string]bool{"Trim": true, "RemoveOldest": true, "Remove": true}

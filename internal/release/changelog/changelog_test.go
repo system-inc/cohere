@@ -2,6 +2,8 @@ package changelog
 
 import (
 	"bytes"
+	"maps"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -290,5 +292,39 @@ func TestSetsAtACommitMatchTheTree(test *testing.T) {
 	}
 	if _, ok := committed["system-inc/structure"]; !ok {
 		test.Error("a nested set was not named by its path under the set directory")
+	}
+}
+
+// A release tagged before the sets moved holds them where they were, and they are read from there by the same
+// names, so the first release after the move diffs against its predecessor's sets and not against none.
+//
+// Not parallel: it sets the environment, which keeps the machine's own git configuration out of SetsAt's git too.
+func TestSetsAtACommitFromBeforeTheMove(test *testing.T) {
+	test.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	test.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	module := test.TempDir()
+	setPath := filepath.Join(module, filepath.FromSlash(earlierSetDirectory), "system-inc", "style.json")
+	if makeError := os.MkdirAll(filepath.Dir(setPath), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	if writeError := os.WriteFile(setPath, []byte(`{"rules": {}}`), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	for _, arguments := range [][]string{
+		{"init", "-q"},
+		{"add", "."},
+		{"-c", "user.name=fixture", "-c", "user.email=fixture@example.com", "commit", "-q", "-m", "fixture"},
+	} {
+		command := exec.Command("git", append([]string{"-C", module}, arguments...)...)
+		if combined, gitError := command.CombinedOutput(); gitError != nil {
+			test.Fatalf("git %v: %v: %s", arguments, gitError, combined)
+		}
+	}
+	sets, setsAtError := SetsAt(module, "HEAD")
+	if setsAtError != nil {
+		test.Fatal(setsAtError)
+	}
+	if len(sets) != 1 || string(sets["system-inc/style"]) != `{"rules": {}}` {
+		test.Errorf("read %q from the earlier layout, want system-inc/style alone", slices.Sorted(maps.Keys(sets)))
 	}
 }

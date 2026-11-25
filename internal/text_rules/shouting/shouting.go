@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // What counts as shouting.

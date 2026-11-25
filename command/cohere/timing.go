@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // timingNameWidth is the width of a timing table's name column, TypeScript's and Go's alike, so the two tables line up

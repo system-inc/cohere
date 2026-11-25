@@ -50,7 +50,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 - Source: https://github.com/microsoft/typescript-go
 - License: `Apache-2.0`
-- In cohere: The TypeScript compiler, built from System, Inc.'s modified fork https://github.com/system-inc/TypeScript, and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).
+- In cohere: The TypeScript compiler, built from System, Inc.'s modified fork https://github.com/system-inc/TypeScript, and a few of its functions copied into internal/typescript_language/type_checking. Its NOTICE is in [NOTICE](NOTICE).
 
 ```text
 Apache License
@@ -658,7 +658,7 @@ Code adapted from these projects, translated to Go or copied in, compiled into t
 
 - Source: https://github.com/typescript-eslint/tsgolint
 - License: `MIT`
-- In cohere: The shim generator behind TypeScript-shim/ and the checker helpers vendored in internal/lint/checking.
+- In cohere: The shim generator behind TypeScript-shim/ and the checker helpers vendored in internal/typescript_language/type_checking.
 
 ```text
 MIT License
@@ -688,7 +688,7 @@ SOFTWARE.
 
 - Source: https://github.com/web-infra-dev/rslint
 - License: `MIT`
-- In cohere: The control-flow graph vendored in internal/lint/ecmascript/control_flow_graph.
+- In cohere: The control-flow graph vendored in internal/typescript_language/ecmascript/control_flow_graph.
 
 ```text
 MIT License
@@ -2154,7 +2154,7 @@ authorization of the copyright holder.
 
 - Source: https://github.com/eslint/eslint
 - License: `MIT`
-- In cohere: Core lint rules in internal/lint/rules/core, ported.
+- In cohere: Core lint rules in internal/typescript_language/rules/core, ported.
 
 ```text
 Copyright OpenJS Foundation and other contributors, <www.openjsf.org>
@@ -2182,7 +2182,7 @@ THE SOFTWARE.
 
 - Source: https://github.com/eslint-community/eslint-utils
 - License: `MIT`
-- In cohere: The reference tracker in internal/lint/ecmascript/reference, ported.
+- In cohere: The reference tracker in internal/typescript_language/ecmascript/reference, ported.
 
 ```text
 MIT License
@@ -2212,7 +2212,7 @@ SOFTWARE.
 
 - Source: https://github.com/typescript-eslint/typescript-eslint
 - License: `MIT`
-- In cohere: TypeScript lint rules in internal/lint/rules/typescript, ported.
+- In cohere: TypeScript lint rules in internal/typescript_language/rules/typescript, ported.
 
 ```text
 MIT License
@@ -2242,7 +2242,7 @@ SOFTWARE.
 
 - Source: https://github.com/oxc-project/oxc
 - License: `MIT`
-- In cohere: Lint rules ported from oxc's, across internal/lint/rules.
+- In cohere: Lint rules ported from oxc's, across internal/typescript_language/rules.
 
 ```text
 MIT License
@@ -2273,7 +2273,7 @@ SOFTWARE.
 
 - Source: https://github.com/jsx-eslint/eslint-plugin-react
 - License: `MIT`
-- In cohere: React lint rules in internal/lint/rules/react, ported.
+- In cohere: React lint rules in internal/typescript_language/rules/react, ported.
 
 ```text
 The MIT License (MIT)
@@ -2303,7 +2303,7 @@ SOFTWARE.
 
 - Source: https://github.com/facebook/react
 - License: `MIT`
-- In cohere: eslint-plugin-react-hooks and the React Compiler's rules, in internal/lint/rules/react and internal/lint/ecmascript/high_level_intermediate_representation, ported.
+- In cohere: eslint-plugin-react-hooks and the React Compiler's rules, in internal/typescript_language/rules/react and internal/typescript_language/ecmascript/high_level_intermediate_representation, ported.
 
 ```text
 MIT License
@@ -2333,7 +2333,7 @@ SOFTWARE.
 
 - Source: https://github.com/vercel/next.js
 - License: `MIT`
-- In cohere: @next/eslint-plugin-next's rules in internal/lint/rules/next, ported.
+- In cohere: @next/eslint-plugin-next's rules in internal/typescript_language/rules/next, ported.
 
 ```text
 The MIT License (MIT)
@@ -2363,7 +2363,7 @@ SOFTWARE.
 
 - Source: https://github.com/tailwindlabs/tailwindcss
 - License: `MIT`
-- In cohere: Tailwind's class model in internal/lint/rules/tailwind, ported.
+- In cohere: Tailwind's class model in internal/typescript_language/rules/tailwind, ported.
 
 ```text
 MIT License
@@ -2393,7 +2393,7 @@ SOFTWARE.
 
 - Source: https://github.com/tailwindlabs/prettier-plugin-tailwindcss
 - License: `MIT`
-- In cohere: Tailwind class ordering in internal/lint/rules/tailwind, ported.
+- In cohere: Tailwind class ordering in internal/typescript_language/rules/tailwind, ported.
 
 ```text
 MIT License
@@ -2423,7 +2423,7 @@ SOFTWARE.
 
 - Source: https://github.com/schoero/eslint-plugin-better-tailwindcss
 - License: `MIT`
-- In cohere: Tailwind lint rules in internal/lint/rules/tailwind, ported.
+- In cohere: Tailwind lint rules in internal/typescript_language/rules/tailwind, ported.
 
 ```text
 MIT License
@@ -2453,7 +2453,7 @@ SOFTWARE.
 
 - Source: https://github.com/JoshuaKGoldberg/ts-api-utils
 - License: `MIT`
-- In cohere: Type predicates in internal/lint/checking, through tsgolint's port of them.
+- In cohere: Type predicates in internal/typescript_language/type_checking, through tsgolint's port of them.
 
 ```text
 # MIT License
@@ -2482,7 +2482,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 - Source: https://github.com/ajafff/tsutils
 - License: `MIT`
-- In cohere: A function in internal/lint/rules/typescript/no_floating_promises.go, ported and modified.
+- In cohere: A function in internal/typescript_language/rules/typescript/no_floating_promises.go, ported and modified.
 
 ```text
 The MIT License (MIT)
@@ -2512,7 +2512,7 @@ SOFTWARE.
 
 - Source: https://github.com/palantir/tslint
 - License: `Apache-2.0`
-- In cohere: A regular expression in internal/lint/rules/typescript/ban_tslint_comment.go, copied.
+- In cohere: A regular expression in internal/typescript_language/rules/typescript/ban_tslint_comment.go, copied.
 
 ```text
                                  Apache License
@@ -2722,7 +2722,7 @@ SOFTWARE.
 
 - Source: https://github.com/javierbrea/eslint-plugin-boundaries
 - License: `MIT`
-- In cohere: The boundary rules in internal/lint/rules/boundaries, ported.
+- In cohere: The boundary rules in internal/typescript_language/rules/boundaries, ported.
 
 ```text
 MIT License
@@ -2752,7 +2752,7 @@ SOFTWARE.
 
 - Source: https://github.com/eslint-community/eslint-plugin-eslint-comments
 - License: `MIT`
-- In cohere: A rule in internal/lint/rules/core/require_description.go, ported.
+- In cohere: A rule in internal/typescript_language/rules/core/require_description.go, ported.
 
 ```text
 MIT License
@@ -2783,7 +2783,7 @@ SOFTWARE.
 - Source: https://github.com/sindresorhus/globals
 - Version: 16.4.0
 - License: `MIT`
-- In cohere: Global names captured into internal/lint/rules/core/no_extend_native.go.
+- In cohere: Global names captured into internal/typescript_language/rules/core/no_extend_native.go.
 
 ```text
 MIT License
@@ -2801,7 +2801,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 - Source: https://github.com/facebook/create-react-app/tree/main/packages/confusing-browser-globals
 - License: `MIT`
-- In cohere: The restricted globals list embedded in internal/lint/configuration/sets/typescript.json.
+- In cohere: The restricted globals list embedded in internal/settings/sets/typescript.json.
 
 ```text
 MIT License

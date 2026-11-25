@@ -12,7 +12,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/system-inc/cohere/go_listing"
+	"github.com/system-inc/cohere/modules/go_listing"
 )
 
 type loader struct {

@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/javascript"
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // The TypeScript and TSX printer: Prettier's language-js printer, ported in internal/format/javascript,

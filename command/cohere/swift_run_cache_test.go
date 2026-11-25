@@ -9,7 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // TestSwiftRunCacheFactsMoveWithTheToolchainAndTheBinary: every fact a Swift run depends on that is no file moves the

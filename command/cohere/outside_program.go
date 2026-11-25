@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // programExtensions are the extensions a tsconfig can put into a program at all. Anything else, a

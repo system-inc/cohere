@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // formatSpeculation is the format pass begun before the walk: one attempt per format candidate, computed as

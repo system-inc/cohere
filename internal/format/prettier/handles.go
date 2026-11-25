@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // parserForExtension maps a file extension to the Prettier parser that handles it.

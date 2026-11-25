@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
 )
 
 // swiftVerdictNames are the verdicts swift_language/HouseRuleVerdicts.json may give, the five Swift's decoding accepts.
 var swiftVerdictNames = []string{"Ported", "Port", "Compiler", "Formatter", "NotApplicable"}
 
 // houseRuleNamespaces are the namespaces whose rules each take one Swift verdict, the ones Swift's
-// HouseRuleVerdictsTests reads from internal/lint/rules.
+// HouseRuleVerdictsTests reads from internal/typescript_language/rules.
 var houseRuleNamespaces = []string{"nexus/", "structure/", "base/"}
 
 // isHouseRule reports whether a registered rule takes a Swift verdict.

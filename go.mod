@@ -21,25 +21,25 @@ replace (
 
 	// The single static assignment form cohere's high-level IR and Adamic's flow graph share, a
 	// module of its own so Adamic can import it through its cohere submodule (#ejcnkja).
-	github.com/system-inc/cohere/static_single_assignment => ./static_single_assignment
+	github.com/system-inc/cohere/modules/static_single_assignment => ./modules/static_single_assignment
 
 	// React's mutation and aliasing model, the effect vocabulary and the mutable ranges inferred from
 	// it, shared with Adamic the same way (#kr2yp54).
-	github.com/system-inc/cohere/mutation_aliasing => ./mutation_aliasing
-
-	// git's own arithmetic over a repository's tree: its objects' ids and the listings `git ls-tree -z` and
-	// `git ls-files --stage -z` print, shared with Loom and Adamic the same way (#4mrck67).
-	github.com/system-inc/cohere/git_tree => ./git_tree
+	github.com/system-inc/cohere/modules/mutation_aliasing => ./modules/mutation_aliasing
 
 	// The memory limit a process's cgroups hold it to, shared with Loom and Adamic the same way (#mf4x0hb).
-	github.com/system-inc/cohere/memory_limit => ./memory_limit
+	github.com/system-inc/cohere/modules/memory_limit => ./modules/memory_limit
 
 	// Go's build cache layout and how to delete from it safely, shared with Loom the same way (#xwfdr3d).
-	github.com/system-inc/cohere/go_cache => ./go_cache
+	github.com/system-inc/cohere/modules/go_cache => ./modules/go_cache
 
 	// What `go list -json` says of a build's packages and the files it names, shared with Loom and Adamic the same
 	// way (#qqg66c7).
-	github.com/system-inc/cohere/go_listing => ./go_listing
+	github.com/system-inc/cohere/modules/go_listing => ./modules/go_listing
+
+	// The ECMAScript Unicode character property tables cohere's regexp parser reads, shared with Adamic the same way
+	// (#gcdfx7v).
+	github.com/system-inc/cohere/modules/unicode_properties => ./modules/unicode_properties
 )
 
 require (
@@ -58,12 +58,12 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
-	github.com/system-inc/cohere/git_tree v0.0.0
-	github.com/system-inc/cohere/go_cache v0.0.0
-	github.com/system-inc/cohere/go_listing v0.0.0
-	github.com/system-inc/cohere/memory_limit v0.0.0
-	github.com/system-inc/cohere/mutation_aliasing v0.0.0
-	github.com/system-inc/cohere/static_single_assignment v0.0.0
+	github.com/system-inc/cohere/modules/go_cache v0.0.0
+	github.com/system-inc/cohere/modules/go_listing v0.0.0
+	github.com/system-inc/cohere/modules/memory_limit v0.0.0
+	github.com/system-inc/cohere/modules/mutation_aliasing v0.0.0
+	github.com/system-inc/cohere/modules/static_single_assignment v0.0.0
+	github.com/system-inc/cohere/modules/unicode_properties v0.0.0
 
 	// The CPU profile's reader, in a test only: a profiled run's files are each parsed as `go tool pprof` reads them,
 	// so a missing, empty or truncated profile fails (command/cohere/contract_profile_test.go, #r33n96f).

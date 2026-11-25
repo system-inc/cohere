@@ -5,12 +5,12 @@ import (
 	_ "embed"
 )
 
-// Abbreviations.json is the vocabulary the naming rules judge with: nexus's
-// consistency-no-abbreviated-identifier in Go, and cohere-swift's of the same name in Swift. The Go rule
-// reads and checks it (internal/lint/rules/nexus/abbreviation_vocabulary.go), refusing an unknown key and
-// panicking at init on a file it refuses, since the words, their forms and their order are that rule's to
-// interpret. cohere-swift compiles in the same bytes (SwiftFiles), so a released cohere-swift carries the
-// words with nothing handed to it at run time.
+// Abbreviations.json is the vocabulary the naming rules judge with: nexus's consistency-no-abbreviated-identifier in
+// Go, and cohere-swift's of the same name in Swift. The Go rule reads and checks it
+// (internal/typescript_language/rules/nexus/abbreviation_vocabulary.go), refusing an unknown key and panicking at init
+// on a file it refuses, since the words, their forms and their order are that rule's to interpret. cohere-swift
+// compiles in the same bytes (SwiftFiles), so a released cohere-swift carries the words with nothing handed to it at
+// run time.
 //
 //go:embed Abbreviations.json
 var abbreviationsFile []byte

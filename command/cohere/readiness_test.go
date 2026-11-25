@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // adamicOptionsOn is a tsconfig with every option Adamic sets.

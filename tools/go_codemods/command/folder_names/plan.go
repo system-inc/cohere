@@ -156,7 +156,7 @@ func (plan *plan) planClause(
 
 // planQualifiers renames every qualifier of packageName in the file to newName, and proposes renaming any local
 // that would capture one of them, to the new name's words in camel case. Anything else standing in the way is
-// refused.
+// refused, a local whose new name is one word among them.
 func (plan *plan) planQualifiers(
 	typed typedFile,
 	packageName *types.PkgName,
@@ -204,6 +204,17 @@ func (plan *plan) planQualifiers(
 			return true
 		}
 		proposed[standing] = true
+		// A one-word name is its own camel case, so renaming the local to it would leave it in the way. Its new
+		// name is a person's choice, made with named_renames before the move.
+		if camelCase(newName) == newName {
+			plan.refusals = append(plan.refusals, fmt.Sprintf(
+				"%s: the local %s is in the import's way, and a one-word name has no camel case to step aside to; "+
+					"rename it first",
+				typed.goPackage.Fset.Position(standing.Pos()),
+				newName,
+			))
+			return true
+		}
 		proposals = append(proposals, local_rename.Proposal{Object: standing, NewName: camelCase(newName)})
 		return true
 	})

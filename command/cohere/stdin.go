@@ -11,8 +11,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
 )
 
 // stdinRequest is one editor save: `cohere --fix [--format] --stdin-filepath <path>` with the buffer on

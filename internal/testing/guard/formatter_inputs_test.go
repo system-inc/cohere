@@ -32,7 +32,7 @@ func TestFormatterInputsCoverWhatCanChangeTheOutput(test *testing.T) {
 	names := map[string]bool{}
 	for _, input := range inputs {
 		names[input.Name] = true
-		if strings.Contains(input.Name, "/internal/lint/rules/") {
+		if strings.Contains(input.Name, "/internal/typescript_language/rules/") {
 			test.Errorf(
 				"a lint rule is a formatter input, so a rule commit would throw the record away: %s",
 				input.Name,

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/go_cache"
+	"github.com/system-inc/cohere/modules/go_cache"
 )
 
 // The Go build cache holds itself under a cap (#jc6ca7r).

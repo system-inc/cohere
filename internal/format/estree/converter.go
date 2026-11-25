@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/format/printing"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // Converter turns one typescript-go source file into an ESTree Program.

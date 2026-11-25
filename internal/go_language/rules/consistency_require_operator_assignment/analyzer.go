@@ -6,8 +6,8 @@
 // with x evaluated once, so where evaluating the target twice has no effect of its own the two forms are the same
 // program, and the rule offers the rewrite as a fix.
 //
-// It is the Go form of ESLint core's operator-assignment, ported for TypeScript in internal/lint/rules/core, whose
-// `always` arm it follows:
+// It is the Go form of ESLint core's operator-assignment, ported for TypeScript in
+// internal/typescript_language/rules/core, whose `always` arm it follows:
 //
 //	x = x op y    reported for every operator with a compound form, and fixed to `x op= y`
 //	x = y op x    reported only when op commutes, `*`, `&`, `|` and `^`, and never fixed

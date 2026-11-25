@@ -17,7 +17,7 @@ import Foundation
 
  Any difference, a missing entry, or an entry that does not decode means describing cold. A cache that
  kept answering after the package changed would check the wrong files and still print a verdict, which is
- the stale-cache failure `internal/types/program/incremental.go` warns about, so the test that matters is
+ the stale-cache failure `internal/typescript_language/program/incremental.go` warns about, so the test that matters is
  warm-after-a-change (`PackageDescriptionCacheTests`).
  */
 struct PackageDescriptionCache {

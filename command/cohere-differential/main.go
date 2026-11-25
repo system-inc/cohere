@@ -29,7 +29,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/differential"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // ruleListProbeFile is the file `-explain` is pointed at to enumerate the measured binary's rules.
@@ -63,7 +63,7 @@ func run() error {
 		return parseArgumentsError
 	}
 
-	lintConfiguration, loadError := configuration.Load(filepath.Join(options.root, ".oxlintrc.json"))
+	lintConfiguration, loadError := settings.Load(filepath.Join(options.root, ".oxlintrc.json"))
 	if loadError != nil {
 		return fmt.Errorf("loading the lint config: %w", loadError)
 	}
@@ -141,12 +141,12 @@ func run() error {
 // has been. The plugin-default knowledge it carried lives in `configuration.PluginDefaultRules`,
 // which the resolver already applies before this function sees the config, so those rules arrive
 // here as ordinary configured rules rather than as a second source to union in.
-func configuredRuleNames(lintConfiguration *configuration.Configuration) map[string]bool {
+func configuredRuleNames(lintConfiguration *settings.Configuration) map[string]bool {
 	names := map[string]bool{}
 	for name, setting := range lintConfiguration.Rules {
 		normalized := differential.NormalizeRuleName(name)
 		// A rule turned off ran over no files, so it is not part of what this comparison covers.
-		if setting.Severity == configuration.SeverityOff {
+		if setting.Severity == settings.SeverityOff {
 			continue
 		}
 		names[normalized] = true
@@ -406,7 +406,7 @@ func cohereOnlyRuleSettings(root string) map[string]json.RawMessage {
 // The check runs before either gate is launched, so a misplaced control costs a second rather than
 // two full lint runs and a misleading verdict.
 func checkControlsAreLintable(
-	lintConfiguration *configuration.Configuration,
+	lintConfiguration *settings.Configuration,
 	controls []differential.Control,
 	extraVerifyRules []string,
 ) error {
@@ -461,7 +461,7 @@ func checkControlsAreLintable(
 // Returning the bare name when nothing matches is deliberate. It makes Enabled report unconfigured,
 // which is the correct answer for a rule the config genuinely does not mention, and it keeps this
 // helper from being the thing that decides a control is valid.
-func pluginQualified(lintConfiguration *configuration.Configuration, bareRuleName string) string {
+func pluginQualified(lintConfiguration *settings.Configuration, bareRuleName string) string {
 	for name := range lintConfiguration.Rules {
 		if differential.NormalizeRuleName(name) == bareRuleName {
 			return name

@@ -1,8 +1,8 @@
 // Package incremental re-exports typescript-go's incremental build machinery.
 //
 // Hand-written rather than generated, for the same reason the parser and format shims are:
-// internal/types/tools/generate_shims covers the packages a headless linter needed, and incremental was not among
-// them because a linter that always checks everything has no use for change detection.
+// internal/typescript_language/tools/generate_shims covers the packages a headless linter needed, and incremental was
+// not among them because a linter that always checks everything has no use for change detection.
 //
 // Note this is internal/execute/incremental, which lives inside the CLI driver rather than
 // beside the compiler. That placement is the reason it was easy to miss: a search for

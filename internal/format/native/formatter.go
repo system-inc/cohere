@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // Formatter formats with the registered printers and one set of options.

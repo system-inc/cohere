@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // RuleSet is one rule set cohere carries, as a project that extends it alone sees it: the loader's own
@@ -65,7 +65,7 @@ func buildSets(inputs Inputs) ([]RuleSet, error) {
 		}
 		sort.Strings(set.Plugins)
 		for _, setRule := range set.Rules {
-			if setRule.Severity != configuration.SeverityOff.String() {
+			if setRule.Severity != settings.SeverityOff.String() {
 				set.RulesOn++
 			}
 		}
@@ -83,7 +83,7 @@ func buildSets(inputs Inputs) ([]RuleSet, error) {
 }
 
 // setRules lists rule settings by name.
-func setRules(settings map[string]configuration.RuleSetting) []SetRule {
+func setRules(settings map[string]settings.RuleSetting) []SetRule {
 	rules := make([]SetRule, 0, len(settings))
 	for name, setting := range settings {
 		rules = append(rules, SetRule{Name: name, Severity: setting.Severity.String(), Options: setting.Options})

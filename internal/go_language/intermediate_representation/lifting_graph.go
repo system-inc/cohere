@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // liftingGraph is the adapter. It holds nothing; each call reads the liftingFunction it is handed.

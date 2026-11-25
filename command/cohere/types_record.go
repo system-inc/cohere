@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // typesRecord is the types section's own reading and writing, for a run with no recording to carry it: any

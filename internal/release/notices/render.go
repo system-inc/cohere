@@ -98,7 +98,7 @@ func renderThirdPartyNotices(
 		License: "Apache-2.0",
 		Carries: "The TypeScript compiler, built from System, Inc.'s modified fork " +
 			compilerFork +
-			", and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).",
+			", and a few of its functions copied into internal/typescript_language/type_checking. Its NOTICE is in [NOTICE](NOTICE).",
 		Text: string(compilerLicense),
 	})
 
