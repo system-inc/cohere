@@ -24,8 +24,14 @@ func TestEveryProjectRunThatKeepsACacheHasItsDirectoryBeforeAnyRunStarts(test *t
 	root := test.TempDir()
 	launches := []projectLaunch{
 		{project: discoveredProject{Directory: ".", Kind: projectKindGoModule}, arguments: []string{"--no-fix"}},
-		{project: discoveredProject{Directory: "swift", Kind: projectKindSwiftPackage}, arguments: []string{"--no-fix"}},
-		{project: discoveredProject{Directory: "web", Kind: projectKindTypeScriptProgram}, arguments: []string{"--no-cache"}},
+		{
+			project:   discoveredProject{Directory: "swift", Kind: projectKindSwiftPackage},
+			arguments: []string{"--no-fix"},
+		},
+		{
+			project:   discoveredProject{Directory: "web", Kind: projectKindTypeScriptProgram},
+			arguments: []string{"--no-cache"},
+		},
 		{project: discoveredProject{Directory: "timed", Kind: projectKindGoModule}, arguments: []string{"--timing"}},
 	}
 	for _, launch := range launches {
