@@ -1154,20 +1154,29 @@ func sumOf(counts []int) int {
 // for its walks before the extra builds could start, an extra build's wait at the share gate, which its load's time
 // leaves out, and its lint's wait for its weight at the lint gate, and of
 // its result, an extra build's deciding which packages restore from the host's run and the host's keeping its packages
-// for the others, each in wall milliseconds, as the record writes them, and whether the build's lint waited at all.
+// for the others, each in wall milliseconds rounded up (millisecondsRoundedUp), and whether the build's lint waited at
+// all.
 //
 // Mutates: record gains run's times
 func recordTimes(record *contract.BuildRecord, run buildRun) {
-	record.LoadMilliseconds = int(run.loading.Milliseconds())
-	record.LintMilliseconds = int(run.linting.Milliseconds())
-	record.WaitMilliseconds = int(run.waited.Milliseconds())
-	record.ShareGateWaitMilliseconds = int(run.shareGateWait.Milliseconds())
-	record.LintWaitMilliseconds = int(run.lintWait.Milliseconds())
+	record.LoadMilliseconds = millisecondsRoundedUp(run.loading)
+	record.LintMilliseconds = millisecondsRoundedUp(run.linting)
+	record.WaitMilliseconds = millisecondsRoundedUp(run.waited)
+	record.ShareGateWaitMilliseconds = millisecondsRoundedUp(run.shareGateWait)
+	record.LintWaitMilliseconds = millisecondsRoundedUp(run.lintWait)
 	record.LintWaited = run.lintWaited
 	if run.result != nil {
-		record.DecideMilliseconds = int(run.result.FromHost.Deciding.Milliseconds())
-		record.KeepMilliseconds = int(run.result.Host.Keeping().Milliseconds())
+		record.DecideMilliseconds = millisecondsRoundedUp(run.result.FromHost.Deciding)
+		record.KeepMilliseconds = millisecondsRoundedUp(run.result.Host.Keeping())
 	}
+}
+
+// millisecondsRoundedUp is duration in whole milliseconds, rounded up, so a time measured is never written as 0: the
+// record leaves out a time that reads 0, and a build that restores everything can load in under a millisecond on a
+// warm machine, which truncating wrote as nothing measured (#cqqs9tp). Only a duration of 0, a time nothing measured,
+// reads 0.
+func millisecondsRoundedUp(duration time.Duration) int {
+	return int((duration + time.Millisecond - 1) / time.Millisecond)
 }
 
 // recordBuildCoverage counts, into each build's record, what it alone covered and what it compiled that no rule ran
