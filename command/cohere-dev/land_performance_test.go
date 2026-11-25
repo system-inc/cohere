@@ -657,7 +657,13 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	builds := filepath.Join(directory, "builds")
 	runs := filepath.Join(directory, "runs")
 	engine := filepath.Join(directory, "engine")
-	engineScript := "#!/bin/sh\necho \"$PWD $COHERE_SYSTEM_CACHE $COHERE_GO_ENGINE_CHILD $*\" >> '" + runs + "'\n" +
+	// It answers as cohere-go to the verb PERFORMANCE_VERB names, go-language when unset, and refuses the other, as a
+	// binary from before #9gjmwgs refuses go-language and one after it refuses go-engine; it answers --version with its
+	// provenance record and records the rest, each child variable apart, so a run names the verb and the mark it got.
+	engineScript := "#!/bin/sh\n" +
+		"[ \"$1\" = \"${PERFORMANCE_VERB:-go-language}\" ] || { echo \"cohere: no project at $PWD\" >&2; exit 1; }\n" +
+		"case \" $* \" in *' --version '*) echo '{\"kind\":\"provenance\",\"contract\":3}'; exit 0 ;; esac\n" +
+		"echo \"$PWD $COHERE_SYSTEM_CACHE $COHERE_GO_CHILD/$COHERE_GO_ENGINE_CHILD $*\" >> '" + runs + "'\n" +
 		"root=''; timeline=''\n" +
 		"while [ \"$#\" -gt 0 ]; do case \"$1\" in --root) root=\"$2\"; shift ;; --timeline) timeline=1 ;; esac; " +
 		"shift; done\n" +
@@ -740,8 +746,8 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		test.Errorf("the engine ran %d times, want %d, fills included:\n%s", len(ran), want, strings.Join(ran, "\n"))
 	}
 	for _, line := range ran {
-		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-engine --contract 3 --root ") {
-			test.Errorf("a run was not the engine over the binary's own system store: %s", line)
+		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1/ go-language --contract 3 --root ") {
+			test.Errorf("a run was not cohere-go, marked COHERE_GO_CHILD, over the binary's own system store: %s", line)
 		}
 	}
 	for _, run := range measurement.runs {
@@ -773,6 +779,21 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 	if _, statError := os.Stat(filepath.Join(scratch, "deeafbf4", "kept")); statError != nil {
 		test.Errorf("deeafbf4 was laid again rather than kept: %v", statError)
+	}
+
+	// A binary from before #9gjmwgs refuses go-language, so the runs start it as go-engine, marked
+	// COHERE_GO_ENGINE_CHILD, as main's land measures the landing that renames them.
+	if removeError := os.Remove(runs); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if output, _, problem := read("PERFORMANCE_VERB=go-engine"); problem != "" {
+		test.Fatalf("a binary that answers only go-engine was not measured: %s\n%s", problem, output)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(readMaybeMissing(test, runs))), "\n") {
+		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" /1 go-engine --contract 3 --root ") {
+			test.Errorf("a run of a binary from before the rename was not go-engine, marked COHERE_GO_ENGINE_CHILD: %s",
+				line)
+		}
 	}
 
 	for _, unrecorded := range []struct{ variable, want string }{

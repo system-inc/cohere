@@ -212,6 +212,15 @@ say "top before $(LC_ALL=C ps -Ao pid,user,pcpu,comm -r 2>/dev/null </dev/null |
 rm -rf system deeafbf4/.cache; mkdir system
 clean=(env -u GOFLAGS -u PWD -u GOGC -u GOMEMLIMIT -u COHERE_SCRATCH_BUILDS_WIDTH -u COHERE_SYSTEM_CACHE -u GOARM64
   GOPROXY=off GOSUMDB=sum.golang.org GONOSUMDB='*')
+# The verb the binary answers as its Go child, and the variable that marks the child. #9gjmwgs renames them from
+# go-engine and COHERE_GO_ENGINE_CHILD to go-language and COHERE_GO_CHILD, and the landing that renames them is measured
+# by main's land, from before it: so the binary is asked once, and a binary that answers go-language's --version with
+# no provenance record is one from before the rename. Wave 2 removes the fallback once it is on main.
+goVerb=go-engine; goChild=COHERE_GO_ENGINE_CHILD
+if (cd "$base/system" && "${clean[@]}" COHERE_GO_CHILD=1 "$base/cohere" go-language --contract 3 --root "$base/system" \
+  --version 2> /dev/null) | grep -q '"kind":"provenance"'; then
+  goVerb=go-language; goChild=COHERE_GO_CHILD
+fi
 # recorded is the number the field $2 holds in run.jsonl's first record of the kind $1, the first it names, or nothing
 # when there is no such record: this bash has no jq, and python3 may not be there.
 recorded() {
@@ -229,8 +238,8 @@ run() {
   runMode=$1; runTree=$2; runRound=$3; shift 3
   where="$base/$runTree"
   rm -f run.jsonl run.err
-  if (cd "$where" && "${clean[@]}" PWD="$where" COHERE_SYSTEM_CACHE="$base/system" COHERE_GO_ENGINE_CHILD=1 \
-    /usr/bin/time -l "$base/cohere" go-engine --contract 3 --root "$where" --no-fix "$@" > "$base/run.jsonl" \
+  if (cd "$where" && "${clean[@]}" PWD="$where" COHERE_SYSTEM_CACHE="$base/system" "$goChild=1" \
+    /usr/bin/time -l "$base/cohere" "$goVerb" --contract 3 --root "$where" --no-fix "$@" > "$base/run.jsonl" \
     2> "$base/run.err"); then
     runCode=0
   else
