@@ -438,8 +438,10 @@ func TestTheBuildsWidthSlack(test *testing.T) {
 // unlabelled release binary read them, the host's live heap 456.3 MB and each of its 7 extra builds holding 653.4 MB
 // (#jrr6a5x). Monkee, 16 GB with 11.5 GB available and so a 5.75 GB limit, runs the builds the budget allows: 3 under
 // `--no-cache`, as its rows read, and 2 with a store. A 250 GB machine runs every build at once. On both, the host's
-// live heap and every build at its budgeted peak, by the factor or by the largest ratio measured with the margin where
-// the slack added a build, stay under the limit: the count alone could be right while the peak passes it.
+// live heap and every build at the largest peak measured, with 512 MiB to spare where the slack added a build, stay
+// under the limit: the count alone could be right while the peak passes it. The ratios are the measured maxima as
+// numbers, 2.16 without a store and 3.22 with one (#hv090f4, #ewkp7w0), so a change to the width's own factors moves
+// the width and not this bound.
 func TestTheBuildsWidthOnTwoMachines(test *testing.T) {
 	test.Parallel()
 	const live = 456_300_000
@@ -459,10 +461,13 @@ func TestTheBuildsWidthOnTwoMachines(test *testing.T) {
 		if got != each.want {
 			test.Errorf("%s: the width is %d, want %d", each.name, got, each.want)
 		}
-		peak := math.Ceil(float64(got) * holding * buildPeakOverLoadEnd(each.withStore))
+		largestMeasured := 2.16
+		if each.withStore {
+			largestMeasured = 3.22
+		}
+		peak := math.Ceil(float64(got) * holding * largestMeasured)
 		if slack {
-			measured, _ := buildPeakOverLoadEndMeasured(each.withStore)
-			peak = math.Ceil(float64(got)*holding*measured) + buildsWidthSlackMarginBytes
+			peak += 512 << 20
 		}
 		if live+peak > float64(each.limit) {
 			test.Errorf("%s: the host's %d bytes and %d builds at their peaks, %.0f bytes, pass the limit, %d",

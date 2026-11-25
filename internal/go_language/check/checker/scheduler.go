@@ -117,7 +117,7 @@ type scheduler struct {
 
 // schedule runs every action of groups, the groups Analyze made by package. Upstream's execAll(roots) starts every
 // action at once, about 950 on cohere's own root, so every package's syntax, types and staticcheck IR are live
-// together, and the collector marks all of it on every cycle under cohere-go's memory cap; and the largest
+// together, and the collector marks all of it on every cycle under cohere-go's memory limit; and the largest
 // packages, started no earlier than the rest, finish last.
 //
 // Here packages are admitted a bounded number at a time. A group waits until every action that any of its actions

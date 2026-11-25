@@ -930,12 +930,12 @@
                 "buildsAtOnce": {
                     "type": "integer",
                     "minimum": 1,
-                    "description": "How many of the builds beside the host's ran side by side, decided once as they started from the machine's cores, the memory cap and the live heap. It changes no finding: the builds' results are merged in the order of builds whatever it is. Absent when builds is, and kept by a replay with them."
+                    "description": "How many of the builds beside the host's ran side by side, decided once as they started from the memory limit, half the memory available, the host's live heap and what each build holds. It changes no finding: the builds' results are merged in the order of builds whatever it is. Absent when builds is, and kept by a replay with them."
                 },
                 "buildsWidthLiveBytes": {
                     "type": "integer",
                     "minimum": 1,
-                    "description": "The host's live heap, in bytes, buildsAtOnce was decided from, measured by a collection once the host's reads were whole. Absent when the decision needed none: one build at a time under --single-threaded or a limit other than the cap, builds that restore nothing from the host, or too few cores or builds for more than one at a time."
+                    "description": "The host's live heap, in bytes, buildsAtOnce was decided from, measured by a collection once the host's reads were whole. Absent when the decision needed none: one build at a time under --single-threaded or a limit not read from the memory available, builds that restore nothing from the host, or too few cores or builds for more than one at a time."
                 },
                 "buildsWidthFromHostLive": {
                     "type": "boolean",
