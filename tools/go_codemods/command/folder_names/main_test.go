@@ -543,3 +543,48 @@ func Use() int {
 		test.Error("a refused pass changed the tree")
 	}
 }
+
+// A package that stays may import a moved one and be imported by another, as settings reads lint's rule and lint's
+// registry reads settings. The proof in memory must not read the moved folders' old copies, which would import the
+// old path beside a package that now imports the new one and fail to type-check.
+func TestFolderNamesProveAroundAPackageThatStays(test *testing.T) {
+	test.Parallel()
+	root := writeRepository(test, map[string]string{
+		"go.work": "go 1.27\n\nuse .\n",
+		"go.mod":  "module fixture\n\ngo 1.27\n",
+		"lint/rule/rule.go": `package rule
+
+// Bound is a configured rule.
+type Bound struct{ Name string }
+`,
+		"settings/settings.go": `package settings
+
+import "fixture/lint/rule"
+
+// Decoder decodes a rule's options.
+type Decoder func() rule.Bound
+`,
+		"lint/registry/registry.go": `package registry
+
+import (
+	"fixture/lint/rule"
+	"fixture/settings"
+)
+
+// Decode is the registry's decoder.
+var Decode settings.Decoder = func() rule.Bound { return rule.Bound{Name: "one"} }
+`,
+	})
+	moves := []folderMove{
+		{OldFolder: "lint/rule", NewFolder: "shelf/rule", NewPackage: "rule"},
+		{OldFolder: "lint/registry", NewFolder: "shelf/registry", NewPackage: "registry"},
+	}
+	var output bytes.Buffer
+	if exitCode := run(root, moves, false, &output); exitCode != 0 {
+		test.Fatalf("exit %d:\n%s", exitCode, output.String())
+	}
+	if exists(root, "lint/rule") || !exists(root, "shelf/registry/registry.go") ||
+		!strings.Contains(readFile(test, root, "settings/settings.go"), `import "fixture/shelf/rule"`) {
+		test.Errorf("the folders did not move or settings did not follow:\n%s", output.String())
+	}
+}
