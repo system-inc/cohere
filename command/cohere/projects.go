@@ -564,17 +564,21 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	}
 	makeProjectCacheDirectories(found.Root, launches)
 	runsAtOnce := projectRunsAtOnce()
-	share := projectMemoryShare(len(launches), runsAtOnce)
+	kinds := make([]projectKind, 0, len(launches))
+	for _, launch := range launches {
+		kinds = append(kinds, launch.project.Kind)
+	}
+	shares := projectMemoryShares(kinds, runsAtOnce)
 	var group sync.WaitGroup
 	running := make(chan struct{}, runsAtOnce)
-	for _, launch := range launches {
+	for position, launch := range launches {
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			running <- struct{}{}
 			defer func() { <-running }()
 			runs[launch.index] = runProject(executable, found.Root, launch.project, labels[launch.index],
-				launch.arguments, launch.yieldFile, launch.openPath, launch.summaryPath, share, children,
+				launch.arguments, launch.yieldFile, launch.openPath, launch.summaryPath, shares[position], children,
 				activeOutput.Mode == outputJson)
 		}()
 	}
@@ -752,11 +756,39 @@ func projectRunsAtOnce() int {
 	return max(1, runtime.NumCPU()/4)
 }
 
-// projectMemoryShare is how many project children of launches share the run's half of available memory: as many as
-// run at once, runsAtOnce, or fewer when there are fewer projects (memoryShareVariable). The run itself checks nothing
-// in process while they run, so it takes no share.
-func projectMemoryShare(launches int, runsAtOnce int) int {
-	return max(1, min(launches, runsAtOnce))
+// projectMemoryShares is the share of the run's half of available memory each project child of kinds takes, by
+// position (memoryShareVariable). Only a child whose heap the memory policy governs and that can grow large holds a
+// share (projectHoldsMemoryShare), and those divide the half by as many of them as run at once, runsAtOnce, or fewer
+// when there are fewer. Every other child takes its own half undivided, 1. The run itself checks nothing in process
+// while they run, so it takes no share.
+//
+// Counting every child starved the Go one beside a Swift and a format project: at cohere's root on a 10-core, 16 GB
+// machine its limit halved to 2.6 GiB with one build at once, the Go project took 12.68 s against 6.27 s and the
+// whole run 28.87 s against 26.58 s, with no swap either way (#jrr6a5x, codebase's row on Monkee).
+func projectMemoryShares(kinds []projectKind, runsAtOnce int) []int {
+	holding := 0
+	for _, kind := range kinds {
+		if projectHoldsMemoryShare(kind) {
+			holding++
+		}
+	}
+	share := max(1, min(holding, runsAtOnce))
+	shares := make([]int, len(kinds))
+	for position, kind := range kinds {
+		shares[position] = 1
+		if projectHoldsMemoryShare(kind) {
+			shares[position] = share
+		}
+	}
+	return shares
+}
+
+// projectHoldsMemoryShare says whether a child of kind holds a share of the run's half: a Go module, whose cohere-go
+// reads the share, and a TypeScript program, checked in the child's own process, both under the memory policy and
+// both able to grow large. A Swift package is checked by cohere-swift, a Swift process the policy never governs, and
+// a format project holds almost nothing and ends fast.
+func projectHoldsMemoryShare(kind projectKind) bool {
+	return kind == projectKindGoModule || kind == projectKindTypeScriptProgram
 }
 
 // projectChildEnvironment is the environment runProject starts a project's child with: environment, this process's,
@@ -799,7 +831,7 @@ func withMemoryShare(environment []string, share int) []string {
 
 // runProject runs one project's check as a child and keeps everything it printed. yieldFile, when set,
 // names what it yields to nearer projects (see ownership.go). memoryShare is how many project children share the
-// run's half of available memory (projectMemoryShare). The child is held in children while it runs, so a signal to
+// run's half of available memory (projectMemoryShares). The child is held in children while it runs, so a signal to
 // this run reaches it.
 //
 // separateStandardError keeps the child's stderr apart from its stdout, for `--json`, whose stdout a program

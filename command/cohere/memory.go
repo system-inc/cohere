@@ -44,9 +44,10 @@ func init() {
 const memoryCeilingFraction = 0.5
 
 // memoryShareVariable is how many processes one cohere run starts at once to share its half of available memory, set
-// by a run that checks several projects on each project child it starts, and inherited by the child's own cohere-go
-// (#jrr6a5x). Each process that reads it takes its half divided by it, so the project children one run holds at once
-// stay within that run's half together, and a run never piles into itself. Runs other minds start are not counted:
+// by a run that checks several projects on each Go and TypeScript project child it starts (projectMemoryShares), and
+// inherited by the child's own cohere-go (#jrr6a5x). Each process that reads it takes its half divided by it, so the
+// heavy project children one run holds at once stay within that run's half together, and a run never piles into
+// itself. Runs other minds start are not counted:
 // each reads what is available as it starts, and holds what it needs, not its ceiling (#jrr6a5x's rows, five cold
 // runs at once at 10 GiB each under a 34 GiB ceiling). Only cohere's own parent writes it, so a value that is not a
 // whole number of at least 1 is read as no share.
