@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -360,7 +361,12 @@ func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
 	unused := contractFixture(test, "Unused.jsonl")
 	last := len(findings) - 1
 
+	// A replacement that changes nothing would leave the case testing an unbroken stream, as the contract cases did
+	// when the fixtures moved to contract 4, so it is refused.
 	replace := func(lines []string, index int, line string) []string {
+		if line == lines[index] {
+			test.Fatalf("a broken stream's replacement changed nothing in line %d: %s", index, line)
+		}
 		mutated := append([]string(nil), lines...)
 		mutated[index] = line
 		return mutated
@@ -386,13 +392,13 @@ func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
 		{"provenance not first", without(findings, 0), 1, "provenance is always first"},
 		{
 			"a contract the front door does not speak",
-			replace(findings, 0, strings.Replace(findings[0], `"contract":3`, `"contract":2`, 1)),
+			replace(findings, 0, strings.Replace(findings[0], fmt.Sprintf(`"contract":%d`, contractVersion), `"contract":2`, 1)),
 			1,
 			"contract 2",
 		},
 		{
 			"a provenance with no contract",
-			replace(findings, 0, strings.Replace(findings[0], `"contract":3,`, "", 1)),
+			replace(findings, 0, strings.Replace(findings[0], fmt.Sprintf(`"contract":%d,`, contractVersion), "", 1)),
 			1,
 			"contract none",
 		},
