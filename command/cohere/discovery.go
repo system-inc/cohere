@@ -100,6 +100,16 @@ type discovery struct {
 	// a project for each, TypeScript's first, then Swift's, then Go's.
 	Projects []discoveredProject
 
+	// Choice is the languages the two flags named, nil for every one (#s7gt4bj). LeftOut are the projects found that
+	// do not run as themselves under it, in Projects' order, kept so what a run leaves to others still names them
+	// (everyProject): a TypeScript program whose language was not named, which runs as a format project of its
+	// directory when a language it formats was, is here too. LeftOutLanguages are the languages here that were not
+	// named, and NotFound those named that nothing here is in, each by the name its flag takes (chooseLanguages).
+	Choice           languageChoice
+	LeftOut          []discoveredProject
+	LeftOutLanguages []string
+	NotFound         []string
+
 	// Refused are markers the root's ignorePatterns match, relative to Root.
 	Refused []string
 
@@ -144,6 +154,10 @@ type discovery struct {
 	// relative to Root, for addRootFormatProject to know whether a root no TypeScript project holds has
 	// anything to format. Counted from the listings the walk already read, as the Swift files are.
 	Formattable map[string]int
+
+	// FormattableKinds counts the same files by directory and then extension, lowercase, for `--languages` and
+	// `--formats` to know which kinds of file are here and where a format project would find any (chooseLanguages).
+	FormattableKinds map[string]map[string]int
 
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
 	// enumeration from rather than listing the same directories again (#bjv0tg4).
@@ -226,10 +240,11 @@ func enclosingRepository(start string) string {
 // globs relative to root.
 func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	found := discovery{
-		Root:           root,
-		Listings:       program.NewDirectoryListings(),
-		Formattable:    map[string]int{},
-		DefaultMatched: map[string]int{},
+		Root:             root,
+		Listings:         program.NewDirectoryListings(),
+		Formattable:      map[string]int{},
+		FormattableKinds: map[string]map[string]int{},
+		DefaultMatched:   map[string]int{},
 	}
 	ignoreTally := configuration.NewIgnoreTally(ignorePatterns)
 
@@ -351,6 +366,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		// directory is.
 		swiftFileCount := 0
 		formattableCount := 0
+		formattableKinds := map[string]int{}
 		holdsCoveredFile := false
 		for _, entry := range entries {
 			// The matcher answers a tracked file as never ignored, so this is tracked, or untracked and not
@@ -373,6 +389,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				swiftFileCount++
 			} else {
 				formattableCount++
+				formattableKinds[strings.ToLower(path.Ext(entry.Name()))]++
 			}
 		}
 		lock.Lock()
@@ -385,6 +402,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		}
 		if formattableCount > 0 {
 			found.Formattable[relative] = formattableCount
+		}
+		if len(formattableKinds) > 0 {
+			found.FormattableKinds[relative] = formattableKinds
 		}
 		if offending {
 			folders = append(folders, folder)
@@ -928,19 +948,121 @@ func (found *discovery) addRootFormatProject() {
 	}
 }
 
-// formatYield is what the format project's run leaves to others: the directory of every running TypeScript
-// project, absolute, whose own run formats it, so two runs never write one file.
-func (found discovery) formatYield() projectYield {
+// chooseLanguages runs, of what discovery found, the languages choice names, wherever their files live, and notes
+// the rest (#s7gt4bj). A Go or Swift project runs when its language is named. A TypeScript program runs whole when
+// `typescript` is named, and otherwise, when a language it formats is (`json` in a program's root), as a format
+// project of its directory, its walk keeping the named languages' files alone (runProjects hands it the rest to leave
+// out). The format project of a root no program holds runs when any language it formats is named. What runs as
+// something else, or not at all, goes to LeftOut; each language here and not named to LeftOutLanguages; each named
+// and not here to NotFound. A run that named no languages changes nothing.
+//
+// formats is whether the run formats: a run that only type-checks or lints, or leaves formatting out, has no format
+// project, so no program becomes one, and a language only a format walk would check is not checked by it.
+func (found *discovery) chooseLanguages(choice languageChoice, formats bool) {
+	if choice == nil {
+		return
+	}
+	found.Choice = choice
+	present := func(known language) bool {
+		if known.engine != "" && slices.ContainsFunc(found.Projects, func(project discoveredProject) bool {
+			return project.Engine == known.engine
+		}) {
+			return true
+		}
+		for _, kinds := range found.FormattableKinds {
+			if slices.ContainsFunc(known.extensions, func(extension string) bool { return kinds[extension] > 0 }) {
+				return true
+			}
+		}
+		return false
+	}
+	found.LeftOutLanguages = languageNames(func(known language) bool {
+		return !choice.names(known.name) && present(known)
+	})
+	found.NotFound = languageNames(func(known language) bool { return choice.names(known.name) && !present(known) })
+
+	var running []discoveredProject
+	formatsAt := map[string]bool{}
+	for _, project := range found.Projects {
+		if project.Engine == engineFormat {
+			formatsAt[project.Directory] = true
+		}
+	}
+	leftOutExtensions := choice.leftOutExtensions()
+	for _, project := range found.Projects {
+		switch {
+		case project.Engine == engineFormat && !found.formatsAnythingAt(project, leftOutExtensions):
+			found.LeftOut = append(found.LeftOut, project)
+		case project.Engine == engineFormat || choice.namesEngine(project.Engine):
+			running = append(running, project)
+		case project.Engine == engineTypeScript && formats && found.formatsAnythingAt(project, leftOutExtensions):
+			found.LeftOut = append(found.LeftOut, project)
+			// One format project a directory: two programs in one directory share its walk.
+			if !formatsAt[project.Directory] {
+				formatsAt[project.Directory] = true
+				running = append(running, discoveredProject{Directory: project.Directory, Engine: engineFormat})
+			}
+		default:
+			found.LeftOut = append(found.LeftOut, project)
+		}
+	}
+	found.Projects = running
+	found.sortProjects()
+}
+
+// formatsAnythingAt reports whether a format project of project's directory would keep any file, those of the
+// extensions in leftOutExtensions left out: a file of another kind in its directory or below, outside every other
+// TypeScript program's directory, which that program's run formats (formatYield). Asked before Projects is chosen
+// from, so every program is still there. A format project with nothing to keep would check nothing, and a run that
+// checks nothing fails.
+func (found discovery) formatsAnythingAt(project discoveredProject, leftOutExtensions []string) bool {
+	yielded := found.formatYield(discoveredProject{Directory: project.Directory, Engine: engineFormat})
+	for directory, kinds := range found.FormattableKinds {
+		if project.Directory != "." && directory != project.Directory && !isBelow(directory, project.Directory) {
+			continue
+		}
+		absolute := filepath.Join(found.Root, filepath.FromSlash(directory))
+		if slices.Contains(yielded.Directories, absolute) ||
+			yieldsFile(yielded.Directories, filepath.Join(absolute, "file")) {
+			continue
+		}
+		for extension, count := range kinds {
+			if count > 0 && !slices.Contains(leftOutExtensions, extension) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// everyProject is every project discovery found, those the two flags left out included, for what a run leaves to
+// others: a program left out is still where its directory's files belong, so no run above takes them as its own.
+func (found discovery) everyProject() []discoveredProject {
+	return append(slices.Clone(found.Projects), found.LeftOut...)
+}
+
+// formatYield is what a format project's run leaves to others: the directory of every TypeScript program strictly
+// below its own, absolute, whose own run formats it, so two runs never write one file. A program the choice left
+// out is there too, since a format project of its directory formats what was named of it, if anything was. The
+// format project of a root no program holds is below none, so it leaves out every program's directory.
+func (found discovery) formatYield(project discoveredProject) projectYield {
 	yield := projectYield{}
-	for _, other := range found.Projects {
-		if other.Engine == engineTypeScript {
+	for _, other := range found.everyProject() {
+		if other.Engine == engineTypeScript && other.Directory != project.Directory &&
+			(project.Directory == "." || isBelow(other.Directory, project.Directory)) {
 			yield.Directories = append(
 				yield.Directories,
 				filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
 			)
 		}
 	}
-	sort.Strings(yield.Directories)
+	slices.Sort(yield.Directories)
+	// Under a choice alone, where a left-out program's directory can appear beside the program's own: a plain
+	// run lists one directory twice when two programs share it, as it always did, so its yield, and its key, are the
+	// ones it had (#s7gt4bj).
+	if found.Choice != nil {
+		yield.Directories = slices.Compact(yield.Directories)
+	}
 	return yield
 }
 
@@ -951,7 +1073,7 @@ func (found discovery) formatYield() projectYield {
 // checks its files itself, and found.Projects holds only the projects that run.
 func (found discovery) swiftYield(project discoveredProject) projectYield {
 	yield := projectYield{}
-	for _, other := range found.Projects {
+	for _, other := range found.everyProject() {
 		if other.Engine == engineSwift && isBelow(other.Directory, project.Directory) {
 			yield.Directories = append(
 				yield.Directories,

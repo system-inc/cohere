@@ -12,6 +12,11 @@ type projectYield struct {
 	// in the same directory formats it. A Swift run's are the Swift projects below it, whose files its
 	// not-checked notes leave out (see discovery.swiftYield).
 	Directories []string `json:"directories"`
+
+	// LeftOutExtensions are the extensions of the files the run's format walk leaves out, those of the languages
+	// the two flags did not name (#s7gt4bj), lowercase and sorted. Left out of the encoding when empty, so a run that
+	// named no languages keeps the replay key it had.
+	LeftOutExtensions []string `json:"leftOutExtensions,omitempty"`
 }
 
 // yieldedFiles is the run's yielded files as the set program.Options.Yielded takes, nil when it yields none.

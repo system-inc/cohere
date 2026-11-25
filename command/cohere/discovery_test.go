@@ -442,7 +442,9 @@ func TestARootNoTypeScriptProjectHoldsGetsTheFormatProject(test *testing.T) {
 			for _, directory := range testCase.wantYieldFrom {
 				wantYield.Directories = append(wantYield.Directories, filepath.Join(root, directory))
 			}
-			if yield := found.formatYield(); !reflect.DeepEqual(yield, wantYield) {
+			if yield := found.formatYield(
+				discoveredProject{Directory: ".", Engine: engineFormat},
+			); !reflect.DeepEqual(yield, wantYield) {
 				test.Errorf("the format project yields %+v, want %+v", yield, wantYield)
 			}
 		})
