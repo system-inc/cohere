@@ -473,6 +473,10 @@ func (pipeline *pipeline) run() int {
 	// The long-line wrap waits for a load that finds the types sound, so a run that wraps loads even when no phase
 	// reads the types.
 	wraps := pipeline.wrapsLongLines()
+	if pipeline.described.nothingOurs {
+		pipeline.checkNothingOurs()
+		return pipeline.finish(nil)
+	}
 	if needsTypes || wraps {
 		pipeline.session = pipeline.cacheSession(pipeline.described.workspace.Environment(),
 			pipeline.described.goEnvironment, cache.FileDigests{}, pipeline.standardError)
@@ -533,6 +537,29 @@ func (pipeline *pipeline) run() int {
 	// The inputs are those of the load the lint ran over, the final round's when a reload ran it again, and the first
 	// load is let go before a reload loads again.
 	loaded = pipeline.runLint(loaded, loadError, linted)
+	return pipeline.finish(loaded)
+}
+
+// checkNothingOurs is the fix, types and lint phases of a root with no Go file of ours (describedProject.nothingOurs),
+// which never lists, so no go list runs and no findings cache is opened, whose keys go env answers. The fix phase
+// formats no file, and the types and lint phases run over a load of no package, as they run over one go list answered
+// with none at a module with no file, so the run reports them the same way: ran, over no file. The go commands the
+// description started beside its census are joined, though nothing reads them.
+func (pipeline *pipeline) checkNothingOurs() {
+	defer pipeline.joinChildren()
+	// No wrap: it waits for a load, and there is no file to wrap.
+	pipeline.runFix(false)
+	pipeline.writeFix()
+	unlisted := &load.Loaded{}
+	pipeline.runTypes(unlisted, nil)
+	pipeline.runLint(unlisted, nil, nil)
+}
+
+// finish writes what follows the phases that load, the unused phase, the duplicates report, the timing record, the
+// memory and inputs records of loaded, the load the lint ran over, and the summary, and returns the exit code the
+// summary states. A loaded of nil, a load that failed or that no phase asked for, or a root never listed
+// (checkNothingOurs), writes neither the memory nor the inputs record.
+func (pipeline *pipeline) finish(loaded *load.Loaded) int {
 	pipeline.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
 	pipeline.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
@@ -543,7 +570,9 @@ func (pipeline *pipeline) run() int {
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
-	// read is not known. The memory record comes just before them, under the same condition, once every load has
+	// read is not known. Nor does a root never listed: no load named the directories a Go file added later would
+	// appear in, so a record of it would replay "nothing to check" over that file; such a run, which lists nothing, is
+	// cheap to run again. The memory record comes just before them, under the same condition, once every load has
 	// ended, so it names each raise that landed.
 	if loaded != nil {
 		pipeline.write(pipeline.raisesRecord())
@@ -1021,8 +1050,8 @@ func (pipeline *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		withheld = append(withheld, contract.WithheldFile{Package: each.Package, File: each.File, Errors: each.Errors})
 	}
 	// The build text says what ran: go list, and for a project with cgo of its own go list -compiled, whose cgo tool
-	// translated the packages with cgo files. It reads the same with the findings cache or without, so a run under
-	// `--no-cache` writes the same record.
+	// translated the packages with cgo files, or that nothing did, at a root never listed (checkNothingOurs). It reads
+	// the same with the findings cache or without, so a run under `--no-cache` writes the same record.
 	build := "go list -deps with go test's variants built here, each package type-checked from source unless the " +
 		"findings cache holds its export data"
 	if loaded.CgoTranslated {
@@ -1030,13 +1059,20 @@ func (pipeline *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 			"packages with cgo files, each package type-checked from source unless the findings cache holds its " +
 			"export data"
 	}
+	build = fmt.Sprintf("%s: %d packages, %d in the workspace", build, loaded.PackagesLoaded,
+		loaded.PackagesInWorkspace)
+	switch {
+	case pipeline.described.nothingOurs && pipeline.described.workspace.FromWorkspace:
+		build = "nothing listed: no module of the workspace holds a Go file of ours, so go list never ran"
+	case pipeline.described.nothingOurs:
+		build = "nothing listed: the module holds no Go file of ours, so go list never ran"
+	}
 	pipeline.write(contract.TypesRecord{
-		Diagnostics:         len(loaded.Diagnostics),
-		Files:               pipeline.filesTypeChecked(loaded),
-		ElapsedMilliseconds: int(loaded.Elapsed.Milliseconds()),
-		FilesWithoutRecord:  withoutRecord,
-		Build: fmt.Sprintf("%s: %d packages, %d in the workspace", build,
-			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
+		Diagnostics:                       len(loaded.Diagnostics),
+		Files:                             pipeline.filesTypeChecked(loaded),
+		ElapsedMilliseconds:               int(loaded.Elapsed.Milliseconds()),
+		FilesWithoutRecord:                withoutRecord,
+		Build:                             build,
 		CensusMissed:                      pipeline.censusMissed,
 		WithheldInDependencyCgo:           withheld,
 		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
