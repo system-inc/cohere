@@ -1,5 +1,3 @@
-//cohere:file-ignore consistency-require-separated-folder-words staticcheck's name, a project's own spelling
-
 // Package staticcheck_configuration is staticcheck's config analyzer as cohere-go runs it, for the ports that read a
 // staticcheck.conf (ST1001 and ST1013), and the directory it starts from, which the findings cache keys a package on.
 //

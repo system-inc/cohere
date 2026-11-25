@@ -12,12 +12,14 @@
 // testdata and vendor folders are never judged, since the engine never loads a package inside either. A package at
 // its module's root is not judged by its folder, whose name is the module's (typescript-go's tsoptions shim is one).
 // A finding in a file that declares itself `cohere:copied` is withheld by the engine, not the rule, as every house
-// rule's is there, so a copied package such as x/tools' analysistest needs nothing. Any other folder that mirrors
-// another project's name, such as the micromark library's, keeps it through the house suppression, a file-ignore in
-// the file the finding is at. The finding sits at that file's start, about the file's place rather than any line of
-// it, and a line directive covers only the line after it, so none can sit above the first:
+// rule's is there, so a copied package such as x/tools' analysistest needs nothing. A project's own name the lists
+// lack, such as staticcheck's or the micromark library's, is a word: it joins policy/HouseWords.txt with its reason,
+// and every engine reads it. Any other folder that keeps another project's name that is no word, such as the external
+// tests beside x/tools' driverutil, keeps it through the house suppression, a file-ignore in the file the finding is
+// at. The finding sits at that file's start, about the file's place rather than any line of it, and a line directive
+// covers only the line after it, so none can sit above the first:
 //
-//	//cohere:file-ignore consistency-require-separated-folder-words the micromark library's name
+//	//cohere:file-ignore consistency-require-separated-folder-words x/tools' driverutil, the package this one copies
 //
 // The rule knows no mirror itself, so the reason lives beside the name it excuses, and one that withholds nothing is
 // a cohere-go/consistency-no-unused-ignore finding.

@@ -11,7 +11,7 @@ enum PolicyWords {
         #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
         # From @cspell/dict-software-terms 5.2.2, under the MIT License:
         #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
-        # With the house's own words, 15 from policy/HouseWords.txt, each with its reason there.
+        # With the house's own words, 17 from policy/HouseWords.txt, each with its reason there.
         # The license texts are in policy/Words.NOTICE.
         a
         aa
@@ -84882,6 +84882,7 @@ enum PolicyWords {
         micromanaging
         micromanipulator
         micromanipulators
+        micromark
         micromatch
         micromeli
         micrometeorite
@@ -130230,6 +130231,7 @@ enum PolicyWords {
         static
         statical
         statically
+        staticcheck
         statice
         statices
         staticfile

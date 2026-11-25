@@ -40,9 +40,10 @@ struct ConsistencyRequireSeparatedFolderWordsTests {
     }
 
     /*
-     Go's table, name for name: the cohere and loom censuses, the tie-break, the brand, three pieces, words a split
-     would break, names already separated, and names that split no way. An empty want is a name that passes. Go's
-     `FormatOptions` is left out, since Swift reads its capital as the separator Go reads an underscore as.
+     Go's table, name for name: the cohere and loom censuses, the tie-break, the brand, the house words, three pieces,
+     words a split would break, names already separated, and names that split no way. An empty want is a name that
+     passes. Go's `FormatOptions` is left out, since Swift reads its capital as the separator Go reads an underscore
+     as.
      */
     @Test(arguments: [
         ("textrules", "text_rules"),
@@ -52,7 +53,6 @@ struct ConsistencyRequireSeparatedFolderWordsTests {
         ("mediaquery", "media_query"),
         ("formatfiles", "format_files"),
         ("formatoptions", "format_options"),
-        ("micromark", "micro_mark"),
         ("oracletest", "oracle_test"),
         ("goengine", "go_engine"),
         ("cgotest", "cgo_test"),
@@ -95,6 +95,9 @@ struct ConsistencyRequireSeparatedFolderWordsTests {
         /* A brand is a word, whole or as a piece. */
         ("imessage", ""),
         ("imessagebridge", "imessage_bridge"),
+        /* A house word, from policy/HouseWords.txt, is a word: a project's own name the lists lack. */
+        ("micromark", ""),
+        ("staticcheck", ""),
         /* Three pieces, two of them closed two-letter words. */
         ("gouiengine", "go_ui_engine"),
         /* Each part on its own, keeping the underscores already there, leading ones included. */

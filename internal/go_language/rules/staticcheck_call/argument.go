@@ -1,5 +1,3 @@
-//cohere:file-ignore consistency-require-separated-folder-words staticcheck's name, a project's own spelling
-
 package staticcheck_call
 
 import "github.com/system-inc/cohere/internal/go_language/intermediate_representation"
