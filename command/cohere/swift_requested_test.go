@@ -109,7 +109,7 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(test *testing.T)
 }
 
 // `cohere --lint` on a Swift package: the child skips fix and types as not requested and calls the run
-// complete, which it is (swift/Contract.md, `complete`). LintOnly.jsonl is a real stream of that run.
+// complete, which it is (swift_language/Contract.md, `complete`). LintOnly.jsonl is a real stream of that run.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary
 func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
 	lint := contractRequestedPhases(flagsOf("lint"))

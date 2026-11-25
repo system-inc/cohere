@@ -37,8 +37,8 @@ func moduleCopy(test *testing.T) string {
 		}
 	}
 	for _, relative := range []string{
-		"swift/HouseRuleVerdicts.json",
-		"swift/Rules.json",
+		"swift_language/HouseRuleVerdicts.json",
+		"swift_language/Rules.json",
 		"CHANGELOG.md",
 		documentation_data.RuleNamesPath,
 	} {

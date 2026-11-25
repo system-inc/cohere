@@ -137,7 +137,7 @@ func TestAFileWhereTheDirectoryGoesIsAnError(test *testing.T) {
 func TestCohereSwiftWritesTheSameBytes(test *testing.T) {
 	test.Parallel()
 	source, readError := os.ReadFile(filepath.Join(
-		"..", "..", "swift", "Sources", "CohereSwift", "Pipeline", "CacheDirectory.swift",
+		"..", "..", "swift_language", "Sources", "CohereSwift", "Pipeline", "CacheDirectory.swift",
 	))
 	if readError != nil {
 		test.Fatal(readError)

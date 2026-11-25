@@ -1,4 +1,4 @@
-{"kind":"provenance","contract":3,"engine":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
+{"kind":"provenance","contract":4,"program":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
 {"kind":"rule","name":"cohere-go/S1000","severity":"error"}
 {"kind":"rule","name":"cohere-go/S1001","severity":"error"}
 {"kind":"rule","name":"cohere-go/S1002","severity":"error"}

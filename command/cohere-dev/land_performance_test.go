@@ -657,14 +657,7 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	builds := filepath.Join(directory, "builds")
 	runs := filepath.Join(directory, "runs")
 	binary := filepath.Join(directory, "stand-in-cohere")
-	// It speaks the contract PERFORMANCE_CONTRACT names, 3 when unset, and refuses any other, as a binary from before
-	// #9gjmwgs's wave 3 refuses 4 and one after it refuses 3; it answers --version with its provenance record and
-	// records the rest, so a run names the contract it was given.
-	binaryScript := "#!/bin/sh\n" +
-		"case \" $* \" in *\" --contract ${PERFORMANCE_CONTRACT:-3} \"*) ;; *) echo 'cohere: another contract' >&2; " +
-		"exit 2 ;; esac\n" +
-		"case \" $* \" in *' --version '*) echo '{\"kind\":\"provenance\"}'; exit 0 ;; esac\n" +
-		"echo \"$PWD $COHERE_SYSTEM_CACHE $COHERE_GO_CHILD $*\" >> '" + runs + "'\n" +
+	binaryScript := "#!/bin/sh\necho \"$PWD $COHERE_SYSTEM_CACHE $COHERE_GO_CHILD $*\" >> '" + runs + "'\n" +
 		"root=''; timeline=''\n" +
 		"while [ \"$#\" -gt 0 ]; do case \"$1\" in --root) root=\"$2\"; shift ;; --timeline) timeline=1 ;; esac; " +
 		"shift; done\n" +
@@ -747,7 +740,7 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		test.Errorf("cohere ran %d times, want %d, fills included:\n%s", len(ran), want, strings.Join(ran, "\n"))
 	}
 	for _, line := range ran {
-		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-language --contract 3 --root ") {
+		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-language --contract 4 --root ") {
 			test.Errorf("a run was not cohere over the binary's own system store: %s", line)
 		}
 	}
@@ -780,20 +773,6 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 	if _, statError := os.Stat(filepath.Join(scratch, "deeafbf4", "kept")); statError != nil {
 		test.Errorf("deeafbf4 was laid again rather than kept: %v", statError)
-	}
-
-	// A binary from wave 3 of #9gjmwgs on speaks contract 4 and refuses 3, so the runs give it 4, as main's land
-	// measures the landing that moves it.
-	if removeError := os.Remove(runs); removeError != nil {
-		test.Fatal(removeError)
-	}
-	if output, _, problem := read("PERFORMANCE_CONTRACT=4"); problem != "" {
-		test.Fatalf("a binary that speaks only contract 4 was not measured: %s\n%s", problem, output)
-	}
-	for _, line := range strings.Split(strings.TrimSpace(string(readMaybeMissing(test, runs))), "\n") {
-		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-language --contract 4 --root ") {
-			test.Errorf("a run of a binary that speaks contract 4 was not given 4: %s", line)
-		}
 	}
 
 	for _, unrecorded := range []struct{ variable, want string }{

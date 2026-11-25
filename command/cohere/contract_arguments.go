@@ -37,7 +37,7 @@ func contractProfilePath(workingDirectory string, frontDoorProfile string, profi
 	return strings.TrimSuffix(path, extension) + "." + profileName + extension
 }
 
-// contractArguments builds a child's command line, `--contract 3 --root <root> [flags] [paths]`, and says
+// contractArguments builds a child's command line, `--contract 4 --root <root> [flags] [paths]`, and says
 // which question the run answers.
 //
 // Every path is made absolute against where the caller typed it, so the child never has to know what

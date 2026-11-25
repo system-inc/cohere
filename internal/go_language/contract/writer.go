@@ -35,7 +35,7 @@ func NewWriter(output io.Writer) *Writer {
 	return writer
 }
 
-// Write writes one record as one line, with `kind` first, as the fixtures in swift/Contract/ write it.
+// Write writes one record as one line, with `kind` first, as the fixtures in swift_language/Contract/ write it.
 //
 // It refuses a record before provenance, a second provenance, and any record after the summary, each
 // of which the front door refuses too. A refused record writes nothing. The line goes out in one call to

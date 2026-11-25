@@ -94,7 +94,7 @@ var swiftLanguage = contractLanguage{
 	FileNoun:      "Swift files",
 	CompilerLabel: "swiftc",
 	VersionLines:  swiftVersionLines,
-	// In swift/Sources/CohereSwift/Project/FileSet.swift's words: what git ignores, what is vendored, and the
+	// In swift_language/Sources/CohereSwift/Project/FileSet.swift's words: what git ignores, what is vendored, and the
 	// manifests. A standalone script is checked, alone (#13nbb1s), so it is never excluded. Every other file no
 	// target compiles is a gap, a file of declarations only and a script whose imports name two platforms, and so
 	// is whatever sentence comes next.
@@ -109,7 +109,7 @@ var swiftLanguage = contractLanguage{
 	CacheOffDetail: "nothing was read from or written to this package's cache: no recorded run was replayed and " +
 		"this one was not recorded, and the child described and built the package in a scratch of its own and " +
 		"removed it",
-	// Pipeline.scratchPath in swift/Sources/CohereSwift/Pipeline/Pipeline.swift: `.cache/cohere/swift`.
+	// Pipeline.scratchPath in swift_language/Sources/CohereSwift/Pipeline/Pipeline.swift: `.cache/cohere/swift`.
 	NamedScratch: "swift",
 }
 
@@ -117,11 +117,14 @@ var swiftLanguage = contractLanguage{
 // because only cohere-swift is built by the launcher from a commit's sources and cached by them.
 func swiftVersionLines(provenance *contractProvenanceRecord, swiftSourceCommit string) []string {
 	lines := []string{fmt.Sprintf("swift: %s %s (commit %s, %s, swift-syntax %s, swift-format %s)",
-		provenance.Engine, provenance.Version, provenance.Commit,
+		provenance.Program, provenance.Version, provenance.Commit,
 		provenance.Toolchain, provenance.SwiftSyntax, provenance.SwiftFormat)}
 	if provenance.SourceTreeModified {
-		lines = append(lines, "  cohere-swift was built from uncommitted changes to its own sources under swift/, "+
-			"so no commit reproduces it")
+		lines = append(
+			lines,
+			"  cohere-swift was built from uncommitted changes to its own sources under swift_language/, "+
+				"so no commit reproduces it",
+		)
 	}
 	if swiftSourceCommit != "" {
 		lines = append(lines, fmt.Sprintf("  cohere-swift was built from Swift sources identical to commit %s, "+
@@ -178,7 +181,7 @@ func goVersionLines(provenance *contractProvenanceRecord, _ string) []string {
 		contract = fmt.Sprint(*provenance.Contract)
 	}
 	lines := []string{fmt.Sprintf("go: %s %s (commit %s, %s, contract %s)",
-		provenance.Engine, provenance.Version, provenance.Commit, provenance.Toolchain, contract)}
+		provenance.Program, provenance.Version, provenance.Commit, provenance.Toolchain, contract)}
 	if provenance.SourceTreeModified {
 		lines = append(lines, "  cohere-go was built from a modified tree, so no commit reproduces it")
 	}

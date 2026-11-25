@@ -6,15 +6,14 @@ import (
 )
 
 // checkedBuild is one build a Go run checked when it checked more than one, as the lint record's `builds` says it
-// (swift/Contract.md, internal/go_language/contract.BuildRecord), the host's first: its target as go env would make it,
-// with ` cgo` when cgo is on and its tags after ` tags `; the files of ours it compiles and the packages it analyzed,
-// every package of the workspace in each; and the findings that stand which it kept and the host's did not, and those
-// it kept that the merge left out. Then what the build restored from the host's run rather than checked, each count
-// written only when not 0: the host's entries kept for the others, and another's packages restored, declined by its
-// load and by its check, every decline by why, the loads again it took, by why, the packages it wrote through to its
-// own findings cache, the hits whose body it took from the run's decodes, and the files and findings it inherited from
-// the host's run. A run of one build writes none, and
-// neither does a Swift run, so their output is as it was.
+// (swift_language/Contract.md, internal/go_language/contract.BuildRecord), the host's first: its target as go env would
+// make it, with ` cgo` when cgo is on and its tags after ` tags `; the files of ours it compiles and the packages it
+// analyzed, every package of the workspace in each; and the findings that stand which it kept and the host's did not,
+// and those it kept that the merge left out. Then what the build restored from the host's run rather than checked, each
+// count written only when not 0: the host's entries kept for the others, and another's packages restored, declined by
+// its load and by its check, every decline by why, the loads again it took, by why, the packages it wrote through to
+// its own findings cache, the hits whose body it took from the run's decodes, and the files and findings it inherited
+// from the host's run. A run of one build writes none, and neither does a Swift run, so their output is as it was.
 type checkedBuild struct {
 	Target           string `json:"target"`
 	Host             bool   `json:"host"`

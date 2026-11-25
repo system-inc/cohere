@@ -960,7 +960,7 @@ var ignoredTopLevelKeys = map[string]string{
 		"purpose: its rules are cohere-go's, not this linter's.",
 
 	swiftBlockKey: "cohere-swift's rules, read by cohere-swift itself " +
-		"(swift/Sources/CohereSwift/Command/RuleConfiguration.swift), which refuses what it does not read. " +
+		"(swift_language/Sources/CohereSwift/Command/RuleConfiguration.swift), which refuses what it does not read. " +
 		"One settings file configures every language, so this loader leaves the block's insides to that language, " +
 		"and refuses only a block no Swift run reads (swift_block.go).",
 }

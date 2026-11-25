@@ -25,7 +25,7 @@ const goLanguageVerb = "go-language"
 const goChildVariable = "COHERE_GO_CHILD"
 
 // runGoLanguageVerb is the hidden `go-language` mode, matched by main before anything else reads the command
-// line: cohere-go, given everything after the verb, writing contract 3 to standardOutput for the front
+// line: cohere-go, given everything after the verb, writing contract 4 to standardOutput for the front
 // door that started it, or for the editor's save the file's text, from the buffer on standardInput (runGoStdin). The
 // memory available is this process's own policy's reading, taken at init, which the child sizes its limit from
 // (go_language's capMemory).

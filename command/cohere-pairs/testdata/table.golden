@@ -3,7 +3,7 @@
 - base `1111111111111111111111111111111111111111`, binary sha256 `0a4601b8`, every build checked, given `--other-builds`
 - branch `2222222222222222222222222222222222222222`, binary sha256 `bfa25050`, every build checked, given nothing
 - host pupa, linux/amd64, 64 cores, go version go1.27.3 linux/amd64
-- 2 rounds per corpus, base first in odd rounds and branch first in even ones, each side a cache-on cold run then a `--no-cache` run, `go-language --contract 3 --no-fix`; one-minute load before each run 0.40 to 15.40
+- 2 rounds per corpus, base first in odd rounds and branch first in even ones, each side a cache-on cold run then a `--no-cache` run, `go-language --contract 4 --no-fix`; one-minute load before each run 0.40 to 15.40
 - corpora: root at `aaaaaaaaaaaa` (files in scope 1200 in all), loom at `9510c6baddda` (files in scope 1200 in all); a number here compares only with a pair over these same commits
 
 ## Checked in all

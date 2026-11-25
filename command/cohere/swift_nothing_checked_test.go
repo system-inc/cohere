@@ -16,8 +16,8 @@ import (
 	"github.com/system-inc/cohere/internal/release/dispatch"
 )
 
-// realSwiftBinary is the child built from this checkout's swift/, resolved once for the test binary as a development
-// run resolves it: reused while its sources are unchanged, built when they moved.
+// realSwiftBinary is the child built from this checkout's swift_language/, resolved once for the test binary as a
+// development run resolves it: reused while its sources are unchanged, built when they moved.
 var realSwiftBinary struct {
 	once         sync.Once
 	path         string

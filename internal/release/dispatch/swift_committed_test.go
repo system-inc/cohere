@@ -58,7 +58,7 @@ func TestTheCommittedSwiftBinaryIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	// A committed edit builds a new binary, and the build reads the commit even while the checkout
 	// holds a different uncommitted edit. A cache hit above could not show that; this fresh build can.
 	writeFile(test, fixture.rule(), "two\n")
-	fixture.commit(test, "swift")
+	fixture.commit(test, "swift_language")
 	writeFile(test, fixture.rule(), "two, uncommitted\n")
 	second, built, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
@@ -77,8 +77,8 @@ func TestTheCommittedSwiftBinaryIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	}
 
 	// A commit that changes only cohere-swift's tests changes nothing compiled in, so it reuses cohere-swift.
-	writeFile(test, filepath.Join(fixture.repository, "swift", "Tests", "RuleTests.swift"), "// a new test\n")
-	fixture.commit(test, "swift/Tests")
+	writeFile(test, filepath.Join(fixture.repository, "swift_language", "Tests", "RuleTests.swift"), "// a new test\n")
+	fixture.commit(test, "swift_language/Tests")
 	third, built, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
@@ -107,7 +107,7 @@ func TestAnOlderCommitGetsItsOwnSwiftBinaryWhileTheCheckoutIsCleanAtANewerOne(te
 	fixture := newSwiftFixture(test)
 	older := fixture.head(test)
 	writeFile(test, fixture.rule(), "two\n")
-	fixture.commit(test, "swift")
+	fixture.commit(test, "swift_language")
 
 	swiftBinary, _, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
@@ -136,10 +136,10 @@ func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
 		test.Fatalf("first build: %v", resolveCommittedSwiftBinaryError)
 	}
 
-	stray := filepath.Join(fixture.paths.SwiftSourceWorktree(), "swift", "Sources", "Stray.swift")
+	stray := filepath.Join(fixture.paths.SwiftSourceWorktree(), "swift_language", "Sources", "Stray.swift")
 	writeFile(test, stray, "// someone wrote here\n")
 	writeFile(test, fixture.rule(), "two\n")
-	fixture.commit(test, "swift")
+	fixture.commit(test, "swift_language")
 
 	_, _, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
@@ -196,13 +196,13 @@ func newSwiftFixture(test *testing.T) *swiftFixture {
 	test.Helper()
 	root := test.TempDir()
 	repository := filepath.Join(root, "cohere")
-	writeFile(test, filepath.Join(repository, "swift", "Package.swift"), "// swift-tools-version:6.0\n")
-	writeFile(test, filepath.Join(repository, "swift", "Package.resolved"), "{}\n")
-	writeFile(test, filepath.Join(repository, "swift", "Sources", "Rule.swift"), "one\n")
-	writeFile(test, filepath.Join(repository, "swift", "Tests", "RuleTests.swift"), "// tests\n")
+	writeFile(test, filepath.Join(repository, "swift_language", "Package.swift"), "// swift-tools-version:6.0\n")
+	writeFile(test, filepath.Join(repository, "swift_language", "Package.resolved"), "{}\n")
+	writeFile(test, filepath.Join(repository, "swift_language", "Sources", "Rule.swift"), "one\n")
+	writeFile(test, filepath.Join(repository, "swift_language", "Tests", "RuleTests.swift"), "// tests\n")
 	writeFile(test, filepath.Join(repository, ".gitignore"), "/.cache/\n")
 	gitCommand(test, repository, "init", "-q")
-	gitCommand(test, repository, "add", "swift", ".gitignore")
+	gitCommand(test, repository, "add", "swift_language", ".gitignore")
 	gitCommand(test, repository, "commit", "-q", "-m", "first")
 
 	fixture := &swiftFixture{
@@ -258,7 +258,7 @@ func (fixture *swiftFixture) fakeBuild(
 }
 
 func (fixture *swiftFixture) rule() string {
-	return filepath.Join(fixture.repository, "swift", "Sources", "Rule.swift")
+	return filepath.Join(fixture.repository, "swift_language", "Sources", "Rule.swift")
 }
 
 func (fixture *swiftFixture) head(test *testing.T) string {

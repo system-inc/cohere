@@ -127,7 +127,7 @@ func renderThirdPartyNotices(
 
 	builder.WriteString("## In cohere-swift\n\n")
 	builder.WriteString("In `cohere-swift`, which the two macOS packages ship beside `cohere`. Packages resolved by\n")
-	builder.WriteString("[swift/Package.resolved](swift/Package.resolved).\n\n")
+	builder.WriteString("[swift_language/Package.resolved](swift_language/Package.resolved).\n\n")
 	for _, pin := range swiftPins {
 		license, known := swiftLicenses[pin.Identity]
 		if !known {

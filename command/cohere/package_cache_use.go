@@ -8,26 +8,24 @@ import (
 )
 
 // packageCacheUse is what cohere-go's per-package findings cache did in the lint phase, by package, as the lint
-// record's `cache` object says it (swift/Contract.md): hit, restored from an entry with nothing run on it; missed,
-// analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; the facts the
-// written entries left out, since nothing outside their package can name their object; the restored facts
-// skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
-// most two. FromSystemCache is the standard-library packages restored from cohere-go's system cache, its tables
-// in the user's cache directory, every build's summed, apart from hit, which `--no-cache` reads too, since they are
-// of cohere and the Go installation and nothing of the project; it is absent when 0. SystemCacheWritten is the
-// entries the run's builds added to their tables of the system cache, summed, absent when 0, and SystemCacheOff is set
-// under `--no-system-cache`, which neither reads nor writes it. SystemCacheNotKept is why the run kept no system cache
-// though it was on, or could not keep it as it should, in one line, absent when there is none (#syscache). Reloads
-// is the packages
-// the run loaded again from source, though the cache held them, to answer a question of a fact computed on demand
-// that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, and Replays the
-// questions of such a fact answered by replaying the push's walk of a package, which a cold run makes too, each absent
-// when 0. Problems is what kept the cache from being read or written, every build's, which the child notes on stderr
-// one by one and the footer counts, and WriteFailed every entry whose write failed, every build's, of which stderr
-// notes only the first, each absent when 0 (#27r8r24). Packs is what the extra builds did with their packs, every
-// build's summed, absent in a run with no extra build (#b2t9xmf).
-// On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as
-// it was.
+// record's `cache` object says it (swift_language/Contract.md): hit, restored from an entry with nothing run on it;
+// missed, analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; the facts
+// the written entries left out, since nothing outside their package can name their object; the restored facts skipped,
+// whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at most two.
+// FromSystemCache is the standard-library packages restored from cohere-go's system cache, its tables in the user's
+// cache directory, every build's summed, apart from hit, which `--no-cache` reads too, since they are of cohere and the
+// Go installation and nothing of the project; it is absent when 0. SystemCacheWritten is the entries the run's builds
+// added to their tables of the system cache, summed, absent when 0, and SystemCacheOff is set under
+// `--no-system-cache`, which neither reads nor writes it. SystemCacheNotKept is why the run kept no system cache though
+// it was on, or could not keep it as it should, in one line, absent when there is none (#syscache). Reloads is the
+// packages the run loaded again from source, though the cache held them, to answer a question of a fact computed on
+// demand that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, and Replays
+// the questions of such a fact answered by replaying the push's walk of a package, which a cold run makes too, each
+// absent when 0. Problems is what kept the cache from being read or written, every build's, which the child notes on
+// stderr one by one and the footer counts, and WriteFailed every entry whose write failed, every build's, of which
+// stderr notes only the first, each absent when 0 (#27r8r24). Packs is what the extra builds did with their packs,
+// every build's summed, absent in a run with no extra build (#b2t9xmf). On is false under `--no-cache`. Only a Go run
+// has one; a Swift run's lint record carries none, so its output is as it was.
 type packageCacheUse struct {
 	On                 bool   `json:"on"`
 	Hit                int    `json:"hit"`
@@ -51,9 +49,9 @@ type packageCacheUse struct {
 }
 
 // buildPacksUse is what the extra builds did with their packs, as the lint record's `cache.packs` says it
-// (swift/Contract.md): each build reads one file of each store holding every record its last run read or wrote there,
-// rather than open each record, and serves a record from it only while the record's shard of the store is as it was.
-// The packs read whole and those missing, which is no refusal, the records served, those whose shard had moved and
+// (swift_language/Contract.md): each build reads one file of each store holding every record its last run read or wrote
+// there, rather than open each record, and serves a record from it only while the record's shard of the store is as it
+// was. The packs read whole and those missing, which is no refusal, the records served, those whose shard had moved and
 // those no pack held, each read from the store, the shard stamps read, each pack refused by the first word of why, and
 // the packs written.
 type buildPacksUse struct {

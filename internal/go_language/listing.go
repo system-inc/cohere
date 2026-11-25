@@ -27,7 +27,7 @@ func provenanceRecord() contract.ProvenanceRecord {
 	}
 	return contract.ProvenanceRecord{
 		Contract:           contract.Version,
-		Engine:             programName,
+		Program:            programName,
 		Version:            current.Version,
 		Commit:             commit,
 		SourceTreeModified: current.SourceTreeModified,

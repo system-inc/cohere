@@ -21,7 +21,7 @@ import (
 const MinimumSwiftBinaryMacOs = "15.0"
 
 // SwiftSourceTreeModifiedVariable states cohere-swift's `sourceTreeModified` to its manifest, "true" or
-// "false", in place of the manifest reading git (swift/Package.swift).
+// "false", in place of the manifest reading git (swift_language/Package.swift).
 //
 // The development launcher states it, because it names cohere-swift it caches by the same answer, read
 // once, so cohere-swift it serves reports the state its name holds (#50wtb2s). A release states nothing:
@@ -58,7 +58,7 @@ func swiftArchitecture(goArchitecture string) (string, error) {
 // assuming a path, because Swift 6.3 and 6.4 put it in different places.
 //
 // cohere-swift names commit as what it was built from. Swift has no `-ldflags -X`, so the commit goes
-// into EngineReleaseStamp.generated.swift beside EngineVersion, which reads it only under
+// into ReleaseStamp.generated.swift beside ProgramVersion, which reads it only under
 // COHERE_RELEASE_STAMP, and the file is removed after the build. It is gitignored, so writing it
 // leaves the manifest's `hasUncommittedChanges` as it was (measured by @system_cohere_swift and here).
 // The build runs in the checkout rather than an export because outside git the manifest reads no
@@ -75,7 +75,7 @@ func buildSwiftBinary(
 		return swiftArchitectureError
 	}
 
-	packageDirectory := filepath.Join(moduleDirectory, "swift")
+	packageDirectory := filepath.Join(moduleDirectory, "swift_language")
 	// The manifest evaluated now, never a cached evaluation. The manifest reads
 	// `Context.gitInformation.hasUncommittedChanges` into cohere-swift's provenance, and SwiftPM's shared
 	// manifest cache answers from an earlier evaluation of the same commit. Measured: a tracked file
@@ -91,7 +91,7 @@ func buildSwiftBinary(
 	}
 
 	stamp := filepath.Join(packageDirectory, "Sources", "CohereSwift", "Command", SwiftReleaseStampFileName)
-	stampSource := "#if COHERE_RELEASE_STAMP\n    enum EngineReleaseStamp { static let commit = \"" +
+	stampSource := "#if COHERE_RELEASE_STAMP\n    enum ReleaseStamp { static let commit = \"" +
 		commit +
 		"\" }\n#endif\n"
 	if writeError := os.WriteFile(stamp, []byte(stampSource), 0o644); writeError != nil {
@@ -299,7 +299,7 @@ func requireMinimumMacOs(path string, allowed string) error {
 	}
 	if newer {
 		return fmt.Errorf(
-			"%s requires macOS %s, and a released binary must launch on macOS %s; lower the deployment target in swift/Package.swift",
+			"%s requires macOS %s, and a released binary must launch on macOS %s; lower the deployment target in swift_language/Package.swift",
 			path,
 			minimum,
 			allowed,

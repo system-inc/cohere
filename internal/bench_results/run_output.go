@@ -11,7 +11,7 @@ import (
 // free to change, and when it moved to one line every reader of it read nothing, so the benchmark reads
 // the contract instead.
 //
-// A root holding several projects prints a summary for each (`.`, `. (Folder)`, `swift`), and they run side
+// A root holding several projects prints a summary for each (`.`, `. (Folder)`, `swift_language`), and they run side
 // by side, so the run is all of them: the longest summary time, every finding, and a cache use that holds for
 // every project. Reading only the last one timed a Swift project on ahra and missed cohere-go that never
 // ran on cohere's root (#7z52pqf).

@@ -270,12 +270,12 @@ func (ignoresNothing) Ignored(string, bool) bool         { return false }
 
 // Discovery starts where the walk up found a project, unless the caller stands in a repository with no
 // project at or above them inside it: then the repository's root, which is how cohere's own repository
-// finds swift/. A project above the repository belongs to some other tree.
+// finds swift_language/. A project above the repository belongs to some other tree.
 func TestDiscoveryRootIsTheRepositoryTheCallerStandsIn(test *testing.T) {
 	test.Parallel()
 	repository := newRepository(test, map[string]string{
-		"swift/Package.swift": discoveryPackage,
-		"docs/readme.md":      "docs\n",
+		"swift_language/Package.swift": discoveryPackage,
+		"docs/readme.md":               "docs\n",
 	})
 	start := filepath.Join(repository, "docs")
 	location, locateError := locateProject(locationRequest{WorkingDirectory: start, ConfigFileName: projectMarker})

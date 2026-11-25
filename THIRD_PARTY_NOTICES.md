@@ -2892,7 +2892,7 @@ THE SOFTWARE.
 ## In cohere-swift
 
 In `cohere-swift`, which the two macOS packages ship beside `cohere`. Packages resolved by
-[swift/Package.resolved](swift/Package.resolved).
+[swift_language/Package.resolved](swift_language/Package.resolved).
 
 ### swift-argument-parser
 

@@ -23,7 +23,7 @@ const hostBuildOnlyUnknown = "--host-build-only is not a flag cohere-go takes"
 // naming the binary, rather than guess which builds it would check. root is an absolute directory for `--root`, which
 // the Go child requires and the version never reads.
 func everyBuildArguments(binaryPath string, root string, environment []string) ([]string, error) {
-	command := exec.Command(binaryPath, "go-language", "--contract", "3", "--root", root, "--version",
+	command := exec.Command(binaryPath, "go-language", "--contract", "4", "--root", root, "--version",
 		"--host-build-only")
 	command.Env = append(environmentWithout(environment, "GOFLAGS"), "COHERE_GO_CHILD=1")
 	var standardError strings.Builder

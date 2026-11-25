@@ -57,7 +57,7 @@ func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error)
 		"/*\n Generated from cohere's policy/messages/ by `go run ./policy/tools/generate`. Do not edit it here:\n",
 	)
 	source.WriteString(
-		" edit the message files and run that again. While the two differ, a test in each engine fails.\n */\n",
+		" edit the message files and run that again. While the two differ, a test in Go and one in Swift fail.\n */\n",
 	)
 	source.WriteString("enum RuleMessages {\n")
 	source.WriteString("    /* A finding's message: the id the catalog files it under, and its text. */\n")

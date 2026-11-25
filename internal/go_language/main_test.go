@@ -335,7 +335,7 @@ type endToEndCase struct {
 	// fixture is the directory under testdata copied as the project, the case's own when empty.
 	fixture string
 
-	// extra follows `--contract 3 --root <root>`, with {root} replaced by the copy's directory.
+	// extra follows `--contract 4 --root <root>`, with {root} replaced by the copy's directory.
 	extra []string
 
 	// arguments, when set, is the whole command line instead, with {root} replaced the same way.
@@ -984,7 +984,7 @@ var (
 			`(,"buildsWidthSlack":true)?(,"buildsWidthFromHostLive":true)?(,"buildsPoolSize":\d+)?`)
 	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance = contract.ProvenanceRecord{
-		Contract: contract.Version, Engine: programName, Version: "test", Commit: "test", Toolchain: "test",
+		Contract: contract.Version, Program: programName, Version: "test", Commit: "test", Toolchain: "test",
 	}
 )
 

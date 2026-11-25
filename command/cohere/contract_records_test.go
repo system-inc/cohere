@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,11 +14,11 @@ import (
 	"time"
 )
 
-// contractFixture reads one of the fixtures swift/Contract.md defines, from the same files the Swift
+// contractFixture reads one of the fixtures swift_language/Contract.md defines, from the same files the Swift
 // encoder's tests read, so neither side can drift without the other's test failing.
 func contractFixture(test *testing.T, name string) []string {
 	test.Helper()
-	contents, readError := os.ReadFile(filepath.Join("..", "..", "swift", "Contract", name))
+	contents, readError := os.ReadFile(filepath.Join("..", "..", "swift_language", "Contract", name))
 	if readError != nil {
 		test.Fatal(readError)
 	}
@@ -360,7 +361,12 @@ func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
 	unused := contractFixture(test, "Unused.jsonl")
 	last := len(findings) - 1
 
+	// A replacement that changes nothing would leave the case testing an unbroken stream, as the contract cases did
+	// when the fixtures moved to contract 4, so it is refused.
 	replace := func(lines []string, index int, line string) []string {
+		if line == lines[index] {
+			test.Fatalf("a broken stream's replacement changed nothing in line %d: %s", index, line)
+		}
 		mutated := append([]string(nil), lines...)
 		mutated[index] = line
 		return mutated
@@ -386,13 +392,17 @@ func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
 		{"provenance not first", without(findings, 0), 1, "provenance is always first"},
 		{
 			"a contract the front door does not speak",
-			replace(findings, 0, strings.Replace(findings[0], `"contract":3`, `"contract":2`, 1)),
+			replace(
+				findings,
+				0,
+				strings.Replace(findings[0], fmt.Sprintf(`"contract":%d`, contractVersion), `"contract":2`, 1),
+			),
 			1,
 			"contract 2",
 		},
 		{
 			"a provenance with no contract",
-			replace(findings, 0, strings.Replace(findings[0], `"contract":3,`, "", 1)),
+			replace(findings, 0, strings.Replace(findings[0], fmt.Sprintf(`"contract":%d,`, contractVersion), "", 1)),
 			1,
 			"contract none",
 		},
@@ -575,8 +585,9 @@ type excludedFile struct {
 }
 
 // declarationsOnlyReason is the child's reason for a file no target compiles that holds only declarations, so
-// it is no standalone script to check alone (swift/Sources/CohereSwift/Project/FileSet.swift, #13nbb1s). A script
-// is checked, and the bare `no target of this package compiles it` is left for a file below a project of its own.
+// it is no standalone script to check alone (swift_language/Sources/CohereSwift/Project/FileSet.swift, #13nbb1s). A
+// script is checked, and the bare `no target of this package compiles it` is left for a file below a project of its
+// own.
 const declarationsOnlyReason = "no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
 
 // projectRecordAt is a contract fixture's project record moved to root, its excluded files replaced, so a
@@ -942,7 +953,7 @@ func TestSwiftContractArguments(test *testing.T) {
 	if contractArgumentsError != nil {
 		test.Fatal(contractArgumentsError)
 	}
-	want := "--contract 3 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
+	want := "--contract 4 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
 	if strings.Join(arguments, " ") != want || mode != contractModeCheck {
 		// `--single-threaded=false` was typed and is false, so it is not forwarded as a switch.
 		test.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
@@ -1015,7 +1026,7 @@ func TestSwiftContractArgumentsRefuseWhatNothingHonors(test *testing.T) {
 			nil,
 		)
 		if contractArgumentsError != nil ||
-			strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix --"+flag {
+			strings.Join(arguments, " ") != "--contract 4 --root /work/macos --no-fix --"+flag {
 			test.Errorf(
 				"--%s did not reach the child: %q (%v)",
 				flag,
@@ -1035,7 +1046,7 @@ func TestSwiftContractArgumentsRefuseWhatNothingHonors(test *testing.T) {
 		"directory": true,
 	}
 	arguments, _, contractArgumentsError := contractArguments(swiftLanguage, swiftFlags, location, given, value, nil)
-	if contractArgumentsError != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix" {
+	if contractArgumentsError != nil || strings.Join(arguments, " ") != "--contract 4 --root /work/macos --no-fix" {
 		test.Errorf(
 			"the flags the front door answers were not passed over: %q (%v)",
 			strings.Join(arguments, " "),
@@ -1576,13 +1587,13 @@ func TestContractRunVersionInGoWords(test *testing.T) {
 	requireLines(
 		test,
 		clean,
-		"\n  swift contract: 3\ngo: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n",
+		"\n  swift contract: 4\ngo: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 4)\n",
 	)
 	forbidLines(test, clean, "modified tree", "identical to commit", "swift:", "Swift", "swift-syntax")
 
 	modified := render(strings.Replace(provenance, `"sourceTreeModified":false`, `"sourceTreeModified":true`, 1), "")
 	requireLines(test, modified,
-		"go: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n",
+		"go: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 4)\n",
 		"  cohere-go was built from a modified tree, so no commit reproduces it\n",
 	)
 }

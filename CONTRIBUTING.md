@@ -70,7 +70,7 @@ go run ./command/cohere
 ```
 
 `cohere` checks itself: a bare `cohere --no-fix` at the root runs cohere-go over this module and
-cohere-swift over `swift/`, and both read 0. Go's own toolchain gates it too: `gofmt -l .`,
+cohere-swift over `swift_language/`, and both read 0. Go's own toolchain gates it too: `gofmt -l .`,
 `go vet ./...`, `go test ./...`, `go build ./...`.
 
 Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go

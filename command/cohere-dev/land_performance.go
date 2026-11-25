@@ -213,14 +213,6 @@ say "top before $(LC_ALL=C ps -Ao pid,user,pcpu,comm -r 2>/dev/null </dev/null |
 rm -rf system deeafbf4/.cache; mkdir system
 clean=(env -u GOFLAGS -u PWD -u GOGC -u GOMEMLIMIT -u COHERE_SCRATCH_BUILDS_WIDTH -u COHERE_SYSTEM_CACHE -u GOARM64
   GOPROXY=off GOSUMDB=sum.golang.org GONOSUMDB='*')
-# The contract the binary's Go child speaks. #9gjmwgs moves it from 3 to 4, and the landing that moves it is measured
-# by main's land, from before it: so the binary is asked once, and one that answers --version under contract 4 with no
-# provenance record is one from before the move. Wave 3 removes the fallback once it is on main.
-contract=3
-if (cd "$base/system" && "${clean[@]}" COHERE_GO_CHILD=1 "$base/cohere" go-language --contract 4 --root "$base/system" \
-  --version 2> /dev/null) | grep -q '"kind":"provenance"'; then
-  contract=4
-fi
 # recorded is the number the field $2 holds in run.jsonl's first record of the kind $1, the first it names, or nothing
 # when there is no such record: this bash has no jq, and python3 may not be there.
 recorded() {
@@ -239,7 +231,7 @@ run() {
   where="$base/$runTree"
   rm -f run.jsonl run.err
   if (cd "$where" && "${clean[@]}" PWD="$where" COHERE_SYSTEM_CACHE="$base/system" COHERE_GO_CHILD=1 \
-    /usr/bin/time -l "$base/cohere" go-language --contract "$contract" --root "$where" --no-fix "$@" > "$base/run.jsonl" \
+    /usr/bin/time -l "$base/cohere" go-language --contract 4 --root "$where" --no-fix "$@" > "$base/run.jsonl" \
     2> "$base/run.err"); then
     runCode=0
   else

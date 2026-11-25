@@ -67,7 +67,7 @@ func (paths Paths) PruneLogPath() string {
 
 // SwiftPackageDirectory is where cohere-swift's package lives inside the cohere module.
 func (paths Paths) SwiftPackageDirectory() string {
-	return filepath.Join(paths.ModuleDirectory, "swift")
+	return filepath.Join(paths.ModuleDirectory, "swift_language")
 }
 
 // SwiftBuildDirectory is the scratch path cohere-swift is built in.

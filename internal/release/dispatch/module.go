@@ -14,7 +14,7 @@ import (
 // returns a bare command name is exactly the bug this tool was built to stop shipping.
 //
 // Shared by the launcher, which builds cohere from this module, and by cohere itself, which builds
-// cohere-swift from the `swift/` directory beside it. Both ask the same question and must get the
+// cohere-swift from the `swift_language/` directory beside it. Both ask the same question and must get the
 // same answer, so there is one walk.
 func FindModuleDirectory() (string, error) {
 	candidates := []string{}

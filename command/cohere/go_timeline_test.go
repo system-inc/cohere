@@ -70,7 +70,7 @@ func TestTimelineReachesTheGoChildAlone(test *testing.T) {
 	if argumentsError != nil {
 		test.Fatalf("--timeline was refused for Go: %v", argumentsError)
 	}
-	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--timeline"}
+	expected := []string{"--contract", "4", "--root", root, "--no-fix", "--timeline"}
 	if !slices.Equal(arguments, expected) || mode != contractModeCheck {
 		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
 			contractModeCheck)

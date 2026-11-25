@@ -35,7 +35,7 @@ func TestASwiftBinaryBuiltFromADirtyTreeIsNotServedOnceTheTreeIsClean(test *test
 	}
 
 	// Committed as it stands, so cohere-swift's inputs read exactly as they did and only their state moved.
-	fixture.commit(test, "swift")
+	fixture.commit(test, "swift_language")
 	clean, built := fixture.resolveDevelopment(test)
 	if binarySaysModified(test, clean) {
 		test.Fatalf(
@@ -62,7 +62,7 @@ func TestASwiftBinaryBuiltFromACleanTreeIsNotServedOnceTheTreeIsDirty(test *test
 	// A new commit, then the rule put back on disk as the first commit held it: the inputs read as they did
 	// for the clean binary above, and now they differ from their commit.
 	writeFile(test, fixture.rule(), "two\n")
-	fixture.commit(test, "swift")
+	fixture.commit(test, "swift_language")
 	writeFile(test, fixture.rule(), "one\n")
 	dirty, built := fixture.resolveDevelopment(test)
 	if !binarySaysModified(test, dirty) {
@@ -91,10 +91,10 @@ func TestTheSwiftTreeBitCoversOnlyTheSwiftPackagesOwnInputs(test *testing.T) {
 	}
 
 	outside := map[string]string{
-		"a tracked edit outside swift/":          ".gitignore",
-		"an untracked file outside swift/":       "notes.txt",
-		"a tracked edit to cohere-swift's tests": filepath.Join("swift", "Tests", "RuleTests.swift"),
-		"an untracked file beside the package":   filepath.Join("swift", "notes.txt"),
+		"a tracked edit outside swift_language/":    ".gitignore",
+		"an untracked file outside swift_language/": "notes.txt",
+		"a tracked edit to cohere-swift's tests":    filepath.Join("swift_language", "Tests", "RuleTests.swift"),
+		"an untracked file beside the package":      filepath.Join("swift_language", "notes.txt"),
 	}
 	for change, path := range outside {
 		writeFile(test, filepath.Join(fixture.repository, path), "uncommitted\n")
@@ -104,17 +104,17 @@ func TestTheSwiftTreeBitCoversOnlyTheSwiftPackagesOwnInputs(test *testing.T) {
 		}
 	}
 
-	added := filepath.Join(fixture.repository, "swift", "Sources", "New.swift")
+	added := filepath.Join(fixture.repository, "swift_language", "Sources", "New.swift")
 	writeFile(test, added, "// nobody committed this\n")
 	if swiftBinary, _ := fixture.resolveDevelopment(test); !binarySaysModified(test, swiftBinary) {
-		test.Error("an untracked file under swift/Sources left cohere-swift clean")
+		test.Error("an untracked file under swift_language/Sources left cohere-swift clean")
 	}
 	if removeError := os.Remove(added); removeError != nil {
 		test.Fatal(removeError)
 	}
 	writeFile(test, fixture.rule(), "one, uncommitted\n")
 	if swiftBinary, _ := fixture.resolveDevelopment(test); !binarySaysModified(test, swiftBinary) {
-		test.Error("a tracked edit under swift/Sources left cohere-swift clean")
+		test.Error("a tracked edit under swift_language/Sources left cohere-swift clean")
 	}
 	fixture.expectEveryBuildWasTold(test)
 }
@@ -172,18 +172,18 @@ func TestTheSwiftManifestPrefersTheStatedTreeState(test *testing.T) {
 		test.Skip("no swift toolchain on PATH")
 	}
 
-	manifest := readFile(test, filepath.Join("..", "..", "..", "swift", "Package.swift"))
+	manifest := readFile(test, filepath.Join("..", "..", "..", "swift_language", "Package.swift"))
 	start := strings.Index(manifest, "let sourceTreeModified =")
 	end := strings.Index(manifest[max(start, 0):], "\n    }\n")
 	if start < 0 || end < 0 {
 		test.Fatal(
-			"swift/Package.swift holds no `let sourceTreeModified =` closed by `    }`, so this test reads nothing",
+			"swift_language/Package.swift holds no `let sourceTreeModified =` closed by `    }`, so this test reads nothing",
 		)
 	}
 	expression := manifest[start : start+end+len("\n    }\n")]
 
 	module := test.TempDir()
-	packageDirectory := filepath.Join(module, "swift")
+	packageDirectory := filepath.Join(module, "swift_language")
 	writeFile(test, filepath.Join(packageDirectory, "Package.swift"), "// swift-tools-version:6.2\n"+
 		"import PackageDescription\n"+expression+
 		"let package = Package(name: \"Stand\",\n"+
