@@ -82,7 +82,7 @@ func run() error {
 	directory := flag.String("directory", "",
 		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
 	languages := flag.String("languages", "",
-		"check only these languages, wherever their files live: a comma list of go, typescript (JavaScript included), swift, adamic, json, markdown, yaml, css and graphql, naming the rest as left out (default: every language found)")
+		"check only these languages, wherever their files live: a comma list of go, typescript (JavaScript and Adamic included), swift, json, markdown, yaml, css and graphql, naming the rest as left out (default: every language found)")
 	typesOnly := flag.Bool(
 		"types",
 		false,

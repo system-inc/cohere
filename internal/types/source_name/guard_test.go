@@ -24,10 +24,6 @@ var tsDecisionsAllowed = map[string]string{
 	"internal/edit/write.go: .ts":              "TypeScriptParsable reads its list with source_name.TreatedAs(fileName)",
 	"internal/format/prettier/handles.go: .ts": "parserFor reads its table with source_name.TreatedAs(fileName)",
 
-	// The languages `--languages` takes, each with its files: Adamic's `.a` is named there too, as a language of its
-	// own, `adamic`, so a run can check TypeScript without Adamic or the reverse (#s7gt4bj, the Square's ruling).
-	"command/cohere/language_choice.go: .ts": "the --languages table gives .a a language of its own, adamic",
-
 	// A tool's disk walk with no program to ask, so it cannot tell Adamic source from a static library.
 	"command/formatter_comparison/main.go: .ts":                        "the comparison tool's corpus walk, which has no program",
 	"internal/lint/rules/tailwind/tools/generate_variant/main.go: .ts": "the variant generator's walk of a Tailwind consumer, which has no program",

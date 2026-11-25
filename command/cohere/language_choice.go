@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -20,18 +21,19 @@ type language struct {
 
 // languages are the names `--languages` takes, in the order a list of them is said. Read without regard to case,
 // so `Go` and `go` name one language. `typescript` takes JavaScript too, the programs and the loose files alike, and
-// every extension the house formatter registers is one language's (TestEveryFormattedExtensionIsOneLanguages).
+// Adamic's `.a`, which a TypeScript program type-checks and lints as its own, until Adamic has a checker of its own
+// (the Square's ruling on #s7gt4bj). Every extension the house formatter registers is one language's
+// (TestEveryFormattedExtensionIsOneLanguages).
 var languages = []language{
 	{name: "go", engine: engineGo},
 	{
 		name:   "typescript",
 		engine: engineTypeScript,
 		extensions: []string{
-			".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs", ".jsx",
+			".ts", ".tsx", ".mts", ".cts", source_name.AdamicExtension, ".js", ".mjs", ".cjs", ".jsx",
 		},
 	},
 	{name: "swift", engine: engineSwift},
-	{name: "adamic", extensions: []string{source_name.AdamicExtension}},
 	{name: "json", extensions: []string{".json"}},
 	{name: "markdown", extensions: []string{".md"}},
 	{name: "yaml", extensions: []string{".yaml", ".yml"}},
@@ -139,6 +141,9 @@ func languageChoiceOf(given map[string]bool, value string) (languageChoice, erro
 // the project only when the project's language is named, and its format walk leaves out the languages not named, as
 // a discovered project's run does through its yield. A run that discovers chooses from what it finds instead
 // (chooseLanguages).
+//
+// A file named on its own, a path or the editor's save, is refused when it is in a language not named, since it
+// would be formatted though its language was left out.
 func chooseNamedRunLanguages(
 	discovers bool,
 	choice languageChoice,
@@ -152,7 +157,32 @@ func chooseNamedRunLanguages(
 		return refuseError
 	}
 	namedRunLeftOutExtensions = choice.leftOutExtensions()
+	return refuseNamedFilesLeftOut(choice, append(slices.Clone(flag.Args()), flagValue("stdin-filepath")))
+}
+
+// refuseNamedFilesLeftOut refuses the first of namedFiles, the run's paths and the editor's save, that is in a
+// language choice did not name, with a sentence naming its language. A directory, or a file of no language a run
+// formats, is in none, and passes.
+func refuseNamedFilesLeftOut(choice languageChoice, namedFiles []string) error {
+	leftOut := choice.leftOutExtensions()
+	for _, named := range namedFiles {
+		if named != "" && leavesOutFile(leftOut, named) {
+			return fmt.Errorf("--languages %s does not name %s, the language of %s, so nothing was checked",
+				sayList(choice), languageOfFile(named), named)
+		}
+	}
 	return nil
+}
+
+// languageOfFile is the name `--languages` takes for the language a file is in, by its extension.
+func languageOfFile(fileName string) string {
+	extension := strings.ToLower(filepath.Ext(fileName))
+	for _, known := range languages {
+		if slices.Contains(known.extensions, extension) {
+			return known.name
+		}
+	}
+	return extension
 }
 
 // refuseUnchosenLanguage refuses a run that discovery does not apply to, one given `--directory` into one project, a

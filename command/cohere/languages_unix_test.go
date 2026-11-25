@@ -82,6 +82,8 @@ func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 		"web/data.json": "{\"size\":1}\n",
 		// Not formatted either, and Markdown, so a walk that keeps a language left out finds it.
 		"web/Steps.md": "* one\n",
+		// The same in capitals, which every walk reads as Markdown too.
+		"web/NOTES.MD": "* two\n",
 		"Notes.md":     "# Notes\n",
 	})
 	initialize := exec.Command("git", "init", "--quiet")
@@ -120,8 +122,10 @@ func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 	test.Run("json checks the program's JSON", func(test *testing.T) {
 		checked := run(test, "--no-fix", "--json", "--languages", "json")
 		record := checked.record(test)
-		if checked.exitCode != 1 || !strings.Contains(checked.standardOutput, filepath.Join("web", "data.json")) ||
+		if checked.exitCode != 1 ||
+			!strings.Contains(checked.standardOutput, filepath.Join("web", "data.json")) ||
 			strings.Contains(checked.standardOutput, "Steps.md") ||
+			strings.Contains(checked.standardOutput, "NOTES.MD") ||
 			!slices.Equal(record.Checked, []string{"json"}) ||
 			!slices.Equal(record.LeftOut, []string{"go", "typescript", "swift", "markdown"}) {
 			test.Errorf("exit %d, record %+v, want 1 naming web/data.json:\n%s\n%s", checked.exitCode, record,
@@ -137,6 +141,33 @@ func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 			len(record.LeftOut) != 0 || len(record.NotFound) != 0 {
 			test.Errorf("named exit %d over %d projects, record %+v; plain exit %d over %d", named.exitCode,
 				named.summaries(), record, whole.exitCode, whole.summaries())
+		}
+	})
+	// Not parallel: the subtests share one tree, whose cache each run writes and the next may replay.
+	test.Run("a run that does not format checks no language only a format walk would", func(test *testing.T) {
+		refused := run(test, "--no-fix", "--types", "--languages", "json")
+		if refused.exitCode == 0 || !strings.Contains(refused.standardError,
+			"names only languages a run checks here by formatting them, and this run does not format") {
+			test.Errorf("exit %d:\n%s", refused.exitCode, refused.standardError)
+		}
+	})
+	// Not parallel: the subtests share one tree, whose cache each run writes and the next may replay.
+	test.Run("a program run by its directory leaves out what was not named", func(test *testing.T) {
+		checked := run(test, "--no-fix", "--languages", "typescript", "--directory", "web")
+		if checked.exitCode != 0 || strings.Contains(checked.standardOutput, "Steps.md") ||
+			strings.Contains(checked.standardOutput, "data.json") {
+			test.Errorf("exit %d, want 0 and neither the Markdown nor the JSON formatted:\n%s", checked.exitCode,
+				checked.standardOutput)
+		}
+	})
+	// Not parallel: the subtests share one tree, whose cache each run writes and the next may replay.
+	test.Run("a named file in a language not named is refused", func(test *testing.T) {
+		refused := run(test, "--no-fix", "--languages", "typescript", "--directory", "web", "Steps.md")
+		if refused.exitCode == 0 || strings.Contains(refused.standardOutput, "would-change") || !strings.Contains(
+			refused.standardError,
+			"--languages typescript does not name markdown, the language of Steps.md",
+		) {
+			test.Errorf("exit %d:\n%s\n%s", refused.exitCode, refused.standardOutput, refused.standardError)
 		}
 	})
 	// Not parallel: the subtests share one tree, whose cache each run writes and the next may replay.
@@ -215,5 +246,45 @@ func TestANarrowedRunNamesWhatItLeftOutWhileItsProjectReplays(test *testing.T) {
 	if output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix",
 		"--verbose"); exitCode != 0 || strings.Contains(output, leftOut) {
 		test.Errorf("the plain run after it exited %d, want 0 and nothing left out:\n%s", exitCode, output)
+	}
+}
+
+// A repository that is one TypeScript program runs it as one project of several under `--languages`, never in this
+// process, so its format walk leaves out what was not named and the footer names it (#s7gt4bj): the program's
+// Markdown is neither formatted nor reported under `typescript`, and its tsconfig, which is JSON, is named left out
+// beside it.
+func TestASingleProgramUnderLanguagesLeavesOutWhatWasNotNamed(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		".gitignore":     ".cache/\n",
+		"tsconfig.json":  "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, \"include\": [\"source\"] }\n",
+		"source/Tidy.ts": "export const tidy = 1;\n",
+		"Steps.md":       "* one\n",
+	})
+	output, exitCode := runCohere(test, binary, root, "--no-fix", "--languages", "typescript")
+	if exitCode != 0 || strings.Contains(output, "Steps.md") ||
+		!strings.Contains(output, "⚠ left out by --languages: json, markdown") {
+		test.Errorf("exit %d, want 0, the Markdown left out and named:\n%s", exitCode, output)
+	}
+}
+
+// Adamic's files are TypeScript's until Adamic has a checker of its own (#s7gt4bj, the Square's ruling): `typescript`
+// type-checks the program's `.a` files, finding the planted type error between two of them, and `adamic` is no name
+// `--languages` takes.
+func TestAdamicFilesAreCheckedAsTypeScript(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := adamicProject(test, nil)
+	output, exitCode := runCohere(test, binary, root, "--no-fix", "--languages", "typescript")
+	if exitCode == 0 || !strings.Contains(output, "src/main.a:3:14") ||
+		!strings.Contains(output, "⚠ left out by --languages: json") {
+		test.Errorf("exit %d, want the type error between the .a files found, and only the JSON left out:\n%s",
+			exitCode, output)
+	}
+	if output, exitCode := runCohere(test, binary, root, "--no-fix", "--languages", "adamic"); exitCode == 0 ||
+		!strings.Contains(output, "names adamic, which is no language") {
+		test.Errorf("--languages adamic exited %d:\n%s", exitCode, output)
 	}
 }

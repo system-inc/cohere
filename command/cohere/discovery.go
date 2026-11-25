@@ -955,7 +955,10 @@ func (found *discovery) addRootFormatProject() {
 // out). The format project of a root no program holds runs when any language it formats is named. What runs as
 // something else, or not at all, goes to LeftOut; each language here and not named to LeftOutLanguages; each named
 // and not here to NotFound. A run that named no languages changes nothing.
-func (found *discovery) chooseLanguages(choice languageChoice) {
+//
+// formats is whether the run formats: a run that only type-checks or lints, or leaves formatting out, has no format
+// project, so no program becomes one, and a language only a format walk would check is not checked by it.
+func (found *discovery) chooseLanguages(choice languageChoice, formats bool) {
 	if choice == nil {
 		return
 	}
@@ -992,7 +995,7 @@ func (found *discovery) chooseLanguages(choice languageChoice) {
 			found.LeftOut = append(found.LeftOut, project)
 		case project.Engine == engineFormat || choice.namesEngine(project.Engine):
 			running = append(running, project)
-		case project.Engine == engineTypeScript && found.formatsAnythingAt(project, leftOutExtensions):
+		case project.Engine == engineTypeScript && formats && found.formatsAnythingAt(project, leftOutExtensions):
 			found.LeftOut = append(found.LeftOut, project)
 			// One format project a directory: two programs in one directory share its walk.
 			if !formatsAt[project.Directory] {
@@ -1054,7 +1057,12 @@ func (found discovery) formatYield(project discoveredProject) projectYield {
 		}
 	}
 	slices.Sort(yield.Directories)
-	yield.Directories = slices.Compact(yield.Directories)
+	// Under `--languages` alone, where a left-out program's directory can appear beside the program's own: a plain
+	// run lists one directory twice when two programs share it, as it always did, so its yield, and its key, are the
+	// ones it had (#s7gt4bj).
+	if found.Choice != nil {
+		yield.Directories = slices.Compact(yield.Directories)
+	}
 	return yield
 }
 

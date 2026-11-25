@@ -173,10 +173,16 @@ func checkDiscoveredProjects(
 	}
 	// After the format project is added, so `--languages` chooses it as it chooses any, and after a tree with no
 	// project is refused, which it is whatever languages were named.
-	found.chooseLanguages(choice)
-	if len(found.Projects) == 0 || len(found.NotFound) == len(choice) && choice != nil {
+	found.chooseLanguages(choice, formats)
+	if len(found.Projects) == 0 && len(found.NotFound) == len(choice) {
 		return 0, false, fmt.Errorf("--languages %s names no language anything here is in, which is %s, so nothing "+
 			"was checked", sayList(choice), sayList(found.LeftOutLanguages))
+	}
+	if len(found.Projects) == 0 {
+		// A named language is here, and only a format walk would check it, which this run does not make.
+		return 0, false, fmt.Errorf("--languages %s names only languages a run checks here by formatting them, and "+
+			"this run does not format, so nothing was checked: run it without --types, --lint or --no-format",
+			sayList(choice))
 	}
 	// On standard error, where a run says what it was refused, so every view says it.
 	if len(found.NotFound) > 0 {

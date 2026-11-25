@@ -25,8 +25,10 @@ func TestLanguagesAreReadAsACommaListAndAnUnknownOneIsRefused(test *testing.T) {
 			test.Errorf("--languages %q read %v (refusal %v), want %v", value, choice, parseError, want)
 		}
 	}
-	every := "it takes go, typescript, swift, adamic, json, markdown, yaml, css and graphql"
+	every := "it takes go, typescript, swift, json, markdown, yaml, css and graphql"
 	for value, named := range map[string]string{
+		// Adamic's files are TypeScript's until Adamic has a checker of its own (the Square's ruling).
+		"adamic":  "names adamic,",
 		"rust":    "names rust,",
 		"go,rust": "names rust,",
 		"":        "names an empty name,",
@@ -96,13 +98,13 @@ func TestChosenLanguagesRunWhereverTheirFilesLive(test *testing.T) {
 	}
 
 	everything := discovered()
-	everything.chooseLanguages(nil)
+	everything.chooseLanguages(nil, true)
 	if len(everything.Projects) != 5 || everything.LeftOut != nil || everything.LeftOutLanguages != nil {
 		test.Errorf("no choice runs %v and leaves out %v", running(everything), everything.LeftOutLanguages)
 	}
 
 	goAlone := discovered()
-	goAlone.chooseLanguages(languageChoice{"go"})
+	goAlone.chooseLanguages(languageChoice{"go"}, true)
 	if !slices.Equal(running(goAlone), []string{". Go"}) ||
 		!slices.Equal(goAlone.LeftOutLanguages, []string{"typescript", "swift", "json", "markdown"}) {
 		test.Errorf("go runs %v and leaves out %v", running(goAlone), goAlone.LeftOutLanguages)
@@ -111,7 +113,7 @@ func TestChosenLanguagesRunWhereverTheirFilesLive(test *testing.T) {
 	// The programs' directory gets one format project, its walk keeping JSON alone, and the root's walk leaves the
 	// programs' directory to it.
 	jsonAlone := discovered()
-	jsonAlone.chooseLanguages(languageChoice{"json"})
+	jsonAlone.chooseLanguages(languageChoice{"json"}, true)
 	if !slices.Equal(running(jsonAlone), []string{". Format", "web Format"}) {
 		test.Errorf(
 			"json runs %v, want the root's format project and one of the programs' directory",
@@ -139,10 +141,82 @@ func TestChosenLanguagesRunWhereverTheirFilesLive(test *testing.T) {
 	// The root's format project keeps nothing, its JSON and Markdown not named and the TypeScript all the programs',
 	// so it does not run: a run that checks nothing fails.
 	typeScript := discovered()
-	typeScript.chooseLanguages(languageChoice{"typescript", "css"})
+	typeScript.chooseLanguages(languageChoice{"typescript", "css"}, true)
 	if !slices.Equal(running(typeScript), []string{"web TypeScript", "web TypeScript"}) ||
 		!slices.Equal(typeScript.NotFound, []string{"css"}) {
 		test.Errorf("typescript and css run %v and find no %v", running(typeScript), typeScript.NotFound)
+	}
+}
+
+// A plain run's format project lists a directory twice when two programs share it, as it always did, so its yield,
+// and the replay key its fingerprint is in, do not move (#s7gt4bj); a run under `--languages` lists it once. And a
+// run that does not format turns no program into a format project, so a language only a format walk would check
+// runs nowhere.
+func TestAPlainRunsYieldIsAsItWasAndARunThatDoesNotFormatConvertsNothing(test *testing.T) {
+	test.Parallel()
+	discovered := func() discovery {
+		return discovery{
+			Root: "/root",
+			Projects: []discoveredProject{
+				{Directory: "web", Engine: engineTypeScript},
+				{Directory: "web", Engine: engineTypeScript, ConfigFile: "tsconfig.app.json"},
+			},
+			FormattableKinds: map[string]map[string]int{"web": {".json": 1}},
+		}
+	}
+	root := discoveredProject{Directory: ".", Engine: engineFormat}
+	whole := discovered()
+	whole.chooseLanguages(nil, true)
+	if yield := whole.formatYield(root); !slices.Equal(yield.Directories, []string{"/root/web", "/root/web"}) {
+		test.Errorf("a plain run's format project yields %v, want the shared directory twice, as before",
+			yield.Directories)
+	}
+	notFormatting := discovered()
+	notFormatting.chooseLanguages(languageChoice{"json"}, false)
+	if len(notFormatting.Projects) != 0 {
+		test.Errorf("json in a run that does not format runs %v, want nothing", notFormatting.Projects)
+	}
+}
+
+// A file named on its own, a path or the editor's save, in a language not named is refused with its language, read
+// without regard to case, since a run would format it though its language was left out (#s7gt4bj). A directory, a
+// file in a named language, and a file of no language a run formats pass.
+func TestANamedFileInALanguageNotNamedIsRefused(test *testing.T) {
+	test.Parallel()
+	choice := languageChoice{"typescript"}
+	for _, named := range []string{"README.md", "docs/NOTES.MD"} {
+		refusal := refuseNamedFilesLeftOut(choice, []string{"source/Tidy.ts", named})
+		if refusal == nil || !strings.Contains(refusal.Error(),
+			"--languages typescript does not name markdown, the language of "+named) {
+			test.Errorf("naming %s was refused with %v", named, refusal)
+		}
+	}
+	if refusal := refuseNamedFilesLeftOut(choice, []string{"source", "source/Tidy.ts", "go.mod", ""}); refusal != nil {
+		test.Errorf("a directory, a TypeScript file, a file of no language or no save was refused: %v", refusal)
+	}
+}
+
+// The front door answers `--languages` for a Go or Swift run it hands an engine, so neither engine's run refuses it
+// as a flag it does not take (#s7gt4bj).
+func TestAGoOrSwiftRunTakesLanguages(test *testing.T) {
+	test.Parallel()
+	given := map[string]bool{"languages": true}
+	value := func(string) string { return "go,swift" }
+	location := projectLocation{Root: "/project", ArgumentBase: "/project", WorkingDirectory: "/project"}
+	for name, flags := range map[string]engineFlags{"Go": goFlags, "Swift": swiftFlags} {
+		if _, _, refusal := engineArguments(goLanguage("module"), flags, location, given, value, nil); refusal != nil {
+			test.Errorf("a %s run refused --languages: %v", name, refusal)
+		}
+	}
+}
+
+// The verbose account's summary line names what `--languages` left out (#s7gt4bj).
+func TestTheSummaryLineNamesWhatLanguagesLeftOut(test *testing.T) {
+	test.Parallel()
+	found := discovery{LeftOutLanguages: []string{"swift", "markdown"}}
+	runs := []projectRun{{project: discoveredProject{Directory: ".", Engine: engineGo}, label: "."}}
+	if line := summaryLine(found, runs); !strings.Contains(line, "left out by --languages: swift, markdown") {
+		test.Errorf("the summary line reads %q", line)
 	}
 }
 

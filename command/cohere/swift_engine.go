@@ -31,7 +31,7 @@ var swiftFlags = engineFlags{
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile", "open",
-		"duplicates", "no-system-cache",
+		"duplicates", "no-system-cache", "languages",
 	},
 }
 

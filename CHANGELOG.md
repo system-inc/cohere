@@ -138,8 +138,8 @@ changed in cohere outside the sets is written under the same heading.
   ignored file, one no package holds, and a buffer that does not parse come back as typed, the reason on
   stderr. The VS Code extension now formats `.go` on save.
 - `--languages <list>` checks only the languages named, wherever their files live (#s7gt4bj): a comma list of
-  `go`, `typescript` (JavaScript included), `swift`, `adamic`, `json`, `markdown`, `yaml`, `css` and `graphql`,
-  read without regard to case, so `cohere --languages go` checks a repository without its Swift. Every file a run
+  `go`, `typescript` (JavaScript and Adamic's `.a` included), `swift`, `json`, `markdown`, `yaml`, `css` and
+  `graphql`, read without regard to case, so `cohere --languages go` checks a repository without its Swift. Every file a run
   checks is in exactly one language. A language whose files a TypeScript program's run formats is checked there
   too: `--languages json` formats the JSON in a program's root, as a format run of that directory. The footer names
   each language here that was left out (`⚠ left out by --languages: swift, markdown`), so a narrowed run never
