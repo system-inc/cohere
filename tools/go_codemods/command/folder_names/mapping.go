@@ -169,7 +169,8 @@ func (mapping *mapping) newTestBinaryPath(packagePath string) string {
 
 // NewPackageName is the name a package clause in folder takes after the moves, given the name it has now: the
 // mapping's name for a moved folder of its own, with _test kept on an external test package, and the old name
-// for everything else. It refuses a clause a moved folder's line did not expect.
+// for everything else. A moved folder's clause must spell its old folder's name or the new name already; any
+// other clause is refused.
 func (mapping *mapping) NewPackageName(folder string, oldName string) (string, error) {
 	move, moved := mapping.byOldFolder[path.Clean(folder)]
 	if !moved {
@@ -182,18 +183,19 @@ func (mapping *mapping) NewPackageName(folder string, oldName string) (string, e
 		}
 		return "main", nil
 	}
+	// A clause that already holds the new name is a folder catching up to its package's name, and it stays.
 	switch oldName {
-	case expected:
+	case expected, move.NewPackage:
 		return move.NewPackage, nil
-	case expected + "_test":
+	case expected + "_test", move.NewPackage + "_test":
 		return move.NewPackage + "_test", nil
 	}
 	return "", fmt.Errorf(
-		"%s: package %s, where the mapping expects %s or %s_test",
+		"%s: package %s, where the mapping expects %s, %s or either with _test",
 		folder,
 		oldName,
 		expected,
-		expected,
+		move.NewPackage,
 	)
 }
 
