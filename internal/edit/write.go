@@ -14,7 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/edit/replace"
 	"github.com/system-inc/cohere/internal/edit/write_root"
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // Parses reports whether text parses cleanly as the script kind implied by its file name.

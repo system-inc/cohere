@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/house_sets"
-	"github.com/system-inc/cohere/internal/lint/rules/tailwind"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/house_sets"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind"
 )
 
 // Zero config is the house stack (Kirk, 2026-10-04, #bfxz13m): a project with no CohereSettings.json,
@@ -23,11 +23,11 @@ import (
 //
 // A `--lint-config` that names a missing file is still an error, as it always was: the person asked for
 // that file. Only the default file's absence means zero config.
-func loadLintConfiguration(graph *program.Graph, location projectLocation) (*configuration.Configuration, error) {
+func loadLintConfiguration(graph *program.Graph, location projectLocation) (*settings.Configuration, error) {
 	if !usesHouseSets(location) {
-		return configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
+		return settings.LoadFor(location.LintConfigFileName, registeredRuleNames())
 	}
-	settings, ownSettingsOfError := configuration.OwnSettingsOf(location.LintConfigFileName)
+	ownSettings, ownSettingsOfError := settings.OwnSettingsOf(location.LintConfigFileName)
 	if ownSettingsOfError != nil {
 		return nil, ownSettingsOfError
 	}
@@ -39,18 +39,18 @@ func loadLintConfiguration(graph *program.Graph, location projectLocation) (*con
 		graph.ProjectFiles(),
 		location.Root,
 		graph.Program.Host().FS(),
-		settings,
+		ownSettings,
 		settingsDirectory,
 	)
 	// Settings for rules the house does not apply would be read by nothing, which is the silent drop
 	// reading them exists to end (#gj5nm6e). The run says so instead, with the way out.
-	if detection.TailwindEntryPoint == "" && tailwind.WritesSettings(settings) {
+	if detection.TailwindEntryPoint == "" && tailwind.WritesSettings(ownSettings) {
 		return nil, fmt.Errorf("%s writes settings[\"better-tailwindcss\"], and zero config does not apply %s: %s. "+
 			"Nothing would read those settings, so name its stylesheet in them as entryPoint, name %q in "+
-			"\"extends\", or remove them", location.LintConfigFileName, configuration.TailwindSetName,
-			strings.TrimSuffix(detection.TailwindSkipped, ", so its rules are skipped"), configuration.TailwindSetName)
+			"\"extends\", or remove them", location.LintConfigFileName, settings.TailwindSetName,
+			strings.TrimSuffix(detection.TailwindSkipped, ", so its rules are skipped"), settings.TailwindSetName)
 	}
-	return configuration.LoadHouse(location.LintConfigFileName, registeredRuleNames(), detection)
+	return settings.LoadHouse(location.LintConfigFileName, registeredRuleNames(), detection)
 }
 
 // usesHouseSets reports whether the run takes the house stack: its settings file is the default one and
@@ -59,7 +59,7 @@ func usesHouseSets(location projectLocation) bool {
 	if _, statError := os.Stat(location.LintConfigFileName); statError != nil && location.LintConfigFileNameGiven {
 		return false
 	}
-	zero, isZeroConfigurationError := configuration.IsZeroConfiguration(location.LintConfigFileName)
+	zero, isZeroConfigurationError := settings.IsZeroConfiguration(location.LintConfigFileName)
 	// A chain that cannot be read is not zero config: LoadFor reads it again and fails the run naming why.
 	return isZeroConfigurationError == nil && zero
 }
@@ -70,7 +70,7 @@ func houseSources(location projectLocation) []string {
 	if !usesHouseSets(location) {
 		return lintConfigSources(location.LintConfigFileName)
 	}
-	sources, houseSourcesError := configuration.HouseSources(location.LintConfigFileName)
+	sources, houseSourcesError := settings.HouseSources(location.LintConfigFileName)
 	if houseSourcesError != nil {
 		return []string{location.LintConfigFileName}
 	}
@@ -83,7 +83,7 @@ func houseSources(location projectLocation) []string {
 //
 // Written to out and not as an invocation line: which sets applied is part of the verdict, true of the
 // tree rather than of this run, so a replay prints it too and nothing is ever applied silently.
-func writeSetsLine(out *bufio.Writer, lintConfiguration *configuration.Configuration) {
+func writeSetsLine(out *bufio.Writer, lintConfiguration *settings.Configuration) {
 	if line := lintConfiguration.SetsLine(); line != "" {
 		fmt.Fprintln(out, line)
 	}

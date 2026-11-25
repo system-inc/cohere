@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/differential"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // The control precondition has to be able to reject, or it is the thing it guards against.
@@ -158,7 +158,7 @@ type lintConfigOverride struct {
 // Built through configuration.Load rather than by hand so the test exercises the same parsing, override
 // ordering, and root resolution the command does. A hand-built Config would test this guard against
 // a shape the loader never produces.
-func configurationFrom(test *testing.T, raw lintConfigFile) *configuration.Configuration {
+func configurationFrom(test *testing.T, raw lintConfigFile) *settings.Configuration {
 	test.Helper()
 
 	directory := test.TempDir()
@@ -171,7 +171,7 @@ func configurationFrom(test *testing.T, raw lintConfigFile) *configuration.Confi
 		test.Fatal(writeError)
 	}
 
-	loaded, loadError := configuration.Load(path)
+	loaded, loadError := settings.Load(path)
 	if loadError != nil {
 		test.Fatal(loadError)
 	}

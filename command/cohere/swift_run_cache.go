@@ -11,7 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // The run cache for a Swift root (#nkk91tv). A Swift run uses the TypeScript run cache whole, as a Go run does (see

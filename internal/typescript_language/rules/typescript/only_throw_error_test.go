@@ -1,0 +1,1418 @@
+package typescript
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+	"github.com/system-inc/cohere/internal/typescript_language/type_checking"
+)
+
+// onlyThrowErrorFile is the fixture name every case in this file runs under.
+//
+// A TypeScript extension rather than `.js`, because the corpus is full of `declare`, type
+// annotations, generics and `as` casts, all of which would be parse errors under a JavaScript name
+// rather than rule inputs.
+const onlyThrowErrorFile = "onlyThrowError.ts"
+
+// onlyThrowErrorSupportingFiles are the two modules some corpus cases import.
+//
+// Upstream keeps both under `tests/fixtures` and every case that imports one depends on the exact
+// contents. `class.ts` exports a userland `Error` that shadows the built-in, which is the whole
+// point of the two cases that import it: `import { Error } from './class'; throw new Error();`
+// reports, because that Error is not the lib one. `./missing` is deliberately absent, so the case
+// importing it resolves to the error type; that is upstream's arrangement, not an oversight here.
+var onlyThrowErrorSupportingFiles = map[string]string{
+	"class.ts": "export class Error {}\n",
+}
+
+// runOnlyThrowError routes every case through the typed harness, and through the options path even
+// when the case configures nothing.
+//
+// A case with no options passes the zero Given rather than a zero struct, which is what a rule
+// configured as bare `"error"` is actually handed in production. That is the shape the standing
+// warning names: reading no options yields the zero value, whose three nil pointers the body then
+// defaults to true. Routing the unconfigured cases through here is what puts that defaulting
+// under test rather than leaving it to a mutation sweep, and it matters more for this rule than for
+// most: every default is permissive, so a defaulting bug turns an unconfigured rule into one that
+// reports every `any` in the tree.
+//
+// # Why the supporting files are always present
+//
+// Adding `class.ts` to every program rather than only to the two cases that import it costs
+// nothing and removes a per-case branch. It declares a module, so it cannot leak a global into the
+// other cases.
+func runOnlyThrowError(
+	test *testing.T,
+	sourceText string,
+	options rule.Given[OnlyThrowErrorOptions],
+) rule_testing.Result {
+	test.Helper()
+	files := map[string]string{onlyThrowErrorFile: sourceText}
+	for name, contents := range onlyThrowErrorSupportingFiles {
+		files[name] = contents
+	}
+	return rule_testing.RunTypedFilesGiven(test, OnlyThrowError, files, onlyThrowErrorFile, options)
+}
+
+// TestOnlyThrowErrorStaysSilent replays every clean case in upstream's corpus.
+//
+// These are the false positives upstream already thought about, and each one was added when
+// somebody hit that bug. They are imported verbatim: extracted from the test file with a
+// TypeScript AST walk rather than retyped, and byte-verified against the source afterwards, so a
+// case asserts what upstream asserts rather than what this port believes.
+//
+// Every one of the 42 was additionally replayed against the installed @typescript-eslint rule
+// before being written here, and all 42 agreed with the corpus's own verdict, so these are
+// measured expectations rather than transcribed ones.
+func TestOnlyThrowErrorStaysSilent(test *testing.T) {
+	test.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		options    rule.Given[OnlyThrowErrorOptions]
+	}{
+		{"upstream valid case 0", "throw new Error();", rule.Given[OnlyThrowErrorOptions]{}},
+		{"upstream valid case 1", "throw new Error('error');", rule.Given[OnlyThrowErrorOptions]{}},
+		{"upstream valid case 2", "throw Error('error');", rule.Given[OnlyThrowErrorOptions]{}},
+		{"upstream valid case 3", "\nconst e = new Error();\nthrow e;\n    ", rule.Given[OnlyThrowErrorOptions]{}},
+		{
+			"upstream valid case 4",
+			"\ntry {\n  throw new Error();\n} catch (e) {\n  throw e;\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 5",
+			"\nfunction foo() {\n  return new Error();\n}\nthrow foo();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 6",
+			"\nconst foo = {\n  bar: new Error(),\n};\nthrow foo.bar;\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 7",
+			"\nconst foo = {\n  bar: new Error(),\n};\n\nthrow foo['bar'];\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 8",
+			"\nconst foo = {\n  bar: new Error(),\n};\n\nconst bar = 'bar';\nthrow foo[bar];\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 9",
+			"\nclass CustomError extends Error {}\nthrow new CustomError();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 10",
+			"\nclass CustomError1 extends Error {}\nclass CustomError2 extends CustomError1 {}\nthrow new CustomError2();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{"upstream valid case 11", "throw (foo = new Error());", rule.Given[OnlyThrowErrorOptions]{}},
+		{"upstream valid case 12", "throw (1, 2, new Error());", rule.Given[OnlyThrowErrorOptions]{}},
+		{"upstream valid case 13", "throw 'literal' && new Error();", rule.Given[OnlyThrowErrorOptions]{}},
+		{"upstream valid case 14", "throw new Error() || 'literal';", rule.Given[OnlyThrowErrorOptions]{}},
+		{"upstream valid case 15", "throw foo ? new Error() : new Error();", rule.Given[OnlyThrowErrorOptions]{}},
+		{
+			"upstream valid case 16",
+			"\nfunction* foo() {\n  let index = 0;\n  throw yield index++;\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 17",
+			"\nasync function foo() {\n  throw await bar;\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 18",
+			"\nimport { Error } from './missing';\nthrow Error;\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 19",
+			"\nclass CustomError<T, C> extends Error {}\nthrow new CustomError<string, string>();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 20",
+			"\nclass CustomError<T = {}> extends Error {}\nthrow new CustomError();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 21",
+			"\nclass CustomError<T extends object> extends Error {}\nthrow new CustomError();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 22",
+			"\nfunction foo() {\n  throw Object.assign(new Error('message'), { foo: 'bar' });\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 23",
+			"\nconst foo: Error | SyntaxError = bar();\nfunction bar() {\n  throw foo;\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 24",
+			"\ndeclare const foo: Error | string;\nthrow foo as Error;\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{"upstream valid case 25", "throw new Error() as Error;", rule.Given[OnlyThrowErrorOptions]{}},
+		{
+			"upstream valid case 26",
+			"\ndeclare const nullishError: Error | undefined;\nthrow nullishError ?? new Error();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 27",
+			"\ndeclare const nullishError: Error | undefined;\nthrow nullishError || new Error();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 28",
+			"\ndeclare const nullishError: Error | undefined;\nthrow nullishError ? nullishError : new Error();\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 29",
+			"\nfunction fun(value: any) {\n  throw value;\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 30",
+			"\nfunction fun(value: unknown) {\n  throw value;\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 31",
+			"\nfunction fun<T extends Error>(t: T): void {\n  throw t;\n}\n    ",
+			rule.Given[OnlyThrowErrorOptions]{},
+		},
+		{
+			"upstream valid case 32",
+			"\nthrow undefined;\n      ",
+			rule.Configured(OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{
+				{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"undefined"}},
+			}, AllowThrowingAny: type_checking.Reference(false), AllowThrowingUnknown: type_checking.Reference(false)}),
+		},
+		{
+			"upstream valid case 33",
+			"\nclass CustomError implements Error {}\nthrow new CustomError();\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				Allow: []type_checking.TypeOrValueSpecifier{
+					{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}},
+				},
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+		},
+		{"upstream valid case 34", "\nthrow new Map();\n      ", rule.Configured(OnlyThrowErrorOptions{
+			Allow: []type_checking.TypeOrValueSpecifier{
+				{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}},
+			},
+			AllowThrowingAny:     type_checking.Reference(false),
+			AllowThrowingUnknown: type_checking.Reference(false),
+		})},
+		// upstream valid case 35 is not here. It is pinned by
+		// TestOnlyThrowErrorAmbientPackageIsAHarnessLimit instead, because our fixture tsconfig
+		// cannot express the program shape it needs. See that test for the measurement.
+		{
+			"upstream valid case 36",
+			"\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2>;\n  throw err;\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowInline: []string{"Promise"}}),
+		},
+		{
+			"upstream valid case 37",
+			"\ntry {\n} catch (e) {\n  throw e;\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+		},
+		{
+			"upstream valid case 38",
+			"\ntry {\n} catch (eOuter) {\n  try {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    }\n  } catch (eInner) {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    } else {\n      throw eInner;\n    }\n  }\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+		},
+		{
+			"upstream valid case 39",
+			"\nPromise.reject('foo').catch(e => {\n  throw e;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+		},
+		{
+			"upstream valid case 40",
+			"\nasync function foo() {\n  throw await Promise.resolve(new Error('error'));\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
+		},
+		{
+			"upstream valid case 41",
+			"\nfunction* foo(): Generator<number, void, Error> {\n  throw yield 303;\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
+		},
+	}
+
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runOnlyThrowError(test, testCase.sourceText, testCase.options))
+		})
+	}
+}
+
+// TestOnlyThrowErrorFires replays every reporting case in upstream's corpus.
+//
+// The expected ids come from driving the installed rule over the same inputs rather than from
+// reading the corpus's `errors` arrays, and the two agreed on all 47. That matters for the two
+// cases that report `undef` rather than `object`: the distinction is invisible to a fixture that
+// only counts findings, and it is the one place this rule's two messages can be swapped without
+// any count changing.
+func TestOnlyThrowErrorFires(test *testing.T) {
+	test.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		options    rule.Given[OnlyThrowErrorOptions]
+		wantIds    []string
+	}{
+		{"upstream invalid case 0", "throw undefined;", rule.Given[OnlyThrowErrorOptions]{}, []string{"undef"}},
+		{"upstream invalid case 1", "throw new String('');", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{"upstream invalid case 2", "throw 'error';", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{"upstream invalid case 3", "throw 0;", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{"upstream invalid case 4", "throw false;", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{"upstream invalid case 5", "throw null;", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{"upstream invalid case 6", "throw {};", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{"upstream invalid case 7", "throw 'a' + 'b';", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{
+			"upstream invalid case 8",
+			"\nconst a = '';\nthrow a + 'b';\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{"upstream invalid case 9", "throw (foo = 'error');", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{
+			"upstream invalid case 10",
+			"throw (new Error(), 1, 2, 3);",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 11",
+			"throw 'literal' && 'not an Error';",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 12",
+			"throw 'literal' || new Error();",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 13",
+			"throw new Error() && 'literal';",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 14",
+			"throw 'literal' ?? new Error();",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 15",
+			"throw foo ? 'not an Error' : 'literal';",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 16",
+			"throw foo ? new Error() : 'literal';",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 17",
+			"throw foo ? 'literal' : new Error();",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{"upstream invalid case 18", "throw `${err}`;", rule.Given[OnlyThrowErrorOptions]{}, []string{"object"}},
+		{
+			"upstream invalid case 19",
+			"\nconst err = 'error';\nthrow err;\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 20",
+			"\nfunction foo(msg) {}\nthrow foo('error');\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 21",
+			"\nconst foo = {\n  msg: 'error',\n};\nthrow foo.msg;\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 22",
+			"\nconst foo = {\n  msg: undefined,\n};\nthrow foo.msg;\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"undef"},
+		},
+		{
+			"upstream invalid case 23",
+			"\nclass CustomError {}\nthrow new CustomError();\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 24",
+			"\nclass Foo {}\nclass CustomError extends Foo {}\nthrow new CustomError();\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 25",
+			"\nconst Error = null;\nthrow Error;\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 26",
+			"\nimport { Error } from './class';\nthrow new Error();\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 27",
+			"\nclass CustomError<T extends object> extends Foo {}\nthrow new CustomError();\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 28",
+			"\nfunction foo<T>() {\n  const res: T;\n  throw res;\n}\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 29",
+			"\nfunction foo<T>(fn: () => Promise<T>) {\n  const promise = fn();\n  const res = promise.then(() => {}).catch(() => {});\n  throw res;\n}\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 30",
+			"\nfunction foo() {\n  throw Object.assign({ foo: 'foo' }, { bar: 'bar' });\n}\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 31",
+			"\nconst foo: Error | { bar: string } = bar();\nfunction bar() {\n  throw foo;\n}\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 32",
+			"\ndeclare const foo: Error | string;\nthrow foo as string;\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 33",
+			"\nfunction fun(value: any) {\n  throw value;\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 34",
+			"\nfunction fun(value: unknown) {\n  throw value;\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Reference(false)}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 35",
+			"\nfunction fun<T extends number>(t: T): void {\n  throw t;\n}\n      ",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 36",
+			"\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2> | void;\n  throw err;\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowInline: []string{"Promise"}}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 37",
+			"\nclass UnknownError implements Error {}\nthrow new UnknownError();\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				Allow: []type_checking.TypeOrValueSpecifier{
+					{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}},
+				},
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 38",
+			"\nlet x = 1;\nPromise.reject('foo').catch(e => {\n  throw x;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 39",
+			"\nPromise.reject('foo').catch((...e) => {\n  throw e;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 40",
+			"\ndeclare const x: any[];\nPromise.reject('foo').catch(...x, e => {\n  throw e;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 41",
+			"\ndeclare const x: any[];\nPromise.reject('foo').then(...x, e => {\n  throw e;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 42",
+			"\ndeclare const onFulfilled: any;\ndeclare const x: any[];\nPromise.reject('foo').then(onFulfilled, ...x, e => {\n  throw e;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 43",
+			"\nPromise.reject('foo').then((...e) => {\n  throw e;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 44",
+			"\nPromise.reject('foo').then(e => {\n  throw globalThis;\n});\n      ",
+			rule.Configured(OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 45",
+			"\nasync function foo() {\n  throw await bar;\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 46",
+			"\nasync function foo() {\n  throw await Promise.resolve<number>(303);\n}\n      ",
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
+			[]string{"object"},
+		},
+	}
+
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				runOnlyThrowError(test, testCase.sourceText, testCase.options),
+				testCase.wantIds...,
+			)
+		})
+	}
+}
+
+// TestOnlyThrowErrorSpans asserts where each finding points, which no message-id fixture can see.
+//
+// The span is the throw argument with its parentheses skipped, and both halves of that are
+// measured against the installed rule rather than assumed. Upstream reports `throw ('error')` at
+// columns 8..15 of a one-line file, which is `'error'` without its wrapper, because ESTree has no
+// parenthesis node to hand the rule. Our parser does have one, so reproducing the span means
+// skipping it, and a port that did not would point at `('error')` while satisfying every id
+// assertion in the two tests above.
+//
+// # The harness trims, and a span sliced from the Go literal would be off by one
+//
+// `rule_testing` writes each fixture as `strings.TrimSpace(contents)+"\n"`, so a source string written
+// with a leading newline is one byte shorter on disk than in the literal here. Every source in
+// this test is therefore written without leading whitespace, so the literal and the file agree and
+// a slice taken against the literal is the slice the rule saw.
+func TestOnlyThrowErrorSpans(test *testing.T) {
+	test.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		options    rule.Given[OnlyThrowErrorOptions]
+		wantSpans  []string
+	}{
+		{
+			"a bare string literal points at the literal",
+			"throw 'error';",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"'error'"},
+		},
+		{
+			"undefined points at the identifier",
+			"throw undefined;",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"undefined"},
+		},
+		{
+			"a new expression points at the whole construction",
+			"throw new String('');",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"new String('')"},
+		},
+		{
+			"a conditional points at the whole conditional",
+			"declare const foo: boolean;\nthrow foo ? 'not an Error' : 'literal';",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"foo ? 'not an Error' : 'literal'"},
+		},
+		{
+			"a member access points at the access",
+			"const foo = {\n  msg: 'error',\n};\nthrow foo.msg;",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"foo.msg"},
+		},
+		{
+			"an await points at the await expression",
+			"declare const bar: number;\nasync function foo() {\n  throw await bar;\n}",
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
+			[]string{"await bar"},
+		},
+
+		// Parentheses are skipped, matching upstream's span exactly. Measured on the installed
+		// rule: `throw ('error');` reports at columns 8..15, which excludes both parens.
+		{
+			"one paren layer is excluded from the span",
+			"throw ('error');",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"'error'"},
+		},
+		{
+			"two paren layers are excluded from the span",
+			"throw (('error'));",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"'error'"},
+		},
+		{
+			"parens around undefined are excluded",
+			"throw (undefined);",
+			rule.Given[OnlyThrowErrorOptions]{},
+			[]string{"undefined"},
+		},
+	}
+
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runOnlyThrowError(test, testCase.sourceText, testCase.options)
+			if len(result.Diagnostics) != len(testCase.wantSpans) {
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
+			}
+			for index, wantSpan := range testCase.wantSpans {
+				diagnostic := result.Diagnostics[index]
+				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if gotSpan != wantSpan {
+					test.Errorf("finding %d spans %q, want %q", index, gotSpan, wantSpan)
+				}
+			}
+		})
+	}
+}
+
+// TestOnlyThrowErrorMessages asserts the rendered text of both messages, exactly.
+//
+// Neither message interpolates anything, so there is no format string to guard and the assertion
+// is an equality on the Description. It is written against literal strings typed here rather than
+// against the rule's own message constants: comparing a diagnostic to the constant it was built
+// from is an equality that looks correct while both sides move together under mutation, so a
+// message-text mutant would survive it.
+func TestOnlyThrowErrorMessages(test *testing.T) {
+	test.Parallel()
+
+	objectResult := runOnlyThrowError(test, "throw 'error';", rule.Given[OnlyThrowErrorOptions]{})
+	if len(objectResult.Diagnostics) != 1 {
+		test.Fatalf("got %d findings, want 1", len(objectResult.Diagnostics))
+	}
+	wantObject := "This throws a value that is not an Error, so whatever catches it gets no stack trace and no " +
+		"message. The failure then surfaces as a bare string or object with no record of where it came " +
+		"from, which is the difference between a five-minute fix and an afternoon. Throw `new Error(...)` " +
+		"instead."
+	if got := objectResult.Diagnostics[0].Message.Description; got != wantObject {
+		test.Errorf("object description is %q, want %q", got, wantObject)
+	}
+	if got := objectResult.Diagnostics[0].Message.Id; got != "object" {
+		test.Errorf("object id is %q, want %q", got, "object")
+	}
+
+	undefResult := runOnlyThrowError(test, "throw undefined;", rule.Given[OnlyThrowErrorOptions]{})
+	if len(undefResult.Diagnostics) != 1 {
+		test.Fatalf("got %d findings, want 1", len(undefResult.Diagnostics))
+	}
+	wantUndef := "This throws `undefined`, which reaches the handler as a value carrying nothing at all: no " +
+		"message, no stack, no type. It is almost always an expression that was meant to produce an error " +
+		"and did not. Throw `new Error(...)` instead."
+	if got := undefResult.Diagnostics[0].Message.Description; got != wantUndef {
+		test.Errorf("undef description is %q, want %q", got, wantUndef)
+	}
+	if got := undefResult.Diagnostics[0].Message.Id; got != "undef" {
+		test.Errorf("undef id is %q, want %q", got, "undef")
+	}
+}
+
+// TestOnlyThrowErrorParenthesizedRethrow pins the one place our parser differs from ESTree.
+//
+// ESTree has no parenthesis node, so upstream's `node.type !== Identifier` guard never sees a
+// wrapper and `throw (e)` reaches the rethrow arm as a bare identifier. Our parser produces
+// `KindParenthesizedExpression`, so a literal port of that guard would decline the rethrow and
+// report a case upstream allows.
+//
+// The second case is the control, and it is the reason this test proves anything: turning
+// `allowRethrowing` off makes the same source report, which shows the first case is silent because
+// the rethrow arm fired rather than for some unrelated reason. Both verdicts were measured against
+// the installed rule before being written here.
+func TestOnlyThrowErrorParenthesizedRethrow(test *testing.T) {
+	test.Parallel()
+
+	source := "try {\n} catch (e) {\n  throw (e);\n}"
+
+	rule_testing.ExpectClean(test, runOnlyThrowError(test, source, rule.Given[OnlyThrowErrorOptions]{}))
+
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Reference(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	})), "object")
+}
+
+// TestOnlyThrowErrorRethrowShape pins the four conditions the promise arm requires.
+//
+// Upstream states them as one conjunction, and reading a conjunction tells you nothing about which
+// conjunct is load-bearing, so each was measured separately against the installed rule by changing
+// exactly one thing and watching the verdict move. The corpus covers the rest-parameter row and
+// none of the other three, so without these a port could drop any of them and stay green.
+//
+// Every case here runs with the two throwing escapes off, because the handler parameter is typed
+// `any`, and with them on the case would be silent through the `any` arm regardless of what the
+// rethrow arm decided. That is the "change the one thing you think makes it pass" check applied
+// before the fixtures were written rather than after.
+func TestOnlyThrowErrorRethrowShape(test *testing.T) {
+	test.Parallel()
+
+	strict := OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	}
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		// The baseline both directions are measured against.
+		{"an arrow catch handler is a rethrow", "Promise.reject('x').catch(e => {\n  throw e;\n});", nil},
+
+		// The handler must be an arrow function. A function expression binds `this` differently and
+		// upstream's check names the arrow kind explicitly.
+		{
+			"a function expression handler is not a rethrow",
+			"Promise.reject('x').catch(function (e) {\n  throw e;\n});",
+			[]string{"object"},
+		},
+
+		// The binding must be the first parameter.
+		{
+			"a second parameter is not the rejection value",
+			"Promise.reject('x').catch((a, e) => {\n  throw e;\n});",
+			[]string{"object"},
+		},
+
+		// It must be a plain identifier parameter. A destructuring pattern binds names taken out of
+		// the rejection rather than the rejection itself.
+		{
+			"a destructured parameter is not the rejection value",
+			"Promise.reject('x').catch(({ e }) => {\n  throw e;\n});",
+			[]string{"object"},
+		},
+
+		// The receiver must be thenable. Any object may have a method called `catch`, and the name
+		// alone would let a rethrow through on something that never handled a rejection.
+		{
+			"a catch method on a non-thenable is not a rethrow",
+			"declare const o: { catch(cb: (e: string) => void): void };\no.catch(e => {\n  throw e;\n});",
+			[]string{"object"},
+		},
+
+		// A literal computed key resolves. Upstream reads the member name statically and a string
+		// literal subscript is one of the forms its reader accepts.
+		{"a literal computed catch resolves", "Promise.reject('x')['catch'](e => {\n  throw e;\n});", nil},
+
+		// `.then` puts the rejection handler second, so a one-argument `.then` has none.
+		{
+			"a two-argument then rethrows from the second handler",
+			"Promise.reject('x').then(() => {}, e => {\n  throw e;\n});",
+			nil,
+		},
+
+		// A catch clause binding is the other rethrow shape, and a nested arrow reading the outer
+		// binding still resolves to the same declaration.
+		{
+			"a nested arrow reading the caught value is a rethrow",
+			"try {\n} catch (e) {\n  const f = () => {\n    throw e;\n  };\n}",
+			nil,
+		},
+	}
+
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runOnlyThrowError(test, testCase.sourceText, rule.Configured(strict))
+			if testCase.wantIds == nil {
+				rule_testing.ExpectClean(test, result)
+				return
+			}
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+		})
+	}
+}
+
+// TestOnlyThrowErrorConstFoldedKeyDiverges records the one stated divergence from upstream.
+//
+// Upstream's member-name reader falls back to a static evaluator that resolves an identifier
+// through the scope manager to a constant initializer, so `const k = 'catch'; p[k](e => ...)` is
+// recognized as a catch call and the rethrow is allowed. Reproducing that means a constant-folding
+// pass, which is more machinery than the whole rest of this rule.
+//
+// Measured on the installed rule, with `allowRethrowing: false` as the control:
+//
+//	const k = 'catch'; Promise.reject('x')[k](e => { throw e; })   allowRethrowing on   SILENT
+//	const k = 'catch'; Promise.reject('x')[k](e => { throw e; })   allowRethrowing off  REPORTS
+//
+// So upstream is silent and this port reports. No case in the corpus writes that shape. This test
+// asserts the divergence rather than upstream's verdict, so that a later port of the evaluator
+// fails here loudly instead of quietly agreeing.
+func TestOnlyThrowErrorConstFoldedKeyDiverges(test *testing.T) {
+	test.Parallel()
+
+	source := "const k = 'catch';\nPromise.reject('x')[k](e => {\n  throw e;\n});"
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	})), "object")
+}
+
+// TestOnlyThrowErrorDefaultsArePermissive pins that all three booleans default to true.
+//
+// This is the arm a nil-options registration reaches, and it is the one most expensive to get
+// wrong: every default here is permissive, so an inverted default turns an unconfigured rule into
+// one that reports every `any` and every rethrow in the tree. The three cases below are each
+// silent only because of their own default, which is shown by the paired strict case reporting.
+func TestOnlyThrowErrorDefaultsArePermissive(test *testing.T) {
+	test.Parallel()
+
+	cases := []struct {
+		name        string
+		sourceText  string
+		strictValue OnlyThrowErrorOptions
+	}{
+		{
+			"any is thrown freely by default",
+			"function fun(value: any) {\n  throw value;\n}",
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)},
+		},
+		{
+			"unknown is thrown freely by default",
+			"function fun(value: unknown) {\n  throw value;\n}",
+			OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Reference(false)},
+		},
+		{
+			"a caught value is rethrown freely by default",
+			"try {\n} catch (e) {\n  throw e;\n}",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
+			},
+		},
+	}
+
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			// nil options is what a rule configured as bare "error" is handed.
+			rule_testing.ExpectClean(test,
+				runOnlyThrowError(test, testCase.sourceText, rule.Given[OnlyThrowErrorOptions]{}))
+			// And the same source under the option turned off, which shows the default is what
+			// made the first assertion pass rather than something else about the input.
+			rule_testing.ExpectFindings(
+				test,
+				runOnlyThrowError(test, testCase.sourceText, rule.Configured(testCase.strictValue)),
+				"object",
+			)
+		})
+	}
+}
+
+// TestOnlyThrowErrorUndefBeatsTheEscapes pins the order of the undefined arm.
+//
+// `throw undefined` reports as `undef` with no options at all, which means the undefined test sits
+// above the any and unknown escapes even though all three are permissive by default. Moving it
+// below either one would make this case silent while every other fixture in the file stayed green,
+// because no other case reaches both arms.
+//
+// The union row is the measurement that keeps the flag test honest. `Error | undefined` reports
+// `object` rather than `undef`, because a union's own flags are `Union` and the undefined flag is
+// on a member rather than on the whole. Reading upstream's `isTypeFlagSet` alone would suggest the
+// opposite, so this is measured against the installed rule and pinned here.
+func TestOnlyThrowErrorUndefBeatsTheEscapes(test *testing.T) {
+	test.Parallel()
+
+	rule_testing.ExpectFindings(test,
+		runOnlyThrowError(test, "throw undefined;", rule.Given[OnlyThrowErrorOptions]{}), "undef")
+
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, "throw undefined;", rule.Configured(OnlyThrowErrorOptions{
+		AllowThrowingAny:     type_checking.Reference(true),
+		AllowThrowingUnknown: type_checking.Reference(true),
+	})), "undef")
+
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test,
+		"declare const nullishError: Error | undefined;\nthrow nullishError;",
+		rule.Given[OnlyThrowErrorOptions]{}), "object")
+}
+
+// TestOnlyThrowErrorNeedsTheTypedHarness asserts the rule declares the checker.
+//
+// Without the declaration the rule is handed a nil checker in production, and its guard makes it go
+// completely silent rather than crash, so every clean fixture would pass vacuously while the rule
+// found nothing at all. A test rather than a comment, so a later revert fails loudly.
+func TestOnlyThrowErrorNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
+
+	if !OnlyThrowError.NeedsTypeChecker {
+		test.Fatal("OnlyThrowError must declare NeedsTypeChecker; every arm reads the argument's type")
+	}
+
+	// The untyped harness hands the rule a nil checker, and the guard turns that into silence.
+	// Asserting the silence is what pins the guard: without it this call panics.
+	rule_testing.ExpectClean(test, rule_testing.Run(test, OnlyThrowError, onlyThrowErrorFile, "throw 'error';"))
+}
+
+// TestDecodeOnlyThrowErrorOptions puts the decoder itself under test.
+//
+// Routing option fixtures through the exported decoder rather than building the struct by hand is
+// what covers the two lines with no upstream counterpart: the `from` string becoming a `uint8`
+// enum, and the one heterogeneous `allow` array splitting into two typed fields. Handing
+// `RunTypedFilesWithOptions` a struct would leave both untested.
+func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
+	test.Parallel()
+
+	test.Run("an empty object leaves every pointer nil so the rule defaults them", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(`{}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
+		}
+		if decoded.AllowRethrowing != nil || decoded.AllowThrowingAny != nil || decoded.AllowThrowingUnknown != nil {
+			test.Errorf("absent booleans decoded to non-nil: %+v", decoded)
+		}
+		if len(decoded.Allow) != 0 || len(decoded.AllowInline) != 0 {
+			test.Errorf("absent allow decoded to %+v", decoded)
+		}
+	})
+
+	test.Run("false is distinguishable from absent", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
+			`{"allowThrowingAny": false}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
+		}
+		if decoded.AllowThrowingAny == nil {
+			test.Fatal("allowThrowingAny: false decoded to nil, which the rule would read as the TRUE default")
+		}
+		if *decoded.AllowThrowingAny {
+			test.Error("allowThrowingAny: false decoded to true")
+		}
+	})
+
+	test.Run("a bare string lands in AllowInline and an object lands in Allow", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
+			`{"allow": ["Promise", {"from": "lib", "name": "undefined"}]}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
+		}
+		if len(decoded.AllowInline) != 1 || decoded.AllowInline[0] != "Promise" {
+			test.Errorf("AllowInline is %v, want [Promise]", decoded.AllowInline)
+		}
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("Allow holds %d specifiers, want 1", len(decoded.Allow))
+		}
+		if decoded.Allow[0].From != type_checking.TypeOrValueSpecifierFromLib {
+			test.Errorf("from decoded to %v, want the lib enum", decoded.Allow[0].From)
+		}
+		if len(decoded.Allow[0].Name) != 1 || decoded.Allow[0].Name[0] != "undefined" {
+			test.Errorf("name decoded to %v, want [undefined]", decoded.Allow[0].Name)
+		}
+	})
+
+	test.Run("name accepts an array as well as a string", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
+			`{"allow": [{"from": "file", "name": ["A", "B"], "path": "x.ts"}]}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
+		}
+		if len(decoded.Allow) != 1 || len(decoded.Allow[0].Name) != 2 {
+			test.Fatalf("Allow decoded to %+v", decoded.Allow)
+		}
+		if strings.Join(decoded.Allow[0].Name, ",") != "A,B" {
+			test.Errorf("name decoded to %v, want [A B]", decoded.Allow[0].Name)
+		}
+		if decoded.Allow[0].Path != "x.ts" {
+			test.Errorf("path decoded to %q, want x.ts", decoded.Allow[0].Path)
+		}
+	})
+
+	test.Run("an unrecognized from is dropped rather than silently meaning file", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
+			`{"allow": [{"from": "nowhere", "name": "X"}]}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
+		}
+		// `file` is the zero value, so keeping the specifier would silently mean `file`. Dropping
+		// it says nothing at all, which is the honest answer for a value we cannot represent.
+		if len(decoded.Allow) != 0 {
+			test.Errorf("an unrecognized from produced %+v, want it dropped", decoded.Allow)
+		}
+	})
+
+	test.Run("the package form carries its package name", func(test *testing.T) {
+		test.Parallel()
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
+			`{"allow": [{"from": "package", "name": "ErrorLike", "package": "errors"}]}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
+		}
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("Allow decoded to %+v", decoded.Allow)
+		}
+		if decoded.Allow[0].From != type_checking.TypeOrValueSpecifierFromPackage {
+			test.Errorf("from decoded to %v, want the package enum", decoded.Allow[0].From)
+		}
+		if decoded.Allow[0].Package != "errors" {
+			test.Errorf("package decoded to %q, want errors", decoded.Allow[0].Package)
+		}
+	})
+}
+
+// TestOnlyThrowErrorAmbientPackageIsAHarnessLimit pins upstream valid case 35, whose verdict our
+// fixture harness cannot reproduce.
+//
+// The case is `import { createError } from 'errors'; throw createError();` with
+// `allow: [{from: 'package', name: 'ErrorLike', package: 'errors'}]`, and upstream is silent.
+// Upstream makes `errors` resolvable with an ambient declaration in a supporting fixture file:
+//
+//	// @ts-ignore
+//	declare module 'errors' {
+//	  class ErrorLike {}
+//	  export function createError(): ErrorLike;
+//	}
+//
+// `rule_testing`'s tsconfig pins `moduleDetection: "force"`, which makes every file a module. A
+// `declare module 'errors'` inside a module is a module augmentation of an existing module rather
+// than an ambient declaration of a new one, so `errors` never resolves, `createError()` has the
+// error type, and the throw reports.
+//
+// # The measurement, and why this is the harness rather than the rule
+//
+// Reproduced on the installed @typescript-eslint rule by varying nothing but that one compiler
+// option, holding source, options and file layout fixed:
+//
+//	moduleDetection: "force"     REPORTS object
+//	moduleDetection unset        SILENT
+//
+// The second row is upstream's own verdict, and it is what the whole 89-case corpus was replayed
+// under: with `moduleDetection` unset, all 89 installed-rule verdicts agree with the corpus's own
+// assertions, and with it set, this one case is the only disagreement.
+//
+// Two controls establish that the module is what fails to resolve, rather than the package
+// specifier being mismatched. Under our harness, the same input is also reported when `allow` is
+// the bare inline name `"ErrorLike"`, which needs no file or package comparison at all and would
+// match on the type's own name; and it is still reported when the supporting file is given an
+// explicit `export {}`. A type that resolved to `ErrorLike` would go clean under the first.
+//
+// So the case is recorded as reporting, with the reason at the line, rather than deleted or
+// green-ed by weakening the rule. Changing the shared harness's tsconfig for one case would move
+// every other typed rule's fixtures, which is a far larger blast radius than one documented row.
+func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(test *testing.T) {
+	test.Parallel()
+
+	files := map[string]string{
+		onlyThrowErrorFile: "import { createError } from 'errors';\nthrow createError();\n",
+		"errors.ts":        "// @ts-ignore\ndeclare module 'errors' {\n  class ErrorLike {}\n\n  export function createError(): ErrorLike;\n}\n",
+	}
+	options := OnlyThrowErrorOptions{
+		Allow: []type_checking.TypeOrValueSpecifier{
+			{From: type_checking.TypeOrValueSpecifierFromPackage, Name: []string{"ErrorLike"}, Package: "errors"},
+		},
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	}
+
+	// Upstream is silent; we report, because the module does not resolve under this tsconfig.
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, files, onlyThrowErrorFile, options), "object")
+
+	// The control: the bare inline name needs no file or package comparison, so a type that had
+	// resolved to ErrorLike would go clean here. It reports, which locates the failure in module
+	// resolution rather than in the specifier matcher.
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, files, onlyThrowErrorFile, OnlyThrowErrorOptions{
+			AllowInline:          []string{"ErrorLike"},
+			AllowThrowingAny:     type_checking.Reference(false),
+			AllowThrowingUnknown: type_checking.Reference(false),
+		}), "object")
+}
+
+// TestOnlyThrowErrorSurvivesMalformedShapes pins the two guards that prevent a panic rather than
+// deciding a finding.
+//
+// Both were found by the mutation sweep and neither is visible to an `ExpectFindings` fixture,
+// because a panic takes the whole run down rather than producing a wrong verdict: the sweep reports
+// survived identically whether the guard matters or not. What each one prevents is the question,
+// not what it decides.
+//
+//	len(arguments) < 2 in the `then` arm    without it, a ONE-argument `.then` whose arrow
+//	                                        parameter is thrown indexes arguments[1] and panics
+//	                                        with "index out of range [1] with length 1"
+//
+//	IsStringLiteralLike on a computed key   without it, `o[k()](...)` calls Node.Text on a
+//	                                        CallExpression, which Node.Text does not handle and
+//	                                        panics on: "Unhandled case in Node.Text"
+//
+// Both panics were reproduced by applying the mutation and running these exact inputs, so the
+// category is measured rather than argued. Neither input appears anywhere in upstream's corpus.
+func TestOnlyThrowErrorSurvivesMalformedShapes(test *testing.T) {
+	test.Parallel()
+
+	strict := OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	}
+
+	test.Run("a one-argument then does not index past its arguments", func(test *testing.T) {
+		test.Parallel()
+		// `.then` puts the rejection handler second, so this arrow is the fulfillment handler and
+		// the throw is not a rethrow. Upstream reports it; the point here is that we get a verdict
+		// at all rather than a panic.
+		rule_testing.ExpectFindings(test, runOnlyThrowError(test,
+			"Promise.reject('x').then(e => {\n  throw e;\n});", rule.Configured(strict)), "object")
+	})
+
+	test.Run("a computed key that is not a literal does not read text off it", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, runOnlyThrowError(test,
+			"declare const o: any;\ndeclare function k(): string;\no[k()](e => {\n  throw e;\n});",
+			rule.Configured(strict)), "object")
+	})
+}
+
+// TestOnlyThrowErrorPrivateMethodName pins that a private name counts as a static member name.
+//
+// Upstream's static member reader accepts `Identifier` and `PrivateIdentifier` alike, so a thenable
+// class with a `#catch` method is a catch call and a throw of its handler parameter is a rethrow.
+//
+// This port first restricted the name to `KindIdentifier`, which reads as the careful choice and is
+// a divergence. The mutation dropping that guard survived the whole fixture set, and re-reading
+// upstream rather than adding a fixture is what found it: measured on the installed rule, the case
+// below is silent upstream and the identifier-only version reported.
+//
+// The class is made thenable on purpose. A plain class with a `#catch` method is silent either way,
+// because the receiver test declines it, so it cannot separate the two versions and would have read
+// as coverage while proving nothing.
+func TestOnlyThrowErrorPrivateMethodName(test *testing.T) {
+	test.Parallel()
+
+	strict := OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	}
+
+	rule_testing.ExpectClean(test, runOnlyThrowError(test,
+		"class C {\n"+
+			"  then(cb: (v: number) => void, r?: (e: any) => void): C {\n"+
+			"    return this;\n"+
+			"  }\n"+
+			"  #catch(cb: (e: any) => void) {}\n"+
+			"  m() {\n"+
+			"    this.#catch(e => {\n"+
+			"      throw e;\n"+
+			"    });\n"+
+			"  }\n"+
+			"}", rule.Configured(strict)))
+
+	// The control: the same shape on a receiver that is not thenable reports, which shows the case
+	// above is clean because the rethrow arm fired rather than because private names are skipped.
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test,
+		"class C {\n"+
+			"  #catch(cb: (e: any) => void) {}\n"+
+			"  m() {\n"+
+			"    this.#catch(e => {\n"+
+			"      throw e;\n"+
+			"    });\n"+
+			"  }\n"+
+			"}", rule.Configured(strict)), "object")
+}
+
+// TestOnlyThrowErrorSpecifierComposites pins the union and intersection semantics of `allow`.
+//
+// These live in the shelf's `TypeMatchesSomeSpecifier`, and neither recursion was there before this
+// port: `internal/utilities/typecheck/specifier.go` was written against a tsgolint revision that
+// predates them, so a composite type was tested against its own symbol, which is nil, and answered
+// false. Upstream's `typeMatchesSpecifier` recurses both ways and the two directions are opposite,
+// which is the asymmetry a reader would most likely collapse into one.
+//
+// Upstream's own corpus covers exactly one row of this, valid case 36 against invalid case 36, and
+// only in the bare-string form. The object-specifier rows below were measured against the installed
+// rule rather than inherited, because a mutation flipping the union's `every` to `some` survived
+// the entire imported corpus:
+//
+//	Map<string,string> | Map<number,number>   allow [{from: lib, name: Map}]   SILENT
+//	Map<string,string> | Set<number>          allow [{from: lib, name: Map}]   REPORTS
+//	Map<string,string> & { a: 1 }             allow [{from: lib, name: Map}]   SILENT
+//
+// The middle row is the one that separates `every` from `some`; without it the flip is invisible.
+func TestOnlyThrowErrorSpecifierComposites(test *testing.T) {
+	test.Parallel()
+
+	allowMap := OnlyThrowErrorOptions{
+		Allow: []type_checking.TypeOrValueSpecifier{
+			{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}},
+		},
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	}
+
+	test.Run("a union matches only when every member matches", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runOnlyThrowError(test,
+			"declare const m: Map<string, string> | Map<number, number>;\nthrow m;", rule.Configured(allowMap)))
+
+		rule_testing.ExpectFindings(test, runOnlyThrowError(test,
+			"declare const m: Map<string, string> | Set<number>;\nthrow m;", rule.Configured(allowMap)), "object")
+	})
+
+	test.Run("an intersection matches when any member matches", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runOnlyThrowError(test,
+			"declare const m: Map<string, string> & { a: 1 };\nthrow m;", rule.Configured(allowMap)))
+	})
+}
+
+// TestOnlyThrowErrorSpecifierDeclinesTheErrorType pins that a specifier never matches the type
+// checker's own error type.
+//
+// When a module does not resolve, the checker gives the import the intrinsic error type, whose
+// intrinsic name is the string `"error"`. A specifier literally named `error` would otherwise match
+// it and silently allow every unresolved import in the file, which is the opposite of what an
+// allowlist is for: the point of naming a type is that you know what it is.
+//
+// Upstream declines it inside `typeMatchesSpecifier`, and our shelf declined it only at the top
+// level of `TypeMatchesSomeSpecifier`, which the recursion added for this port can now walk past.
+// A mutation removing the guard survived the whole corpus. Measured on the installed rule, all
+// three rows report, and the middle and last are the controls showing the input reports for
+// ordinary reasons too:
+//
+//	allow [{from: lib, name: "error"}]   REPORTS
+//	allow ["error"]                      REPORTS
+//	no allow                             REPORTS
+//
+// Under the mutation the first row goes silent and the other two do not, which is why the object
+// form is the one that can see this.
+func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(test *testing.T) {
+	test.Parallel()
+
+	source := "import { thing } from './nonexistent-module-xyz';\nthrow thing;"
+
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
+		Allow: []type_checking.TypeOrValueSpecifier{
+			{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"error"}},
+		},
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	})), "object")
+
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
+		AllowInline:          []string{"error"},
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	})), "object")
+
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	})), "object")
+}
+
+// TestOnlyThrowErrorDeclinesSynthesizedNodes pins that a recovered parse produces no finding.
+//
+// `throw;` and `throw ();` are both "Expression expected" parse errors for upstream's parser, so
+// its rule never runs on either and there is no upstream verdict to be faithful to. Our parser
+// recovers, synthesizing a zero-width `KindIdentifier` whose type is `any`, so both inputs reach
+// the rule. With `allowThrowingAny` at its permissive default they are silent through the `any`
+// arm; with it off, a finding would be emitted with a zero-width span pointing at text the author
+// never wrote.
+//
+// The second case is why the guard sits after the parenthesis skip. `throw;` puts the synthesized
+// node directly under the statement, so a check on the raw argument catches it; `throw ();` wraps
+// it in a real parenthesized expression which is not itself missing, so the same check misses.
+// Measured before the guard moved: `throw ();` reported a zero-width `object` at offset 7 while
+// `throw;` was clean.
+//
+// Neither input is in any corpus, on either side, because neither parses upstream.
+func TestOnlyThrowErrorDeclinesSynthesizedNodes(test *testing.T) {
+	test.Parallel()
+
+	strict := OnlyThrowErrorOptions{
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	}
+
+	for _, source := range []string{"throw;", "throw ();", "throw (());"} {
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runOnlyThrowError(test, source, rule.Configured(strict)))
+			rule_testing.ExpectClean(test, runOnlyThrowError(test, source, rule.Given[OnlyThrowErrorOptions]{}))
+		})
+	}
+}
+
+// TestOnlyThrowErrorUndeclaredIdentifier pins an input on which upstream crashes and we do not.
+//
+// `throw notDeclaredAnywhere;` resolves to no symbol. Upstream's rethrow check reaches for
+// `findVariable(scope, node)` and wraps it in `nullThrows(..., 'Variable ... should exist in scope
+// manager')`, so an identifier that resolves to nothing takes the whole lint run down. Measured on
+// the installed rule, both with `allowRethrowing: true` and at the defaults:
+//
+//	Non-null Assertion Failed: Variable notDeclaredAnywhere should exist in scope manager
+//
+// This is a defect upstream ships, not a decision, so there is no verdict to reproduce. The port's
+// nil check answers "not a rethrow" and lets the type arms decide, which reports `object` because
+// the unresolved identifier's type is the error type. That is the only defensible answer available.
+//
+// It is also a real blind spot the sweep found rather than an unreachable branch. Enumerated over
+// ten malformed and unresolvable shapes, `GetSymbolAtLocation` returned nil for a non-missing
+// identifier only on this one, so nothing else in the fixture set can reach the guard.
+//
+// The default case is silent, and that is worth stating because it is not what a first reading
+// predicts. An unresolved identifier gets the checker's error type, whose flags report `any`, so
+// the permissive `allowThrowingAny` default swallows it before the `object` arm is reached. Only
+// with that option off does the finding appear, which is why the strict row is the one that puts
+// the nil guard under test.
+func TestOnlyThrowErrorUndeclaredIdentifier(test *testing.T) {
+	test.Parallel()
+
+	strict := OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
+	}
+	rule_testing.ExpectFindings(test,
+		runOnlyThrowError(test, "throw notDeclaredAnywhere;", rule.Configured(strict)), "object")
+
+	// Silent at the defaults: the error type reports the `any` flag.
+	rule_testing.ExpectClean(test,
+		runOnlyThrowError(test, "throw notDeclaredAnywhere;", rule.Given[OnlyThrowErrorOptions]{}))
+}
+
+// TestOnlyThrowErrorDependsOnAnotherFile pins what the rule reads, and proves the cross-file claim the
+// findings cache has to honor.
+//
+// The cross-file case is measured: a class declared in a second module extending the built-in
+// `Error`, thrown from this one. `IsErrorLike` walks the base types and asks whether each
+// declaration's source file is a default library, which this file's bytes cannot answer. Flipping
+// only the other file, from `extends Error` to no heritage, flips the verdict here while this file is
+// untouched. The cache honors that through the type fingerprint, which covers other.ts as an import,
+// and the default library through the binary in its key; what the rule reads through ctx.Program is
+// the compiler options and the default library, and nothing else (#b8k3bp6).
+func TestOnlyThrowErrorDependsOnAnotherFile(test *testing.T) {
+	test.Parallel()
+
+	if OnlyThrowError.ProgramReads != rule.ReadsCompilerOptions|rule.ReadsDefaultLibrary {
+		test.Fatalf(
+			"OnlyThrowError must declare what IsErrorLike and the allow specifiers read; declares %s",
+			OnlyThrowError.ProgramReads,
+		)
+	}
+
+	subject := "import { Wrapped } from './other';\nthrow new Wrapped();"
+
+	// The other file's class extends Error, so the throw is fine.
+	rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, OnlyThrowError, map[string]string{
+		onlyThrowErrorFile: subject,
+		"other.ts":         "export class Wrapped extends Error {}\n",
+	}, onlyThrowErrorFile))
+
+	// Byte-for-byte the same subject file, and the verdict moves because the other file changed.
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedFiles(test, OnlyThrowError, map[string]string{
+		onlyThrowErrorFile: subject,
+		"other.ts":         "export class Wrapped {}\n",
+	}, onlyThrowErrorFile), "object")
+}

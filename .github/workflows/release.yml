@@ -173,7 +173,9 @@ jobs:
                   # The paths are the module's real ones. `./cmd` became `./command` on 08-27 and
                   # `./tools` is gone, and from then until this was corrected every release failed
                   # here. That was the guard working, but it was also the only thing that ran.
-                  if ! formatted=$(gofmt -l ./command ./internal); then
+                  # `./modules` is the shelf of modules other repositories pin by tag, each with a
+                  # go.mod of its own (#gcdfx7v).
+                  if ! formatted=$(gofmt -l ./command ./internal ./modules); then
                       echo "gofmt could not read a path it was given (exit above)"
                       exit 1
                   fi
@@ -181,7 +183,7 @@ jobs:
                   # And the population is asserted separately, because a readable path that holds no
                   # Go files is a different failure: gofmt exits 0 with nothing to say, which is
                   # indistinguishable from a formatted tree.
-                  examined=$(find ./command ./internal -name '*.go' | wc -l)
+                  examined=$(find ./command ./internal ./modules -name '*.go' | wc -l)
                   echo "gofmt examined $examined Go files (must be > 0)"
                   if [ "$examined" -eq 0 ]; then
                       echo "no Go files found, so a clean result here would mean nothing"
@@ -194,14 +196,17 @@ jobs:
                       exit 1
                   fi
 
-                  go vet ./command/... ./internal/...
+                  # The shelf's modules by their import path: `./modules/...` matches no package, since
+                  # a relative pattern stops at a go.mod of its own even with go.work in use, and go
+                  # only warns on a pattern that matches nothing (#gcdfx7v).
+                  go vet ./command/... ./internal/... github.com/system-inc/cohere/modules/...
                   # Go's default is 10 minutes per package, and on the runner five packages passed it in
                   # dry run 37238149770 (the slowest, command/cohere, takes 4.5 minutes on a 16-core
                   # desk machine). 30 minutes is room for a three-core runner, and still a ceiling.
-                  go test -timeout 30m ./command/... ./internal/...
+                  go test -timeout 30m ./command/... ./internal/... github.com/system-inc/cohere/modules/...
 
                   # The website's data, checked against the lint tests themselves. -check recaptures every
-                  # example by rerunning ./internal/lint/... with capture on, which the run above can't
+                  # example by rerunning ./internal/typescript_language/... with capture on, which the run above can't
                   # stand in for, because capture changes what the tests record (#d7vx76v). Measured on the
                   # desk machine at load 151: 85 seconds, 2.6 GB peak resident. GOFLAGS carries the same
                   # per-package ceiling into the go test it runs, and only go test takes -timeout.
@@ -476,7 +481,7 @@ jobs:
 
             - name: Run the tests written for what differs on Windows
               run: |
-                  go test ./internal/edit/replace/ ./internal/format/format_files/ ./internal/types/program/ \
+                  go test ./internal/edit/replace/ ./internal/format/format_files/ ./internal/typescript_language/program/ \
                       -run 'TestFileReplacesAFileHeldOpenBriefly|TestIgnorePatternsCoverNestedPaths|TestASameSizeEditUnderARestoredModificationTimeIsAMiss'
 
     # A clean machine, by construction: a fresh runner per platform, installing the packed packages

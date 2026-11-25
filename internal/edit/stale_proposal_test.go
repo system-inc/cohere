@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // measuredText is what a walk read: `let alpha` at the start, which a prefer-const fix rewrites at bytes 0 to 3.

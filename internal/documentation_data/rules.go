@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	golanguagerule "github.com/system-inc/cohere/internal/go_language/rule"
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -71,8 +71,8 @@ type SwiftVerdict struct {
 }
 
 var ruleSourceNotes = map[string]string{
-	"name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
-	"language": "the registry the row comes from: the TypeScript linter's (internal/lint/registry), " +
+	"name": "the rule registry (internal/typescript_language/registry), as `cohere --rules` lists it",
+	"language": "the registry the row comes from: the TypeScript linter's (internal/typescript_language/registry), " +
 		"cohere-go's (internal/go_language/rules), swift_language/Rules.json for Swift",
 	"namespace": "the registered name, before its last slash",
 	"origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; " +
@@ -121,7 +121,7 @@ var namespaceOrigins = map[string]string{
 
 // corePackage is the Go package ESLint core's ports register from. A bare name registered anywhere else
 // is a house rule.
-const corePackage = "github.com/system-inc/cohere/internal/lint/rules/core"
+const corePackage = "github.com/system-inc/cohere/internal/typescript_language/rules/core"
 
 // buildRules renders one row per registration, in name order.
 func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
@@ -132,7 +132,7 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 	enabledBy := map[string][]RuleSetSeverity{}
 	for _, set := range sets {
 		for _, setRule := range set.Rules {
-			if setRule.Severity == configuration.SeverityOff.String() {
+			if setRule.Severity == settings.SeverityOff.String() {
 				continue
 			}
 			enabledBy[setRule.Name] = append(

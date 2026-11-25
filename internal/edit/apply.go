@@ -27,7 +27,7 @@ import (
 	"crypto/sha256"
 	"sort"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // Proposal is one rule's suggested edit, carrying who proposed it.

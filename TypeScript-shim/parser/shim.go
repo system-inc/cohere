@@ -1,8 +1,8 @@
 // Package parser re-exports the typescript-go parser entry points cohere needs.
 //
-// Hand-written rather than generated: internal/types/tools/generate_shims covers the eleven packages tsgolint needed,
-// and the parser was not among them because a headless linter is handed a program rather than
-// parsing files itself. Rule fixtures do parse single files, so this exists for them.
+// Hand-written rather than generated: internal/typescript_language/tools/generate_shims covers the eleven packages
+// tsgolint needed, and the parser was not among them because a headless linter is handed a program rather than parsing
+// files itself. Rule fixtures do parse single files, so this exists for them.
 package parser
 
 import (

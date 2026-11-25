@@ -36,14 +36,14 @@ func TestAnEditOnlyABuiltBinaryReachesMissesTheTestCache(test *testing.T) {
 	nonce := strconv.FormatInt(time.Now().UnixNano(), 10)
 	files := map[string]string{
 		"go.mod": "module probe\n\ngo 1.27\n\n" +
-			"require github.com/system-inc/cohere/go_listing v0.0.0\n\n" +
-			"replace github.com/system-inc/cohere/go_listing => ./go_listing\n",
+			"require github.com/system-inc/cohere/modules/go_listing v0.0.0\n\n" +
+			"replace github.com/system-inc/cohere/modules/go_listing => ./go_listing\n",
 		"inputs/build_inputs.go": string(recorder),
 		"tool/main.go":           "package main\n\nimport (\n\t\"fmt\"\n\n\t\"probe/word\"\n)\n\nfunc main() {\n\tfmt.Print(word.Word)\n}\n",
 		"word/word.go":           "package word\n\nconst Word = \"before\"\n",
 		"check/check_test.go":    checkTest(nonce),
 	}
-	listingFiles, listingError := os.ReadDir(filepath.Join("..", "..", "go_listing"))
+	listingFiles, listingError := os.ReadDir(filepath.Join("..", "..", "modules", "go_listing"))
 	if listingError != nil {
 		test.Fatal(listingError)
 	}
@@ -54,7 +54,7 @@ func TestAnEditOnlyABuiltBinaryReachesMissesTheTestCache(test *testing.T) {
 		if entry.IsDir() || name != "go.mod" && !isSource {
 			continue
 		}
-		content, readError := os.ReadFile(filepath.Join("..", "..", "go_listing", name))
+		content, readError := os.ReadFile(filepath.Join("..", "..", "modules", "go_listing", name))
 		if readError != nil {
 			test.Fatal(readError)
 		}

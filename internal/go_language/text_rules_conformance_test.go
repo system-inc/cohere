@@ -1,9 +1,9 @@
 package go_language
 
 // The Go adapter of the text rules' conformance corpus (#4b337jk), beside the TypeScript one
-// (internal/lint/rules/text_rules_conformance_test.go) and the Swift one. It lives in this package rather than in
-// the rules tree because a case's settings and options must reach its rule the way a project's do, through
-// settings.Load and configureRules, which this package keeps unexported.
+// (internal/typescript_language/rules/text_rules_conformance_test.go) and the Swift one. It lives in this package
+// rather than in the rules tree because a case's settings and options must reach its rule the way a project's do,
+// through settings.Load and configureRules, which this package keeps unexported.
 //
 // Each case runs as cohere-go runs a project: a module of its own on disk, loaded and type-checked by
 // load.Packages, and linted by check.Run. So the adapter sees what cohere-go reports, cohere-go's drop of a

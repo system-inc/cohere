@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -159,17 +159,17 @@ func TestSeveralProjectsFailOnADeadIgnore(test *testing.T) {
 // generated one names output that may not exist yet, so neither is a finding. Any other entry on disk is.
 func TestOnlyAnEntryOnDiskThatIsNotGeneratedIsAFinding(test *testing.T) {
 	test.Parallel()
-	settings := "/repository/CohereSettings.json"
+	settingsPath := "/repository/CohereSettings.json"
 	for name, check := range map[string]struct {
 		account ignoreAccount
 		unused  bool
 	}{
-		"a set's":           {ignoreAccount{Pattern: "**/.next/**", File: configuration.SetPrefix + "next"}, false},
-		"a dead glob":       {ignoreAccount{Pattern: "dist/**", File: settings}, true},
-		"a live glob":       {ignoreAccount{Pattern: "data/**", File: settings, Matched: 4}, false},
-		"a dead generated":  {ignoreAccount{Pattern: "dist/**", Kind: "generated", File: settings}, false},
-		"a dead input":      {ignoreAccount{Pattern: "data/**", Kind: "input", File: settings}, true},
-		"a dead thirdParty": {ignoreAccount{Pattern: "vendor/**", Kind: "thirdParty", File: settings}, true},
+		"a set's":           {ignoreAccount{Pattern: "**/.next/**", File: settings.SetPrefix + "next"}, false},
+		"a dead glob":       {ignoreAccount{Pattern: "dist/**", File: settingsPath}, true},
+		"a live glob":       {ignoreAccount{Pattern: "data/**", File: settingsPath, Matched: 4}, false},
+		"a dead generated":  {ignoreAccount{Pattern: "dist/**", Kind: "generated", File: settingsPath}, false},
+		"a dead input":      {ignoreAccount{Pattern: "data/**", Kind: "input", File: settingsPath}, true},
+		"a dead thirdParty": {ignoreAccount{Pattern: "vendor/**", Kind: "thirdParty", File: settingsPath}, true},
 	} {
 		if got := ignoreIsUnused(check.account); got != check.unused {
 			test.Errorf("%s: unused %v, want %v", name, got, check.unused)

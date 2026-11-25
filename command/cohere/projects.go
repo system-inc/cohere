@@ -19,8 +19,8 @@ import (
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/command_line/sentence"
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // projectKindVariable names the child a child run checks its --directory with. A directory holding both
@@ -118,17 +118,17 @@ func checkDiscoveredProjects(
 	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
 	// file that every run makes. A file the command line named is cohere-swift's to read wherever it
 	// sits, and the projects' runs are handed it (see configuration.CheckSwiftBlockHasAReader).
-	if settings := filepath.Join(
+	if settingsPath := filepath.Join(
 		root,
 		"CohereSettings.json",
-	); settings != lintConfigFileName && isRegularFile(settings) {
-		if checkSwiftBlockHasAReaderError := configuration.CheckSwiftBlockHasAReader(
-			settings,
+	); settingsPath != lintConfigFileName && isRegularFile(settingsPath) {
+		if checkSwiftBlockHasAReaderError := settings.CheckSwiftBlockHasAReader(
+			settingsPath,
 		); checkSwiftBlockHasAReaderError != nil {
 			return 0, false, checkSwiftBlockHasAReaderError
 		}
 	}
-	found, discoverProjectsError := discoverProjects(root, configuration.IgnorePatternsFrom(ignoreEntries))
+	found, discoverProjectsError := discoverProjects(root, settings.IgnorePatternsFrom(ignoreEntries))
 	if discoverProjectsError != nil {
 		return 0, false, discoverProjectsError
 	}
@@ -143,7 +143,7 @@ func checkDiscoveredProjects(
 			return 0, false, folderCheckSeverityError
 		}
 	}
-	if found.FolderSeverity == configuration.SeverityOff {
+	if found.FolderSeverity == settings.SeverityOff {
 		found.Folders = nil
 	}
 	var resolveOwnershipError error
@@ -310,7 +310,7 @@ func checkNarrowedProjectFolders(
 	if rootIgnoreEntriesError != nil {
 		return 0, false, rootIgnoreEntriesError
 	}
-	walked, discoverProjectsError := discoverProjects(location.Root, configuration.IgnorePatternsFrom(ignoreEntries))
+	walked, discoverProjectsError := discoverProjects(location.Root, settings.IgnorePatternsFrom(ignoreEntries))
 	if discoverProjectsError != nil {
 		return 0, false, discoverProjectsError
 	}
@@ -321,7 +321,7 @@ func checkNarrowedProjectFolders(
 	if folderCheckSeverityError != nil {
 		return 0, false, folderCheckSeverityError
 	}
-	if severity == configuration.SeverityOff {
+	if severity == settings.SeverityOff {
 		return 0, false, nil
 	}
 	located := discoveredProject{Directory: ".", Kind: location.Kind}

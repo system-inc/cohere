@@ -488,7 +488,8 @@ func isRuleType(goPackage *packages.Package, literal *ast.CompositeLit) bool {
 	if !isNamed || named.Obj().Pkg() == nil {
 		return false
 	}
-	return named.Obj().Name() == "Rule" && strings.HasSuffix(named.Obj().Pkg().Path(), "/internal/lint/rule")
+	return named.Obj().Name() == "Rule" &&
+		strings.HasSuffix(named.Obj().Pkg().Path(), "/internal/typescript_language/rule")
 }
 
 // reportGlobal prints the counts, then every list a reviewer needs.

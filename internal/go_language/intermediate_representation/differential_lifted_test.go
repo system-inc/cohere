@@ -27,7 +27,7 @@ import (
 	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // differentialLiftedMutant is the mutant a lifted comparison plants in ours: none, the first lifted Store of each

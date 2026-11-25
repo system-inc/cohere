@@ -12,10 +12,10 @@
 // as testdata fixtures, are read without types.
 //
 // Nothing is written until the result is proven: the rewritten files, and every file of the moved folders, are
-// laid over their new paths in memory, the whole workspace is reloaded, and every identifier must resolve to the
-// same declaration as before, with the moved paths and the new names translated, and every file must import the
-// same packages. Then the folders move with `git mv`, so history follows, the rewritten files are written, and the
-// tree is loaded from disk and compared once more.
+// laid over their new paths in memory, each moved Go file hidden at its old path, the whole workspace is reloaded,
+// and every identifier must resolve to the same declaration as before, with the moved paths and the new names
+// translated, and every file must import the same packages. Then the folders move with `git mv`, so history
+// follows, the rewritten files are written, and the tree is loaded from disk and compared once more.
 package main
 
 import (
@@ -453,8 +453,13 @@ func filesUnder(root string, mapping *mapping) ([]string, error) {
 	return files, nil
 }
 
-// buildOverlay rewrites each edited file and lays every moved or rewritten file over its new path. It returns the
-// overlay and the rewritten files by their new paths.
+// hiddenSource stands in, in memory, for a moved Go file at its old path. The file is still on disk until git mv
+// runs, and the old copy would import the old paths beside a package that stays and now imports the new ones, and
+// fail to type-check. Ignored by its build constraint, it leaves its folder with no Go file, which ./... passes over.
+const hiddenSource = "//go:build ignore\n\npackage hidden\n"
+
+// buildOverlay rewrites each edited file and lays every moved or rewritten file over its new path, and hides each
+// moved Go file at its old path. It returns the overlay and the rewritten files by their new paths.
 func buildOverlay(
 	edits []local_rename.Edit,
 	movedFiles []string,
@@ -472,6 +477,9 @@ func buildOverlay(
 		rewritten[newPath(filename)] = contents
 	}
 	for _, filename := range movedFiles {
+		if strings.HasSuffix(filename, ".go") {
+			overlay[filename] = []byte(hiddenSource)
+		}
 		if _, edited := byFile[filename]; edited {
 			continue
 		}

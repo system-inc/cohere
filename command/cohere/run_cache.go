@@ -20,17 +20,17 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // The run cache's command half: decide whether this run can be replayed, replay it if so, and
 // otherwise record it on the way out.
 //
-// The package half (internal/types/program/run_cache.go) proves inputs unchanged. This half decides
+// The package half (internal/typescript_language/program/run_cache.go) proves inputs unchanged. This half decides
 // which runs are eligible and which exits are verdicts, and it is deliberately narrow on both.
 //
 // # Which runs
@@ -693,7 +693,7 @@ func declareLintConfigInputs(path string) {
 	if session == nil {
 		return
 	}
-	for _, source := range configuration.SourcesOnDisk(lintConfigSources(path)) {
+	for _, source := range settings.SourcesOnDisk(lintConfigSources(path)) {
 		if _, statError := os.Stat(source); statError == nil {
 			session.extraFiles = append(session.extraFiles, source)
 		} else {
@@ -770,7 +770,7 @@ func declareFormatWalk(enumeration format_files.Enumeration) {
 			continue
 		}
 		if filepath.Base(path) == format_options.SettingsFileName {
-			session.extraFiles = append(session.extraFiles, configuration.SourcesOnDisk(lintConfigSources(path))...)
+			session.extraFiles = append(session.extraFiles, settings.SourcesOnDisk(lintConfigSources(path))...)
 			continue
 		}
 		session.extraFiles = append(session.extraFiles, path)
@@ -1198,7 +1198,7 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) (program.R
 	anchor := program.NewPathAnchor(location.Root)
 	// An embedded set is hashed by its text, read the way the loader reads it, as a file is.
 	for _, lintConfigFile := range lintConfigFiles {
-		contents, sourceContentsError := configuration.SourceContents(lintConfigFile)
+		contents, sourceContentsError := settings.SourceContents(lintConfigFile)
 		if sourceContentsError != nil {
 			return program.RunCacheKeyParts{}, sourceContentsError
 		}

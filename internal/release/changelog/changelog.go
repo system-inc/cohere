@@ -23,7 +23,11 @@ import (
 )
 
 // SetDirectory is where the sets live in the module, and what their names are relative to.
-const SetDirectory = "internal/lint/configuration/sets"
+const SetDirectory = "internal/settings/sets"
+
+// earlierSetDirectory is where the sets lived through 0.1.x, which those releases' tags still hold: a commit
+// with no set at SetDirectory is read here.
+const earlierSetDirectory = "internal/settings/sets"
 
 const (
 	// Patch is a release whose sets changed nothing that can fail a project that passed.
@@ -339,7 +343,7 @@ func Diff(before map[string][]byte, after map[string][]byte) (map[string]SetChan
 }
 
 // SetsAt reads every set as it is in a commit of the repository at moduleDirectory, as name to text. An
-// empty ref reads the working tree.
+// empty ref reads the working tree. A commit from before the sets moved is read where they were then.
 func SetsAt(moduleDirectory string, reference string) (map[string][]byte, error) {
 	sets := map[string][]byte{}
 	if reference == "" {
@@ -362,9 +366,17 @@ func SetsAt(moduleDirectory string, reference string) (map[string][]byte, error)
 		return sets, walkError
 	}
 
-	listing, gitError := git(moduleDirectory, "ls-tree", "-r", "--name-only", reference, "--", SetDirectory)
+	directory := SetDirectory
+	listing, gitError := git(moduleDirectory, "ls-tree", "-r", "--name-only", reference, "--", directory)
 	if gitError != nil {
 		return nil, gitError
+	}
+	if len(bytes.TrimSpace(listing)) == 0 {
+		directory = earlierSetDirectory
+		listing, gitError = git(moduleDirectory, "ls-tree", "-r", "--name-only", reference, "--", directory)
+		if gitError != nil {
+			return nil, gitError
+		}
 	}
 	for _, path := range strings.Fields(string(listing)) {
 		if filepath.Ext(path) != ".json" {
@@ -374,7 +386,7 @@ func SetsAt(moduleDirectory string, reference string) (map[string][]byte, error)
 		if gitError != nil {
 			return nil, gitError
 		}
-		sets[strings.TrimSuffix(strings.TrimPrefix(path, SetDirectory+"/"), ".json")] = contents
+		sets[strings.TrimSuffix(strings.TrimPrefix(path, directory+"/"), ".json")] = contents
 	}
 	return sets, nil
 }

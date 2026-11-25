@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/system-inc/cohere/internal/types/program"
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // adamicHeld is the program's Adamic `.a` files, cleaned to the form the format scope holds names in

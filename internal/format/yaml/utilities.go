@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // src/language-yaml/utilities.js.

@@ -8,7 +8,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/format/format_files"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // Every ignore says what it kept out of the run (#cxeq6jw). Discovery reads the root's ignorePatterns whole and
@@ -57,7 +57,7 @@ type ignoreAccount struct {
 // ignoreAccountsOf pairs each entry with what discovery counted for it, matched holding one count per entry in
 // the entries' order, the order discovery was handed their globs in. root is the directory the globs are
 // relative to.
-func ignoreAccountsOf(entries []configuration.IgnoreEntry, matched []int, root string) []ignoreAccount {
+func ignoreAccountsOf(entries []settings.IgnoreEntry, matched []int, root string) []ignoreAccount {
 	accounts := make([]ignoreAccount, 0, len(entries))
 	for index, entry := range entries {
 		account := ignoreAccount{
@@ -68,7 +68,7 @@ func ignoreAccountsOf(entries []configuration.IgnoreEntry, matched []int, root s
 			File:      entry.File,
 			shownFile: entry.File,
 		}
-		if !configuration.IsSet(entry.File) {
+		if !settings.IsSet(entry.File) {
 			if relative, relativePathError := filepath.Rel(root, entry.File); relativePathError == nil {
 				account.shownFile = relative
 			}
@@ -89,18 +89,18 @@ func ignoreAccountsOf(entries []configuration.IgnoreEntry, matched []int, root s
 // since no settings file wrote it. Matched counts the directories by that name the walk's listings held.
 var defaultIgnores = []struct {
 	directory string
-	kind      configuration.IgnoreKind
+	kind      settings.IgnoreKind
 	reason    string
 }{
 	{
 		format_files.FixturesLayer,
-		configuration.IgnoreKindInput,
+		settings.IgnoreKindInput,
 		"Go's test fixtures, read by their tests byte for byte: cohere-go and the format walk never enter " +
 			"a testdata directory, and a file a tsconfig includes there is still type-checked and linted.",
 	},
 	{
 		format_files.VendoredLayer,
-		configuration.IgnoreKindThirdParty,
+		settings.IgnoreKindThirdParty,
 		"Somebody else's code, vendored whole: the format walk and cohere-swift never enter a Vendor " +
 			"directory, and a file a tsconfig includes there is still type-checked and linted.",
 	},

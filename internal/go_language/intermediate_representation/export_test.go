@@ -10,7 +10,7 @@ import (
 	"go/types"
 	"testing"
 
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // BuildUnliftedForTest builds program's functions unlifted, as go/ir's NaiveForm builds them, until test ends.

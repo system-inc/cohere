@@ -716,7 +716,7 @@ type qualifierCall struct {
 // qualifierCalls name a local by the call that produced it, when its expansion is taken: the decoded options
 // of a lint rule are its `settings`, as the tree writes them some eighty times.
 var qualifierCalls = map[qualifierCall]string{
-	{packagePath: "github.com/system-inc/cohere/internal/lint/rule", name: "OptionsAs"}: "settings",
+	{packagePath: "github.com/system-inc/cohere/internal/typescript_language/rule", name: "OptionsAs"}: "settings",
 }
 
 // basicQualifier is a blocked expansion in a local of a basic type.

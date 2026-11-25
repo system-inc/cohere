@@ -1,0 +1,532 @@
+package tailwind
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+)
+
+// settingsSamples is two values for every key a better-tailwindcss rule declares: one written in
+// settings["better-tailwindcss"], and one in the rule's own options that must win over it.
+//
+// TestEveryDeclaredKeyHasASettingsCase fails on a declared key with no entry here, so an option that
+// lands later gets its settings case in the same commit.
+var settingsSamples = map[string][2]string{
+	"entryPoint":     {`"./settings.css"`, `"./options.css"`},
+	"tailwindConfig": {`"./settings.css"`, `"./options.css"`},
+	"cwd":            {`"settings"`, `"options"`},
+	"tsconfig":       {`"settings.json"`, `"options.json"`},
+	"selectors": {
+		`[{"kind":"attribute","name":"fromSettings"}]`,
+		`[{"kind":"callee","name":"fromOptions"}]`,
+	},
+	"attributes":             {`["fromSettings"]`, `["fromOptions"]`},
+	"callees":                {`["fromSettings"]`, `["fromOptions"]`},
+	"variables":              {`["fromSettings"]`, `["fromOptions"]`},
+	"tags":                   {`["fromSettings"]`, `["fromOptions"]`},
+	"ignore":                 {`["^settings$"]`, `["^options$"]`},
+	"collapse":               {`false`, `true`},
+	"logical":                {`false`, `true`},
+	"order":                  {`"asc"`, `"desc"`},
+	"unknownClassPosition":   {`"start"`, `"end"`},
+	"unknownClassOrder":      {`"asc"`, `"desc"`},
+	"componentClassPosition": {`"start"`, `"end"`},
+	"componentClassOrder":    {`"asc"`, `"desc"`},
+	"position":               {`"legacy"`, `"recommended"`},
+	"syntax":                 {`"variable"`, `"shorthand"`},
+	"allowMultiline":         {`false`, `true`},
+}
+
+// tailwindOptions is what every better-tailwindcss rule's options carry: the class literal surfaces its Run
+// reads. It is the one thing a table over every rule needs of options whose types differ.
+type tailwindOptions interface {
+	ClassLiteralSurfaces() *ClassLiteralSurfaces
+}
+
+// tailwindDecoderOf is subject's decoder as tailwindRegistration registers it, returning what it decoded as
+// tailwindOptions so one table can hold every rule's.
+func tailwindDecoderOf[Options tailwindOptions, Settled interface {
+	*Options
+	anchorAt(directory string)
+	compileClassLiterals() error
+}](subject rule.Rule[Options]) func(raw []byte, base rule.OptionsBase) (tailwindOptions, error) {
+	decode := decodeTailwindOptionsAt[Options, Settled]()
+	return func(raw []byte, base rule.OptionsBase) (tailwindOptions, error) {
+		// Returned as the decoder returned it, error and all, so a caller reads exactly what the rule's
+		// registration would hand on.
+		decoded, decodeError := decode(raw, base)
+		return decoded, decodeError
+	}
+}
+
+// tailwindDecoders is every better-tailwindcss rule's decoder, by name. Held against tailwindOptionKeys, which
+// registration fills, so a rule registered and missing here fails rather than going untested.
+func tailwindDecoders(test *testing.T) map[string]func(raw []byte, base rule.OptionsBase) (tailwindOptions, error) {
+	test.Helper()
+	decoders := map[string]func(raw []byte, base rule.OptionsBase) (tailwindOptions, error){
+		EnforceConsistentClassOrder.Name:        tailwindDecoderOf(EnforceConsistentClassOrder),
+		EnforceConsistentVariantOrder.Name:      tailwindDecoderOf(EnforceConsistentVariantOrder),
+		EnforceConsistentImportantPosition.Name: tailwindDecoderOf(EnforceConsistentImportantPosition),
+		EnforceConsistentVariableSyntax.Name:    tailwindDecoderOf(EnforceConsistentVariableSyntax),
+		EnforceShorthandClasses.Name:            tailwindDecoderOf(EnforceShorthandClasses),
+		EnforceCanonicalClasses.Name:            tailwindDecoderOf(EnforceCanonicalClasses),
+		NoConcatenatedClasses.Name:              tailwindDecoderOf(NoConcatenatedClasses),
+		NoConflictingClasses.Name:               tailwindDecoderOf(NoConflictingClasses),
+		NoDeprecatedClasses.Name:                tailwindDecoderOf(NoDeprecatedClasses),
+		NoDuplicateClasses.Name:                 tailwindDecoderOf(NoDuplicateClasses),
+		NoUnknownClasses.Name:                   tailwindDecoderOf(NoUnknownClasses),
+		NoUnnecessaryWhitespace.Name:            tailwindDecoderOf(NoUnnecessaryWhitespace),
+	}
+	for ruleName := range tailwindOptionKeys {
+		if _, isListed := decoders[ruleName]; !isListed {
+			test.Fatalf("%s is registered as a better-tailwindcss rule and tailwindDecoders does not list it", ruleName)
+		}
+	}
+	if len(decoders) != 12 || len(tailwindOptionKeys) != 12 {
+		test.Fatalf("found %d better-tailwindcss decoders and %d registered rules, want 12 of each",
+			len(decoders), len(tailwindOptionKeys))
+	}
+	return decoders
+}
+
+// decodedKey re-encodes decoded options and returns one key's value, compacted.
+func decodedKey[Options any](test *testing.T, decoded Options, key string) string {
+	test.Helper()
+	encoded, encodeError := json.Marshal(decoded)
+	if encodeError != nil {
+		test.Fatalf("encoding %T: %v", decoded, encodeError)
+	}
+	var fields map[string]json.RawMessage
+	if decodeError := json.Unmarshal(encoded, &fields); decodeError != nil {
+		test.Fatalf("decoding %T's fields: %v", decoded, decodeError)
+	}
+	return compactJsonForTest(test, fields[key])
+}
+
+// compactJsonForTest is raw compacted with every object's keys sorted, so two spellings of one value compare
+// equal. Raw that is not JSON, such as the empty value of a key the decoded options never wrote, comes back as
+// written.
+func compactJsonForTest(test *testing.T, raw json.RawMessage) string {
+	test.Helper()
+	if !json.Valid(raw) {
+		return string(raw)
+	}
+	return string(canonicalJsonForTest(test, raw))
+}
+
+// canonicalJsonForTest is one well-formed JSON value read as raw text, so each object and array is decoded only
+// as far as its members, into types that hold no value of unknown kind. An object is re-encoded from a map, which
+// encoding/json writes with its keys sorted.
+func canonicalJsonForTest(test *testing.T, raw json.RawMessage) json.RawMessage {
+	test.Helper()
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		members := map[string]json.RawMessage{}
+		if decodeError := json.Unmarshal(trimmed, &members); decodeError != nil {
+			test.Fatalf("reading an object's members: %v\n%s", decodeError, trimmed)
+		}
+		for key, member := range members {
+			members[key] = canonicalJsonForTest(test, member)
+		}
+		encoded, encodeError := json.Marshal(members)
+		if encodeError != nil {
+			test.Fatalf("encoding an object's members: %v\n%s", encodeError, trimmed)
+		}
+		return encoded
+	}
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var elements []json.RawMessage
+		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
+			test.Fatalf("reading an array's elements: %v\n%s", decodeError, trimmed)
+		}
+		for index, element := range elements {
+			elements[index] = canonicalJsonForTest(test, element)
+		}
+		encoded, encodeError := json.Marshal(elements)
+		if encodeError != nil {
+			test.Fatalf("encoding an array's elements: %v\n%s", encodeError, trimmed)
+		}
+		return encoded
+	}
+	var compacted bytes.Buffer
+	if compactError := json.Compact(&compacted, trimmed); compactError != nil {
+		test.Fatalf("compacting a value: %v\n%s", compactError, trimmed)
+	}
+	return compacted.Bytes()
+}
+
+func settingsBase(block string) rule.OptionsBase {
+	return rule.OptionsBase{
+		ConfigDirectory: "/repo",
+		Settings:        map[string]json.RawMessage{"better-tailwindcss": json.RawMessage(block)},
+	}
+}
+
+func TestEveryDeclaredKeyHasASettingsCase(test *testing.T) {
+	test.Parallel()
+	for ruleName, keys := range tailwindOptionKeys {
+		for key := range keys {
+			if _, sampled := settingsSamples[key]; !sampled {
+				test.Errorf("%s declares %q and settingsSamples has no case for it", ruleName, key)
+			}
+		}
+	}
+}
+
+// TestSettingsSitBetweenDefaultsAndOptions is a case per merged key, on every rule that declares it:
+// a key written only in settings reaches the rule, and the rule's own options win over it, as
+// upstream's createRule merges `{...defaults, ...settings, ...options}`.
+func TestSettingsSitBetweenDefaultsAndOptions(test *testing.T) {
+	test.Parallel()
+	for ruleName, decode := range tailwindDecoders(test) {
+		for key := range tailwindOptionKeys[ruleName] {
+			sample := settingsSamples[key]
+			base := settingsBase(`{"` + key + `": ` + sample[0] + `}`)
+
+			fromSettings, decodeError := decode(nil, base)
+			if decodeError != nil {
+				test.Fatalf("%s, %s in settings: %v", ruleName, key, decodeError)
+			}
+			if got := decodedKey(test, fromSettings, key); got != compactJsonForTest(test, json.RawMessage(sample[0])) {
+				test.Errorf("%s: %s written in settings as %s decoded as %s", ruleName, key, sample[0], got)
+			}
+
+			fromBoth, decodeError := decode([]byte(`{"`+key+`": `+sample[1]+`}`), base)
+			if decodeError != nil {
+				test.Fatalf("%s, %s in settings and options: %v", ruleName, key, decodeError)
+			}
+			if got := decodedKey(test, fromBoth, key); got != compactJsonForTest(test, json.RawMessage(sample[1])) {
+				test.Errorf("%s: %s in options (%s) did not win over settings (%s): decoded %s",
+					ruleName, key, sample[1], sample[0], got)
+			}
+		}
+	}
+}
+
+// A key one rule declares and another does not reaches only the rule that declares it, and the merge
+// is shallow: an options key replaces the settings key whole, never merging into it.
+func TestSettingsReachOnlyTheRulesThatDeclareThem(test *testing.T) {
+	test.Parallel()
+	base := settingsBase(`{"order": "desc", "callees": ["a", "b"]}`)
+
+	duplicateOptions, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(nil, base)
+	if decodeTailwindOptionsError != nil {
+		test.Fatalf(
+			"no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v",
+			decodeTailwindOptionsError,
+		)
+	}
+	if callees := legacyNames(duplicateOptions.Callees); callees != "a,b" {
+		test.Fatalf("no-duplicate-classes' callees = %v, want settings' [a b]", callees)
+	}
+
+	options, decodeTailwindOptionsError := decodeTailwindOptionsAt[EnforceConsistentClassOrderOptions]()(
+		[]byte(`{"callees": ["c"]}`),
+		base,
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
+	}
+	if options.Order != "desc" || legacyNames(options.Callees) != "c" {
+		test.Fatalf("class order decoded order %q and callees %v, want settings' desc and options' [c] alone",
+			options.Order, options.Callees)
+	}
+}
+
+// legacyNames is legacy selectors' names joined by commas.
+func legacyNames(selectors []LegacySelector) string {
+	names := make([]string, 0, len(selectors))
+	for _, selector := range selectors {
+		names = append(names, selector.Name)
+	}
+	return strings.Join(names, ",")
+}
+
+// The rule's own element is decoded strictly before anything merges, so its error names its own key.
+func TestARulesOwnOptionsAreDecodedBeforeSettingsMerge(test *testing.T) {
+	test.Parallel()
+	decode := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()
+	_, decodeError := decode([]byte(`{"callee": ["cn"]}`), settingsBase(`{"callees": ["mergeClassNames"]}`))
+	if decodeError == nil || !strings.Contains(decodeError.Error(), "callee") {
+		test.Fatalf("a misspelled key in the rule's own options was not refused by name: %v", decodeError)
+	}
+}
+
+func TestSplitTailwindSettingsRefusesWhatNoRuleReads(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		name, block, refused string
+	}{
+		{"an upstream option not ported yet", `{"messageStyle": "compact"}`, `"messageStyle"`},
+		{"another not ported yet", `{"rootFontSize": 16}`, `"rootFontSize"`},
+		{"no option at all", `{"callees": ["cn"], "calees": ["cn"]}`, `"calees"`},
+		{"not an object", `["cn"]`, "expected an object"},
+	}
+	for _, testCase := range testCases {
+		_, splitTailwindSettingsError := splitTailwindSettings([]byte(testCase.block))
+		if splitTailwindSettingsError == nil ||
+			!strings.Contains(splitTailwindSettingsError.Error(), testCase.refused) {
+			test.Errorf(
+				"%s: %s was not refused naming %s: %v",
+				testCase.name,
+				testCase.block,
+				testCase.refused,
+				splitTailwindSettingsError,
+			)
+		}
+	}
+
+	parts, splitTailwindSettingsError := splitTailwindSettings([]byte(`{"entryPoint": "./theme.css", "order": "desc"}`))
+	if splitTailwindSettingsError != nil {
+		test.Fatal(splitTailwindSettingsError)
+	}
+	if len(parts) != 12 {
+		test.Fatalf("entryPoint reached %d rules, want all 12", len(parts))
+	}
+	if !strings.Contains(string(parts[EnforceConsistentClassOrder.Name]), "order") ||
+		strings.Contains(string(parts[NoDuplicateClasses.Name]), "order") {
+		test.Fatalf("order went to the wrong rules: %v", parts)
+	}
+}
+
+// ourSettings is the block our own repositories write in settings["better-tailwindcss"], verbatim.
+const ourSettings = `{
+	"entryPoint": "./app/_theme/styles/theme.css",
+	"attributes": ["class", "className"],
+	"callees": ["mergeClassNames", "createVariantClassNames"],
+	"variables": [".*[Cc]lassName$", ".*[Cc]lassNames$"]
+}`
+
+// TestAnOutsiderIsReadWithUpstreamsDefaults is the zero-config case: a repository with no settings,
+// writing shadcn's `cn` and `clsx`, has those strings read and reported, as upstream would. Before
+// #gj5nm6e the defaults were ours, so every one of these went unchecked.
+func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
+	test.Parallel()
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		rule.OptionsBase{ConfigDirectory: "/repo"},
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
+	}
+	read := []string{
+		`const merged = cn('flex flex');`,
+		`const merged = clsx('p-2', open && 'p-2 p-2');`,
+		`const merged = twMerge('gap-2 gap-2');`,
+		`const merged = utils.cn('flex flex');`,
+		`const Button = twc.button('px-2 px-2');`,
+		`const classNames = 'flex flex';`,
+		`const styles = 'flex flex';`,
+		`const element = <div className="flex flex" />;`,
+		`const element = <div class="flex flex" />;`,
+		// An attribute's pattern and name are both lowercased before matching, as upstream's are.
+		`const element = <div classname="flex flex" />;`,
+		// Object values at upstream's paths and object keys, ported in #btxd64n.
+		`const merged = clb({ base: 'flex flex' });`,
+		`const button = cva('p-2', { variants: { size: { sm: 'flex flex' } } });`,
+		`const card = tv({ slots: { header: 'flex flex' } });`,
+		`const merged = cn({ 'flex flex': open });`,
+		// Tags and function returns, ported in #btxd64n unit 6b.
+		"const Button = twc.button`px-2 px-2`;",
+		"const Link = twx.a`gap-2 gap-2`;",
+		`const Card = twc.div(() => 'flex flex');`,
+		`const Panel = twc.section((properties) => { return properties.open ? 'p-2 p-2' : 'p-4'; });`,
+	}
+	for _, source := range read {
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+			"duplicateClass",
+		)
+	}
+	unread := []string{
+		`const merged = mergeClassNames('flex flex');`,
+		`const buttonClassName = 'flex flex';`,
+		`const button = cva('p-2', { defaultVariants: { size: 'flex flex' } });`,
+		"const Button = styled.button`px-2 px-2`;",
+		`const Card = twc.div(function named() { return 'flex flex'; });`,
+	}
+	for _, source := range unread {
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+		)
+	}
+}
+
+// TestOurSettingsReadOurMatchers is our consumers' case: their settings name our own callees and
+// variables, which then replace upstream's for those kinds, while each kind they leave unwritten keeps
+// its defaults.
+func TestOurSettingsReadOurMatchers(test *testing.T) {
+	test.Parallel()
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		settingsBase(ourSettings),
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
+	}
+	read := []string{
+		`const merged = mergeClassNames('flex flex');`,
+		`const variants = createVariantClassNames('flex flex');`,
+		`const buttonClassName = 'flex flex';`,
+		`const rowClassNames = 'flex flex';`,
+		`const element = <div className="flex flex" />;`,
+	}
+	for _, source := range read {
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+			"duplicateClass",
+		)
+	}
+	unread := []string{
+		`const merged = cn('flex flex');`,
+		`const classes = 'flex flex';`,
+	}
+	for _, source := range unread {
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+		)
+	}
+}
+
+// An empty list replaces its kind's defaults with nothing, as upstream's `callees !== undefined` does.
+func TestAnEmptyKindReadsNothingOfIt(test *testing.T) {
+	test.Parallel()
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		settingsBase(`{"callees": []}`),
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
+	}
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
+		test,
+		NoDuplicateClasses,
+		"Component.tsx",
+		`const merged = cn('flex flex');`,
+		decoded,
+	))
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(
+		test,
+		NoDuplicateClasses,
+		"Component.tsx",
+		`const classNames = 'flex flex';`,
+		decoded,
+	), "duplicateClass")
+}
+
+// TestNamesMatchAsUpstreamsMatchesName pins utils.js's matchesName: the pattern's first match must
+// be the whole name, and an attribute's pattern and name are lowercased first.
+func TestNamesMatchAsUpstreamsMatchesName(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		patterns  []string
+		lowercase bool
+		name      string
+		want      bool
+	}{
+		{[]string{"class"}, false, "class", true},
+		{[]string{"class"}, false, "className", false},
+		{[]string{".*[Cc]lassName$"}, false, "buttonClassName", true},
+		{[]string{"a|ab"}, false, "ab", false}, // the first match is "a", which is not the name
+		{[]string{"ab|a"}, false, "ab", true},
+		{[]string{"^class(?:Name)?$"}, true, "ClassName", true},
+		{[]string{"^class(?:Name)?$"}, false, "ClassName", false},
+		{[]string{"(unclosed"}, false, "unclosed", false}, // skipped, never fatal
+		{[]string{"x", "y"}, false, "y", true},
+	}
+	for _, testCase := range testCases {
+		patterns := newNamePatterns(testCase.patterns, testCase.lowercase)
+		if got := patterns.matchesUnremembered(testCase.name); got != testCase.want {
+			test.Errorf("%v (lowercase %v) matching %q = %v, want %v",
+				testCase.patterns, testCase.lowercase, testCase.name, got, testCase.want)
+		}
+		// And through a selector group, twice, so the second answer is the group's memo.
+		kind := SelectorKindVariable
+		if testCase.lowercase {
+			kind = SelectorKindAttribute
+		}
+		var selectors []Selector
+		for _, pattern := range testCase.patterns {
+			selectors = append(selectors, Selector{Kind: kind, Name: pattern})
+		}
+		group := newSelectorGroup(selectors, kind)
+		for range 2 {
+			if got := len(group.matching(testCase.name, nil)) > 0; got != testCase.want {
+				test.Errorf("%v (lowercase %v) as selectors matching %q = %v, want %v",
+					testCase.patterns, testCase.lowercase, testCase.name, got, testCase.want)
+			}
+		}
+	}
+}
+
+// TestCalleeNameAndPathIsUpstreamsGetEsCalleeName pins both readings of a callee.
+func TestCalleeNameAndPathIsUpstreamsGetEsCalleeName(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		callee, name, path string
+	}{
+		{"cn", "cn", "cn"},
+		{"utils.cn", "cn", "utils.cn"},
+		{"a.b.cn", "cn", "a.b.cn"},
+		{"a['cn']", "cn", "a.cn"},
+		{"this.cn", "cn", ""},
+		{"items[0].cn", "cn", ""},
+		{"a?.cn", "cn", "a.cn"},
+		{"a[key]", "", ""},
+	}
+	for _, testCase := range testCases {
+		source := "class C extends B { m() { " + testCase.callee + "('flex'); super.cn('flex'); } }"
+		fileName := tspath.NormalizePath("/Component.tsx")
+		sourceFile := parser.ParseSourceFile(
+			ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName)},
+			source,
+			core.ScriptKindTSX,
+		)
+		var calls []*ast.Node
+		var walk func(node *ast.Node) bool
+		walk = func(node *ast.Node) bool {
+			if node.Kind == ast.KindCallExpression {
+				calls = append(calls, node.AsCallExpression().Expression)
+			}
+			node.ForEachChild(walk)
+			return false
+		}
+		walk(sourceFile.AsNode())
+		if len(calls) != 2 {
+			test.Fatalf("%s: found %d calls, want 2", testCase.callee, len(calls))
+		}
+		if name, path := calleeNameAndPath(calls[0]); name != testCase.name || path != testCase.path {
+			test.Errorf(
+				"%s: name %q path %q, want %q and %q",
+				testCase.callee,
+				name,
+				path,
+				testCase.name,
+				testCase.path,
+			)
+		}
+		if name := calleeName(calls[0]); name != testCase.name {
+			test.Errorf(
+				"%s: calleeName %q, want %q, the name calleeNameAndPath gives",
+				testCase.callee,
+				name,
+				testCase.name,
+			)
+		}
+		if name, path := calleeNameAndPath(calls[1]); name != "" || path != "" || calleeName(calls[1]) != "" {
+			test.Errorf("super.cn: name %q path %q, want neither", name, path)
+		}
+	}
+}

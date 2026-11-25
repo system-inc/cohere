@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // coverageSummary is everything the coverage block says, built by each language from its own records

@@ -69,7 +69,7 @@ exit 0
 	lines := strings.Split(strings.TrimSpace(string(commands)), "\n")
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], "vet ") || !strings.Contains(
 		lines[1],
-		"-count=1 -timeout=30s -run=^"+ruleCpuTest+"$ -v ./internal/lint/registry",
+		"-count=1 -timeout=30s -run=^"+ruleCpuTest+"$ -v ./internal/typescript_language/registry",
 	) {
 		test.Fatalf(
 			"commands before refusal: %q; want vet then uncached bounded CPU check, without ordinary tests",

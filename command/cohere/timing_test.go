@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // TestPairsWithEqualNodesAndUnequalCostAreFlagged covers the shape that found the attribution bug.

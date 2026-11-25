@@ -19,7 +19,8 @@
 //     reads them; and a dotted role marker (`.test`, `.spec`, `.stories`, `.d`, `.config`) in TypeScript.
 //   - A name nobody inside the project chose is never judged: a generated file's (the `.generated` marker), and one a
 //     tool requires by its exact spelling (Go's `doc.go`, SwiftPM's `Package.swift`). TypeScript's framework names
-//     are the TypeScript rule's to decide, from internal/lint/ecmascript/next_js, which cohere-go must not link.
+//     are the TypeScript rule's to decide, from internal/typescript_language/ecmascript/next_js, which cohere-go must
+//     not link.
 //   - What is left is cut into words: each run of ASCII letters, cut again where folder_words.IsCaseBoundary says a
 //     word ends, so `string_utils`, `stringUtils`, `StringUtils` and `string-utils` are all `string` and `utils`.
 package file_name_words

@@ -454,3 +454,137 @@ func TestFolderNamesMoveOntoANewShelf(test *testing.T) {
 		test.Errorf("the importer did not follow:\n%s", got)
 	}
 }
+
+// A folder whose clause already holds the new name catches up to its package: it moves, its clause and its
+// importers' qualifiers stay, and only the import paths follow.
+func TestFolderNamesMoveAFolderOntoItsPackagesName(test *testing.T) {
+	test.Parallel()
+	root := writeRepository(test, map[string]string{
+		"go.work": "go 1.27\n\nuse .\n",
+		"go.mod":  "module fixture\n\ngo 1.27\n",
+		"lint/checking/checking.go": `// Package type_checking checks types.
+package type_checking
+
+// Checked is one.
+const Checked = 1
+`,
+		"lint/checking/checking_test.go": `package type_checking_test
+
+import (
+	"testing"
+
+	"fixture/lint/checking"
+)
+
+func TestChecked(test *testing.T) {
+	if type_checking.Checked != 1 {
+		test.Fatal("Checked")
+	}
+}
+`,
+		"user/user.go": `package user
+
+import "fixture/lint/checking"
+
+// Use reads the check.
+var Use = type_checking.Checked
+`,
+	})
+	moves := []folderMove{{OldFolder: "lint/checking", NewFolder: "shelf/type_checking", NewPackage: "type_checking"}}
+	var output bytes.Buffer
+	if exitCode := run(root, moves, false, &output); exitCode != 0 {
+		test.Fatalf("exit %d:\n%s", exitCode, output.String())
+	}
+	if exists(root, "lint/checking") || !strings.Contains(output.String(), "0 package clauses") {
+		test.Errorf("the folder did not move, or a clause holding its name was rewritten:\n%s", output.String())
+	}
+	if got := readFile(test, root, "shelf/type_checking/checking.go"); !strings.HasPrefix(
+		got,
+		"// Package type_checking checks types.\npackage type_checking\n",
+	) {
+		test.Errorf("the clause changed:\n%s", got)
+	}
+	want := `package user
+
+import "fixture/shelf/type_checking"
+
+// Use reads the check.
+var Use = type_checking.Checked
+`
+	if got := readFile(test, root, "user/user.go"); got != want {
+		test.Errorf("user.go:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// A local in the way of a one-word new name cannot step aside to its camel case, which is the same word, so the
+// pass is refused and the tree is left as it was.
+func TestFolderNamesRefuseALocalInTheWayOfAOneWordName(test *testing.T) {
+	test.Parallel()
+	user := `package user
+
+import "fixture/goengine/markertype"
+
+// Use reads the marker.
+func Use() int {
+	marker := 2
+	return markertype.Marker + marker
+}
+`
+	root := writeRepository(test, withFiles(fixtureModule, map[string]string{"user/user.go": user}))
+	moves := []folderMove{{OldFolder: "goengine/markertype", NewFolder: "goengine/marker", NewPackage: "marker"}}
+	var output bytes.Buffer
+	if exitCode := run(root, moves, false, &output); exitCode != 1 {
+		test.Fatalf("exit %d, want 1:\n%s", exitCode, output.String())
+	}
+	if !strings.Contains(output.String(), "the local marker is in the import's way") {
+		test.Errorf("no refusal for the local:\n%s", output.String())
+	}
+	if exists(root, "goengine/marker") || readFile(test, root, "user/user.go") != user {
+		test.Error("a refused pass changed the tree")
+	}
+}
+
+// A package that stays may import a moved one and be imported by another, as settings reads lint's rule and lint's
+// registry reads settings. The proof in memory must not read the moved folders' old copies, which would import the
+// old path beside a package that now imports the new one and fail to type-check.
+func TestFolderNamesProveAroundAPackageThatStays(test *testing.T) {
+	test.Parallel()
+	root := writeRepository(test, map[string]string{
+		"go.work": "go 1.27\n\nuse .\n",
+		"go.mod":  "module fixture\n\ngo 1.27\n",
+		"lint/rule/rule.go": `package rule
+
+// Bound is a configured rule.
+type Bound struct{ Name string }
+`,
+		"settings/settings.go": `package settings
+
+import "fixture/lint/rule"
+
+// Decoder decodes a rule's options.
+type Decoder func() rule.Bound
+`,
+		"lint/registry/registry.go": `package registry
+
+import (
+	"fixture/lint/rule"
+	"fixture/settings"
+)
+
+// Decode is the registry's decoder.
+var Decode settings.Decoder = func() rule.Bound { return rule.Bound{Name: "one"} }
+`,
+	})
+	moves := []folderMove{
+		{OldFolder: "lint/rule", NewFolder: "shelf/rule", NewPackage: "rule"},
+		{OldFolder: "lint/registry", NewFolder: "shelf/registry", NewPackage: "registry"},
+	}
+	var output bytes.Buffer
+	if exitCode := run(root, moves, false, &output); exitCode != 0 {
+		test.Fatalf("exit %d:\n%s", exitCode, output.String())
+	}
+	if exists(root, "lint/rule") || !exists(root, "shelf/registry/registry.go") ||
+		!strings.Contains(readFile(test, root, "settings/settings.go"), `import "fixture/shelf/rule"`) {
+		test.Errorf("the folders did not move or settings did not follow:\n%s", output.String())
+	}
+}

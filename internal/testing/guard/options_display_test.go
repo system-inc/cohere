@@ -17,21 +17,21 @@ import (
 const optionsDisplayName = "ForDisplay"
 
 // optionsDisplayHome is the directory the accessor is declared in, relative to the module root.
-const optionsDisplayHome = "internal/lint/rule"
+const optionsDisplayHome = "internal/typescript_language/rule"
 
 // optionsDisplayReaders are the directories allowed to reach the accessor: its own package, and the test
 // harness, whose docs capture records what each run was handed.
-var optionsDisplayReaders = map[string]bool{optionsDisplayHome: true, "internal/lint/testing": true}
+var optionsDisplayReaders = map[string]bool{optionsDisplayHome: true, "internal/typescript_language/rule_testing": true}
 
 // No rule reads its options through the uncounted accessor.
 //
-// rule.OptionsReads counts every Given.Read so the registry can tell a rule that reached its options from one
-// that ran without reaching them (#zwd43jn). Given.ForDisplay returns the same value uncounted, for the docs
-// capture's record of what a run was handed, and a rule reading through it would look like a rule that never
-// reaches its options while it does, or worse, hide one that reaches them only on some paths. Two censuses
-// keep it the harness's: every method named ForDisplay in the module is Given's in internal/lint/rule, so the
-// name means that method and nothing else, and every reference to a selector of that name, called or taken as
-// a value, is in internal/lint/rule or internal/lint/testing.
+// rule.OptionsReads counts every Given.Read so the registry can tell a rule that reached its options from one that ran
+// without reaching them (#zwd43jn). Given.ForDisplay returns the same value uncounted, for the docs capture's record of
+// what a run was handed, and a rule reading through it would look like a rule that never reaches its options while it
+// does, or worse, hide one that reaches them only on some paths. Two censuses keep it the harness's: every method named
+// ForDisplay in the module is Given's in internal/typescript_language/rule, so the name means that method and nothing
+// else, and every reference to a selector of that name, called or taken as a value, is in
+// internal/typescript_language/rule or internal/typescript_language/rule_testing.
 func TestOnlyTheHarnessReadsOptionsUncounted(test *testing.T) {
 	test.Parallel()
 
@@ -64,51 +64,51 @@ func record(options rule.Given[int]) { _, _ = options.ForDisplay() }`
 		{
 			name: "only Given declares it and only the harness reads it",
 			files: map[string]string{
-				"internal/lint/rule/given.go":      declaration,
-				"internal/lint/testing/capture.go": harness,
+				"internal/typescript_language/rule/given.go":           declaration,
+				"internal/typescript_language/rule_testing/capture.go": harness,
 			},
 		},
 		{
 			name: "a rule package calls it",
 			files: map[string]string{
-				"internal/lint/rule/given.go":      declaration,
-				"internal/lint/testing/capture.go": harness,
-				"internal/lint/rules/probe/probe.go": `package probe
+				"internal/typescript_language/rule/given.go":           declaration,
+				"internal/typescript_language/rule_testing/capture.go": harness,
+				"internal/typescript_language/rules/probe/probe.go": `package probe
 func run(options rule.Given[int]) bool { enabled, _ := options.ForDisplay(); return enabled > 0 }`,
 			},
-			want: []string{"internal/lint/rules/probe/probe.go:2 reaches ForDisplay"},
+			want: []string{"internal/typescript_language/rules/probe/probe.go:2 reaches ForDisplay"},
 		},
 		{
 			// A method value dodges a census of calls, so every selector is counted.
 			name: "a rule package takes it as a value",
 			files: map[string]string{
-				"internal/lint/rule/given.go":      declaration,
-				"internal/lint/testing/capture.go": harness,
-				"internal/lint/rules/probe/probe.go": `package probe
+				"internal/typescript_language/rule/given.go":           declaration,
+				"internal/typescript_language/rule_testing/capture.go": harness,
+				"internal/typescript_language/rules/probe/probe.go": `package probe
 func run(options rule.Given[int]) bool { read := options.ForDisplay; enabled, _ := read(); return enabled > 0 }`,
 			},
-			want: []string{"internal/lint/rules/probe/probe.go:2 reaches ForDisplay"},
+			want: []string{"internal/typescript_language/rules/probe/probe.go:2 reaches ForDisplay"},
 		},
 		{
 			// Another type's method of the name would make a reference ambiguous, so it is refused itself.
 			name: "another type declares a method of the name",
 			files: map[string]string{
-				"internal/lint/rule/given.go":      declaration,
-				"internal/lint/testing/capture.go": harness,
-				"internal/lint/rules/probe/probe.go": `package probe
+				"internal/typescript_language/rule/given.go":           declaration,
+				"internal/typescript_language/rule_testing/capture.go": harness,
+				"internal/typescript_language/rules/probe/probe.go": `package probe
 type settings struct{}
 func (value settings) ForDisplay() string { return "" }`,
 			},
-			want: []string{"internal/lint/rules/probe/probe.go:3 declares ForDisplay on settings"},
+			want: []string{"internal/typescript_language/rules/probe/probe.go:3 declares ForDisplay on settings"},
 		},
 		{
 			name:  "the declaration is gone",
-			files: map[string]string{"internal/lint/testing/capture.go": harness},
+			files: map[string]string{"internal/typescript_language/rule_testing/capture.go": harness},
 			want:  []string{"found 0 declarations of ForDisplay"},
 		},
 		{
 			name:  "nothing reads it",
-			files: map[string]string{"internal/lint/rule/given.go": declaration},
+			files: map[string]string{"internal/typescript_language/rule/given.go": declaration},
 			want:  []string{"found no reference to ForDisplay"},
 		},
 	}

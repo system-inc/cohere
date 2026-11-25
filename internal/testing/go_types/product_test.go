@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/go_listing"
+	"github.com/system-inc/cohere/modules/go_listing"
 )
 
 // keyFixture writes one checkout at root: a module of its own with one package, which the listing names

@@ -17,7 +17,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/css/postcss"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // parseOptions is the part of Prettier's options object the parser reads and writes.

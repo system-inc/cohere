@@ -13,9 +13,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // How a run prints. The default is the human view: the files cohere rewrote, the findings, and one
@@ -101,14 +101,14 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 
 // ruleFinding is a rule's diagnostic as a runFinding, with the severity the settings give the rule for
 // its file. Unnamed rules report as errors, and so does the unused-disable linter diagnostic by default.
-func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Configuration) runFinding {
+func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *settings.Configuration) runFinding {
 	finding := runFinding{
 		Severity:  "error",
 		Rule:      diagnostic.RuleName,
 		MessageId: diagnostic.Message.Id,
 		Message:   singleLineDescription(diagnostic.Message.Description),
 	}
-	if diagnostic.RuleName == configuration.UnusedDisable {
+	if diagnostic.RuleName == settings.UnusedDisable {
 		path, _, _ := diagnostic.Location()
 		finding.Severity = unusedDisableSeverity(lintConfiguration, path).String()
 	}
@@ -118,7 +118,7 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Co
 			if setting, named := lintConfiguration.Resolve(
 				sourceFile.FileName().AsString(),
 			).Rules[diagnostic.RuleName]; named &&
-				setting.Severity == configuration.SeverityWarn {
+				setting.Severity == settings.SeverityWarn {
 				finding.Severity = "warn"
 			}
 		}
@@ -243,15 +243,15 @@ func printChangedFiles(out *bufio.Writer, changed []changedFile) {
 }
 
 // unusedDisableSeverity is shared by rendering and check-only fixes, including nil-config harnesses.
-func unusedDisableSeverity(lintConfiguration *configuration.Configuration, path string) configuration.Severity {
-	resolved := configuration.Resolved{}
+func unusedDisableSeverity(lintConfiguration *settings.Configuration, path string) settings.Severity {
+	resolved := settings.Resolved{}
 	if lintConfiguration != nil {
 		resolved = lintConfiguration.Resolve(path)
 	}
 	return resolved.UnusedDisableSeverity()
 }
 
-func lintWarningCount(diagnostics []rule.Diagnostic, lintConfiguration *configuration.Configuration) int {
+func lintWarningCount(diagnostics []rule.Diagnostic, lintConfiguration *settings.Configuration) int {
 	warnings := 0
 	for _, diagnostic := range diagnostics {
 		if ruleFinding(diagnostic, lintConfiguration).Severity == "warn" {

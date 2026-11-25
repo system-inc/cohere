@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 /*

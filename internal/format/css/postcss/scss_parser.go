@@ -3,7 +3,7 @@ package postcss
 import (
 	"strings"
 
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // postcss-scss 4.0.9, lib/scss-parser.js: `class ScssParser extends Parser`, overriding atrule, comment,

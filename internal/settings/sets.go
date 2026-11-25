@@ -1,0 +1,101 @@
+package settings
+
+import (
+	"embed"
+	"fmt"
+	"io/fs"
+	"os"
+	"sort"
+	"strings"
+)
+
+// The house rule sets, carried in the binary so a repository that installs cohere gets them with no
+// checkout of our libraries (#njhfftt). A configuration names one in `extends` as `cohere:<name>`, and
+// the name is the file's path under sets/ without `.json`: `cohere:typescript`,
+// `cohere:system-inc/structure`.
+//
+//go:embed sets
+var embeddedSetFiles embed.FS
+
+// setFiles is what the sets are read from: the embedded tree, which a test replaces with its own.
+var setFiles fs.ReadFileFS = embeddedSetFiles
+
+// SetPrefix marks an `extends` entry as a rule set cohere carries rather than a path. Never a path:
+// no file a project could write is named with it, so the two readings cannot collide.
+const SetPrefix = "cohere:"
+
+// IsSet reports whether a source names an embedded rule set rather than a file on disk.
+func IsSet(source string) bool {
+	return strings.HasPrefix(source, SetPrefix)
+}
+
+// OurTierPrefix names the sets that make a configuration one of ours: `cohere:system-inc/structure`,
+// `cohere:system-inc/base`.
+const OurTierPrefix = SetPrefix + "system-inc/"
+
+// InOurTiers reports whether a configuration's chain (its sources, as SourcesOf returns them) reaches
+// one of our tier sets.
+//
+// One predicate for the two readers that change behavior on it (#bfxz13m). Inside our tiers the lint
+// loader refuses an off or a departure with no reason, and the format resolver takes the format block
+// from the Nexus tier alone. Outside them a project goes its own way: an off needs no reason and its
+// own `format` block applies. Two predicates would let a project be strict for one reader and free for
+// the other.
+func InOurTiers(sources []string) bool {
+	for _, source := range sources {
+		if strings.HasPrefix(source, OurTierPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// SourceContents returns the bytes of one source in a configuration's chain: an embedded set's text,
+// or a file's.
+//
+// Everything that keys on a configuration's bytes reads them through this, so a chain ending in a set
+// hashes the set's text exactly as it would a base file's.
+func SourceContents(source string) ([]byte, error) {
+	if !IsSet(source) {
+		return os.ReadFile(source)
+	}
+	contents, readFileError := setFiles.ReadFile(setFilePath(strings.TrimPrefix(source, SetPrefix)))
+	if readFileError != nil {
+		return nil, fmt.Errorf("%s is not a rule set cohere carries; the sets are %s",
+			source, strings.Join(SetNames(), ", "))
+	}
+	return contents, nil
+}
+
+// SourcesOnDisk returns the sources that are files, leaving out the embedded sets.
+//
+// For a caller that stats or watches what it was handed: a set has no file, and it changes only when
+// cohere does, which every cache already keys on.
+func SourcesOnDisk(sources []string) []string {
+	onDisk := make([]string, 0, len(sources))
+	for _, source := range sources {
+		if !IsSet(source) {
+			onDisk = append(onDisk, source)
+		}
+	}
+	return onDisk
+}
+
+// SetNames returns every embedded set's name, prefixed and sorted.
+func SetNames() []string {
+	var names []string
+	// Ignored: the walk reads only the embedded tree, which the build checked exists, so it cannot fail.
+	_ = fs.WalkDir(setFiles, "sets", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
+			return pathError
+		}
+		names = append(names, SetPrefix+strings.TrimSuffix(strings.TrimPrefix(path, "sets/"), ".json"))
+		return nil
+	})
+	sort.Strings(names)
+	return names
+}
+
+func setFilePath(name string) string {
+	return "sets/" + name + ".json"
+}

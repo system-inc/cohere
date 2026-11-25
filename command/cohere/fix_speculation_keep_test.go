@@ -12,7 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/native"
-	"github.com/system-inc/cohere/internal/lint/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
 )
 
 // A run that writes nothing keeps the speculation's changed result for a file with no rules, so a markdown or

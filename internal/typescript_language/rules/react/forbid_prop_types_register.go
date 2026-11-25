@@ -1,0 +1,13 @@
+package react
+
+import "github.com/system-inc/cohere/internal/typescript_language/rule"
+
+// init registers this package's `forbid-prop-types` rule.
+//
+// The decoder is hand-written rather than `rule.DecodeOptionsInto` because `forbid` has to be
+// distinguishable as absent; see DecodeForbidPropTypesOptions.
+func init() {
+	rule.Register(
+		rule.Registration[ForbidPropTypesOptions]{Rule: ForbidPropTypes, Decode: DecodeForbidPropTypesOptions},
+	)
+}

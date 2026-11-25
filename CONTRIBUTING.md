@@ -44,7 +44,7 @@ and in phase_, from the graph alone, which is what lets it be fast enough to lea
 `verify` will answer _did it actually do the thing_, which cannot be answered from inside the code
 and needs running it and reading what came out. The oracles belong there: the fixture pairs, the
 mutation sweeps, the known-dirty controls, the differential against the gate this replaces. Today
-they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
+they live here, in `internal/typescript_language/rules/tools/` and beside the rules they hold.
 
 ## Built on
 
@@ -55,10 +55,10 @@ they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
   stateless by design, which is precisely what we are replacing.
 - [web-infra-dev/rslint](https://github.com/web-infra-dev/rslint) — MIT, copyright Bytedance Inc and
   typescript-eslint contributors. Its `internal/utils/cfg` is vendored at
-  `internal/lint/ecmascript/control_flow_graph`: a basic-block control-flow graph with dominators, reachability, and
+  `internal/typescript_language/ecmascript/control_flow_graph`: a basic-block control-flow graph with dominators, reachability, and
   correct `try`/`catch`/`finally` edges, built on the same typescript-go AST we use. Vendored rather
   than depended on, because it is a package rather than a library and we change it when we change a
-  shared decision. The header on `internal/lint/ecmascript/control_flow_graph/builder.go` names the commit and what was
+  shared decision. The header on `internal/typescript_language/ecmascript/control_flow_graph/builder.go` names the commit and what was
   changed.
 
 ## Development
@@ -72,6 +72,12 @@ go run ./command/cohere
 `cohere` checks itself: a bare `cohere --no-fix` at the root runs cohere-go over this module and
 cohere-swift over `swift_language/`, and both read 0. Go's own toolchain gates it too: `gofmt -l .`,
 `go vet ./...`, `go test ./...`, `go build ./...`.
+
+Code another repository pins by tag lives in `modules/`, one folder per Go module, each with its own
+`go.mod` and tagged `modules/<name>/v...`. The rule is mechanical: a folder is in `modules/` if and only if
+it has its own `go.mod`. Every one is a `use` of `go.work`, so the gate tests it, and one cohere imports is
+a `replace` of the root `go.mod` too. `internal/testing/guard` refuses a `go.mod` anywhere else outside
+`testdata/` and the TypeScript fork.
 
 Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go
 held to the token's share of the cores, niced (#qhg0ntb): `go run ./command/cohere-dev test ./...` for the
@@ -419,7 +425,7 @@ for six platforms on every `go test ./...`, until `3dc6e70` made it type-check t
 `cohere-dev` holds the cache at a 64 GB cap (`command/cohere-dev/cache.go`): when a token's run ends,
 at most every ten minutes for the machine, it measures the cache in the background, and when it is over
 the cap it holds every token of the pool and trims the least recently used entries down to a 48 GB
-target. The layout and the delete live in the `go_cache` module, which Loom shares. What each look did
+target. The layout and the delete live in the `modules/go_cache` module, which Loom shares. What each look did
 is logged to `gocache-trim.log` beside the pool's tokens.
 
 **No trim removes an entry used in the last two hours**, so a burst can stand above the cap by what it

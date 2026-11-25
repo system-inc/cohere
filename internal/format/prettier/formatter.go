@@ -8,7 +8,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 /*

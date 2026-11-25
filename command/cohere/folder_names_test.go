@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // folderDirectories are the findings' folders, in the order discovery keeps them.
@@ -209,21 +209,21 @@ func TestTheFolderCheckReadsTheRootsSetting(test *testing.T) {
 	test.Parallel()
 	for name, testCase := range map[string]struct {
 		settings string
-		want     configuration.Severity
+		want     settings.Severity
 	}{
-		"no settings file, the house stack's error": {"", configuration.SeverityError},
+		"no settings file, the house stack's error": {"", settings.SeverityError},
 		"a chain naming its sets, cohere:style's error": {
 			`{"extends": "cohere:typescript"}`,
-			configuration.SeverityError,
+			settings.SeverityError,
 		},
 		"zero config with the project's own file on top": {
-			`{"rules": {"` + configuration.AbbreviatedFolderName + `": "off"}, "reasons": {"` +
-				configuration.AbbreviatedFolderName + `": "This project keeps its folder names as they are."}}`,
-			configuration.SeverityOff,
+			`{"rules": {"` + settings.AbbreviatedFolderName + `": "off"}, "reasons": {"` +
+				settings.AbbreviatedFolderName + `": "This project keeps its folder names as they are."}}`,
+			settings.SeverityOff,
 		},
 		"a chain naming its sets, warned by the project": {
-			`{"extends": "cohere:typescript", "rules": {"` + configuration.AbbreviatedFolderName + `": "warn"}}`,
-			configuration.SeverityWarn,
+			`{"extends": "cohere:typescript", "rules": {"` + settings.AbbreviatedFolderName + `": "warn"}}`,
+			settings.SeverityWarn,
 		},
 	} {
 		test.Run(name, func(test *testing.T) {
@@ -240,7 +240,7 @@ func TestTheFolderCheckReadsTheRootsSetting(test *testing.T) {
 	}
 	root := test.TempDir()
 	writeTree(test, root, map[string]string{
-		"CohereSettings.json": `{"rules": {"` + configuration.AbbreviatedFolderName + `": "error", ` +
+		"CohereSettings.json": `{"rules": {"` + settings.AbbreviatedFolderName + `": "error", ` +
 			`"nexus/no-such-rule": "error"}}`,
 	})
 	if _, refused := folderCheckSeverity(root, ""); refused == nil ||
@@ -287,11 +287,11 @@ func TestARealRunReportsAnAbbreviatedFolderAndRenamingItIsAFreshVerdict(test *te
 	binary := buildCohere(test)
 	root := test.TempDir()
 	// Each settings file in the house format, so the formatter has nothing to say.
-	settings := "{\n    \"extends\": \"cohere:typescript\",\n    \"rules\": {\n        \"" +
-		configuration.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n"
+	settingsText := "{\n    \"extends\": \"cohere:typescript\",\n    \"rules\": {\n        \"" +
+		settings.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n"
 	writeTree(test, root, map[string]string{
 		".gitignore":          ".cache/\n",
-		"CohereSettings.json": settings,
+		"CohereSettings.json": settingsText,
 		// Formatted, as every file here is, so the only finding is the folder's.
 		"tsconfig.json": "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, " +
 			"\"include\": [\"source\"] }\n",
@@ -307,7 +307,7 @@ func TestARealRunReportsAnAbbreviatedFolderAndRenamingItIsAFreshVerdict(test *te
 			test.Fatal(renameError)
 		}
 	}
-	folderLine := filepath.Join(root, "docs") + "/ - error " + configuration.AbbreviatedFolderName + ": "
+	folderLine := filepath.Join(root, "docs") + "/ - error " + settings.AbbreviatedFolderName + ": "
 
 	red := run()
 	if red.exit != 1 || !strings.Contains(red.output, folderLine) || !strings.Contains(red.output, "1 folder finding") {
@@ -333,7 +333,7 @@ func TestARealRunReportsAnAbbreviatedFolderAndRenamingItIsAFreshVerdict(test *te
 		if json.Unmarshal([]byte(line), &record) != nil {
 			continue
 		}
-		if record.Rule == configuration.AbbreviatedFolderName {
+		if record.Rule == settings.AbbreviatedFolderName {
 			sawFinding = record.Kind == "finding" && record.Path == filepath.Join(root, "docs")
 			if record.Line != nil {
 				test.Errorf("the folder's record has a line: %s", line)
@@ -349,7 +349,7 @@ func TestARealRunReportsAnAbbreviatedFolderAndRenamingItIsAFreshVerdict(test *te
 	}
 
 	rename("docs", "documentation")
-	if green := run(); green.exit != 0 || strings.Contains(green.output, configuration.AbbreviatedFolderName) {
+	if green := run(); green.exit != 0 || strings.Contains(green.output, settings.AbbreviatedFolderName) {
 		test.Fatalf("with docs/ renamed the run exited %d, want 0 and no folder named:\n%s", green.exit,
 			green.output)
 	}
@@ -365,10 +365,10 @@ func TestARealRunReportsAnAbbreviatedFolderAndRenamingItIsAFreshVerdict(test *te
 	}
 
 	writeTree(test, root, map[string]string{"CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\",\n" +
-		"    \"rules\": {\n        \"" + configuration.AbbreviatedFolderName + "\": \"off\"\n    },\n" +
-		"    \"reasons\": {\n        \"" + configuration.AbbreviatedFolderName +
+		"    \"rules\": {\n        \"" + settings.AbbreviatedFolderName + "\": \"off\"\n    },\n" +
+		"    \"reasons\": {\n        \"" + settings.AbbreviatedFolderName +
 		"\": \"This project keeps its folder names as they are.\"\n    }\n}\n"})
-	if off := run(); off.exit != 0 || strings.Contains(off.output, configuration.AbbreviatedFolderName) {
+	if off := run(); off.exit != 0 || strings.Contains(off.output, settings.AbbreviatedFolderName) {
 		test.Errorf("with the check off in the project's settings, the run exited %d naming the folder:\n%s",
 			off.exit, off.output)
 	}
@@ -385,7 +385,7 @@ func TestAFolderCheckWhoseSettingsDoNotLoadFailsTheRun(test *testing.T) {
 		"go.mod":         "module example.com/toy\n\ngo 1.24\n",
 		"toy.go":         "package toy\n\n// Toy is one.\nconst Toy = 1\n",
 		"docs/README.md": "# Documentation\n",
-		"CohereSettings.json": "{\n    \"rules\": {\n        \"" + configuration.AbbreviatedFolderName +
+		"CohereSettings.json": "{\n    \"rules\": {\n        \"" + settings.AbbreviatedFolderName +
 			"\": \"error\",\n        \"nexus/no-such-rule\": \"error\"\n    }\n}\n",
 	})
 	output, exit := runCohere(test, binary, root, "--no-fix")
@@ -415,7 +415,7 @@ func TestANarrowedRunJudgesItsProjectsFolders(test *testing.T) {
 			writeTree(test, root, map[string]string{
 				".gitignore": ".cache/\n",
 				"apps/web/CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\",\n    \"rules\": {\n" +
-					"        \"" + configuration.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n",
+					"        \"" + settings.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n",
 				"apps/web/tsconfig.json": "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, " +
 					"\"include\": [\"source\"] }\n",
 				"apps/web/source/tidy.ts": "export const tidy = 1;\n",
@@ -423,7 +423,7 @@ func TestANarrowedRunJudgesItsProjectsFolders(test *testing.T) {
 			})
 			folder := filepath.Join(root, "apps", "web", "docs")
 			output, exit := runCohere(test, binary, filepath.Join(root, testCase.directory), testCase.arguments...)
-			if exit != 1 || !strings.Contains(output, folder+"/ - error "+configuration.AbbreviatedFolderName) ||
+			if exit != 1 || !strings.Contains(output, folder+"/ - error "+settings.AbbreviatedFolderName) ||
 				!strings.Contains(output, "1 folder finding") {
 				test.Fatalf("over docs/ the run exited %d, want 1 naming the folder and counting it:\n%s", exit,
 					output)
@@ -433,7 +433,7 @@ func TestANarrowedRunJudgesItsProjectsFolders(test *testing.T) {
 				test.Fatal(renameError)
 			}
 			output, exit = runCohere(test, binary, filepath.Join(root, testCase.directory), testCase.arguments...)
-			if exit != 0 || strings.Contains(output, configuration.AbbreviatedFolderName) {
+			if exit != 0 || strings.Contains(output, settings.AbbreviatedFolderName) {
 				test.Errorf("with docs/ renamed the run exited %d, want 0 and no folder named:\n%s", exit, output)
 			}
 		})
@@ -460,7 +460,7 @@ func TestARunGivenTheRootAsItsPathJudgesItsFolders(test *testing.T) {
 	if symbolicLinkError := os.Symlink(root, link); symbolicLinkError != nil {
 		test.Fatal(symbolicLinkError)
 	}
-	folderLine := filepath.Join(root, "vars") + "/ - error " + configuration.AbbreviatedFolderName + ": " +
+	folderLine := filepath.Join(root, "vars") + "/ - error " + settings.AbbreviatedFolderName + ": " +
 		`Folder name "vars" is an abbreviation.`
 	for _, path := range []string{".", "./", root, link} {
 		output, exit := runCohere(test, binary, root, "--no-fix", path)

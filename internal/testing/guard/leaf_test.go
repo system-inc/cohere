@@ -13,12 +13,12 @@ import (
 //
 // `internal/rule` is the interface a rule codes against, so depending on it is the entire point.
 var allowedRuleImports = map[string]bool{
-	"github.com/system-inc/cohere/internal/lint/rule": true,
+	"github.com/system-inc/cohere/internal/typescript_language/rule": true,
 
 	// The generated Tailwind collapse table and its gate. Exact rather than a prefix, because a
 	// prefix without a trailing slash would also admit `internal/tailwindanything`, and one with a
 	// trailing slash matches no package at all when the package is the directory itself.
-	"github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse": true,
+	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind/collapse": true,
 	// The house policy both languages read as data: rule names, message text. It imports only the
 	// standard library and moves when a shared decision changes, which is the event a rebuild should
 	// follow. Measured on 2026-10-03 when Base's bare-throw rule began rendering its message from it,
@@ -28,53 +28,59 @@ var allowedRuleImports = map[string]bool{
 	// How a source file's name reads to a TypeScript decision: an Adamic `.a` name as `.ts` (#6mhafvb).
 	// Every rule that decides on a name's `.ts` ending asks it (#kwt1htp), and a guard of its own holds
 	// them to it. It imports only `strings`, so it is a leaf itself and costs a rule edit nothing.
-	"github.com/system-inc/cohere/internal/types/source_name": true,
+	"github.com/system-inc/cohere/internal/typescript_language/source_name": true,
+	// The string measurements no language owns: JavaScript's whitespace, graphemes and edit distance. They sat under
+	// the shelf's prefix, as ecmascript/text, until the 0.2.0 layout gave them a shelf of their own, and they move no
+	// more often there: the package imports only the standard library.
+	"github.com/system-inc/cohere/internal/text": true,
 	// The ids, phis and single assignment the high-level IR and Adamic's flow graph share (#ejcnkja).
 	// It imports only the standard library, and every rule package that names it reached it through
 	// the high-level IR already, which is under the shelf's prefix, so naming it directly adds no
 	// package to any rule edit's rebuild.
-	"github.com/system-inc/cohere/static_single_assignment": true,
-	// The house vocabularies both Go languages read: the abbreviation words' loader and finder, and the shouting
-	// safe list and masks. Each moved out of package nexus so cohere-go's rules could read the same data
-	// without linking the TypeScript checker (#ec8mvbg). internal/text_rules/abbreviation imports only the standard
-	// library and policy, and internal/text_rules/shouting only the standard library and internal/lint/ecmascript/text,
-	// which is under the shelf's prefix, so both are leaves by their imports and change only when the house vocabulary
-	// does. Measured on 2026-11-05, three warm rounds each of `go build ./internal/lint/registry` after a one-comment
-	// edit, under a load average of about 44: editing internal/text_rules/shouting rebuilds in 0.27 to 0.39s and
+	"github.com/system-inc/cohere/modules/static_single_assignment": true,
+	// The house vocabularies both Go languages read: the abbreviation words' loader and finder, and the shouting safe
+	// list and masks. Each moved out of package nexus so cohere-go's rules could read the same data without linking the
+	// TypeScript checker (#ec8mvbg). internal/text_rules/abbreviation imports only the standard library and policy, and
+	// internal/text_rules/shouting only the standard library and internal/text, on this list, so
+	// both are leaves by their imports and change only when the house vocabulary does. Measured on 2026-11-05, three
+	// warm rounds each of `go build ./internal/typescript_language/registry` after a one-comment edit, under a load
+	// average of about 44: editing internal/text_rules/shouting rebuilds in 0.27 to 0.39s and
 	// internal/text_rules/abbreviation in 0.32 to 0.73s, with nothing past them rebuilt; editing a nexus rule, which
 	// imports both, 6.92 to 8.27s, and a base rule, which imports neither, 4.61 to 6.19s. nexus holds 89 source files
 	// to base's 33, so the load and the package's own size dominate that gap; it does not isolate the imports.
 	"github.com/system-inc/cohere/internal/text_rules/abbreviation": true,
 	"github.com/system-inc/cohere/internal/text_rules/shouting":     true,
-	// The SQL reading nexus/security-no-interpolated-sql-string and its cohere-go twin share: which holes in SQL
-	// text sit inside a quoted value or bare after a comparison. It moved out of package nexus so the Go rule reads
-	// SQL as the TypeScript one does without linking the TypeScript checker, the move internal/text_rules/shouting
-	// made. It imports only `strings`, and `go list -deps` names nothing past the standard library, so it is a leaf by
-	// its imports, and it changes only when the shared reading does. Measured on 2026-11-05, three warm rounds each of
-	// `go build ./internal/lint/registry` after a one-comment edit, under a load average of about 19 to 20 (31 over
-	// fifteen minutes): editing internal/text_rules/sql_text rebuilds in 0.12 to 0.13s, and `go build -v` shows it is
-	// the only package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule that imports
-	// it, 2.57 to 2.76s.
+	// The SQL reading nexus/security-no-interpolated-sql-string and its cohere-go twin share: which holes in SQL text
+	// sit inside a quoted value or bare after a comparison. It moved out of package nexus so the Go rule reads SQL as
+	// the TypeScript one does without linking the TypeScript checker, the move internal/text_rules/shouting made. It
+	// imports only `strings`, and `go list -deps` names nothing past the standard library, so it is a leaf by its
+	// imports, and it changes only when the shared reading does. Measured on 2026-11-05, three warm rounds each of `go
+	// build ./internal/typescript_language/registry` after a one-comment edit, under a load average of about 19 to 20
+	// (31 over fifteen minutes): editing internal/text_rules/sql_text rebuilds in 0.12 to 0.13s, and `go build -v`
+	// shows it is the only package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule
+	// that imports it, 2.57 to 2.76s.
 	"github.com/system-inc/cohere/internal/text_rules/sql_text": true,
 	// The warning-comment judgment nexus/consistency-no-warning-comment and its cohere-go twin share: the words, the
 	// whole-word test and the masks (#jmx59gd). It imports only the standard library and internal/text_rules/shouting,
 	// a leaf on this list, so it is a leaf by its imports, and it changes only when the shared judgment does. Measured
-	// on 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a load average
-	// of about 30: 0.20 to 0.25s, and `go build -v` shows it is the only package rebuilt.
+	// on 2026-11-06, three rounds of `go build ./internal/typescript_language/registry` after a one-comment edit, under
+	// a load average of about 30: 0.20 to 0.25s, and `go build -v` shows it is the only package rebuilt.
 	"github.com/system-inc/cohere/internal/text_rules/warning_comment": true,
 	// The separated-folder-words judgment nexus/consistency-require-separated-folder-words and its cohere-go twin
 	// share: the parts, the pieces a split may use and the tie rule (#narw7aq). It imports only the standard library
 	// and policy, on this list, so it is a leaf by its imports, and it changes only when the shared judgment does.
-	// Measured on 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a
-	// load average of about 24 to 34: 0.24 to 0.26s, and `go build -v` shows it is the only package rebuilt.
+	// Measured on 2026-11-06, three rounds of `go build ./internal/typescript_language/registry` after a one-comment
+	// edit, under a load average of about 24 to 34: 0.24 to 0.26s, and `go build -v` shows it is the only package
+	// rebuilt.
 	"github.com/system-inc/cohere/internal/text_rules/folder_words": true,
 	// The file-name judgment nexus/consistency-no-utils-file-name and nexus/consistency-no-abbreviated-file-name share
-	// with their cohere-go twins: a file name's words, and what the utils word and the abbreviation vocabulary make
-	// of them (#2xt6v5r). It imports only the standard library, internal/text_rules/folder_words and
+	// with their cohere-go twins: a file name's words, and what the utils word and the abbreviation vocabulary make of
+	// them (#2xt6v5r). It imports only the standard library, internal/text_rules/folder_words and
 	// internal/text_rules/abbreviation, both on this list, so it is a leaf by its imports, and it changes only when the
-	// shared judgment does. Measured on 2026-11-09, three rounds of `go build -v ./internal/lint/registry` after a
-	// one-comment edit, under a load average of about 39: `go build -v` names it as the only package rebuilt each
-	// time, and the build itself took 0.49s to under a second once cohere-dev's queue for a token was taken out.
+	// shared judgment does. Measured on 2026-11-09, three rounds of `go build -v
+	// ./internal/typescript_language/registry` after a one-comment edit, under a load average of about 39: `go build
+	// -v` names it as the only package rebuilt each time, and the build itself took 0.49s to under a second once
+	// cohere-dev's queue for a token was taken out.
 	"github.com/system-inc/cohere/internal/text_rules/file_name_words": true,
 }
 
@@ -85,23 +91,22 @@ var allowedRuleImports = map[string]bool{
 // nothing, and refusing them would push legitimate dependencies into a worse shape for no measured
 // gain.
 //
-// `internal/lint/ecmascript/` and `internal/lint/checking/` are the shared shelf, which is the
-// thing rules are supposed to reach for. They also hold what vendoring leaves behind: a ported
-// ECMAScript regex parser the regex rules read patterns with, and tsgolint's type-checker helper
-// shelf. Neither is re-synced against anything, so both move when we change a shared decision
-// rather than when an upstream releases.
+// `internal/typescript_language/ecmascript/` and `internal/typescript_language/type_checking/` are the shared shelf,
+// which is the thing rules are supposed to reach for. They also hold what vendoring leaves behind: a ported ECMAScript
+// regex parser the regex rules read patterns with, and tsgolint's type-checker helper shelf. Neither is re-synced
+// against anything, so both move when we change a shared decision rather than when an upstream releases.
 //
 // Measured twice, independently, when `no-invalid-regexp` first reached the parser: editing a
 // rule that imports the parser and editing one that does not both rebuild in 0.30s warm, and a rule edit stays in the
 // ~1.9s band it was in before the import existed. Editing the parser itself costs 3.24s, which is
 // the real depth cost and is paid by whoever edits the parser rather than by rule authors.
 //
-// `internal/lint/rules/tailwind/collapse/` is the generated collapse table and its gate. It is regenerated when
-// Tailwind releases and at no other time, which is the movement property this list is about rather than an
-// exception to it. Measured on 2026-08-23, three warm rounds each: editing a tailwind rule that
-// imports it rebuilds in 0.06s against 0.07s for a rule that imports nothing, which is noise. Editing
-// the table itself costs 1.34s for a full binary rebuild, and that is paid by whoever regenerates it
-// rather than by rule authors, which is the same shape as the regex parser above.
+// `internal/typescript_language/rules/tailwind/collapse/` is the generated collapse table and its gate. It is
+// regenerated when Tailwind releases and at no other time, which is the movement property this list is about rather
+// than an exception to it. Measured on 2026-08-23, three warm rounds each: editing a tailwind rule that imports it
+// rebuilds in 0.06s against 0.07s for a rule that imports nothing, which is noise. Editing the table itself costs 1.34s
+// for a full binary rebuild, and that is paid by whoever regenerates it rather than by rule authors, which is the same
+// shape as the regex parser above.
 //
 // Widened from `ecmascript/` to `utils/` on 2026-08-23, when the first lift out of a rule package
 // landed and this guard refused it. `jsx/` is our own code rather than vendored, which looked like
@@ -118,8 +123,8 @@ var allowedRuleImports = map[string]bool{
 // in this same file exists to prevent. Two guards of ours would have been pulling against each
 // other, and the measurement is what says which one was wrong.
 var allowedRuleImportPrefixes = []string{
-	"github.com/system-inc/cohere/internal/lint/ecmascript/",
-	"github.com/system-inc/cohere/internal/lint/checking",
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/",
+	"github.com/system-inc/cohere/internal/typescript_language/type_checking",
 }
 
 // A rule edit must not trigger a deep rebuild, and this is a build-time check rather than a review
@@ -151,7 +156,7 @@ func TestRulePackagesStayLeaves(test *testing.T) {
 	 * `registry` imports every registering package, so a deep import inside one is on the rebuild
 	 * path for all of them. A package that registers nothing is not.
 	 */
-	listed, imports := listImports(test, "./internal/lint/rules/...")
+	listed, imports := listImports(test, "./internal/typescript_language/rules/...")
 	rulePackages := registeringPackages(test, listed)
 	if len(rulePackages) == 0 {
 		// A check that found nothing to check passes for the wrong reason, which is the same shape

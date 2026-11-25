@@ -10,8 +10,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/command_line/sentence"
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // collectTypeDiagnostics gathers the compiler's own findings for our files.
@@ -200,7 +200,7 @@ func finishScopedTypeCheck(
 	check *typeCheck,
 	graph *program.Graph,
 	location projectLocation,
-	lintConfiguration *configuration.Configuration,
+	lintConfiguration *settings.Configuration,
 	projectFiles []*ast.SourceFile,
 	persist bool,
 ) ([]*ast.SourceFile, []*ast.Diagnostic, error) {
@@ -227,7 +227,7 @@ func finishScopedTypeCheck(
 // dependency's: the whole program is still checked, since our files' types depend on theirs, and nothing found in
 // them is said. An entry keeping the type check keeps them, never linted or formatted, and counted apart.
 // ignores is the run's settings, nil when there are none, which ignores nothing.
-func typeCheckedFiles(files []*ast.SourceFile, ignores *configuration.Configuration) ([]*ast.SourceFile, int) {
+func typeCheckedFiles(files []*ast.SourceFile, ignores *settings.Configuration) ([]*ast.SourceFile, int) {
 	if ignores == nil {
 		return files, 0
 	}
