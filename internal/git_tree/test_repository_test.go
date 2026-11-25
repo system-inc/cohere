@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/git_tree"
+	"github.com/system-inc/cohere/internal/git_tree"
 )
 
 // testRepository is a git repository in a test's temporary directory, which the test's git runs in

@@ -22,7 +22,6 @@ use (
 	./TypeScript-shim/vfs
 	./TypeScript-shim/vfs/cachedvfs
 	./TypeScript-shim/vfs/osvfs
-	./git_tree
 	./modules/go_cache
 	./modules/go_listing
 	./modules/memory_limit

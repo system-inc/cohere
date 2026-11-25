@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/git_tree"
+	"github.com/system-inc/cohere/internal/git_tree"
 )
 
 // A listing git wouldn't print is refused, record by record, never read as some other tree.

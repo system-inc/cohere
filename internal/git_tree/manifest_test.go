@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/git_tree"
+	"github.com/system-inc/cohere/internal/git_tree"
 )
 
 // The golden record is Loom's own manifest fixture (builder/tracked_test.go's trackedTree: top.txt,

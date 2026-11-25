@@ -1,17 +1,17 @@
-// Package git_tree is git's own arithmetic over a repository's files, written once for the three
-// repositories that need it: an object's id (blob, tree and commit, as `git hash-object` and
-// `git write-tree` name them), the listings `git ls-tree -z` and `git ls-files --stage -z` print, the
-// mode git records for a file on disk, and whether a working-tree file still is what a listing records.
-// It also holds the `.tracked` manifest's layout, the record Loom's builder writes into a source that
-// carries no .git and Adamic reads there (manifest.go). That layout is our protocol, not git's.
+// Package git_tree is git's own arithmetic over a repository's files: an object's id (blob, tree and
+// commit, as `git hash-object` and `git write-tree` name them), the listings `git ls-tree -z` and
+// `git ls-files --stage -z` print, the mode git records for a file on disk, and whether a working-tree file
+// still is what a listing records. It also holds the `.tracked` manifest's layout, the record Loom's builder
+// writes into a source that carries no .git and Adamic reads there (manifest.go). That layout is our
+// protocol, not git's.
 //
-// Every answer is git's, checked against git itself in this module's tests: the executable bit is the
+// Every answer is git's, checked against git itself in this package's tests: the executable bit is the
 // owner's alone, a symbolic link is a blob of its target's bytes, a gitlink is a submodule's commit and
 // sorts as a file, and in a tree object a directory sorts as if its name ended in "/".
 //
 // It is pure: it runs no git, opens no store and keys no cache. Each consumer brings its own git runner
-// and its own words for an error, and calls this for the arithmetic. It is a module of its own, beside
-// static_single_assignment, so Loom and Adamic can require it without requiring cohere's root module.
+// and its own words for an error, and calls this for the arithmetic. Only cohere imports it: cohere-dev's
+// landing commit and tree listing, and the Go project's gitlinks (internal/go_language/project).
 package git_tree
 
 import (

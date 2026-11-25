@@ -27,10 +27,6 @@ replace (
 	// it, shared with Adamic the same way (#kr2yp54).
 	github.com/system-inc/cohere/modules/mutation_aliasing => ./modules/mutation_aliasing
 
-	// git's own arithmetic over a repository's tree: its objects' ids and the listings `git ls-tree -z` and
-	// `git ls-files --stage -z` print, shared with Loom and Adamic the same way (#4mrck67).
-	github.com/system-inc/cohere/git_tree => ./git_tree
-
 	// The memory limit a process's cgroups hold it to, shared with Loom and Adamic the same way (#mf4x0hb).
 	github.com/system-inc/cohere/modules/memory_limit => ./modules/memory_limit
 
@@ -62,7 +58,6 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
-	github.com/system-inc/cohere/git_tree v0.0.0
 	github.com/system-inc/cohere/modules/go_cache v0.0.0
 	github.com/system-inc/cohere/modules/go_listing v0.0.0
 	github.com/system-inc/cohere/modules/memory_limit v0.0.0
