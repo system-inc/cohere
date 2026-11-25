@@ -675,6 +675,42 @@ func (verdict boxVerdict) timingReport() string {
 	return strings.Join(parts, "; ")
 }
 
+// skippedOnLanding reads a landing body's count of tests skipped on its gate boxes, its land line's ", N skipped on".
+var skippedOnLanding = regexp.MustCompile(`, ([0-9]+) skipped on `)
+
+// previousSkipped is how many tests main's last landing skipped on its gate boxes, read from its body, and -1 when its
+// body says no count, a landing from before the gate said one.
+func previousSkipped(worktree string) int {
+	// Ignored: a main with no landing body to read has no count to compare, which skipJump reads as -1.
+	body, _ := gitOutput(worktree, "log", "-1", "--first-parent", "--format=%b", "main")
+	if strings.Contains(body, ", nothing it skipped") {
+		return 0
+	}
+	found := skippedOnLanding.FindStringSubmatch(body)
+	if found == nil {
+		return -1
+	}
+	// Ignored: the pattern holds only digits.
+	count, _ := strconv.Atoi(found[1])
+	return count
+}
+
+// skipJumpFloor is the least growth in skipped tests skipJump calls a jump, so a handful more on a small count never
+// reads as one.
+const skipJumpFloor = 20
+
+// skipJump says, loudly, when a gate skipped far more tests than main's last landing did: more than twice as many and
+// at least skipJumpFloor more. 196 against 10 printed and changed nothing twice, when a gate laid no corpus
+// (#3kpxrdt); a jump that large is a gate that stopped running something, not a box that lacked a tool. It is empty
+// when there is no jump or no count to compare.
+func skipJump(now int, before int) string {
+	if before < 0 || now <= 2*before || now-before < skipJumpFloor {
+		return ""
+	}
+	return fmt.Sprintf("look before trusting this green: %d tests skipped, against %d at main's last landing, so "+
+		"something this gate used to run ran nowhere", now, before)
+}
+
 // failureReport is each failed test and package with its output, and each package's timeout whole, every goroutine's
 // stack included, so a timeout names what it was waiting on.
 func (verdict boxVerdict) failureReport() string {
@@ -811,6 +847,10 @@ func runModuleTests(
 			verdict.box, strings.Join(skipped, ", "))
 		where += fmt.Sprintf(", %d skipped on %s and run nowhere: %s", len(skipped), verdict.box,
 			strings.Join(skipped, ", "))
+	}
+	if jump := skipJump(len(skipped), previousSkipped(worktree)); jump != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", jump)
+		where += "; " + jump
 	}
 	if optIn := testsNamed(verdict.optIn); len(optIn) > 0 {
 		fmt.Fprintf(streams.Errors, "cohere-dev: opt-in, so run by no gate: %s\n", strings.Join(optIn, ", "))
