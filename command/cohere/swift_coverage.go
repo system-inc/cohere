@@ -57,7 +57,8 @@ type failedCoverageQuery struct {
 }
 
 // coveredPackagesRecord is the child's answer to `--covered-packages`: the root, the packages a run there
-// checks, the root among them, and the packages inside it the run lists as vendored. See swift_language/Contract.md.
+// checks, the root among them, and the packages inside it the run lists as vendored. See
+// documentation/contract/Contract.md.
 type coveredPackagesRecord struct {
 	Kind     string   `json:"kind"`
 	Root     string   `json:"root"`

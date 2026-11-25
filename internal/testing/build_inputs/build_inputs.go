@@ -12,17 +12,16 @@
 package build_inputs
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/system-inc/cohere/go_listing"
 )
 
 // buildVariables are the environment variables that change what a go build of our code produces. Each is read
@@ -39,33 +38,31 @@ var buildVariables = []string{
 	"GOWORK",
 }
 
-// listedPackage is the part of `go list -json` that names what a package's build reads. A field whose name the
-// house spells apart from go list's is tagged with go list's.
-type listedPackage struct {
-	Directory         string `json:"Dir"`
-	Standard          bool
-	GoFiles           []string
-	CgoFiles          []string
-	CFiles            []string
-	CxxFiles          []string `json:"CXXFiles"`
-	MFiles            []string
-	HFiles            []string
-	FFiles            []string
-	SFiles            []string
-	SwigFiles         []string
-	SwigCxxFiles      []string `json:"SwigCXXFiles"`
-	SysoFiles         []string
-	IgnoredGoFiles    []string
-	IgnoredOtherFiles []string
-	EmbedFiles        []string
-	Module            *struct {
-		GoMod string
-	}
+// listedFields are the fields of a go_listing.Package that name what a package's build reads, asked of go list so
+// it prints nothing else.
+var listedFields = []string{
+	"Dir",
+	"Standard",
+	"GoFiles",
+	"CgoFiles",
+	"CFiles",
+	"CXXFiles",
+	"MFiles",
+	"HFiles",
+	"FFiles",
+	"SFiles",
+	"SwigFiles",
+	"SwigCXXFiles",
+	"SysoFiles",
+	"IgnoredGoFiles",
+	"IgnoredOtherFiles",
+	"EmbedFiles",
+	"Module",
 }
 
-// listedFields is listedPackage's fields as go list's -json takes them, so it prints nothing else.
-const listedFields = "Dir,Standard,GoFiles,CgoFiles,CFiles,CXXFiles,MFiles,HFiles,FFiles,SFiles,SwigFiles," +
-	"SwigCXXFiles,SysoFiles,IgnoredGoFiles,IgnoredOtherFiles,EmbedFiles,Module"
+// listedFiles are the lists a build reads: every list go_listing.BuildFileLists names, and the files a build
+// constraint leaves out, so no build tag leaves a file out of the key.
+var listedFiles = append(go_listing.BuildFileLists(), go_listing.IgnoredGoFiles, go_listing.IgnoredOtherFiles)
 
 // recording is one Record of a build, made once per test process however many tests ask for it: what a process
 // opened once is in its test log for the whole run.
@@ -127,27 +124,10 @@ func record(directory string, arguments []string) (int, error) {
 			continue
 		}
 		paths = append(paths, listed.Directory)
-		for _, files := range [][]string{
-			listed.GoFiles,
-			listed.CgoFiles,
-			listed.CFiles,
-			listed.CxxFiles,
-			listed.MFiles,
-			listed.HFiles,
-			listed.FFiles,
-			listed.SFiles,
-			listed.SwigFiles,
-			listed.SwigCxxFiles,
-			listed.SysoFiles,
-			listed.IgnoredGoFiles,
-			listed.IgnoredOtherFiles,
-			listed.EmbedFiles,
-		} {
-			for _, file := range files {
-				// A test main go generates is named by its path in the build cache: go's own, not ours.
-				if !filepath.IsAbs(file) {
-					paths = append(paths, filepath.Join(listed.Directory, file))
-				}
+		for _, file := range listed.SourceFiles(listedFiles) {
+			// A test main go generates is named by its path in the build cache: go's own, not ours.
+			if !filepath.IsAbs(file) {
+				paths = append(paths, listed.Path(file))
 			}
 		}
 		if listed.Module != nil && listed.Module.GoMod != "" && !modules[listed.Module.GoMod] {
@@ -240,30 +220,20 @@ func isSumFile(path string) bool {
 	return strings.HasSuffix(path, "go.sum") || strings.HasSuffix(path, "go.work.sum")
 }
 
-// list is `go list -deps` of the build's packages, with its flags, from directory.
-func list(directory string, arguments []string) ([]listedPackage, error) {
-	command := exec.Command("go", append([]string{"list", "-deps", "-json=" + listedFields}, arguments...)...)
+// list is `go list -deps` of the build's packages, with its flags, from directory. The build's arguments go after
+// the listing's own flags as they are, flags and packages alike, which is how go list takes a build's.
+func list(directory string, arguments []string) ([]go_listing.Package, error) {
+	listArguments, argumentsError := go_listing.Arguments(go_listing.Request{
+		Dependencies: true,
+		Fields:       listedFields,
+		BuildFlags:   arguments,
+	})
+	if argumentsError != nil {
+		return nil, argumentsError
+	}
+	command := exec.Command("go", listArguments...)
 	command.Dir = directory
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	if runError := command.Run(); runError != nil {
-		return nil, fmt.Errorf("go list: %w\n%s", runError, stderr.String())
-	}
-	packages := []listedPackage{}
-	decoder := json.NewDecoder(&stdout)
-	for {
-		var listed listedPackage
-		decodeError := decoder.Decode(&listed)
-		if errors.Is(decodeError, io.EOF) {
-			return packages, nil
-		}
-		if decodeError != nil {
-			return nil, fmt.Errorf("reading go list's output: %w", decodeError)
-		}
-		packages = append(packages, listed)
-	}
+	return go_listing.Run(command)
 }
 
 // goEnvironment is one of go env's values, as a build from directory sees it.

@@ -96,7 +96,7 @@ func TestTheGoChildRefusesAProfileItCannotCreate(test *testing.T) {
 func TestAProfiledRunWritesAProfileForEachProcessThatDidTheWork(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "Clean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}

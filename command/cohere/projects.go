@@ -847,7 +847,7 @@ func projectLabel(project discoveredProject) string {
 }
 
 // runLabels names each project of the run uniquely, in the run's order: its label, and for a project whose
-// directory an earlier one of the run shares, the child beside it, as `. (Folder)` beside the Go workspace at `.`
+// directory an earlier one of the run shares, the child beside it, as `. (Formats)` beside the Go workspace at `.`
 // (#vyjvz9k). The first keeps the label alone, so a directory holding one project names it as it always did, and a
 // summary, a failure line and a run-cache record each name one project.
 func runLabels(projects []discoveredProject) []string {

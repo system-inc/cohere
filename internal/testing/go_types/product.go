@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/go_listing"
 )
 
 // A Product is the export data of every package a set of tests reads that is outside the module it
@@ -447,19 +449,12 @@ func (product Product) compile(state *productState, directory string) error {
 	if goCommandError != nil {
 		return fmt.Errorf("building the %s product: %w", product.Name, goCommandError)
 	}
+	compiled, decodeError := go_listing.Decode(output)
+	if decodeError != nil {
+		return decodeError
+	}
 	exportFiles := map[string]string{}
-	decoder := json.NewDecoder(bytes.NewReader(output))
-	for {
-		var listed struct {
-			ImportPath string
-			Export     string
-			Error      *listedError
-		}
-		if decodeError := decoder.Decode(&listed); errors.Is(decodeError, io.EOF) {
-			break
-		} else if decodeError != nil {
-			return decodeError
-		}
+	for _, listed := range compiled {
 		if listed.Error != nil {
 			return fmt.Errorf("building the %s product: %s: %s", product.Name, listed.ImportPath, listed.Error.Message)
 		}

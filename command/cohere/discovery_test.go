@@ -462,7 +462,7 @@ func TestSummaryLineCountsTheFormatProject(test *testing.T) {
 		{project: discoveredProject{Directory: "swift", Kind: projectKindSwiftPackage}},
 	}
 	line := summaryLine(discovery{}, runs)
-	if want := "projects: 3 checked (1 Swift, 1 Go, 1 Folder), 1 failed"; !strings.HasPrefix(line, want) {
+	if want := "projects: 3 checked (1 Swift, 1 Go, 1 Formats), 1 failed"; !strings.HasPrefix(line, want) {
 		test.Errorf("summary %q, want it to start %q", line, want)
 	}
 }
@@ -470,7 +470,7 @@ func TestSummaryLineCountsTheFormatProject(test *testing.T) {
 // TestTheFormatProjectsRecordSaysWhatItCovered is #vyjvz9k, through the binary: at a Go module's root holding Markdown
 // and JSON, the format project's `--json` summary counts the files it accounted for: formatted fresh on the first run,
 // vouched for by the format record on the next, and after one file changes, that one fresh and the other two vouched
-// for. Its label is its own, `. (Folder)`, beside the Go project's `.`. It used to say 0 files in scope.
+// for. Its label is its own, `. (Formats)`, beside the Go project's `.`. It used to say 0 files in scope.
 func TestTheFormatProjectsRecordSaysWhatItCovered(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -521,9 +521,9 @@ func TestTheFormatProjectsRecordSaysWhatItCovered(test *testing.T) {
 			writeTree(test, root, map[string]string{"README.md": want.edit})
 		}
 		found := summaries()
-		formatProject, present := found[". (Folder)"]
+		formatProject, present := found[". (Formats)"]
 		if _, goPresent := found["."]; !present || !goPresent {
-			test.Fatalf("run %d: want summaries labeled `.` and `. (Folder)`, got %v", run, found)
+			test.Fatalf("run %d: want summaries labeled `.` and `. (Formats)`, got %v", run, found)
 		}
 		if formatProject.FilesInScope != 3 || formatProject.Checked != want.checked ||
 			formatProject.Cached != want.cached {

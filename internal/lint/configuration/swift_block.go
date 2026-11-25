@@ -79,7 +79,7 @@ func CheckSwiftBlockHasAReader(path string) error {
 }
 
 // holdsSwiftProject reports whether directory is a Swift project's root by the linter's own rule
-// (swift_language/Contract.md, the invocation): a regular file Package.swift, or a regular file project.yml, or
+// (documentation/contract/Contract.md, the invocation): a regular file Package.swift, or a regular file project.yml, or
 // exactly one entry ending .xcodeproj, a bundle the linter counts whatever its type. Two .xcodeproj the
 // fix pass refuses, so they are no project.
 func holdsSwiftProject(directory string) (bool, error) {

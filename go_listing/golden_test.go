@@ -109,6 +109,18 @@ func TestDecodeReadsTheGoldenAsGoPrintedIt(test *testing.T) {
 		) {
 		test.Errorf("the external test decodes as %+v", external)
 	}
+	// The root's embed patterns, its own and its external test's, as its directives spell them.
+	fixture := byImportPath(test, packages, "example.com/fixture")
+	if !slices.Equal(fixture.EmbedPatterns, []string{"message.txt"}) ||
+		len(fixture.TestEmbedPatterns) != 0 ||
+		!slices.Equal(fixture.XTestEmbedPatterns, []string{"expected.txt"}) {
+		test.Errorf(
+			"the root's embed patterns are %q, %q and %q",
+			fixture.EmbedPatterns,
+			fixture.TestEmbedPatterns,
+			fixture.XTestEmbedPatterns,
+		)
+	}
 }
 
 // SourceFiles, CgoIncludeDirectories, Reach and ReachError answer from the golden as from a live run.

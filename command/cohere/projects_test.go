@@ -894,7 +894,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 // contractDirectory is where the Swift contract's fixtures are.
 func contractDirectory(test *testing.T) string {
 	test.Helper()
-	directory, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract"))
+	directory, absolutePathError := filepath.Abs(contractFixtureDirectory)
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
