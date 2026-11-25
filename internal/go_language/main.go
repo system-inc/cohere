@@ -74,6 +74,7 @@ var mainHasRun atomic.Bool
 func Main(
 	arguments []string,
 	availableMemoryBytes uint64,
+	memoryShare uint64,
 	standardInput io.Reader,
 	standardOutput io.Writer,
 	standardError io.Writer,
@@ -87,7 +88,7 @@ func Main(
 	}
 	// Here rather than in run, so a test running cohere-go in process never changes its own memory limit. Nothing
 	// sets the limit after this, which a test holds the package to (TestOnlyMainSetsTheMemoryLimit).
-	memory := decideMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes)
+	memory := decideMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes, memoryShare)
 	// A save writes no file, refused where every write of a source file passes (format.RefuseWrites), so no phase, one
 	// added later included, can write over a file the editor holds unsaved. Here rather than in run, as the memory
 	// limit is, since the refusal is process-wide, and a test running cohere-go in process writes files beside it.

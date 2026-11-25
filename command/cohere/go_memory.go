@@ -8,6 +8,7 @@ type goMemory struct {
 	Source         string `json:"source"`
 	AvailableBytes uint64 `json:"availableBytes"`
 	Environment    string `json:"environment"`
+	SharedBy       uint64 `json:"sharedBy"`
 }
 
 // line says the limit and where it came from, and with buildsAtOnce over 0 how many builds beside the host's ran side
@@ -21,6 +22,9 @@ func (memory goMemory) line(buildsAtOnce int) string {
 	switch memory.Source {
 	case "Available":
 		said = fmt.Sprintf("memory limit %s, half of the %.1f GB available", limit, float64(memory.AvailableBytes)/1e9)
+		if memory.SharedBy > 1 {
+			said += fmt.Sprintf(" shared by %d projects at once", memory.SharedBy)
+		}
 	case "Environment":
 		if memory.LimitBytes == 0 {
 			said = fmt.Sprintf("memory limit none, since the environment sets cohere-go's collector (%s)",

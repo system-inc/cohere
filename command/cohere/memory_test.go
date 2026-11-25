@@ -151,3 +151,69 @@ func TestATestBinaryKeepsTheDefaultCollector(test *testing.T) {
 		test.Fatalf("the test binary's policy is %+v, which would hold every graph it builds", activeMemoryPolicy)
 	}
 }
+
+// One cohere run checking several projects never piles into itself: the project children it runs at once share its
+// half of what is available, each through the environment runProject starts it with, so two at once take a quarter
+// each and a child alone takes the half (#jrr6a5x). A share inherited from a parent run is replaced, never divided
+// again.
+func TestProjectChildrenAtOnceShareTheRunsHalf(test *testing.T) {
+	test.Parallel()
+	const available = 64e9
+	for _, each := range []struct {
+		name        string
+		launches    int
+		runsAtOnce  int
+		inherited   []string
+		wantCeiling uint64
+		wantLine    string
+	}{
+		{name: "two children at once take a quarter each", launches: 2, runsAtOnce: 4, wantCeiling: 16e9,
+			wantLine: "memory: collector off, ceiling 16 GB (half of 64 GB available, shared by 2 projects at once)"},
+		{name: "six projects four at once take an eighth each", launches: 6, runsAtOnce: 4, wantCeiling: 8e9,
+			wantLine: "memory: collector off, ceiling 8.0 GB (half of 64 GB available, shared by 4 projects at once)"},
+		{name: "a child alone takes the half", launches: 1, runsAtOnce: 4, wantCeiling: 32e9,
+			wantLine: "memory: collector off, ceiling 32 GB (half of 64 GB available)"},
+		{name: "a child alone drops a share it inherited", launches: 1, runsAtOnce: 4,
+			inherited: []string{memoryShareVariable + "=3"}, wantCeiling: 32e9,
+			wantLine: "memory: collector off, ceiling 32 GB (half of 64 GB available)"},
+		{name: "two children replace a share they inherited", launches: 2, runsAtOnce: 4,
+			inherited: []string{memoryShareVariable + "=3"}, wantCeiling: 16e9,
+			wantLine: "memory: collector off, ceiling 16 GB (half of 64 GB available, shared by 2 projects at once)"},
+	} {
+		environment := projectChildEnvironment(append([]string{"HOME=/nowhere"}, each.inherited...),
+			discoveredProject{Kind: projectKindGoModule}, "go", "", "", "", projectMemoryShare(each.launches,
+				each.runsAtOnce))
+		lookupEnvironment := func(name string) (string, bool) {
+			for _, entry := range environment {
+				if value, found := strings.CutPrefix(entry, name+"="); found {
+					return value, true
+				}
+			}
+			return "", false
+		}
+		policy := decideMemoryPolicy(lookupEnvironment, func() (uint64, error) { return available, nil })
+		if policy.ceiling != each.wantCeiling {
+			test.Errorf("%s: the child's ceiling is %d, want %d (environment %v)", each.name, policy.ceiling,
+				each.wantCeiling, environment)
+		}
+		if got := policy.line(); got != each.wantLine {
+			test.Errorf("%s: line %q, want %q", each.name, got, each.wantLine)
+		}
+	}
+}
+
+// A share only cohere's parent writes is read as no share when it is not a whole number of at least 1.
+func TestAMalformedMemoryShareIsNoShare(test *testing.T) {
+	test.Parallel()
+	for _, value := range []string{"0", "-2", "two", ""} {
+		lookupEnvironment := func(name string) (string, bool) {
+			if name == memoryShareVariable {
+				return value, true
+			}
+			return "", false
+		}
+		if share := memoryShare(lookupEnvironment); share != 1 {
+			test.Errorf("%s=%q is a share of %d, want 1", memoryShareVariable, value, share)
+		}
+	}
+}

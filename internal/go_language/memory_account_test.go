@@ -45,6 +45,8 @@ func TestDecideMemory(test *testing.T) {
 		environment map[string]string
 		current     int64
 		available   uint64
+		// share is how many project children divide the half, 1 for a run alone.
+		share uint64
 		// set is every limit decideMemory set, the read with -1 left out.
 		set  []int64
 		want contract.Memory
@@ -55,6 +57,14 @@ func TestDecideMemory(test *testing.T) {
 			want: contract.Memory{
 				LimitBytes: monkeeLimitBytes, Source: contract.MemorySourceAvailable,
 				AvailableBytes: monkeeAvailableBytes,
+			},
+		},
+		{
+			name:    "one of 4 project children at once takes a quarter of Monkee's half, and says so",
+			current: monkeeLimitBytes / 4, available: monkeeAvailableBytes, share: 4,
+			want: contract.Memory{
+				LimitBytes: monkeeLimitBytes / 4, Source: contract.MemorySourceAvailable,
+				AvailableBytes: monkeeAvailableBytes, SharedBy: 4,
 			},
 		},
 		{
@@ -111,7 +121,7 @@ func TestDecideMemory(test *testing.T) {
 				return previous
 			}
 
-			memory := decideMemory(lookupEnvironment, setMemoryLimit, decided.available)
+			memory := decideMemory(lookupEnvironment, setMemoryLimit, decided.available, max(decided.share, 1))
 
 			if !slices.Equal(set, decided.set) {
 				test.Errorf("set the limit to %v, want %v", set, decided.set)

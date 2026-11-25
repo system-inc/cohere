@@ -75,6 +75,9 @@ type Memory struct {
 	AvailableBytes uint64 `json:"availableBytes"`
 	// Environment names the variables that set the collector, as `GOGC=100`, when Source is Environment.
 	Environment string `json:"environment,omitempty"`
+	// SharedBy is how many project children of one cohere run divide the half of what is available, when Source is
+	// Available and it is more than one, so the limit is that half divided by it (#jrr6a5x). Absent for a run alone.
+	SharedBy uint64 `json:"sharedBy,omitempty"`
 }
 
 // CgoTranslation is how many packages a run's cgo tool translated, and the milliseconds the go list that ran it
