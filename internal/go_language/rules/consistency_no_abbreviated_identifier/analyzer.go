@@ -11,7 +11,7 @@
 // and is decided by types rather than by spelling.
 //
 // A whole word whose expansion Go already uses, as `err`'s `error` and `ctx`'s `context` are, asks for a descriptive
-// name. Where the value came from gives one (internal/naming/go_origin_names, which the errornames and contextnames
+// name. Where the value came from gives one (internal/go_language/origin_names, which the errornames and contextnames
 // codemods name by too). A local error written once, by a single call, takes the call's name, so `data, err :=
 // os.ReadFile(path)` is told to use readError, and offered it. A context.Context parameter is the caller's,
 // callerContext, and a local context written once takes the name of the call that made it, as context.WithCancel

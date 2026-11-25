@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 )
 
 // globalFixture declares one of each shape the advice rules read, by name.
@@ -118,7 +118,7 @@ func TestAdviceWordsTakeTheirRuledNames(test *testing.T) {
 		if object == nil {
 			test.Fatalf("no %s in %s in the fixture", testCase.name, testCase.owner)
 		}
-		local := rename.IsLocal(object, fixture.Types)
+		local := local_rename.IsLocal(object, fixture.Types)
 		got, why := globalName(loadedVocabulary, testCase.name, object, local)
 		if got != testCase.want || why != testCase.wantWhy {
 			test.Errorf("%s in %s: got %q (%s), want %q", testCase.name, testCase.owner, got, why, testCase.want)
@@ -190,7 +190,7 @@ func TestUpstreamRuleSpellings(test *testing.T) {
 }
 
 // enclosingFunction is the name of the function declaration whose body or signature declares object.
-func enclosingFunction(fixture rename.Package, object types.Object) string {
+func enclosingFunction(fixture local_rename.Package, object types.Object) string {
 	for _, declaration := range fixture.Files[0].Decls {
 		function, isFunction := declaration.(*ast.FuncDecl)
 		if isFunction && function.Pos() <= object.Pos() && object.Pos() < function.End() {

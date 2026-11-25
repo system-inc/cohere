@@ -235,7 +235,7 @@ way. The names, the line lengths and the file layout went through typed codemods
 the end. What was left went through waves of light agents, each holding one package's judgment.
 
 **The codemods are in `tools/go_codemods`.** Every rename goes through global_rename and the local rename, a library
-in `internal/go_rename`: `rename` (one package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
+in `internal/go_language/rename`: `local_rename` (one package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
 the same object under the new names, checked to a fixpoint. The rewrite is reloaded in memory and compared
 before anything is written, and checked again from disk. A name someone else owns (a field an encoder reads by
 name, a method an interface of another package requires, an export outside the repository) is found by type and
@@ -251,7 +251,7 @@ refused, and the refusal is listed with its reason. The passes:
 - `octal_prefix`: each literal the octal-prefix rule flags, `0644` written as `0o644`, through the same reload,
   every literal of a rewritten file proven to keep its constant value.
 - `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words; a bare `cohere` runs the
-  same wrap, `internal/line_wrap`, on the long-line rule's findings once the types load sound, never touching a
+  same wrap, `internal/go_language/line_wrap`, on the long-line rule's findings once the types load sound, never touching a
   comment or taking a file past the long-file limit), `type_split` (one type
   with methods to a file, each file named for it), `folder_names` (a package folder moved with its clause, its
   import paths and every qualifier).

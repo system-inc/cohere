@@ -5,14 +5,14 @@ import (
 	"go/token"
 	"go/types"
 
+	"github.com/system-inc/cohere/internal/go_language/origin_names"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
-	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 )
 
 // errorNameWords are the vocabulary's words as an error's name is built from them, read once from the same file the
 // findings are judged by.
-var errorNameWords = go_origin_names.VocabularyOf(abbreviation.Policy)
+var errorNameWords = origin_names.VocabularyOf(abbreviation.Policy)
 
 // variableWrites is how a package's code writes one variable: how many times, the right side of the statement that
 // defines it, and whether its address is taken, since a write through a pointer is invisible to the count.
@@ -132,18 +132,18 @@ func originName(
 	switch {
 	case types.Identical(variable.Type(), types.Universe.Lookup("error").Type()):
 		if call, isOne := singleCall(written); isOne {
-			newName, _, _ = go_origin_names.CallErrorName(context.TypesInfo, call, errorNameWords)
+			newName, _, _ = origin_names.CallErrorName(context.TypesInfo, call, errorNameWords)
 			messageId = namedForItsCall
 		}
-	case go_origin_names.IsContext(variable.Type()) && written != nil && written.parameter:
+	case origin_names.IsContext(variable.Type()) && written != nil && written.parameter:
 		// A parameter the body writes holds the caller's context only until the write, so the caller's name would
 		// be wrong after it.
 		if written.count == 0 && !written.addressTaken {
-			newName, messageId = go_origin_names.CallerContextName, contextNamedForItsOrigin
+			newName, messageId = origin_names.CallerContextName, contextNamedForItsOrigin
 		}
-	case go_origin_names.IsContext(variable.Type()):
+	case origin_names.IsContext(variable.Type()):
 		if call, isOne := singleCall(written); isOne {
-			newName, _, _ = go_origin_names.ContextCallName(context.TypesInfo, call)
+			newName, _, _ = origin_names.ContextCallName(context.TypesInfo, call)
 			messageId = contextNamedForItsOrigin
 		}
 	}

@@ -22,12 +22,12 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/load"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/go_language/rules"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_uppercase_initialism"
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
 // renamingPipeline is renamingPipelineOver the rename fixture.
@@ -99,7 +99,7 @@ func TestAProofNamesTheRenamesItsRewriteBreaks(test *testing.T) {
 			name: "a use left unrenamed",
 			plant: func(test *testing.T, result *global_rename.Result, root string) {
 				external := filepath.Join(root, "internal", "store", "store_test.go")
-				result.Edits = slices.DeleteFunc(result.Edits, func(edit rename.Edit) bool {
+				result.Edits = slices.DeleteFunc(result.Edits, func(edit local_rename.Edit) bool {
 					return edit.Filename == external
 				})
 			},
@@ -120,7 +120,7 @@ func TestAProofNamesTheRenamesItsRewriteBreaks(test *testing.T) {
 					if offset < 0 {
 						test.Fatalf("store.go holds no %q", around+"record")
 					}
-					result.CommentEdits = append(result.CommentEdits, rename.Edit{
+					result.CommentEdits = append(result.CommentEdits, local_rename.Edit{
 						Filename: file, Offset: offset + len(around), OldText: "record", NewText: "entry",
 					})
 				}
@@ -199,7 +199,7 @@ func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 	}
 
 	windowsFile := filepath.Join(root, "internal", "limits", "limits_windows.go")
-	result.TwinEdits = slices.DeleteFunc(result.TwinEdits, func(edit rename.Edit) bool {
+	result.TwinEdits = slices.DeleteFunc(result.TwinEdits, func(edit local_rename.Edit) bool {
 		return edit.Filename == windowsFile
 	})
 	failures := pipeline.prove(space, map[string][]byte{}, result, options).failures
@@ -261,19 +261,19 @@ func TestAPlatformProofRefusesARenameThatCapturesAUse(test *testing.T) {
 	root := pipeline.described.workspace.Root
 	space := workspace.FromLoaded(root, loaded.Roots, loaded.Packages, nil)
 	options := global_rename.Options{LoadPlatform: pipeline.platformLoad(space, nil), RequireSoundPlatforms: true}
-	edits := func(relative string, from int, every bool) []rename.Edit {
+	edits := func(relative string, from int, every bool) []local_rename.Edit {
 		file := filepath.Join(root, filepath.FromSlash(relative))
 		contents, readError := os.ReadFile(file)
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		var found []rename.Edit
+		var found []local_rename.Edit
 		for offset := from; ; {
 			index := strings.Index(string(contents[offset:]), "maxBytes")
 			if index < 0 {
 				break
 			}
-			found = append(found, rename.Edit{Filename: file, Offset: offset + index, OldText: "maxBytes",
+			found = append(found, local_rename.Edit{Filename: file, Offset: offset + index, OldText: "maxBytes",
 				NewText: "maximumBytes"})
 			offset += index + len("maxBytes")
 			if !every {

@@ -3,7 +3,7 @@
 // spelling) takes the name that call gives it: `context.WithTimeout` gives timeoutContext,
 // `(*testing.T).Context` testContext, and so on; one from any other call is left for the waves. A
 // context.Context parameter came from the caller, and is named for that: callerContext. The parameter's name
-// and the call table are internal/naming/go_origin_names, which cohere-go's naming rule asks too, so its
+// and the call table are internal/go_language/origin_names, which cohere-go's naming rule asks too, so its
 // suggestion and this rename agree. A ctx parameter or variable whose type, after one pointer, is a named type
 // of our own module ending in Context takes the type's name: `composeContext` stays composeContext, and an
 // exact `Context` takes its package's name in front (`rule.Context` gives ruleContext). Every rename goes
@@ -23,10 +23,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/origin_names"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
-	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/policy"
 
@@ -214,23 +214,23 @@ func definingCall(sites writeSites, variable *types.Var) (*ast.CallExpr, string)
 
 // parseVocabulary reads policy/Abbreviations.json through the shared vocabulary, into the words a context's
 // name is built from.
-func parseVocabulary(contents []byte) (go_origin_names.Vocabulary, error) {
+func parseVocabulary(contents []byte) (origin_names.Vocabulary, error) {
 	loaded, loadError := abbreviation.Load(contents, nil)
 	if loadError != nil {
-		return go_origin_names.Vocabulary{}, loadError
+		return origin_names.Vocabulary{}, loadError
 	}
-	words := go_origin_names.VocabularyOf(loaded)
+	words := origin_names.VocabularyOf(loaded)
 	if len(words.Expansions) == 0 {
-		return go_origin_names.Vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
+		return origin_names.Vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
 	}
 	return words, nil
 }
 
 // fullWordsLowerCamel is name in lowerCamel with every vocabulary word expanded. It returns "" and a category
 // when a word has no mechanical expansion.
-func fullWordsLowerCamel(name string, words go_origin_names.Vocabulary) (string, string) {
+func fullWordsLowerCamel(name string, words origin_names.Vocabulary) (string, string) {
 	var builder strings.Builder
-	for index, word := range go_origin_names.CamelWords(name) {
+	for index, word := range origin_names.CamelWords(name) {
 		lowered := strings.ToLower(word)
 		if words.AdviceWords[lowered] {
 			return "", "advice-only word in the type name"
@@ -275,7 +275,7 @@ func ownContextType(variable *types.Var, ownModule string) (*types.TypeName, boo
 // contextOverrides names the ctx of an own Context type whose derived name would be the type's own name, which
 // a parameter cannot take without shadowing the type. Keyed by the package path relative to the module, and
 // applied before the type-derived name.
-var contextOverrides = map[go_origin_names.TypeName]string{
+var contextOverrides = map[origin_names.TypeName]string{
 	{PackagePath: "internal/format/yaml/compose", Name: "composeContext"}:   "composition",
 	{PackagePath: "internal/lint/ecmascript/regexp", Name: "escapeContext"}: "escaping",
 }
@@ -283,16 +283,16 @@ var contextOverrides = map[go_origin_names.TypeName]string{
 // ownContextName names a ctx of one of our own Context types: the override for its type when there is one,
 // else lowerCamel of the type name in full words, with the package name (in its QualifierSpelling) in
 // front when the type is named exactly Context.
-func ownContextName(typeObject *types.TypeName, ownModule string, words go_origin_names.Vocabulary) (string, string) {
+func ownContextName(typeObject *types.TypeName, ownModule string, words origin_names.Vocabulary) (string, string) {
 	relativePath := strings.TrimPrefix(strings.TrimPrefix(typeObject.Pkg().Path(), ownModule), "/")
-	overrideKey := go_origin_names.TypeName{PackagePath: relativePath, Name: typeObject.Name()}
+	overrideKey := origin_names.TypeName{PackagePath: relativePath, Name: typeObject.Name()}
 	if override, found := contextOverrides[overrideKey]; found {
 		return override, ""
 	}
 	base := typeObject.Name()
 	if base == "Context" {
 		qualifier := typeObject.Pkg().Name()
-		if camel, known := go_origin_names.QualifierSpelling(qualifier); known {
+		if camel, known := origin_names.QualifierSpelling(qualifier); known {
 			qualifier = camel
 		}
 		base = qualifier + "Context"
@@ -313,7 +313,7 @@ func findCandidates(
 	info *types.Info,
 	files []*ast.File,
 	ownModule string,
-	words go_origin_names.Vocabulary,
+	words origin_names.Vocabulary,
 ) []candidate {
 	sites := findWrites(info, files)
 	var candidates []candidate
@@ -324,7 +324,7 @@ func findCandidates(
 				return true
 			}
 			variable, isVariable := info.Defs[identifier].(*types.Var)
-			if !isVariable || !rename.IsLocal(variable, packageTypes) {
+			if !isVariable || !local_rename.IsLocal(variable, packageTypes) {
 				return true
 			}
 			decided := candidate{variable: variable}
@@ -343,7 +343,7 @@ func contextName(
 	sites writeSites,
 	variable *types.Var,
 	ownModule string,
-	words go_origin_names.Vocabulary,
+	words origin_names.Vocabulary,
 ) (string, string, string) {
 	if typeObject, isOwn := ownContextType(variable, ownModule); isOwn {
 		typeString := variable.Type().String()
@@ -356,17 +356,17 @@ func contextName(
 		newName, category := ownContextName(typeObject, ownModule, words)
 		return newName, category, typeString
 	}
-	if !go_origin_names.IsContext(variable.Type()) {
+	if !origin_names.IsContext(variable.Type()) {
 		return "", "type is neither context.Context nor an own Context type", variable.Type().String()
 	}
 	if sites.signature[variable] == "parameter" {
-		return go_origin_names.CallerContextName, "", "a parameter"
+		return origin_names.CallerContextName, "", "a parameter"
 	}
 	call, category := definingCall(sites, variable)
 	if call == nil {
 		return "", category, ""
 	}
-	return go_origin_names.ContextCallName(info, call)
+	return origin_names.ContextCallName(info, call)
 }
 
 // declarationRecord is one candidate's outcome, keyed by where it is declared, so a file seen by two
@@ -434,7 +434,7 @@ func run(root string, skips []string, dryRun bool) int {
 		return 1
 	}
 
-	var allEdits []rename.Edit
+	var allEdits []local_rename.Edit
 	var allUnresolved []string
 	records := map[string]*declarationRecord{}
 	var recordOrder []string
@@ -447,7 +447,7 @@ func run(root string, skips []string, dryRun bool) int {
 			ownModule,
 			words,
 		)
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		proposedAt := map[string]string{}
 		for _, decided := range candidates {
 			position := analyzedPackage.Fset.PositionFor(decided.variable.Pos(), false)
@@ -465,11 +465,11 @@ func run(root string, skips []string, dryRun bool) int {
 				recordOrder = append(recordOrder, key)
 			}
 			if decided.newName != "" {
-				proposals = append(proposals, rename.Proposal{Object: decided.variable, NewName: decided.newName})
+				proposals = append(proposals, local_rename.Proposal{Object: decided.variable, NewName: decided.newName})
 				proposedAt[analyzedPackage.Fset.Position(decided.variable.Pos()).String()] = decided.newName
 			}
 		}
-		plan := rename.Check(renamePackage, proposals)
+		plan := local_rename.Check(renamePackage, proposals)
 		for _, unresolved := range plan.Unresolved {
 			allUnresolved = append(allUnresolved, analyzedPackage.ID+": "+unresolved)
 		}
@@ -487,11 +487,11 @@ func run(root string, skips []string, dryRun bool) int {
 			)
 			record.reason = strings.ReplaceAll(rejection.Reason, loaded.Root+"/", "")
 		}
-		allEdits = append(allEdits, rename.Edits(renamePackage, plan.Accepted)...)
+		allEdits = append(allEdits, local_rename.Edits(renamePackage, plan.Accepted)...)
 	}
 
-	edits, disagreements := rename.Deduplicate(allEdits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(allEdits)
+	editsByFile := local_rename.GroupByFile(edits)
 
 	candidateCount, eligibleCount, acceptedCount := 0, 0, 0
 	rejectedByReason := map[string]int{}
@@ -620,7 +620,7 @@ func printCounts(counts map[string]int, limit int) {
 }
 
 // lineBeforeAndAfter returns the source line holding offset, as it is and with the edits that fall on it.
-func lineBeforeAndAfter(filename string, offset int, edits []rename.Edit) (string, string) {
+func lineBeforeAndAfter(filename string, offset int, edits []local_rename.Edit) (string, string) {
 	source, readError := os.ReadFile(filename)
 	if readError != nil {
 		return readError.Error(), ""
@@ -649,8 +649,8 @@ func apply(
 	loaded *workspace.Workspace,
 	root string,
 	skips []string,
-	edits []rename.Edit,
-	editsByFile map[string][]rename.Edit,
+	edits []local_rename.Edit,
+	editsByFile map[string][]local_rename.Edit,
 ) int {
 	return workspace.ApplyVerified(
 		loaded,

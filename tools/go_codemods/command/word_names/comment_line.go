@@ -3,8 +3,8 @@ package main
 import (
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/line_wrap"
+	"github.com/system-inc/cohere/internal/go_language/line_wrap"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // commentLine is one `//` comment of a group, as it reads after its edits.
@@ -13,7 +13,7 @@ type commentLine struct {
 	// indentation is the source before the comment on its line.
 	indentation string
 	text        string
-	edits       []rename.Edit
+	edits       []local_rename.Edit
 	edited      bool
 }
 

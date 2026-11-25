@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/test_functions"
+	"github.com/system-inc/cohere/internal/go_language/test_functions"
 )
 
 // Configuration says where and how to load.

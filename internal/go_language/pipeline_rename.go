@@ -19,13 +19,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/format"
 	"github.com/system-inc/cohere/internal/go_language/load"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_uppercase_initialism"
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
 	"github.com/system-inc/cohere/internal/write_root"
 )
 
@@ -464,14 +464,14 @@ func (pipeline *pipeline) proposals(
 		owner  *packages.Package
 		object types.Object
 	}
-	declarations := map[rename.EditKey]declared{}
+	declarations := map[local_rename.EditKey]declared{}
 	for _, analyzed := range current.Packages {
 		for identifier, object := range analyzed.TypesInfo.Defs {
 			if object == nil {
 				continue
 			}
 			position := analyzed.Fset.PositionFor(identifier.Pos(), false)
-			key := rename.EditKey{Filename: position.Filename, Offset: position.Offset}
+			key := local_rename.EditKey{Filename: position.Filename, Offset: position.Offset}
 			if _, held := declarations[key]; !held {
 				declarations[key] = declared{owner: analyzed, object: object}
 			}
@@ -488,7 +488,7 @@ func (pipeline *pipeline) proposals(
 		if pipeline.refusedRenames[[3]string{each.file, spelled, each.newName}] {
 			continue
 		}
-		found, held := declarations[rename.EditKey{Filename: each.file, Offset: each.offset}]
+		found, held := declarations[local_rename.EditKey{Filename: each.file, Offset: each.offset}]
 		if !held {
 			pipeline.refuseRename(each, spelled, refusedNotDeclared, "no identifier declares a name at its position")
 			continue
@@ -754,7 +754,7 @@ func renamedCounts(result *global_rename.Result, askedBy []askedProposal) map[st
 			ruleOf[pair] = asked.rename.rule
 		}
 	}
-	edits, _ := rename.Deduplicate(slices.Concat(result.Edits, result.TwinEdits))
+	edits, _ := local_rename.Deduplicate(slices.Concat(result.Edits, result.TwinEdits))
 	counts := map[string]map[string]int{}
 	for _, edit := range edits {
 		name, held := ruleOf[[2]string{edit.OldText, edit.NewText}]

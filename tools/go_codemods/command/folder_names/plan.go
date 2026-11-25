@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -29,14 +29,14 @@ type counts struct {
 
 // plan is everything the moves change in Go source, before anything is written.
 type plan struct {
-	edits []rename.Edit
+	edits []local_rename.Edit
 	// names are the identifiers an edit gives a new name, by the file as loaded and offset: package clauses,
 	// qualifiers and renamed locals.
-	names map[rename.EditKey]string
+	names map[local_rename.EditKey]string
 	// renamedObjects are the locals renamed out of a new package name's way, with their new names.
 	renamedObjects map[types.Object]string
 	// droppedAliases are the alias identifiers an edit removes, by the file as loaded and offset.
-	droppedAliases map[rename.EditKey]bool
+	droppedAliases map[local_rename.EditKey]bool
 	counts         counts
 	refusals       []string
 	notes          []string
@@ -44,9 +44,9 @@ type plan struct {
 
 func newPlan() *plan {
 	return &plan{
-		names:          map[rename.EditKey]string{},
+		names:          map[local_rename.EditKey]string{},
 		renamedObjects: map[types.Object]string{},
-		droppedAliases: map[rename.EditKey]bool{},
+		droppedAliases: map[local_rename.EditKey]bool{},
 	}
 }
 
@@ -63,7 +63,7 @@ type typedFile struct {
 // moved, every import of a moved folder's path, and every qualifier of an import whose package takes a new name,
 // with any local standing in that name's way renamed. It returns the locals to rename, which the caller checks
 // with the rest of the package's.
-func (plan *plan) planTypedFile(mapping *mapping, sources fileSource, typed typedFile) []rename.Proposal {
+func (plan *plan) planTypedFile(mapping *mapping, sources fileSource, typed typedFile) []local_rename.Proposal {
 	contents, readError := sources.read(typed.filename)
 	if readError != nil {
 		plan.refusals = append(plan.refusals, fmt.Sprintf("%s: %v", typed.filename, readError))
@@ -73,7 +73,7 @@ func (plan *plan) planTypedFile(mapping *mapping, sources fileSource, typed type
 	offset := func(position token.Pos) int { return fileSet.PositionFor(position, false).Offset }
 	plan.planClause(mapping, typed.relativeFolder, typed.filename, typed.file, offset)
 
-	var proposals []rename.Proposal
+	var proposals []local_rename.Proposal
 	for _, spec := range typed.file.Imports {
 		importPath, unquoteError := strconv.Unquote(spec.Path.Value)
 		if unquoteError != nil {
@@ -110,7 +110,7 @@ func (plan *plan) planTypedFile(mapping *mapping, sources fileSource, typed type
 				string(contents[offset(spec.Name.Pos()):offset(spec.Path.Pos())]),
 				"",
 			)
-			plan.droppedAliases[rename.EditKey{Filename: typed.filename, Offset: offset(spec.Name.Pos())}] = true
+			plan.droppedAliases[local_rename.EditKey{Filename: typed.filename, Offset: offset(spec.Name.Pos())}] = true
 			plan.counts.AliasesDropped++
 		}
 		proposals = append(proposals, plan.planQualifiers(typed, packageName, newName, offset)...)
@@ -136,7 +136,7 @@ func (plan *plan) planClause(
 		return
 	}
 	plan.add(filename, offset(file.Name.Pos()), file.Name.Name, newName)
-	plan.names[rename.EditKey{Filename: filename, Offset: offset(file.Name.Pos())}] = newName
+	plan.names[local_rename.EditKey{Filename: filename, Offset: offset(file.Name.Pos())}] = newName
 	plan.counts.PackageClauses++
 	if file.Doc == nil {
 		return
@@ -162,9 +162,9 @@ func (plan *plan) planQualifiers(
 	packageName *types.PkgName,
 	newName string,
 	offset func(token.Pos) int,
-) []rename.Proposal {
+) []local_rename.Proposal {
 	info := typed.goPackage.TypesInfo
-	var proposals []rename.Proposal
+	var proposals []local_rename.Proposal
 	proposed := map[types.Object]bool{}
 	if existing := typed.goPackage.Types.Scope().Lookup(newName); existing != nil {
 		plan.refusals = append(
@@ -179,7 +179,7 @@ func (plan *plan) planQualifiers(
 			return true
 		}
 		plan.add(typed.filename, offset(identifier.Pos()), identifier.Name, newName)
-		plan.names[rename.EditKey{Filename: typed.filename, Offset: offset(identifier.Pos())}] = newName
+		plan.names[local_rename.EditKey{Filename: typed.filename, Offset: offset(identifier.Pos())}] = newName
 		plan.counts.Qualifiers++
 		scope := typed.goPackage.Types.Scope().Innermost(identifier.Pos())
 		if scope == nil {
@@ -193,7 +193,7 @@ func (plan *plan) planQualifiers(
 		if standing == nil || proposed[standing] {
 			return true
 		}
-		if !rename.IsLocal(standing, typed.goPackage.Types) {
+		if !local_rename.IsLocal(standing, typed.goPackage.Types) {
 			if standing.Parent() != typed.goPackage.Types.Scope() {
 				plan.refusals = append(plan.refusals, fmt.Sprintf(
 					"%s: %s is declared there and is not a local variable, so it cannot be renamed out of the import's way",
@@ -204,7 +204,7 @@ func (plan *plan) planQualifiers(
 			return true
 		}
 		proposed[standing] = true
-		proposals = append(proposals, rename.Proposal{Object: standing, NewName: camelCase(newName)})
+		proposals = append(proposals, local_rename.Proposal{Object: standing, NewName: camelCase(newName)})
 		return true
 	})
 	return proposals
@@ -233,7 +233,10 @@ func camelCase(name string) string {
 
 // add records one edit.
 func (plan *plan) add(filename string, offset int, oldText string, newText string) {
-	plan.edits = append(plan.edits, rename.Edit{Filename: filename, Offset: offset, OldText: oldText, NewText: newText})
+	plan.edits = append(
+		plan.edits,
+		local_rename.Edit{Filename: filename, Offset: offset, OldText: oldText, NewText: newText},
+	)
 }
 
 // relativeFolderOf is filename's folder relative to root, and whether it is under it.

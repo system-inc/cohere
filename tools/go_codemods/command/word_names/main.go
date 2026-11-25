@@ -22,9 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/policy"
 
@@ -937,7 +937,7 @@ func definitionsOf(info *types.Info, file *ast.File) (map[*types.Var]ast.Expr, m
 // planPackage finds every local in the editable files whose name the vocabulary flags, decides the name for
 // those it can, and counts the flagged names that are not locals. A proposed local carries the qualified
 // names to try if global_rename refuses its name for a conflict.
-func planPackage(renamePackage rename.Package, vocabulary *vocabulary) ([]localName, []nonLocalName) {
+func planPackage(renamePackage local_rename.Package, vocabulary *vocabulary) ([]localName, []nonLocalName) {
 	var locals []localName
 	var nonLocals []nonLocalName
 	for _, file := range renamePackage.Files {
@@ -975,7 +975,7 @@ func planPackage(renamePackage rename.Package, vocabulary *vocabulary) ([]localN
 			}
 			position := renamePackage.FileSet.PositionFor(identifier.Pos(), false)
 			variable, isVariable := object.(*types.Var)
-			if !isVariable || !rename.IsLocal(variable, renamePackage.Types) {
+			if !isVariable || !local_rename.IsLocal(variable, renamePackage.Types) {
 				nonLocals = append(nonLocals, nonLocalName{
 					position: position,
 					kind:     nonLocalKind(object, renamePackage.Types),
@@ -1046,7 +1046,10 @@ func planPackage(renamePackage rename.Package, vocabulary *vocabulary) ([]localN
 // checkQualified runs global_rename over every proposed local, and gives each one it refuses for a conflict its
 // next qualified name, round after round, until a round gives none a new name. It returns the last round's
 // plan, and for each accepted local the rule that chose its name.
-func checkQualified(renamePackage rename.Package, locals []localName) (rename.Plan, map[types.Object]string) {
+func checkQualified(
+	renamePackage local_rename.Package,
+	locals []localName,
+) (local_rename.Plan, map[types.Object]string) {
 	choices := map[types.Object][]choice{}
 	var order []types.Object
 	for _, local := range locals {
@@ -1060,14 +1063,14 @@ func checkQualified(renamePackage rename.Package, locals []localName) (rename.Pl
 	}
 	current := map[types.Object]int{}
 	for {
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		for _, object := range order {
 			proposals = append(
 				proposals,
-				rename.Proposal{Object: object, NewName: choices[object][current[object]].name},
+				local_rename.Proposal{Object: object, NewName: choices[object][current[object]].name},
 			)
 		}
-		plan := rename.Check(renamePackage, proposals)
+		plan := local_rename.Check(renamePackage, proposals)
 		advanced := false
 		for _, rejection := range plan.Rejections {
 			if strings.HasPrefix(rejection.Reason, "conflict:") &&
@@ -1169,8 +1172,8 @@ func run(root string, vocabularyPath string, skips []string, dryRun bool) int {
 	localsByKey := map[string]localName{}
 	nonLocalsByKey := map[string]nonLocalName{}
 	acceptedByKey := map[string]localName{}
-	var allEdits []rename.Edit
-	var allRejections []rename.Rejection
+	var allEdits []local_rename.Edit
+	var allRejections []local_rename.Rejection
 	var allUnresolved []string
 	for _, variant := range loaded.Analyzed {
 		renamePackage := loaded.RenamePackage(variant)
@@ -1193,10 +1196,10 @@ func run(root string, vocabularyPath string, skips []string, dryRun bool) int {
 			)] = localName{object: object, position: position, newName: newName, outcome: outcomeProposed,
 				rule: rules[object]}
 		}
-		allEdits = append(allEdits, rename.Edits(renamePackage, plan.Accepted)...)
+		allEdits = append(allEdits, local_rename.Edits(renamePackage, plan.Accepted)...)
 	}
-	edits, disagreements := rename.Deduplicate(allEdits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(allEdits)
+	editsByFile := local_rename.GroupByFile(edits)
 
 	outcomes := map[string]int{}
 	proposed := 0
@@ -1370,15 +1373,15 @@ func apply(
 	loaded *workspace.Workspace,
 	root string,
 	skips []string,
-	edits []rename.Edit,
-	editsByFile map[string][]rename.Edit,
+	edits []local_rename.Edit,
+	editsByFile map[string][]local_rename.Edit,
 ) int {
 	return workspace.ApplyVerified(loaded, root, skips, edits, editsByFile, "wordnames", streams.Output, streams.Errors)
 }
 
 // lineInContext returns the source line holding position, as it is and with the file's edits on that line
 // applied.
-func lineInContext(position token.Position, fileEdits []rename.Edit) (string, string) {
+func lineInContext(position token.Position, fileEdits []local_rename.Edit) (string, string) {
 	source, readError := os.ReadFile(position.Filename)
 	if readError != nil {
 		return readError.Error(), ""
@@ -1392,7 +1395,7 @@ func lineInContext(position token.Position, fileEdits []rename.Edit) (string, st
 	}
 	line := string(source[lineStart:lineEnd])
 	rewritten := line
-	var onLine []rename.Edit
+	var onLine []local_rename.Edit
 	for _, edit := range fileEdits {
 		if edit.Offset >= lineStart && edit.Offset < lineEnd {
 			onLine = append(onLine, edit)

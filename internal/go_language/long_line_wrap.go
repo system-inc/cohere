@@ -9,10 +9,10 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/copied"
 	"github.com/system-inc/cohere/internal/go_language/format"
+	"github.com/system-inc/cohere/internal/go_language/line_wrap"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_file"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_language/suppression"
-	"github.com/system-inc/cohere/internal/line_wrap"
 )
 
 // longLineRuleWord is how every directive naming consistency_no_long_line spells it, in full or by its leaf, so a

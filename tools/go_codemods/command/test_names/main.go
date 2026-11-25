@@ -16,8 +16,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
 
 	"golang.org/x/tools/go/packages"
@@ -94,10 +94,10 @@ func run(root string, skips []string, dryRun bool) int {
 		return 1
 	}
 
-	var allEdits []rename.Edit
-	var commentEdits []rename.Edit
+	var allEdits []local_rename.Edit
+	var commentEdits []local_rename.Edit
 	commentsSkippedInRejectedDeclarations := 0
-	var allRejections []rename.Rejection
+	var allRejections []local_rename.Rejection
 	var allUnresolved []string
 	proposalCount := 0
 	acceptedDeclarations := map[string]string{}
@@ -105,7 +105,7 @@ func run(root string, skips []string, dryRun bool) int {
 	for _, analyzedPackage := range loaded.Analyzed {
 		renamePackage := loaded.RenamePackage(analyzedPackage)
 		handles, hasTesting := findTesting(analyzedPackage)
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		for _, file := range renamePackage.Files {
 			ast.Inspect(file, func(node ast.Node) bool {
 				identifier, isIdentifier := node.(*ast.Ident)
@@ -131,13 +131,13 @@ func run(root string, skips []string, dryRun bool) int {
 					}
 					return true
 				}
-				proposals = append(proposals, rename.Proposal{Object: variable, NewName: newName})
+				proposals = append(proposals, local_rename.Proposal{Object: variable, NewName: newName})
 				return true
 			})
 			proposals = append(proposals, testCaseProposals(analyzedPackage, file)...)
 		}
 		proposalCount += len(proposals)
-		plan := rename.Check(renamePackage, proposals)
+		plan := local_rename.Check(renamePackage, proposals)
 		allRejections = append(allRejections, plan.Rejections...)
 		for _, unresolved := range plan.Unresolved {
 			allUnresolved = append(allUnresolved, analyzedPackage.ID+": "+unresolved)
@@ -150,7 +150,7 @@ func run(root string, skips []string, dryRun bool) int {
 				position.Offset,
 			)] = object.Name() + " -> " + newName
 		}
-		allEdits = append(allEdits, rename.Edits(renamePackage, plan.Accepted)...)
+		allEdits = append(allEdits, local_rename.Edits(renamePackage, plan.Accepted)...)
 		if hasTesting {
 			edits, skipped := handleCommentEdits(analyzedPackage, renamePackage, plan, handles)
 			commentEdits = append(commentEdits, edits...)
@@ -159,8 +159,8 @@ func run(root string, skips []string, dryRun bool) int {
 	}
 	allEdits = append(allEdits, commentEdits...)
 
-	edits, disagreements := rename.Deduplicate(allEdits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(allEdits)
+	editsByFile := local_rename.GroupByFile(edits)
 
 	fmt.Fprintf(streams.Output, "proposals: %d\n", proposalCount)
 	fmt.Fprintf(streams.Output, "accepted declarations: %d\n", len(acceptedDeclarations))
@@ -257,8 +257,8 @@ func apply(
 	loaded *workspace.Workspace,
 	root string,
 	skips []string,
-	edits []rename.Edit,
-	editsByFile map[string][]rename.Edit,
+	edits []local_rename.Edit,
+	editsByFile map[string][]local_rename.Edit,
 ) int {
 	return workspace.ApplyVerified(loaded, root, skips, edits, editsByFile, "testnames", streams.Output, streams.Errors)
 }
@@ -353,10 +353,14 @@ var commentHandle = regexp.MustCompile(`\bt\.[A-Za-z_]\w*`)
 
 // reportComments counts comments in the edited files that still say `t.` once the comment edits are made,
 // and lists the ten most common.
-func reportComments(loaded *workspace.Workspace, editsByFile map[string][]rename.Edit, commentEdits []rename.Edit) {
-	rewritten := map[rename.EditKey]bool{}
+func reportComments(
+	loaded *workspace.Workspace,
+	editsByFile map[string][]local_rename.Edit,
+	commentEdits []local_rename.Edit,
+) {
+	rewritten := map[local_rename.EditKey]bool{}
 	for _, edit := range commentEdits {
-		rewritten[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = true
+		rewritten[local_rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = true
 	}
 	counts := map[string]int{}
 	filesWith := map[string]bool{}
@@ -372,7 +376,7 @@ func reportComments(loaded *workspace.Workspace, editsByFile map[string][]rename
 			for _, comment := range group.List {
 				commentOffset := fileSet.PositionFor(comment.Pos(), false).Offset
 				for _, location := range commentHandle.FindAllStringIndex(comment.Text, -1) {
-					if rewritten[rename.EditKey{Filename: filename, Offset: commentOffset + location[0]}] {
+					if rewritten[local_rename.EditKey{Filename: filename, Offset: commentOffset + location[0]}] {
 						continue
 					}
 					match := comment.Text[location[0]:location[1]]
@@ -429,8 +433,8 @@ func sortedKeys[Value any](values map[string]Value) []string {
 
 // testCaseProposals proposes `testCase` for every range loop value named exactly `test` over a slice, array,
 // pointer to array, or map: the table-test case, which otherwise blocks `t` from becoming `test`.
-func testCaseProposals(goPackage *packages.Package, file *ast.File) []rename.Proposal {
-	var proposals []rename.Proposal
+func testCaseProposals(goPackage *packages.Package, file *ast.File) []local_rename.Proposal {
+	var proposals []local_rename.Proposal
 	ast.Inspect(file, func(node ast.Node) bool {
 		rangeStatement, isRange := node.(*ast.RangeStmt)
 		if !isRange || rangeStatement.Tok != token.DEFINE {
@@ -457,7 +461,7 @@ func testCaseProposals(goPackage *packages.Package, file *ast.File) []rename.Pro
 		default:
 			return true
 		}
-		proposals = append(proposals, rename.Proposal{Object: variable, NewName: "testCase"})
+		proposals = append(proposals, local_rename.Proposal{Object: variable, NewName: "testCase"})
 		return true
 	})
 	return proposals
@@ -472,10 +476,10 @@ var handleCommentReference = regexp.MustCompile(`t\.([A-Za-z_][A-Za-z0-9_]*)`)
 // may name that one. It returns the edits and how many such references it left in rejected declarations.
 func handleCommentEdits(
 	goPackage *packages.Package,
-	renamePackage rename.Package,
-	plan rename.Plan,
+	renamePackage local_rename.Package,
+	plan local_rename.Plan,
 	handles testingTypes,
-) ([]rename.Edit, int) {
+) ([]local_rename.Edit, int) {
 	methods := map[string]bool{}
 	methodSet := types.NewMethodSet(handles.pointerT)
 	for index := 0; index < methodSet.Len(); index++ {
@@ -484,7 +488,7 @@ func handleCommentEdits(
 	isRenamedHandle := func(object types.Object, newName string) bool {
 		return object.Name() == "t" && newName == "test"
 	}
-	var edits []rename.Edit
+	var edits []local_rename.Edit
 	skipped := 0
 	for _, file := range renamePackage.Files {
 		for _, declaration := range file.Decls {
@@ -535,7 +539,7 @@ func handleCommentEdits(
 							skipped++
 							continue
 						}
-						edits = append(edits, rename.Edit{
+						edits = append(edits, local_rename.Edit{
 							Filename: goPackage.Fset.PositionFor(comment.Pos(), false).Filename,
 							Offset:   commentOffset + location[0],
 							OldText:  "t",

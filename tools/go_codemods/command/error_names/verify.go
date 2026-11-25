@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -28,16 +28,16 @@ type problemLine struct {
 // the whole pass. A line a longer name pushes past the house width is the line wrap's, run after the pass.
 func checkPackage(
 	goPackage *packages.Package,
-	edits []rename.Edit,
-	retargets map[rename.EditKey]int,
-	insertions []rename.Insertion,
+	edits []local_rename.Edit,
+	retargets map[local_rename.EditKey]int,
+	insertions []local_rename.Insertion,
 ) ([]problemLine, error) {
-	editsByFile := rename.GroupByFile(edits)
+	editsByFile := local_rename.GroupByFile(edits)
 	insertedLines := map[string][]int{}
-	seenOffsets := map[rename.EditKey]bool{}
+	seenOffsets := map[local_rename.EditKey]bool{}
 	var problems []problemLine
 	for _, insertion := range insertions {
-		key := rename.EditKey{Filename: insertion.Filename, Offset: insertion.Offset}
+		key := local_rename.EditKey{Filename: insertion.Filename, Offset: insertion.Offset}
 		if seenOffsets[key] {
 			problems = append(
 				problems,
@@ -78,7 +78,7 @@ func checkPackage(
 			continue
 		}
 		edited[filename] = true
-		original, rewritten, rewriteError := rename.RewriteFile(filename, fileEdits)
+		original, rewritten, rewriteError := local_rename.RewriteFile(filename, fileEdits)
 		if rewriteError != nil {
 			problems = append(problems, problemLine{filename: filename, reason: rewriteError.Error()})
 			continue
@@ -150,16 +150,23 @@ func checkPackage(
 		return problems, nil
 	}
 
-	newNames := map[rename.EditKey]string{}
+	newNames := map[local_rename.EditKey]string{}
 	for _, edit := range edits {
-		newNames[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = edit.NewText
+		newNames[local_rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = edit.NewText
 	}
 	// No root: both fingerprints read the same files over the same file set, so a file's own name is stable here,
 	// and lineAt finds a file by that name.
-	offsets := rename.IdentifierOffsets(goPackage.Fset, goPackage.Syntax, "", nil)
-	expected := rename.Fingerprint(goPackage.Fset, goPackage.Types, goPackage.TypesInfo, goPackage.Syntax, "", nil)
-	rename.Expect(expected, offsets, newNames, retargets, insertions)
-	actual := rename.Fingerprint(goPackage.Fset, checked, info, files, "", nil)
+	offsets := local_rename.IdentifierOffsets(goPackage.Fset, goPackage.Syntax, "", nil)
+	expected := local_rename.Fingerprint(
+		goPackage.Fset,
+		goPackage.Types,
+		goPackage.TypesInfo,
+		goPackage.Syntax,
+		"",
+		nil,
+	)
+	local_rename.Expect(expected, offsets, newNames, retargets, insertions)
+	actual := local_rename.Fingerprint(goPackage.Fset, checked, info, files, "", nil)
 	for filename, expectedRecords := range expected {
 		actualRecords := actual[filename]
 		if len(expectedRecords) != len(actualRecords) {

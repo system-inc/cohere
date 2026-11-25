@@ -36,8 +36,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
 
 	"golang.org/x/mod/modfile"
@@ -147,7 +147,7 @@ func moveFolders(root string, moves []folderMove, dryRun bool, output *bufio.Wri
 		fmt.Fprintf(output, "foldernames: %v\n", walkError)
 		return 1
 	}
-	edits, disagreements := rename.Deduplicate(plan.edits)
+	edits, disagreements := local_rename.Deduplicate(plan.edits)
 	plan.refusals = append(plan.refusals, disagreements...)
 
 	newPath := func(filename string) string {
@@ -261,7 +261,7 @@ func (plan *plan) planLoad(
 	limit map[string]bool,
 ) {
 	for _, rootsPackage := range roots {
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		var files []*ast.File
 		for _, file := range rootsPackage.Syntax {
 			filename := filepath.Clean(rootsPackage.Fset.PositionFor(file.Pos(), false).Filename)
@@ -281,13 +281,13 @@ func (plan *plan) planLoad(
 		if len(proposals) == 0 {
 			continue
 		}
-		renamePackage := rename.Package{
+		renamePackage := local_rename.Package{
 			FileSet: rootsPackage.Fset,
 			Types:   rootsPackage.Types,
 			Info:    rootsPackage.TypesInfo,
 			Files:   files,
 		}
-		checked := rename.Check(renamePackage, proposals)
+		checked := local_rename.Check(renamePackage, proposals)
 		for _, rejection := range checked.Rejections {
 			plan.refusals = append(plan.refusals, fmt.Sprintf("%s: renaming %s to %s, out of an import's way: %s",
 				rejection.Position, rejection.Object.Name(), rejection.NewName, rejection.Reason))
@@ -302,7 +302,7 @@ func (plan *plan) planLoad(
 		for identifier, object := range rootsPackage.TypesInfo.Uses {
 			plan.nameRenamed(rootsPackage, identifier, object, checked.Accepted)
 		}
-		plan.edits = append(plan.edits, rename.Edits(renamePackage, checked.Accepted)...)
+		plan.edits = append(plan.edits, local_rename.Edits(renamePackage, checked.Accepted)...)
 	}
 }
 
@@ -318,7 +318,7 @@ func (plan *plan) nameRenamed(
 		return
 	}
 	position := goPackage.Fset.PositionFor(identifier.Pos(), false)
-	plan.names[rename.EditKey{Filename: position.Filename, Offset: position.Offset}] = newName
+	plan.names[local_rename.EditKey{Filename: position.Filename, Offset: position.Offset}] = newName
 }
 
 // planPlatforms loads each platform whose own files a move touches, a file only that platform builds that sits in
@@ -456,15 +456,15 @@ func filesUnder(root string, mapping *mapping) ([]string, error) {
 // buildOverlay rewrites each edited file and lays every moved or rewritten file over its new path. It returns the
 // overlay and the rewritten files by their new paths.
 func buildOverlay(
-	edits []rename.Edit,
+	edits []local_rename.Edit,
 	movedFiles []string,
 	newPath func(string) string,
 ) (map[string][]byte, map[string][]byte, error) {
 	overlay := map[string][]byte{}
 	rewritten := map[string][]byte{}
-	byFile := rename.GroupByFile(edits)
+	byFile := local_rename.GroupByFile(edits)
 	for _, filename := range sortedKeys(byFile) {
-		_, contents, rewriteError := rename.RewriteFile(filename, byFile[filename])
+		_, contents, rewriteError := local_rename.RewriteFile(filename, byFile[filename])
 		if rewriteError != nil {
 			return nil, nil, rewriteError
 		}
@@ -541,7 +541,14 @@ func readModulePath(root string) (string, error) {
 }
 
 // report prints the counts, every refusal and every note.
-func report(output *bufio.Writer, root string, mapping *mapping, plan *plan, edits []rename.Edit, movedFiles []string) {
+func report(
+	output *bufio.Writer,
+	root string,
+	mapping *mapping,
+	plan *plan,
+	edits []local_rename.Edit,
+	movedFiles []string,
+) {
 	editedFiles := map[string]bool{}
 	for _, edit := range edits {
 		editedFiles[edit.Filename] = true

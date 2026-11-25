@@ -30,7 +30,7 @@ import (
 	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/go_language/bounded"
-	"github.com/system-inc/cohere/internal/line_wrap"
+	"github.com/system-inc/cohere/internal/go_language/line_wrap"
 	"github.com/system-inc/cohere/internal/write_root"
 )
 
