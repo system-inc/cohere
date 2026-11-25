@@ -9,10 +9,10 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/sentence"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/sentence"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // swiftFlags are the flags a Swift run takes. The pass-through switches are the ones cohere-swift reads

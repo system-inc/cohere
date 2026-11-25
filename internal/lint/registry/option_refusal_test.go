@@ -273,7 +273,7 @@ var nestedOptionCases = []nestedOptionCase{
 }
 
 // TestTheShoutingRuleRefusesAnAllowList pins Kirk's ruling of 2026-11-06 (#4b337jk): shouting has no
-// per-project allow list, so the safe list in internal/shouting is the one place an acronym is
+// per-project allow list, so the safe list in internal/text_rules/shouting is the one place an acronym is
 // earned. A config that still writes `allow` is refused by name through the real config layer
 // rather than loaded and ignored, which would leave its author believing the words were silenced.
 // The bare severity is the control, so the refusal is about the option, not the rule.

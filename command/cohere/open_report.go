@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/command_line/sentence"
 )
 
 // openReport keeps only findings that actually reached the report, after fixes. Children return

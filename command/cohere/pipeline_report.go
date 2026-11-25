@@ -245,8 +245,8 @@ func (report *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, rea
 		}
 		// An opt-in phase nobody named was not deprived of anything by the bail.
 		if optInPhases[name] && !requested[name] {
-			// The dash is escaped, not changed: swift_language/Contract.md fixes this detail's spelling for both
-			// languages.
+			// The dash is escaped, not changed: documentation/contract/Contract.md fixes this detail's spelling for
+			// both languages.
 			report.record(name, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 			continue
 		}
@@ -311,7 +311,7 @@ func skippedAsNotRequested(record phaseRecord) bool {
 }
 
 // checkedEveryRequestedPhase reports whether every phase the caller asked for ran, which is what an
-// child's `complete` claims (swift_language/Contract.md).
+// child's `complete` claims (documentation/contract/Contract.md).
 //
 // It is checkedEverything with one difference: a phase skipped as not requested is not a gap, since
 // `--lint` asked for lint and got all of it. Every other skip of a reporting phase still is one, and so

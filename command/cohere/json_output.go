@@ -8,9 +8,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/sentence"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/contract"
-	"github.com/system-inc/cohere/internal/sentence"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // `--json` is the run for a program to read: newline-delimited JSON, one object per line, each with a

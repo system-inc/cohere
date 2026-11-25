@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
-	"github.com/system-inc/cohere/internal/executable_testing"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // macBoxFixture is a landing ready to gate on the house Macs: a module with one package and one test, and a
@@ -30,10 +30,11 @@ type macBoxFixture struct {
 	// `<box>.omit` names, which it leaves out, `<box>.fails`, which fails, and `<box>.extra`, which it adds; and
 	// `<box>.shards`, `<import path> <count> <test>...`, runs that package in that many shards as sharedBoxShards
 	// prints them, its middle shard the slowest, every test passing but the one `<box>.shardomit` names, which no
-	// shard ends. `<box>.unlaid` is what her gap prints in place of `<box>.run` until a gap carrying corpora has laid
-	// them, which copies its carry to `<box>.carry` and its remote to `<box>.lay`, or prints `<box>.lay.fails` and
-	// exits 1 when that is there. The stand-in writes each call it took to `calls`, one line each, and each box's
-	// remote command whole to `<box>.remote`.
+	// shard ends; and `<box>.steps`, `<plain seconds> <race seconds>`, says a tests step after the passing run's plain
+	// tests and a race step after its -race run, as sharedBoxGate says its steps. `<box>.unlaid` is what her gap prints
+	// in place of `<box>.run` until a gap carrying corpora has laid them, which copies its carry to `<box>.carry` and
+	// its remote to `<box>.lay`, or prints `<box>.lay.fails` and exits 1 when that is there. The stand-in writes each
+	// call it took to `calls`, one line each, and each box's remote command whole to `<box>.remote`.
 	replies string
 	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
@@ -69,6 +70,8 @@ gap)
     omit=$(cat "$replies/$box.omit" 2>/dev/null || true); fails=$(cat "$replies/$box.fails" 2>/dev/null || true)
     shards=$(cat "$replies/$box.shards" 2>/dev/null || true)
     shardomit=$(cat "$replies/$box.shardomit" 2>/dev/null || true)
+    plainStep=""; raceStep=""
+    [ ! -e "$replies/$box.steps" ] || read -r plainStep raceStep < "$replies/$box.steps"
     # The remote's arguments after its script, an empty one written - so each keeps its place, nothing globbed.
     set -f
     set -- $(printf '%s' "${10}" | sed "s/^.* bash -s -- //; s/''/-/g" | tr -d "'")
@@ -104,6 +107,7 @@ gap)
       echo '{"Action":"pass","Package":"'"$package"'","Elapsed":'"$plain"'}'
     done
     [ ! -e "$replies/$box.extra" ] || echo '{"Action":"pass","Package":"'"$(cat "$replies/$box.extra")"'"}'
+    [ -z "$plainStep" ] || echo "` + boxStepMarker + `tests $plainStep"
     [ "$failed" = 0 ] || exit 1
     [ "$races" != - ] || exit 0
     echo "` + boxRaceMarker + `"
@@ -111,6 +115,7 @@ gap)
       directory="${token%%@*}"
       echo '{"Action":"pass","Package":"example.com/fixture/'"${directory#./}"'","Elapsed":'"$race"'}'
     done
+    [ -z "$raceStep" ] || echo "` + boxStepMarker + `race $raceStep"
     exit 0
   fi
   commit=$(printf '%s' "${10}" | sed 's/.* bash -s -- \([0-9a-f]*\) .*/\1/')

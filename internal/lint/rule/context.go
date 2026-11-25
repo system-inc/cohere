@@ -202,7 +202,7 @@ func (ruleContext Context) ReportRangeWithFixes(textRange core.TextRange, messag
 //
 // A method on the context, reading the context's own file, rather than a function taking a file: the
 // type-reach guard counts text read out of any other file as descending into an imported body, so the
-// only spelling offered is the one that cannot (internal/guard/type_reach_test.go).
+// only spelling offered is the one that cannot (internal/testing/guard/type_reach_test.go).
 func (ruleContext Context) NodeText(node *ast.Node) string {
 	span := TokenRange(ruleContext.SourceFile, node)
 	return ruleContext.SourceFile.Text()[span.Pos():span.End()]

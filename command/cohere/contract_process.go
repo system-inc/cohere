@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // contractWaitDelay bounds how long Wait may wait on the child's pipes after the child has ended. Killing

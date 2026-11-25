@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // A live check against a real cohere binary, skipped unless one is named.

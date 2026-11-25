@@ -26,7 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/function_purity"
 	"github.com/system-inc/cohere/internal/go_language/rules/self_assignment"
 	"github.com/system-inc/cohere/internal/go_language/rules/single_append_concatenation"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // demandDifferentialVariable names the tree the demand differential runs over: root for cohere's own module, or a

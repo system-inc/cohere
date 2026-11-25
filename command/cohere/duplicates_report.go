@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/duplicate_functions"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // The duplicates report (#jfvhbj7): functions whose canonical IR is one graph, grouped, at size 11 and up. A report,

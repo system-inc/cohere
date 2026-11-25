@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // To a pipe or a file, a step and a note print nothing; a failure always prints (#ytqqv8v).

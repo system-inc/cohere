@@ -11,8 +11,8 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 	"github.com/system-inc/cohere/modules/unicode_properties"
 )
 

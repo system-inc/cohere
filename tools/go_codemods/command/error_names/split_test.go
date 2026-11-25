@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -38,7 +38,7 @@ func runPass(test *testing.T, source string) passResult {
 	}
 	goPackage := &packages.Package{ID: "fixture", PkgPath: "fixture", Fset: checked.fileSet, Syntax: checked.files,
 		Types: checked.packageTypes, TypesInfo: checked.info, Imports: imports}
-	renamePackage := rename.Package{
+	renamePackage := local_rename.Package{
 		FileSet: checked.fileSet,
 		Types:   checked.packageTypes,
 		Info:    checked.info,
@@ -54,7 +54,7 @@ func runPass(test *testing.T, source string) passResult {
 	}
 	if len(decided.edits) > 0 {
 		filename := checked.fileSet.PositionFor(checked.files[0].Pos(), false).Filename
-		_, rewritten, rewriteError := rename.RewriteFile(filename, decided.edits)
+		_, rewritten, rewriteError := local_rename.RewriteFile(filename, decided.edits)
 		if rewriteError != nil {
 			test.Fatal(rewriteError)
 		}

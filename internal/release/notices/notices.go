@@ -29,8 +29,8 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/native"
-	"github.com/system-inc/cohere/internal/listed_directories"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
 // NoticeFileName and ThirdPartyNoticesFileName are written at the module root and shipped in every

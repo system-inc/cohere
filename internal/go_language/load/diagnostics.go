@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/test_functions"
+	"github.com/system-inc/cohere/internal/go_language/test_functions"
 )
 
 // Kind is where a diagnostic came from: go list, the parser, or the type checker, which also reports what go

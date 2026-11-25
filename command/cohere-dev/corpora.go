@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
-// Corpora: some tests read code outside this repository, by name (internal/corpus). Every run sets each
+// Corpora: some tests read code outside this repository, by name (internal/testing/corpus). Every run sets each
 // corpus's variable the user's corpora file names and the environment leaves unset, so a developer who has
 // the checkouts writes the file once and every gate covers them. Every run ends by naming the corpora it did
 // not cover, whether its tests ran or answered from Go's cache, since a skip in a cached package prints

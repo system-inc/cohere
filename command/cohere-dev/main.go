@@ -36,7 +36,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // main is the one way out: it exits with the code finishedExitCode returns, once that has run its deferred show.

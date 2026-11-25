@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // coldArgumentsScript is bench/cold_arguments.zsh, which quiet_machine.sh sources for its cold and idle runs'

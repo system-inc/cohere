@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/naming/go_origin_names"
+	"github.com/system-inc/cohere/internal/go_language/origin_names"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
@@ -121,7 +121,7 @@ func typeCheckAs(test *testing.T, packagePath string, source string) fixture {
 	})
 }
 
-func fixtureWords(test *testing.T) go_origin_names.Vocabulary {
+func fixtureWords(test *testing.T) origin_names.Vocabulary {
 	test.Helper()
 	words, vocabularyError := parseVocabulary([]byte(fixtureVocabulary))
 	if vocabularyError != nil {
@@ -299,7 +299,7 @@ func clean(ctx rule.Context) {
 `
 	checked := typeCheck(test, source)
 	candidates := findCandidates(checked.packageTypes, checked.info, checked.files, fixtureModule, fixtureWords(test))
-	var proposals []rename.Proposal
+	var proposals []local_rename.Proposal
 	for _, decided := range candidates {
 		if decided.newName != "ruleContext" {
 			test.Fatalf(
@@ -309,13 +309,18 @@ func clean(ctx rule.Context) {
 				decided.category,
 			)
 		}
-		proposals = append(proposals, rename.Proposal{Object: decided.variable, NewName: decided.newName})
+		proposals = append(proposals, local_rename.Proposal{Object: decided.variable, NewName: decided.newName})
 	}
 	if len(proposals) != 2 {
 		test.Fatalf("got %d proposals, want 2", len(proposals))
 	}
-	plan := rename.Check(
-		rename.Package{FileSet: checked.fileSet, Types: checked.packageTypes, Info: checked.info, Files: checked.files},
+	plan := local_rename.Check(
+		local_rename.Package{
+			FileSet: checked.fileSet,
+			Types:   checked.packageTypes,
+			Info:    checked.info,
+			Files:   checked.files,
+		},
 		proposals,
 	)
 	if len(plan.Accepted) != 1 || len(plan.Rejections) != 1 {
@@ -356,9 +361,14 @@ func compose(ctx *composeContext) *composeContext {
 	if len(candidates) != 1 || candidates[0].newName != "composeContext" {
 		test.Fatalf("got %+v, want one composeContext proposal", candidates)
 	}
-	proposals := []rename.Proposal{{Object: candidates[0].variable, NewName: candidates[0].newName}}
-	plan := rename.Check(
-		rename.Package{FileSet: checked.fileSet, Types: checked.packageTypes, Info: checked.info, Files: checked.files},
+	proposals := []local_rename.Proposal{{Object: candidates[0].variable, NewName: candidates[0].newName}}
+	plan := local_rename.Check(
+		local_rename.Package{
+			FileSet: checked.fileSet,
+			Types:   checked.packageTypes,
+			Info:    checked.info,
+			Files:   checked.files,
+		},
 		proposals,
 	)
 	if len(plan.Rejections) != 1 {
@@ -424,8 +434,8 @@ func TestContextOverrides(test *testing.T) {
 			if len(candidates) != 1 || candidates[0].newName != testCase.newName {
 				test.Fatalf("got %+v, want one %s proposal", candidates, testCase.newName)
 			}
-			proposals := []rename.Proposal{{Object: candidates[0].variable, NewName: candidates[0].newName}}
-			plan := rename.Check(rename.Package{
+			proposals := []local_rename.Proposal{{Object: candidates[0].variable, NewName: candidates[0].newName}}
+			plan := local_rename.Check(local_rename.Package{
 				FileSet: checked.fileSet,
 				Types:   checked.packageTypes,
 				Info:    checked.info,

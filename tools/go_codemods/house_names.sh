@@ -9,6 +9,7 @@
 #
 # Usage, from the root of a cohere worktree:
 #   tools/go_codemods/house_names.sh [--root <path>] [--only <n>] [--rename-library-exports <package,package>]
+#                                    [--package <directory>]
 #   tools/go_codemods/house_names.sh --count    prints how many passes there are, for a caller running them by --only
 #
 # With no --root the passes run over the cohere worktree itself. With --root they are built from the cohere worktree
@@ -18,7 +19,9 @@
 # counting from 1, and wraps what it changed, so a caller can commit each pass apart. The global word_names pass
 # renames the exports of library packages only where the packages are named: cohere's own two by default over
 # cohere, none over another repository unless --rename-library-exports names them, since an importable package's
-# consumers outside the workspace cannot be renamed with it.
+# consumers outside the workspace cannot be renamed with it. --package confines every pass to one package, the Go files
+# directly in that directory relative to the root: every other Go file is a skipped path, so a rename whose uses reach
+# another package is refused whole, never made in part, and the change lands as that package's alone.
 #
 # Each pass is built from tools/go_codemods in the tree it runs over, so the version of a pass that runs is the one
 # that tree holds: a pass is landed exactly when its source is on main, and no list of approved builds is needed.
@@ -50,7 +53,9 @@ root=$(pwd -P)
 only=0
 libraryExports=modules/static_single_assignment,modules/mutation_aliasing
 libraryExportsGiven=0
-usage="usage: house_names.sh [--root <path>] [--only <n>] [--rename-library-exports <package,package>] | --count"
+usage="usage: house_names.sh [--root <path>] [--only <n>] [--rename-library-exports <package,package>]"
+usage+=" [--package <directory>] | --count"
+package=
 while (( $# > 0 )); do
 	case $1 in
 		--root)
@@ -59,6 +64,7 @@ while (( $# > 0 )); do
 			shift 2
 			;;
 		--only) only=$2; shift 2 ;;
+		--package) package=$2; shift 2 ;;
 		--count) echo "${#passes[@]}"; exit 0 ;;
 		--rename-library-exports) libraryExports=$2; libraryExportsGiven=1; shift 2 ;;
 		*) echo "house_names: unknown argument $1; $usage" >&2; exit 2 ;;
@@ -90,6 +96,42 @@ if [[ -f $root/.gitmodules ]]; then
 	while read -r nested; do
 		[[ -n $nested ]] && skips+=(-skip "$nested")
 	done < <(git -C "$root" config --file .gitmodules --get-regexp '\.path$' | awk '{print $2}')
+fi
+# --package skips every Go file outside the package's own directory: a directory off the package's path by its first
+# component off it, which also covers the package's subdirectories, since each is a package of its own, and a file in a
+# directory above the package by its own name, since skipping that directory would skip the package with it.
+if [[ -n $package ]]; then
+	package=${package%/}
+	package=${package#./}
+	if ! git -C "$root" ls-files -- "$package/*.go" | grep -q -v "^$package/.*/"; then
+		echo "house_names: --package $package names no directory of tracked Go files under $root" >&2
+		exit 2
+	fi
+	while read -r skip; do
+		[[ -n $skip ]] && skips+=(-skip "$skip")
+	done < <(git -C "$root" ls-files -- '*.go' | awk -v package="$package" '
+		{
+			fileCount = split($0, file, "/")
+			directoryCount = fileCount - 1
+			packageCount = split(package, packagePath, "/")
+			common = 0
+			while (common < directoryCount && common < packageCount && file[common + 1] == packagePath[common + 1]) {
+				common++
+			}
+			if (common == directoryCount && directoryCount == packageCount) {
+				next
+			}
+			if (directoryCount > common) {
+				skip = file[1]
+				for (component = 2; component <= common + 1; component++) {
+					skip = skip "/" file[component]
+				}
+				print skip
+			} else {
+				print $0
+			}
+		}
+	' | sort -u)
 fi
 selected=("${passes[@]}")
 if (( only > 0 )); then

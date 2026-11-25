@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // plantedGo stands in for a shared box's go: it answers go env, and records every go mod download, go mod verify and

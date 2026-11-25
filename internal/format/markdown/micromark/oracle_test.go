@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The event oracle: the fork's own micromark, run by Node with the extensions parse-markdown.js passes,
@@ -23,7 +23,7 @@ import (
 // Go side generates that table from the bundle instead; inputs here should not depend on a code point
 // whose classification changed between the bundle's Unicode and this Node's.
 
-// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/testing/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/micromark.
 func forkRoot(test *testing.T) string {
 	test.Helper()

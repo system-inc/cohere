@@ -15,10 +15,10 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/system-inc/cohere/internal/command_line/sentence"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/sentence"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // main exits with the code finishedExitCode returns, once that has run its deferred show.

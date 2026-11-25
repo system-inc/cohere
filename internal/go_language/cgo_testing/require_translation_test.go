@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // fakeGo is a go that says CGO_ENABLED is FAKE_CGO and answers go list as FAKE_LIST says: "compiles", "refuses"

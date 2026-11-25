@@ -1,0 +1,59 @@
+package guard
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/release/dispatch"
+)
+
+// The formatter's identity keys the format record, so it must move with everything that can change what
+// the formatter prints and with nothing else (see internal/release/dispatch/formatter.go). The check below
+// reads the real module's formatter sources, so it lives here with the other whole-source checks: in
+// dispatch, every format edit reran dispatch's Swift and build tests with it (#nxgt2ca).
+
+// TestFormatterInputsCoverWhatCanChangeTheOutput reads the real module's inputs and checks each class
+// is there: the printers, the options they resolve, the typescript-go parser they parse with, and the
+// pass loop, and that no lint rule is.
+func TestFormatterInputsCoverWhatCanChangeTheOutput(test *testing.T) {
+	test.Parallel()
+
+	// This package sits two directories below the module root.
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
+	}
+
+	inputs, formatterInputsError := dispatch.FormatterInputs(module, nil)
+	if formatterInputsError != nil {
+		test.Fatal(formatterInputsError)
+	}
+	names := map[string]bool{}
+	for _, input := range inputs {
+		names[input.Name] = true
+		if strings.Contains(input.Name, "/internal/lint/rules/") {
+			test.Errorf(
+				"a lint rule is a formatter input, so a rule commit would throw the record away: %s",
+				input.Name,
+			)
+		}
+		if len(input.Sum) != 64 {
+			test.Errorf("%s has no content hash: %q", input.Name, input.Sum)
+		}
+	}
+	for _, class := range []struct{ what, contains string }{
+		{"the printers", "github.com/system-inc/cohere/internal/format/native/"},
+		{"the options they resolve", "github.com/system-inc/cohere/internal/format/format_options/"},
+		{"the parser they parse with", "github.com/microsoft/TypeScript/tsc/"},
+		{"the pass loop", dispatch.FormatterPassLoop},
+	} {
+		present := false
+		for name := range names {
+			present = present || strings.Contains(name, class.contains)
+		}
+		if !present {
+			test.Errorf("%s (%s) are not among the formatter's inputs", class.what, class.contains)
+		}
+	}
+}

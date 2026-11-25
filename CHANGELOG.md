@@ -126,7 +126,7 @@ changed in cohere outside the sets is written under the same heading.
   A name's words are cut at underscores, hyphens, dots, a Swift `+` and case, with what a tool reads set
   aside (`_test`, `_linux`, `_amd64`, `.test`, `.d`, `.config`), and a generated file, a name a tool requires
   (`doc.go`, `Package.swift`, Next.js's `page.tsx` and `next-env.d.ts`) and a file under `node_modules`,
-  `vendor`, `third_party` or `testdata` are never judged. `internal/file_name_words` is the one judgment the
+  `vendor`, `third_party` or `testdata` are never judged. `internal/text_rules/file_name_words` is the one judgment the
   TypeScript and Go rules read, and Swift ports it. Both are off in `cohere:style`, and the Go pair in cohere's
   own settings, until their census is routed.
 - An editor's save of a `.go` file: `cohere --fix [--format] --stdin-filepath <path>` in a Go module or
@@ -169,8 +169,8 @@ changed in cohere outside the sets is written under the same heading.
   it said `the Swift engine was built from`.
   `--json` writes a build before the check as `{"kind":"programBuild","program":...}` (was `engineBuild` and
   `engine`), and the timeline's first stamp is `main.begin` (was `engine.main.begin`). The root's format-only
-  project is labeled and counted as `Folder` (was `Format`). The findings cache, the kept listings and the run
-  cache take new versions, so the first run after an upgrade is cold.
+  project is labeled and counted as `Formats` (was `Format`), the word of its flag, `--formats`. The findings
+  cache, the kept listings and the run cache take new versions, so the first run after an upgrade is cold.
 - cohere's own `docs/` is `documentation/`, and `internal/docs_data/` is `internal/documentation_data/`, package
   `documentation_data`, so the folder check reads cohere itself clean (#zyq63kk). The website's data is
   `documentation/data/` from here, written by `go run ./internal/documentation_data/tools/generate`, and a reader

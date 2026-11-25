@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // A command a test ran has exited, but its captured output never closes: exec's Wait sits in

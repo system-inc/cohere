@@ -12,8 +12,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // postcssScssParseScript is the scss oracle: postcss-scss 4.0.9's lib/scss-parse from the fork's

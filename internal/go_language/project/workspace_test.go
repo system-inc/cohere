@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/gitignore"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A go.work's modules are its uses, minus any inside a submodule, found by its gitlink in the index rather

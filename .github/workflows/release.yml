@@ -481,7 +481,7 @@ jobs:
 
             - name: Run the tests written for what differs on Windows
               run: |
-                  go test ./internal/replace/ ./internal/format/format_files/ ./internal/types/program/ \
+                  go test ./internal/edit/replace/ ./internal/format/format_files/ ./internal/types/program/ \
                       -run 'TestFileReplacesAFileHeldOpenBriefly|TestIgnorePatternsCoverNestedPaths|TestASameSizeEditUnderARestoredModificationTimeIsAMiss'
 
     # A clean machine, by construction: a fresh runner per platform, installing the packed packages

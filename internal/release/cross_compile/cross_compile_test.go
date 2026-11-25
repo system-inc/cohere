@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_types"
 	release "github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 // crossCompileVariable chooses how TestEveryReleaseTargetCompiles proves the targets. Unset, it

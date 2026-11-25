@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // swiftReplayFixture is a tiny Swift package the real cohere binary checks, through a stand-in cohere-swift named by

@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/cache_directory"
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // Before any project's run starts, the cache directory of each project whose run keeps a run cache is made, and of no
@@ -55,7 +55,7 @@ func TestEveryProjectRunThatKeepsACacheHasItsDirectoryBeforeAnyRunStarts(test *t
 func TestAFreshTreesSecondRunReplaysItsGoSide(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "Clean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}

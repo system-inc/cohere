@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // TestAMixedRunUnderJsonWritesOnlyRecordsToStdout: a repository holding a TypeScript program and a Swift
@@ -24,7 +24,7 @@ import (
 func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "Clean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}

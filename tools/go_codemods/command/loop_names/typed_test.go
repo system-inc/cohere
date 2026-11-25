@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // typedPrelude opens every fixture of the type and use rules: the imports their bodies call, each read once so
@@ -236,10 +236,10 @@ func TestTypedNames(test *testing.T) {
 
 // settled runs findCandidates and settle over source and returns each letter's accepted name by declaration
 // line, and the plan.
-func settled(test *testing.T, source string) (map[int]string, rename.Plan, fixture) {
+func settled(test *testing.T, source string) (map[int]string, local_rename.Plan, fixture) {
 	test.Helper()
 	checked := typeCheck(test, typedPrelude+source)
-	renamePackage := rename.Package{
+	renamePackage := local_rename.Package{
 		FileSet: checked.fileSet,
 		Types:   checked.packageTypes,
 		Info:    checked.info,
@@ -294,14 +294,14 @@ func TestSettleMovesATypeSwitchAsOne(test *testing.T) {
 			test.Fatalf("got %q, want typedValue for every clause", newName)
 		}
 	}
-	renamePackage := rename.Package{
+	renamePackage := local_rename.Package{
 		FileSet: checked.fileSet,
 		Types:   checked.packageTypes,
 		Info:    checked.info,
 		Files:   checked.files,
 	}
 	guardRewritten := false
-	for _, edit := range rename.Edits(renamePackage, plan.Accepted) {
+	for _, edit := range local_rename.Edits(renamePackage, plan.Accepted) {
 		if checked.fileSet.File(checked.files[0].Pos()).Line(
 			checked.fileSet.File(checked.files[0].Pos()).Pos(edit.Offset),
 		) == 13 &&

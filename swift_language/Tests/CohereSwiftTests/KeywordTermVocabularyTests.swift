@@ -5,8 +5,8 @@ import Testing
 
 /*
  The keyword terms' loader, held to the Go loader's own vectors (`policy/keyword_terms_test.go`), and the abbreviation
- vocabulary's reading of them, held to Go's (`internal/naming/abbreviation/keyword_term_test.go`), so the two languages
- refuse the same files and judge the same names (#hvyvfr5).
+ vocabulary's reading of them, held to Go's (`internal/text_rules/abbreviation/keyword_term_test.go`), so the two
+ languages refuse the same files and judge the same names (#hvyvfr5).
  */
 struct KeywordTermVocabularyTests {
     static let minimal =

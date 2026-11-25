@@ -15,8 +15,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // plannedExternal is what one proposed external name's comments become if global_rename accepts the rename.
@@ -30,9 +30,9 @@ type plannedExternal struct {
 	// respellings are dropped.
 	commentRanges [][2]int
 	// subject is the respelling of the doc's opening name, or nil when the doc does not open with it.
-	subject *rename.Edit
+	subject *local_rename.Edit
 	// note inserts the note, or is nil when a doc comment of the declaration already names the spelling.
-	note *rename.Edit
+	note *local_rename.Edit
 	// noteIsDoc is whether the note is the declaration's whole doc, which it had none of.
 	noteIsDoc bool
 	// refusal says why the name cannot be renamed under the rule, or is "".
@@ -82,8 +82,12 @@ func planExternal(
 			opening.Text,
 			"// "+identifier.Name,
 		); found && (rest == "" || !isIdentifierByte(rest[0])) {
-			planned.subject = &rename.Edit{Filename: position.Filename, Offset: offset(opening.Pos()) + len("// "),
-				OldText: identifier.Name, NewText: newName}
+			planned.subject = &local_rename.Edit{
+				Filename: position.Filename,
+				Offset:   offset(opening.Pos()) + len("// "),
+				OldText:  identifier.Name,
+				NewText:  newName,
+			}
 		}
 		if docNames(doc, external.spelling, planned.subject, offset) {
 			return planned
@@ -106,7 +110,7 @@ func planExternal(
 		for _, line := range strings.Split(external.note, "\n") {
 			text += "\n" + indentation + "// " + line
 		}
-		planned.note = &rename.Edit{Filename: position.Filename, Offset: offset(doc.End()), NewText: text}
+		planned.note = &local_rename.Edit{Filename: position.Filename, Offset: offset(doc.End()), NewText: text}
 		return planned
 	}
 	if !strings.HasPrefix(external.note, newName+" ") {
@@ -122,7 +126,7 @@ func planExternal(
 	for _, line := range strings.Split(external.note, "\n") {
 		text.WriteString(indentation + "// " + line + "\n")
 	}
-	planned.note = &rename.Edit{Filename: position.Filename, Offset: begin, NewText: text.String()}
+	planned.note = &local_rename.Edit{Filename: position.Filename, Offset: begin, NewText: text.String()}
 	planned.noteIsDoc = true
 	return planned
 }
@@ -134,7 +138,7 @@ func lineStart(source []byte, offset int) int {
 
 // docNames is whether a doc comment names spelling as a word anywhere but at its subject, the opening name the
 // rename respells.
-func docNames(doc *ast.CommentGroup, spelling string, subject *rename.Edit, offset func(token.Pos) int) bool {
+func docNames(doc *ast.CommentGroup, spelling string, subject *local_rename.Edit, offset func(token.Pos) int) bool {
 	for _, comment := range doc.List {
 		start := offset(comment.Pos())
 		for _, index := range wordIndexes(comment.Text, spelling) {
@@ -254,7 +258,7 @@ func keepExternalSpellings(result *global_rename.Result, externals map[string]pl
 			accepted[key] = renamed
 		}
 	}
-	inExternalComment := func(edit rename.Edit) bool {
+	inExternalComment := func(edit local_rename.Edit) bool {
 		for key := range accepted {
 			planned := externals[key]
 			if planned.filename != edit.Filename || edit.OldText != planned.oldName {
@@ -268,7 +272,7 @@ func keepExternalSpellings(result *global_rename.Result, externals map[string]pl
 		}
 		return false
 	}
-	var kept []rename.Edit
+	var kept []local_rename.Edit
 	for _, edit := range result.CommentEdits {
 		if !inExternalComment(edit) {
 			kept = append(kept, edit)

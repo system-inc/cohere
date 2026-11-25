@@ -11,7 +11,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 	"github.com/system-inc/cohere/modules/mutation_aliasing"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )

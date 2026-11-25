@@ -371,7 +371,7 @@ func concurrencyNoCheckThenWriteIsConstant(symbol *ast.Symbol) bool {
 
 // concurrencyNoCheckThenWriteSharpFiles is the files the compiler resolved this file's imports of the package
 // `sharp` to, once per file. It reads the program, so it lives beside the rule that declares that read:
-// internal/guard counts a rule's reads in the file that defines it.
+// internal/testing/guard counts a rule's reads in the file that defines it.
 func concurrencyNoCheckThenWriteSharpFiles(ruleContext rule.Context) map[string]bool {
 	return rule.Cached(ruleContext.FileCache, "concurrencyNoCheckThenWriteSharpFiles", func() map[string]bool {
 		files := map[string]bool{}

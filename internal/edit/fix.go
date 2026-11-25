@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/write_root"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 )
 
 // DefaultMaxPasses bounds convergence.

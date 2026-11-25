@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // testVocabularyPath is the dry-run tree's policy file, the one the command reads there. WORDNAMES_VOCABULARY
@@ -66,7 +66,7 @@ func (fixtureImporter) Import(path string) (*types.Package, error) {
 	return (&types.Config{}).Check(path, fileSet, []*ast.File{file}, nil)
 }
 
-func typeCheck(test *testing.T, source string) rename.Package {
+func typeCheck(test *testing.T, source string) local_rename.Package {
 	test.Helper()
 	filename := filepath.Join(test.TempDir(), "fixture.go")
 	if writeError := os.WriteFile(filename, []byte(source), 0o644); writeError != nil {
@@ -91,7 +91,7 @@ func typeCheck(test *testing.T, source string) rename.Package {
 	if checkError != nil {
 		test.Fatalf("type-checking: %v", checkError)
 	}
-	return rename.Package{FileSet: fileSet, Types: packageTypes, Info: info, Files: []*ast.File{file}}
+	return local_rename.Package{FileSet: fileSet, Types: packageTypes, Info: info, Files: []*ast.File{file}}
 }
 
 // TestWordnamesRenamesLocalsAsTheFormsSay runs each fixture through planPackage and global_rename, and checks

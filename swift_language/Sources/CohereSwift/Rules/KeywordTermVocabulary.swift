@@ -2,7 +2,7 @@ import Foundation
 
 /*
  The keyword terms, cohere's `policy/KeywordTerms.json`, the same file the TypeScript and Go rules read through
- `internal/naming/abbreviation`, so all three read one list of the spellings in which a language's keyword means the
+ `internal/text_rules/abbreviation`, so all three read one list of the spellings in which a language's keyword means the
  keyword rather than an abbreviation (#hvyvfr5): JavaScript's `var` in `isVarDeclaration`, which is no "variable".
  The abbreviation vocabulary reads it, so a `Var` segment that opens a listed spelling is not reported, and every
  other `Var` still is.

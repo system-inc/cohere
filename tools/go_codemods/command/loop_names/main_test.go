@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
@@ -294,18 +294,23 @@ func clean(items []int) int {
 `
 	checked := typeCheck(test, source)
 	candidates := findCandidates(checked.packageTypes, checked.info, checked.fileSet, checked.files, fixtureWords(test))
-	var proposals []rename.Proposal
+	var proposals []local_rename.Proposal
 	for _, decided := range candidates {
 		if len(decided.names) == 0 || decided.names[0] != "index" {
 			test.Fatalf("%s: got names %q category %q, want index", decided.variable, decided.names, decided.category)
 		}
-		proposals = append(proposals, rename.Proposal{Object: decided.variable, NewName: decided.names[0]})
+		proposals = append(proposals, local_rename.Proposal{Object: decided.variable, NewName: decided.names[0]})
 	}
 	if len(proposals) != 2 {
 		test.Fatalf("got %d proposals, want 2", len(proposals))
 	}
-	plan := rename.Check(
-		rename.Package{FileSet: checked.fileSet, Types: checked.packageTypes, Info: checked.info, Files: checked.files},
+	plan := local_rename.Check(
+		local_rename.Package{
+			FileSet: checked.fileSet,
+			Types:   checked.packageTypes,
+			Info:    checked.info,
+			Files:   checked.files,
+		},
 		proposals,
 	)
 	if len(plan.Accepted) != 1 || len(plan.Rejections) != 1 {

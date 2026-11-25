@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/needs"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/testing/needs"
 	"golang.org/x/mod/modfile"
 )
 
@@ -100,9 +100,10 @@ type boxVerdict struct {
 	// was framing, which never ends with a pass or a fail, so printing only the failed tests' output dropped it and a
 	// timeout read as a bare `FAIL` with no test named (internal/go_language on Sun2, Nov 23, #r28e4nh).
 	timeouts map[string][]string
-	// steps is each step the box's run said it ended, `<step> <seconds>`, in order, and packageSeconds each package's
-	// test binary's run, from its pass or fail.
+	// steps is each step the box's run said it ended, `<step> <seconds>`, in order, and stepsWall their sum, the run's
+	// wall from its first step's start; packageSeconds each package's test binary's run, from its pass or fail.
 	steps          []string
+	stepsWall      time.Duration
 	packageSeconds map[string]float64
 	// budget is the core budget the box's run said it kept to (boxBudgetMarker), empty when it kept to none.
 	budget string
@@ -123,6 +124,9 @@ type boxVerdict struct {
 	// a gate one box ran whole. halves says on the land line which box ran which half, empty when parts is.
 	parts  []boxVerdict
 	halves string
+	// split is how a split gate's halves were placed and what each took, as the land line says it (splitBalance),
+	// empty for a gate one box ran whole.
+	split string
 	// wholeBecause is why a gate that would have split ran whole on one box, as the land line says it, empty when it
 	// split or was never to.
 	wholeBecause string
@@ -188,6 +192,7 @@ func readTestJson(output []byte) boxVerdict {
 			// verdict comes from them.
 			spent, _ := strconv.Atoi(seconds)
 			verdict.steps = append(verdict.steps, name+" "+(time.Duration(spent)*time.Second).String())
+			verdict.stepsWall += time.Duration(spent) * time.Second
 			continue
 		}
 		if listing, isListing := strings.CutPrefix(line, boxShardListingMarker); isListing {
@@ -274,6 +279,15 @@ func readTestJson(output []byte) boxVerdict {
 // failed reports whether the verdict holds a failure: a failed package, which a build failure is too, or a test.
 func (verdict boxVerdict) failed() bool {
 	return len(verdict.packagesFailed) > 0 || len(verdict.failedTests) > 0
+}
+
+// halfWall is how long the run took by its steps, its -race run's included, zero when it said none: a split gate's
+// half's wall (gate_split.go).
+func (verdict boxVerdict) halfWall() time.Duration {
+	if verdict.race == nil {
+		return verdict.stepsWall
+	}
+	return verdict.stepsWall + verdict.race.stepsWall
 }
 
 // readShardListing reads the line after boxShardListingMarker, a sharded package's listing (sharded_run.go), into
@@ -739,6 +753,10 @@ func runModuleTests(
 			fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run, %s\n", verdict.box, timing)
 		}
 	}
+	// How a split gate's halves were placed beside what each took, so the balance is read from the record (#q1mvjgg).
+	if verdict.split != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s's gate, %s\n", verdict.box, verdict.split)
+	}
 	if verdict.failed() {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s failed, so nothing landed:\n", verdict.failedOn(),
 			platform)
@@ -808,6 +826,9 @@ func runModuleTests(
 	if verdict.wholeBecause != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", verdict.wholeBecause)
 		where += "; " + verdict.wholeBecause
+	}
+	if verdict.split != "" {
+		where += "; " + verdict.split
 	}
 	// Where the gate's time went joins the landing's body too, so main's history holds it beside the gate's total.
 	if timing := verdict.timingReport(); timing != "" {

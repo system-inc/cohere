@@ -76,8 +76,8 @@ cohere-swift over `swift_language/`, and both read 0. Go's own toolchain gates i
 Code another repository pins by tag lives in `modules/`, one folder per Go module, each with its own
 `go.mod` and tagged `modules/<name>/v...`. The rule is mechanical: a folder is in `modules/` if and only if
 it has its own `go.mod`. Every one is a `use` of `go.work`, so the gate tests it, and one cohere imports is
-a `replace` of the root `go.mod` too. `internal/guard` refuses a `go.mod` anywhere else outside `testdata/`
-and the TypeScript fork.
+a `replace` of the root `go.mod` too. `internal/testing/guard` refuses a `go.mod` anywhere else outside
+`testdata/` and the TypeScript fork.
 
 Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go
 held to the token's share of the cores, niced (#qhg0ntb): `go run ./command/cohere-dev test ./...` for the
@@ -161,7 +161,7 @@ toolchain or module cache it can't vouch for, refuses the landing, and its verdi
 shared uid".
 
 A gate box holds the private corpora too, laid read-only under `~/scratch/system_cohere_tools/corpora` at the
-commits `internal/corpus/corpus_pinned.go` names in the tree being landed (`gate_corpus.go`, #5r0vrte), and its
+commits `internal/testing/corpus/corpus_pinned.go` names in the tree being landed (`gate_corpus.go`, #5r0vrte), and its
 script sets each corpus's variable to its laid copy. A box that lacks one names it and tests nothing; land then
 lays it from the checkout its corpora file names, carried on a gap of its own, and asks the box again. ahra goes
 without `data/`, which no test reads. ahra and connected are installed from their pnpm lockfiles and the
@@ -188,7 +188,7 @@ files or findings than main's, is a line of its own, never compared: a run that 
 awareness, never a gate on speed: a
 landing that makes cohere slower lands with its note saying so (Kirk, Nov 21). `cohere-dev measure [<commit>]` runs
 the measurement alone, landing nothing. The file is land's alone: never write or edit it, and nothing that
-builds or tests may read it, which `internal/guard` holds, since it is written after the gate. While another holds
+builds or tests may read it, which `internal/testing/guard` holds, since it is written after the gate. While another holds
 Shackler, land waits holding the lock, saying whose claim and since when, and after `COHERE_DEV_PERFORMANCE_WAIT`
 (2h unless it says) refuses, naming the holder; a measurement that fails refuses the landing in her words. A tree
 with no `command/cohere` has nothing to measure and lands saying so. Each phase's seconds are on the land line.
@@ -241,7 +241,7 @@ way. The names, the line lengths and the file layout went through typed codemods
 the end. What was left went through waves of light agents, each holding one package's judgment.
 
 **The codemods are in `tools/go_codemods`.** Every rename goes through global_rename and the local rename, a library
-in `internal/go_rename`: `rename` (one package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
+in `internal/go_language/rename`: `local_rename` (one package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
 the same object under the new names, checked to a fixpoint. The rewrite is reloaded in memory and compared
 before anything is written, and checked again from disk. A name someone else owns (a field an encoder reads by
 name, a method an interface of another package requires, an export outside the repository) is found by type and
@@ -257,7 +257,7 @@ refused, and the refusal is listed with its reason. The passes:
 - `octal_prefix`: each literal the octal-prefix rule flags, `0644` written as `0o644`, through the same reload,
   every literal of a rewritten file proven to keep its constant value.
 - `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words; a bare `cohere` runs the
-  same wrap, `internal/line_wrap`, on the long-line rule's findings once the types load sound, never touching a
+  same wrap, `internal/go_language/line_wrap`, on the long-line rule's findings once the types load sound, never touching a
   comment or taking a file past the long-file limit), `type_split` (one type
   with methods to a file, each file named for it), `folder_names` (a package folder moved with its clause, its
   import paths and every qualifier).
@@ -284,7 +284,7 @@ whose cure depends on what failing means there, and the rest of the correctness 
   is relay; the diff is the record.
 
 A whole class of findings sometimes has one cure, and then it isn't 400 judgments. A command's dropped
-`fmt.Printf` errors are cured by writing to `internal/streams`, whose buffered writes can't fail partway and whose
+`fmt.Printf` errors are cured by writing to `internal/command_line/streams`, whose buffered writes can't fail partway and whose
 delivery `streams.Finish` checks once at exit, the way `command/cohere-dev` does.
 
 ## Porting a rule

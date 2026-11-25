@@ -29,9 +29,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/system-inc/cohere/internal/edit/write_root"
 	"github.com/system-inc/cohere/internal/go_language/bounded"
-	"github.com/system-inc/cohere/internal/line_wrap"
-	"github.com/system-inc/cohere/internal/write_root"
+	"github.com/system-inc/cohere/internal/go_language/line_wrap"
 )
 
 // Options says what a run does with the files gofmt would change.

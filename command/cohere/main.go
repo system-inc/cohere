@@ -19,14 +19,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/cohere/internal/command_line/sentence"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/sentence"
-	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/unused_exports"
 )
@@ -1602,7 +1602,8 @@ func run() error {
 
 	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
-		// The dash is escaped, not changed: swift_language/Contract.md fixes this detail's spelling for both languages.
+		// The dash is escaped, not changed: documentation/contract/Contract.md fixes this detail's spelling for both
+		// languages.
 		report.record(phaseUnused, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 	} else {
 		unusedStart := time.Now()

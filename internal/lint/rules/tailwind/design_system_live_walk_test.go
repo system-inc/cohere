@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 

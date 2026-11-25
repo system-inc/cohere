@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // cohere-dev land: a merge queue, so a green gate can't be starved by main moving under it (#fz6xejy).

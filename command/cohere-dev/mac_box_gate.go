@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // The road to a gate box (#rr818c8): the commit goes into Loom's feed on Zach with `ahra loom push --feed`, Operations'
@@ -63,7 +63,7 @@ const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 
 // macBoxCorpusVariables is every corpus's variable, which the gate's Mac script unsets before it sets the laid ones, so
 // a variable another org left in loom's environment never points a test at a copy the gate didn't lay. A test holds it
-// to internal/corpus's list.
+// to internal/testing/corpus's list.
 const macBoxCorpusVariables = "COHERE_CORPUS_AHRA COHERE_CORPUS_STRUCTURE COHERE_CORPUS_CONNECTED COHERE_PRETTIER_FORK"
 
 // macBoxMirrorReads is how a Mac's script reads her mirrors, given base, mirrors, tries, pause and refuse before it: it

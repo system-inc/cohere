@@ -28,7 +28,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The unit-isolation test (#h350vqr) holds every rule the side table declares rules.InputsPerUnit or
