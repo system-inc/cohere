@@ -503,11 +503,9 @@ func runBoxGate(
 		if splitError != nil {
 			return boxVerdict{}, splitError.Error()
 		}
-		corpora, unlaid, corporaError := gateCorpora(worktree, commit)
-		if corporaError != nil {
-			return boxVerdict{}, "the corpora this landing pins can't be read: " + corporaError.Error()
-		}
-		corporaLaid, unlaidCorpora = corporaNamed(corpora), unlaid
+		// No corpus is laid: cohere's tests read no snapshot of another repository (Kirk, Nov 25, #5wj23dd), so a test
+		// that still reads one skips by name, as on a developer's machine, until its deletion lands.
+		corpora := []gateCorpus{}
 		pin, unavailable := feedGateCommit(worktree, commit)
 		if unavailable != "" {
 			return boxVerdict{}, unavailable
