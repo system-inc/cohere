@@ -111,7 +111,6 @@ func describeProject(request invocation) (described *describedProject, describeE
 	described = &describedProject{
 		workspace:          workspace,
 		census:             census,
-		nothingOurs:        len(census.Ours) == 0,
 		manifest:           manifest,
 		inScopeSet:         map[string]bool{},
 		constrainedInScope: map[string]bool{},

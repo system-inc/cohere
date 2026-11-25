@@ -266,6 +266,10 @@ type pipeline struct {
 	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
 	renamed bool
 
+	// unlisted is set once the run has decided its root holds nothing to list (nothingToList), so no go list runs, and
+	// the types record says so.
+	unlisted bool
+
 	// fix is the fix phase's record, held unwritten from gofmt until the long-line wrap and the rename after the load
 	// have added to it, nil when the phase was not requested.
 	fix *heldFix
@@ -473,7 +477,8 @@ func (pipeline *pipeline) run() int {
 	// The long-line wrap waits for a load that finds the types sound, so a run that wraps loads even when no phase
 	// reads the types.
 	wraps := pipeline.wrapsLongLines()
-	if pipeline.described.nothingOurs {
+	if (needsTypes || wraps) && pipeline.nothingToList() {
+		pipeline.unlisted = true
 		pipeline.checkNothingOurs()
 		return pipeline.finish(nil)
 	}
@@ -540,8 +545,35 @@ func (pipeline *pipeline) run() int {
 	return pipeline.finish(loaded)
 }
 
-// checkNothingOurs is the fix, types and lint phases of a root with no Go file of ours (describedProject.nothingOurs),
-// which never lists, so no go list runs and no findings cache is opened, whose keys go env answers. The fix phase
+// nothingToList reports whether the root holds no Go file of ours, by two witnesses that must both read none
+// (#td4wp62): the census, which walked each module, and the index of each module's repository, read in process and
+// judged by the rules go reads a tree by (project.TrackedGoFile). A root either says holds a file is listed as any root
+// with files is. The census alone would turn a walk that wrongly counted nothing into a green over Go never checked,
+// and no load would follow to show it (missedByCensus), so with no index to read, a module in no repository or a
+// repository whose index cannot be read, the root is listed too, as it always was. When the index tracks a file go
+// would read that the census never counted, the two read one tree, so one of them is wrong: the run says so as cohere's
+// bug and falls short, whatever the listing then finds.
+func (pipeline *pipeline) nothingToList() bool {
+	if len(pipeline.described.census.Ours) > 0 {
+		return false
+	}
+	tracked, witnessError := project.TrackedGoFile(pipeline.described.workspace)
+	if witnessError != nil {
+		return false
+	}
+	if tracked != "" {
+		pipeline.incomplete = true
+		pipeline.note("the census counted no Go file of ours in the %s at %s, and the repository's index tracks %s, "+
+			"which go reads, so the %s is listed as one with files; the two read one tree, so this is a bug in cohere "+
+			"to report", pipeline.described.container(), pipeline.described.record.Root, tracked,
+			pipeline.described.container())
+		return false
+	}
+	return true
+}
+
+// checkNothingOurs is the fix, types and lint phases of a root with no Go file of ours (nothingToList), which never
+// lists, so no go list runs and no findings cache is opened, whose keys go env answers. The fix phase
 // formats no file, and the types and lint phases run over a load of no package, as they run over one go list answered
 // with none at a module with no file, so the run reports them the same way: ran, over no file. The go commands the
 // description started beside its census are joined, though nothing reads them.
@@ -1062,9 +1094,9 @@ func (pipeline *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 	build = fmt.Sprintf("%s: %d packages, %d in the workspace", build, loaded.PackagesLoaded,
 		loaded.PackagesInWorkspace)
 	switch {
-	case pipeline.described.nothingOurs && pipeline.described.workspace.FromWorkspace:
+	case pipeline.unlisted && pipeline.described.workspace.FromWorkspace:
 		build = "nothing listed: no module of the workspace holds a Go file of ours, so go list never ran"
-	case pipeline.described.nothingOurs:
+	case pipeline.unlisted:
 		build = "nothing listed: the module holds no Go file of ours, so go list never ran"
 	}
 	pipeline.write(contract.TypesRecord{

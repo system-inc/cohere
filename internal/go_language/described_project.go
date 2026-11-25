@@ -19,12 +19,6 @@ type describedProject struct {
 	// census is the workspace's census, which the builds a run of every build checks are read from (project.BuildsFor).
 	census project.Census
 
-	// nothingOurs is whether no module of the root holds a Go file of ours, none at all or only files the census
-	// excludes, as the census counted them before any phase (#td4wp62). Such a root is never listed: with nothing to
-	// check, go list answers for nothing of the run's, so a refusal go meets only because it was asked, as the
-	// inconsistent vendoring of a go.mod under `-mod=vendor`, never fails the run (pipeline.checkNothingOurs).
-	nothingOurs bool
-
 	// readableOurs are the census's files that are ours and could be read, before the build constraints narrow
 	// them: what the load accounts for. An unreadable file is left out, since the load
 	// reads each file it accounts for and one it cannot open fails it whole; the file is already a record.
