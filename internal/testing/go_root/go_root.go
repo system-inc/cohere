@@ -5,6 +5,8 @@
 // `GOROOT` variable is set, and go test sets none. What go test does set is PATH, with the toolchain's bin first
 // (cmd/go's base.AppendPATH), so the go found there sits in the root's bin. A root found that way is checked before
 // it is used: one that holds no go in its bin or no runtime source is refused, never guessed past.
+//
+// It reads the toolchain's cgo setting and C compiler in process too (CgoEnabled, CCompiler), by cmd/go's own rules.
 package go_root
 
 import (
