@@ -58,7 +58,7 @@ func (run languagesRun) summaries() int {
 func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "Clean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
@@ -211,7 +211,7 @@ func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 func TestANarrowedRunNamesWhatItLeftOutWhileItsProjectReplays(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "Clean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}

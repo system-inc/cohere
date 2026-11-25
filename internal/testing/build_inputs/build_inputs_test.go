@@ -40,6 +40,36 @@ func outsideModule(test *testing.T, directory string) (returned string, refused 
 	return OutsideModule(stoppingTest{test}, directory), ""
 }
 
+// Record opens the files a build constraint leaves out too, so an edit that compiles one in is a miss: a Go file
+// under `//go:build never` (IgnoredGoFiles) and an assembly file for another system (IgnoredOtherFiles). The
+// fixture is a module of one package, so what Record opens is exactly its directory, its compiled file, those two
+// files and its go.mod; it has no go.sum, and no workspace is read.
+//
+// Not parallel: it sets `GOWORK` and `GOFLAGS`, which are the process's, so the fixture is listed as a module of its
+// own whatever workspace and flags the test runs under.
+func TestRecordOpensTheFilesABuildConstraintLeavesOut(test *testing.T) {
+	test.Setenv("GOWORK", "off")
+	test.Setenv("GOFLAGS", "")
+	test.Setenv("GOPROXY", "off")
+	module := test.TempDir()
+	for name, content := range map[string]string{
+		"go.mod":      "module example.com/fixture\n\ngo 1.21\n",
+		"lib.go":      "package fixture\n",
+		"other.go":    "//go:build never\n\npackage fixture\n",
+		"asm_plan9.s": "// assembled for plan9 alone\n",
+	} {
+		if writeError := os.WriteFile(filepath.Join(module, name), []byte(content), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	if opened := Record(test, OutsideModule(test, module), "."); opened != 5 {
+		test.Errorf(
+			"Record opened %d files, want 5: the directory, lib.go, other.go, asm_plan9.s and go.mod",
+			opened,
+		)
+	}
+}
+
 // OutsideModule passes a directory of the test's own and refuses this package's, and one that only reaches this
 // package through a symbolic link, since what go reads there is the module's code (#h1e0b8b).
 func TestOutsideModuleRefusesADirectoryInsideTheModule(test *testing.T) {

@@ -8,14 +8,14 @@ import (
 )
 
 // packageCacheUse is what cohere-go's per-package findings cache did in the lint phase, by package, as the lint
-// record's `cache` object says it (swift_language/Contract.md): hit, restored from an entry with nothing run on it;
-// missed, analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; the facts
-// the written entries left out, since nothing outside their package can name their object; the restored facts skipped,
-// whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at most two.
-// FromSystemCache is the standard-library packages restored from cohere-go's system cache, its tables in the user's
-// cache directory, every build's summed, apart from hit, which `--no-cache` reads too, since they are of cohere and the
-// Go installation and nothing of the project; it is absent when 0. SystemCacheWritten is the entries the run's builds
-// added to their tables of the system cache, summed, absent when 0, and SystemCacheOff is set under
+// record's `cache` object says it (documentation/contract/Contract.md): hit, restored from an entry with nothing run on
+// it; missed, analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; the
+// facts the written entries left out, since nothing outside their package can name their object; the restored facts
+// skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
+// most two. FromSystemCache is the standard-library packages restored from cohere-go's system cache, its tables in the
+// user's cache directory, every build's summed, apart from hit, which `--no-cache` reads too, since they are of cohere
+// and the Go installation and nothing of the project; it is absent when 0. SystemCacheWritten is the entries the run's
+// builds added to their tables of the system cache, summed, absent when 0, and SystemCacheOff is set under
 // `--no-system-cache`, which neither reads nor writes it. SystemCacheNotKept is why the run kept no system cache though
 // it was on, or could not keep it as it should, in one line, absent when there is none (#syscache). Reloads is the
 // packages the run loaded again from source, though the cache held them, to answer a question of a fact computed on
@@ -49,11 +49,11 @@ type packageCacheUse struct {
 }
 
 // buildPacksUse is what the extra builds did with their packs, as the lint record's `cache.packs` says it
-// (swift_language/Contract.md): each build reads one file of each store holding every record its last run read or wrote
-// there, rather than open each record, and serves a record from it only while the record's shard of the store is as it
-// was. The packs read whole and those missing, which is no refusal, the records served, those whose shard had moved and
-// those no pack held, each read from the store, the shard stamps read, each pack refused by the first word of why, and
-// the packs written.
+// (documentation/contract/Contract.md): each build reads one file of each store holding every record its last run read
+// or wrote there, rather than open each record, and serves a record from it only while the record's shard of the store
+// is as it was. The packs read whole and those missing, which is no refusal, the records served, those whose shard had
+// moved and those no pack held, each read from the store, the shard stamps read, each pack refused by the first word of
+// why, and the packs written.
 type buildPacksUse struct {
 	Read          int            `json:"read"`
 	Missing       int            `json:"missing"`

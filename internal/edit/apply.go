@@ -1,4 +1,4 @@
-// Package fix applies the repairs rules propose, and refuses the ones that would corrupt a file.
+// Package edit applies the repairs rules propose, and refuses the ones that would corrupt a file.
 //
 // This is the only component in cohere that writes to source. Everything else reads: the parser
 // reads bytes, the checker reads the parse, a rule reads the tree and proposes. A proposal is

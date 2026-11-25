@@ -8,10 +8,9 @@
 //
 // # The oracle is goja(file), not file
 //
-// The predecessor of this harness (internal/format/comparison) treated every tree file as a fixed point
-// of Prettier, so any change a candidate proposed was a divergence. That no longer holds. The projects
-// run Prettier with prettier-plugin-tailwindcss, and the embedded formatter runs core Prettier without
-// it, so the tree is a fixed point of a different formatter than the one being matched. Class order is
+// A change a candidate proposes to a tree file is not by itself a divergence. The projects run Prettier
+// with prettier-plugin-tailwindcss, and the embedded formatter runs core Prettier without it, so the
+// tree is a fixed point of a different formatter than the one being matched. Class order is
 // cohere's lint fixer's job, not the format phase's. So the oracle output is computed, never assumed.
 //
 // # Two numbers, because one of them flatters

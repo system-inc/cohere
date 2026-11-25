@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/go_listing"
 )
 
 // keyFixture writes one checkout at root: a module of its own with one package, which the listing names
@@ -26,18 +28,22 @@ func keyFixture(test *testing.T, root string, source string) *listing {
 	if writeError := os.WriteFile(filepath.Join(shim, "ast.go"), []byte(source), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	packages := []*listedPackage{
+	packages := []*go_listing.Package{
 		{ImportPath: "strings", Name: "strings", Standard: true, GoFiles: []string{"builder.go", "strings.go"}},
 		{ImportPath: "golang.org/x/sync/errgroup", Name: "errgroup", GoFiles: []string{"errgroup.go"},
-			Module: &listedModule{
+			Module: &go_listing.Module{
 				Path:      "golang.org/x/sync",
 				Version:   "v0.17.0",
 				Directory: filepath.Join(test.TempDir(), "mod", "golang.org", "x", "sync@v0.17.0"),
 			}},
 		{ImportPath: "example.com/shim/ast", Name: "ast", Directory: shim, GoFiles: []string{"ast.go"},
-			Module: &listedModule{Path: "example.com/shim/ast", Directory: shim, GoMod: filepath.Join(shim, "go.mod")}},
+			Module: &go_listing.Module{
+				Path:      "example.com/shim/ast",
+				Directory: shim,
+				GoMod:     filepath.Join(shim, "go.mod"),
+			}},
 	}
-	result := &listing{packages: packages, byPath: map[string]*listedPackage{}}
+	result := &listing{packages: packages, byPath: map[string]*go_listing.Package{}}
 	for _, listedPackage := range packages {
 		result.byPath[listedPackage.ImportPath] = listedPackage
 	}
@@ -185,9 +191,9 @@ func TestAPackageOutsideTheRepositoryIsRefusedAKey(test *testing.T) {
 func TestExportDataStandsOnlyForWhatImportsNothingOfTheSource(test *testing.T) {
 	test.Parallel()
 
-	source := &listedModule{Path: "example.com/cohere"}
-	outside := &listedModule{Path: "example.com/outside"}
-	packages := []*listedPackage{
+	source := &go_listing.Module{Path: "example.com/cohere"}
+	outside := &go_listing.Module{Path: "example.com/outside"}
+	packages := []*go_listing.Package{
 		{ImportPath: "fmt", Standard: true},
 		{ImportPath: "example.com/outside/leaf", Module: outside, Deps: []string{"fmt"}},
 		{ImportPath: "example.com/cohere/rule", Module: source, Deps: []string{"example.com/outside/leaf", "fmt"}},

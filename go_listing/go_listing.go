@@ -23,9 +23,7 @@ package go_listing
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 )
 
 // A Module is the module a listed package belongs to.
@@ -45,27 +43,27 @@ type Module struct {
 // dependencies first under -deps. The empty output is no packages. Anything that isn't a stream of
 // objects, a value of another type or one cut short, is refused, named by its place in the stream.
 // An object with no ImportPath is read as it stands, since a -json field list may leave it out.
+//
+// Each object is read once, straight into its place in the result, so a whole tree's listing costs one
+// pass over its bytes and no allocation per package beyond what the package holds.
 func Decode(output []byte) ([]Package, error) {
 	var packages []Package
 	decoder := json.NewDecoder(bytes.NewReader(output))
 	for {
-		// Each value is taken whole before it is read as a Package, since a null would read as a
-		// package with nothing in it.
-		var value json.RawMessage
-		decodeError := decoder.Decode(&value)
-		if errors.Is(decodeError, io.EOF) {
+		index := len(packages)
+		// The next value's first byte says whether it is an object, before it is read: a null would
+		// read as a package with nothing in it. The decoder stops at the end of the value before, so
+		// the next one starts at its offset, after any white space.
+		next := bytes.TrimLeft(output[decoder.InputOffset():], " \t\r\n")
+		if len(next) == 0 {
 			return packages, nil
 		}
-		if decodeError != nil {
-			return nil, fmt.Errorf("reading go list's output, object %d: %w", len(packages), decodeError)
+		if next[0] != '{' {
+			return nil, fmt.Errorf("reading go list's output, object %d: %.40q isn't an object", index, next)
 		}
-		if value[0] != '{' {
-			return nil, fmt.Errorf("reading go list's output, object %d: %.40q isn't an object", len(packages), value)
+		packages = append(packages, Package{})
+		if decodeError := decoder.Decode(&packages[index]); decodeError != nil {
+			return nil, fmt.Errorf("reading go list's output, object %d: %w", index, decodeError)
 		}
-		var listed Package
-		if unmarshalError := json.Unmarshal(value, &listed); unmarshalError != nil {
-			return nil, fmt.Errorf("reading go list's output, object %d: %w", len(packages), unmarshalError)
-		}
-		packages = append(packages, listed)
 	}
 }

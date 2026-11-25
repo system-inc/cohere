@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/system-inc/cohere/go_listing"
 	"github.com/system-inc/cohere/internal/go_language/test_functions"
 )
 
@@ -244,7 +245,7 @@ func refuseUnreadOverlay(overlay map[string][]byte, sourceFiles map[string]bool)
 }
 
 // canonical is the import path a package's import of path resolves to.
-func canonical(importer *listedPackage, path string) string {
+func canonical(importer *go_listing.Package, path string) string {
 	if resolved, ok := importer.ImportMap[path]; ok {
 		return resolved
 	}

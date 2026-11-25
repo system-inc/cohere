@@ -379,7 +379,7 @@ func runFakeGoChild(test *testing.T, body string) (string, int, error) {
 // Not parallel: its subtests drive check runs through contractRun, whose record acceptors set the
 // package-level activeSummary.
 func TestAGoChildThatDoesNotFinishChecksNothing(test *testing.T) {
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "GoClean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "GoClean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}

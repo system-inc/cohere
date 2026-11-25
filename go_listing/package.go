@@ -46,6 +46,14 @@ type Package struct {
 	TestEmbedFiles  []string
 	XTestEmbedFiles []string
 
+	// EmbedPatterns are the package's //go:embed patterns as its directives spell them, and TestEmbedPatterns
+	// and XTestEmbedPatterns its in-package and external tests'. They are patterns, not files, so no FileList
+	// names them: the files they match are EmbedFiles and its test lists. A pattern can match a file added
+	// later, so a caller that keys a build may key the package's directory whole when it has one.
+	EmbedPatterns      []string
+	TestEmbedPatterns  []string
+	XTestEmbedPatterns []string
+
 	CgoCFlags   []string `json:"CgoCFLAGS"`
 	CgoCppFlags []string `json:"CgoCPPFLAGS"`
 	CgoCxxFlags []string `json:"CgoCXXFLAGS"`

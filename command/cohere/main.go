@@ -1602,7 +1602,8 @@ func run() error {
 
 	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
-		// The dash is escaped, not changed: swift_language/Contract.md fixes this detail's spelling for both languages.
+		// The dash is escaped, not changed: documentation/contract/Contract.md fixes this detail's spelling for both
+		// languages.
 		report.record(phaseUnused, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 	} else {
 		unusedStart := time.Now()
