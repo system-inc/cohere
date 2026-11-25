@@ -16,7 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The printer's acceptance test, run from this package: the differential's comparison over every .md

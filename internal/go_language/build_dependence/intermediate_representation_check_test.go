@@ -33,7 +33,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/check/checker"
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_language/rules/build_intermediate_representation"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The wide run's variables: the tree it loads, and the builds it compares against the host, by name

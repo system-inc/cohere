@@ -18,10 +18,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
 
 	"golang.org/x/tools/go/packages"
 )

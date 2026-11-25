@@ -32,7 +32,7 @@ import (
 // testdata is left out on both sides: its files are fixtures some test reads, not tests that run.
 func TestEveryCohereVariableATestSetsIsRead(test *testing.T) {
 	test.Parallel()
-	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

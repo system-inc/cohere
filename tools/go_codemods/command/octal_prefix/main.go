@@ -24,10 +24,10 @@ import (
 	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_require_octal_prefix"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // passName is what the verified apply calls this pass in a refusal.

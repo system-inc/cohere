@@ -18,7 +18,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/command_line/sentence"
 )
 
 // Output is stdout, and Errors is stderr, each as a person reads it. Each writes to whatever file os.Stdout or

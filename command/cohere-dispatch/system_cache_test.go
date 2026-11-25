@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/system_cache_testing"
+	"github.com/system-inc/cohere/internal/testing/system_cache_testing"
 )
 
 // TestMain gives cohere every test here starts, through the dispatcher, a system cache of this test binary's

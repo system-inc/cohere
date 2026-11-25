@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/load"
-	"github.com/system-inc/cohere/internal/go_types"
+	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 // listedDirectoriesChildVariable names the loader and the fixture module TestListedDirectoriesChild loads.

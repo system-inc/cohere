@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/cache_directory"
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // goReplayFixture is a tiny Go module, in a directory of its own so an ancestor go.work can be planted beside it,

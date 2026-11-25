@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/listed_directories"
+	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
 // listedPackage is what `go list -deps -json` says of one package, the fields the loader reads.

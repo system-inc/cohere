@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // A change on main to a package land links, with command/cohere-dev left as it was, hands a landing from a branch

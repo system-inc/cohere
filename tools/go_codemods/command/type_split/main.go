@@ -20,7 +20,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // alwaysSkipped is the TypeScript submodule, upstream's code rather than cohere's.

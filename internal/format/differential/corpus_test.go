@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // TestCorpora is the acceptance test: the native printer against the embedded Prettier, over real trees.

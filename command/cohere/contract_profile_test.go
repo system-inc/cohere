@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/pprof/profile"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // A child's profile sits beside the front door's, the child's name before the extension (#r33n96f), absolute

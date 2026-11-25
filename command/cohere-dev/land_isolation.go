@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/mod/modfile"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // The unit-isolation step (#h350vqr): a landing that touches a rule's package, its code or its fixtures, runs that

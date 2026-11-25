@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/origin_names"
 	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // The second phase renames the declarations whose name abbreviates error and whose uses reach past one

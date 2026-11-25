@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // fixture is a temporary multi-package module with its own go.work, loaded as a cohere worktree is.

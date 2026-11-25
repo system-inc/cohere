@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/cache_directory"
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // Before any project's run starts, the cache directory of each project whose run keeps a run cache is made, and of no

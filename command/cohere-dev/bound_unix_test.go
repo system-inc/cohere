@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // spawnerVariable makes this test binary the planted spawner: a process that starts sleeps until it is

@@ -14,7 +14,7 @@ import (
 // PinnedFile is the file, from this repository's root, whose constants name every commit the land gate lays a corpus
 // at. The gate reads it from the commit it lands rather than from its own build, so a landing that moves a pin is
 // gated against the corpus at the pin it moves to (#5r0vrte).
-const PinnedFile = "internal/corpus/corpus_pinned.go"
+const PinnedFile = "internal/testing/corpus/corpus_pinned.go"
 
 // Pins is what the land gate lays of one corpus on a gate box (#5r0vrte).
 type Pins struct {

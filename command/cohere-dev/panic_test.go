@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // panicChildVariable tells a test binary run by TestAPanicDeliversWhatWasWrittenBeforeIt to be the cohere-dev

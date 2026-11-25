@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // stalePatterns are what the tests list of the stale workspace: a's packages, which import dep.

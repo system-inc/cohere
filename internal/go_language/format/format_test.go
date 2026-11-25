@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/write_root"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 )
 
 const formattedSource = "package fixture\n\nvar Count = 1\n"

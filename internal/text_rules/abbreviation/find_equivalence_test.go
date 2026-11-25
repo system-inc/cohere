@@ -11,7 +11,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 	"github.com/system-inc/cohere/policy"
 )
 

@@ -29,8 +29,10 @@ var raceGated = []raceEntry{
 		"(#bnabymg)"},
 	{directory: "internal/edit", reason: "TestConcurrentReadersNeverSeeAPartialFile reads while a write replaces " +
 		"the file"},
-	{directory: "internal/executable_testing", reason: "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs " +
-		"scripts while other goroutines fork (#g93ts58)"},
+	{
+		directory: "internal/edit/write_root",
+		reason:    "TestCopiesAskedAtOnceAgree asks for one copy from several goroutines",
+	},
 	{
 		directory: "internal/go_language",
 		// The guard's own words (concurrencyTestName), so the run selects every test whose name says it runs code at
@@ -89,10 +91,14 @@ var raceGated = []raceEntry{
 		reason: "TestInstallingTheSwiftBinaryConcurrentlyLeavesOneBinary installs " +
 			"from two runs at once",
 	},
+	{
+		directory: "internal/testing/executable_testing",
+		reason: "TestAScriptWrittenWhileOthersForkRunsAtOnce writes and runs " +
+			"scripts while other goroutines fork (#g93ts58)",
+	},
 	{directory: "internal/types/program", reason: "programs check, parse libraries and record their run cache at " +
 		"once, and every rule walks a file while a checker and a reader read its tree (checker_concurrency_test.go, " +
 		"library_parses_test.go, run_cache_test.go, rule_walk_concurrency_test.go, #qb5xxj1)"},
-	{directory: "internal/write_root", reason: "TestCopiesAskedAtOnceAgree asks for one copy from several goroutines"},
 }
 
 // raceEntry is one package the gate runs under -race, by its directory under the module root, and why. Its run is a

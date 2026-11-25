@@ -55,7 +55,7 @@ import (
 func TestRulesNeverWriteTheSyntaxTree(test *testing.T) {
 	test.Parallel()
 
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
@@ -84,7 +84,7 @@ func TestRulesNeverWriteTheSyntaxTree(test *testing.T) {
 func TestTheSyntaxTreeWriteScanNamesTheFixturesWrites(test *testing.T) {
 	test.Parallel()
 
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

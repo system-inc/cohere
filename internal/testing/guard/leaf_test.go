@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // allowedRuleImports are the packages of ours a rule package may depend on.
@@ -194,7 +194,7 @@ func hasAllowedPrefix(imported string) bool {
 func listImports(test *testing.T, pattern string) ([]string, map[string][]string) {
 	test.Helper()
 	// Tests run in their own package directory, and the pattern is written relative to the module root.
-	root := filepath.Join("..", "..")
+	root := filepath.Join("..", "..", "..")
 	// go list reads the packages' sources in a process of its own, so Go's test cache keys on them only through
 	// this (#4p82x8d).
 	build_inputs.Record(test, root, pattern)
@@ -230,7 +230,7 @@ func registeringPackages(test *testing.T, packages []string) []string {
 	registering := make([]string, 0, len(packages))
 	for _, importPath := range packages {
 		directory := strings.TrimPrefix(importPath, modulePrefix)
-		matches, globError := filepath.Glob(filepath.Join("..", "..", directory, "*_register.go"))
+		matches, globError := filepath.Glob(filepath.Join("..", "..", "..", directory, "*_register.go"))
 		if globError != nil {
 			test.Fatalf("looking for registrations in %s: %v", importPath, globError)
 		}

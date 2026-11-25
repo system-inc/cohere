@@ -86,7 +86,7 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 func TestTheCreatingGetterScanSeesAPlantedCall(test *testing.T) {
 	test.Parallel()
 
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

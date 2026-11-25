@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A waiter names each new holder, not only the first it saw (#vz3g7cn). On a one-token machine the test

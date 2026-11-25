@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_types"
+	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 /*

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // TestAMixedRunUnderJsonWritesOnlyRecordsToStdout: a repository holding a TypeScript program and a Swift

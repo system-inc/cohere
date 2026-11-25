@@ -17,11 +17,11 @@ const performanceFile = "Performance.jsonc"
 
 // performanceFileNamers is every tracked file that may name performanceFile, each with why.
 var performanceFileNamers = map[string]string{
-	"command/cohere-dev/land_performance.go":         "the writer",
-	"command/cohere-dev/land_performance_test.go":    "the writer's tests",
-	"internal/guard/performance_file_unread_test.go": "this guard",
-	"Performance.jsonc":                              "the file, naming itself in its header",
-	"CONTRIBUTING.md":                                "the house's account of land, which says land alone writes it",
+	"command/cohere-dev/land_performance.go":                 "the writer",
+	"command/cohere-dev/land_performance_test.go":            "the writer's tests",
+	"internal/testing/guard/performance_file_unread_test.go": "this guard",
+	"Performance.jsonc":                                      "the file, naming itself in its header",
+	"CONTRIBUTING.md":                                        "the house's account of land, which says land alone writes it",
 }
 
 // Nothing that builds or tests reads Performance.jsonc (#6wnsnq2, ruling 2). cohere-dev land writes it into each
@@ -35,7 +35,7 @@ var performanceFileNamers = map[string]string{
 // path.
 func TestNothingThatBuildsOrTestsReadsPerformanceJsonc(test *testing.T) {
 	test.Parallel()
-	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

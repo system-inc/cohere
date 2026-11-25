@@ -72,10 +72,10 @@ var reviewedLiterals = map[string]map[string]string{
 		"internal/release/dispatch/hash.go":  "a variable handed to `go env`",
 	},
 	"GOFLAGS": {
-		"internal/goengine/load/excluded.go":          goEnvironmentArgument,
-		"internal/goengine/load/load.go":              "a variable handed to `go env`",
-		"command/cohere-dev/pool.go":                  "an environment variable's name, matched in a switch",
-		"command/cohere/run_cache_end_to_end_test.go": "a variable handed to `go env -json`, decoded into a map",
-		"internal/guard/guard_overlay_test.go":        "an environment variable read with os.Getenv",
+		"internal/goengine/load/excluded.go":           goEnvironmentArgument,
+		"internal/goengine/load/load.go":               "a variable handed to `go env`",
+		"command/cohere-dev/pool.go":                   "an environment variable's name, matched in a switch",
+		"command/cohere/run_cache_end_to_end_test.go":  "a variable handed to `go env -json`, decoded into a map",
+		"internal/testing/guard/guard_overlay_test.go": "an environment variable read with os.Getenv",
 	},
 }

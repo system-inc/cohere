@@ -16,8 +16,8 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/go_language/load"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // standardFiles are a small Go installation's files below its root: errors, with a file the constraints leave out;

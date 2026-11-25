@@ -28,7 +28,7 @@ func (piece *part) lineCount() int {
 }
 
 // readsRuleProgram is whether piece's code reads the program through a rule.Context in a file that defines a rule,
-// as internal/guard reads it: a `.Program` selector on a context, named ctx or context or a parameter of type
+// as internal/testing/guard reads it: a `.Program` selector on a context, named ctx or context or a parameter of type
 // rule.Context anywhere in the file, directly or as the last link of a chain, and a `rule.Rule` composite literal
 // in the file. The guard requires such a read to sit in a file that defines a rule, so the part cannot leave it.
 func (piece *part) readsRuleProgram() bool {

@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // fakeSwiftBinary writes a shell script standing in for cohere-swift, so the process boundary can be driven

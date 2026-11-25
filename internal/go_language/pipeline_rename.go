@@ -15,6 +15,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/edit/write_root"
 	"github.com/system-inc/cohere/internal/go_language/check"
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/format"
@@ -26,7 +27,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_uppercase_initialism"
-	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // renamingRules are the rules whose findings ask for a rename cohere-go applies after the load: each attaches one

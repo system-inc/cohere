@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // contractVersion is the version of swift_language/Contract.md this front door speaks.

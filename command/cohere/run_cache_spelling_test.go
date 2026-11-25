@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // runFrom runs the fixture's binary in dir as a shell there would, with PWD naming dir, so the run spells its

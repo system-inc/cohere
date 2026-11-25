@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/write_root"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 )
 
 // rootOf is the WriteRoot of the directory fileName sits in, the root every test here that is not about roots writes

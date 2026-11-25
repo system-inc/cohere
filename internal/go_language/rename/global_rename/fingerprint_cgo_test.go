@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/edit/write_root"
 	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
-	"github.com/system-inc/cohere/internal/write_root"
 
 	"golang.org/x/tools/go/packages"
 )

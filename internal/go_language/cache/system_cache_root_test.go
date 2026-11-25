@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/system_cache_testing"
+	"github.com/system-inc/cohere/internal/testing/system_cache_testing"
 )
 
 // assertOneLineNotKept fails the test unless notKept is a reason, said on one line after "system cache not kept: ",

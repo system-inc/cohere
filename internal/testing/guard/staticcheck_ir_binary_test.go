@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // The cohere binary carries no part of staticcheck's intermediate representation (#7cv09fg): every rule reads the
@@ -43,7 +43,7 @@ func TestTheBinaryLinksNoStaticcheckIntermediateRepresentation(test *testing.T) 
 func linkedPackages(test *testing.T, pattern string) []string {
 	test.Helper()
 	// Tests run in their own package directory, and the pattern is written relative to the module root.
-	root := filepath.Join("..", "..")
+	root := filepath.Join("..", "..", "..")
 	build_inputs.Record(test, root, pattern)
 	// A worktree's VCS state can't be read in every checkout, and listing what links needs none of it.
 	command := exec.Command("go", "list", "-buildvcs=false", "-deps", pattern)

@@ -650,7 +650,7 @@ func TestNames(test *testing.T) {
 func TestSkipPrefixes(test *testing.T) {
 	test.Parallel()
 	var skip skipPrefixes
-	for _, value := range []string{"internal/sentence", "policy/", "command/cohere/fix.go"} {
+	for _, value := range []string{"internal/command_line/sentence", "policy/", "command/cohere/fix.go"} {
 		if setError := skip.Set(value); setError != nil {
 			test.Fatal(setError)
 		}
@@ -659,9 +659,15 @@ func TestSkipPrefixes(test *testing.T) {
 		test.Error("an empty prefix was accepted")
 	}
 	for path, want := range map[string]bool{
-		"internal/sentence": true, "internal/sentence/split.go": true, "internal/sentences": false,
-		"policy": true, "policy/tools/generate": true, "policyx": false,
-		"command/cohere/fix.go": true, "command/cohere/fix_test.go": false, "command/cohere": false,
+		"internal/command_line/sentence":          true,
+		"internal/command_line/sentence/split.go": true,
+		"internal/command_line/sentences":         false,
+		"policy":                                  true,
+		"policy/tools/generate":                   true,
+		"policyx":                                 false,
+		"command/cohere/fix.go":                   true,
+		"command/cohere/fix_test.go":              false,
+		"command/cohere":                          false,
 	} {
 		if got := skip.matches(path); got != want {
 			test.Errorf("matches(%q) = %v, want %v", path, got, want)

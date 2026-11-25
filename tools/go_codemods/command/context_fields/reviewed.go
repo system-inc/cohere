@@ -11,8 +11,8 @@ const (
 // literal of that name in any other file.
 var reviewedLiterals = map[string]map[string]string{
 	"ctx": {
-		"internal/guard/reads_program_test.go": "the guard's fallback name for a function literal's rule.Context " +
-			"parameter whose type is elided; it finds a rule.Context field by its type",
+		"internal/testing/guard/reads_program_test.go": "the guard's fallback name for a function literal's " +
+			"rule.Context parameter whose type is elided; it finds a rule.Context field by its type",
 		"internal/lint/ecmascript/high_level_intermediate_representation/reactive_test.go": javaScriptName,
 		"internal/lint/rules/nexus/abbreviation_gate_test.go":                              abbreviationWord,
 		"internal/lint/rules/nexus/abbreviation_vocabulary_test.go":                        abbreviationWord,

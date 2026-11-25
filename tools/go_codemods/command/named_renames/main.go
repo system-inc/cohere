@@ -20,9 +20,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // pinnedFlags collects repeated -pinned-library values, each a package path, an equals sign and the reason.

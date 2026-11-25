@@ -19,7 +19,7 @@ import (
 // guardOverlay is the overlay the guards here read the rule packages through: the one `GOFLAGS` names, as
 // file path to contents, or nil when `GOFLAGS` names none.
 //
-// The guards load the rule packages with internal/go_types, which runs `go list` and then parses every
+// The guards load the rule packages with internal/testing/go_types, which runs `go list` and then parses every
 // file itself, from disk. `go test -overlay x.json` reaches neither: the flag builds the test binary and
 // stops there, and nothing in the binary can see it (measured: no build setting records it, and the
 // environment is untouched). So a guard run that way checked the working tree while the command line
@@ -161,7 +161,7 @@ func writeOverlay(test *testing.T, target string, contents string) string {
 func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	test.Parallel()
 
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
@@ -185,7 +185,7 @@ func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
 func TestTheTypeReachGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	test.Parallel()
 
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
@@ -278,7 +278,7 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 func TestAShapesClaimPlantsIntoEveryRuleFile(test *testing.T) {
 	test.Parallel()
 
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
@@ -338,11 +338,11 @@ func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(test *testing.T) {
 		goFlags   string
 		refused   bool
 	}{
-		{"go test -overlay /tmp/x.json ./internal/guard", "", true},
-		{"go test -overlay=/tmp/x.json ./internal/guard", "", true},
-		{"go test ./internal/guard", "-overlay=/tmp/x.json", false},
-		{"go test -overlay=/tmp/x.json ./internal/guard", "-overlay=/tmp/x.json", false},
-		{"go test ./internal/guard", "", false},
+		{"go test -overlay /tmp/x.json ./internal/testing/guard", "", true},
+		{"go test -overlay=/tmp/x.json ./internal/testing/guard", "", true},
+		{"go test ./internal/testing/guard", "-overlay=/tmp/x.json", false},
+		{"go test -overlay=/tmp/x.json ./internal/testing/guard", "-overlay=/tmp/x.json", false},
+		{"go test ./internal/testing/guard", "", false},
 	} {
 		if got := overlayFlagOutsideGoFlags(testCase.arguments, testCase.goFlags); got != testCase.refused {
 			test.Errorf(
@@ -364,7 +364,7 @@ var reactPragmaOwnFileCall = regexp.MustCompile(`rule\.IsReactPragmaBinding\([A-
 // identifier checks alone cannot establish that argument at a call site; the scan must check it too.
 func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(test *testing.T) {
 	test.Parallel()
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

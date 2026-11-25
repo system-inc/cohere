@@ -190,7 +190,7 @@ func record(directory string, arguments []string) (int, error) {
 // OutsideModule returns directory, a place a test runs the go command, after failing the test unless it lies
 // outside the module the test belongs to, symbolic links followed. Go rechecks only files inside that module, so a
 // go command run on a module the test wrote somewhere of its own reads nothing the cache could miss, and needs no
-// Record; one that runs inside the module reads our code, and does. The guard in internal/guard accepts a go
+// Record; one that runs inside the module reads our code, and does. The guard in internal/testing/guard accepts a go
 // command whose directory is set from this in place of a Record, and this makes that claim checked rather than
 // trusted.
 func OutsideModule(test testing.TB, directory string) string {

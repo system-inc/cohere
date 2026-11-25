@@ -16,13 +16,14 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
-// The private corpora on the gate's Macs (#5r0vrte). Some tests read code outside this repository (internal/corpus),
-// and a gate box held none of it, so 202 of them skipped there and ran nowhere. Now each Mac keeps every corpus laid
-// read-only under macBoxScratch/corpora/<name>/<commit>, at the commits internal/corpus/corpus_pinned.go names in the
-// tree being landed, and the gate's script sets each corpus's variable to its laid copy before the tests.
+// The private corpora on the gate's Macs (#5r0vrte). Some tests read code outside this repository
+// (internal/testing/corpus), and a gate box held none of it, so 202 of them skipped there and ran nowhere. Now each Mac
+// keeps every corpus laid read-only under macBoxScratch/corpora/<name>/<commit>, at the commits
+// internal/testing/corpus/corpus_pinned.go names in the tree being landed, and the gate's script sets each corpus's
+// variable to its laid copy before the tests.
 //
 // A corpus is laid from the lander's own checkout, the one its corpora file names, and reaches the box only as a
 // carry on the gap that lays it: Loom's door never places a job that reads it, so ahra's source goes to the named

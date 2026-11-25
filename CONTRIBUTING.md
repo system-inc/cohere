@@ -155,7 +155,7 @@ toolchain or module cache it can't vouch for, refuses the landing, and its verdi
 shared uid".
 
 A gate box holds the private corpora too, laid read-only under `~/scratch/system_cohere_tools/corpora` at the
-commits `internal/corpus/corpus_pinned.go` names in the tree being landed (`gate_corpus.go`, #5r0vrte), and its
+commits `internal/testing/corpus/corpus_pinned.go` names in the tree being landed (`gate_corpus.go`, #5r0vrte), and its
 script sets each corpus's variable to its laid copy. A box that lacks one names it and tests nothing; land then
 lays it from the checkout its corpora file names, carried on a gap of its own, and asks the box again. ahra goes
 without `data/`, which no test reads. ahra and connected are installed from their pnpm lockfiles and the
@@ -182,7 +182,7 @@ files or findings than main's, is a line of its own, never compared: a run that 
 awareness, never a gate on speed: a
 landing that makes cohere slower lands with its note saying so (Kirk, Nov 21). `cohere-dev measure [<commit>]` runs
 the measurement alone, landing nothing. The file is land's alone: never write or edit it, and nothing that
-builds or tests may read it, which `internal/guard` holds, since it is written after the gate. While another holds
+builds or tests may read it, which `internal/testing/guard` holds, since it is written after the gate. While another holds
 Shackler, land waits holding the lock, saying whose claim and since when, and after `COHERE_DEV_PERFORMANCE_WAIT`
 (2h unless it says) refuses, naming the holder; a measurement that fails refuses the landing in her words. A tree
 with no `command/cohere` has nothing to measure and lands saying so. Each phase's seconds are on the land line.
@@ -278,7 +278,7 @@ whose cure depends on what failing means there, and the rest of the correctness 
   is relay; the diff is the record.
 
 A whole class of findings sometimes has one cure, and then it isn't 400 judgments. A command's dropped
-`fmt.Printf` errors are cured by writing to `internal/streams`, whose buffered writes can't fail partway and whose
+`fmt.Printf` errors are cured by writing to `internal/command_line/streams`, whose buffered writes can't fail partway and whose
 delivery `streams.Finish` checks once at exit, the way `command/cohere-dev` does.
 
 ## Porting a rule

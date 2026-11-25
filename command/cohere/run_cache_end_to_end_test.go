@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/system_cache_testing"
+	"github.com/system-inc/cohere/internal/testing/system_cache_testing"
 )
 
 // usersCacheDirectory is the user cache directory of the person running the tests, read before TestMain moved the

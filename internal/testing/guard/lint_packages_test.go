@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_types"
+	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 // lintTypes is the export data of every package outside cohere that ./internal/lint/... imports: the
@@ -18,8 +18,8 @@ import (
 // refuses (#qnnnkbf).
 var lintTypes = go_types.Product{
 	Name:      "lint",
-	Test:      "TestProduct_LintTypes (internal/guard)",
-	Directory: "../..",
+	Test:      "TestProduct_LintTypes (internal/testing/guard)",
+	Directory: "../../..",
 	Patterns:  []string{"./internal/lint/..."},
 }
 
@@ -95,7 +95,7 @@ func overlayKey(overlay map[string][]byte) string {
 }
 
 func loadLintPackages(overlay map[string][]byte) ([]*go_types.Package, string) {
-	root, absolutePathError := filepath.Abs("../..")
+	root, absolutePathError := filepath.Abs("../../..")
 	if absolutePathError != nil {
 		return nil, absolutePathError.Error()
 	}

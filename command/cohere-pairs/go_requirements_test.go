@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // standInGo is a go for the offline check to run: it runs go1.27.0, has every toolchain but go1.27.9, writing each one

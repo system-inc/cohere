@@ -189,7 +189,7 @@ func TestResolveSkipsWhenUnsetAndFailsWhenWrong(test *testing.T) {
 			want:     "--- FAIL",
 		},
 		"not in the repository": {spelling: "app/styles/theme.css", want: "--- FAIL"},
-		"in the repository":     {spelling: "internal/corpus/corpus.go", want: "--- PASS"},
+		"in the repository":     {spelling: "internal/testing/corpus/corpus.go", want: "--- PASS"},
 		"out of the repository": {spelling: "..", want: "--- FAIL"},
 	} {
 		output := runProbe(test, "TestResolveSkipsWhenUnsetAndFailsWhenWrong", testCase.spelling, testCase.value)
@@ -207,7 +207,7 @@ func TestResolveSkipsWhenUnsetAndFailsWhenWrong(test *testing.T) {
 // name every corpus, so a corpus added or renamed here cannot leave the generators reading another root.
 func TestTheGeneratorsNameTheSameCorpora(test *testing.T) {
 	test.Parallel()
-	path := filepath.Join("..", "lint", "rules", "tailwind", "tools", "corpus.mjs")
+	path := filepath.Join("..", "..", "lint", "rules", "tailwind", "tools", "corpus.mjs")
 	source, readError := os.ReadFile(path)
 	if readError != nil {
 		test.Fatal(readError)
@@ -233,7 +233,7 @@ func TestTheGeneratorsNameTheSameCorpora(test *testing.T) {
 		want[corpus.Name] = corpus.Variable
 	}
 	if !reflect.DeepEqual(got, want) {
-		test.Errorf("%s names %v; internal/corpus names %v", path, got, want)
+		test.Errorf("%s names %v; internal/testing/corpus names %v", path, got, want)
 	}
 }
 

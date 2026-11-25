@@ -36,7 +36,7 @@ func TestOnlyTheHarnessReadsOptionsUncounted(test *testing.T) {
 	test.Parallel()
 
 	// This package sits two directories below the module root.
-	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

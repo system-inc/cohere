@@ -62,7 +62,7 @@ func TestRulePackagesDoNotShadowSharedUtilities(test *testing.T) {
 func TestRulePackageHelperCensus(test *testing.T) {
 	test.Parallel()
 
-	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	files, globError := filepath.Glob("../../lint/rules/*/*.go")
 	if globError != nil {
 		test.Fatalf("globbing rule files: %v", globError)
 	}
@@ -108,7 +108,7 @@ type ruleLocalFunction struct {
 func ruleLocalFunctionNames(test *testing.T) []ruleLocalFunction {
 	test.Helper()
 
-	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	files, globError := filepath.Glob("../../lint/rules/*/*.go")
 	if globError != nil {
 		test.Fatalf("globbing rule files: %v", globError)
 	}
@@ -141,11 +141,11 @@ func ruleLocalFunctionNames(test *testing.T) []ruleLocalFunction {
 func exportedUtilityNames(test *testing.T) map[string]string {
 	test.Helper()
 
-	files, globError := filepath.Glob("../lint/ecmascript/*/*/*.go")
+	files, globError := filepath.Glob("../../lint/ecmascript/*/*/*.go")
 	if globError != nil {
 		test.Fatalf("globbing utility files: %v", globError)
 	}
-	nested, globError := filepath.Glob("../lint/ecmascript/*/*.go")
+	nested, globError := filepath.Glob("../../lint/ecmascript/*/*.go")
 	if globError != nil {
 		test.Fatalf("globbing utility files: %v", globError)
 	}
@@ -288,7 +288,7 @@ var wrappedAccessors = []wrappedAccessor{
 func TestRulePackagesDoNotReachPastWrappedAccessors(test *testing.T) {
 	test.Parallel()
 
-	files, globError := filepath.Glob("../lint/rules/*/*.go")
+	files, globError := filepath.Glob("../../lint/rules/*/*.go")
 	if globError != nil {
 		test.Fatalf("globbing rule files: %v", globError)
 	}

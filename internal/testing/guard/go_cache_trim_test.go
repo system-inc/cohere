@@ -28,7 +28,7 @@ const trimCaller = "command/cohere-dev"
 // caches of their own. The go_cache module itself never imports its own path, so its own calls are not read.
 func TestOnlyCohereDevTrims(test *testing.T) {
 	test.Parallel()
-	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // TestCost measures formatting throughput per byte rather than per file.

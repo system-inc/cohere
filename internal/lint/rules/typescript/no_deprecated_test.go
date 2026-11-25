@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // noDeprecatedFinding is one expected report: which message, on what name, with what reason.

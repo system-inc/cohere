@@ -13,10 +13,10 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // widthCases are the shapes most likely to separate a port from upstream, each for a stated reason.

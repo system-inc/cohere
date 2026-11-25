@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The corpus is text scanning with no dependency on the comment scanner, which is why it moved with

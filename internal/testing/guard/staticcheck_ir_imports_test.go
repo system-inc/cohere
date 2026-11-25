@@ -28,7 +28,7 @@ var staticcheckIntermediateRepresentation = []string{
 // nothing.
 func TestNoCodeImportsStaticchecksIntermediateRepresentation(test *testing.T) {
 	test.Parallel()
-	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

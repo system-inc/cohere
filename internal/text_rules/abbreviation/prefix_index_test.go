@@ -10,7 +10,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // prefixIndexCorpusVariable names directories whose Go files the index is also held to the walk over, separated as

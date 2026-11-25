@@ -601,21 +601,21 @@ func ruleLiteralSelector(literalType ast.Expr) (*ast.SelectorExpr, bool) {
 // ruleSourceFiles lists the non-test Go files under internal/lint/rules.
 func ruleSourceFiles(test *testing.T) []string {
 	test.Helper()
-	return goSourceFilesUnder(test, "../lint/rules")
+	return goSourceFilesUnder(test, "../../lint/rules")
 }
 
 // ruleInterfaceSourceFiles lists the non-test Go files of the rule package, whose helpers taking a
 // Program (rule.FingerprintPath) read it for the rules that call them.
 func ruleInterfaceSourceFiles(test *testing.T) []string {
 	test.Helper()
-	return goSourceFilesUnder(test, "../lint/rule")
+	return goSourceFilesUnder(test, "../../lint/rule")
 }
 
 // checkingSourceFiles lists the non-test Go files of the shared type-checking helpers, which take a
 // rule.Program from the rules that call them.
 func checkingSourceFiles(test *testing.T) []string {
 	test.Helper()
-	return goSourceFilesUnder(test, "../lint/checking")
+	return goSourceFilesUnder(test, "../../lint/checking")
 }
 
 func goSourceFilesUnder(test *testing.T, root string) []string {

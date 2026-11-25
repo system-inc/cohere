@@ -501,8 +501,8 @@ var standingGates = []standingGate{
 
 // standingGateWritten are the files of standing gate modules that import go-flags spelled with an escape,
 // `go\x2dflags`, by module and then by name, which runStandingGate writes into its copy rather than testdata keeping
-// them: gofmt canonicalizes an import path, rewriting the escape to `go-flags`, and internal/guard holds every Go file
-// the module owns, testdata included, to gofmt, as the release's first step does, while the escape is what the
+// them: gofmt canonicalizes an import path, rewriting the escape to `go-flags`, and internal/testing/guard holds every
+// Go file the module owns, testdata included, to gofmt, as the release's first step does, while the escape is what the
 // modules test.
 var standingGateWritten = map[string]map[string]string{
 	"import-goflags-escaped-win": {"part_windows.go": `package gate

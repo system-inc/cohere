@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/line_wrap"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // skipList collects every -skip flag.

@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // languagesRun is one run of the binary over a tree: its stdout, stderr and exit code.

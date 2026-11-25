@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The differential: on a real tree, every path's verdict and deciding rule equals git check-ignore's, read

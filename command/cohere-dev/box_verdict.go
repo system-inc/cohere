@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/needs"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/testing/needs"
 	"golang.org/x/mod/modfile"
 )
 

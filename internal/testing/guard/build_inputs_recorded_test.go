@@ -36,12 +36,12 @@ import (
 //     command with no Dir runs in its package's directory, inside the module, and needs Record.
 //
 // A test file in a nested module (a directory between it and the root holds a go.mod of its own) cannot import
-// internal/build_inputs, so there its Dir may instead be set from a call of a function named outsideModule that
+// internal/testing/build_inputs, so there its Dir may instead be set from a call of a function named outsideModule that
 // its package's own test files declare, which makes the same check OutsideModule does. In the root module that
 // spelling is refused: the check there is build_inputs.OutsideModule, the one the guard's claim rests on.
 func TestEveryGoCommandATestStartsRecordsWhatItReads(test *testing.T) {
 	test.Parallel()
-	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
@@ -88,7 +88,7 @@ import (
 	shell "os/exec"
 	"testing"
 
-	inputs "github.com/system-inc/cohere/internal/build_inputs"
+	inputs "github.com/system-inc/cohere/internal/testing/build_inputs"
 	other "example.com/other"
 )
 
@@ -305,7 +305,7 @@ var readsPackages = map[string]bool{
 }
 
 // buildInputsPath is the package whose Record covers a go command.
-const buildInputsPath = "github.com/system-inc/cohere/internal/build_inputs"
+const buildInputsPath = "github.com/system-inc/cohere/internal/testing/build_inputs"
 
 // goCommandsWithoutRecordIn parses the test file at path, in the module rooted at module, and runs
 // goCommandsWithoutRecord on it, letting its package's own outsideModule cover a command when the file sits in a

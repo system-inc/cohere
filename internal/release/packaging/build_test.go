@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A released binary that quietly stops being stripped grows about 18 MB, measured at 43.1 against

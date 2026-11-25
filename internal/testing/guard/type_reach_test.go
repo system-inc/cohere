@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_types"
+	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 // A rule claims TypeReach Shapes only where nothing it can run reads into an imported function's body, and
