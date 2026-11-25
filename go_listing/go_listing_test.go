@@ -15,6 +15,8 @@ import (
 //	SourceFiles answering EmbedFiles with GoFiles: TestSourceFilesNamesExactlyTheFixturesFiles
 //	DepsErrors decoded under another tag: TestDecodeReadsTheGoldenAsGoPrintedIt
 //	ReachError passing over DepsErrors: TestDecodeReadsAnObjectOfAFieldList
+//	EmbedPatterns or XTestEmbedPatterns decoded under another tag: TestDecodeReadsTheGoldenAsGoPrintedIt
+//	TestEmbedPatterns decoded under another tag: TestDecodeReadsEachEmbedPatternList
 
 // Decode reads what go list prints and refuses anything else, never a part of it.
 func TestDecodeReadsAnObjectOfAFieldList(test *testing.T) {
@@ -54,6 +56,22 @@ func TestDecodeReadsAnObjectOfAFieldList(test *testing.T) {
 		DepsErrors: []*go_listing.PackageError{{Message: "no Go files"}},
 	}}); reachError == nil || reachError.Error() != "a, through a dependency: no Go files" {
 		test.Errorf("a dependency's error refuses the reach as %v", reachError)
+	}
+}
+
+// Decode reads each of the three embed pattern lists under go list's own name for it. The golden has no
+// in-package test that embeds, so TestEmbedPatterns is read here.
+func TestDecodeReadsEachEmbedPatternList(test *testing.T) {
+	test.Parallel()
+	packages, decodeError := go_listing.Decode([]byte(
+		`{"EmbedPatterns": ["static/*"], "TestEmbedPatterns": ["testdata"], "XTestEmbedPatterns": ["golden.txt"]}`,
+	))
+	if decodeError != nil ||
+		len(packages) != 1 ||
+		!slices.Equal(packages[0].EmbedPatterns, []string{"static/*"}) ||
+		!slices.Equal(packages[0].TestEmbedPatterns, []string{"testdata"}) ||
+		!slices.Equal(packages[0].XTestEmbedPatterns, []string{"golden.txt"}) {
+		test.Errorf("the embed patterns read as %+v (%v)", packages, decodeError)
 	}
 }
 
