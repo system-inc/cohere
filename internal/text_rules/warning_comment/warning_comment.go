@@ -5,14 +5,14 @@
 // both read it, so the words, what makes one a whole word, and which text is code are decided once. Each language
 // hands it a group of comments, read as one text, and applies only its own language's facts first: which comments
 // form a group, and which are a tool's directive rather than prose. It lives in its own package, importing nothing
-// heavier than internal/shouting, because the nexus rules package links the TypeScript checker and cohere-go
+// heavier than internal/text_rules/shouting, because the nexus rules package links the TypeScript checker and cohere-go
 // must not.
 //
 // The words are `TODO`, `FIXME` and `XXX`, matched as written, in capitals, since a lowercase todo is ordinary
 // English, and only as whole words, so a sentence about `TODOS` or a name like `TODO_LIST` is prose. Anything in
 // backticks is a mention of the word rather than a task, as this package's own comments mention them, and so is a
-// code block, which is judged by internal/shouting's indented block mask, so the shouting rule and this one never
-// disagree about one.
+// code block, which is judged by internal/text_rules/shouting's indented block mask, so the shouting rule and this one
+// never disagree about one.
 package warning_comment
 
 import (
@@ -22,7 +22,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/shouting"
+	"github.com/system-inc/cohere/internal/text_rules/shouting"
 )
 
 var (

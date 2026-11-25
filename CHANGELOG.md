@@ -126,7 +126,7 @@ changed in cohere outside the sets is written under the same heading.
   A name's words are cut at underscores, hyphens, dots, a Swift `+` and case, with what a tool reads set
   aside (`_test`, `_linux`, `_amd64`, `.test`, `.d`, `.config`), and a generated file, a name a tool requires
   (`doc.go`, `Package.swift`, Next.js's `page.tsx` and `next-env.d.ts`) and a file under `node_modules`,
-  `vendor`, `third_party` or `testdata` are never judged. `internal/file_name_words` is the one judgment the
+  `vendor`, `third_party` or `testdata` are never judged. `internal/text_rules/file_name_words` is the one judgment the
   TypeScript and Go rules read, and Swift ports it. Both are off in `cohere:style`, and the Go pair in cohere's
   own settings, until their census is routed.
 - An editor's save of a `.go` file: `cohere --fix [--format] --stdin-filepath <path>` in a Go module or

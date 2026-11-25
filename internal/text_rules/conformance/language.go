@@ -1,4 +1,4 @@
-package text_rules
+package conformance
 
 // Language is one of cohere's three languages, which is also the language it judges. Each language has exactly
 // one language, so a case's languages and a ledger row's language are spelled alike.

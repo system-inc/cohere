@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/warning_comment"
+	"github.com/system-inc/cohere/internal/text_rules/warning_comment"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -26,11 +26,11 @@ var consistencyNoWarningCommentText = policy.MessageOf("nexus/consistency-no-war
 // A deferred task kept in a comment rots there: the code around it reads as finished to every reader not looking at
 // that line, and the task is done only if someone happens to edit the file. It belongs where tasks are tracked.
 //
-// The judgment is internal/warning_comment's, which cohere-go's cohere-go/consistency-no-warning-comment reads
-// too, so the two linters report the same words: in capitals, whole, anywhere in any comment, outside backticks and
-// code blocks, each finding on its word. ESLint's `no-warning-comments`, which this replaces in the style set, matched
-// case-insensitively and only at a comment's start, so it reported a lowercase todo and missed a word mid-sentence or
-// on a block comment's second line.
+// The judgment is internal/text_rules/warning_comment's, which cohere-go's cohere-go/consistency-no-warning-comment
+// reads too, so the two linters report the same words: in capitals, whole, anywhere in any comment, outside backticks
+// and code blocks, each finding on its word. ESLint's `no-warning-comments`, which this replaces in the style set,
+// matched case-insensitively and only at a comment's start, so it reported a lowercase todo and missed a word
+// mid-sentence or on a block comment's second line.
 //
 // No fix: the repair is moving the task to where tasks are tracked, which a rule cannot do.
 var ConsistencyNoWarningComment = rule.Rule[rule.NoOptions]{

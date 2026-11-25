@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/origin_names"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 )
 
 // The policy's vocabulary reads into the three kinds of word an error's name is built from: a word with one

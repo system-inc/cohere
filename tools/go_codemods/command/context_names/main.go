@@ -26,8 +26,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/origin_names"
 	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
 	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 	"github.com/system-inc/cohere/policy"
 
 	"golang.org/x/mod/modfile"

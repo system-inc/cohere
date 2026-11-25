@@ -2,8 +2,8 @@ import Foundation
 
 /*
  What a Swift file's name says in words, and the two judgments of those words the file-name rules make: the Swift port
- of cohere's `internal/file_name_words`, which the TypeScript and Go rules read (#2xt6v5r), held to the same verdicts
- by the text rules corpus (families `utils-file-name` and `abbreviated-file-name`).
+ of cohere's `internal/text_rules/file_name_words`, which the TypeScript and Go rules read (#2xt6v5r), held to the same
+ verdicts by the text rules corpus (families `utils-file-name` and `abbreviated-file-name`).
 
  A name is read in three steps, as Go reads it:
    - What a tool reads off the name is set aside: the `.swift` extension.

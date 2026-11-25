@@ -3,7 +3,7 @@
 //
 // A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call
 // site by a reader who has to expand the abbreviation and hope they expanded it the way the author meant. The words
-// and the forms they are judged in are policy/Abbreviations.json, read through internal/naming/abbreviation, so the
+// and the forms they are judged in are policy/Abbreviations.json, read through internal/text_rules/abbreviation, so the
 // house keeps one vocabulary across every language.
 //
 // Only names this package declares are judged. A name that is someone else's, a use, an imported package's name, an
@@ -31,7 +31,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_language/rules/load_memo"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 	"github.com/system-inc/cohere/policy"
 )
 

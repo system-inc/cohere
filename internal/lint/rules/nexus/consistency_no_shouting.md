@@ -19,7 +19,7 @@ tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 Tokens a hyphen or an ampersand joins are read whole first, as Nexus's `findUppercaseTokens` reads them (#1z7kbtz):
 a run with a digit anywhere or a part one letter long is an identifier, and nothing in it is shouting, so a fact id
 like `F-PROMISE-13` and a name like `AT&T` pass, while `WILL-NOT` has neither and each of its words is judged alone.
-every language reads runs the same way (`uppercaseTokens` in `internal/shouting/shouting.go`, and Swift's `words(in:)`),
+every language reads runs the same way (`uppercaseTokens` in `internal/text_rules/shouting/shouting.go`, and Swift's `words(in:)`),
 held by corpus cases `sh29` to `sh31`.
 
 A run of `//` comments on consecutive lines, with nothing but whitespace between them, is masked as
@@ -36,8 +36,8 @@ slashes and the one space after them, as cohere-go and cohere-swift read one, an
 or in a one-line block comment opened on its slashes and its capitals were read as shouting (#xfa3q6w,
 corpus cases `sh24` and `sh25`; `TestConsistencyNoShoutingReadsACommentWithoutItsDelimiters`).
 
-The masks live in `internal/shouting/shouting.go`, and the safe list in `policy/Shouting.json`, which
-`internal/shouting/vocabulary.go` reads. cohere-go's `cohere-go/consistency-no-shouting` reads both
+The masks live in `internal/text_rules/shouting/shouting.go`, and the safe list in `policy/Shouting.json`, which
+`internal/text_rules/shouting/vocabulary.go` reads. cohere-go's `cohere-go/consistency-no-shouting` reads both
 too, and Swift compiles in the same list, so every language agrees on what an acronym is.
 
 Kirk's ruling on the 2026-10-01 review: all caps belongs in backticks, single quotes or double quotes

@@ -1,4 +1,4 @@
-package text_rules
+package conformance
 
 import (
 	"strings"

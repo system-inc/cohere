@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 )
 
 // A file name's words in each language's convention: Go's snake_case, TypeScript's camelCase, PascalCase and

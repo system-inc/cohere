@@ -3,7 +3,7 @@ package origin_names
 import (
 	"strings"
 
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 )
 
 // Vocabulary is the abbreviation vocabulary as an error's name is built from it, by lowercased word: the words with

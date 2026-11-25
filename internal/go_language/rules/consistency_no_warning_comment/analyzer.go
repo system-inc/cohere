@@ -10,13 +10,14 @@
 //
 // Nor is a code block, the lines of a doc comment indented by a tab or further spaces after the slashes, which go/doc
 // shows verbatim as code: a `TODO` there is an example of a comment, and backticks would render literally inside it.
-// Which lines are a code block is judged by internal/shouting's mask, as the shouting rule judges them, so the two
-// rules never disagree about one: a block opens after a blank comment line or at the group's start, and an indented
-// line straight after prose is a paragraph continuation, as in CommonMark, and is read.
+// Which lines are a code block is judged by internal/text_rules/shouting's mask, as the shouting rule judges them, so
+// the two rules never disagree about one: a block opens after a blank comment line or at the group's start, and an
+// indented line straight after prose is a paragraph continuation, as in CommonMark, and is read.
 //
-// The judgment past Go's own grammar, the words, the whole-word test and the masks, is internal/warning_comment's,
-// which the TypeScript rule nexus/consistency-no-warning-comment reads too, so the two rules report the same
-// words. This package hands it each comment group with the directives set aside, and places each word it returns.
+// The judgment past Go's own grammar, the words, the whole-word test and the masks, is
+// internal/text_rules/warning_comment's, which the TypeScript rule nexus/consistency-no-warning-comment reads too, so
+// the two rules report the same words. This package hands it each comment group with the directives set aside, and
+// places each word it returns.
 package consistency_no_warning_comment
 
 import (
@@ -30,7 +31,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules/positions"
-	"github.com/system-inc/cohere/internal/warning_comment"
+	"github.com/system-inc/cohere/internal/text_rules/warning_comment"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -71,9 +72,9 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// judgeGroup reports every warning word in group, outside a code block and backticks, as internal/warning_comment
-// finds them. Go's directives are set aside first, since go/doc leaves a directive out of the comment's text, so it
-// is neither read nor a line between its neighbours.
+// judgeGroup reports every warning word in group, outside a code block and backticks, as
+// internal/text_rules/warning_comment finds them. Go's directives are set aside first, since go/doc leaves a directive
+// out of the comment's text, so it is neither read nor a line between its neighbours.
 func judgeGroup(pass *analysis.Pass, table *positions.Table, tokenFile *token.File, group *ast.CommentGroup) {
 	if !anyCommentHoldsWarningWord(group) {
 		return

@@ -21,7 +21,7 @@ const prefixIndexCorpusVariable = "COHERE_ABBREVIATION_CORPUS"
 // (#fex6s0v). That is a claim that the lookup gives the very entry the walk stopped at, in each phase, so this holds
 // the Find that ships to the Find it replaced, kept below as it was, field for field: found or not, the form, the entry
 // itself, the message id, every value and every spelling. It holds both vocabularies, Policy and NameWords, which
-// internal/file_name_words reads through the same Find.
+// internal/text_rules/file_name_words reads through the same Find.
 //
 // The names are every word of cohere-go rule's fixtures, the corpus find_equivalence_test.go reads for the
 // vocabulary (this repository's words, the ahra tree's identifiers, and every abbreviation in every form), every word

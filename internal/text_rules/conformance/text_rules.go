@@ -1,4 +1,4 @@
-// Package text_rules is the text rules' conformance corpus (#4b337jk): one set of cases with one expected
+// Package conformance is the text rules' conformance corpus (#4b337jk): one set of cases with one expected
 // verdict each, which every language's own test suite reads and must meet. Some rules exist once per language,
 // as twins, and the twins disagreed. The verdicts are decided once, in the cases, and never by what an
 // language happens to do.
@@ -41,7 +41,7 @@
 // it should, and families.json names it `{"missing": true}`. Its cases are written in that language anyway and
 // none of them runs. The row goes stale the moment families.json names a rule there, which the loader refuses,
 // so deleting the row is what lets the cases run.
-package text_rules
+package conformance
 
 import (
 	"bytes"

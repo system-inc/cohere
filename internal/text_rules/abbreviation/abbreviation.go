@@ -177,8 +177,8 @@ var Policy = mustLoad(
 )
 
 // NameWords is policy/NameWords.json, read once with the same loader: the words a folder's or a file's name spells
-// out and an identifier need not (#zyq63kk). Only a name on a path reads it, through internal/file_name_words, and
-// no keyword term speaks for its words, since a keyword is an identifier's.
+// out and an identifier need not (#zyq63kk). Only a name on a path reads it, through
+// internal/text_rules/file_name_words, and no keyword term speaks for its words, since a keyword is an identifier's.
 var NameWords = mustLoad("policy/NameWords.json", policy.NameWordsFile(), nil)
 
 func mustLoad(name string, data []byte, keywordTerms []policy.KeywordTerm) *Vocabulary {

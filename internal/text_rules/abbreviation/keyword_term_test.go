@@ -3,7 +3,7 @@ package abbreviation_test
 import (
 	"testing"
 
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 	"github.com/system-inc/cohere/policy"
 )
 

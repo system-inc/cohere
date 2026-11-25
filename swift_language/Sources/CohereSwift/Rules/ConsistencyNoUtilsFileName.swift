@@ -5,7 +5,7 @@ import Foundation
  `Utils.swift`, `ViewUtil.swift` and `String+Utils.swift` are each reported once (#2xt6v5r, the text rules family
  `utils-file-name`). A file named for nothing in particular collects whatever has no other home, which is what a
  folder of that name does, one level down. The Swift form of `nexus/consistency-no-utils-file-name` and
- `cohere-go/consistency-no-utils-file-name`, which read cohere's `internal/file_name_words`.
+ `cohere-go/consistency-no-utils-file-name`, which read cohere's `internal/text_rules/file_name_words`.
 
  The name's words are `FileNameWords`', each held whole to `ConsistencyNoUtilsFolder.isBanned`, so `Utilities.swift`
  and `Myutils.swift` pass, as `Utilities` and `myutils` do as folders. A generated file, `Package.swift` and

@@ -163,8 +163,8 @@ func splitParts(name string, spelling Spelling) ([]string, []string) {
 // whole before the word after it and URLSession is URL and Session. Swift's
 // cohere-swift/consistency-require-separated-folder-words cuts its parts at the same two boundaries (#2fnqe2h), so a
 // capitalized name reads the same in both languages, and the corpus holds them to it (fw16 to fw20). It is exported for
-// internal/file_name_words, which cuts a file name's words at the same two boundaries, so a folder and a file named
-// alike are read alike.
+// internal/text_rules/file_name_words, which cuts a file name's words at the same two boundaries, so a folder and a
+// file named alike are read alike.
 func IsCaseBoundary(name string, index int) bool {
 	if !isUppercase(name[index]) {
 		return false

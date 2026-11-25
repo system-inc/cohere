@@ -60,8 +60,8 @@ func endsWithCapitalized(name string, abbreviation string) bool {
 }
 
 // ContainsAllowedSegment reports whether a name contains a word that merely holds an abbreviation's letters, like
-// `InnoDb`. internal/file_name_words asks it of a folder's name read with its parent's, so a brand spelled across
-// the two, google/docs, is read as the brand.
+// `InnoDb`. internal/text_rules/file_name_words asks it of a folder's name read with its parent's, so a brand spelled
+// across the two, google/docs, is read as the brand.
 func (vocabulary *Vocabulary) ContainsAllowedSegment(name string) bool {
 	for _, segment := range vocabulary.AllowedSegments {
 		if strings.Contains(name, segment) {

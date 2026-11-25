@@ -7,7 +7,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/origin_names"
 	"github.com/system-inc/cohere/internal/go_language/rule"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 )
 
 // errorNameWords are the vocabulary's words as an error's name is built from them, read once from the same file the

@@ -1,4 +1,4 @@
-package text_rules
+package conformance
 
 // Result is what the comparator found.
 type Result struct {

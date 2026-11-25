@@ -27,8 +27,8 @@ package file_name_words
 import (
 	"strings"
 
-	"github.com/system-inc/cohere/internal/folder_words"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
+	"github.com/system-inc/cohere/internal/text_rules/folder_words"
 )
 
 // Language is the language a file is written in, whose conventions say which parts of its name are words.

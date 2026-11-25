@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/sql_text"
+	"github.com/system-inc/cohere/internal/text_rules/sql_text"
 )
 
 // ReadStatement is pinned where it lives, one case per shape both rules lean on: a hole inside a quoted value, a
