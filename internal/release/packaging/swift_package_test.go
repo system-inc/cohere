@@ -64,7 +64,7 @@ func TestMinimumMacOsIsReadFromTheBinary(test *testing.T) {
 	binary := smallMacBinary(test, "arm64")
 	if requireMinimumMacOsError := requireMinimumMacOs(
 		binary,
-		MinimumSwiftEngineMacOs,
+		MinimumSwiftBinaryMacOs,
 	); requireMinimumMacOsError != nil {
 		test.Fatalf("a binary Go built for an old macOS was refused: %v", requireMinimumMacOsError)
 	}
@@ -85,7 +85,7 @@ func TestMinimumMacOsIsReadFromTheBinary(test *testing.T) {
 		test.Fatalf("rewriting the minimum macOS: %v\n%s", outputError, output)
 	}
 
-	requireMinimumMacOsError := requireMinimumMacOs(tooNew, MinimumSwiftEngineMacOs)
+	requireMinimumMacOsError := requireMinimumMacOs(tooNew, MinimumSwiftBinaryMacOs)
 	if requireMinimumMacOsError == nil {
 		test.Fatal("a binary requiring macOS 27 was accepted for a release promising macOS 15")
 	}
@@ -133,7 +133,7 @@ func TestSwiftArchitectureNamesEveryMacTarget(test *testing.T) {
 	test.Parallel()
 
 	for _, target := range Targets {
-		if !ShipsSwiftEngine(target.GoOperatingSystem) {
+		if !ShipsSwiftBinary(target.GoOperatingSystem) {
 			continue
 		}
 		if _, swiftArchitectureError := swiftArchitecture(target.GoArchitecture); swiftArchitectureError != nil {
@@ -143,14 +143,18 @@ func TestSwiftArchitectureNamesEveryMacTarget(test *testing.T) {
 }
 
 // contractPair writes a stand-in cohere whose `--version` prints cohereVersion, and a stand-in binary that
-// runs engineScript with its arguments in "$@". Shell scripts rather than real builds, because what is
+// runs binaryScript with its arguments in "$@". Shell scripts rather than real builds, because what is
 // under test is how the release reads the two answers, and a real binary takes fifteen minutes to build.
-func contractPair(test *testing.T, cohereVersion string, engineScript string) (coherePath string, enginePath string) {
+func contractPair(
+	test *testing.T,
+	cohereVersion string,
+	binaryScript string,
+) (coherePath string, swiftBinaryPath string) {
 	test.Helper()
 
 	directory := test.TempDir()
 	coherePath = filepath.Join(directory, "cohere")
-	enginePath = filepath.Join(directory, SwiftEngineFileName)
+	swiftBinaryPath = filepath.Join(directory, SwiftBinaryFileName)
 	writeExecutable(test, coherePath, 0o755)
 	if writeError := executable_testing.WriteFile(
 		coherePath,
@@ -161,15 +165,15 @@ func contractPair(test *testing.T, cohereVersion string, engineScript string) (c
 	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	writeExecutable(test, enginePath, 0o755)
+	writeExecutable(test, swiftBinaryPath, 0o755)
 	if writeError := executable_testing.WriteFile(
-		enginePath,
-		[]byte("#!/bin/sh\n"+engineScript+"\n"),
+		swiftBinaryPath,
+		[]byte("#!/bin/sh\n"+binaryScript+"\n"),
 		0o755,
 	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	return coherePath, enginePath
+	return coherePath, swiftBinaryPath
 }
 
 // stampedCommit is the commit the stand-in binaries below say they were built from, and the one the
@@ -192,10 +196,10 @@ echo '{"kind":"provenance","contract":` + contract +
 func TestSwiftContractAcceptsAMatchingPair(test *testing.T) {
 	test.Parallel()
 
-	coherePath, enginePath := contractPair(test, "cohere 1.0.0\n  swift contract: 3", speaksContract("3"))
+	coherePath, swiftBinaryPath := contractPair(test, "cohere 1.0.0\n  swift contract: 3", speaksContract("3"))
 	if requireSwiftContractError := requireSwiftContract(
 		coherePath,
-		enginePath,
+		swiftBinaryPath,
 		stampedCommit,
 	); requireSwiftContractError != nil {
 		test.Fatalf("a pair speaking the same contract was refused: %v", requireSwiftContractError)
@@ -210,7 +214,7 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 	for _, testCase := range []struct {
 		name          string
 		cohereVersion string
-		engineScript  string
+		binaryScript  string
 		says          string
 	}{
 		{
@@ -232,8 +236,8 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			coherePath, enginePath := contractPair(test, testCase.cohereVersion, testCase.engineScript)
-			requireSwiftContractError := requireSwiftContract(coherePath, enginePath, stampedCommit)
+			coherePath, swiftBinaryPath := contractPair(test, testCase.cohereVersion, testCase.binaryScript)
+			requireSwiftContractError := requireSwiftContract(coherePath, swiftBinaryPath, stampedCommit)
 			if requireSwiftContractError == nil {
 				test.Fatal("a mismatched pair was staged")
 			}
@@ -244,7 +248,7 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 	}
 }
 
-// TestSwiftEngineBuildReadsTheTreeAsItIsNow builds a stand-in binary through buildSwiftEngine twice in one
+// TestSwiftBinaryBuildReadsTheTreeAsItIsNow builds a stand-in binary through buildSwiftBinary twice in one
 // repository: clean, then with a tracked file edited. It is laid out as cohere-swift is, a CohereSwift
 // target with the stamp gitignored under Command/, its manifest defines a flag from
 // `Context.gitInformation.hasUncommittedChanges` as cohere-swift's does, and the product prints that flag
@@ -253,7 +257,7 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 // SwiftPM's shared manifest cache would answer the second build from the first evaluation and stamp a
 // modified tree as clean; the release turns that cache off. The first build also proves the stamp: it
 // reaches the binary, it does not count as a modification, and it is gone afterwards.
-func TestSwiftEngineBuildReadsTheTreeAsItIsNow(test *testing.T) {
+func TestSwiftBinaryBuildReadsTheTreeAsItIsNow(test *testing.T) {
 	test.Parallel()
 
 	if runtime.GOOS != "darwin" {
@@ -282,7 +286,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	writeFile(
 		test,
 		filepath.Join(module, "swift", ".gitignore"),
-		"/Sources/CohereSwift/Command/"+SwiftEngineStampFileName+"\n",
+		"/Sources/CohereSwift/Command/"+SwiftReleaseStampFileName+"\n",
 	)
 	writeFile(test, filepath.Join(module, ".gitignore"), ".scratch/\n")
 	gitIn(test, module, "init", "--quiet")
@@ -297,15 +301,15 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	scratch := filepath.Join(module, ".scratch")
 	says := func() string {
 		test.Helper()
-		destination := filepath.Join(test.TempDir(), SwiftEngineFileName)
-		if buildSwiftEngineError := buildSwiftEngine(
+		destination := filepath.Join(test.TempDir(), SwiftBinaryFileName)
+		if buildSwiftBinaryError := buildSwiftBinary(
 			module,
 			scratch,
 			target,
 			destination,
 			commit,
-		); buildSwiftEngineError != nil {
-			test.Fatal(buildSwiftEngineError)
+		); buildSwiftBinaryError != nil {
+			test.Fatal(buildSwiftBinaryError)
 		}
 		output, outputError := exec.Command(destination).Output()
 		if outputError != nil {
@@ -318,7 +322,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 		test.Fatalf("a binary built from a clean tree says %q, and should say clean and its commit %s", got, commit)
 	}
 	if _, statError := os.Stat(
-		filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftEngineStampFileName),
+		filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftReleaseStampFileName),
 	); statError == nil {
 		test.Fatal("the stamp was left in the checkout after the build")
 	}

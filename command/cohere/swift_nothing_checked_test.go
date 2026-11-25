@@ -16,39 +16,39 @@ import (
 	"github.com/system-inc/cohere/internal/release/dispatch"
 )
 
-// realSwiftEngine is the child built from this checkout's swift/, resolved once for the test binary as a development
+// realSwiftBinary is the child built from this checkout's swift/, resolved once for the test binary as a development
 // run resolves it: reused while its sources are unchanged, built when they moved.
-var realSwiftEngine struct {
+var realSwiftBinary struct {
 	once         sync.Once
 	path         string
 	resolveError error
 }
 
-// builtSwiftEngine is the path of the child a development cohere would run, built from this checkout's sources.
-func builtSwiftEngine(test *testing.T) string {
+// builtSwiftBinary is the path of the child a development cohere would run, built from this checkout's sources.
+func builtSwiftBinary(test *testing.T) string {
 	test.Helper()
-	realSwiftEngine.once.Do(func() {
+	realSwiftBinary.once.Do(func() {
 		moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
 		if findModuleDirectoryError != nil {
-			realSwiftEngine.resolveError = findModuleDirectoryError
+			realSwiftBinary.resolveError = findModuleDirectoryError
 			return
 		}
 		versionOutput, swiftVersionOutputError := dispatch.SwiftVersionOutput()
 		if swiftVersionOutputError != nil {
-			realSwiftEngine.resolveError = swiftVersionOutputError
+			realSwiftBinary.resolveError = swiftVersionOutputError
 			return
 		}
-		realSwiftEngine.path, _, realSwiftEngine.resolveError = dispatch.ResolveSwiftEngine(
+		realSwiftBinary.path, _, realSwiftBinary.resolveError = dispatch.ResolveSwiftBinary(
 			dispatch.DefaultPaths(moduleDirectory),
 			"",
 			contractVersion,
 			versionOutput,
 		)
 	})
-	if realSwiftEngine.resolveError != nil {
-		test.Fatalf("cannot resolve cohere-swift: %v", realSwiftEngine.resolveError)
+	if realSwiftBinary.resolveError != nil {
+		test.Fatalf("cannot resolve cohere-swift: %v", realSwiftBinary.resolveError)
 	}
-	return realSwiftEngine.path
+	return realSwiftBinary.path
 }
 
 // toolsWithoutGit is a directory holding the tools a Swift run starts and nothing else, git least of all, so a run
@@ -148,7 +148,7 @@ func TestARealSwiftRunThatExcludedEveryFileFails(test *testing.T) {
 	}
 	binary := buildCohere(test)
 	environment := []string{
-		dispatch.SwiftEngineOverrideVariable + "=" + builtSwiftEngine(test),
+		dispatch.SwiftBinaryOverrideVariable + "=" + builtSwiftBinary(test),
 		"PATH=" + toolsWithoutGit(test),
 	}
 	// run is a `--no-fix` run at root: its standard output, and with `--json` nothing else, since the line saying

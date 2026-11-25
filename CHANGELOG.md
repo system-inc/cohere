@@ -162,7 +162,11 @@ changed in cohere outside the sets is written under the same heading.
   hidden mode `cohere go-language` (was `cohere go-engine`), and a script that starts one reads the new names:
   `COHERE_PROJECT_KIND` (was `COHERE_PROJECT_ENGINE`) with the values `TypeScriptProgram`, `SwiftPackage`,
   `GoModule` and `Folder` (were `TypeScript`, `Swift`, `Go` and `Format`), and `COHERE_GO_CHILD` (was
-  `COHERE_GO_ENGINE_CHILD`). `--version` says `go:` and `swift:` where it said `go engine:` and `swift engine:`.
+  `COHERE_GO_ENGINE_CHILD`). The override naming a cohere-swift to run is `COHERE_SWIFT_BINARY` (was
+  `COHERE_SWIFT_ENGINE`), announced as `cohere: running cohere-swift <path> named by COHERE_SWIFT_BINARY`, and the
+  values a run hands its children are `COHERE_SWIFT_BINARY_PATH` and `COHERE_SWIFT_BINARY_COMMIT`. `--version`
+  says `go:` and `swift:` where it said `go engine:` and `swift engine:`, and `cohere-swift was built from` where
+  it said `the Swift engine was built from`.
   `--json` writes a build before the check as `{"kind":"programBuild","program":...}` (was `engineBuild` and
   `engine`), and the timeline's first stamp is `main.begin` (was `engine.main.begin`). The root's format-only
   project is labeled and counted as `Folder` (was `Format`). The findings cache, the kept listings and the run

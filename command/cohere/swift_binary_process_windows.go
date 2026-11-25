@@ -15,12 +15,12 @@ func startInOwnProcessGroup(*exec.Cmd) {
 	// Windows has no process groups, so the child starts as any child does.
 }
 
-func signalProcessGroup(engineGroup int, _ os.Signal) {
-	killProcessGroup(engineGroup)
+func signalProcessGroup(childGroup int, _ os.Signal) {
+	killProcessGroup(childGroup)
 }
 
-func killProcessGroup(engineGroup int) {
-	if process, findProcessError := os.FindProcess(engineGroup); findProcessError == nil {
+func killProcessGroup(childGroup int) {
+	if process, findProcessError := os.FindProcess(childGroup); findProcessError == nil {
 		// Ignored: a child already gone is the outcome asked for, and killContractGroup kills again until the child
 		// is reaped.
 		_ = process.Kill()

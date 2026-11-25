@@ -384,9 +384,9 @@ func run() error {
 	}
 
 	if locateError == nil && location.Kind == projectKindSwiftPackage {
-		exitCode, runSwiftEngineError := runSwiftEngine(location, given, flag.Args())
-		if runSwiftEngineError != nil {
-			return runSwiftEngineError
+		exitCode, runSwiftProjectError := runSwiftProject(location, given, flag.Args())
+		if runSwiftProjectError != nil {
+			return runSwiftProjectError
 		}
 		// Through the run cache, which records a Swift verdict (see beginSwiftRunCache), as a Go run's exit goes.
 		if exitCode != 0 {

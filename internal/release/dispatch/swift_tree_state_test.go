@@ -25,19 +25,19 @@ import (
 const testSwiftVersionOutput = "Apple Swift version 6.4 (" + testToolchain + ")\nTarget: arm64-apple-macosx26.0\n"
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in.
-func TestAnEngineBuiltFromADirtyTreeIsNotServedOnceTheTreeIsClean(test *testing.T) {
+func TestASwiftBinaryBuiltFromADirtyTreeIsNotServedOnceTheTreeIsClean(test *testing.T) {
 	fixture := newSwiftFixture(test)
 	writeFile(test, fixture.rule(), "two\n")
 
 	dirty, built := fixture.resolveDevelopment(test)
-	if !built || !engineSaysModified(test, dirty) {
+	if !built || !binarySaysModified(test, dirty) {
 		test.Fatalf("a binary built from an uncommitted rule says it is clean (built=%v)", built)
 	}
 
 	// Committed as it stands, so cohere-swift's inputs read exactly as they did and only their state moved.
 	fixture.commit(test, "swift")
 	clean, built := fixture.resolveDevelopment(test)
-	if engineSaysModified(test, clean) {
+	if binarySaysModified(test, clean) {
 		test.Fatalf(
 			"the clean tree was served a binary that says its tree was modified (built=%v, the same binary: %v)",
 			built,
@@ -51,11 +51,11 @@ func TestAnEngineBuiltFromADirtyTreeIsNotServedOnceTheTreeIsClean(test *testing.
 }
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in.
-func TestAnEngineBuiltFromACleanTreeIsNotServedOnceTheTreeIsDirty(test *testing.T) {
+func TestASwiftBinaryBuiltFromACleanTreeIsNotServedOnceTheTreeIsDirty(test *testing.T) {
 	fixture := newSwiftFixture(test)
 
 	clean, built := fixture.resolveDevelopment(test)
-	if !built || engineSaysModified(test, clean) {
+	if !built || binarySaysModified(test, clean) {
 		test.Fatalf("a binary built from a clean tree says it was modified (built=%v)", built)
 	}
 
@@ -65,7 +65,7 @@ func TestAnEngineBuiltFromACleanTreeIsNotServedOnceTheTreeIsDirty(test *testing.
 	fixture.commit(test, "swift")
 	writeFile(test, fixture.rule(), "one\n")
 	dirty, built := fixture.resolveDevelopment(test)
-	if !engineSaysModified(test, dirty) {
+	if !binarySaysModified(test, dirty) {
 		test.Fatalf(
 			"the dirty tree was served a binary that claims a clean build (built=%v, the same binary: %v)",
 			built,
@@ -83,10 +83,10 @@ func TestAnEngineBuiltFromACleanTreeIsNotServedOnceTheTreeIsDirty(test *testing.
 // tracked or untracked.
 //
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in.
-func TestTheEngineBitCoversOnlyTheEnginesOwnInputs(test *testing.T) {
+func TestTheSwiftTreeBitCoversOnlyTheSwiftPackagesOwnInputs(test *testing.T) {
 	fixture := newSwiftFixture(test)
 	clean, _ := fixture.resolveDevelopment(test)
-	if engineSaysModified(test, clean) {
+	if binarySaysModified(test, clean) {
 		test.Fatal("a binary built from a clean tree says it was modified")
 	}
 
@@ -98,22 +98,22 @@ func TestTheEngineBitCoversOnlyTheEnginesOwnInputs(test *testing.T) {
 	}
 	for change, path := range outside {
 		writeFile(test, filepath.Join(fixture.repository, path), "uncommitted\n")
-		engine, built := fixture.resolveDevelopment(test)
-		if engineSaysModified(test, engine) || built || engine != clean {
+		swiftBinary, built := fixture.resolveDevelopment(test)
+		if binarySaysModified(test, swiftBinary) || built || swiftBinary != clean {
 			test.Errorf("%s marked cohere-swift modified or moved it (built=%v)", change, built)
 		}
 	}
 
 	added := filepath.Join(fixture.repository, "swift", "Sources", "New.swift")
 	writeFile(test, added, "// nobody committed this\n")
-	if engine, _ := fixture.resolveDevelopment(test); !engineSaysModified(test, engine) {
+	if swiftBinary, _ := fixture.resolveDevelopment(test); !binarySaysModified(test, swiftBinary) {
 		test.Error("an untracked file under swift/Sources left cohere-swift clean")
 	}
 	if removeError := os.Remove(added); removeError != nil {
 		test.Fatal(removeError)
 	}
 	writeFile(test, fixture.rule(), "one, uncommitted\n")
-	if engine, _ := fixture.resolveDevelopment(test); !engineSaysModified(test, engine) {
+	if swiftBinary, _ := fixture.resolveDevelopment(test); !binarySaysModified(test, swiftBinary) {
 		test.Error("a tracked edit under swift/Sources left cohere-swift clean")
 	}
 	fixture.expectEveryBuildWasTold(test)
@@ -163,7 +163,7 @@ func TestTheSwiftBuildIsHandedOnlyTheStatedTreeState(test *testing.T) {
 // cohere-swift's real manifest takes the stated answer over git's, both ways, and reads git when nothing is
 // stated. The stand-in package's manifest is the real one's `sourceTreeModified`, copied from it here, so
 // the expression under test is the one cohere-swift builds with.
-func TestTheEngineManifestPrefersTheStatedTreeState(test *testing.T) {
+func TestTheSwiftManifestPrefersTheStatedTreeState(test *testing.T) {
 	test.Parallel()
 	if runtime.GOOS != "darwin" {
 		test.Skip("cohere-swift is built only on macOS")
@@ -257,9 +257,9 @@ func TestTheTreeStateReadsInAWorktreeWhoseSubmoduleIsASymlink(test *testing.T) {
 // resolveDevelopment resolves cohere-swift from the fixture's working tree, failing the test on error.
 func (fixture *swiftFixture) resolveDevelopment(test *testing.T) (string, bool) {
 	test.Helper()
-	binaryPath, built, resolveSwiftEngineError := ResolveSwiftEngine(fixture.paths, "", 2, testSwiftVersionOutput)
-	if resolveSwiftEngineError != nil {
-		test.Fatalf("resolving the development binary: %v", resolveSwiftEngineError)
+	binaryPath, built, resolveSwiftBinaryError := ResolveSwiftBinary(fixture.paths, "", 2, testSwiftVersionOutput)
+	if resolveSwiftBinaryError != nil {
+		test.Fatalf("resolving the development binary: %v", resolveSwiftBinaryError)
 	}
 	return binaryPath, built
 }
@@ -275,8 +275,8 @@ func (fixture *swiftFixture) expectEveryBuildWasTold(test *testing.T) {
 	}
 }
 
-// engineSaysModified is the sourceTreeModified a binary's provenance record reports.
-func engineSaysModified(test *testing.T, binaryPath string) bool {
+// binarySaysModified is the sourceTreeModified a binary's provenance record reports.
+func binarySaysModified(test *testing.T, binaryPath string) bool {
 	test.Helper()
 	var record struct {
 		Kind               string `json:"kind"`

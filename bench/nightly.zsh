@@ -266,8 +266,8 @@ measure_project() {
   else
     (
       cd $copy || exit 1
-      unset COHERE_SWIFT_ENGINE
-      [[ -x $logs/cohere-swift ]] && export COHERE_SWIFT_ENGINE=$logs/cohere-swift
+      unset COHERE_SWIFT_BINARY
+      [[ -x $logs/cohere-swift ]] && export COHERE_SWIFT_BINARY=$logs/cohere-swift
       $logs/cohere-pinned --json --no-fix --no-cache --timing
     ) > $timing 2>&1
     parse_timing $timing > $timing_table

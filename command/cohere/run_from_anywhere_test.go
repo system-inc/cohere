@@ -86,7 +86,7 @@ func runWithSwiftBinary(
 	test.Helper()
 	command := exec.Command(binary, verboseArguments(arguments)...)
 	command.Dir = directory
-	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+swiftBinary, "COHERE_VERDICT_FD=")
+	command.Env = append(os.Environ(), "COHERE_SWIFT_BINARY="+swiftBinary, "COHERE_VERDICT_FD=")
 	output, outputError := command.CombinedOutput()
 	if outputError == nil {
 		return string(output), 0

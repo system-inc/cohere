@@ -295,24 +295,24 @@ func buildPlatformPackage(
 	// looks for it there and nowhere else, so a package missing it is a broken package, not a smaller
 	// one: the build fails rather than staging without it.
 	executables := []string{binaryPath}
-	enginePath := filepath.Join(directory, "bin", SwiftEngineFileName)
-	engineCommit := ""
-	if ShipsSwiftEngine(target.GoOperatingSystem) {
+	swiftBinaryPath := filepath.Join(directory, "bin", SwiftBinaryFileName)
+	binaryCommit := ""
+	if ShipsSwiftBinary(target.GoOperatingSystem) {
 		var readReleaseCommitError error
-		engineCommit, readReleaseCommitError = readReleaseCommit(options.ModuleDirectory)
+		binaryCommit, readReleaseCommitError = readReleaseCommit(options.ModuleDirectory)
 		if readReleaseCommitError != nil {
 			return StagedPackage{}, readReleaseCommitError
 		}
-		if buildSwiftEngineError := buildSwiftEngine(
+		if buildSwiftBinaryError := buildSwiftBinary(
 			options.ModuleDirectory,
 			options.SwiftScratchDirectory,
 			target,
-			enginePath,
-			engineCommit,
-		); buildSwiftEngineError != nil {
-			return StagedPackage{}, buildSwiftEngineError
+			swiftBinaryPath,
+			binaryCommit,
+		); buildSwiftBinaryError != nil {
+			return StagedPackage{}, buildSwiftBinaryError
 		}
-		executables = append(executables, enginePath)
+		executables = append(executables, swiftBinaryPath)
 	}
 
 	// Signed before the manifest is written, so a signing failure leaves an obviously incomplete
@@ -337,11 +337,11 @@ func buildPlatformPackage(
 	}
 
 	// After signing, so the pair checked is the pair that ships.
-	if ShipsSwiftEngine(target.GoOperatingSystem) {
+	if ShipsSwiftBinary(target.GoOperatingSystem) {
 		if requireSwiftContractError := requireSwiftContract(
 			binaryPath,
-			enginePath,
-			engineCommit,
+			swiftBinaryPath,
+			binaryCommit,
 		); requireSwiftContractError != nil {
 			return StagedPackage{}, requireSwiftContractError
 		}

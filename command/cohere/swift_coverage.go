@@ -161,14 +161,14 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(activeOutput.Mode == outputVerbose)
-	binaryPath, _, resolveSwiftEngineBinaryError := resolvedSwiftEngineBinary(
+	binaryPath, _, resolveSwiftBinaryError := resolvedSwiftBinary(
 		projectLocation{Root: directories[0], Kind: projectKindSwiftPackage},
 	)
 	dispatch.Report.Clear()
-	if resolveSwiftEngineBinaryError != nil {
+	if resolveSwiftBinaryError != nil {
 		for _, project := range projects {
 			answers[project.Directory] = coverageAnswer{
-				queryError: fmt.Errorf("resolving cohere-swift: %w", resolveSwiftEngineBinaryError),
+				queryError: fmt.Errorf("resolving cohere-swift: %w", resolveSwiftBinaryError),
 			}
 		}
 		return answers

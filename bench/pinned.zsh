@@ -206,7 +206,7 @@ run_generator() {
 }
 
 # pin_cohere sets cohere_version, cohere_source and cohere_pinned, a copy of the cohere binary in <logs>, and the Swift
-# binary every run uses (pin_swift_engine). Asking the launcher for its version is what makes it build the
+# binary every run uses (pin_swift_binary). Asking the launcher for its version is what makes it build the
 # binary for the current commit, so the newest cohere in its binary cache is that one, and the two versions
 # agreeing proves it. They are compared on cohere's own lines and on cohere-swift's provenance line,
 # which the same binary prints the same, and not on the lines that say where cohere-swift came from,
@@ -220,7 +220,7 @@ pin_cohere() {
   local launcher=$(whence -p $cohere || print ${cohere:A})
   cohere_pinned=$logs/cohere-pinned
   for attempt in 1 2 3; do
-    unset COHERE_SWIFT_ENGINE
+    unset COHERE_SWIFT_BINARY
     cohere_version=$(cd $copy && $cohere --version 2>&1) || fail "cohere --version failed: $cohere_version"
     if [[ ${launcher:A:t} == cohere-dispatch ]]; then
       local newest=(${launcher:A:h}/cohere-darwin-*(N.om[1]))
@@ -230,7 +230,7 @@ pin_cohere() {
       cohere_source=${launcher:A}
     fi
     cp $cohere_source $cohere_pinned
-    pin_swift_engine $logs $launcher
+    pin_swift_binary $logs $launcher
     [[ $(cd $copy && $cohere_pinned --version 2>&1 | version_identity) == $(print -- "$cohere_version" | version_identity) ]] &&
       return 0
     print -u2 "the newest cohere is not the build the launcher reports, asking again"
@@ -242,20 +242,20 @@ pin_cohere() {
 # version_identity is a `--version` output without the lines that say where cohere-swift came from.
 version_identity() { grep -v -e '^  cohere-swift was built' -e '^cohere: running cohere-swift'; }
 
-# pin_swift_engine sets swift_engine, swift_source and swift_commit, and exports COHERE_SWIFT_ENGINE, so every
+# pin_swift_binary sets swift_binary, swift_source and swift_commit, and exports COHERE_SWIFT_BINARY, so every
 # run of a Swift project uses one cohere-swift, the one built from the cohere binary's own commit, and no run
 # builds one inside its timing (#ywx8zgd). Copied out of the cohere tree, the cohere binary cannot find the checkout
 # its cohere-swift is built from: on a Swift-only project it refused to run at all, and on cohere's root it
 # found the copy and built one there, inside the first timed run.
 #
-# Through the launcher, cohere-swift is the one dispatch.ResolveSwiftEngine names for the checkout the
-# launcher lives in and the cohere binary's full commit, asked through tools/swift_engine, so it is the very file the
+# Through the launcher, cohere-swift is the one dispatch.ResolveSwiftBinary names for the checkout the
+# launcher lives in and the cohere binary's full commit, asked through tools/swift_binary, so it is the very file the
 # binary would have resolved. A packaged cohere ships its cohere-swift beside it. A cohere built from a
 # modified tree has no commit to build a cohere-swift from, so none is pinned, the header says so, and a Swift
 # project's run resolves its own.
-pin_swift_engine() {
+pin_swift_binary() {
   local logs=$1 launcher=$2
-  swift_engine=$logs/cohere-swift
+  swift_binary=$logs/cohere-swift
   swift_source= swift_commit=
   if [[ ${launcher:A:t} == cohere-dispatch ]]; then
     local module=${launcher:A:h:h:h:h}
@@ -266,10 +266,10 @@ pin_swift_engine() {
     swift_commit=$(git -C $module rev-parse --verify "$commit^{commit}") ||
       fail "the cohere binary's commit $commit is not in $module"
     # Built without a version stamp, which nothing reads, so it builds in a cohere-dev worktree too (#268j573).
-    (cd ${bench_directory:h} && go build -buildvcs=false -o $logs/swift_engine \
-      ./internal/bench_results/tools/swift_engine) ||
+    (cd ${bench_directory:h} && go build -buildvcs=false -o $logs/swift_binary_resolver \
+      ./internal/bench_results/tools/swift_binary) ||
       fail "could not build the cohere-swift resolver"
-    swift_source=$($logs/swift_engine $module $swift_commit $contract) ||
+    swift_source=$($logs/swift_binary_resolver $module $swift_commit $contract) ||
       fail "could not resolve cohere-swift built from $swift_commit"
   elif [[ -f ${cohere_source:h}/cohere-swift ]]; then
     swift_source=${cohere_source:h}/cohere-swift
@@ -277,21 +277,21 @@ pin_swift_engine() {
   else
     return 0
   fi
-  cp $swift_source $swift_engine
+  cp $swift_source $swift_binary
   # Launched once here, so macOS's scan of a new executable on its first launch (about 8ms a MB, about 260ms for
   # cohere-swift) is paid before round 1 rather than inside it, as the cohere binary's own `--version` above pays its
   # scan (#4b87w3r). A copy that cannot say its version would fail every Swift run, so it stops the bench here.
-  $swift_engine --version > /dev/null 2>&1 || fail "the pinned cohere-swift $swift_engine does not run"
-  export COHERE_SWIFT_ENGINE=$swift_engine
+  $swift_binary --version > /dev/null 2>&1 || fail "the pinned cohere-swift $swift_binary does not run"
+  export COHERE_SWIFT_BINARY=$swift_binary
 }
 
-# swift_engine_named_otherwise prints the first cohere-swift a run's <log> says it ran that is not the pinned
+# swift_binary_named_otherwise prints the first cohere-swift a run's <log> says it ran that is not the pinned
 # one, or that it resolved on its own, so a round never measures two builds. Nothing when the run named the
 # pinned binary, or ran no Swift.
-swift_engine_named_otherwise() {
+swift_binary_named_otherwise() {
   local log=$1
-  if [[ -n ${COHERE_SWIFT_ENGINE:-} ]]; then
-    awk -v pinned=$swift_engine '
+  if [[ -n ${COHERE_SWIFT_BINARY:-} ]]; then
+    awk -v pinned=$swift_binary '
       /^cohere: running cohere-swift / && $4 != pinned { print $4; exit }
       /^  cohere-swift was built from / { print "one it resolved itself"; exit }' $log
   fi
@@ -313,8 +313,8 @@ print_pinned_header() {
     "$(( $(sysctl -n hw.memsize) / 1073741824 )) GB, macOS $(sw_vers -productVersion)"
   print "# cohere   $cohere_source"
   print -- "$cohere_version" | sed 's/^/#   /'
-  if [[ -n ${COHERE_SWIFT_ENGINE:-} ]]; then
-    print "# swift    $swift_source, built from commit $swift_commit, pinned as $swift_engine"
+  if [[ -n ${COHERE_SWIFT_BINARY:-} ]]; then
+    print "# swift    $swift_source, built from commit $swift_commit, pinned as $swift_binary"
   else
     print "# swift    not pinned: the cohere binary was built from a modified tree, so a Swift project resolves its own"
   fi

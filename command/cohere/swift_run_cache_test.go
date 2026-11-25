@@ -12,11 +12,11 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// TestSwiftRunCacheFactsMoveWithTheToolchainAndTheEngine: every fact a Swift run depends on that is no file moves the
+// TestSwiftRunCacheFactsMoveWithTheToolchainAndTheBinary: every fact a Swift run depends on that is no file moves the
 // run's key, and a variable no Swift run reads, or the same environment in another order, leaves it where it was. A
 // key that stayed put under a moved fact would replay a verdict another toolchain or cohere-swift gave: which `swift`,
 // xcrun and SDK answer decides what the compiler says, and how the child is chosen decides which rules ran.
-func TestSwiftRunCacheFactsMoveWithTheToolchainAndTheEngine(test *testing.T) {
+func TestSwiftRunCacheFactsMoveWithTheToolchainAndTheBinary(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	anchor := program.NewPathAnchor(root)
@@ -57,7 +57,7 @@ func TestSwiftRunCacheFactsMoveWithTheToolchainAndTheEngine(test *testing.T) {
 		}
 		return parts.Key()
 	}
-	baseline := facts{base, found(firstSwift), selected(firstXcode), "", swiftEngineFromWorkingTree, false}
+	baseline := facts{base, found(firstSwift), selected(firstXcode), "", swiftBinaryFromWorkingTree, false}
 	with := func(change func(*facts)) facts {
 		changed := baseline
 		changed.environment = slices.Clone(base)
@@ -135,11 +135,11 @@ func TestSwiftRunCacheFactsMoveWithTheToolchainAndTheEngine(test *testing.T) {
 	}
 }
 
-// TestOnlyAnEngineBuiltFromTheWorkingTreeAsksTheTreesState: the tree's clean or dirty state is a fact only for a
+// TestOnlyASwiftBinaryBuiltFromTheWorkingTreeAsksTheTreesState: the tree's clean or dirty state is a fact only for a
 // child built from the working tree, whose bit follows it (#s5z3n30). A named, shipped or committed binary's bit is
 // fixed in its bytes, and its binary is an input, so the state is never asked for one, since asking is a git process
 // a replay would pay for nothing.
-func TestOnlyAnEngineBuiltFromTheWorkingTreeAsksTheTreesState(test *testing.T) {
+func TestOnlyASwiftBinaryBuiltFromTheWorkingTreeAsksTheTreesState(test *testing.T) {
 	test.Parallel()
 	anchor := program.NewPathAnchor(test.TempDir())
 	none := func(string) (string, error) { return "", os.ErrNotExist }
@@ -152,17 +152,17 @@ func TestOnlyAnEngineBuiltFromTheWorkingTreeAsksTheTreesState(test *testing.T) {
 		}
 	}
 	asked := false
-	swiftRunCacheFacts(anchor, "", false, "", swiftEngineFromWorkingTree, func() bool { asked = true; return false },
+	swiftRunCacheFacts(anchor, "", false, "", swiftBinaryFromWorkingTree, func() bool { asked = true; return false },
 		nil, none, none)
 	if !asked {
 		test.Error("a child built from the working tree never asked for the tree's state, which its bit follows")
 	}
 }
 
-// TestSwiftEngineChoiceFollowsTheResolvesOrder: the choice keyed is the one resolveSwiftEngineBinary makes, the
+// TestSwiftBinaryChoiceFollowsTheResolvesOrder: the choice keyed is the one resolveSwiftBinary makes, the
 // override first, then a release's own cohere-swift, then a clean commit's, then the working tree's, so a replay never
 // crosses from a child chosen one way to one chosen another.
-func TestSwiftEngineChoiceFollowsTheResolvesOrder(test *testing.T) {
+func TestSwiftBinaryChoiceFollowsTheResolvesOrder(test *testing.T) {
 	test.Parallel()
 	released := release.Provenance{Version: "1.2.3", SelfCommit: "0123456789abcdef0123456789abcdef01234567"}
 	clean := release.Provenance{Version: "dev", SelfCommit: "0123456789abcdef0123456789abcdef01234567"}
@@ -173,13 +173,13 @@ func TestSwiftEngineChoiceFollowsTheResolvesOrder(test *testing.T) {
 		provenance release.Provenance
 		want       string
 	}{
-		{"an override wins over a release", "/tmp/engine", released, "named /tmp/engine"},
+		{"an override wins over a release", "/tmp/cohere-swift", released, "named /tmp/cohere-swift"},
 		{"a release runs its own", "", released, "shipped beside this cohere"},
 		{"a clean commit builds from it", "", clean, "built from commit " + clean.SelfCommit},
-		{"a modified tree builds from the working tree", "", modified, swiftEngineFromWorkingTree},
+		{"a modified tree builds from the working tree", "", modified, swiftBinaryFromWorkingTree},
 	}
 	for _, testCase := range cases {
-		if got := swiftEngineChoice(testCase.override, testCase.provenance); got != testCase.want {
+		if got := swiftBinaryChoice(testCase.override, testCase.provenance); got != testCase.want {
 			test.Errorf("%s: the choice is %q, want %q", testCase.name, got, testCase.want)
 		}
 	}
@@ -207,7 +207,7 @@ func TestASwiftRecordKeepsNoHoldingDirectoryItDidNotList(test *testing.T) {
 		return path
 	}
 	source, configuration := write("Sources/App/App.swift"), write(".git/config")
-	engine := write("engine/cohere-swift")
+	swiftBinary := write("binary/cohere-swift")
 	complete, exitCode, findings := true, 0, 0
 	run := &contractRun{
 		language: swiftLanguage,
@@ -224,7 +224,7 @@ func TestASwiftRecordKeepsNoHoldingDirectoryItDidNotList(test *testing.T) {
 		projectRoots: []string{root},
 		summary:      []byte("{}"),
 	}
-	declareSwiftRunCacheInputs(run, 0, filepath.Join(root, "CohereSettings.json"), engine, "named "+engine)
+	declareSwiftRunCacheInputs(run, 0, filepath.Join(root, "CohereSettings.json"), swiftBinary, "named "+swiftBinary)
 	session := activeRunCache
 	if !session.declared || session.declined != "" {
 		test.Fatalf("a verdict with inputs was not declared (declined %q)", session.declined)
@@ -237,12 +237,12 @@ func TestASwiftRecordKeepsNoHoldingDirectoryItDidNotList(test *testing.T) {
 	for _, input := range recorded.Inputs {
 		inputs[input.Path] = input
 	}
-	for _, kept := range []string{source, configuration, engine, root, filepath.Join(root, "Sources", "App")} {
+	for _, kept := range []string{source, configuration, swiftBinary, root, filepath.Join(root, "Sources", "App")} {
 		if _, found := inputs[kept]; !found {
 			test.Errorf("the record left out %s", kept)
 		}
 	}
-	for _, left := range []string{filepath.Join(root, ".git"), filepath.Join(root, "engine")} {
+	for _, left := range []string{filepath.Join(root, ".git"), filepath.Join(root, "binary")} {
 		if _, found := inputs[left]; found {
 			test.Errorf("the record kept %s, a directory the child never listed", left)
 		}

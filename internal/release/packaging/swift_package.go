@@ -11,14 +11,14 @@ import (
 	"strings"
 )
 
-// MinimumSwiftEngineMacOs is the oldest macOS a released cohere-swift may require.
+// MinimumSwiftBinaryMacOs is the oldest macOS a released cohere-swift may require.
 //
 // cohere-swift's own floor is macOS 15, set by Synchronization's Mutex, and @system_cohere_swift
 // measured it. The release reads the minimum from the built binary itself and refuses anything above
 // this. Otherwise a Package.swift that drifted back to a newer deployment target would ship a binary
 // that will not even launch on most of the Macs people have, and nothing would say so until a user
 // ran it.
-const MinimumSwiftEngineMacOs = "15.0"
+const MinimumSwiftBinaryMacOs = "15.0"
 
 // SwiftSourceTreeModifiedVariable states cohere-swift's `sourceTreeModified` to its manifest, "true" or
 // "false", in place of the manifest reading git (swift/Package.swift).
@@ -50,7 +50,7 @@ func swiftArchitecture(goArchitecture string) (string, error) {
 	return "", fmt.Errorf("no Swift architecture is known for GOARCH %s", goArchitecture)
 }
 
-// buildSwiftEngine builds cohere-swift for target into destination, and refuses a product that is not
+// buildSwiftBinary builds cohere-swift for target into destination, and refuses a product that is not
 // the executable it should be.
 //
 // It resolves first and then builds with automatic resolution off, so cohere-swift is built from exactly
@@ -63,7 +63,7 @@ func swiftArchitecture(goArchitecture string) (string, error) {
 // leaves the manifest's `hasUncommittedChanges` as it was (measured by @system_cohere_swift and here).
 // The build runs in the checkout rather than an export because outside git the manifest reads no
 // git information and calls the tree modified.
-func buildSwiftEngine(
+func buildSwiftBinary(
 	moduleDirectory string,
 	scratchRoot string,
 	target Target,
@@ -90,7 +90,7 @@ func buildSwiftEngine(
 		"none",
 	}
 
-	stamp := filepath.Join(packageDirectory, "Sources", "CohereSwift", "Command", SwiftEngineStampFileName)
+	stamp := filepath.Join(packageDirectory, "Sources", "CohereSwift", "Command", SwiftReleaseStampFileName)
 	stampSource := "#if COHERE_RELEASE_STAMP\n    enum EngineReleaseStamp { static let commit = \"" +
 		commit +
 		"\" }\n#endif\n"
@@ -108,7 +108,7 @@ func buildSwiftEngine(
 		return fmt.Errorf("resolving cohere-swift's dependencies: %w", runError)
 	}
 
-	arguments := append([]string{"build", "-c", "release", "--arch", architecture, "--product", SwiftEngineFileName,
+	arguments := append([]string{"build", "-c", "release", "--arch", architecture, "--product", SwiftBinaryFileName,
 		"--disable-automatic-resolution", "-Xswiftc", "-DCOHERE_RELEASE_STAMP"}, location...)
 	build := exec.Command("swift", arguments...)
 	// The manifest reads git for a release. A stated answer inherited from whoever ran the release would be
@@ -129,7 +129,7 @@ func buildSwiftEngine(
 	if outputError != nil {
 		return fmt.Errorf("asking SwiftPM where it put cohere-swift for %s: %w", target, outputError)
 	}
-	product := filepath.Join(strings.TrimSpace(string(binPath)), SwiftEngineFileName)
+	product := filepath.Join(strings.TrimSpace(string(binPath)), SwiftBinaryFileName)
 
 	contents, readError := os.ReadFile(product)
 	if readError != nil {
@@ -148,7 +148,7 @@ func buildSwiftEngine(
 	if requireArchitectureError := requireArchitecture(destination, architecture); requireArchitectureError != nil {
 		return requireArchitectureError
 	}
-	return requireMinimumMacOs(destination, MinimumSwiftEngineMacOs)
+	return requireMinimumMacOs(destination, MinimumSwiftBinaryMacOs)
 }
 
 // requireSwiftContract refuses a package whose cohere and cohere-swift would refuse each other.
@@ -165,7 +165,7 @@ func buildSwiftEngine(
 //
 // The record's commit must be the one cohere-swift was stamped with, so a binary built without the
 // stamp, which says `dev`, is never staged.
-func requireSwiftContract(coherePath string, enginePath string, commit string) error {
+func requireSwiftContract(coherePath string, swiftBinaryPath string, commit string) error {
 	var cohereError bytes.Buffer
 	versionCommand := exec.Command(coherePath, "--version")
 	versionCommand.Stderr = &cohereError
@@ -191,20 +191,20 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 			"the staged %s names no Swift contract in --version (it printed %q), so whether %s speaks it cannot be checked",
 			coherePath,
 			strings.TrimSpace(string(versionOutput)),
-			SwiftEngineFileName,
+			SwiftBinaryFileName,
 		)
 	}
 
-	var engineError bytes.Buffer
-	engineCommand := exec.Command(enginePath, "--contract", contract, "--version")
-	engineCommand.Stderr = &engineError
-	engineOutput, outputError := engineCommand.Output()
+	var binaryError bytes.Buffer
+	binaryCommand := exec.Command(swiftBinaryPath, "--contract", contract, "--version")
+	binaryCommand.Stderr = &binaryError
+	binaryOutput, outputError := binaryCommand.Output()
 	if outputError != nil {
 		return fmt.Errorf("the staged %s refused contract %d, which the cohere beside it speaks: %w: %s",
-			enginePath, expected, outputError, strings.TrimSpace(engineError.String()))
+			swiftBinaryPath, expected, outputError, strings.TrimSpace(binaryError.String()))
 	}
 
-	firstLine, _, _ := strings.Cut(strings.TrimSpace(string(engineOutput)), "\n")
+	firstLine, _, _ := strings.Cut(strings.TrimSpace(string(binaryOutput)), "\n")
 	var record struct {
 		Kind     string `json:"kind"`
 		Contract *int   `json:"contract"`
@@ -216,14 +216,14 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 	); decodeError != nil || record.Kind != "provenance" || record.Contract == nil {
 		return fmt.Errorf(
 			"the staged %s answered --version with %q, not a provenance record naming its contract",
-			enginePath,
+			swiftBinaryPath,
 			firstLine,
 		)
 	}
 	if *record.Contract != expected {
 		return fmt.Errorf(
 			"the staged %s speaks contract %d, and the cohere beside it speaks contract %d",
-			enginePath,
+			swiftBinaryPath,
 			*record.Contract,
 			expected,
 		)
@@ -231,7 +231,7 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 	if record.Commit != commit {
 		return fmt.Errorf(
 			"the staged %s says it was built from %q, and this release builds commit %s",
-			enginePath,
+			swiftBinaryPath,
 			record.Commit,
 			commit,
 		)

@@ -30,13 +30,13 @@ const swiftVersionOutputVariable = "COHERE_SWIFT_VERSION_OUTPUT"
 // swiftExecutableVariable carries the `swift` that `xcrun --find swift` names. The child reads it too.
 const swiftExecutableVariable = "COHERE_SWIFT_EXECUTABLE"
 
-// swiftEnginePathVariable carries the child binary the tree resolved, so a project's run neither hashes the
+// swiftBinaryPathVariable carries the child binary the tree resolved, so a project's run neither hashes the
 // child's sources nor builds it again.
-const swiftEnginePathVariable = "COHERE_SWIFT_ENGINE_PATH"
+const swiftBinaryPathVariable = "COHERE_SWIFT_BINARY_PATH"
 
-// swiftEngineCommitVariable carries the commit that cohere-swift is guaranteed to match, or nothing. See
-// resolveSwiftEngineBinary.
-const swiftEngineCommitVariable = "COHERE_SWIFT_ENGINE_COMMIT"
+// swiftBinaryCommitVariable carries the commit that cohere-swift is guaranteed to match, or nothing. See
+// resolveSwiftBinary.
+const swiftBinaryCommitVariable = "COHERE_SWIFT_BINARY_COMMIT"
 
 // swiftResolvedByVariable names the process that published the values above, by its pid.
 const swiftResolvedByVariable = "COHERE_SWIFT_RESOLVED_BY"
@@ -45,8 +45,8 @@ const swiftResolvedByVariable = "COHERE_SWIFT_RESOLVED_BY"
 var swiftResolutionVariables = []string{
 	swiftVersionOutputVariable,
 	swiftExecutableVariable,
-	swiftEnginePathVariable,
-	swiftEngineCommitVariable,
+	swiftBinaryPathVariable,
+	swiftBinaryCommitVariable,
 	swiftResolvedByVariable,
 }
 
@@ -97,20 +97,20 @@ var swiftVersionOutput = sync.OnceValues(func() (string, error) {
 	return output, nil
 })
 
-// resolvedSwiftEngineBinary is resolveSwiftEngineBinary once per process tree: the child a parent resolved
+// resolvedSwiftBinary is resolveSwiftBinary once per process tree: the child a parent resolved
 // when it published one, and otherwise resolved here and published. A child the caller named with
-// COHERE_SWIFT_ENGINE is never published, so each run goes on saying it runs a binary no hash vouches for.
-func resolvedSwiftEngineBinary(location projectLocation) (string, string, error) {
-	if inherited := os.Getenv(swiftEnginePathVariable); inherited != "" && isRegularFile(inherited) {
-		return inherited, os.Getenv(swiftEngineCommitVariable), nil
+// COHERE_SWIFT_BINARY is never published, so each run goes on saying it runs a binary no hash vouches for.
+func resolvedSwiftBinary(location projectLocation) (string, string, error) {
+	if inherited := os.Getenv(swiftBinaryPathVariable); inherited != "" && isRegularFile(inherited) {
+		return inherited, os.Getenv(swiftBinaryCommitVariable), nil
 	}
-	binaryPath, commit, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(location, release.Current())
-	if resolveSwiftEngineBinaryError != nil {
-		return "", "", resolveSwiftEngineBinaryError
+	binaryPath, commit, resolveSwiftBinaryError := resolveSwiftBinary(location, release.Current())
+	if resolveSwiftBinaryError != nil {
+		return "", "", resolveSwiftBinaryError
 	}
-	if os.Getenv(dispatch.SwiftEngineOverrideVariable) == "" {
-		publishSwiftResolution(swiftEngineCommitVariable, commit)
-		publishSwiftResolution(swiftEnginePathVariable, binaryPath)
+	if os.Getenv(dispatch.SwiftBinaryOverrideVariable) == "" {
+		publishSwiftResolution(swiftBinaryCommitVariable, commit)
+		publishSwiftResolution(swiftBinaryPathVariable, binaryPath)
 	}
 	return binaryPath, commit, nil
 }

@@ -17,12 +17,12 @@ import (
 
 const swiftOnlySettings = "{ \"swift\": { \"rules\": { \"cohere-swift/file-length\": [\"error\", { \"max\": 1 }] } } }\n"
 
-// loggingSwiftEngine is a clean stand-in cohere-swift that appends each command line it is given to the file it
+// loggingSwiftBinary is a clean stand-in cohere-swift that appends each command line it is given to the file it
 // returns.
-func loggingSwiftEngine(test *testing.T) (string, string) {
+func loggingSwiftBinary(test *testing.T) (string, string) {
 	test.Helper()
 	log := filepath.Join(test.TempDir(), "arguments")
-	return fakeSwiftEngine(
+	return fakeSwiftBinary(
 		test,
 		"echo \"$@\" >> '"+log+"'\ncat "+filepath.Join(contractDirectory(test), "Clean.jsonl"),
 	), log
@@ -43,13 +43,13 @@ func readLog(test *testing.T, log string) string {
 func TestASwiftPackageWhoseSettingsHoldOnlyASwiftBlockRuns(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	engine, log := loggingSwiftEngine(test)
+	swiftBinary, log := loggingSwiftBinary(test)
 	root := newRepository(test, map[string]string{
 		"Package.swift":         discoveryPackage,
 		"Sources/Toy/Toy.swift": "let toy = 1\n",
 		"CohereSettings.json":   swiftOnlySettings,
 	})
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	if exitCode != 0 || strings.Contains(output, "does not implement") {
 		test.Fatalf("a package whose settings hold only a swift block did not run (exit %d):\n%s", exitCode, output)
 	}
@@ -66,12 +66,12 @@ func TestASwiftPackageWhoseSettingsHoldOnlyASwiftBlockRuns(test *testing.T) {
 func TestATypeScriptProgramAndASwiftPackageShareOneSettingsFile(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	engine, log := loggingSwiftEngine(test)
+	swiftBinary, log := loggingSwiftBinary(test)
 	root := mixedRepository(test, ".")
 	writeTree(test, root, map[string]string{
 		"CohereSettings.json": "{ \"rules\": {}, \"swift\": { \"rules\": { \"cohere-swift/file-length\": \"error\" } } }\n",
 	})
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	if exitCode != 0 ||
 		!strings.Contains(output, "== . (TypeScript) ==") ||
 		!strings.Contains(output, "== . (Swift) ==") {
@@ -93,7 +93,7 @@ func TestATypeScriptProgramAndASwiftPackageShareOneSettingsFile(test *testing.T)
 func TestASwiftBlockNoSwiftRunReadsIsRefusedByName(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	engine, log := loggingSwiftEngine(test)
+	swiftBinary, log := loggingSwiftBinary(test)
 
 	typeScriptOnly := newRepository(test, map[string]string{
 		"tsconfig.json":       incrementalFixtureConfiguration + "\n",
@@ -102,7 +102,7 @@ func TestASwiftBlockNoSwiftRunReadsIsRefusedByName(test *testing.T) {
 		".gitignore":          "tsconfig.tsbuildinfo\n",
 	})
 	for _, arguments := range [][]string{{"--no-fix"}, {"--no-fix", "--directory", typeScriptOnly}} {
-		output, exitCode := runWithSwiftBinary(test, binary, engine, typeScriptOnly, arguments...)
+		output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, typeScriptOnly, arguments...)
 		if exitCode == 0 ||
 			!strings.Contains(output, `CohereSettings.json declares "swift"`) ||
 			!strings.Contains(output, "holds no Swift project") {
@@ -123,7 +123,7 @@ func TestASwiftBlockNoSwiftRunReadsIsRefusedByName(test *testing.T) {
 		filepath.Join(packageBelow, "apple", "Toy"),
 		map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"},
 	)
-	output, exitCode := runWithSwiftBinary(test, binary, engine, packageBelow, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, packageBelow, "--no-fix")
 	if exitCode == 0 ||
 		!strings.Contains(output, `CohereSettings.json declares "swift"`) ||
 		!strings.Contains(output, "holds no Swift project") {
@@ -140,7 +140,7 @@ func TestASwiftBlockNoSwiftRunReadsIsRefusedByName(test *testing.T) {
 		"Base.json":             swiftOnlySettings,
 		"CohereSettings.json":   "{ \"extends\": \"./Base.json\" }\n",
 	})
-	output, exitCode = runWithSwiftBinary(test, binary, engine, inBase, "--no-fix")
+	output, exitCode = runWithSwiftBinary(test, binary, swiftBinary, inBase, "--no-fix")
 	if exitCode == 0 || !strings.Contains(output, `Base.json declares "swift", and it is extended by`) {
 		test.Errorf("a swift block in an extended base was not refused by name (exit %d):\n%s", exitCode, output)
 	}
@@ -154,7 +154,7 @@ func TestASwiftBlockNoSwiftRunReadsIsRefusedByName(test *testing.T) {
 func TestANamedSettingsFileAwayFromTheSwiftProjectIsNotRefused(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	engine, log := loggingSwiftEngine(test)
+	swiftBinary, log := loggingSwiftBinary(test)
 	root := mixedRepository(test, "apple/Toy")
 	writeTree(test, filepath.Join(root, "settings"), map[string]string{
 		"Shared.json": "{ \"rules\": {}, \"swift\": { \"rules\": { \"cohere-swift/file-length\": \"error\" } } }\n",
@@ -162,7 +162,7 @@ func TestANamedSettingsFileAwayFromTheSwiftProjectIsNotRefused(test *testing.T) 
 	output, exitCode := runWithSwiftBinary(
 		test,
 		binary,
-		engine,
+		swiftBinary,
 		root,
 		"--no-fix",
 		"--lint-config",

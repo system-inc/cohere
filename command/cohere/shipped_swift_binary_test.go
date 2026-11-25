@@ -21,7 +21,7 @@ import (
 
 // installCohere puts cohere at `<install>/bin/cohere`, the layout of a platform package, stamped with
 // version when it is not empty, and returns the binary. The install directory has no cohere module above
-// it, so the only engine a run can find is one placed beside the binary.
+// it, so the only cohere-swift a run can find is one placed beside the binary.
 //
 // Each install is a directory of its own, holding a hard link to a build shared by every install of that
 // stamp: the package's binary for no stamp, and stampedCohere's for a version. Linking cohere once per
@@ -77,9 +77,9 @@ func stampedCohere(test *testing.T, version string) string {
 	return stamped.path
 }
 
-// placeSiblingEngine puts a stand-in cohere-swift beside binary that records its arguments in a file
+// placeSiblingSwiftBinary puts a stand-in cohere-swift beside binary that records its arguments in a file
 // and streams a clean run, and returns the file it records into.
-func placeSiblingEngine(test *testing.T, binary string) string {
+func placeSiblingSwiftBinary(test *testing.T, binary string) string {
 	test.Helper()
 	clean, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract", "Clean.jsonl"))
 	if absolutePathError != nil {
@@ -88,7 +88,7 @@ func placeSiblingEngine(test *testing.T, binary string) string {
 	invoked := filepath.Join(test.TempDir(), "invoked")
 	script := "#!/bin/sh\necho \"$@\" > '" + invoked + "'\ncat '" + clean + "'\n"
 	if writeError := executable_testing.WriteFile(
-		filepath.Join(filepath.Dir(binary), release.SwiftEngineFileName),
+		filepath.Join(filepath.Dir(binary), release.SwiftBinaryFileName),
 		[]byte(script),
 		0o755,
 	); writeError != nil {
@@ -122,7 +122,7 @@ func runInstalled(test *testing.T, binary string, directory string, arguments ..
 		test,
 		binary,
 		directory,
-		[]string{dispatch.SwiftEngineOverrideVariable + "="},
+		[]string{dispatch.SwiftBinaryOverrideVariable + "="},
 		arguments...,
 	)
 }
@@ -132,12 +132,12 @@ const swiftShipsForMacOnly = "cohere-swift ships for macOS alone, and elsewhere 
 
 // A released cohere runs the child its package ships beside it, with no checkout anywhere, reached
 // through a symlink the way a package manager's `bin` link reaches it.
-func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
+func TestAReleasedCohereRunsTheSwiftBinaryShippedBesideIt(test *testing.T) {
 	test.Parallel()
 	needs.Platform(test, "darwin", swiftShipsForMacOnly)
 
 	binary := installCohere(test, "1.0.0")
-	invoked := placeSiblingEngine(test, binary)
+	invoked := placeSiblingSwiftBinary(test, binary)
 	link := filepath.Join(test.TempDir(), "cohere")
 	if symlinkError := os.Symlink(binary, link); symlinkError != nil {
 		test.Fatal(symlinkError)
@@ -160,7 +160,11 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 	}
 	if want := "--contract 3 --root "; !strings.HasPrefix(string(recorded), want) ||
 		!(strings.Contains(string(recorded), root) || strings.Contains(string(recorded), resolvedRoot)) {
-		test.Fatalf("the shipped engine was run with %q, expected the contract and the package root %s", recorded, root)
+		test.Fatalf(
+			"the shipped cohere-swift was run with %q, expected the contract and the package root %s",
+			recorded,
+			root,
+		)
 	}
 	if strings.Contains(output, "building cohere-swift") {
 		test.Fatalf("a released cohere built a child:\n%s", output)
@@ -178,7 +182,7 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 // A released cohere with no child beside it is a broken install, and says so, even standing inside a
 // cohere checkout it could build one from: a child built there would run unpaired rules under the
 // release's version.
-func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
+func TestAReleasedCohereWithNoSwiftBinaryBesideItNeverBuildsOne(test *testing.T) {
 	test.Parallel()
 	needs.Platform(test, "darwin", swiftShipsForMacOnly)
 
@@ -202,10 +206,10 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 	if resolveSymlinksError != nil {
 		test.Fatal(resolveSymlinksError)
 	}
-	expected := filepath.Join(installed, release.SwiftEngineFileName)
+	expected := filepath.Join(installed, release.SwiftBinaryFileName)
 	if !strings.Contains(output, "This cohere 1.0.0 install has no cohere-swift: expected "+expected) ||
 		!strings.Contains(output, "reinstall cohere") {
-		test.Fatalf("the missing engine was not named with the way out:\n%s", output)
+		test.Fatalf("the missing cohere-swift was not named with the way out:\n%s", output)
 	}
 	if strings.Contains(output, "building cohere-swift") || strings.Contains(output, "swift --version") {
 		test.Fatalf("a released cohere reached for the checkout:\n%s", output)
@@ -214,12 +218,12 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 
 // A development cohere never takes a child from beside itself, so a stale cohere-swift next to a
 // `go build -o` cannot run in place of the checkout's. Outside a checkout it has none, and says so.
-func TestADevelopmentCohereIgnoresAnEngineBesideIt(test *testing.T) {
+func TestADevelopmentCohereIgnoresASwiftBinaryBesideIt(test *testing.T) {
 	test.Parallel()
 	needs.Platform(test, "darwin", swiftShipsForMacOnly)
 
 	binary := installCohere(test, "")
-	invoked := placeSiblingEngine(test, binary)
+	invoked := placeSiblingSwiftBinary(test, binary)
 	root := swiftPackage(test, "")
 
 	output, exitCode := runInstalled(test, binary, root, "--no-fix")
@@ -235,14 +239,14 @@ func TestADevelopmentCohereIgnoresAnEngineBesideIt(test *testing.T) {
 // built, whichever kind of cohere is running. The child named by the override still runs: it is the
 // child developer's, and naming one is saying what to run.
 // Not parallel: it sets cohere-swift override variable with test.Setenv, the working directory with test.Chdir,
-// and the package-level swiftEnginePlatform
-func TestSwiftIsRefusedByNameWhereTheEngineDoesNotShip(test *testing.T) {
-	test.Setenv(dispatch.SwiftEngineOverrideVariable, "")
+// and the package-level swiftBinaryPlatform
+func TestSwiftIsRefusedByNameWhereCohereSwiftDoesNotShip(test *testing.T) {
+	test.Setenv(dispatch.SwiftBinaryOverrideVariable, "")
 	// Outside any cohere module, so a resolver that skipped the refusal fails at once on the checkout it
 	// cannot find, rather than starting a Swift build from the module this test runs in.
 	test.Chdir(test.TempDir())
-	original := swiftEnginePlatform
-	test.Cleanup(func() { swiftEnginePlatform = original })
+	original := swiftBinaryPlatform
+	test.Cleanup(func() { swiftBinaryPlatform = original })
 	location := projectLocation{Root: "/work/Toy"}
 	for _, platform := range []release.Target{
 		{GoOperatingSystem: "linux", GoArchitecture: "amd64"},
@@ -250,17 +254,17 @@ func TestSwiftIsRefusedByNameWhereTheEngineDoesNotShip(test *testing.T) {
 		{GoOperatingSystem: "windows", GoArchitecture: "amd64"},
 		{GoOperatingSystem: "windows", GoArchitecture: "arm64"},
 	} {
-		swiftEnginePlatform = platform
+		swiftBinaryPlatform = platform
 		for _, provenance := range []release.Provenance{{Version: "1.0.0"}, {Version: "dev"}} {
-			_, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(location, provenance)
+			_, _, resolveSwiftBinaryError := resolveSwiftBinary(location, provenance)
 			want := "Swift is not available on this platform (" + platform.String() +
 				"): cohere-swift ships only for macOS, so nothing in /work/Toy was checked"
-			if resolveSwiftEngineBinaryError == nil || resolveSwiftEngineBinaryError.Error() != want {
+			if resolveSwiftBinaryError == nil || resolveSwiftBinaryError.Error() != want {
 				test.Errorf(
 					"%s, cohere %s: got %v\nwant %s",
 					platform,
 					provenance.Version,
-					resolveSwiftEngineBinaryError,
+					resolveSwiftBinaryError,
 					want,
 				)
 			}
@@ -268,22 +272,22 @@ func TestSwiftIsRefusedByNameWhereTheEngineDoesNotShip(test *testing.T) {
 	}
 
 	// The control: on macOS the same released cohere gets past the platform, to its sibling.
-	swiftEnginePlatform = release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
-	if _, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(
+	swiftBinaryPlatform = release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
+	if _, _, resolveSwiftBinaryError := resolveSwiftBinary(
 		location,
 		release.Provenance{Version: "1.0.0"},
-	); resolveSwiftEngineBinaryError == nil ||
-		!strings.Contains(resolveSwiftEngineBinaryError.Error(), "install has no cohere-swift") {
-		test.Errorf("on macOS a released cohere was not sent to its sibling: %v", resolveSwiftEngineBinaryError)
+	); resolveSwiftBinaryError == nil ||
+		!strings.Contains(resolveSwiftBinaryError.Error(), "install has no cohere-swift") {
+		test.Errorf("on macOS a released cohere was not sent to its sibling: %v", resolveSwiftBinaryError)
 	}
 
-	engine := fakeSwiftEngine(test, "")
-	test.Setenv(dispatch.SwiftEngineOverrideVariable, engine)
-	swiftEnginePlatform = release.Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}
-	if binaryPath, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(
+	swiftBinary := fakeSwiftBinary(test, "")
+	test.Setenv(dispatch.SwiftBinaryOverrideVariable, swiftBinary)
+	swiftBinaryPlatform = release.Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}
+	if binaryPath, _, resolveSwiftBinaryError := resolveSwiftBinary(
 		location,
 		release.Provenance{Version: "1.0.0"},
-	); resolveSwiftEngineBinaryError != nil || binaryPath != engine {
-		test.Errorf("the override was refused on linux: %q, %v", binaryPath, resolveSwiftEngineBinaryError)
+	); resolveSwiftBinaryError != nil || binaryPath != swiftBinary {
+		test.Errorf("the override was refused on linux: %q, %v", binaryPath, resolveSwiftBinaryError)
 	}
 }

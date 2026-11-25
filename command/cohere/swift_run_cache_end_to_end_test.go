@@ -35,8 +35,8 @@ type swiftReplayFixture struct {
 
 	// tools is first on PATH and holds the stand-in `swift`, whose `--version` is the toolchain string.
 	tools string
-	// engine is the stand-in cohere-swift the override names.
-	engine string
+	// swiftBinary is the stand-in cohere-swift the override names.
+	swiftBinary string
 	// starts is a file the child adds a line to each time it starts, so a test can count the runs that were not
 	// replays.
 	starts string
@@ -45,9 +45,9 @@ type swiftReplayFixture struct {
 	environment []string
 }
 
-// swiftReplayEngine is the stand-in cohere-swift: a check run over `--root` that reports one rule finding, at
+// swiftReplayBinary is the stand-in cohere-swift: a check run over `--root` that reports one rule finding, at
 // App.swift, and names every file and directory below the root but cohere's cache, as the child's inputs record does.
-const swiftReplayEngine = `echo started >> "$COHERE_TEST_SWIFT_STARTS"
+const swiftReplayBinary = `echo started >> "$COHERE_TEST_SWIFT_STARTS"
 root=""
 while [ $# -gt 0 ]; do
 	if [ "$1" = "--root" ]; then root="$2"; shift; fi
@@ -79,22 +79,22 @@ func swiftReplayVersion(toolchain string) string {
 func newSwiftReplayFixture(test *testing.T) *swiftReplayFixture {
 	test.Helper()
 	fixture := &swiftReplayFixture{
-		test:   test,
-		binary: buildCohere(test),
-		root:   filepath.Join(test.TempDir(), "package"),
-		tools:  test.TempDir(),
-		engine: filepath.Join(test.TempDir(), "cohere-swift"),
-		starts: filepath.Join(test.TempDir(), "starts"),
+		test:        test,
+		binary:      buildCohere(test),
+		root:        filepath.Join(test.TempDir(), "package"),
+		tools:       test.TempDir(),
+		swiftBinary: filepath.Join(test.TempDir(), "cohere-swift"),
+		starts:      filepath.Join(test.TempDir(), "starts"),
 	}
 	fixture.write("Package.swift", "// swift-tools-version:6.2\nimport PackageDescription\n")
 	fixture.write(".gitignore", ".cache/\n")
 	fixture.write("Sources/App/App.swift", "let value: Int? = 1\nlet forced = value!\n")
 	fixture.write("Sources/App/Second.swift", "struct Second {}\n")
-	fixture.script(fixture.engine, swiftReplayEngine)
+	fixture.script(fixture.swiftBinary, swiftReplayBinary)
 	fixture.script(filepath.Join(fixture.tools, "swift"), swiftReplayVersion("swiftlang-6.4.0.34.1"))
 	fixture.environment = []string{
 		"PATH=" + fixture.tools + string(os.PathListSeparator) + os.Getenv("PATH"),
-		"COHERE_SWIFT_ENGINE=" + fixture.engine,
+		"COHERE_SWIFT_BINARY=" + fixture.swiftBinary,
 		"COHERE_TEST_SWIFT_STARTS=" + fixture.starts,
 	}
 	return fixture
@@ -134,8 +134,8 @@ func (fixture *swiftReplayFixture) variable(name string) string {
 	return ""
 }
 
-// engineStarts is how many times the stand-in cohere-swift has started.
-func (fixture *swiftReplayFixture) engineStarts() int {
+// binaryStarts is how many times the stand-in cohere-swift has started.
+func (fixture *swiftReplayFixture) binaryStarts() int {
 	fixture.test.Helper()
 	contents, readError := os.ReadFile(fixture.starts)
 	if errors.Is(readError, os.ErrNotExist) {
@@ -178,9 +178,9 @@ func (fixture *swiftReplayFixture) run(cached bool, arguments ...string) goRepla
 func (fixture *swiftReplayFixture) establishHit(arguments ...string) {
 	fixture.test.Helper()
 	recorded := fixture.run(true, arguments...)
-	started := fixture.engineStarts()
+	started := fixture.binaryStarts()
 	replayed := fixture.run(true, arguments...)
-	if !isSwiftReplay(replayed) || fixture.engineStarts() != started {
+	if !isSwiftReplay(replayed) || fixture.binaryStarts() != started {
 		fixture.test.Fatalf("an unchanged package did not replay:\n--- the recording run\n%s%s\n--- the next run\n%s%s",
 			recorded.stdout, recorded.stderr, replayed.stdout, replayed.stderr)
 	}
@@ -225,7 +225,7 @@ func TestASwiftReplayIsTheColdRunsVerdict(test *testing.T) {
 			if !isSwiftReplay(replayed) {
 				test.Fatalf("the second run did not replay:\n%s%s", replayed.stdout, replayed.stderr)
 			}
-			if starts := fixture.engineStarts(); starts != 2 {
+			if starts := fixture.binaryStarts(); starts != 2 {
 				test.Errorf("the child started %d times over a recording, a replay and a cold run, want 2", starts)
 			}
 			if replayed.exitCode != cold.exitCode {
@@ -320,12 +320,12 @@ func TestASwiftRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 		}},
 		// Rebuilt with the same behavior: only its bytes say it is another child, and its rules may differ.
 		{"the child rebuilt in place", func(fixture *swiftReplayFixture) {
-			fixture.script(fixture.engine, "# rebuilt\n"+swiftReplayEngine)
+			fixture.script(fixture.swiftBinary, "# rebuilt\n"+swiftReplayBinary)
 		}},
 		{"another child named", func(fixture *swiftReplayFixture) {
 			another := filepath.Join(fixture.test.TempDir(), "cohere-swift")
-			fixture.script(another, swiftReplayEngine)
-			fixture.setVariable("COHERE_SWIFT_ENGINE", another)
+			fixture.script(another, swiftReplayBinary)
+			fixture.setVariable("COHERE_SWIFT_BINARY", another)
 		}},
 	}
 	for _, scenario := range scenarios {
@@ -337,9 +337,9 @@ func TestASwiftRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			// The new modification time must differ from the recorded one at the file system's resolution.
 			time.Sleep(10 * time.Millisecond)
 			scenario.change(fixture)
-			started := fixture.engineStarts()
+			started := fixture.binaryStarts()
 			after := fixture.run(true, arguments...)
-			if isSwiftReplay(after) || fixture.engineStarts() != started+1 {
+			if isSwiftReplay(after) || fixture.binaryStarts() != started+1 {
 				test.Fatalf("%s and the next run replayed the recorded verdict:\n%s%s", scenario.name, after.stdout,
 					after.stderr)
 			}
@@ -371,8 +371,8 @@ func TestASwiftInputChangedDuringTheRunIsNeverReplayedOver(test *testing.T) {
 			fixture.write("Sources/App/Second.swift", "struct Second { let edited = 1 }\n")
 			path := filepath.Join(fixture.root, change.path)
 			during := slices.Clone(fixture.environment)
-			fixture.setVariable("COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE", path)
-			fixture.setVariable("COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE_TEXT", change.text)
+			fixture.setVariable("COHERE_TEST_WRITE_AFTER_SWIFT_CHILD", path)
+			fixture.setVariable("COHERE_TEST_WRITE_AFTER_SWIFT_CHILD_TEXT", change.text)
 			if changed := fixture.run(true, arguments...); isSwiftReplay(changed) {
 				test.Fatalf("the run with the change in it replayed, so it proves nothing:\n%s", changed.stdout)
 			}
@@ -381,10 +381,10 @@ func TestASwiftInputChangedDuringTheRunIsNeverReplayedOver(test *testing.T) {
 				test.Fatalf("the instrument did not write %s, so nothing below is about it: %v", path, readError)
 			}
 
-			started := fixture.engineStarts()
+			started := fixture.binaryStarts()
 			after := fixture.run(true, arguments...)
 			cold := fixture.run(false, arguments...)
-			if isSwiftReplay(after) || fixture.engineStarts() != started+2 {
+			if isSwiftReplay(after) || fixture.binaryStarts() != started+2 {
 				test.Fatalf("a run recorded over a change made while it ran was replayed:\n%s", after.stdout)
 			}
 			if goNormalized(swiftVerdict(after.stdout)) != goNormalized(swiftVerdict(cold.stdout)) ||
@@ -403,7 +403,7 @@ func TestASwiftRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 	test.Parallel()
 	fresh := newSwiftReplayFixture(test)
 	fresh.run(false, "--no-fix", "--verbose")
-	if after := fresh.run(true, "--no-fix", "--verbose"); isSwiftReplay(after) || fresh.engineStarts() != 2 {
+	if after := fresh.run(true, "--no-fix", "--verbose"); isSwiftReplay(after) || fresh.binaryStarts() != 2 {
 		test.Fatalf("a run after a --no-cache run replayed, so the --no-cache run was recorded:\n%s", after.stdout)
 	}
 
@@ -412,9 +412,9 @@ func TestASwiftRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 	fixture.establishHit("--no-fix", "--json")
 	before := cacheDirectoryState(test, fixture.root)
 	for _, view := range []string{"--verbose", "--json"} {
-		started := fixture.engineStarts()
+		started := fixture.binaryStarts()
 		cold := fixture.run(false, "--no-fix", view)
-		if isSwiftReplay(cold) || fixture.engineStarts() != started+1 {
+		if isSwiftReplay(cold) || fixture.binaryStarts() != started+1 {
 			test.Fatalf("a --no-cache run replayed:\n%s", cold.stdout)
 		}
 		switch view {
@@ -489,7 +489,7 @@ func TestEveryProjectOfARootWithGoAndSwiftReplays(test *testing.T) {
 	// The first run makes each project's cache directory, and the Swift one's moves the listing of `swift/`, which
 	// cohere-go read, so that run's Go verdict is not recorded; the next one is, and the one after replays both.
 	first := run()
-	if len(sections(first)) != 2 || swift.engineStarts() != 1 {
+	if len(sections(first)) != 2 || swift.binaryStarts() != 1 {
 		test.Fatalf("the root was not checked as a Go and a Swift project:\n%s", first)
 	}
 	run()
@@ -499,17 +499,17 @@ func TestEveryProjectOfARootWithGoAndSwiftReplays(test *testing.T) {
 			test.Errorf("the %s project ran again rather than replaying:\n%s", kind, section)
 		}
 	}
-	if starts := swift.engineStarts(); starts != 1 {
+	if starts := swift.binaryStarts(); starts != 1 {
 		test.Errorf("cohere-swift started %d times over a recording and two replays, want 1", starts)
 	}
 }
 
-// swiftScriptsRootEngine is the stand-in cohere-swift at a scripts-only root (#wpd36zj): a check over `--root`'s Swift
+// swiftScriptsRootBinary is the stand-in cohere-swift at a scripts-only root (#wpd36zj): a check over `--root`'s Swift
 // files, one rule finding at each that holds `forced`, whose inputs record names what the real cohere-swift's names
 // there (swift/Tests/CohereSwiftTests/StandaloneScriptTests.swift, aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict):
 // each Swift file and each directory its walk listed, and nothing under node_modules, .cache or .git, which the walk
 // never enters. COHERE_TEST_WALK_DEPENDENCIES names node_modules too, the walk a mutant would make.
-const swiftScriptsRootEngine = `echo started >> "$COHERE_TEST_SWIFT_STARTS"
+const swiftScriptsRootBinary = `echo started >> "$COHERE_TEST_SWIFT_STARTS"
 root=""
 while [ $# -gt 0 ]; do
 	if [ "$1" = "--root" ]; then root="$2"; shift; fi
@@ -579,7 +579,7 @@ func TestAScriptsOnlyRootReplaysUntilAScriptMoves(test *testing.T) {
 			fixture.write(".gitignore", ".cache/\n")
 			fixture.write("modules/ebay/EbayVision.swift", "let words = 1\nprint(words)\n")
 			fixture.write("node_modules/dependency/Tool.swift", "print(1)\n")
-			fixture.script(fixture.engine, swiftScriptsRootEngine)
+			fixture.script(fixture.swiftBinary, swiftScriptsRootBinary)
 			fixture.setVariable(projectKindVariable, string(projectKindSwiftPackage))
 			if scenario.walksDeps {
 				fixture.setVariable("COHERE_TEST_WALK_DEPENDENCIES", "1")
@@ -591,9 +591,9 @@ func TestAScriptsOnlyRootReplaysUntilAScriptMoves(test *testing.T) {
 			// The new modification time must differ from the recorded one at the file system's resolution.
 			time.Sleep(10 * time.Millisecond)
 			scenario.change(fixture)
-			started := fixture.engineStarts()
+			started := fixture.binaryStarts()
 			after := fixture.run(true, arguments...)
-			if replayed := isSwiftReplay(after) && fixture.engineStarts() == started; replayed != scenario.replays {
+			if replayed := isSwiftReplay(after) && fixture.binaryStarts() == started; replayed != scenario.replays {
 				test.Fatalf("%s: replayed %t, want %t:\n%s%s", scenario.name, replayed, scenario.replays,
 					after.stdout, after.stderr)
 			}

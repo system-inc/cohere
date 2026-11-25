@@ -31,15 +31,15 @@ func resetProgramBuilds(test *testing.T) {
 // named by and how long it took, and a Swift run is timed from after it, so the footer never bills a compile as
 // the check (#ket0hrp: `swift ✓ 💎 101s`, then `0.9s` a minute later). One that finds the child built records
 // nothing, and its run is timed from the process's start, as before.
-// Not parallel: it swaps resolveDevelopmentSwiftEngine and swiftEnginePlatform, and the package's record of
+// Not parallel: it swaps resolveDevelopmentSwiftBinary and swiftBinaryPlatform, and the package's record of
 // builds, which every Swift resolve in this process reads.
 func TestAProgramBuildIsRecordedAndLeftOutOfTheCheck(test *testing.T) {
 	needs.Tool(test, "swift", "a Swift run asks the toolchain its version before it checks anything")
-	keptResolve, keptPlatform := resolveDevelopmentSwiftEngine, swiftEnginePlatform
-	test.Cleanup(func() { resolveDevelopmentSwiftEngine, swiftEnginePlatform = keptResolve, keptPlatform })
-	swiftEnginePlatform = release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
-	test.Setenv(dispatch.SwiftEngineOverrideVariable, "")
-	test.Setenv(swiftEnginePathVariable, "")
+	keptResolve, keptPlatform := resolveDevelopmentSwiftBinary, swiftBinaryPlatform
+	test.Cleanup(func() { resolveDevelopmentSwiftBinary, swiftBinaryPlatform = keptResolve, keptPlatform })
+	swiftBinaryPlatform = release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
+	test.Setenv(dispatch.SwiftBinaryOverrideVariable, "")
+	test.Setenv(swiftBinaryPathVariable, "")
 	const pause = 300 * time.Millisecond
 	for _, resolve := range []struct {
 		name  string
@@ -48,20 +48,20 @@ func TestAProgramBuildIsRecordedAndLeftOutOfTheCheck(test *testing.T) {
 		// Not parallel: each subtest swaps the resolver the other reads.
 		test.Run(resolve.name, func(test *testing.T) {
 			resetProgramBuilds(test)
-			resolveDevelopmentSwiftEngine = func(dispatch.Paths, string, int, string) (string, bool, error) {
+			resolveDevelopmentSwiftBinary = func(dispatch.Paths, string, int, string) (string, bool, error) {
 				if resolve.built {
 					time.Sleep(pause)
 				}
 				return "/cache/bin/cohere-swift-darwin-arm64-9ff2b6ea1bf8967f", resolve.built, nil
 			}
-			if _, _, resolveError := resolveSwiftEngineBinary(
+			if _, _, resolveError := resolveSwiftBinary(
 				projectLocation{},
 				release.Provenance{Version: "dev"},
 			); resolveError != nil {
 				test.Fatal(resolveError)
 			}
 			builds := builtPrograms()
-			run := swiftEngineRun(bufio.NewWriter(os.Stdout), contractModeCheck, projectLocation{})
+			run := swiftContractRun(bufio.NewWriter(os.Stdout), contractModeCheck, projectLocation{})
 			offset := run.report.processStart.Sub(processStart)
 			if !resolve.built {
 				if len(builds) != 0 || offset != 0 {

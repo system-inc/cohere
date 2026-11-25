@@ -35,18 +35,18 @@ import (
 // The worktree belongs to this cache and nobody edits it. If it is ever found dirty the build is refused
 // rather than forced, because forcing would discard something without knowing what it was.
 
-// swiftEngineInputs are what decide cohere-swift, as `commit:path` objects: the same three the
+// swiftPackageInputs are what decide cohere-swift, as `commit:path` objects: the same three the
 // working-tree hash reads, so a commit that changes only tests reuses the binary. They are also the
-// pathspecs a development binary's `sourceTreeModified` is read under (ResolveSwiftEngine).
-var swiftEngineInputs = []string{"swift/Package.swift", "swift/Package.resolved", "swift/Sources"}
+// pathspecs a development binary's `sourceTreeModified` is read under (ResolveSwiftBinary).
+var swiftPackageInputs = []string{"swift/Package.swift", "swift/Package.resolved", "swift/Sources"}
 
-// resolveCommittedSwiftEngine returns cohere-swift for commit, building it when the cache has none.
-func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, contract int) (string, bool, error) {
-	hash, committedSwiftEngineHashError := committedSwiftEngineHash(paths, commit, toolchain)
-	if committedSwiftEngineHashError != nil {
-		return "", false, committedSwiftEngineHashError
+// resolveCommittedSwiftBinary returns cohere-swift for commit, building it when the cache has none.
+func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, contract int) (string, bool, error) {
+	hash, committedSwiftPackageHashError := committedSwiftPackageHash(paths, commit, toolchain)
+	if committedSwiftPackageHashError != nil {
+		return "", false, committedSwiftPackageHashError
 	}
-	binaryPath := paths.SwiftEngineBinaryPath(hash)
+	binaryPath := paths.SwiftBinaryPath(hash)
 	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
 	}
@@ -92,12 +92,12 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	); buildSwiftProductError != nil {
 		return "", false, buildSwiftProductError
 	}
-	if proveCommittedSwiftEngineError := proveCommittedSwiftEngine(
+	if proveCommittedSwiftBinaryError := proveCommittedSwiftBinary(
 		temporary,
 		commit,
 		contract,
-	); proveCommittedSwiftEngineError != nil {
-		return "", false, proveCommittedSwiftEngineError
+	); proveCommittedSwiftBinaryError != nil {
+		return "", false, proveCommittedSwiftBinaryError
 	}
 	if renameError := os.Rename(temporary, binaryPath); renameError != nil {
 		return "", false, fmt.Errorf("moving the built cohere-swift into the cache: %w", renameError)
@@ -105,39 +105,39 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	return binaryPath, true, nil
 }
 
-// committedSwiftEngineHash names cohere-swift for commit without reading a single file from disk.
+// committedSwiftPackageHash names cohere-swift for commit without reading a single file from disk.
 //
 // Git object ids are content addresses, so `commit:swift/Sources` names exactly the sources at that
 // commit. A cache hit therefore never touches the worktree, and after the first run at a commit it
-// starts no git either: see swiftEngineInputObjects.
-func committedSwiftEngineHash(paths Paths, commit string, toolchain string) (string, error) {
-	objects, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit)
-	if swiftEngineInputObjectsError != nil {
-		return "", swiftEngineInputObjectsError
+// starts no git either: see swiftPackageInputObjects.
+func committedSwiftPackageHash(paths Paths, commit string, toolchain string) (string, error) {
+	objects, swiftPackageInputObjectsError := swiftPackageInputObjects(paths, commit)
+	if swiftPackageInputObjectsError != nil {
+		return "", swiftPackageInputObjectsError
 	}
 
 	digest := sha256.New()
 	fmt.Fprintf(digest, "kind\x00%s\x00", snapshotTag)
 	fmt.Fprintf(digest, "toolchain\x00%s\x00", toolchain)
 	fmt.Fprintf(digest, "platform\x00%s/%s\x00", runtime.GOOS, runtime.GOARCH)
-	for index, input := range swiftEngineInputs {
+	for index, input := range swiftPackageInputs {
 		fmt.Fprintf(digest, "input\x00%s\x00%s\x00", input, objects[index])
 	}
 	return hex.EncodeToString(digest.Sum(nil))[:hashLength], nil
 }
 
-// swiftEngineInputObjects are the object ids of cohere-swift's inputs at commit, one per
-// swiftEngineInputs entry.
+// swiftPackageInputObjects are the object ids of cohere-swift's inputs at commit, one per
+// swiftPackageInputs entry.
 //
 // A commit's tree never changes, so the answer is asked of git once and kept, named for the commit and
 // for the list of inputs asked about: a cohere whose list differs reads its own file. A kept answer that
 // is not the right number of object names is asked again rather than trusted.
-func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
-	list := sha256.Sum256([]byte(strings.Join(swiftEngineInputs, "\x00")))
+func swiftPackageInputObjects(paths Paths, commit string) ([]string, error) {
+	list := sha256.Sum256([]byte(strings.Join(swiftPackageInputs, "\x00")))
 	kept := filepath.Join(paths.CacheDirectory, "swift-inputs", commit+"-"+hex.EncodeToString(list[:])[:hashLength])
 	if contents, readError := os.ReadFile(kept); readError == nil {
 		objects := strings.Fields(string(contents))
-		valid := len(objects) == len(swiftEngineInputs)
+		valid := len(objects) == len(swiftPackageInputs)
 		for _, object := range objects {
 			valid = valid && isObjectName(object)
 		}
@@ -146,8 +146,8 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 		}
 	}
 
-	specifications := make([]string, 0, len(swiftEngineInputs))
-	for _, input := range swiftEngineInputs {
+	specifications := make([]string, 0, len(swiftPackageInputs))
+	for _, input := range swiftPackageInputs {
 		specifications = append(specifications, commit+":"+input)
 	}
 	// No --verify: it accepts exactly one argument. Each specification here is `<hex commit>:<path>`.
@@ -158,15 +158,15 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 		return nil, fmt.Errorf(
 			"reading cohere-swift's inputs at %s (%s): %w",
 			release.ShortCommit(commit),
-			strings.Join(swiftEngineInputs, ", "),
+			strings.Join(swiftPackageInputs, ", "),
 			gitOutputError,
 		)
 	}
 	objects := strings.Fields(output)
-	if len(objects) != len(swiftEngineInputs) {
+	if len(objects) != len(swiftPackageInputs) {
 		return nil, fmt.Errorf(
 			"asked git for %d cohere-swift inputs at %s and got %d answers",
-			len(swiftEngineInputs),
+			len(swiftPackageInputs),
 			release.ShortCommit(commit),
 			len(objects),
 		)
@@ -252,13 +252,13 @@ func requireWorktreeAt(worktree string, commit string) error {
 	return requireCleanWorktree(worktree)
 }
 
-// proveCommittedSwiftEngine asks the built binary what it is and refuses it unless it reports a clean
+// proveCommittedSwiftBinary asks the built binary what it is and refuses it unless it reports a clean
 // source tree.
 //
 // cohere-swift's commit field reads "dev" until the release build stamps it (EngineVersion.swift), so it
 // cannot be checked here yet. What can be checked is the bit its manifest computed from the tree it was
 // built in, which is exactly the property this build exists to have.
-func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) error {
+func proveCommittedSwiftBinary(binaryPath string, commit string, contract int) error {
 	command := exec.Command(binaryPath, "--contract", fmt.Sprint(contract), "--version")
 	var standardError bytes.Buffer
 	command.Stderr = &standardError

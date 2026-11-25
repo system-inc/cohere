@@ -84,8 +84,11 @@ var raceGated = []raceEntry{
 	{directory: "internal/lint/rules/typescript", reason: "TestNoDupeClassMembersAndACheckerReadTheClassAtOnce runs " +
 		"the rule beside a checker's read of the class it lints (no_dupe_class_members_concurrency_test.go, " +
 		"#72kn826)"},
-	{directory: "internal/release/dispatch", reason: "TestInstallingTheEngineConcurrentlyLeavesOneBinary installs " +
-		"from two runs at once"},
+	{
+		directory: "internal/release/dispatch",
+		reason: "TestInstallingTheSwiftBinaryConcurrentlyLeavesOneBinary installs " +
+			"from two runs at once",
+	},
 	{directory: "internal/types/program", reason: "programs check, parse libraries and record their run cache at " +
 		"once, and every rule walks a file while a checker and a reader read its tree (checker_concurrency_test.go, " +
 		"library_parses_test.go, run_cache_test.go, rule_walk_concurrency_test.go, #qb5xxj1)"},

@@ -93,18 +93,18 @@ func TestAProcessTreeAsksTheSwiftToolchainOnce(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	root := coveringRepository(test)
-	covering, _ := coveringSwiftEngine(
+	covering, _ := coveringSwiftBinary(
 		test,
 		coverageAnswerThrough(root, root, filepath.Join(contractDirectory(test), "Clean.jsonl")),
 	)
 	seen := filepath.Join(test.TempDir(), "seen")
-	engine := fakeSwiftEngine(test,
+	swiftBinary := fakeSwiftBinary(test,
 		"printf '%s|%s\\n' \"$(printf '%s' \"$COHERE_SWIFT_VERSION_OUTPUT\" | tr '\\n' ' ')\" "+
 			"\"$COHERE_SWIFT_EXECUTABLE\" >> '"+seen+"'\nexec '"+covering+"' \"$@\"")
 	toolchain, log := fakeToolchain(test, true)
 
 	output, _ := runWithToolchain(test, binary, root, toolchain, []string{
-		"COHERE_SWIFT_ENGINE=" + engine,
+		"COHERE_SWIFT_BINARY=" + swiftBinary,
 		"COHERE_SWIFT_VERSION_OUTPUT=stale swiftlang-1.0.0",
 		"COHERE_SWIFT_EXECUTABLE=/stale/swift",
 		"COHERE_SWIFT_RESOLVED_BY=1",
@@ -130,7 +130,7 @@ func TestAProcessTreeAsksTheSwiftToolchainOnce(test *testing.T) {
 // A run trusts a child and a toolchain it inherits only from its own parent: given them by the process that
 // started it, it runs that cohere-swift and asks nothing; given the same values by anyone else, it drops them and
 // resolves its own, here through a `swift` that does not answer, so the child it was handed never runs.
-func TestARunTrustsAnInheritedSwiftEngineOnlyFromItsParent(test *testing.T) {
+func TestARunTrustsAnInheritedSwiftBinaryOnlyFromItsParent(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	root := newRepository(test, map[string]string{
@@ -147,10 +147,10 @@ func TestARunTrustsAnInheritedSwiftEngineOnlyFromItsParent(test *testing.T) {
 	} {
 		test.Run(trust.name, func(test *testing.T) {
 			test.Parallel()
-			engine, log := loggingSwiftEngine(test)
+			swiftBinary, log := loggingSwiftBinary(test)
 			toolchain, asked := fakeToolchain(test, false)
 			output, exitCode := runWithToolchain(test, binary, root, toolchain, []string{
-				"COHERE_SWIFT_ENGINE_PATH=" + engine,
+				"COHERE_SWIFT_BINARY_PATH=" + swiftBinary,
 				"COHERE_SWIFT_VERSION_OUTPUT=" + fakeSwiftVersion,
 				"COHERE_SWIFT_RESOLVED_BY=" + trust.resolvedBy,
 			}, "--no-fix")

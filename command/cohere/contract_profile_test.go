@@ -100,8 +100,8 @@ func TestAProfiledRunWritesAProfileForEachProcessThatDidTheWork(test *testing.T)
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	swiftEngine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := executable_testing.WriteFile(swiftEngine, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
+	if writeError := executable_testing.WriteFile(swiftBinary, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -133,7 +133,7 @@ func TestAProfiledRunWritesAProfileForEachProcessThatDidTheWork(test *testing.T)
 		}
 	}
 	// The child mark is emptied, since a front door that inherited it would refuse to start the child at all.
-	environment := []string{goChildVariable + "=", "COHERE_SWIFT_ENGINE=" + swiftEngine}
+	environment := []string{goChildVariable + "=", "COHERE_SWIFT_BINARY=" + swiftBinary}
 	// The footer's marker, since the account says "not replayed" of a run that was not.
 	replayedMarker := "• replayed"
 	written := func(test *testing.T, prefix string) []string {

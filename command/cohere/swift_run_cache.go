@@ -39,7 +39,7 @@ func beginSwiftRunCache(location projectLocation) {
 	}
 	anchor := program.NewPathAnchor(location.Root)
 	facts := swiftRunCacheFacts(anchor, location.LintConfigFileName, activeOutput.Style.color,
-		activeProjectYieldFingerprint(), swiftEngineChoice(os.Getenv(dispatch.SwiftEngineOverrideVariable),
+		activeProjectYieldFingerprint(), swiftBinaryChoice(os.Getenv(dispatch.SwiftBinaryOverrideVariable),
 			release.Current()), workingTreeModified, os.Environ(), exec.LookPath, os.Readlink)
 	// No section beyond the run's own: the findings, shapes and types sections serve a TypeScript graph's walk.
 	session := beginRunCacheSession(location.Root, anchor, program.CacheTableSections{}, facts...)
@@ -56,9 +56,9 @@ var swiftKeyedVariables = []string{"DEVELOPER_DIR", "TOOLCHAINS", "SDKROOT", "HO
 // when no variable names one.
 const xcodeSelectLink = "/var/db/xcode_select_link"
 
-// swiftEngineFromWorkingTree is the choice of a child built from the working tree's sources, the one choice whose
+// swiftBinaryFromWorkingTree is the choice of a child built from the working tree's sources, the one choice whose
 // binary is decided by files the front door can name.
-const swiftEngineFromWorkingTree = "built from the working tree's sources"
+const swiftBinaryFromWorkingTree = "built from the working tree's sources"
 
 // swiftRunCacheFacts is what a Swift run's verdict depends on that is no file the child names, each a fact in the
 // run's key. Computed with no subprocess, since a replay pays for them and `swift --version` alone costs more than the
@@ -68,11 +68,11 @@ const swiftEngineFromWorkingTree = "built from the working tree's sources"
 // root resolved and the settings file, as a TypeScript run keys them. Whether the output is colored, since a recording
 // made for a terminal carries escape codes a replay into a pipe must not print. What the run leaves to the Swift
 // projects below it, which arrives by a variable the arguments do not show (see ownership.go). How the child was
-// chosen (swiftEngineChoice), so a run of a named engine never replays one built from sources, nor one built from a
+// chosen (swiftBinaryChoice), so a run of a named binary never replays one built from sources, nor one built from a
 // commit one built from the working tree.
 //
 // For a child built from the working tree, also whether the child's own inputs there have uncommitted changes, the
-// state the child it would be served is built and stamped with (dispatch.SwiftEngineTreeModified). That engine
+// state the child it would be served is built and stamped with (dispatch.SwiftPackageTreeModified). That binary
 // reports it as `sourceTreeModified`, the run's modified-build gap, and the declared sources record their bytes but
 // not whether git calls them changed, so a replay would otherwise show the state of whichever child wrote the record
 // (#s5z3n30). It is the one fact a subprocess answers,
@@ -92,7 +92,7 @@ func swiftRunCacheFacts(
 	settingsFile string,
 	color bool,
 	yield string,
-	engineChoice string,
+	binaryChoice string,
 	treeModified func() bool,
 	environment []string,
 	lookPath func(string) (string, error),
@@ -104,9 +104,9 @@ func swiftRunCacheFacts(
 		"lint-config=" + anchor.Stable(settingsFile),
 		fmt.Sprintf("color=%t", color),
 		"yield=" + yield,
-		"swift-binary=" + engineChoice,
+		"swift-binary=" + binaryChoice,
 	}
-	if engineChoice == swiftEngineFromWorkingTree {
+	if binaryChoice == swiftBinaryFromWorkingTree {
 		facts = append(facts, fmt.Sprintf("swift-binary-tree-modified=%t", treeModified()))
 	}
 	for _, tool := range []string{"swift", "xcrun", "xcodebuild", "xcodegen"} {
@@ -135,20 +135,20 @@ func swiftRunCacheFacts(
 
 // workingTreeModified is whether the checkout a child built from the working tree comes from has uncommitted changes,
 // the state that cohere-swift is built and stamped with. A checkout that can't be found reads as modified, as a git
-// that can't answer does in dispatch.SwiftEngineTreeModified: nothing then vouches for the tree.
+// that can't answer does in dispatch.SwiftPackageTreeModified: nothing then vouches for the tree.
 func workingTreeModified() bool {
 	moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
 	if findModuleDirectoryError != nil {
 		return true
 	}
-	return dispatch.SwiftEngineTreeModified(moduleDirectory)
+	return dispatch.SwiftPackageTreeModified(moduleDirectory)
 }
 
-// swiftEngineChoice is how this run will choose the child, in the order resolveSwiftEngineBinary chooses, read with
+// swiftBinaryChoice is how this run will choose the child, in the order resolveSwiftBinary chooses, read with
 // no hashing and no process: the binary the override names, the one a release ships beside cohere, one built from the
 // commit this cohere was built from, or one built from the working tree's sources. Which binary that is, is declared
 // once the run has it (declareSwiftRunCacheInputs); the choice is keyed so a replay never crosses from one to another.
-func swiftEngineChoice(override string, provenance release.Provenance) string {
+func swiftBinaryChoice(override string, provenance release.Provenance) string {
 	switch {
 	case override != "":
 		return "named " + override
@@ -157,7 +157,7 @@ func swiftEngineChoice(override string, provenance release.Provenance) string {
 	case committedSwiftSource(provenance) != "":
 		return "built from commit " + committedSwiftSource(provenance)
 	}
-	return swiftEngineFromWorkingTree
+	return swiftBinaryFromWorkingTree
 }
 
 // declareSwiftRunCacheInputs declares a finished Swift run's inputs to the run cache, as declareContractRunCacheInputs
@@ -181,27 +181,27 @@ func declareSwiftRunCacheInputs(run *contractRun, exitCode int, settingsFile str
 			declareFileOrAbsent(absolute)
 		}
 	}
-	if choice == swiftEngineFromWorkingTree {
-		if reason := declareSwiftEngineSources(); reason != "" {
+	if choice == swiftBinaryFromWorkingTree {
+		if reason := declareSwiftPackageSources(); reason != "" {
 			declineRunCache(reason)
 		}
 	}
 }
 
-// declareSwiftEngineSources declares what a child built from the working tree is built from, as
-// dispatch.ResolveSwiftEngine hashes it: the child package's manifest and resolved file, and every file and directory
+// declareSwiftPackageSources declares what a child built from the working tree is built from, as
+// dispatch.ResolveSwiftBinary hashes it: the child package's manifest and resolved file, and every file and directory
 // under its `Sources`. Empty when declared, and otherwise why not.
-func declareSwiftEngineSources() string {
+func declareSwiftPackageSources() string {
 	moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
 	if findModuleDirectoryError != nil {
 		return "cohere-swift's sources could not be found to declare: " + findModuleDirectoryError.Error()
 	}
-	engineDirectory := dispatch.DefaultPaths(moduleDirectory).SwiftEngineDirectory()
-	declareFileOrAbsent(filepath.Join(engineDirectory, "Package.swift"))
-	declareFileOrAbsent(filepath.Join(engineDirectory, "Package.resolved"))
+	packageDirectory := dispatch.DefaultPaths(moduleDirectory).SwiftPackageDirectory()
+	declareFileOrAbsent(filepath.Join(packageDirectory, "Package.swift"))
+	declareFileOrAbsent(filepath.Join(packageDirectory, "Package.resolved"))
 	session := activeRunCache
 	walkError := filepath.WalkDir(
-		filepath.Join(engineDirectory, "Sources"),
+		filepath.Join(packageDirectory, "Sources"),
 		func(path string, entry fs.DirEntry, pathError error) error {
 			if pathError != nil {
 				return pathError

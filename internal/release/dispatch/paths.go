@@ -65,8 +65,8 @@ func (paths Paths) PruneLogPath() string {
 	return filepath.Join(paths.CacheDirectory, "prune.log")
 }
 
-// SwiftEngineDirectory is where cohere-swift's package lives inside the cohere module.
-func (paths Paths) SwiftEngineDirectory() string {
+// SwiftPackageDirectory is where cohere-swift's package lives inside the cohere module.
+func (paths Paths) SwiftPackageDirectory() string {
 	return filepath.Join(paths.ModuleDirectory, "swift")
 }
 
@@ -79,9 +79,9 @@ func (paths Paths) SwiftBuildDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "swift-build")
 }
 
-// SwiftEngineBinaryPath is where cohere-swift built from inputs with this hash lives, named the way
+// SwiftBinaryPath is where cohere-swift built from inputs with this hash lives, named the way
 // BinaryPath names cohere's, platform included.
-func (paths Paths) SwiftEngineBinaryPath(hash string) string {
+func (paths Paths) SwiftBinaryPath(hash string) string {
 	return filepath.Join(
 		paths.BinaryDirectory(),
 		fmt.Sprintf("cohere-swift-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash),

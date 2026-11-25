@@ -21,17 +21,17 @@ const testToolchain = "swiftlang-6.4.0.34.1"
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
 // fixtures at once would build with each other's.
-func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *testing.T) {
+func TestTheCommittedSwiftBinaryIsBuiltFromTheCommitNotTheWorkingTree(test *testing.T) {
 	fixture := newSwiftFixture(test)
 
-	first, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+	first, built, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
 		testToolchain,
 		2,
 	)
-	if resolveCommittedSwiftEngineError != nil {
-		test.Fatalf("building from the first commit: %v", resolveCommittedSwiftEngineError)
+	if resolveCommittedSwiftBinaryError != nil {
+		test.Fatalf("building from the first commit: %v", resolveCommittedSwiftBinaryError)
 	}
 	if !built {
 		test.Fatal("an empty cache reported no build")
@@ -42,14 +42,14 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 
 	// An uncommitted edit in the checkout is not part of the commit, so the same binary serves.
 	writeFile(test, fixture.rule(), "one, uncommitted\n")
-	again, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+	again, built, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
 		testToolchain,
 		2,
 	)
-	if resolveCommittedSwiftEngineError != nil {
-		test.Fatalf("resolving with an uncommitted edit on disk: %v", resolveCommittedSwiftEngineError)
+	if resolveCommittedSwiftBinaryError != nil {
+		test.Fatalf("resolving with an uncommitted edit on disk: %v", resolveCommittedSwiftBinaryError)
 	}
 	if built || again != first {
 		test.Fatalf("an uncommitted Swift edit changed cohere-swift (built=%v)", built)
@@ -60,14 +60,14 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 	writeFile(test, fixture.rule(), "two, uncommitted\n")
-	second, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+	second, built, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
 		testToolchain,
 		2,
 	)
-	if resolveCommittedSwiftEngineError != nil {
-		test.Fatalf("building from the second commit: %v", resolveCommittedSwiftEngineError)
+	if resolveCommittedSwiftBinaryError != nil {
+		test.Fatalf("building from the second commit: %v", resolveCommittedSwiftBinaryError)
 	}
 	if !built || second == first {
 		test.Fatalf("a committed Swift edit did not build a new binary (built=%v)", built)
@@ -79,14 +79,14 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	// A commit that changes only cohere-swift's tests changes nothing compiled in, so it reuses cohere-swift.
 	writeFile(test, filepath.Join(fixture.repository, "swift", "Tests", "RuleTests.swift"), "// a new test\n")
 	fixture.commit(test, "swift/Tests")
-	third, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+	third, built, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
 		testToolchain,
 		2,
 	)
-	if resolveCommittedSwiftEngineError != nil {
-		test.Fatalf("resolving a tests-only commit: %v", resolveCommittedSwiftEngineError)
+	if resolveCommittedSwiftBinaryError != nil {
+		test.Fatalf("resolving a tests-only commit: %v", resolveCommittedSwiftBinaryError)
 	}
 	if built || third != second {
 		test.Fatalf("a tests-only commit rebuilt cohere-swift (built=%v)", built)
@@ -99,7 +99,7 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
 // fixtures at once would build with each other's.
-func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *testing.T) {
+func TestAnOlderCommitGetsItsOwnSwiftBinaryWhileTheCheckoutIsCleanAtANewerOne(test *testing.T) {
 	// The case no provenance check can catch. A member commits, the checkout is clean at the new
 	// commit, and a gate still running the cohere built from the previous one asks for cohere-swift. A
 	// working-tree build would hand it the newer binary, and that binary would honestly report a clean
@@ -109,11 +109,16 @@ func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *t
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 
-	engine, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, older, testToolchain, 2)
-	if resolveCommittedSwiftEngineError != nil {
-		test.Fatalf("building the older commit's binary: %v", resolveCommittedSwiftEngineError)
+	swiftBinary, _, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
+		fixture.paths,
+		older,
+		testToolchain,
+		2,
+	)
+	if resolveCommittedSwiftBinaryError != nil {
+		test.Fatalf("building the older commit's binary: %v", resolveCommittedSwiftBinaryError)
 	}
-	if output := run(test, engine); output != "rule=one\n" {
+	if output := run(test, swiftBinary); output != "rule=one\n" {
 		test.Fatalf("the older commit got a binary printing %q, which is the newer commit's", output)
 	}
 }
@@ -122,13 +127,13 @@ func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *t
 // fixtures at once would build with each other's.
 func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
 	fixture := newSwiftFixture(test)
-	if _, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+	if _, _, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
 		testToolchain,
 		2,
-	); resolveCommittedSwiftEngineError != nil {
-		test.Fatalf("first build: %v", resolveCommittedSwiftEngineError)
+	); resolveCommittedSwiftBinaryError != nil {
+		test.Fatalf("first build: %v", resolveCommittedSwiftBinaryError)
 	}
 
 	stray := filepath.Join(fixture.paths.SwiftSourceWorktree(), "swift", "Sources", "Stray.swift")
@@ -136,15 +141,15 @@ func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 
-	_, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+	_, _, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
 		testToolchain,
 		2,
 	)
-	if resolveCommittedSwiftEngineError == nil ||
-		!strings.Contains(resolveCommittedSwiftEngineError.Error(), "changes nobody should have made") {
-		test.Fatalf("a dirty worktree was moved or built from: %v", resolveCommittedSwiftEngineError)
+	if resolveCommittedSwiftBinaryError == nil ||
+		!strings.Contains(resolveCommittedSwiftBinaryError.Error(), "changes nobody should have made") {
+		test.Fatalf("a dirty worktree was moved or built from: %v", resolveCommittedSwiftBinaryError)
 	}
 	if _, statError := os.Stat(stray); statError != nil {
 		test.Fatalf("the refusal discarded the stray file, which forcing would do: %v", statError)
@@ -153,19 +158,19 @@ func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in, and two
 // fixtures at once would build with each other's.
-func TestACommittedSwiftEngineReportingAModifiedTreeIsNotCached(test *testing.T) {
+func TestACommittedSwiftBinaryReportingAModifiedTreeIsNotCached(test *testing.T) {
 	fixture := newSwiftFixture(test)
 	fixture.reportModified = true
 
-	_, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+	_, _, resolveCommittedSwiftBinaryError := resolveCommittedSwiftBinary(
 		fixture.paths,
 		fixture.head(test),
 		testToolchain,
 		2,
 	)
-	if resolveCommittedSwiftEngineError == nil ||
-		!strings.Contains(resolveCommittedSwiftEngineError.Error(), "modified source tree") {
-		test.Fatalf("a binary reporting a modified tree was accepted: %v", resolveCommittedSwiftEngineError)
+	if resolveCommittedSwiftBinaryError == nil ||
+		!strings.Contains(resolveCommittedSwiftBinaryError.Error(), "modified source tree") {
+		test.Fatalf("a binary reporting a modified tree was accepted: %v", resolveCommittedSwiftBinaryError)
 	}
 	// A cache that was never created holds nothing a refused binary could have left.
 	entries, readDirectoryError := os.ReadDir(fixture.paths.BinaryDirectory())

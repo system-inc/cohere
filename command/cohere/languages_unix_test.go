@@ -62,8 +62,8 @@ func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	swiftEngine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := executable_testing.WriteFile(swiftEngine, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
+	if writeError := executable_testing.WriteFile(swiftBinary, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -96,7 +96,7 @@ func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, arguments...)
 		command.Dir = root
-		command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+swiftEngine, goChildVariable+"=")
+		command.Env = append(os.Environ(), "COHERE_SWIFT_BINARY="+swiftBinary, goChildVariable+"=")
 		var standardOutput bytes.Buffer
 		var standardError bytes.Buffer
 		command.Stdout, command.Stderr = &standardOutput, &standardError
@@ -215,8 +215,8 @@ func TestANarrowedRunNamesWhatItLeftOutWhileItsProjectReplays(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	swiftEngine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := executable_testing.WriteFile(swiftEngine, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
+	if writeError := executable_testing.WriteFile(swiftBinary, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -235,7 +235,7 @@ func TestANarrowedRunNamesWhatItLeftOutWhileItsProjectReplays(test *testing.T) {
 	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
 		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
 	}
-	environment := []string{"COHERE_SWIFT_ENGINE=" + swiftEngine, goChildVariable + "="}
+	environment := []string{"COHERE_SWIFT_BINARY=" + swiftBinary, goChildVariable + "="}
 	leftOut := "⚠ left out: swift"
 	// Twice: the first plain run's Go project is never recorded, since the Swift project's run beside it makes
 	// swift/.cache while the Go census reads that directory, which the Go run then refuses to vouch for. The second

@@ -112,7 +112,7 @@ func TestGoChildArgumentsForwardNoCache(test *testing.T) {
 
 // TestTimingReachesTheGoChild: `--timing` is taken, not refused, and forwarded to cohere-go, which answers it with
 // its timing record (#3apgjer). Swift's run forwards it as it always did, for the child to refuse with exit 2, which
-// the front door reports as nothing checked (TestRunEngineBinaryEndings' exit 2 case).
+// the front door reports as nothing checked (TestRunContractBinaryEndings' exit 2 case).
 func TestTimingReachesTheGoChild(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()

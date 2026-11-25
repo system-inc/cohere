@@ -13,7 +13,7 @@ import (
 // answer into the build, and SwiftPM's shared manifest cache would otherwise hand back the answer from an
 // earlier evaluation of the same commit, so the rebuilt binary would call an edited tree clean. The stand-in
 // package's product prints the flag its manifest read, and the real build runs twice, clean then edited.
-func TestASwiftEngineRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
+func TestASwiftBinaryRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
 	test.Parallel()
 
 	if runtime.GOOS != "darwin" {

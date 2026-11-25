@@ -11,7 +11,7 @@ import (
 )
 
 // renderRequested renders a stream for a command line that asked for the phases requested names, the way
-// runSwiftEngine does, and returns what renderRecords returns.
+// runSwiftProject does, and returns what renderRecords returns.
 func renderRequested(
 	test *testing.T,
 	lines []string,

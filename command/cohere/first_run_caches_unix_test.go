@@ -59,12 +59,12 @@ func TestAFreshTreesSecondRunReplaysItsGoSide(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	swiftEngine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := executable_testing.WriteFile(swiftEngine, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
+	if writeError := executable_testing.WriteFile(swiftBinary, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	environment := []string{"COHERE_SWIFT_ENGINE=" + swiftEngine, goChildVariable + "="}
+	environment := []string{"COHERE_SWIFT_BINARY=" + swiftBinary, goChildVariable + "="}
 	for tree := range 12 {
 		test.Run(fmt.Sprintf("tree %d", tree), func(test *testing.T) {
 			test.Parallel()

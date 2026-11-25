@@ -295,7 +295,7 @@ measure() {
     top -l 2 -s 1 -n 12 -o cpu -stats command,pid,cpu 2> /dev/null |
     awk '/^COMMAND/ { sample++ } sample == 2' > $logs/$mode-$round.busy-after
   # One build per round: a run that ran any cohere-swift but the pinned one measured another (#ywx8zgd).
-  local other_swift=$(swift_engine_named_otherwise $log)
+  local other_swift=$(swift_binary_named_otherwise $log)
   [[ -z $other_swift ]] ||
     fail "the $mode run of round $round ran cohere-swift $other_swift, not the pinned one; see $log"
   local quiet=loaded

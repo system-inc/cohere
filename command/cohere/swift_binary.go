@@ -35,12 +35,12 @@ var swiftFlags = contractFlags{
 	},
 }
 
-// runSwiftEngine checks a Swift package by running cohere-swift on it and rendering its records.
+// runSwiftProject checks a Swift package by running cohere-swift on it and rendering its records.
 //
 // A released cohere runs the child its package ships beside it. A development cohere resolves one the
 // way the launcher resolves cohere: from this module's `swift/` sources, rebuilt when they or the
-// toolchain change. See resolveSwiftEngineBinary for the order.
-func runSwiftEngine(location projectLocation, given map[string]bool, positionals []string) (int, error) {
+// toolchain change. See resolveSwiftBinary for the order.
+func runSwiftProject(location projectLocation, given map[string]bool, positionals []string) (int, error) {
 	if given["tsconfig"] {
 		return 1, fmt.Errorf(
 			"--tsconfig names a TypeScript program, and %s is a Swift package (it holds a %s), so there is no tsconfig to use",
@@ -70,7 +70,7 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	// Before the child is resolved, so a run with nothing changed replays here and exits having hashed no child
 	// source, asked no toolchain and started no process. Only a check: a listing is no verdict, and none of its flags
 	// is one the run cache admits anyway.
-	engineChoice := swiftEngineChoice(os.Getenv(dispatch.SwiftEngineOverrideVariable), release.Current())
+	binaryChoice := swiftBinaryChoice(os.Getenv(dispatch.SwiftBinaryOverrideVariable), release.Current())
 	if mode == contractModeCheck {
 		beginSwiftRunCache(location)
 	}
@@ -81,13 +81,13 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(given["verbose"] && flagValue("verbose") == "true")
-	binaryPath, sourceCommit, resolveSwiftEngineBinaryError := resolvedSwiftEngineBinary(location)
+	binaryPath, sourceCommit, resolveSwiftBinaryError := resolvedSwiftBinary(location)
 	dispatch.Report.Clear()
-	if resolveSwiftEngineBinaryError != nil {
-		return 1, resolveSwiftEngineBinaryError
+	if resolveSwiftBinaryError != nil {
+		return 1, resolveSwiftBinaryError
 	}
 
-	run := swiftEngineRun(streams.Output, mode, location)
+	run := swiftContractRun(streams.Output, mode, location)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.swiftSourceCommit = sourceCommit
 	run.requested = contractRequestedPhases(given, flagValue)
@@ -108,44 +108,44 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	// os.Stderr is read here, after the run cache began, so the child writes into the recording's tee.
 	exitCode, runError := runContractBinary(binaryPath, arguments, run, os.Stderr)
 	// A test instrument: a file written after the child read the tree and before its run is recorded, holding
-	// COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE_TEXT, so a test can change an input the verdict was read from. See
+	// COHERE_TEST_WRITE_AFTER_SWIFT_CHILD_TEXT, so a test can change an input the verdict was read from. See
 	// TestASwiftInputChangedDuringTheRunIsNeverReplayedOver.
-	if written := os.Getenv("COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE"); written != "" {
+	if written := os.Getenv("COHERE_TEST_WRITE_AFTER_SWIFT_CHILD"); written != "" {
 		if createDirectoryError := os.MkdirAll(filepath.Dir(written), 0o755); createDirectoryError != nil {
 			return 1, createDirectoryError
 		}
-		text := []byte(os.Getenv("COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE_TEXT"))
+		text := []byte(os.Getenv("COHERE_TEST_WRITE_AFTER_SWIFT_CHILD_TEXT"))
 		if writeError := os.WriteFile(written, text, 0o644); writeError != nil {
 			return 1, writeError
 		}
 	}
 	if runError == nil {
-		declareSwiftRunCacheInputs(run, exitCode, location.LintConfigFileName, binaryPath, engineChoice)
+		declareSwiftRunCacheInputs(run, exitCode, location.LintConfigFileName, binaryPath, binaryChoice)
 	}
 	return exitCode, runError
 }
 
-// swiftEngineRun is a Swift run timed from its check's start, so a build of the child before it is said apart
+// swiftContractRun is a Swift run timed from its check's start, so a build of the child before it is said apart
 // from the check's time (program_build.go).
-func swiftEngineRun(out *bufio.Writer, mode contractMode, location projectLocation) *contractRun {
+func swiftContractRun(out *bufio.Writer, mode contractMode, location projectLocation) *contractRun {
 	return newContractRun(out, mode, swiftLanguage, location.rootNote(), checkStart())
 }
 
-// resolveDevelopmentSwiftEngine resolves a development cohere's engine, building it when there is none. A
+// resolveDevelopmentSwiftBinary resolves a development cohere's cohere-swift, building it when there is none. A
 // variable so a test can stand in for a build, which takes minutes.
-var resolveDevelopmentSwiftEngine = dispatch.ResolveSwiftEngine
+var resolveDevelopmentSwiftBinary = dispatch.ResolveSwiftBinary
 
-// swiftEnginePlatform is the platform this cohere runs on. A variable so a test can run as a platform
+// swiftBinaryPlatform is the platform this cohere runs on. A variable so a test can run as a platform
 // the machine running it is not.
-var swiftEnginePlatform = release.Target{GoOperatingSystem: runtime.GOOS, GoArchitecture: runtime.GOARCH}
+var swiftBinaryPlatform = release.Target{GoOperatingSystem: runtime.GOOS, GoArchitecture: runtime.GOARCH}
 
-// resolveSwiftEngineBinary picks the child, in this order:
+// resolveSwiftBinary picks the child, in this order:
 //
-//  1. The one the caller named with COHERE_SWIFT_ENGINE, on any platform and any build.
+//  1. The one the caller named with COHERE_SWIFT_BINARY, on any platform and any build.
 //  2. None, on a platform the child does not ship for, refused by name before anything is looked for.
 //     A Linux checkout would otherwise try to build the child and bury the reason in a toolchain error.
 //  3. For a released cohere, the child its package ships beside it, and nothing else: see
-//     shippedSwiftEngine.
+//     shippedSwiftBinary.
 //  4. For a development cohere, one built from this module's checkout, below.
 //
 // A development cohere never takes a child from beside itself. A `go build -o` next to a stale
@@ -162,21 +162,21 @@ var swiftEnginePlatform = release.Target{GoOperatingSystem: runtime.GOOS, GoArch
 // nothing guarantees it: a child named by the override, or one built from the working tree. The
 // provenance is this cohere's, passed in rather than read here so a test can state a clean named commit,
 // which a test binary never has, and prove the override still vouches for none.
-func resolveSwiftEngineBinary(location projectLocation, provenance release.Provenance) (string, string, error) {
-	if named := os.Getenv(dispatch.SwiftEngineOverrideVariable); named != "" {
+func resolveSwiftBinary(location projectLocation, provenance release.Provenance) (string, string, error) {
+	if named := os.Getenv(dispatch.SwiftBinaryOverrideVariable); named != "" {
 		if !isRegularFile(named) {
 			return "", "", fmt.Errorf(
 				"%s names %s, which is not a file, so nothing was checked",
-				dispatch.SwiftEngineOverrideVariable,
+				dispatch.SwiftBinaryOverrideVariable,
 				named,
 			)
 		}
-		// The invocation's, as a graph line is (see invocationTag): a replay ran no engine, named or not.
+		// The invocation's, as a graph line is (see invocationTag): a replay ran no child, named or not.
 		printInvocation(
 			streams.Errors,
 			"cohere: running cohere-swift %s named by %s, not one built from the sources on disk\n",
 			named,
-			dispatch.SwiftEngineOverrideVariable,
+			dispatch.SwiftBinaryOverrideVariable,
 		)
 		// Asked for the child's sake, as for a shipped one below.
 		// Ignored: a toolchain that does not answer is the child's to report.
@@ -184,11 +184,11 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		return named, "", nil
 	}
 
-	if !release.ShipsSwiftEngine(swiftEnginePlatform.GoOperatingSystem) {
+	if !release.ShipsSwiftBinary(swiftBinaryPlatform.GoOperatingSystem) {
 		return "", "", fmt.Errorf(
 			"Swift is not available on this platform (%s): %s ships only for macOS, so nothing in %s was checked",
-			swiftEnginePlatform,
-			release.SwiftEngineFileName,
+			swiftBinaryPlatform,
+			release.SwiftBinaryFileName,
 			location.Root,
 		)
 	}
@@ -197,8 +197,8 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		// Asked for the children' sake, which read it rather than each asking again (see swift_toolchain.go).
 		// Ignored: a toolchain that does not answer is the child's to report, as it was before this asked.
 		_, _ = swiftVersionOutput()
-		binaryPath, shippedSwiftEngineError := shippedSwiftEngine(provenance)
-		return binaryPath, "", shippedSwiftEngineError
+		binaryPath, shippedSwiftBinaryError := shippedSwiftBinary(provenance)
+		return binaryPath, "", shippedSwiftBinaryError
 	}
 
 	moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
@@ -215,22 +215,22 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		return "", "", swiftVersionOutputError
 	}
 	started := time.Now()
-	binaryPath, built, resolveSwiftEngineError := resolveDevelopmentSwiftEngine(
+	binaryPath, built, resolveSwiftBinaryError := resolveDevelopmentSwiftBinary(
 		dispatch.DefaultPaths(moduleDirectory),
 		commit,
 		contractVersion,
 		versionOutput,
 	)
-	if resolveSwiftEngineError != nil {
-		return "", "", resolveSwiftEngineError
+	if resolveSwiftBinaryError != nil {
+		return "", "", resolveSwiftBinaryError
 	}
 	if built {
-		recordProgramBuild(swiftEngineName, binaryPath, time.Since(started))
+		recordProgramBuild(swiftProgramName, binaryPath, time.Since(started))
 	}
 	return binaryPath, commit, nil
 }
 
-// shippedSwiftEngine is the child a released cohere's package ships beside it: release.SwiftEngineFileName
+// shippedSwiftBinary is the child a released cohere's package ships beside it: release.SwiftBinaryFileName
 // in the directory of this executable, symlinks resolved, which is the package's `bin/`, since the npm
 // launcher execs the platform binary directly.
 //
@@ -238,7 +238,7 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 // rules were on disk there and report them under the release's version. A missing sibling is a broken
 // install, and it says so rather than checking nothing. It vouches for no commit: the release stamps
 // none into cohere, and the child's own provenance record names what it was built from.
-func shippedSwiftEngine(provenance release.Provenance) (string, error) {
+func shippedSwiftBinary(provenance release.Provenance) (string, error) {
 	executable, executableError := os.Executable()
 	if executableError != nil {
 		return "", fmt.Errorf(
@@ -249,7 +249,7 @@ func shippedSwiftEngine(provenance release.Provenance) (string, error) {
 	if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 		executable = resolved
 	}
-	binaryPath := filepath.Join(filepath.Dir(executable), release.SwiftEngineFileName)
+	binaryPath := filepath.Join(filepath.Dir(executable), release.SwiftBinaryFileName)
 	if !isRegularFile(binaryPath) {
 		return "", fmt.Errorf(
 			"this cohere %s install has no cohere-swift: expected %s, which the macOS package ships beside cohere, so nothing was checked; reinstall cohere",

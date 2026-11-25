@@ -22,14 +22,14 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// SwiftEngineOverrideVariable points cohere at a specific cohere-swift binary, the counterpart of
+// SwiftBinaryOverrideVariable points cohere at a specific cohere-swift binary, the counterpart of
 // COHERE_BINARY for cohere itself.
 //
 // For whoever is developing cohere-swift, and for running a known build while the sources on disk are
 // mid-edit. An explicit binary wins over the rebuild for the reason resolveBinary gives: someone who
 // names a binary has said what they want to run. It is announced on every run, because the findings
 // then come from a binary no hash vouches for.
-const SwiftEngineOverrideVariable = "COHERE_SWIFT_ENGINE"
+const SwiftBinaryOverrideVariable = "COHERE_SWIFT_BINARY"
 
 // buildSwiftProduct builds the Swift package at packageDirectory and copies the product to binaryPath,
 // with environment added to the build's own. A development build states the tree's state there; a
@@ -39,7 +39,7 @@ const SwiftEngineOverrideVariable = "COHERE_SWIFT_ENGINE"
 // measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
 var buildSwiftProduct = buildSwiftProductWithSwiftPm
 
-// ResolveSwiftEngine returns the path to a cohere-swift binary matching cohere-swift's sources and the
+// ResolveSwiftBinary returns the path to a cohere-swift binary matching cohere-swift's sources and the
 // installed toolchain, building it when there is none.
 //
 // The same bargain Resolve makes for cohere, for the same reason: the rules are compiled in, so a
@@ -49,7 +49,7 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPm
 // so the same sources under a new Xcode are a different binary.
 //
 // The hash also holds the bit cohere-swift reports as `sourceTreeModified`: whether its own inputs, the
-// files swiftEngineInputs names, differ from the commit, tracked or untracked. Nothing else in the
+// files swiftPackageInputs names, differ from the commit, tracked or untracked. Nothing else in the
 // repository counts, so the bit and the hash cover the same files. It was once left out of the hash, on the
 // argument that a stale bit errs toward the warning. It errs both ways. A clean tree was served a binary
 // built while an unrelated file was dirty, which reported a modified build and was refused at land, and a
@@ -59,36 +59,36 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPm
 // rather than whatever SwiftPM reads from git a moment later.
 //
 // That is the working-tree half. When commit is not empty cohere-swift is built from that commit
-// instead, which is what a gate gets: see resolveCommittedSwiftEngine. The contract is the one the
+// instead, which is what a gate gets: see resolveCommittedSwiftBinary. The contract is the one the
 // caller speaks, used only to ask a freshly built committed binary for its provenance.
 //
 // versionOutput is what `swift --version` printed, as SwiftVersionOutput returns it. The caller asks, once per
 // process tree, since every project's run and every language needs the same answer (#nkk91tv).
 //
 // The returned boolean reports whether a build ran.
-func ResolveSwiftEngine(paths Paths, commit string, contract int, versionOutput string) (string, bool, error) {
+func ResolveSwiftBinary(paths Paths, commit string, contract int, versionOutput string) (string, bool, error) {
 	toolchain, swiftToolchainError := swiftToolchain(versionOutput)
 	if swiftToolchainError != nil {
 		return "", false, swiftToolchainError
 	}
 
 	if commit != "" {
-		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
+		return resolveCommittedSwiftBinary(paths, commit, toolchain, contract)
 	}
 
-	modified := SwiftEngineTreeModified(paths.ModuleDirectory)
-	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain, modified)
-	if swiftEngineHashError != nil {
-		return "", false, swiftEngineHashError
+	modified := SwiftPackageTreeModified(paths.ModuleDirectory)
+	hash, swiftPackageHashError := swiftPackageHash(paths.SwiftPackageDirectory(), toolchain, modified)
+	if swiftPackageHashError != nil {
+		return "", false, swiftPackageHashError
 	}
 
-	binaryPath := paths.SwiftEngineBinaryPath(hash)
+	binaryPath := paths.SwiftBinaryPath(hash)
 	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
 	}
 
 	if buildSwiftProductError := buildSwiftProduct(
-		paths.SwiftEngineDirectory(),
+		paths.SwiftPackageDirectory(),
 		paths.SwiftBuildDirectory(),
 		binaryPath,
 		[]string{release.SwiftSourceTreeModifiedVariable + "=" + strconv.FormatBool(modified)},
@@ -127,19 +127,19 @@ func swiftToolchain(versionOutput string) (string, error) {
 	return identity, nil
 }
 
-// swiftEngineHash digests every input that decides what cohere-swift binary does.
+// swiftPackageHash digests every input that decides what cohere-swift binary does.
 //
 // `Package.swift` and `Package.resolved` pin the package graph, and every file under `Sources/` is
 // compiled in. Tests are left out because they are not in the binary, and `.build` because it is
 // output. Contents are hashed, never times, for the reason Inputs.Compute gives. modified is the tree's
-// state the build is handed, which cohere-swift compiles in and reports (see ResolveSwiftEngine).
-func swiftEngineHash(engineDirectory string, toolchain string, modified bool) (string, error) {
+// state the build is handed, which cohere-swift compiles in and reports (see ResolveSwiftBinary).
+func swiftPackageHash(packageDirectory string, toolchain string, modified bool) (string, error) {
 	files := []string{
-		filepath.Join(engineDirectory, "Package.swift"),
-		filepath.Join(engineDirectory, "Package.resolved"),
+		filepath.Join(packageDirectory, "Package.swift"),
+		filepath.Join(packageDirectory, "Package.resolved"),
 	}
 
-	sources := filepath.Join(engineDirectory, "Sources")
+	sources := filepath.Join(packageDirectory, "Sources")
 	walkError := filepath.WalkDir(sources, func(path string, entry fs.DirEntry, pathError error) error {
 		if pathError != nil {
 			return pathError
@@ -171,7 +171,7 @@ func swiftEngineHash(engineDirectory string, toolchain string, modified bool) (s
 		// The path relative to the package, rather than the base name Inputs.Compute uses: two files
 		// named `Rule.swift` in different directories are different inputs, and moving one between
 		// targets changes the binary.
-		relative, relativePathError := filepath.Rel(engineDirectory, path)
+		relative, relativePathError := filepath.Rel(packageDirectory, path)
 		if relativePathError != nil {
 			return "", relativePathError
 		}
@@ -329,7 +329,7 @@ func buildSwiftProductWithSwiftPm(
 // fails atomically when the name exists, and a binary already there is kept. Two processes can both find
 // cohere-swift missing and both build it; with a rename the second install replaced the first one's binary
 // under a run already reading it, and that run, seeing an input change, refused its record (#p5ndwqa).
-// Keeping the first is safe because the name is swiftEngineHash's digest of everything that decides the
+// Keeping the first is safe because the name is swiftPackageHash's digest of everything that decides the
 // binary, so whatever is already there is the same binary.
 func copyExecutable(source string, destination string) error {
 	input, openError := os.Open(source)

@@ -28,9 +28,9 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	engine := filepath.Join(test.TempDir(), "cohere-swift")
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
 	if writeError := executable_testing.WriteFile(
-		engine,
+		swiftBinary,
 		[]byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755,
 	); writeError != nil {
@@ -47,7 +47,7 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	command := exec.Command(binary, "--no-fix", "--json")
 	command.Dir = root
 	// Never a replay: the run record lives in the root's own .cache/cohere, and the root is new.
-	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine)
+	command.Env = append(os.Environ(), "COHERE_SWIFT_BINARY="+swiftBinary)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	command.Stdout, command.Stderr = &standardOutput, &standardError
@@ -75,7 +75,7 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 		test.Errorf("expected a summary record for each of the two projects, found %v:\n%s",
 			labels, standardOutput.String())
 	}
-	if !strings.Contains(standardError.String(), "named by COHERE_SWIFT_ENGINE") {
+	if !strings.Contains(standardError.String(), "named by COHERE_SWIFT_BINARY") {
 		test.Errorf("the Swift project's note did not reach stderr:\nstderr:\n%s", standardError.String())
 	}
 }

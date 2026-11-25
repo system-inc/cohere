@@ -329,7 +329,7 @@ func resolveAlias(name string, aliasOf map[string]string) string {
 	}
 }
 
-// isMarkerOnly mirrors cohere's internal/goengine/rules/markertype.IsMarkerOnly, which the rules call
+// isMarkerOnly mirrors cohere's internal/go_language/rules/markertype.IsMarkerOnly, which the rules call
 // and which a module outside cohere cannot import: methods are all markers, each with a receiver, no
 // parameters, no results and a body with no statements, the way a sum type's variant declares its
 // membership. None at all is no marker type.

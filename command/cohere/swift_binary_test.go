@@ -20,9 +20,9 @@ import (
 	"github.com/system-inc/cohere/internal/executable_testing"
 )
 
-// fakeSwiftEngine writes a shell script standing in for cohere-swift, so the process boundary can be driven
+// fakeSwiftBinary writes a shell script standing in for cohere-swift, so the process boundary can be driven
 // through every way a child ends without building the real one.
-func fakeSwiftEngine(test *testing.T, body string) string {
+func fakeSwiftBinary(test *testing.T, body string) string {
 	test.Helper()
 	path := filepath.Join(test.TempDir(), "cohere-swift")
 	if writeError := executable_testing.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
@@ -31,14 +31,14 @@ func fakeSwiftEngine(test *testing.T, body string) string {
 	return path
 }
 
-func runFakeSwiftEngine(test *testing.T, body string, mode contractMode) (string, string, int, error) {
+func runFakeSwiftBinary(test *testing.T, body string, mode contractMode) (string, string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
 	var standardError bytes.Buffer
 	stream := bufio.NewWriter(&out)
 	run := newContractRun(stream, mode, swiftLanguage, "", time.Now())
 	exitCode, runContractBinaryError := runContractBinary(
-		fakeSwiftEngine(test, body),
+		fakeSwiftBinary(test, body),
 		[]string{"--contract", "1"},
 		run,
 		&standardError,
@@ -49,7 +49,7 @@ func runFakeSwiftEngine(test *testing.T, body string, mode contractMode) (string
 
 // Not parallel: its subtests drive check runs through contractRun, whose record acceptors set the package-level
 // activeSummary
-func TestRunEngineBinaryEndings(test *testing.T) {
+func TestRunContractBinaryEndings(test *testing.T) {
 	fixtures, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract"))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
@@ -58,13 +58,13 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("a real stream streams and exits with its summary", func(test *testing.T) {
-		out, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+		out, _, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(
 			test,
 			"cat '"+filepath.Join(fixtures, "Findings.jsonl")+"'; exit 1",
 			contractModeCheck,
 		)
-		if runFakeSwiftEngineError != nil || exitCode != 1 {
-			test.Fatalf("exit %d, err %v\n%s", exitCode, runFakeSwiftEngineError, out)
+		if runFakeSwiftBinaryError != nil || exitCode != 1 {
+			test.Fatalf("exit %d, err %v\n%s", exitCode, runFakeSwiftBinaryError, out)
 		}
 		if !strings.Contains(out, "[cohere-swift/force-unwrapping/forceUnwrap]") || !strings.Contains(out, "phases: ") {
 			test.Errorf("the stream was not rendered:\n%s", out)
@@ -74,28 +74,28 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("the control: a clean stream exits 0", func(test *testing.T) {
-		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+		_, _, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(
 			test,
 			"cat '"+filepath.Join(fixtures, "Clean.jsonl")+"'",
 			contractModeCheck,
 		)
-		if runFakeSwiftEngineError != nil || exitCode != 0 {
-			test.Fatalf("a clean engine run exited %d, err %v", exitCode, runFakeSwiftEngineError)
+		if runFakeSwiftBinaryError != nil || exitCode != 0 {
+			test.Fatalf("a clean child run exited %d, err %v", exitCode, runFakeSwiftBinaryError)
 		}
 	})
 
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("exit 2 passes stderr through and says nothing was checked", func(test *testing.T) {
-		_, standardError, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+		_, standardError, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(
 			test,
 			"echo 'cohere-swift: --timing is not implemented for Swift yet' >&2; exit 2",
 			contractModeCheck,
 		)
-		if runFakeSwiftEngineError == nil ||
+		if runFakeSwiftBinaryError == nil ||
 			exitCode != 1 ||
-			!strings.Contains(runFakeSwiftEngineError.Error(), "did not run, so nothing was checked") {
-			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
+			!strings.Contains(runFakeSwiftBinaryError.Error(), "did not run, so nothing was checked") {
+			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftBinaryError)
 		}
 		if !strings.Contains(standardError, "--timing is not implemented") {
 			test.Errorf("the child's own sentence was not passed through: %q", standardError)
@@ -105,19 +105,19 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("a signal is named as a signal, never as an exit code", func(test *testing.T) {
-		out, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+		out, _, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(
 			test,
 			"head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; kill -9 $$",
 			contractModeCheck,
 		)
-		if runFakeSwiftEngineError == nil || exitCode != 1 {
-			test.Fatalf("a killed child exited %d, err %v", exitCode, runFakeSwiftEngineError)
+		if runFakeSwiftBinaryError == nil || exitCode != 1 {
+			test.Fatalf("a killed child exited %d, err %v", exitCode, runFakeSwiftBinaryError)
 		}
-		if !strings.Contains(runFakeSwiftEngineError.Error(), "was killed by") {
-			test.Errorf("the signal was not named: %v", runFakeSwiftEngineError)
+		if !strings.Contains(runFakeSwiftBinaryError.Error(), "was killed by") {
+			test.Errorf("the signal was not named: %v", runFakeSwiftBinaryError)
 		}
-		if strings.Contains(runFakeSwiftEngineError.Error(), "exited -1") {
-			test.Errorf("printed an exit code the process never chose: %v", runFakeSwiftEngineError)
+		if strings.Contains(runFakeSwiftBinaryError.Error(), "exited -1") {
+			test.Errorf("printed an exit code the process never chose: %v", runFakeSwiftBinaryError)
 		}
 		if !strings.Contains(out, "did not run (cohere-swift was killed") {
 			test.Errorf("the phase line did not say what was not reached:\n%s", out)
@@ -128,15 +128,15 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// activeSummary
 	test.Run("a broken record kills the child rather than waiting on it", func(test *testing.T) {
 		// The child sleeps past any run, so a front door that waited on it hangs, a hang go test's -timeout fails.
-		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+		_, _, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(
 			test,
 			"head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; sleep 100000",
 			contractModeCheck,
 		)
-		if runFakeSwiftEngineError == nil ||
+		if runFakeSwiftBinaryError == nil ||
 			exitCode != 1 ||
-			!strings.Contains(runFakeSwiftEngineError.Error(), "cohere-swift is broken") {
-			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
+			!strings.Contains(runFakeSwiftBinaryError.Error(), "cohere-swift is broken") {
+			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftBinaryError)
 		}
 	})
 
@@ -145,20 +145,20 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// run, so a front door that waits on it again hangs, a hang go test's -timeout fails.
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
-	test.Run("a broken engine's children die with it", func(test *testing.T) {
+	test.Run("a broken child's children die with it", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
 		killChildAtCleanup(test, childFile)
-		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test,
+		_, _, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(test,
 			"sleep 100000 & echo $! > '"+
 				childFile+
 				"'; head -1 '"+
 				filepath.Join(fixtures, "Clean.jsonl")+
 				"'; echo 'Compiling swift-syntax'; wait",
 			contractModeCheck)
-		if runFakeSwiftEngineError == nil ||
+		if runFakeSwiftBinaryError == nil ||
 			exitCode != 1 ||
-			!strings.Contains(runFakeSwiftEngineError.Error(), "cohere-swift is broken") {
-			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
+			!strings.Contains(runFakeSwiftBinaryError.Error(), "cohere-swift is broken") {
+			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftBinaryError)
 		}
 		requireProcessEnded(test, childFile)
 	})
@@ -181,7 +181,7 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 			interrupts <- syscall.SIGTERM
 		}()
 		exitCode, runContractBinaryUntilError := runContractBinaryUntil(
-			fakeSwiftEngine(
+			fakeSwiftBinary(
 				test,
 				"sleep 100000 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait",
 			),
@@ -265,9 +265,9 @@ func killChildAtCleanup(test *testing.T, path string) {
 	})
 }
 
-// TestAStandInEnginesChildIsKilledWhenItsTestEnds: a child a test leaves running is gone once the test's
+// TestAStandInBinarysChildIsKilledWhenItsTestEnds: a child a test leaves running is gone once the test's
 // cleanups have run, so a stand-in cohere-swift test that fails early or hangs leaves no sleep behind.
-func TestAStandInEnginesChildIsKilledWhenItsTestEnds(test *testing.T) {
+func TestAStandInBinarysChildIsKilledWhenItsTestEnds(test *testing.T) {
 	test.Parallel()
 	sleeper := exec.Command("sleep", "100000")
 	if startError := sleeper.Start(); startError != nil {

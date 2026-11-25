@@ -14,8 +14,8 @@ import (
 // recorded here, the project's time leaves it out, and the footer and `--json` say it on their own. A released
 // cohere runs the child it ships and builds nothing, so this is only ever set in development.
 
-// swiftEngineName is cohere-swift's binary, as a build names it.
-const swiftEngineName = "cohere-swift"
+// swiftProgramName is cohere-swift's binary, as a build names it.
+const swiftProgramName = "cohere-swift"
 
 // programBuild is one child this invocation built from source before it could check.
 type programBuild struct {

@@ -36,7 +36,7 @@ func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testin
 	}
 	binary := buildCohere(test)
 	environment := []string{
-		dispatch.SwiftEngineOverrideVariable + "=" + builtSwiftEngine(test),
+		dispatch.SwiftBinaryOverrideVariable + "=" + builtSwiftBinary(test),
 		"PATH=" + toolsWithoutGit(test),
 	}
 	for _, layout := range []struct {
@@ -153,7 +153,7 @@ func TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgno
 	}
 	binary := buildCohere(test)
 	environment := []string{
-		dispatch.SwiftEngineOverrideVariable + "=" + builtSwiftEngine(test),
+		dispatch.SwiftBinaryOverrideVariable + "=" + builtSwiftBinary(test),
 		"PATH=" + toolsWithoutGit(test),
 	}
 	// Left as the temp directory spells it, as a developer's shell does. On macOS it reaches /private through a link,

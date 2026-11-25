@@ -8,7 +8,7 @@ import (
 	"unicode"
 )
 
-// The functions here mirror cohere's internal/goengine/rules/consistency_require_matching_file_name, which a module
+// The functions here mirror cohere's internal/go_language/rules/consistency_require_matching_file_name, which a module
 // outside cohere cannot import, so the files typesplit names are the ones that rule accepts and the files it renames
 // are exactly the ones that rule flags. operatingSystems and architectures in names.go are the same lists the rule
 // copies from go/build.

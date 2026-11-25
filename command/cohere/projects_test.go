@@ -1,7 +1,7 @@
 //go:build unix
 
 // Every project here is checked through a stand-in cohere-swift, a /bin/sh script, so the file builds on
-// Unix, as swift_engine_test.go does (#tejf9bc).
+// Unix, as swift_binary_test.go does (#tejf9bc).
 
 package main
 
@@ -53,8 +53,8 @@ func outsideAnyRepository(test *testing.T, root string) string {
 func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
-	findings := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Findings.jsonl")+"\nexit 1")
+	clean := fakeSwiftBinary(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
+	findings := fakeSwiftBinary(test, "cat "+filepath.Join(contractDirectory(test), "Findings.jsonl")+"\nexit 1")
 
 	root := mixedRepository(test, "apple/Toy")
 	output, exitCode := runWithSwiftBinary(test, binary, clean, root, "--no-fix")
@@ -104,7 +104,7 @@ func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(test *testing.T) {
 func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
+	clean := fakeSwiftBinary(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
 
 	together := mixedRepository(test, ".")
 	output, exitCode := runWithSwiftBinary(test, binary, clean, together, "--no-fix")
@@ -142,7 +142,7 @@ func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(test *test
 func TestACrashedProjectOrNoProjectFailsTheRun(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	crashed := fakeSwiftEngine(test, "exit 2")
+	crashed := fakeSwiftBinary(test, "exit 2")
 	root := mixedRepository(test, "apple/Toy")
 	output, exitCode := runWithSwiftBinary(test, binary, crashed, root, "--no-fix")
 	if exitCode == 0 || !strings.Contains(output, "apple/Toy (Swift): failed") {
@@ -160,17 +160,17 @@ func TestACrashedProjectOrNoProjectFailsTheRun(test *testing.T) {
 // child gets --format-only, its types and lint skipped as not requested are no gap, and its format finding
 // fails the run, beside a TypeScript program and in the package alone. Before, the child had no such mode,
 // so the package was skipped with its gap named, and the flag against it alone was refused.
-func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
+func TestFormatOnlyRunsCohereSwiftInItsFormatOnlyMode(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	arguments := filepath.Join(test.TempDir(), "arguments")
-	engine := fakeSwiftEngine(
+	swiftBinary := fakeSwiftBinary(
 		test,
 		"echo \"$@\" >> '"+arguments+"'\ncat "+filepath.Join(contractDirectory(test), "FormatOnly.jsonl")+"\nexit 1",
 	)
 	root := mixedRepository(test, "apple/Toy")
 
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix", "--format-only")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix", "--format-only")
 	if exitCode == 0 ||
 		!strings.Contains(output, "apple/Toy (Swift): failed, exit") ||
 		!strings.Contains(output, "  . (TypeScript): green") ||
@@ -188,7 +188,7 @@ func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 	output, alone := runWithSwiftBinary(
 		test,
 		binary,
-		engine,
+		swiftBinary,
 		root,
 		"--no-fix",
 		"--format-only",
@@ -234,15 +234,15 @@ func coveringRepository(test *testing.T) string {
 	return root
 }
 
-// coveringSwiftEngine is a stand-in cohere-swift for coveringRepository. It logs every command line to the file
+// coveringSwiftBinary is a stand-in cohere-swift for coveringRepository. It logs every command line to the file
 // it returns, answers `--covered-packages` with coverage, and otherwise runs check: both shell, with the
 // `--root` it was given in $root. A check run reports Lib's findings from Lib's own run and from the root's,
 // which checks Lib too, so a test can count how often they appear.
-func coveringSwiftEngine(test *testing.T, coverage string) (string, string) {
+func coveringSwiftBinary(test *testing.T, coverage string) (string, string) {
 	test.Helper()
 	log := filepath.Join(test.TempDir(), "arguments")
 	findings := filepath.Join(contractDirectory(test), "Findings.jsonl")
-	engine := fakeSwiftEngine(test, "echo \"$@\" >> '"+log+"'\n"+
+	swiftBinary := fakeSwiftBinary(test, "echo \"$@\" >> '"+log+"'\n"+
 		"root=''; covering=''; previous=''\n"+
 		"for argument in \"$@\"; do\n"+
 		"  if [ \"$previous\" = --root ]; then root=$argument; fi\n"+
@@ -253,7 +253,7 @@ func coveringSwiftEngine(test *testing.T, coverage string) (string, string) {
 		"case \"$root\" in */Libraries/Lib) cat '"+findings+"'; exit 1;; esac\n"+
 		"if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then cat '"+findings+"'; exit 1; fi\n"+
 		"cat '"+filepath.Join(contractDirectory(test), "Clean.jsonl")+"'")
-	return engine, log
+	return swiftBinary, log
 }
 
 // coverageAnswerThrough is the shell that answers `--covered-packages` the way the child does for coveringRepository:
@@ -289,12 +289,12 @@ func TestASwiftPackageAnotherRunCoversIsNotCheckedTwice(test *testing.T) {
 	if symlinkError := os.Symlink(root, alias); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
-	engine, log := coveringSwiftEngine(
+	swiftBinary, log := coveringSwiftBinary(
 		test,
 		coverageAnswerThrough(root, alias, filepath.Join(contractDirectory(test), "Clean.jsonl")),
 	)
 
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	if exitCode == 0 {
 		test.Errorf("the root's findings, Lib's among them, did not fail the run:\n%s", output)
 	}
@@ -334,9 +334,9 @@ func TestAFailedCoverageQueryRunsEveryPackageAndSaysSo(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	root := coveringRepository(test)
-	engine, _ := coveringSwiftEngine(test, "echo 'cohere-swift: the manifest would not load' >&2; exit 2")
+	swiftBinary, _ := coveringSwiftBinary(test, "echo 'cohere-swift: the manifest would not load' >&2; exit 2")
 
-	output, _ := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, _ := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	for _, want := range []string{
 		"== . (Swift) ==",
 		"== Libraries/Lib (Swift) ==",
@@ -364,10 +364,10 @@ func TestAFailedCoverageQueryRunsEveryPackageAndSaysSo(test *testing.T) {
 func TestOneSwiftPackageAsksNoCoverage(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	engine, log := coveringSwiftEngine(test, "echo 'asked' >&2; exit 2")
+	swiftBinary, log := coveringSwiftBinary(test, "echo 'asked' >&2; exit 2")
 	root := mixedRepository(test, "apple/Toy")
 
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	if exitCode != 0 || !strings.Contains(output, "projects: 2 checked (1 TypeScript, 1 Swift), every one green") {
 		test.Errorf("a repository with one Swift package did not run as it did (exit %d):\n%s", exitCode, output)
 	}
@@ -398,11 +398,11 @@ func TestSwiftNoPackageHoldsIsAScriptsOnlyRootsInOrOutOfARepository(test *testin
 				"Sources/App/Screen.swift": "let screen = 1\n",
 				"Tests/AppTests.swift":     "let tests = 1\n",
 			})
-			engine, _ := coveringSwiftEngine(test,
+			swiftBinary, _ := coveringSwiftBinary(test,
 				"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
 					"\\\"checked\\\":[\\\"$root\\\"],\\\"vendored\\\":[]}\"\nexit 0")
 
-			output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+			output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 			if exitCode != 0 {
 				test.Errorf("a clean repository with an app's Swift exited %d, want 0:\n%s", exitCode, output)
 			}
@@ -427,13 +427,13 @@ func TestSwiftACoveredPackageHoldsIsNoGap(test *testing.T) {
 			"Sources/Toy/Toy.swift": "let toy = 1\n",
 		})
 	}
-	engine, _ := coveringSwiftEngine(test, "checked=\"\\\"$root\\\"\"\n"+
+	swiftBinary, _ := coveringSwiftBinary(test, "checked=\"\\\"$root\\\"\"\n"+
 		"case \"$root\" in */A) checked=\"$checked,\\\"$root/../B\\\"\";; esac\n"+
 		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
 		"\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
 		"exit 0")
 
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	if exitCode != 0 || !strings.Contains(output, "B not run: checked as part of A") {
 		test.Fatalf("A's run did not cover B, so this does not test a covered package (exit %d):\n%s", exitCode, output)
 	}
@@ -643,15 +643,18 @@ func TestUnclaimedSwiftIsAScriptsOnlyRootInOrOutOfARepository(test *testing.T) {
 // ahra's shape: a TypeScript program at the root, a package below it, and a script under no Swift project. The
 // script's Swift run is the child's at the repository's root, through the --directory and kind a discovered
 // project's run is given, labelled beside the TypeScript project there (#wpd36zj).
-func TestAScriptsOnlyRootRunsTheSwiftEngineAtTheRepositoryRoot(test *testing.T) {
+func TestAScriptsOnlyRootRunsCohereSwiftAtTheRepositoryRoot(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	root := mixedRepository(test, "apple/Toy")
 	writeTree(test, root, map[string]string{"modules/ebay/EbayVision.swift": "print(1)\n"})
-	engine, log := coveringSwiftEngine(test, "echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
-		"\\\"checked\\\":[\\\"$root\\\"],\\\"vendored\\\":[]}\"\nexit 0")
+	swiftBinary, log := coveringSwiftBinary(
+		test,
+		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
+			"\\\"checked\\\":[\\\"$root\\\"],\\\"vendored\\\":[]}\"\nexit 0",
+	)
 
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	if exitCode != 0 {
 		test.Errorf("a clean repository with a script exited %d, want 0:\n%s", exitCode, output)
 	}
@@ -700,10 +703,10 @@ func xcodeRepository(test *testing.T) string {
 	return root
 }
 
-// xcodeSwiftEngine is a stand-in cohere-swift for xcodeRepository, with the root's check stream given. It answers
+// xcodeSwiftBinary is a stand-in cohere-swift for xcodeRepository, with the root's check stream given. It answers
 // `--covered-packages` with each root checking itself and the root checking Libraries/Lib as well, and logs
 // each check run's root, resolved, and the yield its run was handed, to the file it returns.
-func xcodeSwiftEngine(test *testing.T, rootStream string) (string, string) {
+func xcodeSwiftBinary(test *testing.T, rootStream string) (string, string) {
 	test.Helper()
 	log := filepath.Join(test.TempDir(), "yields")
 	provenance := filepath.Join(contractDirectory(test), "Clean.jsonl")
@@ -713,7 +716,7 @@ func xcodeSwiftEngine(test *testing.T, rootStream string) (string, string) {
 	if writeError := os.WriteFile(otherStream, []byte(strings.Join(clean, "\n")+"\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	engine := fakeSwiftEngine(test, "root=''; covering=''; previous=''\n"+
+	swiftBinary := fakeSwiftBinary(test, "root=''; covering=''; previous=''\n"+
 		"for argument in \"$@\"; do\n"+
 		"  if [ \"$previous\" = --root ]; then root=$argument; fi\n"+
 		"  if [ \"$argument\" = --covered-packages ]; then covering=1; fi\n"+
@@ -731,7 +734,7 @@ func xcodeSwiftEngine(test *testing.T, rootStream string) (string, string) {
 		"yield=''; if [ -n \"$COHERE_PROJECT_YIELD\" ]; then yield=$(cat \"$COHERE_PROJECT_YIELD\"); fi\n"+
 		"printf '%s\\t%s\\n' \"$(cd \"$root\" && pwd -P)\" \"$yield\" >> '"+log+"'\n"+
 		"if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then cat '"+rootStream+"'; else cat '"+otherStream+"'; fi")
-	return engine, log
+	return swiftBinary, log
 }
 
 // In ahraos-presence's shape, CapturePhone runs as its own Swift project and the root's run yields it and
@@ -762,9 +765,9 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 	if writeError := os.WriteFile(rootStream, []byte(strings.Join(stream, "\n")+"\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	engine, log := xcodeSwiftEngine(test, rootStream)
+	swiftBinary, log := xcodeSwiftBinary(test, rootStream)
 
-	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix")
 	if exitCode != 0 {
 		test.Errorf("a clean repository with a gap exited %d, want 0:\n%s", exitCode, output)
 	}
@@ -854,7 +857,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		test.Errorf("the Swift runs yielded %v, want %v:\n%s", yields, want, logged)
 	}
 
-	output, exitCode = runWithSwiftBinary(test, binary, engine, root, "--no-fix", "--json")
+	output, exitCode = runWithSwiftBinary(test, binary, swiftBinary, root, "--no-fix", "--json")
 	if exitCode != 0 {
 		test.Errorf("under --json the run exited %d, want 0:\n%s", exitCode, output)
 	}
@@ -908,9 +911,9 @@ func TestTheCoveredPackagesQueryKeepsANoCacheRunsPromise(test *testing.T) {
 		test.Run(map[bool]string{true: "under --no-cache", false: "with the cache on"}[noCache], func(test *testing.T) {
 			test.Parallel()
 			arguments := filepath.Join(test.TempDir(), "arguments")
-			engine := fakeSwiftEngine(test, "echo \"$@\" > '"+arguments+"'\n"+
+			swiftBinary := fakeSwiftBinary(test, "echo \"$@\" > '"+arguments+"'\n"+
 				`echo '{"kind":"coveredPackages","root":"/r","checked":["/r"],"vendored":[]}'`)
-			if _, queryError := queryCoveredPackages(engine, test.TempDir(), noCache); queryError != nil {
+			if _, queryError := queryCoveredPackages(swiftBinary, test.TempDir(), noCache); queryError != nil {
 				test.Fatalf("the query failed: %v", queryError)
 			}
 			passed, readError := os.ReadFile(arguments)

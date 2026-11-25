@@ -11,7 +11,7 @@ import (
 // A binary already installed under its hash is never replaced, not even by different bytes. A run reads
 // the binary as one of its inputs, so a second install's replacement under a run already reading it gave
 // the binary a new identity and times, and the run refused its record (#p5ndwqa).
-func TestInstallingTheEngineKeepsABinaryAlreadyThere(test *testing.T) {
+func TestInstallingTheSwiftBinaryKeepsABinaryAlreadyThere(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	source := filepath.Join(directory, "product")
@@ -44,7 +44,7 @@ func TestInstallingTheEngineKeepsABinaryAlreadyThere(test *testing.T) {
 }
 
 // A missing binary is installed whole and executable, with the product's bytes.
-func TestInstallingTheEnginePutsTheProductInPlace(test *testing.T) {
+func TestInstallingTheSwiftBinaryPutsTheProductInPlace(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	source := filepath.Join(directory, "product")
@@ -70,7 +70,7 @@ func TestInstallingTheEnginePutsTheProductInPlace(test *testing.T) {
 
 // Processes that find cohere-swift missing at once and all install it leave one binary, whole, and nothing
 // else.
-func TestInstallingTheEngineConcurrentlyLeavesOneBinary(test *testing.T) {
+func TestInstallingTheSwiftBinaryConcurrentlyLeavesOneBinary(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	source := filepath.Join(directory, "product")

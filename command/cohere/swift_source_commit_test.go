@@ -17,7 +17,7 @@ import (
 // launcher's committed path vouches for it. Claiming a commit for a child nothing vouches for is the
 // provenance failure this line exists to avoid, so each test pins one direction of that.
 
-func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(test *testing.T) {
+func TestTheSwiftVersionLineNamesACommitOnlyWhenOneIsVouchedFor(test *testing.T) {
 	test.Parallel()
 	provenance := contractFixture(test, "Clean.jsonl")[0]
 	commit := "a97349d9534c52c831ec0835fe7ceba880637fd1"
@@ -53,7 +53,7 @@ func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(test *testing.T) 
 	}
 }
 
-func TestOnlyACleanNamedCohereOffersACommitToTheSwiftEngine(test *testing.T) {
+func TestOnlyACleanNamedCohereOffersACommitToCohereSwift(test *testing.T) {
 	test.Parallel()
 	commit := "a97349d9534c52c831ec0835fe7ceba880637fd1"
 	cases := map[string]struct {
@@ -72,26 +72,26 @@ func TestOnlyACleanNamedCohereOffersACommitToTheSwiftEngine(test *testing.T) {
 }
 
 // Not parallel: it sets cohere-swift override variable with test.Setenv, which a parallel test may not
-func TestAnEngineNamedByTheOverrideVouchesForNoCommit(test *testing.T) {
-	engine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := os.WriteFile(engine, []byte("#!/bin/sh\n"), 0o755); writeError != nil {
+func TestASwiftBinaryNamedByTheOverrideVouchesForNoCommit(test *testing.T) {
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
+	if writeError := os.WriteFile(swiftBinary, []byte("#!/bin/sh\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	test.Setenv(dispatch.SwiftEngineOverrideVariable, engine)
+	test.Setenv(dispatch.SwiftBinaryOverrideVariable, swiftBinary)
 
 	// A clean named commit, so a resolver that handed the committed source to the override would show it.
 	clean := release.Provenance{SelfCommit: "a97349d9534c52c831ec0835fe7ceba880637fd1"}
-	binaryPath, sourceCommit, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(projectLocation{}, clean)
-	if resolveSwiftEngineBinaryError != nil {
-		test.Fatal(resolveSwiftEngineBinaryError)
+	binaryPath, sourceCommit, resolveSwiftBinaryError := resolveSwiftBinary(projectLocation{}, clean)
+	if resolveSwiftBinaryError != nil {
+		test.Fatal(resolveSwiftBinaryError)
 	}
-	if binaryPath != engine {
-		test.Fatalf("resolved %s, the override named %s", binaryPath, engine)
+	if binaryPath != swiftBinary {
+		test.Fatalf("resolved %s, the override named %s", binaryPath, swiftBinary)
 	}
 	if sourceCommit != "" {
 		test.Fatalf(
 			"a child named by %s vouched for commit %s, which nothing guarantees",
-			dispatch.SwiftEngineOverrideVariable,
+			dispatch.SwiftBinaryOverrideVariable,
 			sourceCommit,
 		)
 	}

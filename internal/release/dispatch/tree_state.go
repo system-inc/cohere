@@ -12,19 +12,19 @@ import (
 // built clean and claim a clean build that never happened. So the state is read fresh on every resolve,
 // keyed into the binary's name, and handed to the build, and the binary reports what its name holds.
 
-// SwiftEngineTreeModified reports whether cohere-swift's own inputs, swiftEngineInputs, have uncommitted changes in
+// SwiftPackageTreeModified reports whether cohere-swift's own inputs, swiftPackageInputs, have uncommitted changes in
 // the checkout at moduleDirectory: the state a binary built from that working tree is built and stamped with, and
 // reports as `sourceTreeModified`. The one call site of that meaning, so the resolver that builds cohere-swift and the
 // run cache that keys a replay on it ask the same question (#s5z3n30).
-func SwiftEngineTreeModified(moduleDirectory string) bool {
-	return workingTreeModified(moduleDirectory, swiftEngineInputs...)
+func SwiftPackageTreeModified(moduleDirectory string) bool {
+	return workingTreeModified(moduleDirectory, swiftPackageInputs...)
 }
 
 // workingTreeModified reports whether repository has uncommitted changes, tracked or untracked, ignored
 // files never counting, under pathspecs when any are given and in the whole repository otherwise.
 //
 // Each binary's bit covers its own inputs, the files its hash reads. The `--dev` cohere's are the whole
-// module, as Go's `vcs.modified` was, so it asks with no pathspec. cohere-swift's are swiftEngineInputs,
+// module, as Go's `vcs.modified` was, so it asks with no pathspec. cohere-swift's are swiftPackageInputs,
 // so a member's edit elsewhere in the repository never marks cohere-swift modified (#50wtb2s).
 //
 // Submodules are left out, for the reason land.go gives: most of the house's worktrees have TypeScript as

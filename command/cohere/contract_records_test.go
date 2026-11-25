@@ -35,7 +35,7 @@ func renderRecords(test *testing.T, mode contractMode, lines []string, childExit
 }
 
 // renderRecordsYielding is renderRecords for a run that yields directories, resolved, to the Swift projects
-// below it, as runSwiftEngine hands them over.
+// below it, as runSwiftProject hands them over.
 func renderRecordsYielding(
 	test *testing.T,
 	mode contractMode,
@@ -841,11 +841,11 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	}
 }
 
-// TestSwiftRunBelievesAnEngineThatFellShort holds the allowed direction of the completeness check: a
+// TestSwiftRunBelievesABinaryThatFellShort holds the allowed direction of the completeness check: a
 // child that says it did not check everything is believed even when its records show no gap, because
 // it can see gaps no record carries, such as a file it could not read.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary
-func TestSwiftRunBelievesAnEngineThatFellShort(test *testing.T) {
+func TestSwiftRunBelievesABinaryThatFellShort(test *testing.T) {
 	clean := contractFixture(test, "Clean.jsonl")
 	last := len(clean) - 1
 	clean[last] = strings.Replace(
@@ -925,7 +925,7 @@ func TestSwiftRunListingModes(test *testing.T) {
 	})
 }
 
-func TestSwiftEngineArguments(test *testing.T) {
+func TestSwiftContractArguments(test *testing.T) {
 	test.Parallel()
 	location := projectLocation{
 		Root:               "/work/macos",
@@ -974,7 +974,7 @@ func TestSwiftEngineArguments(test *testing.T) {
 // as false asks for nothing and passes, and the flags the front door answers itself pass too. --format-only
 // and --no-format reach the child, which reads them with TypeScript's meaning since c024df4b, and
 // --no-cache since 9def2dc1.
-func TestSwiftEngineArgumentsRefuseWhatNothingHonors(test *testing.T) {
+func TestSwiftContractArgumentsRefuseWhatNothingHonors(test *testing.T) {
 	test.Parallel()
 	location := projectLocation{Root: "/work/macos", Kind: projectKindSwiftPackage, ArgumentBase: "/work/macos"}
 	values := map[string]string{"no-format": "false", "verbose": "true", "phases": "true", "coverage": "true"}

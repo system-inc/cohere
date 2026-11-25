@@ -25,9 +25,9 @@ func TestAMixedRootEndsOnOneFooterLine(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	engine := filepath.Join(test.TempDir(), "cohere-swift")
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
 	if writeError := executable_testing.WriteFile(
-		engine,
+		swiftBinary,
 		[]byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755,
 	); writeError != nil {
@@ -44,7 +44,7 @@ func TestAMixedRootEndsOnOneFooterLine(test *testing.T) {
 	run := func(arguments ...string) []string {
 		command := exec.Command(binary, append([]string{"--no-fix"}, arguments...)...)
 		command.Dir = root
-		command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine)
+		command.Env = append(os.Environ(), "COHERE_SWIFT_BINARY="+swiftBinary)
 		// A failing run is read from its lines like a passing one: which footers it printed is the question.
 		output, runError := command.CombinedOutput()
 		if runError != nil {
