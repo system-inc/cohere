@@ -169,8 +169,8 @@ changed in cohere outside the sets is written under the same heading.
   it said `the Swift engine was built from`.
   `--json` writes a build before the check as `{"kind":"programBuild","program":...}` (was `engineBuild` and
   `engine`), and the timeline's first stamp is `main.begin` (was `engine.main.begin`). The root's format-only
-  project is labeled and counted as `Folder` (was `Format`). The findings cache, the kept listings and the run
-  cache take new versions, so the first run after an upgrade is cold.
+  project is labeled and counted as `Formats` (was `Format`), the word of its flag, `--formats`. The findings
+  cache, the kept listings and the run cache take new versions, so the first run after an upgrade is cold.
 - cohere's own `docs/` is `documentation/`, and `internal/docs_data/` is `internal/documentation_data/`, package
   `documentation_data`, so the folder check reads cohere itself clean (#zyq63kk). The website's data is
   `documentation/data/` from here, written by `go run ./internal/documentation_data/tools/generate`, and a reader
