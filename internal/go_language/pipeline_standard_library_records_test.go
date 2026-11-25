@@ -3,7 +3,6 @@ package go_language
 import (
 	"encoding/hex"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/rules"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // standardLibraryRecordsFixture reaches errors, fmt, strings and unicode/utf8, which cohere-go tests' table holds, and
@@ -412,15 +412,11 @@ func TestAWarmBuildDependenceRunWritesNoEntryToTheSystemCache(test *testing.T) {
 // its withheld body alone. The table is filled from a fixture that imports plugin too, so the host restores it.
 func TestTheStandardLibrarysSideGraphSeedsWhatItsLoadWithheld(test *testing.T) {
 	test.Parallel()
-	enabled, goEnvironmentError := exec.Command("go", "env", "CGO_ENABLED").Output()
-	if goEnvironmentError != nil {
-		test.Fatalf("reading CGO_ENABLED with go env: %v", goEnvironmentError)
-	}
-	if strings.TrimSpace(string(enabled)) != "1" || !slices.Contains([]string{"darwin", "linux", "freebsd"},
+	if enabled := go_root.CgoEnabled(); !enabled || !slices.Contains([]string{"darwin", "linux", "freebsd"},
 		runtime.GOOS) {
 		test.Skipf("plugin has a cgo file only with cgo on under darwin, linux or freebsd, and here GOOS is %s and "+
-			"CGO_ENABLED %s: run `go run ./command/cohere-dev test ./internal/go_language -run %s` on one with cgo on",
-			runtime.GOOS, strings.TrimSpace(string(enabled)), test.Name())
+			"cgo on %t: run `go run ./command/cohere-dev test ./internal/go_language -run %s` on one with cgo on",
+			runtime.GOOS, enabled, test.Name())
 	}
 
 	pluginFile := "package library\n\nimport \"plugin\"\n\n// Load opens the plugin at path.\n" +

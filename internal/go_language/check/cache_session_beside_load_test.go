@@ -9,6 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/load"
 	"github.com/system-inc/cohere/internal/go_language/rule"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // A run beside the load saves a standard-library package to the system cache only once the load has made it final
@@ -24,7 +25,7 @@ func TestARunBesideTheLoadSavesAPackageOnlyOnceTheLoadHasMadeItFinal(test *testi
 	directory := standardLibraryModule(test)
 	rules := []rule.Rule{countingFactRule(&sync.Map{})}
 	session := NewCacheSession(systemCacheCaching(systemStore(test), standardLibraryContext("check tests",
-		goRootOf(test))), rules)
+		go_root.GoRoot(test))), rules)
 	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
 		load.Caching{Restorer: session, Listings: session})
 	if loadError != nil {
@@ -86,7 +87,7 @@ func TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal(test *testi
 	directory := standardLibraryModule(test)
 	rules := []rule.Rule{countingFactRule(&sync.Map{})}
 	session := NewCacheSession(systemCacheCaching(systemStore(test), standardLibraryContext("check tests",
-		goRootOf(test))), rules)
+		go_root.GoRoot(test))), rules)
 	// The host's session of a run with extra builds, which keys every package it loads for the keep (keptKeys).
 	session.KeepForBuilds()
 	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,

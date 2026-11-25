@@ -66,6 +66,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/internal/go_language/rules/security_no_interpolated_sql_string"
 	"github.com/system-inc/cohere/internal/go_language/settings"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from cohere-go")
@@ -988,14 +989,14 @@ var (
 	}
 )
 
-// toolchainRoot is the `GOROOT` go env names for this process, asked once, or "" when go env can't say, in which
-// case no path is normalized for it and a stream naming the toolchain's files compares unnormalized.
+// toolchainRoot is the toolchain's `GOROOT`, found once in this process, or "" when it can't be found, in which case
+// no path is normalized for it and a stream naming the toolchain's files compares unnormalized.
 var toolchainRoot = sync.OnceValue(func() string {
-	output, runError := exec.Command("go", "env", "GOROOT").Output()
-	if runError != nil {
+	root, findError := go_root.Find()
+	if findError != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(output))
+	return root
 })
 
 // normalize makes a stream comparable across runs: the copy's root reads /project, every elapsed time 0, the
