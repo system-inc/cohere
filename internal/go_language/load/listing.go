@@ -17,7 +17,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_language/timing"
-	"github.com/system-inc/cohere/internal/listed_directories"
+	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
 // listedPackage is what `go list -deps -json -e` says of one package, the fields the load reads. Module decodes

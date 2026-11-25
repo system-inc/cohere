@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // cohere-dev worktree: one worktree per name at a path that stays, moved between units of work with git, so

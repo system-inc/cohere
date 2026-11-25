@@ -361,7 +361,7 @@ func isNoBaseToStringLiteral(node *ast.Node) bool {
 }
 
 // noBaseToStringIsDefaultLibrarySymbol asks the program whether a symbol comes from the default library. It
-// reads the program, so it lives beside the rule that declares that read: internal/guard counts a rule's reads
+// reads the program, so it lives beside the rule that declares that read: internal/testing/guard counts a rule's reads
 // in the file that defines it.
 func noBaseToStringIsDefaultLibrarySymbol(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	return rule.IsSymbolFromDefaultLibrary(ruleContext.Program, symbol)

@@ -18,7 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules"
-	"github.com/system-inc/cohere/internal/system_cache_testing"
+	"github.com/system-inc/cohere/internal/testing/system_cache_testing"
 )
 
 // Every run in this package's tests reads a system cache of the test binary's own, never the person's: TestMain set

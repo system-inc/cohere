@@ -13,7 +13,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The parse oracle: Node runs yaml-unist-parser's parse(text, { uniqueKeys: false }) from the fork's
@@ -27,7 +27,7 @@ import (
 // the other, and every Parent is the node upstream's _parent is. Where upstream throws, Parse must fail
 // with the same name and message, and for a YAMLSyntaxError the same position.
 
-// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/testing/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml-unist-parser.
 func forkRoot(test testing.TB) string {
 	test.Helper()

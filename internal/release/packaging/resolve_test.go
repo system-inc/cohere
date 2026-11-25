@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // The defect every test here guards is one shape: a resolution that produces something runnable

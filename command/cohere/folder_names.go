@@ -9,11 +9,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/rule_names"
+	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
 )
 
 // A folder's name spells its words out (#zyq63kk). Kirk, Nov 13: "has a folder called docs, i want it to be
@@ -21,9 +21,9 @@ import (
 // as a docs/ does, so no language's rules could see it, and the check sits in the one walk that reads every directory a
 // repository keeps: discovery's. One check, for TypeScript, Go and Swift projects alike, reported at the folder.
 //
-// The judgment is internal/file_name_words' FolderAbbreviated: the folder's words, cut as a file stem's are, judged by
-// policy/NameWords.json alone, with a registered rule's name set aside and a brand read across the folder and its
-// parent, so google/docs is Google Docs. Never by the shared vocabulary, whose code meanings read a folder's plain
+// The judgment is internal/text_rules/file_name_words' FolderAbbreviated: the folder's words, cut as a file stem's are,
+// judged by policy/NameWords.json alone, with a registered rule's name set aside and a brand read across the folder and
+// its parent, so google/docs is Google Docs. Never by the shared vocabulary, whose code meanings read a folder's plain
 // words wrongly (Op art, a stage prop): a word judges folders by joining NameWords on its own census. `utils` and
 // run-together words are other rules': nexus/consistency-no-utils-folder and
 // nexus/consistency-require-separated-folder-words.
@@ -46,7 +46,7 @@ import (
 // replayed over.
 
 // folderCheckLabel labels the folder check's summary under `--json`, beside each project's, as the format project at
-// the root is labelled `. (Folder)`: no directory's label can be it.
+// the root is labelled `. (Formats)`: no directory's label can be it.
 const folderCheckLabel = ". (folders)"
 
 // folderFinding is one folder whose name abbreviates a word the house spells out.

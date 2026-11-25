@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // The machine's budget for heavy Go work (#qhg0ntb).

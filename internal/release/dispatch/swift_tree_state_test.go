@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // The development binary is cached by a hash, and it reports whether its own inputs, the files that hash

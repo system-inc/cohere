@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // buildCensusVariable names the tree the build census runs cohere-go over: root for cohere's own module, or a

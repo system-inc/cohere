@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // A landing whose merge with main conflicts only in generated files is resolved by regenerating them (#y84h1te).

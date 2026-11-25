@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // Each snippet goes through this printer and through the embedded Prettier fork, and the two outputs must

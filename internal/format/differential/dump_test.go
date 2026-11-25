@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // TestDumpDifferences is TestCorpora's working copy for a printer port: the same comparison against the

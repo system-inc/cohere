@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // fakeSwiftBinary writes a shell script standing in for cohere-swift, so the process boundary can be driven
@@ -50,7 +50,7 @@ func runFakeSwiftBinary(test *testing.T, body string, mode contractMode) (string
 // Not parallel: its subtests drive check runs through contractRun, whose record acceptors set the package-level
 // activeSummary
 func TestRunContractBinaryEndings(test *testing.T) {
-	fixtures, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract"))
+	fixtures, absolutePathError := filepath.Abs(contractFixtureDirectory)
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

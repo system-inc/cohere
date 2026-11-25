@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // The gate's fifth step runs cohere on the tree it lands (#06g3f7x). Main at 80ac82fd read 8 findings on a bare

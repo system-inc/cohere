@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/naming/go_origin_names"
+	"github.com/system-inc/cohere/internal/go_language/origin_names"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 
 	"golang.org/x/tools/go/cfg"
 )
@@ -72,7 +72,7 @@ type group struct {
 	// declared by an inserted `var`, the start of the statement it is inserted before.
 	visibleFrom token.Pos
 	// insertion, for a variable declared by an inserted `var`, says where, and indent how far in.
-	insertion *rename.Insertion
+	insertion *local_rename.Insertion
 	indent    string
 	// anchorOffset is the anchor identifier's offset in its file, for the report.
 	anchorOffset int
@@ -82,11 +82,11 @@ type group struct {
 // and for the report each group's name and whether it is new.
 type splitPlan struct {
 	variable  *types.Var
-	edits     []rename.Edit
-	retargets map[rename.EditKey]int
+	edits     []local_rename.Edit
+	retargets map[local_rename.EditKey]int
 	groups    []*group
 	// insertions are the declarations the split adds, whose text is among its edits.
-	insertions []rename.Insertion
+	insertions []local_rename.Insertion
 	// residual says why the original keeps the name err, when it does.
 	residual string
 }
@@ -98,7 +98,7 @@ type splitter struct {
 	info         *types.Info
 	functions    *functionIndex
 	occurrences  map[*types.Var][]*ast.Ident
-	words        go_origin_names.Vocabulary
+	words        origin_names.Vocabulary
 	// files are the package's editable files, for their comments and their text.
 	files   []*ast.File
 	sources map[string]string
@@ -489,7 +489,7 @@ func (analysis *splitter) nameWeb(each *web) {
 			each.category = "a write is not a call"
 			return
 		}
-		newName, category, callName := go_origin_names.CallErrorName(analysis.info, call, analysis.words)
+		newName, category, callName := origin_names.CallErrorName(analysis.info, call, analysis.words)
 		if newName == "" {
 			each.category = category
 			return
@@ -727,7 +727,7 @@ func (analysis *splitter) group(
 // plan turns the groups into edits: every occurrence takes its group's name, a new variable's anchor becomes
 // a short declaration, and every occurrence of a new variable is retargeted to its anchor.
 func (analysis *splitter) plan(variable *types.Var, groups []*group) *splitPlan {
-	result := &splitPlan{variable: variable, retargets: map[rename.EditKey]int{}, groups: groups}
+	result := &splitPlan{variable: variable, retargets: map[local_rename.EditKey]int{}, groups: groups}
 	offset := func(position token.Pos) token.Position { return analysis.fileSet.PositionFor(position, false) }
 	for _, each := range groups {
 		var identifiers []*ast.Ident
@@ -740,7 +740,7 @@ func (analysis *splitter) plan(variable *types.Var, groups []*group) *splitPlan 
 		for _, identifier := range identifiers {
 			position := offset(identifier.Pos())
 			if each.newName != identifier.Name {
-				result.edits = append(result.edits, rename.Edit{
+				result.edits = append(result.edits, local_rename.Edit{
 					Filename: position.Filename,
 					Offset:   position.Offset,
 					OldText:  identifier.Name,
@@ -749,12 +749,12 @@ func (analysis *splitter) plan(variable *types.Var, groups []*group) *splitPlan 
 			}
 			switch {
 			case each.insertion != nil:
-				result.retargets[rename.EditKey{
+				result.retargets[local_rename.EditKey{
 					Filename: position.Filename,
 					Offset:   position.Offset,
-				}] = rename.InsertedDeclaration(each.insertion.Offset)
+				}] = local_rename.InsertedDeclaration(each.insertion.Offset)
 			case !each.host:
-				result.retargets[rename.EditKey{
+				result.retargets[local_rename.EditKey{
 					Filename: position.Filename,
 					Offset:   position.Offset,
 				}] = offset(each.anchor.identifier.Pos()).Offset
@@ -767,7 +767,7 @@ func (analysis *splitter) plan(variable *types.Var, groups []*group) *splitPlan 
 			result.insertions = append(result.insertions, *each.insertion)
 			result.edits = append(
 				result.edits,
-				rename.Edit{Filename: each.insertion.Filename, Offset: each.insertion.Offset,
+				local_rename.Edit{Filename: each.insertion.Filename, Offset: each.insertion.Offset,
 					NewText: each.indent + "var " + each.newName + " " + each.insertion.TypeName + "\n"},
 			)
 		}
@@ -778,13 +778,16 @@ func (analysis *splitter) plan(variable *types.Var, groups []*group) *splitPlan 
 			position := offset(assignment.TokPos)
 			result.edits = append(
 				result.edits,
-				rename.Edit{Filename: position.Filename, Offset: position.Offset, OldText: "=", NewText: ":="},
+				local_rename.Edit{Filename: position.Filename, Offset: position.Offset, OldText: "=", NewText: ":="},
 			)
 			// A blank on the left of a short declaration declares a blank variable of its own.
 			for _, left := range assignment.Lhs {
 				if identifier, isIdentifier := left.(*ast.Ident); isIdentifier && identifier.Name == "_" {
 					blank := offset(identifier.Pos())
-					result.retargets[rename.EditKey{Filename: blank.Filename, Offset: blank.Offset}] = blank.Offset
+					result.retargets[local_rename.EditKey{
+						Filename: blank.Filename,
+						Offset:   blank.Offset,
+					}] = blank.Offset
 				}
 			}
 		}
@@ -902,8 +905,13 @@ func (analysis *splitter) insertedDeclaration(
 		anchor:      anchor,
 		scope:       scope,
 		visibleFrom: before.Pos(),
-		insertion:   &rename.Insertion{Filename: tokenFile.Name(), Offset: lineStart, Name: name, TypeName: "error"},
-		indent:      indent,
+		insertion: &local_rename.Insertion{
+			Filename: tokenFile.Name(),
+			Offset:   lineStart,
+			Name:     name,
+			TypeName: "error",
+		},
+		indent: indent,
 	}, ""
 }
 

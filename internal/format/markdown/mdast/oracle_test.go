@@ -15,7 +15,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The tree oracle: the embedded markdown bundle's own parser, run by goja, the exact code the format

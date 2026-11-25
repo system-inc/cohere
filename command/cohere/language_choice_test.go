@@ -126,7 +126,7 @@ func TestChosenLanguagesRunWhereverTheirFilesLive(test *testing.T) {
 	// programs' directory to it.
 	jsonAlone := discovered()
 	jsonAlone.chooseLanguages(languageChoice{"json"}, true)
-	if !slices.Equal(running(jsonAlone), []string{". Folder", "web Folder"}) {
+	if !slices.Equal(running(jsonAlone), []string{". Formats", "web Formats"}) {
 		test.Errorf(
 			"json runs %v, want the root's format project and one of the programs' directory",
 			running(jsonAlone),

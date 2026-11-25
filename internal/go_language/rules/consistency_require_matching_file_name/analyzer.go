@@ -16,9 +16,9 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules/served"
+	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
 	"github.com/system-inc/cohere/policy"
 )
 

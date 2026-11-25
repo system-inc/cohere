@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // liveConfigPath is the real config cohere must agree with: ahra's, which is private, so a test that reads

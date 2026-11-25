@@ -16,10 +16,10 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // glueParseScript is the oracle: the fork's own parse with parser "css" (prettier.__debug.parse, which

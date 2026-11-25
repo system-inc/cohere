@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // performanceFixture is a landing of a tree with a command/cohere, so there is a cohere to measure: the land fixture's

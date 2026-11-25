@@ -19,9 +19,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 )
 
 // skipFlags collects repeated -skip values.
@@ -128,8 +128,8 @@ func applyList(
 	for _, occurrence := range unresolved {
 		fmt.Fprintln(output, occurrence)
 	}
-	edits, disagreements := rename.Deduplicate(edits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(edits)
+	editsByFile := local_rename.GroupByFile(edits)
 
 	counts := map[string]int{}
 	for _, request := range requests {
@@ -196,18 +196,18 @@ func readList(path string) ([]request, error) {
 // plan finds each request's declaration, checks every package's requests together through global_rename,
 // and returns the edits of the accepted renames, each request's outcome, and a line for each occurrence the
 // renaming could not resolve.
-func plan(loaded *workspace.Workspace, requests []request) ([]rename.Edit, map[string]string, []string) {
+func plan(loaded *workspace.Workspace, requests []request) ([]local_rename.Edit, map[string]string, []string) {
 	outcomes := map[string]string{}
 	wanted := map[string]request{}
 	for _, request := range requests {
 		wanted[request.position] = request
 		outcomes[request.position] = "not found: no identifier is declared at this position in an editable file"
 	}
-	var edits []rename.Edit
+	var edits []local_rename.Edit
 	var unresolvedLines []string
 	for _, analyzedPackage := range loaded.Analyzed {
 		renamePackage := loaded.RenamePackage(analyzedPackage)
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		positionOf := map[types.Object]string{}
 		constants := map[types.Object]string{}
 		for _, file := range renamePackage.Files {
@@ -231,7 +231,7 @@ func plan(loaded *workspace.Workspace, requests []request) ([]rename.Edit, map[s
 					// The guard of a type switch declares one variable per clause, renamed together.
 					for _, clause := range clauses {
 						positionOf[clause] = key
-						proposals = append(proposals, rename.Proposal{Object: clause, NewName: request.newName})
+						proposals = append(proposals, local_rename.Proposal{Object: clause, NewName: request.newName})
 					}
 					return true
 				}
@@ -249,7 +249,7 @@ func plan(loaded *workspace.Workspace, requests []request) ([]rename.Edit, map[s
 					constants[object] = request.newName
 					return true
 				}
-				proposals = append(proposals, rename.Proposal{Object: object, NewName: request.newName})
+				proposals = append(proposals, local_rename.Proposal{Object: object, NewName: request.newName})
 				return true
 			})
 		}
@@ -260,7 +260,7 @@ func plan(loaded *workspace.Workspace, requests []request) ([]rename.Edit, map[s
 		if len(proposals) == 0 {
 			continue
 		}
-		checked := rename.Check(renamePackage, proposals)
+		checked := local_rename.Check(renamePackage, proposals)
 		for _, rejection := range checked.Rejections {
 			outcomes[positionOf[rejection.Object]] = "refused: " + rejection.Reason
 		}
@@ -273,7 +273,7 @@ func plan(loaded *workspace.Workspace, requests []request) ([]rename.Edit, map[s
 				fmt.Sprintf("unresolved occurrence in %s: %s", analyzedPackage.ID, unresolved),
 			)
 		}
-		edits = append(edits, rename.Edits(renamePackage, checked.Accepted)...)
+		edits = append(edits, local_rename.Edits(renamePackage, checked.Accepted)...)
 	}
 	return edits, outcomes, unresolvedLines
 }
@@ -320,14 +320,19 @@ func isFunctionConstant(object types.Object, packageTypes *types.Package) bool {
 // cover constants, so a constant's rename rests on the verified apply: the reload compares every identifier's
 // resolution, and a new name that captured or was captured by another declaration is a mismatch that writes
 // nothing.
-func constantEdits(fileSet *token.FileSet, info *types.Info, constant types.Object, newName string) []rename.Edit {
-	var edits []rename.Edit
+func constantEdits(
+	fileSet *token.FileSet,
+	info *types.Info,
+	constant types.Object,
+	newName string,
+) []local_rename.Edit {
+	var edits []local_rename.Edit
 	add := func(identifier *ast.Ident, object types.Object) {
 		if object != constant {
 			return
 		}
 		position := fileSet.PositionFor(identifier.Pos(), false)
-		edits = append(edits, rename.Edit{
+		edits = append(edits, local_rename.Edit{
 			Filename: position.Filename,
 			Offset:   position.Offset,
 			OldText:  identifier.Name,

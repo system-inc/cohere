@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // returnEarly runs cohere as a child and exits with its exit code as soon as cohere writes it to

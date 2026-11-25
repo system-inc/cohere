@@ -19,7 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/markdown"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The perturbed markdown corpus. Our markdown is almost all already formatted, so the harness tests

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 )
 
 // The cases are the rules circle's analyzer fixtures: what it flags and what it suggests, and what it leaves.

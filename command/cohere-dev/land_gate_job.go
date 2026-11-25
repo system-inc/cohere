@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // A landing's tests can run as a Loom job of the land-gate kind, in place of a gap on a gate box, when gateVariable

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // A release is profile-guided and built at arm64 v8.4 on darwin (#r6sqd2c), and nothing fails when either quietly

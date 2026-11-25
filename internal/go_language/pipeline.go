@@ -16,6 +16,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 	"github.com/system-inc/cohere/internal/go_language/bounded"
 	"github.com/system-inc/cohere/internal/go_language/cache"
 	"github.com/system-inc/cohere/internal/go_language/check"
@@ -30,7 +31,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_language/settings"
 	"github.com/system-inc/cohere/internal/go_language/timing"
-	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // detailNotRequested is the one skip detail that means nobody asked for the phase, which is not a gap.

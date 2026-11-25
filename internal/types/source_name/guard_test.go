@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_types"
+	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 // tsDecisionsAllowed are the `.ts` decisions that are right to leave alone, by file (relative to the
@@ -25,7 +25,6 @@ var tsDecisionsAllowed = map[string]string{
 	"internal/format/prettier/handles.go: .ts": "parserFor reads its table with source_name.TreatedAs(fileName)",
 
 	// A tool's disk walk with no program to ask, so it cannot tell Adamic source from a static library.
-	"command/formatter_comparison/main.go: .ts":                        "the comparison tool's corpus walk, which has no program",
 	"internal/lint/rules/tailwind/tools/generate_variant/main.go: .ts": "the variant generator's walk of a Tailwind consumer, which has no program",
 	"internal/lint/rules/tailwind/tsconfig_paths.go: .ts":              "tsconfig-paths-webpack-plugin's default extensions, which better-tailwindcss keeps; it resolves a stylesheet import and has never heard of .a",
 

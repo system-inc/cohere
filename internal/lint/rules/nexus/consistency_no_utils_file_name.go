@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -21,7 +21,7 @@ var consistencyNoUtilsFileNameText = policy.MessageOf("nexus/consistency-no-util
 // A file named for nothing in particular collects whatever has no other home, which is what a folder of that name
 // does, one level down.
 //
-// The words are internal/file_name_words', the judgment cohere-go's cohere-go/consistency-no-utils-file-name
+// The words are internal/text_rules/file_name_words', the judgment cohere-go's cohere-go/consistency-no-utils-file-name
 // reads too: a name is cut at its hyphens, underscores and dots and where its case changes, a dotted role a tool
 // reads (`.test`, `.d`, `.config`) is no word, and each word is held whole to file_name_words.IsUtils, so
 // `utilities.ts` and `myutils.ts` pass, as `utilities` and `myutils` do as folders.

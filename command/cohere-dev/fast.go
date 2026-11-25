@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/corpus"
-	"github.com/system-inc/cohere/internal/listed_directories"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
 // The fast tier is the edit loop (#nxgt2ca, ruled by @system_cohere on Kirk's two-tier call):
@@ -62,7 +62,7 @@ type landingGateEntry struct {
 	// package rather than all of it; empty for a whole package.
 	skippedBy string
 
-	// reads is the corpus its expensive tests read, for an entry whose cost is that corpus (internal/corpus);
+	// reads is the corpus its expensive tests read, for an entry whose cost is that corpus (internal/testing/corpus);
 	// the zero Corpus for one that reads none. Without the corpus those tests skip and the entry costs
 	// nothing, which would read as an entry that got cheap.
 	reads corpus.Corpus

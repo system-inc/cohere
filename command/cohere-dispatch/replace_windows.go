@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"os/signal"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // replaceProcess runs the cohere binary and returns its exit code for this process to exit with, the nearest

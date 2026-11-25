@@ -33,9 +33,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 	"github.com/system-inc/cohere/policy"
 
 	"golang.org/x/tools/go/types/typeutil"
@@ -692,7 +692,7 @@ func findCandidates(packageTypes *types.Package, info *types.Info, fileSet *toke
 				return true
 			}
 			variable, isVariable := info.Defs[identifier].(*types.Var)
-			if !isVariable || !rename.IsLocal(variable, packageTypes) {
+			if !isVariable || !local_rename.IsLocal(variable, packageTypes) {
 				return true
 			}
 			decided, found := decisions[variable]
@@ -1019,7 +1019,7 @@ type declarationRecord struct {
 // or every candidate of its group together, whose name global_rename refuses tries its next name, and the whole set
 // is judged again. Each round moves at least one group forward and none back, so this ends. It returns the
 // final plan and, for every group that ran out, global_rename's reason for its last name.
-func settle(renamePackage rename.Package, candidates []candidate) (rename.Plan, map[string]string) {
+func settle(renamePackage local_rename.Package, candidates []candidate) (local_rename.Plan, map[string]string) {
 	groupOf := map[types.Object]string{}
 	for _, decided := range candidates {
 		groupOf[decided.variable] = groupKey(decided)
@@ -1027,16 +1027,16 @@ func settle(renamePackage rename.Package, candidates []candidate) (rename.Plan, 
 	step := map[string]int{}
 	refusals := map[string]string{}
 	for {
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		for _, decided := range candidates {
 			if current := step[groupKey(decided)]; current < len(decided.names) {
 				proposals = append(
 					proposals,
-					rename.Proposal{Object: decided.variable, NewName: decided.names[current]},
+					local_rename.Proposal{Object: decided.variable, NewName: decided.names[current]},
 				)
 			}
 		}
-		plan := rename.Check(renamePackage, proposals)
+		plan := local_rename.Check(renamePackage, proposals)
 		refused := map[string]string{}
 		for _, rejection := range plan.Rejections {
 			if _, recorded := refused[groupOf[rejection.Object]]; !recorded {
@@ -1094,9 +1094,9 @@ func run(root string, skips []string, dryRun bool) int {
 		return 1
 	}
 
-	var allEdits []rename.Edit
+	var allEdits []local_rename.Edit
 	// allCommentEdits are the doc comment respellings among allEdits, printed for review.
-	var allCommentEdits []rename.Edit
+	var allCommentEdits []local_rename.Edit
 	var allUnresolved []string
 	records := map[string]*declarationRecord{}
 	var recordOrder []string
@@ -1137,7 +1137,7 @@ func run(root string, skips []string, dryRun bool) int {
 		for _, unresolved := range plan.Unresolved {
 			allUnresolved = append(allUnresolved, analyzedPackage.ID+": "+unresolved)
 		}
-		allEdits = append(allEdits, rename.Edits(renamePackage, plan.Accepted)...)
+		allEdits = append(allEdits, local_rename.Edits(renamePackage, plan.Accepted)...)
 		commentEdits := docCommentEdits(renamePackage, plan.Accepted)
 		allEdits = append(allEdits, commentEdits...)
 		allCommentEdits = append(allCommentEdits, commentEdits...)
@@ -1147,8 +1147,8 @@ func run(root string, skips []string, dryRun bool) int {
 	allEdits = append(allEdits, fieldResult.Edits...)
 	others := otherLetterDeclarations(loaded)
 
-	edits, disagreements := rename.Deduplicate(allEdits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(allEdits)
+	editsByFile := local_rename.GroupByFile(edits)
 
 	candidateCount, eligibleCount, acceptedCount := 0, 0, 0
 	refusedByReason, notEligibleByCategory, acceptedNames, acceptedRules, nameSteps :=
@@ -1253,7 +1253,7 @@ func run(root string, skips []string, dryRun bool) int {
 		}
 	}
 	fmt.Fprintln(streams.Output, "\ndoc comment respellings:")
-	commentEdits, _ := rename.Deduplicate(allCommentEdits)
+	commentEdits, _ := local_rename.Deduplicate(allCommentEdits)
 	for _, edit := range commentEdits {
 		before, after := lineBeforeAndAfter(edit.Filename, edit.Offset, editsByFile[edit.Filename])
 		fmt.Fprintf(
@@ -1362,7 +1362,7 @@ func printCounts(counts map[string]int, limit int) {
 }
 
 // lineBeforeAndAfter returns the source line holding offset, as it is and with the edits that fall on it.
-func lineBeforeAndAfter(filename string, offset int, edits []rename.Edit) (string, string) {
+func lineBeforeAndAfter(filename string, offset int, edits []local_rename.Edit) (string, string) {
 	source, readError := os.ReadFile(filename)
 	if readError != nil {
 		return readError.Error(), ""
@@ -1391,14 +1391,14 @@ func apply(
 	loaded *workspace.Workspace,
 	root string,
 	skips []string,
-	edits []rename.Edit,
-	editsByFile map[string][]rename.Edit,
+	edits []local_rename.Edit,
+	editsByFile map[string][]local_rename.Edit,
 ) int {
 	return workspace.ApplyVerified(loaded, root, skips, edits, editsByFile, "loopnames", streams.Output, streams.Errors)
 }
 
 // relativeOffset prints where an edit falls, relative to the root, by line.
-func relativeOffset(loaded *workspace.Workspace, edit rename.Edit) string {
+func relativeOffset(loaded *workspace.Workspace, edit local_rename.Edit) string {
 	source, readError := os.ReadFile(edit.Filename)
 	line := 0
 	if readError == nil && edit.Offset <= len(source) {

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 const fakeSwiftVersion = "Apple Swift version 9.9 (swiftlang-9.9.9.9.9 clang-1)"

@@ -4,7 +4,7 @@
 //
 // A file's name is read on every path, so it is held to the words an identifier is. This is the Go form of
 // nexus/consistency-no-abbreviated-file-name and cohere-swift's rule of the same name, and reads a file name's words
-// through internal/file_name_words, the judgment the TypeScript rule reads too (the text rules family
+// through internal/text_rules/file_name_words, the judgment the TypeScript rule reads too (the text rules family
 // `abbreviated-file-name`): the name is cut at its underscores, go/build's `_test` and build-constraint suffixes are
 // set aside, and its words are read as the one camelCase identifier they spell, so msg_printer.go is judged as
 // msgPrinter would be. The message names the word and how to spell it out.
@@ -25,9 +25,9 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/rule_names"
+	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
 	"github.com/system-inc/cohere/policy"
 )
 

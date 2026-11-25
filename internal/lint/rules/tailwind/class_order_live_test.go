@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The acceptance suite for the live class-order sort, measured against Tailwind's own answers.

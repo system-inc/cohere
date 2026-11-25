@@ -28,7 +28,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
 )
 
-// TestMain points go/build at the toolchain's `GOROOT`, as internal/go_rename/rename's tests do: under
+// TestMain points go/build at the toolchain's `GOROOT`, as internal/go_language/rename/local_rename's tests do: under
 // `GOFLAGS=-trimpath` the test binary has none baked in, and importer.Default finds the standard library
 // through go/build.
 func TestMain(main *testing.M) {

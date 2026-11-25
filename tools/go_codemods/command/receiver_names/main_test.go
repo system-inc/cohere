@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
@@ -89,10 +89,10 @@ func planFixture(test *testing.T, sources map[string]string, skipped ...string) 
 			editableFiles = append(editableFiles, file)
 		}
 	}
-	renamePackage := rename.Package{FileSet: fileSet, Types: packageTypes, Info: info, Files: editableFiles}
+	renamePackage := local_rename.Package{FileSet: fileSet, Types: packageTypes, Info: info, Files: editableFiles}
 	plan := planReceivers(renamePackage, files, fixtureVocabulary)
-	for filename, edits := range rename.GroupByFile(rename.Edits(renamePackage, plan.accepted)) {
-		_, rewritten, rewriteError := rename.RewriteFile(filename, edits)
+	for filename, edits := range local_rename.GroupByFile(local_rename.Edits(renamePackage, plan.accepted)) {
+		_, rewritten, rewriteError := local_rename.RewriteFile(filename, edits)
 		if rewriteError != nil {
 			test.Fatal(rewriteError)
 		}

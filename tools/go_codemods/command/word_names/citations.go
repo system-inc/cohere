@@ -15,9 +15,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/system-inc/cohere/internal/go_rename/global_rename"
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 )
 
 // citationEdits respells every comment citation of an accepted rename's old name, in the editable files of the
@@ -70,7 +70,7 @@ func citationEdits(
 	for name := range ambiguous {
 		delete(newNames, name)
 	}
-	var edits []rename.Edit
+	var edits []local_rename.Edit
 	seenFiles := map[string]bool{}
 	for _, rootsPackage := range loaded.Roots {
 		for _, file := range rootsPackage.Syntax {
@@ -84,7 +84,7 @@ func citationEdits(
 					start := rootsPackage.Fset.PositionFor(comment.Pos(), false).Offset
 					for _, word := range identifierWords(comment.Text) {
 						if newName := newNames[word.text]; newName != "" {
-							edits = append(edits, rename.Edit{
+							edits = append(edits, local_rename.Edit{
 								Filename: filename,
 								Offset:   start + word.offset,
 								OldText:  word.text,
@@ -96,7 +96,7 @@ func citationEdits(
 			}
 		}
 	}
-	all, _ := rename.Deduplicate(append(append([]rename.Edit(nil), result.CommentEdits...), edits...))
+	all, _ := local_rename.Deduplicate(append(append([]local_rename.Edit(nil), result.CommentEdits...), edits...))
 	sort.Slice(all, func(left, right int) bool {
 		if all[left].Filename != all[right].Filename {
 			return all[left].Filename < all[right].Filename

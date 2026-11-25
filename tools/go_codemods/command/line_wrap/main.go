@@ -5,8 +5,8 @@
 // It walks every Go file under root, skipping TypeScript/, testdata/, generated files and every -skip path (a
 // file, or a directory and everything under it, relative to root), and prints counts of
 // long lines before and after, the residue, and any file whose output failed the equivalence proof. With -w it
-// writes the files that changed and passed the proof. The wrapping and the proof are internal/line_wrap's, which
-// cohere-go's fix phase runs too.
+// writes the files that changed and passed the proof. The wrapping and the proof are
+// internal/go_language/line_wrap's, which cohere-go's fix phase runs too.
 package main
 
 import (
@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/line_wrap"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/go_language/line_wrap"
 )
 
 // skipList collects every -skip flag.

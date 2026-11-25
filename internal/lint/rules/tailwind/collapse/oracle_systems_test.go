@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // oracleCopies are the copies of Tailwind oracle a test compares against (#f598zk0): the public theme's,

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // teeStream copies a standard stream to its real destination and to a buffer.

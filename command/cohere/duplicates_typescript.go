@@ -14,12 +14,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/cache_directory"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/canonical_function_hash"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/suppression"
-	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 

@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
-	"github.com/system-inc/cohere/internal/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 func TestWholeModuleAndCountOnceAreReadFromTheArguments(test *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
 )
 
 // fixtureSource holds every shape the rule decides on: legacy octal in a call, a const block, a separator straight
@@ -227,7 +227,7 @@ func TestALiteralWhoseValueChangesWritesNothing(test *testing.T) {
 	if planError != nil {
 		test.Fatal(planError)
 	}
-	edits, _ := rename.Deduplicate(found.edits)
+	edits, _ := local_rename.Deduplicate(found.edits)
 	changed := 0
 	for index := range edits {
 		if edits[index].OldText == "0644" {
@@ -242,7 +242,7 @@ func TestALiteralWhoseValueChangesWritesNothing(test *testing.T) {
 	var refusals bytes.Buffer
 	output := bufio.NewWriter(&report)
 	errorOutput := bufio.NewWriter(&refusals)
-	exitCode := workspace.ApplyVerifiedChecked(loaded, root, nil, edits, rename.GroupByFile(edits),
+	exitCode := workspace.ApplyVerifiedChecked(loaded, root, nil, edits, local_rename.GroupByFile(edits),
 		literalCheck(loaded, edits), passName, output, errorOutput)
 	if flushError := output.Flush(); flushError != nil {
 		test.Fatal(flushError)

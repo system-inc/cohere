@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/executable_testing"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
 // cohere-swift a gate runs must come from the commit the gate's cohere was built from. These tests

@@ -2,6 +2,7 @@ package go_listing_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/go_listing"
@@ -12,9 +13,13 @@ import (
 //	Reach without the root's test main: TestReachIsWhatABuildOfTheRootReads
 //	Reach without its guard on the empty root: TestDecodeReadsAnObjectOfAFieldList
 //	CgoIncludeDirectories reading "-I" "<directory>" as no directory: TestReachIsWhatABuildOfTheRootReads
+//	CgoIncludeDirectories reading -I alone: TestCgoIncludeDirectoriesReadsEachOptionInEitherSpelling
 //	SourceFiles answering EmbedFiles with GoFiles: TestSourceFilesNamesExactlyTheFixturesFiles
 //	DepsErrors decoded under another tag: TestDecodeReadsTheGoldenAsGoPrintedIt
 //	ReachError passing over DepsErrors: TestDecodeReadsAnObjectOfAFieldList
+//	EmbedPatterns or XTestEmbedPatterns decoded under another tag: TestDecodeReadsTheGoldenAsGoPrintedIt
+//	TestEmbedPatterns decoded under another tag: TestDecodeReadsEachEmbedPatternList
+//	Decode taking each object whole before reading it as a Package: TestDecodeReadsEachObjectOnce
 
 // Decode reads what go list prints and refuses anything else, never a part of it.
 func TestDecodeReadsAnObjectOfAFieldList(test *testing.T) {
@@ -57,20 +62,68 @@ func TestDecodeReadsAnObjectOfAFieldList(test *testing.T) {
 	}
 }
 
-// CgoIncludeDirectories reads -I in either spelling from all three flag lists, places each against the
-// package's directory, and names each once.
-func TestCgoIncludeDirectoriesReadsEitherSpelling(test *testing.T) {
+// Decode reads each object once, straight into the result, so a listing of a thousand packages allocates
+// for the result and the decoder's buffer and nothing per package that holds nothing to allocate. Taking
+// each object whole before reading it, which the null check once did, allocates a copy of it and the
+// package it then reads, at least twice for each object.
+//
+// Not parallel: testing.AllocsPerRun counts the whole process's allocations, so a test running beside it
+// would add to them.
+func TestDecodeReadsEachObjectOnce(test *testing.T) {
+	const objects = 1000
+	output := []byte(strings.Repeat("{\"Standard\": true}\n", objects))
+	var packages []go_listing.Package
+	var decodeError error
+	allocations := testing.AllocsPerRun(10, func() { packages, decodeError = go_listing.Decode(output) })
+	if decodeError != nil || len(packages) != objects || !packages[objects-1].Standard {
+		test.Fatalf("%d objects read as %d packages (%v)", objects, len(packages), decodeError)
+	}
+	if allocations >= objects {
+		test.Errorf("reading %d objects allocated %.0f times, want fewer than one for each", objects, allocations)
+	}
+}
+
+// Decode reads each of the three embed pattern lists under go list's own name for it. The golden has no
+// in-package test that embeds, so TestEmbedPatterns is read here.
+func TestDecodeReadsEachEmbedPatternList(test *testing.T) {
+	test.Parallel()
+	packages, decodeError := go_listing.Decode([]byte(
+		`{"EmbedPatterns": ["static/*"], "TestEmbedPatterns": ["testdata"], "XTestEmbedPatterns": ["golden.txt"]}`,
+	))
+	if decodeError != nil ||
+		len(packages) != 1 ||
+		!slices.Equal(packages[0].EmbedPatterns, []string{"static/*"}) ||
+		!slices.Equal(packages[0].TestEmbedPatterns, []string{"testdata"}) ||
+		!slices.Equal(packages[0].XTestEmbedPatterns, []string{"golden.txt"}) {
+		test.Errorf("the embed patterns read as %+v (%v)", packages, decodeError)
+	}
+}
+
+// CgoIncludeDirectories reads each include path option, -I, -isystem, -iquote and -idirafter, in either
+// spelling from all three flag lists, places each against the package's directory, and names each once.
+// -include names a file, and neither it nor the file after it is read as a directory.
+func TestCgoIncludeDirectoriesReadsEachOptionInEitherSpelling(test *testing.T) {
 	test.Parallel()
 	listed := go_listing.Package{
 		Directory:   "/module/package",
-		CgoCFlags:   []string{"-O2", "-I", "include", "-I/absolute/./one", "-DNAME=-Inot"},
-		CgoCppFlags: []string{"-I../shared", "-Iinclude", "-isystem", "/system"},
-		CgoCxxFlags: []string{"-I/absolute/one", "-I"},
+		CgoCFlags:   []string{"-O2", "-I", "include", "-I/absolute/./one", "-DNAME=-Inot", "-include", "forced.h"},
+		CgoCppFlags: []string{"-I../shared", "-Iinclude", "-isystem", "/system", "-iquote", "quoted"},
+		CgoCxxFlags: []string{
+			"-I/absolute/one",
+			"-idirafter/after",
+			"-isystem../shared",
+			"-isystem../system",
+			"-iquote",
+		},
 	}
 	if got, want := listed.CgoIncludeDirectories(), []string{
 		"/module/package/include",
 		"/absolute/one",
 		"/module/shared",
+		"/system",
+		"/module/package/quoted",
+		"/after",
+		"/module/system",
 	}; !slices.Equal(got, want) {
 		test.Errorf("the include directories are %q, want %q", got, want)
 	}

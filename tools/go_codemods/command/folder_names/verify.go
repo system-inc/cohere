@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -25,7 +25,7 @@ type record struct {
 type translation struct {
 	file           func(string) string
 	packagePath    func(string) string
-	names          map[rename.EditKey]string
+	names          map[local_rename.EditKey]string
 	renamedObjects map[types.Object]string
 }
 
@@ -95,7 +95,7 @@ func fingerprint(goPackage *packages.Package, translate translation) map[string]
 		for _, identifier := range identifiers {
 			name := identifier.Name
 			offset := goPackage.Fset.PositionFor(identifier.Pos(), false).Offset
-			if newName, renamed := translate.names[rename.EditKey{Filename: filename, Offset: offset}]; renamed {
+			if newName, renamed := translate.names[local_rename.EditKey{Filename: filename, Offset: offset}]; renamed {
 				name = newName
 			}
 			records = append(records, record{
@@ -113,7 +113,7 @@ func fingerprint(goPackage *packages.Package, translate translation) map[string]
 func importsOf(
 	goPackage *packages.Package,
 	translate translation,
-	dropped map[rename.EditKey]bool,
+	dropped map[local_rename.EditKey]bool,
 ) map[string][]string {
 	result := map[string][]string{}
 	for _, file := range goPackage.Syntax {
@@ -123,7 +123,7 @@ func importsOf(
 			name := ""
 			if spec.Name != nil {
 				name = spec.Name.Name
-				if dropped[rename.EditKey{
+				if dropped[local_rename.EditKey{
 					Filename: filename,
 					Offset:   goPackage.Fset.PositionFor(spec.Name.Pos(), false).Offset,
 				}] {
@@ -146,7 +146,7 @@ func importsOf(
 func expect(
 	roots []*packages.Package,
 	translate translation,
-	dropped map[rename.EditKey]bool,
+	dropped map[local_rename.EditKey]bool,
 	mapping *mapping,
 ) *expectation {
 	result := &expectation{identifiers: map[string]map[string][]record{}, imports: map[string]map[string][]string{}}

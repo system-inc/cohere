@@ -11,8 +11,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The tree loader. The Go parser is being ported in parallel, so these tests print trees the real one
@@ -21,7 +21,7 @@ import (
 // so JSON leaves it out and the loader sets Parent the way defineParents does. Offsets come back in
 // UTF-16 units and are converted to bytes against the text, the conversion layer 3 does once.
 
-// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
+// forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/testing/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml-unist-parser.
 func forkRoot(test testing.TB) string {
 	test.Helper()

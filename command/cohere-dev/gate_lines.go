@@ -3,7 +3,7 @@ package main
 import (
 	"sync"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // gateLines is where a gate's runs on its boxes say what they are doing: the terminal, each write shown at once and

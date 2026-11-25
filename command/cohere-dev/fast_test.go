@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
-	"github.com/system-inc/cohere/internal/needs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // measureLandingGateVariable opts in to measuring each landing-gate-only entry's CPU, which the nightly sets.

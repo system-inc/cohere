@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
+	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // The fixture is the theme the shipped Tailwind 4.3.3 resolved for every stylesheet in the

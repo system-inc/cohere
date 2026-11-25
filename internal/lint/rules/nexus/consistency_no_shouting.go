@@ -9,7 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/shouting"
+	"github.com/system-inc/cohere/internal/text_rules/shouting"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -60,7 +60,7 @@ func messageShoutingInComment(token string) rule.Message {
 // tools match exactly.
 //
 // The rule takes no options. Kirk ruled on 2026-11-06 (#4b337jk) that there is no per-project allow
-// list: the shared safe list in internal/shouting, which every language reads, is the one mechanism, so
+// list: the shared safe list in internal/text_rules/shouting, which every language reads, is the one mechanism, so
 // an acronym a project needs earns its place there with its reason, and a config that writes `allow`
 // is refused.
 var ConsistencyNoShouting = rule.Rule[rule.NoOptions]{

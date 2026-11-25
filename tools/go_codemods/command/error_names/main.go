@@ -1,7 +1,7 @@
 // Command errornames names every error for what produced it. A local `err` (or an error named `e`) written
 // once takes a name from its call: a table of standard library calls first (matched through types, never by
 // spelling), else the function's name in full words plus Error, a function value's name, or for a call of a
-// call's result the function that made it. That naming is internal/naming/go_origin_names, which
+// call's result the function that made it. That naming is internal/go_language/origin_names, which
 // cohere-go's naming rule asks too, so its suggestion and this rename agree. A local written more than once is
 // split into one variable per web of reaching definitions (splitter.go), each named the same way. A named
 // result takes its function's name and a walk callback's error parameter is pathError, each split too when the
@@ -26,11 +26,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_rename/rename"
-	"github.com/system-inc/cohere/internal/go_rename/workspace"
-	"github.com/system-inc/cohere/internal/naming/abbreviation"
-	"github.com/system-inc/cohere/internal/naming/go_origin_names"
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/go_language/origin_names"
+	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/go_language/rename/workspace"
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 	"github.com/system-inc/cohere/policy"
 
 	"golang.org/x/tools/go/packages"
@@ -107,14 +107,14 @@ type pendingParameter struct {
 
 // parseVocabulary reads policy/Abbreviations.json through the shared vocabulary, into the words an error's
 // name is built from.
-func parseVocabulary(contents []byte) (go_origin_names.Vocabulary, error) {
+func parseVocabulary(contents []byte) (origin_names.Vocabulary, error) {
 	loaded, loadError := abbreviation.Load(contents, nil)
 	if loadError != nil {
-		return go_origin_names.Vocabulary{}, loadError
+		return origin_names.Vocabulary{}, loadError
 	}
-	words := go_origin_names.VocabularyOf(loaded)
+	words := origin_names.VocabularyOf(loaded)
 	if len(words.Expansions) == 0 {
-		return go_origin_names.Vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
+		return origin_names.Vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
 	}
 	return words, nil
 }
@@ -309,7 +309,7 @@ func findCandidates(
 	info *types.Info,
 	fileSet *token.FileSet,
 	files []*ast.File,
-	words go_origin_names.Vocabulary,
+	words origin_names.Vocabulary,
 	fixup bool,
 	finalNames map[string]string,
 ) []candidate {
@@ -345,7 +345,7 @@ func findCandidates(
 				return true
 			}
 			variable, isVariable := info.Defs[identifier].(*types.Var)
-			if !isVariable || !rename.IsLocal(variable, packageTypes) {
+			if !isVariable || !local_rename.IsLocal(variable, packageTypes) {
 				return true
 			}
 			decided := candidate{variable: variable}
@@ -499,8 +499,8 @@ func literalBindings(info *types.Info, files []*ast.File) map[*ast.FuncLit]liter
 				}
 				bind(names, typed.Values)
 			case *ast.CompositeLit:
-				configuration := go_origin_names.TypeName{PackagePath: "go/types", Name: "Config"}
-				if go_origin_names.NamedTypeOf(info.TypeOf(typed)) != configuration {
+				configuration := origin_names.TypeName{PackagePath: "go/types", Name: "Config"}
+				if origin_names.NamedTypeOf(info.TypeOf(typed)) != configuration {
 					return true
 				}
 				for _, element := range typed.Elts {
@@ -594,7 +594,7 @@ func pendParameter(
 func callSites(
 	goPackage *packages.Package,
 	finalNames map[string]string,
-	words go_origin_names.Vocabulary,
+	words origin_names.Vocabulary,
 	sites map[string]map[int][]string,
 ) {
 	for _, file := range goPackage.Syntax {
@@ -627,11 +627,11 @@ func argumentName(
 	goPackage *packages.Package,
 	argument ast.Expr,
 	finalNames map[string]string,
-	words go_origin_names.Vocabulary,
+	words origin_names.Vocabulary,
 ) string {
 	switch typed := ast.Unparen(argument).(type) {
 	case *ast.CallExpr:
-		newName, _, _ := go_origin_names.CallErrorName(goPackage.TypesInfo, typed, words)
+		newName, _, _ := origin_names.CallErrorName(goPackage.TypesInfo, typed, words)
 		return newName
 	case *ast.Ident:
 		if _, isVariable := goPackage.TypesInfo.ObjectOf(typed).(*types.Var); !isVariable {
@@ -669,7 +669,7 @@ func nameParameter(pending *pendingParameter, sites map[string]map[int][]string)
 			return agreed, fmt.Sprintf("clause 2: all %d callers hand in %s", len(names), agreed)
 		}
 	}
-	words := go_origin_names.CamelWords(pending.function)
+	words := origin_names.CamelWords(pending.function)
 	first := ""
 	if len(words) > 0 {
 		first = strings.ToLower(words[0])
@@ -688,7 +688,7 @@ func errorName(
 	sites writeSites,
 	variable *types.Var,
 	errorType types.Type,
-	words go_origin_names.Vocabulary,
+	words origin_names.Vocabulary,
 	fixup bool,
 ) (string, string, string) {
 	if !types.Identical(variable.Type(), errorType) {
@@ -719,18 +719,18 @@ func errorName(
 		return "", category, ""
 	}
 	if fixup {
-		function, _, category := go_origin_names.ProducingFunction(info, call)
+		function, _, category := origin_names.ProducingFunction(info, call)
 		if function == nil {
 			return "", category, ""
 		}
-		callName := go_origin_names.QualifiedName(function)
-		if !go_origin_names.IsQualifiedCall(function) {
+		callName := origin_names.QualifiedName(function)
+		if !origin_names.IsQualifiedCall(function) {
 			return "", "fixup: call is not New, For or Of", callName
 		}
-		newName, category := go_origin_names.QualifiedErrorName(function, words)
+		newName, category := origin_names.QualifiedErrorName(function, words)
 		return newName, category, callName
 	}
-	return go_origin_names.CallErrorName(info, call, words)
+	return origin_names.CallErrorName(info, call, words)
 }
 
 // receivedErrorName names an error received from a channel by the channel, where its name says what it
@@ -751,7 +751,7 @@ func receivedErrorName(value ast.Expr) string {
 	default:
 		return ""
 	}
-	words := go_origin_names.CamelWords(name)
+	words := origin_names.CamelWords(name)
 	switch strings.ToLower(words[len(words)-1]) {
 	case "errs", "errors":
 		return "receivedError"
@@ -764,7 +764,7 @@ func receivedErrorName(value ast.Expr) string {
 // resultErrorName names a named result from its function: the declared function's name in full words plus
 // Error, by the same rule as a call's (`func (writer *Writer) Close() (closeError error)`). A literal's or a
 // function type's result has no function name to take.
-func resultErrorName(info *types.Info, owner ast.Node, words go_origin_names.Vocabulary) (string, string, string) {
+func resultErrorName(info *types.Info, owner ast.Node, words origin_names.Vocabulary) (string, string, string) {
 	declaration, isDeclaration := owner.(*ast.FuncDecl)
 	if !isDeclaration {
 		return "", "named result of a function literal or type", ""
@@ -773,8 +773,8 @@ func resultErrorName(info *types.Info, owner ast.Node, words go_origin_names.Voc
 	if !isFunction {
 		return "", "named result of a function literal or type", ""
 	}
-	newName, category := go_origin_names.FunctionErrorName(function, words)
-	return newName, category, go_origin_names.QualifiedName(function)
+	newName, category := origin_names.FunctionErrorName(function, words)
+	return newName, category, origin_names.QualifiedName(function)
 }
 
 // parameterErrorName names an error parameter. A walk callback's third parameter, a function literal taking
@@ -804,9 +804,9 @@ func isWalkCallback(signature *types.Signature) bool {
 	if basic, isBasic := signature.Params().At(0).Type().(*types.Basic); !isBasic || basic.Kind() != types.String {
 		return false
 	}
-	entry := go_origin_names.NamedTypeOf(signature.Params().At(1).Type())
-	if entry != (go_origin_names.TypeName{PackagePath: "io/fs", Name: "DirEntry"}) &&
-		entry != (go_origin_names.TypeName{PackagePath: "io/fs", Name: "FileInfo"}) {
+	entry := origin_names.NamedTypeOf(signature.Params().At(1).Type())
+	if entry != (origin_names.TypeName{PackagePath: "io/fs", Name: "DirEntry"}) &&
+		entry != (origin_names.TypeName{PackagePath: "io/fs", Name: "FileInfo"}) {
 		return false
 	}
 	return types.Identical(signature.Params().At(2).Type(), errorType)
@@ -816,8 +816,8 @@ func isWalkCallback(signature *types.Signature) bool {
 // leading err moves to the end as Error (`errOne` gives oneError), with every other vocabulary word expanded.
 // It reports false for a name with no such word. A name holding an advice-only or matcher-judged word gets a
 // category instead of a name.
-func abbreviatedErrorName(name string, words go_origin_names.Vocabulary) (string, string, bool) {
-	parts := go_origin_names.CamelWords(name)
+func abbreviatedErrorName(name string, words origin_names.Vocabulary) (string, string, bool) {
+	parts := origin_names.CamelWords(name)
 	if len(parts) < 2 {
 		return "", "", false
 	}
@@ -849,21 +849,21 @@ func abbreviatedErrorName(name string, words go_origin_names.Vocabulary) (string
 			builder.WriteString(expansion)
 			continue
 		}
-		builder.WriteString(go_origin_names.HouseCased(word, index))
+		builder.WriteString(origin_names.HouseCased(word, index))
 	}
 	return builder.String(), "", true
 }
 
 // otherAbbreviatedError reports whether a local error not named err still carries an abbreviated name: one
 // or two letters, or a camel word in the vocabulary. They are out of this pass and counted for the waves.
-func otherAbbreviatedError(variable *types.Var, words go_origin_names.Vocabulary) bool {
+func otherAbbreviatedError(variable *types.Var, words origin_names.Vocabulary) bool {
 	if variable.Name() == "err" || variable.Name() == "_" {
 		return false
 	}
 	if len(variable.Name()) <= 2 {
 		return true
 	}
-	for _, word := range go_origin_names.CamelWords(variable.Name()) {
+	for _, word := range origin_names.CamelWords(variable.Name()) {
 		lowered := strings.ToLower(word)
 		if _, abbreviated := words.Expansions[lowered]; abbreviated || words.AdviceWords[lowered] {
 			return true
@@ -931,10 +931,10 @@ func run(root string, skips []string, dryRun bool, fixup bool) int {
 		return 1
 	}
 
-	var allEdits []rename.Edit
-	allRetargets := map[rename.EditKey]int{}
-	var allInsertions []rename.Insertion
-	insertedAlready := map[rename.Insertion]bool{}
+	var allEdits []local_rename.Edit
+	allRetargets := map[local_rename.EditKey]int{}
+	var allInsertions []local_rename.Insertion
+	insertedAlready := map[local_rename.Insertion]bool{}
 	var allUnresolved []string
 	records := map[string]*declarationRecord{}
 	var recordOrder []string
@@ -995,7 +995,7 @@ func run(root string, skips []string, dryRun bool, fixup bool) int {
 				variable, isVariable := analyzedPackage.TypesInfo.Defs[identifier].(*types.Var)
 				if isVariable &&
 					!isCandidate[variable] &&
-					rename.IsLocal(variable, analyzedPackage.Types) &&
+					local_rename.IsLocal(variable, analyzedPackage.Types) &&
 					types.Identical(variable.Type(), types.Universe.Lookup("error").Type()) &&
 					otherAbbreviatedError(variable, words) {
 					otherAbbreviated[recordKey(variable)] = variable.Name()
@@ -1037,8 +1037,8 @@ func run(root string, skips []string, dryRun bool, fixup bool) int {
 		}
 	}
 
-	edits, disagreements := rename.Deduplicate(allEdits)
-	editsByFile := rename.GroupByFile(edits)
+	edits, disagreements := local_rename.Deduplicate(allEdits)
+	editsByFile := local_rename.GroupByFile(edits)
 
 	candidateCount, eligibleCount, acceptedCount := 0, 0, 0
 	rejectedByReason := map[string]int{}
@@ -1216,7 +1216,7 @@ func nameParameters(
 	loaded *workspace.Workspace,
 	candidatesOf map[*packages.Package][]candidate,
 	finalNames map[string]string,
-	words go_origin_names.Vocabulary,
+	words origin_names.Vocabulary,
 ) []string {
 	sites := map[string]map[int][]string{}
 	for _, analyzedPackage := range loaded.Analyzed {
@@ -1265,11 +1265,11 @@ func splitNames(plan *splitPlan) string {
 
 // packageDecision is what a package's candidates come to after global_rename and the package check.
 type packageDecision struct {
-	plan      rename.Plan
-	edits     []rename.Edit
-	retargets map[rename.EditKey]int
+	plan      local_rename.Plan
+	edits     []local_rename.Edit
+	retargets map[local_rename.EditKey]int
 	// insertions are the declarations the package's splits add.
-	insertions []rename.Insertion
+	insertions []local_rename.Insertion
 	// dropped is each candidate the package check refused, with the first reason it gave.
 	dropped    map[*types.Var]string
 	proposedAt map[string]string
@@ -1282,7 +1282,11 @@ type packageDecision struct {
 // checkPackage over the result. Each line it finds wrong drops the decisions of the top-level declaration
 // holding it (the splits first, since a split's names are the ones global_rename never saw, then the renames),
 // and the package is decided again, until the check passes.
-func decidePackage(goPackage *packages.Package, renamePackage rename.Package, candidates []candidate) packageDecision {
+func decidePackage(
+	goPackage *packages.Package,
+	renamePackage local_rename.Package,
+	candidates []candidate,
+) packageDecision {
 	decision := packageDecision{dropped: map[*types.Var]string{}, oldNames: map[string]bool{}}
 	declarationOf := map[*types.Var]ast.Decl{}
 	for _, decided := range candidates {
@@ -1299,7 +1303,7 @@ func decidePackage(goPackage *packages.Package, renamePackage rename.Package, ca
 		}
 	}
 	for {
-		var proposals []rename.Proposal
+		var proposals []local_rename.Proposal
 		decision.proposedAt = map[string]string{}
 		for _, decided := range candidates {
 			if _, isDropped := decision.dropped[decided.variable]; isDropped ||
@@ -1307,12 +1311,12 @@ func decidePackage(goPackage *packages.Package, renamePackage rename.Package, ca
 				decided.split != nil {
 				continue
 			}
-			proposals = append(proposals, rename.Proposal{Object: decided.variable, NewName: decided.newName})
+			proposals = append(proposals, local_rename.Proposal{Object: decided.variable, NewName: decided.newName})
 			decision.proposedAt[goPackage.Fset.Position(decided.variable.Pos()).String()] = decided.newName
 		}
-		decision.plan = rename.Check(renamePackage, proposals)
-		decision.edits = rename.Edits(renamePackage, decision.plan.Accepted)
-		decision.retargets = map[rename.EditKey]int{}
+		decision.plan = local_rename.Check(renamePackage, proposals)
+		decision.edits = local_rename.Edits(renamePackage, decision.plan.Accepted)
+		decision.retargets = map[local_rename.EditKey]int{}
 		decision.insertions = nil
 		var live []candidate
 		for _, decided := range candidates {
@@ -1435,7 +1439,7 @@ func printCounts(counts map[string]int, limit int) {
 }
 
 // lineBeforeAndAfter returns the source line holding offset, as it is and with the edits that fall on it.
-func lineBeforeAndAfter(filename string, offset int, edits []rename.Edit) (string, string) {
+func lineBeforeAndAfter(filename string, offset int, edits []local_rename.Edit) (string, string) {
 	source, readError := os.ReadFile(filename)
 	if readError != nil {
 		return readError.Error(), ""

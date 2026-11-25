@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/go_language/contract"
-	"github.com/system-inc/cohere/internal/streams"
 )
 
 // Every landing measures itself (#6wnsnq2), in Kirk's words "nothing gets committed to main without timing numbers".
@@ -33,7 +33,7 @@ import (
 //     performanceWaitVariable's wait has passed, naming the holder. A measurement that runs and fails refuses the
 //     landing in the box's words.
 //   - What was gated is what lands, plus this file alone. It is written after the gate, so nothing that builds or tests
-//     may read it, which internal/guard holds (TestNothingThatBuildsOrTestsReadsPerformanceJsonc).
+//     may read it, which internal/testing/guard holds (TestNothingThatBuildsOrTestsReadsPerformanceJsonc).
 //   - The comparison is honest: a number is "moved" only when its new minimum to maximum range doesn't overlap the
 //     old one, and "level" otherwise; another machine, another build or another shape of measurement is a line of its
 //     own, never a comparison.

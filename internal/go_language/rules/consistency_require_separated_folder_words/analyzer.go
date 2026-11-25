@@ -4,9 +4,9 @@
 // A mind reading cold reads format_options at a glance and has to stop and parse formatoptions, and a folder's name
 // is read before anything in it, on every import line and every path. The rule reads the package's folder, the last
 // element of its import path below the module root, and its package clause where the clause differs from the folder
-// and is not main. A name is judged one underscore-separated part at a time by internal/folder_words, the judgment
-// TypeScript's nexus/consistency-require-separated-folder-words reads too: a part that is a word passes, and a part
-// that splits into two or more words is the finding, with the split as the spelling it asks for. The words are
+// and is not main. A name is judged one underscore-separated part at a time by internal/text_rules/folder_words, the
+// judgment TypeScript's nexus/consistency-require-separated-folder-words reads too: a part that is a word passes, and a
+// part that splits into two or more words is the finding, with the split as the spelling it asks for. The words are
 // policy's, so a word the lists lack is a reviewed change to policy, never a carve-out here.
 //
 // testdata and vendor folders are never judged, since the engine never loads a package inside either. A package at
@@ -34,8 +34,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	"github.com/system-inc/cohere/internal/folder_words"
 	"github.com/system-inc/cohere/internal/go_language/rule"
+	"github.com/system-inc/cohere/internal/text_rules/folder_words"
 	"github.com/system-inc/cohere/policy"
 )
 

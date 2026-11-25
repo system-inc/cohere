@@ -2,8 +2,8 @@
 //
 // All-caps reads as aggression, and it spreads: a reader mirrors the register of what they are answering, so one
 // shouted comment ratchets a file's comments into block capitals until emphasis means nothing. The judgment of what
-// counts as shouting, the acronym safe list and the masks that hide code, lives in internal/shouting, which the
-// TypeScript rule nexus/consistency-no-shouting reads too, so the two rules agree on what an acronym is.
+// counts as shouting, the acronym safe list and the masks that hide code, lives in internal/text_rules/shouting, which
+// the TypeScript rule nexus/consistency-no-shouting reads too, so the two rules agree on what an acronym is.
 //
 // Go writes its doc comments as a run of // lines where TypeScript writes one block comment, so a comment group is
 // masked as one text, each // line's slashes and the one space after them set aside the way a block comment's
@@ -24,7 +24,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_language/rule"
-	"github.com/system-inc/cohere/internal/shouting"
+	"github.com/system-inc/cohere/internal/text_rules/shouting"
 	"github.com/system-inc/cohere/policy"
 )
 

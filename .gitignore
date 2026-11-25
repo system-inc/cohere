@@ -16,14 +16,12 @@
 #
 # A binary whose name differs from its directory needs its own line: `gen_tailwind_collapse` is built
 # from `internal/lint/rules/tailwind/tools/generate_collapse`, so no directory-derived entry ever covered it.
-/formatdiff
 /gen_tailwind_collapse
 /cohere
 /cohere-differential
 /cohere-dispatch
 /cohere-release
 /extract_oxc_fixtures
-/formatter_comparison
 /generate_candidate
 /generate_class_order
 /generate_collapse

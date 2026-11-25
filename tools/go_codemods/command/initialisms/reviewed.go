@@ -34,14 +34,14 @@ const (
 // still refuses a rename for any literal of that name in any other file.
 var reviewedLiterals = map[string]map[string]string{
 	"OS": {
-		"internal/shouting/shouting.go": shoutingWord,
+		"internal/text_rules/shouting/shouting.go": shoutingWord,
 	},
 	"CSS": {
-		"internal/shouting/shouting.go":                   shoutingWord,
+		"internal/text_rules/shouting/shouting.go":        shoutingWord,
 		"internal/format/markdown/languages_generated.go": "Linguist's name for the language, in the generated language table",
 	},
 	"URL": {
-		"internal/shouting/shouting.go":                                   shoutingWord,
+		"internal/text_rules/shouting/shouting.go":                        shoutingWord,
 		"internal/lint/rules/next/no_unwanted_polyfillio.go":              "a JavaScript global polyfill.io can serve",
 		"internal/lint/rules/nexus/constant_casing_shapes.go":             "a JavaScript global class",
 		"internal/lint/rules/typescript/no_base_to_string.go":             "a TypeScript library type the rule ignores by default",
@@ -49,12 +49,12 @@ var reviewedLiterals = map[string]map[string]string{
 		"internal/lint/rules/typescript/restrict_template_expressions.go": "a TypeScript library type the rule allows by default",
 	},
 	"YAML": {
-		"internal/shouting/shouting.go":                             shoutingWord,
+		"internal/text_rules/shouting/shouting.go":                  shoutingWord,
 		"internal/format/markdown/languages_generated.go":           "Linguist's name for the language, in the generated language table",
 		"internal/format/markdown/tools/generate_languages/main.go": "a language name the generator checks Linguist's table against",
 	},
 	"BOM": {
-		"internal/shouting/shouting.go": shoutingWord,
+		"internal/text_rules/shouting/shouting.go": shoutingWord,
 	},
 	"GOOS": {
 		"internal/goengine/load/excluded.go": goEnvironmentArgument,
@@ -72,10 +72,10 @@ var reviewedLiterals = map[string]map[string]string{
 		"internal/release/dispatch/hash.go":  "a variable handed to `go env`",
 	},
 	"GOFLAGS": {
-		"internal/goengine/load/excluded.go":          goEnvironmentArgument,
-		"internal/goengine/load/load.go":              "a variable handed to `go env`",
-		"command/cohere-dev/pool.go":                  "an environment variable's name, matched in a switch",
-		"command/cohere/run_cache_end_to_end_test.go": "a variable handed to `go env -json`, decoded into a map",
-		"internal/guard/guard_overlay_test.go":        "an environment variable read with os.Getenv",
+		"internal/goengine/load/excluded.go":           goEnvironmentArgument,
+		"internal/goengine/load/load.go":               "a variable handed to `go env`",
+		"command/cohere-dev/pool.go":                   "an environment variable's name, matched in a switch",
+		"command/cohere/run_cache_end_to_end_test.go":  "a variable handed to `go env -json`, decoded into a map",
+		"internal/testing/guard/guard_overlay_test.go": "an environment variable read with os.Getenv",
 	},
 }

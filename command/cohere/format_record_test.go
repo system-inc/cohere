@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // The format record decides what the default format scope holds, so each test below asserts the exact

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
 // A quiet window switches the cache trim off (#cqfy7cv), and is a wall every heavy job meets (#1rh8dav).

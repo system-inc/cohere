@@ -12,9 +12,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/cohere/internal/replace"
+	"github.com/system-inc/cohere/internal/edit/replace"
+	"github.com/system-inc/cohere/internal/edit/write_root"
 	"github.com/system-inc/cohere/internal/types/source_name"
-	"github.com/system-inc/cohere/internal/write_root"
 )
 
 // Parses reports whether text parses cleanly as the script kind implied by its file name.

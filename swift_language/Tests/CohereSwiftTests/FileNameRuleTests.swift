@@ -6,9 +6,9 @@ import Testing
 
 /*
  Fixture pairs for consistency-no-utils-file-name and consistency-no-abbreviated-file-name, ported from the Go rules'
- own cases (`internal/file_name_words`, `consistency_no_utils_file_name_test.go`). Each path's package root is the
- directory named `project` on it, as the pipeline would set it. The silent cases are the near misses and the names
- nobody inside the package chose.
+ own cases (`internal/text_rules/file_name_words`, `consistency_no_utils_file_name_test.go`). Each path's package root
+ is the directory named `project` on it, as the pipeline would set it. The silent cases are the near misses and the
+ names nobody inside the package chose.
  */
 struct FileNameRuleTests {
     static let source = "/* A header comment, so the finding is seen to sit before it. */\nlet value = 1\n"

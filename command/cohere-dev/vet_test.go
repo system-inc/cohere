@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // unkeyedLiteral is a module whose package user builds another package's struct with unkeyed fields, which

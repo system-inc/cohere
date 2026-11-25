@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/rename"
-	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
