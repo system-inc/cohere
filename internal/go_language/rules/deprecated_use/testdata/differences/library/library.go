@@ -41,3 +41,17 @@ var (
 	// GroupedNew is not.
 	GroupedNew = 2
 )
+
+// RetiredConstant is deprecated as RetiredFunction is, with a paragraph after its notice.
+//
+// Deprecated: use another.
+//
+// It stays for old callers.
+const RetiredConstant = 3
+
+// RetiredType is deprecated as RetiredFunction is, with a paragraph after its notice.
+//
+// Deprecated: use another.
+//
+// It stays for old callers.
+type RetiredType struct{}
