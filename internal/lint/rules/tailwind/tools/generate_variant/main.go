@@ -274,7 +274,7 @@ func harvestClassLists(sourceRoot string, maximum int) ([][]string, error) {
 			// A tree this large has directories the walker cannot enter, and none of them hold
 			// class literals. Failing the whole harvest on one of them would make the fixture
 			// depend on the permissions of a directory it does not read.
-			return nil //nolint:nilerr
+			return nil
 		}
 		if entry.IsDir() {
 			switch entry.Name() {
@@ -291,7 +291,9 @@ func harvestClassLists(sourceRoot string, maximum int) ([][]string, error) {
 
 		contents, readError := os.ReadFile(path)
 		if readError != nil {
-			return nil //nolint:nilerr
+			// A file that vanished or can't be read mid-walk costs the corpus one file's lists, as an
+			// unreadable directory does, and failing the harvest on it would make the fixture depend on it.
+			return nil
 		}
 
 		for _, match := range classAttributePattern.FindAllSubmatch(contents, -1) {

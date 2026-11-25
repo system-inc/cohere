@@ -156,7 +156,6 @@ func emitCompare(function *Function, operator token.Token, x, y Value, source as
 		operandX = emitConv(function, x, y.Type(), source)
 	} else if _, ok := y.(*Constant); ok {
 		operandY = emitConv(function, y, x.Type(), source)
-		//lint:ignore SA9003 no-op
 	} else {
 		// other cases, e.g. channels.  No-op.
 	}
