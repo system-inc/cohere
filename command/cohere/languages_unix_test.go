@@ -237,9 +237,14 @@ func TestANarrowedRunNamesWhatItLeftOutWhileItsProjectReplays(test *testing.T) {
 	}
 	environment := []string{"COHERE_SWIFT_ENGINE=" + swiftEngine, goEngineChildVariable + "="}
 	leftOut := "⚠ left out: swift"
-	if output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix",
-		"--verbose"); exitCode != 0 || strings.Contains(output, leftOut) {
-		test.Fatalf("the plain run exited %d, want 0 and nothing left out:\n%s", exitCode, output)
+	// Twice: the first plain run's Go project is never recorded, since the Swift project's run beside it makes
+	// swift/.cache while the Go census reads that directory, which the Go run then refuses to vouch for. The second
+	// finds the directory settled and records.
+	for range 2 {
+		if output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix",
+			"--verbose"); exitCode != 0 || strings.Contains(output, leftOut) {
+			test.Fatalf("the plain run exited %d, want 0 and nothing left out:\n%s", exitCode, output)
+		}
 	}
 	output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--verbose",
 		"--languages", "go")
