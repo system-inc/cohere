@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -32,7 +32,7 @@ const outsideNamedPaths = "outside the named paths"
 func settleNothingChecked(
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
-	lintConfiguration *configuration.Configuration,
+	lintConfiguration *settings.Configuration,
 	location projectLocation,
 	typesRan bool,
 	lintRan bool,
@@ -63,23 +63,23 @@ func settleNothingChecked(
 func addTypeScriptExcluded(
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
-	settings *configuration.Configuration,
+	projectSettings *settings.Configuration,
 	root string,
 ) {
 	if outside := len(graph.ProjectFiles()) - len(projectFiles); outside > 0 {
 		activeSummary.Gaps.addExcluded(outsideNamedPaths, "", outside)
 	}
-	if settings == nil {
+	if projectSettings == nil {
 		return
 	}
 	for _, sourceFile := range projectFiles {
-		resolved := settings.Resolve(sourceFile.FileName().AsString())
+		resolved := projectSettings.Resolve(sourceFile.FileName().AsString())
 		if !resolved.Ignored || resolved.TypesOnly {
 			continue
 		}
 		activeSummary.Gaps.addExcluded(
 			`matched ignorePatterns "`+resolved.IgnoredBy+`"`,
-			ignoreEntrySource(settings, resolved.IgnoredBy, root),
+			ignoreEntrySource(projectSettings, resolved.IgnoredBy, root),
 			1,
 		)
 	}
@@ -87,12 +87,12 @@ func addTypeScriptExcluded(
 
 // ignoreEntrySource is the settings file that wrote the ignore entry with pattern, relative to root, or the set's
 // name, and empty when no entry of these settings wrote it, as a house variant's own may.
-func ignoreEntrySource(settings *configuration.Configuration, pattern string, root string) string {
-	for _, entry := range settings.IgnoreEntries {
+func ignoreEntrySource(projectSettings *settings.Configuration, pattern string, root string) string {
+	for _, entry := range projectSettings.IgnoreEntries {
 		if entry.Pattern != pattern {
 			continue
 		}
-		if configuration.IsSet(entry.File) {
+		if settings.IsSet(entry.File) {
 			return entry.File
 		}
 		if relative, relativePathError := filepath.Rel(root, entry.File); relativePathError == nil {

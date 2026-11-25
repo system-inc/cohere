@@ -11,8 +11,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_pattern"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // PreferRegexLiteralsOptions is the rule's option surface.

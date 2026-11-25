@@ -93,7 +93,7 @@ Current status lives in the rules spreadsheet, not here.
     internal/lint/rule/                 rule.Rule, rule.Register
     internal/lint/testing/              Run, RunTyped, ExpectFindings, ExpectFixedSource
     internal/lint/registry/             the guards
-    internal/lint/configuration/        config resolution
+    internal/settings/        config resolution
     internal/types/program/             the type graph
     internal/edit/                      the write layer
     TypeScript/ and TypeScript-shim/    the vendored compiler and its linkname shims

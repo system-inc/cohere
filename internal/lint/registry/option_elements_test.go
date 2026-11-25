@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 /*
@@ -455,7 +455,7 @@ func optionsThroughTheConfigLayer(test *testing.T, ruleName string, value string
 	if writeError := os.WriteFile(path, []byte(contents), 0o600); writeError != nil {
 		test.Fatalf("writing %s: %v", path, writeError)
 	}
-	loaded, loadError := configuration.Load(path)
+	loaded, loadError := settings.Load(path)
 	if loadError != nil {
 		test.Fatalf("loading %s: %v", contents, loadError)
 	}

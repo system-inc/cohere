@@ -11,9 +11,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -35,8 +35,8 @@ type printedDeparture struct {
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
 func writeResolvedConfiguration(
 	out *bufio.Writer,
-	lintConfiguration *configuration.Configuration,
-	resolved configuration.Resolved,
+	lintConfiguration *settings.Configuration,
+	resolved settings.Resolved,
 	location projectLocation,
 	path string,
 ) error {
@@ -146,7 +146,7 @@ func writeResolvedConfiguration(
 // options or inventing plugin defaults. A later settings reader needs no change to this command.
 func settingsForFile(
 	base rule.OptionsBase,
-	resolved configuration.Resolved,
+	resolved settings.Resolved,
 	registrations []rule.SettingsRegistration,
 ) (map[string]json.RawMessage, error) {
 	settings := map[string]json.RawMessage{}
@@ -187,15 +187,15 @@ func settingsForFile(
 
 // resolvedConfigRules preserves the registered-rule view and adds this file's alternate configuration
 // spellings. Every name in it is a registered rule or reaches one.
-func resolvedConfigRules(resolved configuration.Resolved) map[string][]json.RawMessage {
+func resolvedConfigRules(resolved settings.Resolved) map[string][]json.RawMessage {
 	rules := map[string][]json.RawMessage{}
 	for _, registered := range registry.All() {
 		status, setting := resolved.StatusOf(registered.Name)
 		var severity int
 		switch status {
-		case configuration.StatusEnabled:
+		case settings.StatusEnabled:
 			severity = int(setting.Severity)
-		case configuration.StatusScopedOff:
+		case settings.StatusScopedOff:
 			severity = 0
 		default:
 			continue

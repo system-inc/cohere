@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // goTimelineStream is the Go contract's timeline fixture: a clean run whose timeline record, four stamps, comes last
@@ -195,7 +195,7 @@ func TestANarrowedRunOfNoGoProjectRefusesAGoOnlySwitch(test *testing.T) {
 	writeTree(test, root, map[string]string{
 		".gitignore": ".cache/\n",
 		"apps/web/CohereSettings.json": "{\n    \"extends\": \"cohere:typescript\",\n    \"rules\": {\n" +
-			"        \"" + configuration.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n",
+			"        \"" + settings.AbbreviatedFolderName + "\": \"error\"\n    }\n}\n",
 		"apps/web/tsconfig.json": "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, " +
 			"\"include\": [\"source\"] }\n",
 		"apps/web/source/tidy.ts": "export const tidy = 1;\n",
@@ -203,7 +203,7 @@ func TestANarrowedRunOfNoGoProjectRefusesAGoOnlySwitch(test *testing.T) {
 	})
 	folder := filepath.Join(root, "apps", "web", "docs")
 	output, exit := runCohere(test, binary, root, "--no-fix", "--directory", "apps/web")
-	if exit != 1 || !strings.Contains(output, folder+"/ - error "+configuration.AbbreviatedFolderName) {
+	if exit != 1 || !strings.Contains(output, folder+"/ - error "+settings.AbbreviatedFolderName) {
 		test.Fatalf("the control exited %d, want 1 naming the folder, so the run reaches the folder check:\n%s", exit,
 			output)
 	}

@@ -22,9 +22,9 @@ import (
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/edit/write_root"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/types/source_name"
 )
@@ -183,11 +183,11 @@ func applyProposedFixes(
 			continue
 		}
 		// A warning-only directive repair is available to --fix, but must not turn --no-fix red.
-		if !write && diagnostic.RuleName == configuration.UnusedDisable &&
+		if !write && diagnostic.RuleName == settings.UnusedDisable &&
 			unusedDisableSeverity(
 				graph.LintConfiguration,
 				diagnostic.SourceFile.FileName().AsString(),
-			) == configuration.SeverityWarn {
+			) == settings.SeverityWarn {
 			continue
 		}
 		// In the form the format scope holds, since both halves of the union below are keyed by it. The
@@ -319,10 +319,10 @@ func applyProposedFixes(
 				return nil, nil
 			}
 			proposals, relintError := relint(fileName, text)
-			if !write && unusedDisableSeverity(graph.LintConfiguration, fileName) == configuration.SeverityWarn {
+			if !write && unusedDisableSeverity(graph.LintConfiguration, fileName) == settings.SeverityWarn {
 				kept := proposals[:0]
 				for _, proposal := range proposals {
-					if proposal.RuleName != configuration.UnusedDisable {
+					if proposal.RuleName != settings.UnusedDisable {
 						kept = append(kept, proposal)
 					}
 				}
@@ -826,7 +826,7 @@ func proposalsForText(
 	}
 
 	if len(directives.Directives()) > 0 &&
-		unusedDisableSeverity(graph.LintConfiguration, fileName) != configuration.SeverityOff {
+		unusedDisableSeverity(graph.LintConfiguration, fileName) != settings.SeverityOff {
 		ran := make([]string, 0, len(applicable))
 		for _, subject := range applicable {
 			ran = append(ran, subject.Name)

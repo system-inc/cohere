@@ -3,7 +3,7 @@ package registry
 import (
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
@@ -20,7 +20,7 @@ func BenchmarkLoadForTheLiveConfiguration(benchmark *testing.B) {
 	path := corpus.Ahra.Path(benchmark, "CohereSettings.json")
 	names := Names()
 	for benchmark.Loop() {
-		if _, loadForError := configuration.LoadFor(path, names); loadForError != nil {
+		if _, loadForError := settings.LoadFor(path, names); loadForError != nil {
 			benchmark.Fatal(loadForError)
 		}
 	}

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // Directive spellings cohere honors, with identical grammar.

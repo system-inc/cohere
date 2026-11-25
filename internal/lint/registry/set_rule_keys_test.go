@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // Every set cohere carries loads against the real registry, and every rule key each one writes, at top level
@@ -25,7 +25,7 @@ func TestEveryKeyInEverySetReachesARegisteredRule(test *testing.T) {
 	if len(names) == 0 {
 		test.Fatal("the registry is empty, so this test proves nothing")
 	}
-	setNames := configuration.SetNames()
+	setNames := settings.SetNames()
 	if len(setNames) < 3 {
 		test.Fatalf("cohere carries %d sets (%v); the embedded tree did not load", len(setNames), setNames)
 	}
@@ -35,11 +35,11 @@ func TestEveryKeyInEverySetReachesARegisteredRule(test *testing.T) {
 		if writeError := os.WriteFile(path, []byte(`{"extends": "`+setName+`"}`), 0o600); writeError != nil {
 			test.Fatal(writeError)
 		}
-		if _, loadForError := configuration.LoadFor(path, names); loadForError != nil {
+		if _, loadForError := settings.LoadFor(path, names); loadForError != nil {
 			test.Errorf("%s does not load against the registry: %v", setName, loadForError)
 		}
 
-		contents, sourceContentsError := configuration.SourceContents(setName)
+		contents, sourceContentsError := settings.SourceContents(setName)
 		if sourceContentsError != nil {
 			test.Fatal(sourceContentsError)
 		}
@@ -62,7 +62,7 @@ func TestEveryKeyInEverySetReachesARegisteredRule(test *testing.T) {
 			}
 		}
 		for _, key := range keys {
-			if configuration.IsLinterCheck(key) || reachesARegisteredRule(key, names) {
+			if settings.IsLinterCheck(key) || reachesARegisteredRule(key, names) {
 				continue
 			}
 			test.Errorf("%s names %q, which reaches no registered rule", setName, key)
@@ -72,7 +72,7 @@ func TestEveryKeyInEverySetReachesARegisteredRule(test *testing.T) {
 
 func reachesARegisteredRule(key string, names []string) bool {
 	for _, name := range names {
-		if configuration.KeyReachesRule(key, name) {
+		if settings.KeyReachesRule(key, name) {
 			return true
 		}
 	}

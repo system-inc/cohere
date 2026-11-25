@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // noRestrictedImportsGlob is one compiled gitignore-style pattern from a `group` entry.

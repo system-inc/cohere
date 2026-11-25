@@ -15,7 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -167,7 +167,7 @@ type discovery struct {
 	// by path (see folder_names.go), judged on every walk and kept only where the root's settings turn the check on,
 	// at FolderSeverity, which is off otherwise.
 	Folders        []folderFinding
-	FolderSeverity configuration.Severity
+	FolderSeverity settings.Severity
 }
 
 // unusedModule is a Go module that runs on its own though a workspace sits above it, which a reader who
@@ -246,7 +246,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		FormattableKinds: map[string]map[string]int{},
 		DefaultMatched:   map[string]int{},
 	}
-	ignoreTally := configuration.NewIgnoreTally(ignorePatterns)
+	ignoreTally := settings.NewIgnoreTally(ignorePatterns)
 
 	// The matcher is the repository's, a submodule's own when the root is inside one, so the .gitignore
 	// files between its root and this one apply too.
@@ -382,7 +382,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			}
 			filePath := path.Join(relative, entry.Name())
 			if directoryScope.Ignored(fromRepository(filePath), false) ||
-				configuration.MatchAny(ignorePatterns, filePath) {
+				settings.MatchAny(ignorePatterns, filePath) {
 				continue
 			}
 			if isSwift {
@@ -427,7 +427,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				continue
 			}
 			markerPath := path.Join(relative, marker.name)
-			if configuration.MatchAny(ignorePatterns, markerPath) {
+			if settings.MatchAny(ignorePatterns, markerPath) {
 				found.Refused = append(found.Refused, markerPath)
 				continue
 			}
@@ -439,7 +439,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		}
 		if marker := xcodeMarker(entries, names); marker != "" {
 			markerPath := path.Join(relative, marker)
-			if configuration.MatchAny(ignorePatterns, markerPath) {
+			if settings.MatchAny(ignorePatterns, markerPath) {
 				found.Refused = append(found.Refused, markerPath)
 			} else {
 				xcodeCandidates[relative] = true
@@ -512,7 +512,7 @@ func countIgnoredBelow(
 	root string,
 	directory string,
 	entries []os.DirEntry,
-	tally *configuration.IgnoreTally,
+	tally *settings.IgnoreTally,
 ) error {
 	scope, newIgnoreScopeError := newIgnoreScope(filepath.Join(root, directory))
 	if newIgnoreScopeError != nil {
@@ -529,7 +529,7 @@ func countIgnoredIn(
 	directory string,
 	entries []os.DirEntry,
 	scope ignoreScope,
-	tally *configuration.IgnoreTally,
+	tally *settings.IgnoreTally,
 ) error {
 	for _, entry := range entries {
 		tally.Count(path.Join(directory, entry.Name()), entry.IsDir())
@@ -570,7 +570,7 @@ func countIgnoredIn(
 // `internal/load/testdata/0.1/refuse/**` keeps fixtures out of a TypeScript program that includes them, and
 // would read as dead. A pattern that begins with a wildcard names no path and stays as the walk left it, so this
 // never walks a tree the pattern does not name, and a directory the pattern takes whole is counted once.
-func countNamedPaths(root string, tally *configuration.IgnoreTally) error {
+func countNamedPaths(root string, tally *settings.IgnoreTally) error {
 	for _, index := range tally.Unmatched() {
 		prefix := tally.LiteralPrefix(index)
 		if prefix == "" {
@@ -819,16 +819,16 @@ func rootIgnorePatterns(root string) ([]string, error) {
 	if rootIgnoreEntriesError != nil {
 		return nil, rootIgnoreEntriesError
 	}
-	return configuration.IgnorePatternsFrom(entries), nil
+	return settings.IgnorePatternsFrom(entries), nil
 }
 
 // rootIgnoreEntries is rootIgnorePatterns with each entry whole, its reason and the file that wrote it.
-func rootIgnoreEntries(root string) ([]configuration.IgnoreEntry, error) {
-	settings := filepath.Join(root, "CohereSettings.json")
-	if !isRegularFile(settings) {
+func rootIgnoreEntries(root string) ([]settings.IgnoreEntry, error) {
+	settingsPath := filepath.Join(root, "CohereSettings.json")
+	if !isRegularFile(settingsPath) {
 		return nil, nil
 	}
-	return configuration.IgnoreEntriesOf(settings)
+	return settings.IgnoreEntriesOf(settingsPath)
 }
 
 // isTheLocatedProject reports whether discovery found exactly the one project the walk up located, which

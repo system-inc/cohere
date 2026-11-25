@@ -124,7 +124,7 @@ tsgolint_binary=($tools/node_modules/@oxlint-tsgolint/*/tsgolint(N))
 # the tools directory, since by name it would find the project's own, built against another Prettier.
 cohere_checkout=${cohere_source:h:h:h:h}
 cohere_commit=$(print -- "$cohere_version" | awk '$1 == "commit:" { print $2 }')
-format_set=$(git -C $cohere_checkout show $cohere_commit:internal/lint/configuration/sets/typescript.json) ||
+format_set=$(git -C $cohere_checkout show $cohere_commit:internal/settings/sets/typescript.json) ||
   fail "cannot read cohere's TypeScript set at $cohere_commit in $cohere_checkout"
 (cd $copy && print -r -- "$format_set" | node -e '
   const [copy, logs, tools] = process.argv.slice(1);

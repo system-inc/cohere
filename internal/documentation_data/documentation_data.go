@@ -4,7 +4,7 @@
 // Nothing here is typed in. Each output reads one source the build already trusts: the rule registry
 // and what each registration declares, the rule sets cohere carries as the loader resolves them, the
 // Swift registry and verdict catalog, cohere-go's registry, the settings schemas
-// internal/settings_schema renders, CHANGELOG.md, the flag set as the binary prints it, the cases the rule
+// internal/settings/schema renders, CHANGELOG.md, the flag set as the binary prints it, the cases the rule
 // tests assert, recorded by the capture hook in internal/lint/testing, and the benchmark runs
 // bench/quiet_machine.sh recorded in bench/results. A field no source holds yet is left out rather than
 // guessed, and the sourceNotes in rules.json say where each field comes from.
@@ -28,8 +28,8 @@ import (
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/format/native"
 	golanguagerule "github.com/system-inc/cohere/internal/go_language/rule"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // The files Build produces under Directory, relative to the module root. RuleNamesPath is the one it writes
@@ -54,7 +54,7 @@ type Inputs struct {
 	// SetNames is every rule set cohere carries, prefixed (`cohere:typescript`), and LoadSet resolves
 	// one the way a project extending it alone would see it. SetContents is a set's own text.
 	SetNames    []string
-	LoadSet     func(name string) (*configuration.Configuration, error)
+	LoadSet     func(name string) (*settings.Configuration, error)
 	SetContents func(name string) ([]byte, error)
 
 	// SwiftVerdicts is swift_language/HouseRuleVerdicts.json.
@@ -72,7 +72,7 @@ type Inputs struct {
 	// reports them (go_language.FixingRules), each of which must name a rule GoRules holds.
 	GoFixingRules []string
 
-	// SettingsSchemas is what internal/settings_schema renders, keyed by its path relative to the module
+	// SettingsSchemas is what internal/settings/schema renders, keyed by its path relative to the module
 	// root. The *.schema.json files are copied beside the rest, so the site reads one directory.
 	SettingsSchemas map[string][]byte
 
@@ -177,7 +177,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		files[Directory+"/"+filepath.Base(path)] = contents
 	}
 	if _, present := files[Directory+"/"+settingsSchemaName]; !present {
-		return nil, fmt.Errorf("documentation_data: internal/settings_schema rendered no %s", settingsSchemaName)
+		return nil, fmt.Errorf("documentation_data: internal/settings/schema rendered no %s", settingsSchemaName)
 	}
 	return files, nil
 }

@@ -45,7 +45,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // The byte constants upstream names, kept at their upstream names so the port diffs against the

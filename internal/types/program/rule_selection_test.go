@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile covers the selection memo (#9jpmqm9).
@@ -17,15 +17,15 @@ import (
 // are still counted once for every file rather than once for every selection.
 func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testing.T) {
 	test.Parallel()
-	graph := &Graph{LintConfiguration: &configuration.Configuration{
-		Rules: map[string]configuration.RuleSetting{
-			"runs": {Severity: configuration.SeverityError},
-			"off":  {Severity: configuration.SeverityOff},
+	graph := &Graph{LintConfiguration: &settings.Configuration{
+		Rules: map[string]settings.RuleSetting{
+			"runs": {Severity: settings.SeverityError},
+			"off":  {Severity: settings.SeverityOff},
 		},
-		Overrides: []configuration.Override{
+		Overrides: []settings.Override{
 			{
 				Files: []string{"special/**"},
-				Rules: map[string]configuration.RuleSetting{"runs": {Severity: configuration.SeverityOff}},
+				Rules: map[string]settings.RuleSetting{"runs": {Severity: settings.SeverityOff}},
 			},
 		},
 	}}
@@ -39,7 +39,7 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testin
 		}
 		rules = append(rules, entry)
 	}
-	selections := map[*configuration.ResolutionIdentity]*ruleSelection{}
+	selections := map[*settings.ResolutionIdentity]*ruleSelection{}
 	scopedOff, unconfigured := map[string]int{}, map[string]int{}
 
 	first, _ := graph.rulesFor("source/a.ts", rules, selections, scopedOff, unconfigured)
@@ -74,9 +74,9 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testin
 // overrides give the rule red, so their selections differ and their options do not.
 func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *testing.T) {
 	test.Parallel()
-	setting := func(marker string) configuration.RuleSetting {
-		return configuration.RuleSetting{
-			Severity: configuration.SeverityError,
+	setting := func(marker string) settings.RuleSetting {
+		return settings.RuleSetting{
+			Severity: settings.SeverityError,
 			Options:  []json.RawMessage{json.RawMessage(`"` + marker + `"`)},
 		}
 	}
@@ -101,17 +101,17 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 	}
 	rules := []rule.Entry{derivedEntry}
 	graph := &Graph{
-		LintConfiguration: &configuration.Configuration{
-			Rules: map[string]configuration.RuleSetting{"derived": setting("red")},
-			Overrides: []configuration.Override{
+		LintConfiguration: &settings.Configuration{
+			Rules: map[string]settings.RuleSetting{"derived": setting("red")},
+			Overrides: []settings.Override{
 				{
 					Files: []string{"special/**"},
-					Rules: map[string]configuration.RuleSetting{"derived": setting("blue")},
+					Rules: map[string]settings.RuleSetting{"derived": setting("blue")},
 				},
-				{Files: []string{"again/**"}, Rules: map[string]configuration.RuleSetting{"derived": setting("red")}},
+				{Files: []string{"again/**"}, Rules: map[string]settings.RuleSetting{"derived": setting("red")}},
 			},
 		},
-		RuleOptions: configuration.OptionsRegistry{"derived": {Decode: func(raw json.RawMessage) (rule.Bound, error) {
+		RuleOptions: settings.OptionsRegistry{"derived": {Decode: func(raw json.RawMessage) (rule.Bound, error) {
 			var marker string
 			if decodeError := json.Unmarshal(raw, &marker); decodeError != nil {
 				return rule.Bound{}, decodeError
@@ -128,7 +128,7 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			selections := map[*configuration.ResolutionIdentity]*ruleSelection{}
+			selections := map[*settings.ResolutionIdentity]*ruleSelection{}
 			scopedOff, unconfigured := map[string]int{}, map[string]int{}
 			for file, want := range map[string]string{
 				"source/a.ts":  "red",

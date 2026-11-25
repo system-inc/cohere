@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // Comment is one comment in a file: where it is, what kind it is, and its text.

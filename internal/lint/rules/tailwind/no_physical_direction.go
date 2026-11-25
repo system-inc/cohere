@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 	"github.com/system-inc/cohere/internal/types/source_name"
 	"github.com/system-inc/cohere/policy"
 )

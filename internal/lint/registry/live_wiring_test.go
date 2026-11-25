@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
@@ -31,7 +31,7 @@ func liveConfigPath(test testing.TB) string {
 func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T) {
 	test.Parallel()
 
-	loaded, loadError := configuration.Load(liveConfigPath(test))
+	loaded, loadError := settings.Load(liveConfigPath(test))
 	if loadError != nil {
 		test.Fatalf("loading the live config: %v", loadError)
 	}
@@ -67,7 +67,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T)
 		// running on nothing alongside genuine gaps. That is a false positive on correct work, and
 		// a guard that cries wolf on the right answer gets ignored on the wrong one.
 		status, _ := resolved.StatusOf(subject.Name)
-		if status == configuration.StatusUnconfigured {
+		if status == settings.StatusUnconfigured {
 			unreachable = append(unreachable, subject.Name)
 		}
 	}
@@ -88,7 +88,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T)
 			staleExemptions = append(staleExemptions, name+": no registered rule has this name")
 			continue
 		}
-		if status, _ := resolved.StatusOf(name); status != configuration.StatusUnconfigured {
+		if status, _ := resolved.StatusOf(name); status != settings.StatusUnconfigured {
 			staleExemptions = append(staleExemptions, name+": the live config configures it")
 		}
 	}

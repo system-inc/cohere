@@ -21,8 +21,8 @@ package registry
 import (
 	"encoding/json"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 
 	_ "github.com/system-inc/cohere/internal/lint/rules/adamic"
 	_ "github.com/system-inc/cohere/internal/lint/rules/base"
@@ -79,17 +79,17 @@ func Count() int {
 //
 // This form knows no base, so a rule whose options name a place on disk can only take an absolute
 // path from it and refuses a relative or absent one by name. The command uses OptionsAt.
-func Options() configuration.OptionsRegistry {
+func Options() settings.OptionsRegistry {
 	return OptionsAt(rule.OptionsBase{})
 }
 
 // OptionsAt is Options for a run that knows where its config lives and which project it checks, so a
 // rule registered with DecodeAt can anchor a relative path, or default an absent one, rather than
 // matching nothing.
-func OptionsAt(base rule.OptionsBase) configuration.OptionsRegistry {
-	options := configuration.OptionsRegistry{}
+func OptionsAt(base rule.OptionsBase) settings.OptionsRegistry {
+	options := settings.OptionsRegistry{}
 	for _, entry := range rule.Registered() {
-		ruleOptions := configuration.RuleOptions{Required: entry.RequiresOptions, Unconfigured: entry.Unconfigured}
+		ruleOptions := settings.RuleOptions{Required: entry.RequiresOptions, Unconfigured: entry.Unconfigured}
 		// Bind reads base only under OptionArityAt, so handing it to every arity changes nothing for the others.
 		decode := func(raw json.RawMessage) (rule.Bound, error) { return entry.Bind(raw, base) }
 		switch entry.Arity {

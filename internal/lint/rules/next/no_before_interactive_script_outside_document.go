@@ -4,8 +4,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 var messageNoBeforeInteractiveScriptOutsideDocument = rule.Message{

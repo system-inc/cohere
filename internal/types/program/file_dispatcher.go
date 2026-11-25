@@ -5,9 +5,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // fileDispatcher is one worker's dispatch machinery, made once and reused for every file the worker walks.
@@ -202,7 +202,7 @@ func (dispatcher *fileDispatcher) dispatchFileSafely(
 	offeredCounts map[string]int,
 	ruleOptions map[string]rule.Bound,
 	measureOnly map[string]bool,
-	resolution configuration.Resolved,
+	resolution settings.Resolved,
 ) (
 	visited int,
 	silenced suppressionTally,
@@ -258,7 +258,7 @@ func (dispatcher *fileDispatcher) dispatchFile(
 	offeredCounts map[string]int,
 	ruleOptions map[string]rule.Bound,
 	measureOnly map[string]bool,
-	resolution configuration.Resolved,
+	resolution settings.Resolved,
 ) (visitedNodes int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, readiness *fileReadiness) {
 	listened := false
 
@@ -398,7 +398,7 @@ func (dispatcher *fileDispatcher) dispatchFile(
 		}
 	}
 
-	if resolution.UnusedDisableSeverity() != configuration.SeverityOff {
+	if resolution.UnusedDisableSeverity() != settings.SeverityOff {
 		reportDeadDirectives(sourceFile, directives, ranRules, measureOnly, ruleCrashes, report)
 	}
 	silenced = tally(sourceFile.FileName().AsString(), directives, ranRule, resolution)

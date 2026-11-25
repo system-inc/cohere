@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // noRestrictedTypesKeywordKinds is upstream's `TYPE_KEYWORDS`, mapping a configurable spelling onto

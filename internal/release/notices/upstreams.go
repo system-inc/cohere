@@ -500,7 +500,7 @@ var Upstreams = []Upstream{
 		Name:        "confusing-browser-globals",
 		Url:         "https://github.com/facebook/create-react-app/tree/main/packages/confusing-browser-globals",
 		License:     "MIT",
-		Carries:     "The restricted globals list embedded in internal/lint/configuration/sets/typescript.json.",
+		Carries:     "The restricted globals list embedded in internal/settings/sets/typescript.json.",
 		Reach:       Compiled,
 		LicenseFile: "confusing-browser-globals.txt",
 	},

@@ -12,8 +12,8 @@ import (
 	type_checking "github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // messageBanTsCommentBanned is upstream's `tsDirectiveComment`, the outright refusal of a directive.

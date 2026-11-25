@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // ourTailwindSettings is the block our three Tailwind repositories write, verbatim.
@@ -108,7 +108,7 @@ func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 	test.Parallel()
 	const ruleName = "better-tailwindcss/enforce-consistent-class-order"
 	ownOrder := []json.RawMessage{json.RawMessage(`{"order": "asc"}`)}
-	optionsWith := func(block string) configuration.OptionsRegistry {
+	optionsWith := func(block string) settings.OptionsRegistry {
 		return OptionsAt(settingsOf(map[string]string{"better-tailwindcss": block}))
 	}
 

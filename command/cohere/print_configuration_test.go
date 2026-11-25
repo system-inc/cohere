@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // `--print-config` answers what runs on a file, rule by registered rule, in ESLint's shape, so a parity
@@ -20,19 +20,19 @@ import (
 // through its typescript-eslint twin's key.
 func TestPrintConfigResolvesEveryRegisteredRuleForAFile(test *testing.T) {
 	test.Parallel()
-	lintConfiguration := &configuration.Configuration{
+	lintConfiguration := &settings.Configuration{
 		Root: "/repository",
-		Rules: map[string]configuration.RuleSetting{
+		Rules: map[string]settings.RuleSetting{
 			"max-classes-per-file": {
-				Severity: configuration.SeverityError,
+				Severity: settings.SeverityError,
 				Options:  []json.RawMessage{json.RawMessage(`{"ignoreExpressions":true}`)},
 			},
-			"@typescript-eslint/no-invalid-this": {Severity: configuration.SeverityError},
-			"no-var":                             {Severity: configuration.SeverityWarn},
+			"@typescript-eslint/no-invalid-this": {Severity: settings.SeverityError},
+			"no-var":                             {Severity: settings.SeverityWarn},
 		},
-		Overrides: []configuration.Override{{
+		Overrides: []settings.Override{{
 			Files: []string{"**/*.test.ts"},
-			Rules: map[string]configuration.RuleSetting{"no-var": {Severity: configuration.SeverityOff}},
+			Rules: map[string]settings.RuleSetting{"no-var": {Severity: settings.SeverityOff}},
 		}},
 	}
 
@@ -264,21 +264,21 @@ func TestPrintConfigSettingsReaders(test *testing.T) {
 			}, nil
 		},
 	}}
-	resolved := configuration.Resolved{Rules: map[string]configuration.RuleSetting{
-		"future/read": {Severity: configuration.SeverityWarn},
-		"future/off":  {Severity: configuration.SeverityOff},
+	resolved := settings.Resolved{Rules: map[string]settings.RuleSetting{
+		"future/read": {Severity: settings.SeverityWarn},
+		"future/off":  {Severity: settings.SeverityOff},
 	}}
-	settings, settingsForFileError := settingsForFile(base, resolved, registrations)
+	fileSettings, settingsForFileError := settingsForFile(base, resolved, registrations)
 	if settingsForFileError != nil {
 		test.Fatal(settingsForFileError)
 	}
-	if len(settings) != 1 || string(settings["future-plugin"]) != `{"read":"yes"}` {
-		test.Errorf("registered settings = %s", settings)
+	if len(fileSettings) != 1 || string(fileSettings["future-plugin"]) != `{"read":"yes"}` {
+		test.Errorf("registered settings = %s", fileSettings)
 	}
-	resolved.Rules["future/read"] = configuration.RuleSetting{Severity: configuration.SeverityOff}
-	settings, settingsForFileError = settingsForFile(base, resolved, registrations)
-	if settingsForFileError != nil || len(settings) != 0 {
-		test.Errorf("settings without a reader = %s, %v", settings, settingsForFileError)
+	resolved.Rules["future/read"] = settings.RuleSetting{Severity: settings.SeverityOff}
+	fileSettings, settingsForFileError = settingsForFile(base, resolved, registrations)
+	if settingsForFileError != nil || len(fileSettings) != 0 {
+		test.Errorf("settings without a reader = %s, %v", fileSettings, settingsForFileError)
 	}
 }
 
@@ -289,13 +289,13 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 	binary := buildCohere(test)
 	root := test.TempDir()
 	base := `{"extends":"cohere:adamic","rules":{"@typescript-eslint/no-invalid-this":"error"}}`
-	settings := `{"extends":"./Base.json","rules":{"unused-disable":"error"},"overrides":[{"files":["Other.ts"],"rules":{"unused-disable":"off","nexus/no-debugger":"error"},"reason":"fixture exception"}]}`
+	settingsText := `{"extends":"./Base.json","rules":{"unused-disable":"error"},"overrides":[{"files":["Other.ts"],"rules":{"unused-disable":"off","nexus/no-debugger":"error"},"reason":"fixture exception"}]}`
 	writeTree(test, root, map[string]string{
 		"tsconfig.json":       `{"compilerOptions":{"target":"ES2022","module":"ESNext","lib":["ES2022"]},"include":["*.ts"]}`,
 		"Thing.ts":            "export const thing = 1;\n",
 		"Other.ts":            "export const other = 2;\n",
 		"Base.json":           base,
-		"CohereSettings.json": settings,
+		"CohereSettings.json": settingsText,
 	})
 	read := func(file string) (map[string]string, printedUnusedDisable) {
 		test.Helper()
@@ -317,12 +317,12 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 	}
 	// unused-disable is printed on its own key, never among the rules, since --rules lists only registered
 	// rules and a parity check would read an entry there as a rule cohere has no implementation for.
-	checkSeverity := func(printed printedUnusedDisable, want configuration.Severity) {
+	checkSeverity := func(printed printedUnusedDisable, want settings.Severity) {
 		test.Helper()
 		if printed.severity == nil || *printed.severity != int(want) {
 			test.Errorf("unusedDisable = %v, want %d", printed.severity, want)
 		}
-		if _, listed := printed.rules[configuration.UnusedDisable]; listed {
+		if _, listed := printed.rules[settings.UnusedDisable]; listed {
 			test.Errorf("unused-disable is listed among the rules, where --rules cannot answer for it")
 		}
 	}
@@ -351,23 +351,23 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 			test.Errorf("unconfigured alias rule %s printed", absent)
 		}
 	}
-	checkSeverity(rules, configuration.SeverityError)
+	checkSeverity(rules, settings.SeverityError)
 	aliases, rules = read("Other.ts")
 	if aliases["nexus/no-debugger"] != "no-debugger" {
 		test.Errorf("scoped alias = %v", aliases)
 	}
-	checkSeverity(rules, configuration.SeverityOff)
+	checkSeverity(rules, settings.SeverityOff)
 	// The default is asked of the child's resolver, so its next default change requires no print fix.
 	for _, fixture := range []struct {
 		level string
-		want  configuration.Severity
+		want  settings.Severity
 	}{
-		{"warn", configuration.SeverityWarn},
-		{"", (configuration.Resolved{}).UnusedDisableSeverity()},
+		{"warn", settings.SeverityWarn},
+		{"", (settings.Resolved{}).UnusedDisableSeverity()},
 	} {
-		changed := strings.Replace(settings, `"unused-disable":"error"`, `"unused-disable":"warn"`, 1)
+		changed := strings.Replace(settingsText, `"unused-disable":"error"`, `"unused-disable":"warn"`, 1)
 		if fixture.level == "" {
-			changed = strings.Replace(settings, `"rules":{"unused-disable":"error"}`, `"rules":{}`, 1)
+			changed = strings.Replace(settingsText, `"rules":{"unused-disable":"error"}`, `"rules":{}`, 1)
 		}
 		if writeError := os.WriteFile(
 			filepath.Join(root, "CohereSettings.json"),

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // AddLeadingComment is upstream's addLeadingComment, src/main/comments/utilities.js.

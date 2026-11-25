@@ -10,9 +10,9 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/format/format_files"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/rule_names"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
 )
 
@@ -172,33 +172,33 @@ func outermostFolders(findings []folderFinding) []folderFinding {
 // A chain that does not load is the run's failure, named, never an off: a Go or Swift project's run never loads the
 // TypeScript chain, so a root of only those, its settings refused and a docs/ in it, read green (#zyq63kk, proven
 // on a scratch Go module before this failed closed).
-func folderCheckSeverity(root string, lintConfigFileName string) (configuration.Severity, error) {
-	settings := lintConfigFileName
-	if settings == "" {
-		settings = filepath.Join(root, "CohereSettings.json")
+func folderCheckSeverity(root string, lintConfigFileName string) (settings.Severity, error) {
+	settingsPath := lintConfigFileName
+	if settingsPath == "" {
+		settingsPath = filepath.Join(root, "CohereSettings.json")
 	}
-	var loaded *configuration.Configuration
+	var loaded *settings.Configuration
 	var loadError error
-	if zero, isZeroConfigurationError := configuration.IsZeroConfiguration(
-		settings,
+	if zero, isZeroConfigurationError := settings.IsZeroConfiguration(
+		settingsPath,
 	); isZeroConfigurationError == nil && zero {
 		// The per-file sets' evidence is the program's, which discovery does not build, and a folder is no file, so
 		// the stack is read without it: every set reaches cohere:style, where the check is ruled on.
-		loaded, loadError = configuration.LoadHouse(settings, registeredRuleNames(), configuration.HouseDetection{})
+		loaded, loadError = settings.LoadHouse(settingsPath, registeredRuleNames(), settings.HouseDetection{})
 	} else {
-		loaded, loadError = configuration.LoadFor(settings, registeredRuleNames())
+		loaded, loadError = settings.LoadFor(settingsPath, registeredRuleNames())
 	}
 	if loadError != nil {
-		return configuration.SeverityOff, fmt.Errorf(
+		return settings.SeverityOff, fmt.Errorf(
 			"reading %s for the folder check, %s, which judges the folders this run walked: %w",
-			settings,
-			configuration.AbbreviatedFolderName,
+			settingsPath,
+			settings.AbbreviatedFolderName,
 			loadError,
 		)
 	}
-	setting, configured := loaded.Rules[configuration.AbbreviatedFolderName]
+	setting, configured := loaded.Rules[settings.AbbreviatedFolderName]
 	if !configured {
-		return configuration.SeverityOff, nil
+		return settings.SeverityOff, nil
 	}
 	return setting.Severity, nil
 }
@@ -231,7 +231,7 @@ func noteFolderCheckSkipped(location projectLocation) error {
 	if folderCheckSeverityError != nil {
 		return folderCheckSeverityError
 	}
-	if severity != configuration.SeverityOff {
+	if severity != settings.SeverityOff {
 		folderCheckSkipped = "the run named paths below its project's root, and the folder check judges a whole " +
 			"project's folders: run with no path, or the root as its path, to judge them"
 	}
@@ -270,20 +270,20 @@ func printFolderFindings(out *bufio.Writer, found discovery) {
 				Kind:      "finding",
 				Path:      folder,
 				Severity:  severity,
-				Rule:      configuration.AbbreviatedFolderName,
+				Rule:      settings.AbbreviatedFolderName,
 				MessageId: finding.MessageId,
 				Message:   finding.Message,
 			})
 		case outputVerbose:
-			fmt.Fprintf(out, "%s/ - %s %s: %s\n", folder, severity, configuration.AbbreviatedFolderName,
+			fmt.Fprintf(out, "%s/ - %s %s: %s\n", folder, severity, settings.AbbreviatedFolderName,
 				finding.Message)
 		default:
 			styled := activeOutput.Style.dim(severity)
-			if found.FolderSeverity == configuration.SeverityError {
+			if found.FolderSeverity == settings.SeverityError {
 				styled = activeOutput.Style.red(severity)
 			}
 			fmt.Fprintf(out, "%s/ %s %s %s\n", folder, styled,
-				activeOutput.Style.dim(configuration.AbbreviatedFolderName), finding.Message)
+				activeOutput.Style.dim(settings.AbbreviatedFolderName), finding.Message)
 		}
 	}
 	if activeOutput.Mode == outputJson {
@@ -295,7 +295,7 @@ func printFolderFindings(out *bufio.Writer, found discovery) {
 // the check is set to warn, so it fails only when the setting is an error.
 func folderSummaryOf(found discovery) runSummary {
 	summary := runSummary{Label: folderCheckLabel, Rules: 1, Findings: len(found.Folders)}
-	if found.FolderSeverity == configuration.SeverityWarn {
+	if found.FolderSeverity == settings.SeverityWarn {
 		summary.WarningFindings = summary.Findings
 	}
 	return summary

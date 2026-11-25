@@ -17,8 +17,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/cpu_clock"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // Graph is a built type graph: the program, and the checkers that answer questions about it.
@@ -64,11 +64,11 @@ type Graph struct {
 	// Nil means every rule applies to every file, which is what the tests and any caller predating
 	// this layer expect. The command always loads a real one and fails loudly if it cannot, so the
 	// permissive default is reachable only from a caller that chose it deliberately.
-	LintConfiguration *configuration.Configuration
+	LintConfiguration *settings.Configuration
 
 	// RuleOptions says how to decode each rule's configuration, and which rules cannot run without
 	// it. Empty means no rule takes options, which is what a test that did not set one expects.
-	RuleOptions configuration.OptionsRegistry
+	RuleOptions settings.OptionsRegistry
 
 	// RegisteredRuleNames is every rule the registry holds, whether or not this run selected it.
 	//
@@ -638,7 +638,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 			localScopedOff := map[string]int{}
 			localUnconfigured := map[string]int{}
 			// The rule selection for each distinct resolution this worker has met. See rulesFor.
-			localSelections := map[*configuration.ResolutionIdentity]*ruleSelection{}
+			localSelections := map[*settings.ResolutionIdentity]*ruleSelection{}
 			localFailures := []error{}
 			localCrashes := []FileCrash{}
 			localRuleCrashes := []RuleCrash{}
@@ -1137,17 +1137,17 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 func (graph *Graph) rulesFor(
 	fileName string,
 	rules []rule.Entry,
-	selections map[*configuration.ResolutionIdentity]*ruleSelection,
+	selections map[*settings.ResolutionIdentity]*ruleSelection,
 	scopedOff map[string]int,
 	unconfigured map[string]int,
-) (*ruleSelection, configuration.Resolved) {
+) (*ruleSelection, settings.Resolved) {
 	if graph.LintConfiguration == nil {
 		selection, made := selections[noConfiguration]
 		if !made {
 			selection = &ruleSelection{applicable: rules}
 			selections[noConfiguration] = selection
 		}
-		return selection, configuration.Resolved{}
+		return selection, settings.Resolved{}
 	}
 
 	resolution := graph.LintConfiguration.Resolve(fileName)
@@ -1177,7 +1177,7 @@ func (graph *Graph) rulesFor(
 }
 
 // selectRules makes the selection for one resolution.
-func (graph *Graph) selectRules(rules []rule.Entry, resolution configuration.Resolved) *ruleSelection {
+func (graph *Graph) selectRules(rules []rule.Entry, resolution settings.Resolved) *ruleSelection {
 	selection := &ruleSelection{
 		applicable:  make([]rule.Entry, 0, len(rules)),
 		options:     map[string]rule.Bound{},
@@ -1186,7 +1186,7 @@ func (graph *Graph) selectRules(rules []rule.Entry, resolution configuration.Res
 	for _, subject := range rules {
 		status, _ := resolution.StatusOf(subject.Name)
 		if graph.Readiness.Measures(subject.Name) {
-			if status == configuration.StatusScopedOff || status == configuration.StatusUnconfigured {
+			if status == settings.StatusScopedOff || status == settings.StatusUnconfigured {
 				// Off for the chain and run for readiness: still counted as off below, since that is what
 				// the chain says, and run at the set's own options.
 				bound, decodeError := graph.Bind(subject, graph.Readiness.Options[subject.Name])
@@ -1204,13 +1204,13 @@ func (graph *Graph) selectRules(rules []rule.Entry, resolution configuration.Res
 			}
 		}
 		switch status {
-		case configuration.StatusScopedOff:
+		case settings.StatusScopedOff:
 			// Someone configured this rule off, here or tree-wide. Counted rather than dropped
 			// silently, because a rule absent across a directory is otherwise indistinguishable
 			// from a rule with nothing to report.
 			selection.scopedOff = append(selection.scopedOff, subject.Name)
 			continue
-		case configuration.StatusUnconfigured:
+		case settings.StatusUnconfigured:
 			// Nobody has said whether this rule should run. That is a different fact from a
 			// deliberate exclusion and it is counted separately, or a rule waiting on a decision
 			// reads as one somebody already made.

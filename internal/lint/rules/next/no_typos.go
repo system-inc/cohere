@@ -6,8 +6,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // dataFetchingFunctions are the three names Next.js calls by name in the Pages Router.

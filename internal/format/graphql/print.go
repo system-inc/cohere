@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // escapeQuoteAndBackslash is upstream's replaceAll(/["\\]/g, String.raw`\$&`).

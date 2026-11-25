@@ -44,7 +44,7 @@ package tailwind
 import (
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // SelectorNodeKind distinguishes the seven node shapes the parser produces.

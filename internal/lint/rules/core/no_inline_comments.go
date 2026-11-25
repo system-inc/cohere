@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // NoInlineCommentsOptions configures an escape hatch.

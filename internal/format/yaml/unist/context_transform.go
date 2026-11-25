@@ -11,7 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/yaml/compose"
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // transformNode is upstream's transformNode. props is upstream's { tokens }: the tag, anchor and comment

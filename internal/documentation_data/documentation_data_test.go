@@ -15,10 +15,10 @@ import (
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/documentation_data/capture"
 	golanguagerules "github.com/system-inc/cohere/internal/go_language/rules"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/rule_names"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // moduleRoot is the directory the generated paths are relative to: go test runs in the package's own
@@ -143,7 +143,7 @@ func TestCheckSeesATierChange(test *testing.T) {
 	changedSet := inputs.SetNames[0]
 	var changedRule string
 	loadSet := inputs.LoadSet
-	inputs.LoadSet = func(name string) (*configuration.Configuration, error) {
+	inputs.LoadSet = func(name string) (*settings.Configuration, error) {
 		resolved, loadSetError := loadSet(name)
 		if loadSetError != nil || name != changedSet {
 			return resolved, loadSetError
@@ -155,9 +155,9 @@ func TestCheckSeesATierChange(test *testing.T) {
 		sort.Strings(names)
 		changedRule = names[0]
 		setting := resolved.Rules[changedRule]
-		setting.Severity = configuration.SeverityError
-		if resolved.Rules[changedRule].Severity == configuration.SeverityError {
-			setting.Severity = configuration.SeverityWarn
+		setting.Severity = settings.SeverityError
+		if resolved.Rules[changedRule].Severity == settings.SeverityError {
+			setting.Severity = settings.SeverityWarn
 		}
 		resolved.Rules[changedRule] = setting
 		return resolved, nil

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // ignoreLayer is one of the project's ignore lists after git's, and how its patterns are read.
@@ -37,10 +37,10 @@ func (layer ignoreLayer) covers(root string, relative string, directory bool) bo
 	for _, pattern := range layer.globs {
 		// A glob prunes a directory only when it takes everything below it, `name/**` or `**`: lint
 		// matches files, and `*.code.js` matching a directory's name says nothing about its contents.
-		if directory && !configuration.TakesWholeDirectory(pattern) {
+		if directory && !settings.TakesWholeDirectory(pattern) {
 			continue
 		}
-		if configuration.Match(pattern, fromSettings) {
+		if settings.Match(pattern, fromSettings) {
 			return true
 		}
 	}

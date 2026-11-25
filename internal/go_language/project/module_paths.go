@@ -9,9 +9,9 @@ import (
 
 // ModulePaths is the module path of each module a root's settings govern, as its go.mod names it: every module its
 // go.work uses, or the root's own go.mod without one, in the go.work's order. The settings ask it whether a root holds
-// a module of ours (internal/our_tiers), before the project is described, so it reads only those files and runs no
-// git. A go.work or go.mod it cannot read or parse names nothing here: describing the project refuses it in its own
-// words, a moment later.
+// a module of ours (internal/settings/our_tiers), before the project is described, so it reads only those files and
+// runs no git. A go.work or go.mod it cannot read or parse names nothing here: describing the project refuses it in
+// its own words, a moment later.
 func ModulePaths(root string) []string {
 	contents, readError := os.ReadFile(filepath.Join(root, "go.work"))
 	if readError != nil {

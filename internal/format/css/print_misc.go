@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/printing"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // javaScriptWhitespaceClass is JavaScript's \s as a Go character class: WhiteSpace and LineTerminator.

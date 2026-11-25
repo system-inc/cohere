@@ -9,8 +9,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // defaultCaseCommentPattern is typescript-eslint's DEFAULT_COMMENT_PATTERN, `/^no default$/iu`, compiled

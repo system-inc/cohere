@@ -17,8 +17,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // FileSystem is what detection asks the disk, through the program's own filesystem, so the run cache
@@ -31,17 +31,17 @@ type FileSystem interface {
 // Detect reads which house sets fit which of the project's files.
 //
 // projectRoot is the directory whose tsconfig the run uses: Next's file conventions and the Tailwind
-// stylesheet are found relative to it. settings are the project's own, from the file in
+// stylesheet are found relative to it. ownSettings are the project's own, from the file in
 // settingsDirectory, nil when it writes none: a Tailwind location they name is where the stylesheet is
 // looked for, as the rules will look.
 func Detect(
 	files []*ast.SourceFile,
 	projectRoot string,
 	fileSystem FileSystem,
-	settings map[string]json.RawMessage,
+	ownSettings map[string]json.RawMessage,
 	settingsDirectory string,
-) configuration.HouseDetection {
-	detection := configuration.HouseDetection{ReactFiles: map[string]bool{}, NextFiles: map[string]bool{}}
+) settings.HouseDetection {
+	detection := settings.HouseDetection{ReactFiles: map[string]bool{}, NextFiles: map[string]bool{}}
 
 	importsNext := map[string]bool{}
 	for _, file := range files {
@@ -78,7 +78,7 @@ func Detect(
 	detection.TailwindEntryPoint, detection.TailwindSkipped = detectTailwind(
 		projectRoot,
 		fileSystem,
-		settings,
+		ownSettings,
 		settingsDirectory,
 	)
 	return detection
@@ -147,11 +147,11 @@ var tailwindConfigFiles = []string{
 func detectTailwind(
 	projectRoot string,
 	fileSystem FileSystem,
-	settings map[string]json.RawMessage,
+	ownSettings map[string]json.RawMessage,
 	settingsDirectory string,
 ) (string, string) {
 	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
-	if location, named := tailwind.LocationInSettings(settings, settingsDirectory); named {
+	if location, named := tailwind.LocationInSettings(ownSettings, settingsDirectory); named {
 		entryPoint, _, configuredEntryPointError := tailwind.ConfiguredEntryPoint(projectRoot, location, fileExists)
 		if configuredEntryPointError != nil {
 			return "", "the location settings[\"better-tailwindcss\"] name does not resolve (" +

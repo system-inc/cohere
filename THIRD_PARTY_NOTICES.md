@@ -2801,7 +2801,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 - Source: https://github.com/facebook/create-react-app/tree/main/packages/confusing-browser-globals
 - License: `MIT`
-- In cohere: The restricted globals list embedded in internal/lint/configuration/sets/typescript.json.
+- In cohere: The restricted globals list embedded in internal/settings/sets/typescript.json.
 
 ```text
 MIT License

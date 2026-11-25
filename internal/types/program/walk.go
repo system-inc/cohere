@@ -11,9 +11,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // Result is the findings of one walk, and the coverage that produced them.
@@ -246,12 +246,12 @@ func namesOnlyUnrunRules(directive *suppression.Directive, ranRule map[string]bo
 // keeps the excuse, because the directive may be load-bearing for that one.
 //
 // Looked up by the name the directive wrote, which is the name the config is keyed by.
-func namesOnlyOffRules(directive *suppression.Directive, resolution configuration.Resolved) bool {
+func namesOnlyOffRules(directive *suppression.Directive, resolution settings.Resolved) bool {
 	if len(directive.Rules) == 0 {
 		return false
 	}
 	for _, named := range directive.Rules {
-		if status, _ := resolution.StatusOf(named); status != configuration.StatusScopedOff {
+		if status, _ := resolution.StatusOf(named); status != settings.StatusScopedOff {
 			return false
 		}
 	}
@@ -288,7 +288,7 @@ func tally(
 	fileName string,
 	directives *suppression.Index,
 	ranRule map[string]bool,
-	resolution configuration.Resolved,
+	resolution settings.Resolved,
 ) suppressionTally {
 	counted := suppressionTally{}
 	for index, directive := range directives.Directives() {
@@ -336,7 +336,7 @@ func walk(node *ast.Node, listeners [][]func(node *ast.Node)) int {
 // noConfiguration keys the one selection a walk with no configuration makes: every rule, with no options, so
 // each runs as its Unconfigured (boundIn). An identity of its own, which no Config's resolution can share, since
 // identities are compared by pointer.
-var noConfiguration = &configuration.ResolutionIdentity{}
+var noConfiguration = &settings.ResolutionIdentity{}
 
 // ruleClassNames is the applicable rules' names in each findings-cache class. See CacheClasses and
 // ShapeClasses.

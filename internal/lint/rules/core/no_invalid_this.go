@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 var messageNoInvalidThisUnexpectedThis = rule.Message{
@@ -64,7 +64,7 @@ var messageNoInvalidThisUnexpectedThis = rule.Message{
 // Read this before you conclude anything about whether this rule runs. It was landed deliberately
 // unenabled, `CohereSettings.json` contains no `no-invalid-this` key, and it runs anyway.
 //
-// `settingFor` (`internal/lint/configuration/resolve.go:96`) resolves a config key by exact match,
+// `settingFor` (`internal/settings/resolve.go:96`) resolves a config key by exact match,
 // and failing that by trimming each configured key by the rule name and requiring what remains to
 // end in `/`. The live config carries `"@typescript-eslint/no-invalid-this": "error"`. Trim that
 // by this rule's name and `"@typescript-eslint/"` remains, which ends on the boundary, so the

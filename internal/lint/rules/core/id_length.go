@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // IdLengthSettings is the decoded option surface.

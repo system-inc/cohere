@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // UpstreamSha is the facebook/react commit the vendored corpus was taken from.

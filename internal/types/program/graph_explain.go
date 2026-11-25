@@ -8,9 +8,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // RuleAccount is what one rule did on one file.
@@ -90,7 +90,7 @@ func (graph *Graph) Explain(
 
 	explanation := &Explanation{FileName: sourceFile.FileName().AsString()}
 
-	var resolution configuration.Resolved
+	var resolution settings.Resolved
 	if graph.LintConfiguration != nil {
 		resolution = graph.LintConfiguration.Resolve(sourceFile.FileName().AsString())
 		if resolution.Ignored {
@@ -192,11 +192,11 @@ func (graph *Graph) Explain(
 // Each phrasing says who decided, because "somebody turned this off here" and "nobody has said
 // whether this should run" are different facts. Collapsing them describes a brand-new rule as
 // though it had been deliberately excluded.
-func declineReason(status configuration.Status) string {
+func declineReason(status settings.Status) string {
 	switch status {
-	case configuration.StatusScopedOff:
+	case settings.StatusScopedOff:
 		return "the config turns it off for this file"
-	case configuration.StatusUnconfigured:
+	case settings.StatusUnconfigured:
 		return "it is not in the config, so nobody has said whether it should run"
 	}
 	return ""

@@ -9,17 +9,17 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/text_rules/conformance"
 )
 
 // textRulesHouseSets are the sets the TypeScript adapter reads each rule's status and options from: the ones
 // the confirmation probe extended (textrules-confirmation.md, "How it was run"), so a rule runs with what the
 // house gives it, read through the configuration layer rather than copied by hand.
-var textRulesHouseSets = []string{configuration.TypeScriptSetName, configuration.SetPrefix + "style"}
+var textRulesHouseSets = []string{settings.TypeScriptSetName, settings.SetPrefix + "style"}
 
 // textRulesProbeRules are the rules the probe turned on in its own settings, beside the sets, because the
 // sets leave them off: `nexus/consistency-no-abbreviated-identifier` and
@@ -37,7 +37,7 @@ var textRulesProbeRules = map[string]string{
 
 // textRulesHouse is the house configuration loaded once per test, which each case's own file resolves through.
 type textRulesHouse struct {
-	loaded *configuration.Configuration
+	loaded *settings.Configuration
 	// directory is where the settings file sits, which a case's project-relative file name resolves under, so
 	// the house's overrides (`**/*.generated.*` under max-lines) reach it as they reach a project's file.
 	directory string
@@ -47,15 +47,15 @@ type textRulesHouse struct {
 func loadTextRulesHouse(test *testing.T) textRulesHouse {
 	test.Helper()
 	directory := test.TempDir()
-	settings, encodeError := json.Marshal(map[string]any{"extends": textRulesHouseSets, "rules": textRulesProbeRules})
+	settingsJson, encodeError := json.Marshal(map[string]any{"extends": textRulesHouseSets, "rules": textRulesProbeRules})
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
 	settingsPath := filepath.Join(directory, "CohereSettings.json")
-	if writeError := os.WriteFile(settingsPath, settings, 0o600); writeError != nil {
+	if writeError := os.WriteFile(settingsPath, settingsJson, 0o600); writeError != nil {
 		test.Fatal(writeError)
 	}
-	loaded, loadForError := configuration.LoadFor(settingsPath, registry.Names())
+	loaded, loadForError := settings.LoadFor(settingsPath, registry.Names())
 	if loadForError != nil {
 		test.Fatalf("loading the house sets %v: %v", textRulesHouseSets, loadForError)
 	}
@@ -71,10 +71,10 @@ func (house textRulesHouse) optionsFor(test *testing.T, ruleName string, testCas
 		filepath.Join(house.directory, filepath.FromSlash(testCase.FileName(conformance.LanguageTypeScript))),
 	)
 	switch status, _ := resolved.StatusOf(ruleName); status {
-	case configuration.StatusUnconfigured:
+	case settings.StatusUnconfigured:
 		test.Fatalf("the house sets %v never configure %s, so there is nothing to run it with", textRulesHouseSets,
 			ruleName)
-	case configuration.StatusScopedOff, configuration.StatusFileIgnored:
+	case settings.StatusScopedOff, settings.StatusFileIgnored:
 		return rule.Bound{}, false
 	}
 	elements := resolved.RawOptionsFor(ruleName)

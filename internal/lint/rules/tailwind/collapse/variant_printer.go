@@ -3,7 +3,7 @@ package tailwind
 import (
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // PrintVariant writes a parsed variant back as Tailwind spells it, which is upstream's

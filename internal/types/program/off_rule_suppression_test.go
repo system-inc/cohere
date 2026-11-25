@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -48,7 +48,7 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 			}}
 		},
 	}
-	settings := `{"rules": {
+	settingsText := `{"rules": {
 		"plugin/test-prefixed": "error",
 		"test-quiet": "error",
 		"test-registered-off": "off",
@@ -78,7 +78,7 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 			test.Parallel()
 			directory := writeProject(test, map[string]string{
 				"tsconfig.json":       minimalConfiguration,
-				"CohereSettings.json": settings,
+				"CohereSettings.json": settingsText,
 				"main.ts": "// eslint-disable-next-line " +
 					shape.directive +
 					" -- the reason\nconst a = 1;\n",
@@ -90,7 +90,7 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 				test.Fatalf("building: %v", buildError)
 			}
 			var loadError error
-			graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+			graph.LintConfiguration, loadError = settings.Load(filepath.Join(directory, "CohereSettings.json"))
 			if loadError != nil {
 				test.Fatalf("loading the config: %v", loadError)
 			}
@@ -159,7 +159,7 @@ func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = settings.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}

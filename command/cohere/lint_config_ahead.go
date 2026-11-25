@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // lintConfigAhead is the lint config read on its own goroutine while the graph builds (#g3046x5).
@@ -21,10 +21,10 @@ type lintConfigAhead struct {
 
 	// Set before done closes. The errors are kept apart so configureLint reports them in the order it always did:
 	// the load's, then the selectors', then the settings'.
-	configuration *configuration.Configuration
+	configuration *settings.Configuration
 	loadError     error
 	settingsError error
-	options       configuration.OptionsRegistry
+	options       settings.OptionsRegistry
 }
 
 // startLintConfigAhead begins reading the config and returns at once, or returns nil when the config can only be
@@ -37,7 +37,7 @@ func startLintConfigAhead(location projectLocation) *lintConfigAhead {
 	go func() {
 		defer close(ahead.done)
 		// What loadLintConfiguration does for a project that names its sets.
-		ahead.configuration, ahead.loadError = configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
+		ahead.configuration, ahead.loadError = settings.LoadFor(location.LintConfigFileName, registeredRuleNames())
 		if ahead.loadError != nil {
 			return
 		}

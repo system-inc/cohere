@@ -16,10 +16,10 @@ import (
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/duplicate_functions"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/canonical_function_hash"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/suppression"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -56,7 +56,7 @@ func writeTypeScriptDuplicates(
 	callerContext context.Context,
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
-	lintConfiguration *configuration.Configuration,
+	lintConfiguration *settings.Configuration,
 	location projectLocation,
 ) {
 	if !*duplicatesRequested {
@@ -67,17 +67,17 @@ func writeTypeScriptDuplicates(
 			NotRun: "this run built no program to read functions from, as --format-only builds none"})
 		return
 	}
-	settings := lintConfiguration
-	if settings == nil {
-		loaded, loadForError := configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
+	projectSettings := lintConfiguration
+	if projectSettings == nil {
+		loaded, loadForError := settings.LoadFor(location.LintConfigFileName, registeredRuleNames())
 		if loadForError != nil {
 			writeDuplicatesReport(streams.Output, duplicate_functions.Report{Floor: duplicate_functions.Floor,
 				NotRun: fmt.Sprintf("reading %s: %v", location.LintConfigFileName, loadForError)})
 			return
 		}
-		settings = loaded
+		projectSettings = loaded
 	}
-	writeDuplicatesReport(streams.Output, typeScriptDuplicates(callerContext, graph, projectFiles, settings, location))
+	writeDuplicatesReport(streams.Output, typeScriptDuplicates(callerContext, graph, projectFiles, projectSettings, location))
 }
 
 // typeScriptDuplicates is the duplicates report over a TypeScript program: every function of every project file the
@@ -92,7 +92,7 @@ func typeScriptDuplicates(
 	callerContext context.Context,
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
-	lintConfiguration *configuration.Configuration,
+	lintConfiguration *settings.Configuration,
 	location projectLocation,
 ) duplicate_functions.Report {
 	started := time.Now()

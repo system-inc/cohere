@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -33,7 +33,7 @@ import (
  */
 
 // readinessSetName is the set a readiness run measures against.
-const readinessSetName = configuration.SetPrefix + "adamic"
+const readinessSetName = settings.SetPrefix + "adamic"
 
 // adamicOptions are the compiler options Adamic sets itself that change what the checker proves. A
 // project without one is measured under weaker options than Adamic's, and the segment says which.
@@ -69,14 +69,14 @@ var adamicOptions = []struct {
 // loadReadiness is the set's rules with their raw options, read the way the loader reads any chain. A
 // cohere that carries no such set measures nothing, and says so, rather than measuring against nothing.
 func loadReadiness() (*program.Readiness, error) {
-	set, loadError := configuration.Load(readinessSetName)
+	set, loadError := settings.Load(readinessSetName)
 	if loadError != nil {
 		return nil, loadError
 	}
 	resolution := set.Resolve("index.ts")
 	options := map[string][]json.RawMessage{}
 	for _, name := range set.RuleKeys() {
-		if status, _ := resolution.StatusOf(name); status == configuration.StatusEnabled {
+		if status, _ := resolution.StatusOf(name); status == settings.StatusEnabled {
 			options[name] = resolution.RawOptionsFor(name)
 		}
 	}

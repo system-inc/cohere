@@ -79,7 +79,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // A LoadedDesignSystem is what ParseCandidate asks its four questions through, so a signature that

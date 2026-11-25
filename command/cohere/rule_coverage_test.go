@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -84,11 +84,11 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 			}
 		}
 	}
-	lintConfiguration := &configuration.Configuration{Rules: map[string]configuration.RuleSetting{
-		"rule-00":         {Severity: configuration.SeverityError},
-		"unported-one":    {Severity: configuration.SeverityError},
-		"plugin/unported": {Severity: configuration.SeverityWarn},
-		"unported-off":    {Severity: configuration.SeverityOff},
+	lintConfiguration := &settings.Configuration{Rules: map[string]settings.RuleSetting{
+		"rule-00":         {Severity: settings.SeverityError},
+		"unported-one":    {Severity: settings.SeverityError},
+		"plugin/unported": {Severity: settings.SeverityWarn},
+		"unported-off":    {Severity: settings.SeverityOff},
 	}}
 
 	summary := classifyTypeScriptCoverage(rules, coverage, lintConfiguration)
@@ -256,8 +256,8 @@ func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
 			"off-and-unconfigured": 785,
 		},
 	}
-	lintConfiguration := &configuration.Configuration{
-		Rules: map[string]configuration.RuleSetting{"not-ported": {Severity: configuration.SeverityError}},
+	lintConfiguration := &settings.Configuration{
+		Rules: map[string]settings.RuleSetting{"not-ported": {Severity: settings.SeverityError}},
 	}
 
 	output := renderLintReport(lintReport{
@@ -509,10 +509,10 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 
 	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	test.Run("parity", func(test *testing.T) {
-		lintConfiguration := &configuration.Configuration{Rules: map[string]configuration.RuleSetting{
-			"quiet-rule":    {Severity: configuration.SeverityError},
-			"not-yet-here":  {Severity: configuration.SeverityError},
-			"turned-off-be": {Severity: configuration.SeverityOff},
+		lintConfiguration := &settings.Configuration{Rules: map[string]settings.RuleSetting{
+			"quiet-rule":    {Severity: settings.SeverityError},
+			"not-yet-here":  {Severity: settings.SeverityError},
+			"turned-off-be": {Severity: settings.SeverityOff},
 		}}
 		output := renderLintReport(lintReport{
 			Result:            program.Result{Coverage: cleanCoverage()},
@@ -598,10 +598,10 @@ func TestACleanRunPrintsTwoCoverageLines(test *testing.T) {
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 	root := "/repository"
-	withDeparture := &configuration.Configuration{
-		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
+	withDeparture := &settings.Configuration{
+		Rules: map[string]settings.RuleSetting{"guard-for-in": {Severity: settings.SeverityError}},
 		Root:  root,
-		Departures: map[string]configuration.Departure{
+		Departures: map[string]settings.Departure{
 			"guard-for-in": {File: root + "/CohereSettings.json", Reason: "no for-in replacement here yet"},
 		},
 	}
@@ -611,8 +611,8 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 		test.Errorf("the departure did not print as\n%s\nin:\n%s", want, output)
 	}
 
-	without := &configuration.Configuration{
-		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
+	without := &settings.Configuration{
+		Rules: map[string]settings.RuleSetting{"guard-for-in": {Severity: settings.SeverityError}},
 		Root:  root,
 	}
 	if output := renderLintReport(lintReport{LintConfiguration: without}); strings.Contains(output, "departure:") {
@@ -627,19 +627,19 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
 	root := "/repository"
-	lintConfiguration := &configuration.Configuration{
+	lintConfiguration := &settings.Configuration{
 		Root: root,
-		Overrides: []configuration.Override{
+		Overrides: []settings.Override{
 			{
 				Files: []string{"**/*.test.ts"},
-				Rules: map[string]configuration.RuleSetting{"max-lines": {Severity: configuration.SeverityOff}},
+				Rules: map[string]settings.RuleSetting{"max-lines": {Severity: settings.SeverityOff}},
 				File:  root + "/CohereSettings.json",
 			},
 			{
 				Files: []string{"**/api/graphql/*.generated.ts"},
-				Rules: map[string]configuration.RuleSetting{
-					"nexus/consistency-no-abbreviated-identifier": {Severity: configuration.SeverityOff},
-					"@typescript-eslint/no-explicit-any":          {Severity: configuration.SeverityOff},
+				Rules: map[string]settings.RuleSetting{
+					"nexus/consistency-no-abbreviated-identifier": {Severity: settings.SeverityOff},
+					"@typescript-eslint/no-explicit-any":          {Severity: settings.SeverityOff},
 				},
 				Reason: "until the generator emits real scalar types",
 				File:   root + "/structure/StructureCohereSettings.json",
@@ -675,13 +675,13 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.
 		RulesScopedOff:    map[string]int{"prefer-arrow-callback": 40, "no-continue": 40},
 		RulesUnconfigured: map[string]int{},
 	}
-	lintConfiguration := &configuration.Configuration{
+	lintConfiguration := &settings.Configuration{
 		Root: root,
-		Rules: map[string]configuration.RuleSetting{
-			"prefer-arrow-callback": {Severity: configuration.SeverityOff},
-			"no-continue":           {Severity: configuration.SeverityOff},
+		Rules: map[string]settings.RuleSetting{
+			"prefer-arrow-callback": {Severity: settings.SeverityOff},
+			"no-continue":           {Severity: settings.SeverityOff},
 		},
-		OffReasons: map[string]configuration.OffReason{
+		OffReasons: map[string]settings.OffReason{
 			"prefer-arrow-callback": {
 				File:   root + "/CohereSettings.json",
 				Reason: "we write function callbacks on purpose",

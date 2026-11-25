@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/settings"
 )
 
 // A dead ignore is a finding (#cxeq6jw): an entry a settings file on disk wrote that matched nothing this run is
@@ -24,8 +24,8 @@ const unusedIgnoreRule = "correctness-no-unused-ignore"
 // project can delete, and it does not name generated output, which may not have been written yet. One of cohere's
 // defaults never is, since no file wrote it (see defaultIgnores).
 func ignoreIsUnused(account ignoreAccount) bool {
-	return account.Matched == 0 && !account.Default && !configuration.IsSet(account.File) &&
-		account.Kind != string(configuration.IgnoreKindGenerated)
+	return account.Matched == 0 && !account.Default && !settings.IsSet(account.File) &&
+		account.Kind != string(settings.IgnoreKindGenerated)
 }
 
 // unusedIgnoreFinding is an entry as a dead ignore's finding, at the entry in the file that wrote it. occurrence

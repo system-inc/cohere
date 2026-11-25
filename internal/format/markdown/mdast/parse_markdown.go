@@ -5,7 +5,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/system-inc/cohere/internal/format/arena"
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 // ParseMarkdown is the fork's parseMarkdown, src/language-markdown/parse/parse-markdown.js: front matter

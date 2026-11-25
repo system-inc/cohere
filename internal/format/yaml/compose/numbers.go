@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"strconv"
 
-	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	ecmascripttext "github.com/system-inc/cohere/internal/text"
 )
 
 func nan() float64              { return math.NaN() }

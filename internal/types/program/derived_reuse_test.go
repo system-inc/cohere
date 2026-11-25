@@ -13,9 +13,9 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -335,22 +335,22 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 				"reds/a.ts":      "export const a = 1;\n",
 				"blues/b.ts":     "export const b = 2;\n",
 			})
-			setting := func(marker string) configuration.RuleSetting {
-				return configuration.RuleSetting{
-					Severity: configuration.SeverityError,
+			setting := func(marker string) settings.RuleSetting {
+				return settings.RuleSetting{
+					Severity: settings.SeverityError,
 					Options:  []json.RawMessage{json.RawMessage(`"` + marker + `"`)},
 				}
 			}
-			lintConfiguration := &configuration.Configuration{
+			lintConfiguration := &settings.Configuration{
 				Root:  root,
-				Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("red-marker.ts")},
-				Overrides: []configuration.Override{{Files: []string{"blues/**"},
-					Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("blue-marker.ts")}}},
+				Rules: map[string]settings.RuleSetting{"test-derived-options": setting("red-marker.ts")},
+				Overrides: []settings.Override{{Files: []string{"blues/**"},
+					Rules: map[string]settings.RuleSetting{"test-derived-options": setting("blue-marker.ts")}}},
 			}
 			// The registry binds the rule a walk hands it, so the Run that counts that walk's runs is the one bound to
 			// each selection's marker.
-			registryFor := func(subject rule.Rule[string]) configuration.OptionsRegistry {
-				return configuration.OptionsRegistry{
+			registryFor := func(subject rule.Rule[string]) settings.OptionsRegistry {
+				return settings.OptionsRegistry{
 					"test-derived-options": {Decode: func(raw json.RawMessage) (rule.Bound, error) {
 						var marker string
 						if decodeError := json.Unmarshal(raw, &marker); decodeError != nil {
@@ -498,7 +498,7 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 
 	var computations atomic.Int32
 	var rules []rule.Rule[rule.NoOptions]
-	settings := map[string]configuration.RuleSetting{}
+	ruleSettings := map[string]settings.RuleSetting{}
 	for index := range 6 {
 		name := "test-derived-" + string(rune('a'+index))
 		rules = append(rules, rule.Rule[rule.NoOptions]{
@@ -510,21 +510,21 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 			},
 			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil },
 		})
-		settings[name] = configuration.RuleSetting{Severity: configuration.SeverityError}
+		ruleSettings[name] = settings.RuleSetting{Severity: settings.SeverityError}
 	}
 	// Two overrides that change nothing but which resolution a file lands in, so the walk makes three
 	// selections on each worker that sees all three directories.
-	graph.LintConfiguration = &configuration.Configuration{
+	graph.LintConfiguration = &settings.Configuration{
 		Root:  root,
-		Rules: settings,
-		Overrides: []configuration.Override{
+		Rules: ruleSettings,
+		Overrides: []settings.Override{
 			{
 				Files: []string{"b/**"},
-				Rules: map[string]configuration.RuleSetting{"test-derived-a": {Severity: configuration.SeverityError}},
+				Rules: map[string]settings.RuleSetting{"test-derived-a": {Severity: settings.SeverityError}},
 			},
 			{
 				Files: []string{"c/**"},
-				Rules: map[string]configuration.RuleSetting{"test-derived-b": {Severity: configuration.SeverityError}},
+				Rules: map[string]settings.RuleSetting{"test-derived-b": {Severity: settings.SeverityError}},
 			},
 		},
 	}

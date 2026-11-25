@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	golanguagerule "github.com/system-inc/cohere/internal/go_language/rule"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -132,7 +132,7 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 	enabledBy := map[string][]RuleSetSeverity{}
 	for _, set := range sets {
 		for _, setRule := range set.Rules {
-			if setRule.Severity == configuration.SeverityOff.String() {
+			if setRule.Severity == settings.SeverityOff.String() {
 				continue
 			}
 			enabledBy[setRule.Name] = append(

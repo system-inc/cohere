@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
+	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -39,7 +39,7 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = settings.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -145,7 +145,7 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = settings.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -191,7 +191,7 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = settings.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -283,7 +283,7 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 			test.Fatalf("building: %v", buildError)
 		}
 		var loadError error
-		graph.LintConfiguration, loadError = configuration.Load(filepath.Join(root, "CohereSettings.json"))
+		graph.LintConfiguration, loadError = settings.Load(filepath.Join(root, "CohereSettings.json"))
 		if loadError != nil {
 			test.Fatalf("loading the config: %v", loadError)
 		}

@@ -73,7 +73,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // bareValueDataTypes is upstream's `BARE_VALUE_DATA_TYPES`, the only data types a `--value()` may

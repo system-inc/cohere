@@ -28,7 +28,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/text"
 )
 
 // NewSignatureCompiler prepares a compiler over one design system.

@@ -1395,7 +1395,7 @@ config layer and the rule, and a fixture never crosses that boundary: it hands t
 decoder a literal it wrote itself, so the decoder is exercised on the shape the fixture
 author already believed in.
 
-The measured instance was one line. `internal/lint/configuration/load.go` parsed a
+The measured instance was one line. `internal/settings/load.go` parsed a
 rule setting as `["severity", <options>]` and kept exactly one element, `tuple[1]`, while
 ESLint's `context.options` is **every** element after the severity. Every rule whose upstream
 option surface has more than one element was configured differently from upstream, and each
@@ -1831,7 +1831,7 @@ rather than a gap nobody measures.
 Then add the rule name to `/Users/kirkouimet/Projects/ahra/CohereSettings.json` in the
 rules block. **Not `.oxlintrc.json`**, which is oxlint's own config and which cohere no
 longer reads. The live guards name `CohereSettings.json` at
-`internal/lint/registry/live_wiring_test.go:12` and `internal/lint/configuration/live_test.go`.
+`internal/lint/registry/live_wiring_test.go:12` and `internal/settings/live_test.go`.
 
 **Grep that file for your rule name first.** Many rules are already enabled there.
 Adding a second entry produces valid JSON with a duplicate key, one silently wins, and

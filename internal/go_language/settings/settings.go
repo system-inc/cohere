@@ -25,10 +25,10 @@
 //	} }
 //
 // Inside our tiers every off owes its reason, and a block that turns a rule off without one is refused at load. A Go
-// root is inside them when a module it governs is ours by its path (internal/our_tiers): Go has no set to extend, so
-// it is the module that says whose code it is (#v11k0g2). Outside them an off is the project's to make, with or
-// without a reason. Either way coverage prints the reason beside the rule, and an entry that explains nothing, blank,
-// for a rule the block does not turn off, or beside a departure for the same rule, is refused.
+// root is inside them when a module it governs is ours by its path (internal/settings/our_tiers): Go has no set to
+// extend, so it is the module that says whose code it is (#v11k0g2). Outside them an off is the project's to make, with
+// or without a reason. Either way coverage prints the reason beside the rule, and an entry that explains nothing,
+// blank, for a rule the block does not turn off, or beside a departure for the same rule, is refused.
 //
 // When the root has no config, every house rule runs at error. That is not the permissive default the
 // TypeScript loader refuses, because every rule runs, and the note says so on every run, so a missing
@@ -50,7 +50,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/our_tiers"
+	"github.com/system-inc/cohere/internal/settings/our_tiers"
 )
 
 // Severity is how strongly a rule's findings count, spelled as the contract prints it.
@@ -68,7 +68,7 @@ const (
 )
 
 // SeveritySpellings are the severities parseSeverity accepts, exactly as written, for the settings schema
-// (internal/settings_schema) to read rather than copy, so the schema never allows a spelling cohere-go
+// (internal/settings/schema) to read rather than copy, so the schema never allows a spelling cohere-go
 // refuses. TestTheSeveritySpellingsAreTheLoaders holds the list to parseSeverity.
 var SeveritySpellings = []string{"error", "warn", "warning", "off"}
 
@@ -345,8 +345,8 @@ func parseOffReasons(value json.RawMessage, known map[string]bool, settings Sett
 }
 
 // refuseUnreasonedOffs refuses a block that turns a rule off with no reason, when a module the root governs is ours
-// (internal/our_tiers). An off with no reason reads as a decision while recording none, and inside our tiers every
-// off owes its why, as the TypeScript loader holds it (#v11k0g2). written are the rules the block names, sorted.
+// (internal/settings/our_tiers). An off with no reason reads as a decision while recording none, and inside our tiers
+// every off owes its why, as the TypeScript loader holds it (#v11k0g2). written are the rules the block names, sorted.
 func refuseUnreasonedOffs(settings Settings, written []string, modulePaths []string) error {
 	ours := ""
 	for _, modulePath := range modulePaths {
@@ -491,7 +491,7 @@ func jsonKind(value json.RawMessage) byte {
 }
 
 // TargetPattern is a target as go tool dist list spells one, `GOOS/GOARCH`, each a word of lowercase letters and
-// digits, for the settings schema (internal/settings_schema) to read rather than copy.
+// digits, for the settings schema (internal/settings/schema) to read rather than copy.
 const TargetPattern = `^[a-z0-9]+/[a-z0-9]+$`
 
 // targetPattern is TargetPattern, compiled.
