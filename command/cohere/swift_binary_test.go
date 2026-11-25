@@ -9,7 +9,6 @@ import (
 	"bufio"
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -127,10 +126,12 @@ func TestRunContractBinaryEndings(test *testing.T) {
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("a broken record kills the child rather than waiting on it", func(test *testing.T) {
-		// The child sleeps past any run, so a front door that waited on it hangs, a hang go test's -timeout fails.
+		// The child sleeps until this test ends, so a front door that waited on it hangs, a hang go test's -timeout
+		// fails. The sleep is this test binary's own child (own_child_test.go), and ends with the test.
 		_, _, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(
 			test,
-			"head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; sleep 100000",
+			"head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; "+
+				ownChildShellCommand(test, ownChildSleep, ownChildLifeline(test)),
 			contractModeCheck,
 		)
 		if runFakeSwiftBinaryError == nil ||
@@ -141,15 +142,15 @@ func TestRunContractBinaryEndings(test *testing.T) {
 	})
 
 	// The child is started before the broken record, so it is always alive when the child is killed.
-	// Killing only the child left it holding the pipes, and the front door waited on it. It sleeps past any
-	// run, so a front door that waits on it again hangs, a hang go test's -timeout fails.
+	// Killing only the child left it holding the pipes, and the front door waited on it. It sleeps until this
+	// test ends, so a front door that waits on it again hangs, a hang go test's -timeout fails, and the test's
+	// lifeline ends it however the test went.
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("a broken child's children die with it", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
-		killChildAtCleanup(test, childFile)
 		_, _, exitCode, runFakeSwiftBinaryError := runFakeSwiftBinary(test,
-			"sleep 100000 & echo $! > '"+
+			ownChildShellCommand(test, ownChildSleep, ownChildLifeline(test))+" & echo $! > '"+
 				childFile+
 				"'; head -1 '"+
 				filepath.Join(fixtures, "Clean.jsonl")+
@@ -165,12 +166,11 @@ func TestRunContractBinaryEndings(test *testing.T) {
 
 	// `SIGTERM` rather than an interrupt, because a POSIX shell starts a background job with interrupts
 	// ignored, and the stand-in's child must be one the signal can end. The child waits on a child that sleeps
-	// past any run, so a signal not passed on leaves the run waiting, a hang go test's -timeout fails.
+	// until this test ends, so a signal not passed on leaves the run waiting, a hang go test's -timeout fails.
 	// Not parallel: it drives a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("a signal cohere receives is passed to the child and everything it started", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
-		killChildAtCleanup(test, childFile)
 		interrupts := make(chan os.Signal, 1)
 		var out bytes.Buffer
 		var standardError bytes.Buffer
@@ -183,7 +183,8 @@ func TestRunContractBinaryEndings(test *testing.T) {
 		exitCode, runContractBinaryUntilError := runContractBinaryUntil(
 			fakeSwiftBinary(
 				test,
-				"sleep 100000 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait",
+				ownChildShellCommand(test, ownChildSleep, ownChildLifeline(test))+" & echo $! > '"+childFile+
+					"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait",
 			),
 			[]string{"--contract", "1"}, run, &standardError, interrupts)
 		flushStream(test, stream)
@@ -213,7 +214,8 @@ func waitForFile(test *testing.T, path string) {
 }
 
 // requireProcessEnded fails unless the process whose id a stand-in cohere-swift wrote to path is gone. An
-// orphan is reaped by launchd or init a moment after it dies, so it is given two seconds.
+// orphan is reaped by launchd or init a moment after it dies, so it is given two seconds. One that outlived its
+// parent is not killed here, by an id read from a file: the lifeline it was handed ends it when its test does.
 func requireProcessEnded(test *testing.T, path string) {
 	test.Helper()
 	contents, readError := os.ReadFile(path)
@@ -229,67 +231,34 @@ func requireProcessEnded(test *testing.T, path string) {
 			return
 		}
 	}
-	// Ignored: a child gone by now is what the kill asks for, and the test fails below either way.
-	_ = syscall.Kill(child, syscall.SIGKILL)
 	test.Errorf("the child's child %d outlived it", child)
 }
 
-// standInChild is the command a stand-in cohere-swift starts as its child, the one killChildAtCleanup may end.
-const standInChild = "sleep 100000"
-
-// killChildAtCleanup ends, when the test does, the stand-in cohere-swift's child whose id the child wrote to path, if
-// it is still running. requireProcessEnded kills it too, but only a test that gets that far: one that fails
-// before it, or hangs until go test's -timeout, would leave the sleep on the machine for a day.
-//
-// It kills by id, never by name, and only a process still running standInChild, since an id is reused once its
-// process ends and a cleanup that killed whatever holds it now could end someone else's work.
-func killChildAtCleanup(test *testing.T, path string) {
-	test.Helper()
-	test.Cleanup(func() {
-		contents, readError := os.ReadFile(path)
-		if readError != nil {
-			// The child never wrote the id, so it never started the child, and there is nothing to end.
-			return
-		}
-		child, parseError := strconv.Atoi(strings.TrimSpace(string(contents)))
-		if parseError != nil {
-			return
-		}
-		command, psError := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(child)).Output()
-		if psError != nil || strings.TrimSpace(string(command)) != standInChild {
-			// ps fails on an id no process holds, and a different command means the id was reused.
-			return
-		}
-		// Ignored: the child ending on its own between the look and the kill is the outcome the kill asks for.
-		_ = syscall.Kill(child, syscall.SIGKILL)
-	})
-}
-
-// TestAStandInBinarysChildIsKilledWhenItsTestEnds: a child a test leaves running is gone once the test's
-// cleanups have run, so a stand-in cohere-swift test that fails early or hangs leaves no sleep behind.
-func TestAStandInBinarysChildIsKilledWhenItsTestEnds(test *testing.T) {
+// TestAStandInBinarysChildEndsWhenItsTestEnds: a child a test leaves running is gone once the test's cleanups have
+// run, so a stand-in cohere-swift test that fails early or hangs leaves no child behind. The child is this test
+// binary, handed the subtest's lifeline as a stand-in's child is, and nothing signals it: the lifeline's removal
+// ends it, with an exit of its own.
+func TestAStandInBinarysChildEndsWhenItsTestEnds(test *testing.T) {
 	test.Parallel()
-	sleeper := exec.Command("sleep", "100000")
-	if startError := sleeper.Start(); startError != nil {
-		test.Fatal(startError)
-	}
-	childFile := filepath.Join(test.TempDir(), "child")
-	if writeError := os.WriteFile(childFile, []byte(strconv.Itoa(sleeper.Process.Pid)+"\n"), 0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
-	ended := make(chan struct{})
-	go func() {
-		// Ignored: the sleep ends by the kill, so its wait reports that signal; what matters is that it ends.
-		_ = sleeper.Wait()
-		close(ended)
-	}()
+	ended := make(chan error, 1)
 	// The subtest stands for a stand-in cohere-swift test that leaves its child running; its cleanups run as it ends.
-	// Not parallel: the wait below needs its cleanup to have killed the child, and a parallel subtest would not
+	// The child's command is this test's, so the kill its cleanup holds back for a run that stopped early is this
+	// test's too, and comes after the wait below.
+	// Not parallel: the wait below needs its cleanup to have ended the child, and a parallel subtest would not
 	// start until this test returned
-	test.Run("a test that leaves its child running", func(test *testing.T) {
-		killChildAtCleanup(test, childFile)
+	started := test.Run("a test that leaves its child running", func(subtest *testing.T) {
+		sleeper := ownChild(test, ownChildSleep, ownChildLifeline(subtest))
+		if startError := sleeper.Start(); startError != nil {
+			subtest.Fatal(startError)
+		}
+		go func() { ended <- sleeper.Wait() }()
 	})
-	// No deadline: a cleanup that did not kill the child leaves this waiting on a sleep that outlasts any run, a
-	// hang go test's -timeout fails.
-	<-ended
+	if !started {
+		return
+	}
+	// No deadline: a cleanup that did not end the child leaves this waiting on a sleep that outlasts go test's
+	// -timeout, which fails the hang.
+	if waitError := <-ended; waitError != nil {
+		test.Errorf("the child ended with %v, want an exit of its own once its lifeline was gone", waitError)
+	}
 }
