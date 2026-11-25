@@ -121,17 +121,30 @@ func (listed Package) fileList(list FileList) []string {
 	panic(fmt.Sprintf("go_listing: %q is no file list go list prints", string(list)))
 }
 
+// includePathOptions are the C compiler's options that add a directory to the include path: -I, and
+// -isystem, -iquote and -idirafter, which search the same way for the includes they apply to. No
+// other option starts with one of these, and none of these starts with another. -include names a
+// file to include, not a directory to search, and is no include path option.
+var includePathOptions = []string{"-I", "-isystem", "-iquote", "-idirafter"}
+
 // CgoIncludeDirectories are the directories the package's cgo flags (CgoCFLAGS, CgoCPPFLAGS and
-// CgoCXXFLAGS, in that order) name with -I, spelled "-I<directory>" or "-I" then the directory, each
-// absolute against the package's Directory and cleaned, each once, in the order the flags name them.
-// go list prints `${SRCDIR}` already replaced, and a relative directory already joined to the package's,
-// so the joining is for a listing that didn't. A -I with nothing after it names nothing. The headers
-// in them are what a cgo package reads from outside its own HFiles, which go's build cache doesn't key.
+// CgoCXXFLAGS, in that order) add to the include path, with -I, -isystem, -iquote or -idirafter,
+// each spelled with the directory in the same flag ("-I<directory>") or the next ("-I" then the
+// directory). Each is absolute against the package's Directory and cleaned, each once, in the order
+// the flags name them. go list prints `${SRCDIR}` already replaced, and a relative directory already
+// joined to the package's, so the joining is for a listing that didn't. An option with nothing after
+// it names nothing. The headers in them are what a cgo package reads from outside its own HFiles,
+// which go's build cache doesn't key.
 func (listed Package) CgoIncludeDirectories() []string {
 	var directories []string
 	for _, flags := range [][]string{listed.CgoCFlags, listed.CgoCppFlags, listed.CgoCxxFlags} {
 		for index := 0; index < len(flags); index++ {
-			directory, found := strings.CutPrefix(flags[index], "-I")
+			directory, found := "", false
+			for _, option := range includePathOptions {
+				if directory, found = strings.CutPrefix(flags[index], option); found {
+					break
+				}
+			}
 			if !found {
 				continue
 			}

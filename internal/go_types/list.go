@@ -16,68 +16,26 @@ package go_types
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/system-inc/cohere/go_listing"
 	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
-// listedPackage is what `go list -deps -json` says of one package, the fields the loader reads.
-type listedPackage struct {
-	ImportPath string
-	Name       string
-	Directory  string `json:"Dir"`
-	Standard   bool
-	DepOnly    bool
-	GoFiles    []string
-	CgoFiles   []string
-	Imports    []string
-
-	TestGoFiles  []string
-	XTestGoFiles []string
-	TestImports  []string
-	XTestImports []string
-
-	ImportMap  map[string]string
-	Deps       []string
-	Module     *listedModule
-	Error      *listedError
-	DepsErrors []*listedError
-}
-
-// listedError is an error go list reports for a package or one of its dependencies. go list names the text
-// Err, and the tag keeps that key.
-type listedError struct {
-	Message string `json:"Err"`
-}
-
-// listedModule is the module a listed package belongs to.
-type listedModule struct {
-	Path      string
-	Version   string
-	Directory string `json:"Dir"`
-	GoMod     string
-	GoVersion string
-	// Main is whether the module is a main module, one the go command was run in rather than a dependency.
-	Main    bool
-	Replace *listedModule
-}
-
-// listedFields are the fields asked of go list, so it computes nothing else.
+// listedFields are the go_listing.Package fields the loader reads, asked of go list so it computes nothing else.
 var listedFields = "ImportPath,Name,Dir,Standard,DepOnly,GoFiles,CgoFiles,Imports,ImportMap,Deps,Module,Error," +
 	"DepsErrors,TestGoFiles,XTestGoFiles,TestImports,XTestImports"
 
 // listing is one `go list -deps -json` run: every package the patterns name and everything they import, in
 // the order go prints them, dependencies first.
 type listing struct {
-	packages []*listedPackage
-	byPath   map[string]*listedPackage
+	packages []*go_listing.Package
+	byPath   map[string]*go_listing.Package
 }
 
 var listings = struct {
@@ -123,17 +81,14 @@ func runList(directory string, environment []string, patterns []string) (*listin
 	if goCommandError != nil {
 		return nil, goCommandError
 	}
-	result := &listing{byPath: map[string]*listedPackage{}}
-	decoder := json.NewDecoder(bytes.NewReader(output))
-	for {
-		var listed listedPackage
-		if decodeError := decoder.Decode(&listed); errors.Is(decodeError, io.EOF) {
-			break
-		} else if decodeError != nil {
-			return nil, fmt.Errorf("reading go list's output: %w", decodeError)
-		}
-		result.packages = append(result.packages, &listed)
-		result.byPath[listed.ImportPath] = &listed
+	packages, decodeError := go_listing.Decode(output)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	result := &listing{byPath: map[string]*go_listing.Package{}}
+	for index := range packages {
+		result.packages = append(result.packages, &packages[index])
+		result.byPath[packages[index].ImportPath] = &packages[index]
 	}
 	if len(result.packages) == 0 {
 		return nil, fmt.Errorf("go list found no packages for %s in %s", strings.Join(patterns, " "), directory)
