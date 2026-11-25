@@ -47,6 +47,11 @@ func TestGoMemoryLine(test *testing.T) {
 			want: "memory limit 8.0 GiB as a bound alone, with the collector at Go's default, since available " +
 				"memory could not be read",
 		},
+		{
+			name:   "a source this front door does not know",
+			record: `{"limitBytes":4294967296,"source":"Tomorrow","availableBytes":0}`,
+			want:   `memory limit 4.0 GiB, from a source this front door does not know ("Tomorrow")`,
+		},
 	}
 	for _, described := range cases {
 		test.Run(described.name, func(test *testing.T) {
