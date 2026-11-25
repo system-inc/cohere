@@ -53,12 +53,6 @@ const (
 // house's mirrors, macBoxMirrors (#3djwr33).
 const landJobCorpusMirrorsVariable = "COHERE_LAND_CORPUS_MIRRORS"
 
-// landJobCorporaVariable is the directory of the corpora's extracted archives; unset, it is landJobCorporaDefault.
-const (
-	landJobCorporaVariable = "COHERE_LAND_CORPORA"
-	landJobCorporaDefault  = "/opt/loom-corpora"
-)
-
 // landJobCommitVariable is the commit the Loom job runs at, which Loom's runner sets in every job's environment. Unset,
 // as in a plain checkout, the commit is the working directory's `HEAD`.
 const landJobCommitVariable = "LOOM_JOB_COMMIT"
@@ -404,20 +398,9 @@ func (job *landJobRun) lay() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkSubmodulesError)
 		return "", 1
 	}
-	corpora, gap, refusal := layLandJobCorpora(job.repository, job.merge, job.corpusMirrors,
-		settingOr(landJobCorporaVariable, landJobCorporaDefault), job.mirrors)
-	if refusal != "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
-		return "", 1
-	}
-	job.corpora, job.corpusGap = corpora, gap
-	if gap != "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", gap)
-	}
-	laid := "no corpus, since the merge pins none"
-	if len(corpora) > 0 {
-		laid = "the corpora at their pins: " + corporaNamed(corpora)
-	}
+	// No corpus is laid: cohere's tests read no snapshot of another repository (Kirk, Nov 25, #5wj23dd), so a test
+	// that still reads one skips by name until its deletion lands.
+	laid := "no corpus, since cohere's tests read no snapshot of another repository"
 	return shortCommit(job.merge) + " at " + job.tree + ", " + laid, 0
 }
 

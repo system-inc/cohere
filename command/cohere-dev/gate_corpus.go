@@ -116,56 +116,6 @@ var coherePinnedName = path.Base(corpus.PinnedFile)
 // cohereModule is cohere's own module path, whose trees always carry the pin file.
 const cohereModule = "github.com/system-inc/cohere"
 
-// gateCorpora is every corpus the landing of commit lays, and a line for each it can't, naming why: the lander's
-// corpora file names no checkout to lay it from, which runs nowhere, named on the land line.
-//
-// The pin file is found in the tree being landed by its name, wherever that tree keeps it (pinnedFileIn), never at the
-// path the land's own code names: land runs main's code as it was when the landing was asked for, so a landing queued
-// before the file moved read the old path, found nothing, laid no corpus, and 196 tests skipped on a green gate twice
-// (168fc2d5c and 1312d2e60, #3kpxrdt). A cohere tree with no pin file refuses the landing; only a tree that isn't
-// cohere's, a test's fixture, lays none.
-func gateCorpora(worktree string, commit string) ([]gateCorpus, []string, error) {
-	pinned, found, findError := pinnedFileIn(worktree, commit)
-	if findError != nil {
-		return nil, nil, findError
-	}
-	if !found {
-		return nil, []string{fmt.Sprintf("no corpus is laid, since %s is no cohere tree and holds no %s",
-			shortCommit(commit), coherePinnedName)}, nil
-	}
-	source, showError := gitOutput(worktree, "show", commit+":"+pinned)
-	if showError != nil {
-		return nil, nil, fmt.Errorf("reading %s at %s: %w", pinned, shortCommit(commit), showError)
-	}
-	pins, pinsError := corpus.PinsIn([]byte(source))
-	if pinsError != nil {
-		return nil, nil, pinsError
-	}
-	configurationPath, configurationPathError := corpus.ConfigPath()
-	if configurationPathError != nil {
-		return nil, nil, configurationPathError
-	}
-	configuration, configurationError := corpus.ReadConfiguration(configurationPath)
-	if configurationError != nil {
-		return nil, nil, configurationError
-	}
-	laid := []gateCorpus{}
-	unlaid := []string{}
-	for _, each := range corpus.All {
-		checkout := os.Getenv(each.Variable)
-		if checkout == "" {
-			checkout = configuration[each.Name]
-		}
-		if checkout == "" {
-			unlaid = append(unlaid, fmt.Sprintf("%s isn't laid, since %s names no checkout of it to lay from, so "+
-				"its tests run nowhere", each.Name, configurationPath))
-			continue
-		}
-		laid = append(laid, gateCorpus{corpus: each, pins: pins[each.Name], checkout: checkout})
-	}
-	return laid, unlaid, nil
-}
-
 // pinnedFileIn finds the pin file in commit's tree by its name, and reports whether there is one. A tree with two
 // refuses, since which pins it lays would be a guess, and a cohere tree, by its go.mod's module, with none refuses,
 // naming the name it looked for, since its corpus tests would skip and the gate read green over them.
