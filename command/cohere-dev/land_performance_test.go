@@ -785,6 +785,22 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 			test.Errorf("a run with %s read as %q, want %q:\n%s", unrecorded.variable, problem, want, output)
 		}
 	}
+
+	// Handed main's binary, which is the one it builds here, the script says so after its build and stops before any
+	// run, as the land job reads it (#6ex523f).
+	sum := sha256.Sum256([]byte(binaryScript))
+	mainBinary := hex.EncodeToString(sum[:])
+	ranBefore := len(readMaybeMissing(test, runs))
+	same := exec.Command("bash", "-s", "--", commit, reference, "2", "3", "2", fmt.Sprint(performanceWarmRounds),
+		mainBinary)
+	same.Dir, same.Stdin = test.TempDir(), strings.NewReader(script)
+	same.Env = slices.Concat(environment, []string{"HOME=" + home})
+	output, sameError := same.CombinedOutput()
+	if isSame, problem := sameBinaryAsMain(output, commit, mainBinary, sameError); !isSame || problem != "" ||
+		len(readMaybeMissing(test, runs)) != ranBefore {
+		test.Errorf("handed main's binary, the script read as the same binary %t (%s), cohere running after it %t:\n%s",
+			isSame, problem, len(readMaybeMissing(test, runs)) != ranBefore, output)
+	}
 }
 
 // toolchainDigestOf is sharedBoxToolchainCheck's digest of the tree at goroot, read here in Go: each regular file's

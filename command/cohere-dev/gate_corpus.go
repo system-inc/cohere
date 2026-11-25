@@ -93,10 +93,14 @@ var corpusRecipes = map[string]corpusRecipe{
 }
 
 // gateCorpus is one corpus a landing lays: its pins, read from the tree being landed, and the lander's checkout of it.
+// The land job's sources (land_job_run.go) are other kinds: a bare mirror, with no working tree to fill a submodule
+// from, or a directory of files at the pin, which the carry takes whole.
 type gateCorpus struct {
-	corpus   corpus.Corpus
-	pins     corpus.Pins
-	checkout string
+	corpus    corpus.Corpus
+	pins      corpus.Pins
+	checkout  string
+	bare      bool
+	directory bool
 }
 
 // place is where the corpus is laid on a box, under macBoxScratch/corpora: its name, then its checkout commit with the
@@ -389,6 +393,10 @@ func writeCorpusCarry(carry string, directory string, corpora []gateCorpus) ([]s
 				return nil, repositoryError
 			}
 			checkout = each.pins.Checkout
+		} else if each.directory {
+			if directoryError := addCorpusDirectory(archive, prefix, each, recipe.excluded); directoryError != nil {
+				return nil, directoryError
+			}
 		} else if treeError := addCorpusTree(archive, prefix, each, recipe.excluded); treeError != nil {
 			return nil, treeError
 		}
@@ -424,6 +432,11 @@ func addCorpusTree(archive *tar.Writer, prefix string, each gateCorpus, excluded
 		if !found || len(parts) != 3 || parts[0] != "160000" || slices.ContainsFunc(excluded, isLeftOut) {
 			continue
 		}
+		// A bare mirror has no working tree to fill a submodule from, so a carry that needs one refuses, naming it.
+		if each.bare {
+			return fmt.Errorf("%s at %s records the submodule %s, which its bare mirror %s can't fill",
+				each.corpus.Name, shortCommit(each.pins.Checkout), path, each.checkout)
+		}
 		submodule := filepath.Join(each.checkout, filepath.FromSlash(path))
 		if copyError := copyGitArchive(archive, submodule, parts[2], prefix+path+"/", []string{"."}); copyError != nil {
 			return fmt.Errorf("%s's submodule %s at %s, from %s: %w", each.corpus.Name, path, shortCommit(parts[2]),
@@ -431,6 +444,63 @@ func addCorpusTree(archive *tar.Writer, prefix string, each gateCorpus, excluded
 		}
 	}
 	return nil
+}
+
+// addCorpusDirectory adds the corpus's directory, a tree of files already at its pin, under prefix, leaving out
+// excluded at its top, each file, directory and link as it is.
+func addCorpusDirectory(archive *tar.Writer, prefix string, each gateCorpus, excluded []string) error {
+	return filepath.WalkDir(each.checkout, func(file string, entry fs.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
+		}
+		relative, relativeError := filepath.Rel(each.checkout, file)
+		if relativeError != nil || relative == "." {
+			return relativeError
+		}
+		if slices.Contains(excluded, filepath.ToSlash(relative)) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		information, informationError := entry.Info()
+		if informationError != nil {
+			return informationError
+		}
+		link := ""
+		if entry.Type()&fs.ModeSymlink != 0 {
+			target, linkError := os.Readlink(file)
+			if linkError != nil {
+				return linkError
+			}
+			link = target
+		}
+		header, headerError := tar.FileInfoHeader(information, link)
+		if headerError != nil {
+			return headerError
+		}
+		header.Name = prefix + filepath.ToSlash(relative)
+		if entry.IsDir() {
+			header.Name += "/"
+		}
+		header.Format = tar.FormatUnknown
+		if writeError := archive.WriteHeader(header); writeError != nil {
+			return writeError
+		}
+		if !information.Mode().IsRegular() {
+			return nil
+		}
+		opened, openError := os.Open(file)
+		if openError != nil {
+			return openError
+		}
+		_, copyError := io.Copy(archive, opened)
+		closeError := opened.Close()
+		if copyError != nil {
+			return copyError
+		}
+		return closeError
+	})
 }
 
 // copyGitArchive copies `git archive` of commit in repository, limited to pathspecs, into archive under prefix.

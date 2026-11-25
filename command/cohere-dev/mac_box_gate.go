@@ -61,6 +61,24 @@ const (
 // for 3 minutes, before the box refuses. A test replaces the line to point the script at mirrors of its own.
 const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 
+// macBoxLandCacheLine is macBoxScript's and landGateScript's line setting landCache, sharedBoxGate's kept Go cache
+// (sharedBoxCacheBlock), to none: set in the script itself, so no variable in a shared box's environment can keep a
+// cache there. The land job on Shackler alone replaces it with its own setting (land_job_run.go).
+const macBoxLandCacheLine = `landCache=""`
+
+// macBoxTemporaryBlock makes gatetemp, the tests' temporary directory under /tmp: a new one each run on a gate box, and
+// on Shackler, with landCache set, one path every land job, made empty first. go test's cache keys a test on the
+// `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job would miss every package that makes one.
+// The land job is serial (land_job_run.go), so no two runs share the path.
+const macBoxTemporaryBlock = `if [ -n "$landCache" ]; then
+  gatetemp="/tmp/cohere-land-gate.$(id -u)"
+  { chmod -R u+w "$gatetemp" 2>/dev/null || true; rm -rf "$gatetemp"; } || refuse "$gatetemp couldn't be emptied"
+  mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
+else
+  gatetemp=$(mktemp -d /tmp/cohere-gate.XXXXXX)
+fi
+`
+
 // macBoxCorpusVariables is every corpus's variable, which the gate's Mac script unsets before it sets the laid ones, so
 // a variable another org left in loom's environment never points a test at a copy the gate didn't lay. A test holds it
 // to internal/testing/corpus's list.
@@ -102,12 +120,14 @@ held() {
 // patterns. It sets each corpus's variable to the copy laid under macBoxScratch/corpora, and when one isn't laid there
 // it names what it lacks (corpusUnlaidMarker) and tests nothing, for the lander to lay it (gate_corpus.go). It works
 // only under macBoxScratch, in a bare repository and one tree that last across landings, so the tree's path stays one
-// path. It waits for the box's mirror to hold the commit, refusing once it has waited 3 minutes, fetches the commit
-// and the pin, checks them out, and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the
-// mirrors through macBoxMirrorReads, and removes the configuration file naming them safe before any test runs.
+// path. It waits for the box's mirror to hold the commit, refusing once it has waited 3 minutes, fetches the commit and
+// the pin, checks them out, and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the mirrors
+// through macBoxMirrorReads, and removes the configuration file naming them safe before any test runs. On a gate box it
+// keeps no Go cache (macBoxLandCacheLine); the land job runs it on Shackler with its mirrors and its cache.
 const macBoxScript = `set -euo pipefail
 commit="$1"; pin="$2"; races="$3"; corpora="$4"; shift 4
 ` + macBoxMirrorLine + `
+` + macBoxLandCacheLine + `
 base=` + macBoxScratch + `
 mkdir -p "$base"; cd "$base"
 refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
@@ -139,8 +159,7 @@ done
 [ -z "$unlaid" ] || { echo "` + corpusUnlaidMarker + `${unlaid# }"; exit 0; }
 # The tests' temporary directory is reached through a link, /tmp to /private/tmp, as a developer's Mac reaches its own
 # through /var, so a test of what such a path does runs here too; the gap's own is reached through none (#5r0vrte).
-gatetemp=$(mktemp -d /tmp/cohere-gate.XXXXXX)
-trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
+` + macBoxTemporaryBlock + `trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
 export TMPDIR="$gatetemp"
 cd tree
 goroot="` + macBoxGoroot + `"; digest="` + macBoxToolchainDigest + `"
