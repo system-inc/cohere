@@ -774,6 +774,15 @@ func runModuleTests(
 			"fall back to Kirk's Mac: %s\n", unavailable)
 		return 1, ""
 	}
+	return verdictLine(worktree, covered, verdict, sharedBoxTrust)
+}
+
+// verdictLine says a box's verdict on a landing's tests, read whole (readBoxRun), and returns the exit code and where
+// they ran, as the land line says it after what was tested, trust saying what the verdict holds against: a refusal, a
+// failing test or a failing -race run refuses the landing, saying why, and a pass is said with its packages, the tests
+// it skipped or never compiled, its corpora and where its time went. The land job says its own verdict through it too
+// (land_job_run.go).
+func verdictLine(worktree string, covered project.Workspace, verdict boxVerdict, trust string) (int, string) {
 	if verdict.refused != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s refused to test this landing, so nothing landed: %s\n",
 			verdict.box, verdict.refused)
@@ -808,15 +817,15 @@ func runModuleTests(
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s passed, %d packages\n", verdict.box, platform,
 		verdict.packagesPassed)
-	where := fmt.Sprintf("on %s (%s, %d packages, %s)", verdict.box, platform, verdict.packagesPassed, sharedBoxTrust)
+	where := fmt.Sprintf("on %s (%s, %d packages, %s)", verdict.box, platform, verdict.packagesPassed, trust)
 	// A split gate names which box ran which half (gate_split.go).
 	if verdict.halves != "" {
 		where = fmt.Sprintf("on %s (%s, %d packages: %s, %s)", verdict.box, platform, verdict.packagesPassed,
-			verdict.halves, sharedBoxTrust)
+			verdict.halves, trust)
 	}
 	if verdict.job != "" {
 		where = fmt.Sprintf("on a scratch box (%s, %d packages, %s; land-gate job %s)", platform,
-			verdict.packagesPassed, sharedBoxTrust, verdict.job)
+			verdict.packagesPassed, trust, verdict.job)
 	}
 	if verdict.race != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run passed, %d packages\n", verdict.box,

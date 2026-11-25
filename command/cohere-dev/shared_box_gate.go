@@ -13,10 +13,30 @@ package main
 //     passes before any test runs, so the module cache is whole and matches go.sum. A box that never held a module
 //     only another platform needs failed the tests that list for that platform, though its own build never asked
 //     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8).
-//   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it.
+//   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it, but in the land job
+//     (below).
 //
 // It is the exception to the house's rule against -count=1 in a gate. That rule holds because Go's test cache is
-// keyed honestly, and on a cache any job can write it isn't. Kirk's Mac's own runs keep the cache.
+// keyed honestly, and on a cache any job can write it isn't. Kirk's Mac's own runs keep the cache, and so does the land
+// job on Shackler (land_job_run.go, #s50bcnr), whose cache is a directory no other job writes: there sharedBoxGate runs
+// with the cache that job keeps and without -count=1 (sharedBoxCacheBlock), so a package nothing changed replays.
+
+// sharedBoxCacheBlock is sharedBoxGate's choice of Go cache, by landCache, which every script that runs it sets
+// before it: empty on every gate box and scratch box (macBoxLandCacheLine), so the box's environment never keeps a
+// cache there, and the land job's kept directory on Shackler alone. Empty, the cache is made empty for this job and
+// removed after it, and countFlag is -count=1, which every go test the gate runs carries: today's cold, correct run.
+// Set, the cache is landCache's gocache, kept across the land job's jobs, and countFlag is empty, so Go's honest keys
+// replay every package whose inputs didn't change as "(cached)".
+const sharedBoxCacheBlock = `# The Go cache: this job's own, empty, on a shared box, or the land job's, kept.
+countFlag=-count=1
+if [ -n "${landCache:-}" ]; then
+  gocache="$landCache/gocache"
+  mkdir -p "$gocache" || refuse "the land job's Go cache $gocache couldn't be made"
+  countFlag=""
+else
+  gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
+fi
+`
 
 // sharedBoxTrust is what the land line says of a verdict from a shared box beside it: it holds against our own
 // mistakes, not against a candidate written to forge one, since every job there runs as one account (#1v2shq7).
@@ -95,14 +115,14 @@ const boxCoreBudgetVariable = "COHERE_DEV_GATE_CORES"
 const boxBudgetMarker = "cohere-dev-gate: budget "
 
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
-// goroot, digest, node, nodeDigest and races (racePatterns' tokens, comma-separated) as variables, and the packages
-// to test as its arguments: the module's patterns, or import paths, which a gate Mac is handed. It prints boxMarker
-// before the tests, boxRaceMarker before the -race run once the module passes, and sharedBoxRefusedMarker, ending the
-// run, when it won't trust the box. When boxShardedPackage is among its arguments, the plain go test runs the rest,
-// and that package runs after it in shards (sharedBoxShards), the run failing once both have when either failed. The
-// -race run is one go test of the plain tokens, then one of each token's package with its run, every one through the
-// same filter so the run after the marker reads as one stream, and a failure of any is the run's, after the rest
-// have run.
+// goroot, digest, node, nodeDigest, races (racePatterns' tokens, comma-separated) and landCache (sharedBoxCacheBlock)
+// as variables, and the packages to test as its arguments: the module's patterns, or import paths, which a gate Mac is
+// handed. It prints boxMarker before the tests, boxRaceMarker before the -race run once the module passes, and
+// sharedBoxRefusedMarker, ending the run, when it won't trust the box. When boxShardedPackage is among its arguments,
+// the plain go test runs the rest, and that package runs after it in shards (sharedBoxShards), the run failing once
+// both have when either failed. The -race run is one go test of the plain tokens, then one of each token's package with
+// its run, every one through the same filter so the run after the marker reads as one stream, and a failure of any is
+// the run's, after the rest have run.
 const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 # step says how many seconds the step it names took, from the end of the one before it (#bc8nf0r).
 stepStarted=$(date +%s)
@@ -126,10 +146,9 @@ if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
   export GOMAXPROCS=2 GOFLAGS="$GOFLAGS -p=$budgetPackages"
   echo "` + boxBudgetMarker + `${` + boxCoreBudgetVariable + `} cores, go test -p $budgetPackages on 2 threads each"
 fi
-gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
-# The shards' outputs and the run's own temporary directory, when the script before this made one, go with the
-# cache.
-trap 'rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
+` + sharedBoxCacheBlock + `# The shards' outputs and the run's own temporary directory, when the script before this
+# made one, go with the cache, and a kept cache stays.
+trap '[ -n "${landCache:-}" ] || rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
 export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 step toolchain
@@ -145,11 +164,11 @@ done
 # run that failed, as one go test of every package would have run them, and the run ends failed once both have.
 testsFailed=0
 if [ -z "$sharded" ]; then
-  go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"' ||
+  go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"' ||
     testsFailed=1
 elif [ -n "$others" ]; then
   # Unquoted, so each package is its own argument: an import path, which holds no space or glob.
-  go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json $others |
+  go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json $others |
     grep -vE '"Action":"(start|run|pause|cont)"' || testsFailed=1
 fi
 step tests
@@ -169,14 +188,14 @@ if [ -n "$races" ]; then
   raceFailed=0
   # Unquoted, so each plain token is its own argument: a directory of the module, which holds no space or glob.
   if [ -n "$plainRaces" ]; then
-    go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -race $plainRaces |
+    go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -race $plainRaces |
       grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1
   fi
   step race
   for race in "${raceTokens[@]}"; do
     case "$race" in
     *` + raceRunSeparator + `*)
-      go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -race -run "${race#*` + raceRunSeparator + `}" \
+      go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -race -run "${race#*` + raceRunSeparator + `}" \
         "${race%%` + raceRunSeparator + `*}" | grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1 ;;
     esac
   done
