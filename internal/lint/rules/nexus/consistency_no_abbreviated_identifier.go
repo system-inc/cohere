@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/binding"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -102,7 +102,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdent
 		fileName := imports.NormalizedFileName(ruleContext.SourceFile)
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)
 		isFrameworkConstantFile := matchesAnyFilePattern(fileName, settings.FrameworkConstantFilePatterns)
-		routeContract := nextjs.RouteContractExports(fileName)
+		routeContract := next_js.RouteContractExports(fileName)
 
 		judge := func(node *ast.Node) {
 			name := node.Text()
@@ -134,7 +134,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdent
 			// passes the `max[A-Z]` gate and no consumer named it, so this rule told route
 			// authors to write `maximumDuration`, which Next then silently ignores. That is the
 			// shape of the rename that cost five phi web routes their prerendering, so the
-			// floor comes from `nextjs.IsRouteContractExport` whatever the consumer passes.
+			// floor comes from `next_js.IsRouteContractExport` whatever the consumer passes.
 			//
 			// The module-scope declaration is exempt, but not a nested binding that shares
 			// its spelling: a `const config` inside a function is this file's own name again

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -123,7 +123,7 @@ var companionFileSuffixes = []string{".test", ".spec", ".stories", ".story"}
 //	two or more components        react/no-multi-comp reports every one after the first, and this
 //	                              rule waits until the split makes the question answerable
 //	an anonymous component        react/display-name reports it; once named, this rule compares
-//	a Next.js convention file     the framework owns the name; see nextjs.IsConventionFile
+//	a Next.js convention file     the framework owns the name; see next_js.IsConventionFile
 //	a test or stories file        see companionFileSuffixes
 //	a .ts or .js file             a component file is a .tsx or .jsx file
 //
@@ -152,7 +152,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule[rule.NoOptions]{
 		// and a mutation deleting the fold survived a fixture written to catch it.
 		fileName := path.Base(ruleContext.SourceFile.FileName().AsString())
 		fileBaseName, isComponentFile := componentFileBaseName(fileName)
-		if !isComponentFile || nextjs.IsConventionFile(fileBaseName) || isCompanionFile(fileBaseName) {
+		if !isComponentFile || next_js.IsConventionFile(fileBaseName) || isCompanionFile(fileBaseName) {
 			return nil
 		}
 

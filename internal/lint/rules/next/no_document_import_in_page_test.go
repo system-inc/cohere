@@ -167,7 +167,7 @@ func TestNoDocumentImportInPageReportsOnShapesTheCorpusNeverPins(test *testing.T
 		{
 			// Named like the document and still reported, because the shared helper requires a pages
 			// segment. Measured reporting on the release binary, and the case where our other
-			// predicate, nextjs.IsDocumentFile, would answer the opposite.
+			// predicate, next_js.IsDocumentFile, would answer the opposite.
 			name:     "the document convention outside a pages directory",
 			fileName: "components/_document.tsx",
 			source:   "import Document from \"next/document\";\n",
@@ -280,7 +280,7 @@ func TestNoDocumentImportInPageIsSilentOnShapesTheCorpusNeverPins(test *testing.
 		},
 		{
 			// Exempt upstream, because the shared helper's prefix test carries no trailing dot.
-			// Measured silent on the release binary. Our other predicate, nextjs.IsDocumentFile, keeps
+			// Measured silent on the release binary. Our other predicate, next_js.IsDocumentFile, keeps
 			// the dot and would report here, which is why this rule does not use it.
 			name:     "a longer name sharing the document prefix",
 			fileName: "pages/_documentation.tsx",

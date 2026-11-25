@@ -31,7 +31,7 @@ var messageNoTitleInDocumentHead = rule.Message{
 // before they run. This one does not, and the absence is upstream's and is correct. The rule cannot
 // be reached until a file has imported from `next/document`, which is a far tighter gate than any
 // filename test: a `<Head>` from `@react-email/components` or a local component of that name can
-// never satisfy it. Adding `nextjs.IsDocumentFile` here would look like a tidy-up and would silently
+// never satisfy it. Adding `next_js.IsDocumentFile` here would look like a tidy-up and would silently
 // delete the rule's main true positive, since `next/document`'s `Head` used *outside* a document
 // file is exactly the mistake being caught, and both upstreams catch it there.
 //

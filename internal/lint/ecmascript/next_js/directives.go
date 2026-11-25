@@ -1,4 +1,4 @@
-package nextjs
+package next_js
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"

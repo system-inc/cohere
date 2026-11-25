@@ -3,7 +3,7 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -35,7 +35,7 @@ var messageNoBeforeInteractiveScriptOutsideDocument = rule.Message{
 //
 // # Which document predicate, and why this rule is the one that differs
 //
-// `internal/utilities/nextjs` carries two document predicates on purpose. `IsDocumentFile` is the union
+// `internal/lint/ecmascript/next_js` carries two document predicates on purpose. `IsDocumentFile` is the union
 // of every spelling the eight `@next/next` gating rules use, for the rules whose own upstreams
 // disagree and whose corpora never vote. `IsDocumentPage` is oxc's single shared `is_document_page`
 // reproduced byte for byte.
@@ -128,7 +128,7 @@ var messageNoBeforeInteractiveScriptOutsideDocument = rule.Message{
 //
 // The app directory test is a substring test rather than a segment test, faithfully: any path
 // containing `app/` is exempt, so `myapp/pages/x.jsx` is silent, probed and confirmed. The cost is
-// real on our own trees rather than theoretical, and `nextjs.IsInApplicationDirectory` records which
+// real on our own trees rather than theoretical, and `next_js.IsInApplicationDirectory` records which
 // checkouts it silences.
 //
 // # The import scan runs before the walk
@@ -156,7 +156,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule[rule.NoOptions]{
 
 		// Hoisted, unlike upstream, which asks this at every opening element. Same answer, asked
 		// once. Returning no listeners is this tree's spelling of upstream's `should_run`.
-		if nextjs.IsInApplicationDirectory(fileName.AsString()) {
+		if next_js.IsInApplicationDirectory(fileName.AsString()) {
 			return nil
 		}
 
@@ -179,7 +179,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule[rule.NoOptions]{
 			if strategy == nil {
 				return
 			}
-			if nextjs.IsDocumentPage(fileName.AsString()) {
+			if next_js.IsDocumentPage(fileName.AsString()) {
 				return
 			}
 			ruleContext.ReportNode(strategy, messageNoBeforeInteractiveScriptOutsideDocument)

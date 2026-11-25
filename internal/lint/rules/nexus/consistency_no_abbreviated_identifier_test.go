@@ -838,7 +838,7 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(test *test
 }
 
 // TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone covers the floor
-// `nextjs.IsRouteContractExport` sets with no options at all.
+// `next_js.IsRouteContractExport` sets with no options at all.
 //
 // `maxDuration` is the case no consumer list carried: it passes the `max[A-Z]` gate, and the rule
 // told route authors to write `maximumDuration`, which Next then silently ignores. Each silent case is

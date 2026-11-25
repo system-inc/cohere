@@ -647,7 +647,7 @@ by question:
 
     binding      class_members  comments   control_flow_graph   decorators
     high_level_intermediate_representation             imports  jsx
-    literal      module        nextjs     property             react
+    literal      module        next_js    property             react
     reference    regexp        regex_pattern             regex_syntax
     scope        text
 

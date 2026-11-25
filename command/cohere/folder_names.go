@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/file_name_words"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/rule_names"
 )
 
@@ -87,7 +87,7 @@ func judgeFolder(relative string, takenWhole func(string) bool) (folderFinding, 
 		return folderFinding{}, false
 	}
 	name := segments[len(segments)-1]
-	if nextjs.IsRoutingFolder(name) {
+	if next_js.IsRoutingFolder(name) {
 		return folderFinding{}, false
 	}
 	parent := ""

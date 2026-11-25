@@ -1,4 +1,4 @@
-// Package nextjs answers which Next.js file a path is, for the rules that gate on it.
+// Package next_js answers which Next.js file a path is, for the rules that gate on it.
 //
 // Eight rules in the `@next/next` family decide "is this the document file" and upstream answers it
 // four different ways: a shared `is_document_page` that splits on `pages`, two byte-equivalent
@@ -12,7 +12,7 @@
 // So this package is a deliberate divergence from the port target, ruled 2026-08-23. Fidelity is to
 // what a rule decides rather than to how it obtains what it needs, and all eight are deciding the
 // same thing.
-package nextjs
+package next_js
 
 import (
 	"strings"

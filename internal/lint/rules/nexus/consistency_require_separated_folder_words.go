@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/folder_words"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -46,7 +46,7 @@ const nodeModulesFolder = "node_modules"
 //   - Nothing below node_modules, which holds packages, not the project's source. Discovery never enters one, and a
 //     tsconfig that includes one is the only way a file of it reaches a rule. Build output and other generated
 //     trees are ignored by .gitignore, which discovery never enters either, so no rule sees them.
-//   - No App Router folder, which Next.js reads by its punctuation (nextjs.IsRoutingFolder): `[id]` is a key the
+//   - No App Router folder, which Next.js reads by its punctuation (next_js.IsRoutingFolder): `[id]` is a key the
 //     code reads as `params.id`, `(os-layout)` and `(.)photo` a group and an interception, `@modal` a slot. A
 //     private folder's underscore is Next's, and the name after it is the project's, so `_components` is judged,
 //     and passes.
@@ -113,7 +113,7 @@ func outermostRunTogetherFolder(projectRoot string, fileName string) (string, st
 		return "", "", false
 	}
 	for _, folder := range folders {
-		if nextjs.IsRoutingFolder(folder) {
+		if next_js.IsRoutingFolder(folder) {
 			continue
 		}
 		if replacement, runTogether := folder_words.Separated(folder, typeScriptFolderSpelling); runTogether {

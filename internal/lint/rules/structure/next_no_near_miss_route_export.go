@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -86,7 +86,7 @@ var nearMissConfusableWords = map[string]bool{"params": true, "props": true, "pa
 // means the default title. Five phi web routes exported `generateStaticParameters` from 2025-06-20,
 // the commit that migrated them from the old repository, and none of them prerendered.
 //
-// Which names count comes from `nextjs.RouteContractExports`, read from the installed Next build
+// Which names count comes from `next_js.RouteContractExports`, read from the installed Next build
 // rather than its documentation, and differs by file: a page has `generateMetadata` and no `POST`, a
 // route the reverse.
 //
@@ -112,7 +112,7 @@ var nearMissConfusableWords = map[string]bool{"params": true, "props": true, "pa
 var NextNoNearMissRouteExport = rule.Rule[rule.NoOptions]{
 	Name: "structure/next-no-near-miss-route-export",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-		contract := nextjs.RouteContractExports(imports.NormalizedFileName(ruleContext.SourceFile))
+		contract := next_js.RouteContractExports(imports.NormalizedFileName(ruleContext.SourceFile))
 		if len(contract) == 0 {
 			return nil
 		}

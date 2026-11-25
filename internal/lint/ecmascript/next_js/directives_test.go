@@ -1,4 +1,4 @@
-package nextjs
+package next_js
 
 import (
 	"testing"

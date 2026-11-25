@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -95,7 +95,7 @@ var messageNoTypos = rule.Message{
 // returns data rather than rendering a page, so it has no data fetching functions to misspell. The
 // gate is answered once per file in `Run` rather than per node, which is also how upstream spells it.
 //
-// The gate is `nextjs.IsInPagesDirectory`, whose comment carries the two places the ESLint original
+// The gate is `next_js.IsInPagesDirectory`, whose comment carries the two places the ESLint original
 // gets this wrong and oxc fixes it.
 //
 // One upstream fixture deserves a note because copying its verdict without its reasoning would be
@@ -110,7 +110,7 @@ var NoTypos = rule.Rule[rule.NoOptions]{
 	// `/` boundary, so a prefixed name matches nothing and runs on no files while every test passes.
 	Name: "@next/next/no-typos",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-		if !nextjs.IsInPagesDirectory(ruleContext.SourceFile.FileName().AsString()) {
+		if !next_js.IsInPagesDirectory(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

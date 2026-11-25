@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/react"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -237,7 +237,7 @@ func judgeIdentifierCasingFunction(ruleContext rule.Context, node *ast.Node) {
 	// framework's, as consistency-require-constant-casing holds for the same exports written as
 	// constants.
 	if exported && node.Parent != nil && node.Parent.Kind == ast.KindSourceFile &&
-		nextjs.IsRouteContractExport(imports.NormalizedFileName(ruleContext.SourceFile), name.Text()) {
+		next_js.IsRouteContractExport(imports.NormalizedFileName(ruleContext.SourceFile), name.Text()) {
 		return
 	}
 	if startsWithUppercase(name.Text()) {

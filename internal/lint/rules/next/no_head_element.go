@@ -3,7 +3,7 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -45,7 +45,7 @@ var NoHeadElement = rule.Rule[rule.NoOptions]{
 		// Answering here rather than inside the listener means a file under an app directory
 		// registers no listener at all, which is also how upstream spells it: `should_run` is asked
 		// before the walk rather than at every element.
-		if nextjs.IsInApplicationDirectory(ruleContext.SourceFile.FileName().AsString()) {
+		if next_js.IsInApplicationDirectory(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
