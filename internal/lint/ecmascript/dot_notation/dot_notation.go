@@ -187,7 +187,7 @@ func useBracketsMessage(key string) rule.Message {
 		Id: "useBrackets",
 		Description: fmt.Sprintf(
 			".%s is a syntax error. This project has turned off `allowKeywords`, which targets "+
-				"engines old enough that a reserved word after a dot fails to parse at all. The "+
+				"runtimes old enough that a reserved word after a dot fails to parse at all. The "+
 				"access itself is fine; only the spelling has to change, so write it in brackets.",
 			key,
 		),

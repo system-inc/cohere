@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Brings a cohere worktree's Go up to the house names main already holds, by running each codemod pass, in the
-# order the passes landed, over the whole tree. Every pass is deterministic: it renames only through the rename
-# engine (a rename is accepted only if every identifier still resolves to the same object), reloads the tree, and
+# order the passes landed, over the whole tree. Every pass is deterministic: it renames only through
+# global_rename (a rename is accepted only if every identifier still resolves to the same object), reloads the tree, and
 # fails unless it type-checks with every identifier matching. Running it on a tree that already has the names
 # changes nothing. The last pass, octal_prefix, renames nothing: it writes each legacy octal literal, `0644`, as
 # `0o644`, the literals cohere-go/consistency-require-octal-prefix flags, through the same proof, with every literal
@@ -115,13 +115,13 @@ for specification in "${passes[@]}" line_wrap; do
 	fi
 done
 
-# loadRunning reports whether a whole-workspace load is running: a pass, or a cohere binary running its go-engine
+# loadRunning reports whether a whole-workspace load is running: a pass, or a cohere binary running its go-language
 # child. It matches by the executable a process runs (ps's comm), then for cohere by its first argument, never by
 # text anywhere on a command line, since a session's prompt can carry these words and would hold every run waiting.
 loadRunning() {
 	ps -axo comm=,args= | awk '
 		$1 ~ /\/go_codemods_bin\// { found = 1 }
-		$1 ~ /(^|\/)cohere$/ && $3 == "go-engine" { found = 1 }
+		$1 ~ /(^|\/)cohere$/ && $3 == "go-language" { found = 1 }
 		END { exit found ? 0 : 1 }
 	'
 }

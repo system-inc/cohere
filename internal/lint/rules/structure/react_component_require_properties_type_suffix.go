@@ -93,7 +93,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule[rule.NoOptions]{
 
 		// Type names the file already declares. A rename onto one of these produces a duplicate
 		// identifier, and where the taken name is the alias's own right-hand side it also produces a
-		// type that references itself. Both parse, so the fix engine cannot refuse them.
+		// type that references itself. Both parse, so the fix pass cannot refuse them.
 		declaredTypeNames := map[string]bool{}
 
 		checkParameterType := func(parameters []*ast.Node) {

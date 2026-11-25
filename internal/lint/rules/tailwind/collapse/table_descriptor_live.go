@@ -123,7 +123,7 @@ func NewTable(system *LoadedDesignSystem) *Table {
 // addThemeNamespaces fills Namespaces and KeysByNamespace from the repository's own theme.
 //
 // This is the per-repository half of the table and the reason no table can be committed. It mirrors
-// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs`, which asks the engine the same question
+// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs`, which asks Tailwind the same question
 // the same way, because the two must agree: the readings in the base table were measured under the
 // namespace set that function produces, and a namespace set derived differently would make the table
 // answer a different question than the lookup asks.
@@ -155,7 +155,7 @@ func (table *Table) addThemeNamespaces(theme *Theme) {
 		namespaces = append(namespaces, prefix)
 	}
 
-	// Longest first, then lexical. The order is the engine's namespace precedence and part of the
+	// Longest first, then lexical. The order is Tailwind's namespace precedence and part of the
 	// contract rather than a presentation choice: `--drop-shadow` must be tested before `--shadow`,
 	// or `drop-shadow-lg` resolves through the wrong namespace. It is also the order context.mjs
 	// sorts in, which is the order the base table's readings were measured under.
@@ -171,7 +171,7 @@ func (table *Table) addThemeNamespaces(theme *Theme) {
 // addRepositoryStatics adds a reading for every static `@utility` block the repository declared.
 //
 // A static utility takes no value, so its reading is a constant rather than a model: PropertySort
-// over the block body, which is exactly what the engine does. The repository wins a collision with
+// over the block body, which is exactly what Tailwind does. The repository wins a collision with
 // the framework's table, matching upstream, where `@utility` registration runs after the framework's
 // and `Utilities.set` overwrites.
 func (table *Table) addRepositoryStatics(system *LoadedDesignSystem) {
@@ -200,14 +200,14 @@ func (table *Table) addRepositoryStatics(system *LoadedDesignSystem) {
 // every other repository root a measured descriptor row like any framework root.
 //
 // That split cannot be reproduced here, and reproducing half of it would be worse than not trying. A
-// measured row needs the engine: the extractor probes each root with 527 value shapes and reads the
+// measured row needs Tailwind: the extractor probes each root with 527 value shapes and reads the
 // result out of `compileAstNodes`. Nothing in shipped Go can do that, which is the same reason the
 // framework's rows are generated rather than computed. So a live table's only honest answer for a
 // repository root is to decline and let the evaluator, which *can* compile the block, answer it.
 //
 // Measured, because the cost of declining is a real number rather than a shrug: over the fixture
 // corpus this moves 180 cases from answered to declined. Every one is then recoverable: 58 are read
-// back by the evaluator, exactly matching the engine, and the remaining 122 had no engine reading to
+// back by the evaluator, exactly matching Tailwind, and the remaining 122 had no Tailwind reading to
 // begin with, so they were never scorable. Declining here costs nothing a caller cannot recover, and
 // a wrong row would cost a wrong sort with no way to notice.
 // TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers holds that, so it cannot decay into a claim.

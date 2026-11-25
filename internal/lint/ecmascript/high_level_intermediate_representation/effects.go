@@ -77,8 +77,8 @@
 // it is the absence of an entry. A port that "improved" on this by reasoning about what the methods
 // really do would disagree with React on ordinary code.
 //
-// So the table is not an optimization in front of an inference engine. It is the source of every
-// effect, and the inference engine's job is to propagate those seeded facts through aliasing,
+// So the table is not an optimization in front of an inference pass. It is the source of every
+// effect, and the inference pass's job is to propagate those seeded facts through aliasing,
 // capture and control flow.
 //
 // # What fraction of real calls hit a signature, measured on Kirk's tree
@@ -1101,7 +1101,7 @@ func effectsForCall(
 		// effects and substitutes the arguments for the parameters
 		// (`InferMutationAliasingEffects.ts:1016`, "We're calling a locally declared function, we
 		// already know it's effects!"). The full resolution is a bottom-up effects pass plus a
-		// substitution engine, recorded as `EffectGapInterproceduralParameters` and `#qgzpt6a`.
+		// substitution pass, recorded as `EffectGapInterproceduralParameters` and `#qgzpt6a`.
 		//
 		// With no arguments the substitution is empty, so the answer reduces to the callback's own
 		// effects, and this asks only the half that matters for range widening: does it mutate a
@@ -1590,7 +1590,7 @@ func effectsFromAliasingSignature(signature effectSignature, receiver Place, arg
 //
 // # This is the one consequence of that machinery, not the machinery
 //
-// The full port is a bottom-up effects pass plus a 194-line substitution engine, recorded as
+// The full port is a bottom-up effects pass plus a 194-line substitution pass, recorded as
 // `EffectGapInterproceduralParameters` and `#qgzpt6a`. What this does instead is answer one question
 // the whole corpus turns on: does an argument that is a callback mutate the parameter it is handed?
 //

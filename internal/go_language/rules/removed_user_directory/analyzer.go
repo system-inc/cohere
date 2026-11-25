@@ -1,6 +1,6 @@
 // Package removed_user_directory is staticcheck's SA9007, a call to os.RemoveAll that deletes the whole of a
 // directory the system or the user keeps, the temporary directory, the user's cache, config or home directory, where
-// a subdirectory of it was meant, ported onto the engine's own intermediate representation (#tf4cb8g).
+// a subdirectory of it was meant, ported onto cohere's own intermediate representation (#tf4cb8g).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa9007/sa9007.go, whose logic it keeps and
 // whose messages it reports word for word, from the start to the end of the call, or of its go or defer statement,
@@ -43,7 +43,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA9007",
 	"SA9007",
 	"Flags a call to os.RemoveAll that deletes the temporary directory or the user's cache, config or home "+
-		"directory itself: staticcheck's SA9007, ported onto the engine's own "+
+		"directory itself: staticcheck's SA9007, ported onto cohere-go's own "+
 		"intermediate representation.",
 	&Listener,
 )

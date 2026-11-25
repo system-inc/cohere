@@ -8,7 +8,7 @@
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/unsafeptr/unsafeptr.go, whose
 // logic it keeps, isSafeArith exactly as written, and whose messages it reports word for word, over the same range.
-// It sits on the engine's syntax dispatcher, hearing the three kinds of node the original inspects in one preorder, as
+// It sits on cohere-go's syntax dispatcher, hearing the three kinds of node the original inspects in one preorder, as
 // the original's Preorder does, on the walk the dispatcher makes once for every syntax rule. The registry runs the
 // port in the original's place, and the original stays the oracle: the parity tests beside this file run both over
 // the same packages.

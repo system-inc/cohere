@@ -1,4 +1,4 @@
-// Package consistency_no_boolean_outcome is the Go engine's rule that a struct does not say how an operation turned
+// Package consistency_no_boolean_outcome is cohere-go's rule that a struct does not say how an operation turned
 // out with a bool beside an error or a value: type LookupResult struct { Success bool; Error error }.
 //
 // One bit collapses every way the operation can turn out, at the moment the distinction is cheapest to keep, and it
@@ -66,7 +66,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_boolean_outcome", "Fl
 	"in one bit. A function's (value, ok) and (value, error) results are Go's idiom and are not read, nor is a struct "+
 	"spelled inline.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var booleanOutcomeMessage = policy.MessageOf(Name, "booleanOutcome")

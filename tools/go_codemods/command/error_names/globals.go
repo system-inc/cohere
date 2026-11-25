@@ -17,7 +17,7 @@ import (
 // function: package-level sentinels, which keep Go's err prefix spelled out as staticcheck's ST1012 asks
 // (`errPoolNeverEmpty` gives errorPoolNeverEmpty), error-making functions (`errNothingToRepeat` gives
 // nothingToRepeatError), and fields (`wantErr` gives wantError, a field `Err` gives Error). They go through
-// the cross-package engine, which keeps a name others own: an exported name used outside the workspace, a
+// global_rename, which keeps a name others own: an exported name used outside the workspace, a
 // method an interface needs, a field an encoder reads by name. A declaration another finding quotes is
 // renamed too, and that finding re-worded under the new name.
 

@@ -19,14 +19,14 @@ import (
 // copy of, so the package's directory is the fake's own, and everything else a link to the local installation.
 const cgoStandardFile = "src/internal/runtime/cgobench/funcs.go"
 
-// cgoStandardRun is what the engine said over the cgo package under one `GOROOT`: the lint record's crashes, and its
+// cgoStandardRun is what cohere-go said over the cgo package under one `GOROOT`: the lint record's crashes, and its
 // findings, `GOROOT` spelled `$GOROOT` so two installations' findings compare.
 type cgoStandardRun struct {
 	crashes  []contract.Crash
 	findings []string
 }
 
-// runOverCgoStandardPackage runs the engine, every rule on, under `--no-cache` and with its lint beside its load as
+// runOverCgoStandardPackage runs cohere-go, every rule on, under `--no-cache` and with its lint beside its load as
 // overlaps says, over the cgo package of the `GOROOT` the process names, root, from root's src.
 func runOverCgoStandardPackage(test *testing.T, root string, overlaps bool) cgoStandardRun {
 	test.Helper()
@@ -62,15 +62,15 @@ func runOverCgoStandardPackage(test *testing.T, root string, overlaps bool) cgoS
 
 // Two `GOROOT` copies of one toolchain at different paths, sharing one `GOCACHE`, share go's translation of a
 // standard package's cgo files, since go keys it on their contents and not their directory, and its `//line`
-// directives name the copy that made it. Once that copy is gone, the engine over the other copy reads the translation
+// directives name the copy that made it. Once that copy is gone, cohere-go over the other copy reads the translation
 // as if its own copy had made it (#gpmr5z0): every rule finishes, cgocall, which reads the raw files the directives
-// name, and every rule that reads a file's bytes through the engine's own pass.ReadFile against the offsets its syntax
+// name, and every rule that reads a file's bytes through cohere-go's own pass.ReadFile against the offsets its syntax
 // holds, as the long-line rule does, and the findings are the first copy's, beside the load and after it alike.
 //
 // It needs a go that translates cgo, so it skips, named, where the toolchain has no cgo and under a runner's stand-in
 // go, as Loom's, which refuses to compile.
 //
-// Not parallel: it sets the process's own `GOROOT` and `GOCACHE`, which every go command the engine runs reads.
+// Not parallel: it sets the process's own `GOROOT` and `GOCACHE`, which every go command cohere-go runs reads.
 func TestACgoTranslationSharedWithAGoneGorootReadsTheCurrentOne(test *testing.T) {
 	cgo_testing.RequireTranslation(test)
 

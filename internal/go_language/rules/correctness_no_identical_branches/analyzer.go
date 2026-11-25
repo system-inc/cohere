@@ -1,4 +1,4 @@
-// Package correctness_no_identical_branches is the Go engine's rule that a conditional's branches do not all do the
+// Package correctness_no_identical_branches is cohere-go's rule that a conditional's branches do not all do the
 // same thing.
 //
 // An if whose two branches are the same code, or a switch whose every clause is, chooses nothing: the code runs the
@@ -84,7 +84,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_no_identical_branches", 
 	"denote the same thing on both sides. Empty branches, a select, and a type switch that binds a variable are left "+
 	"alone.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads the type information to tell a name that means the
+// Rule is this rule's entry in cohere-go's registry. It reads the type information to tell a name that means the
 // same thing in both branches from one that only looks the same.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 

@@ -1,7 +1,7 @@
 // Package wait_group is vet's waitgroup pass, a call to (*sync.WaitGroup).Add as the first statement of a function
 // literal that a go statement starts, `go func() { group.Add(1); ... }()`. The new goroutine may not have run yet
 // when Wait is called, so Wait can return before the work it was meant to wait for has begun; Add belongs before the
-// go statement. It sits on the engine's syntax dispatcher, hearing each call on the walk the dispatcher makes once for
+// go statement. It sits on cohere-go's syntax dispatcher, hearing each call on the walk the dispatcher makes once for
 // every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/waitgroup/waitgroup.go, whose

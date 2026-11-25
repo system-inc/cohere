@@ -6,7 +6,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Resolved keys, in a pass's ResultOf, the run's fact resolver, a *fact_resolver.Resolver, which the engine's checker
+// Resolved keys, in a pass's ResultOf, the run's fact resolver, a *fact_resolver.Resolver, which cohere-go's checker
 // hands every pass when its checker.Options.Resolved is this key and its Options.Resolver is set (#w7zmvat). A reader
 // of a fact computed on demand reads it through fact_resolver.Of; build_intermediate_representation reads it to take
 // the package the resolver shares with it, so a root's representation is built once in a run (#wt5vaft). It lives

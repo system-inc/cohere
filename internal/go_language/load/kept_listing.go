@@ -21,8 +21,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/timing"
 )
 
-// listingFormatVersion is hashed into every listing's key, so a listing kept in another shape is never read.
-const listingFormatVersion = "go-engine-listing-1"
+// listingFormatVersion is hashed into every listing's key, so a listing kept in another shape is never read. 2 is 1's
+// shape under the package's name, go-language where 1 said go-engine (#9gjmwgs), so a listing kept before it misses.
+const listingFormatVersion = "go-language-listing-2"
 
 // ListingStore is where the load keeps go list's answer between runs, by a sha256 key: the findings cache's store for
 // a listing, and the system cache's for a build context (KeepContext).

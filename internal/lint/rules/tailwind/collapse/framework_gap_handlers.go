@@ -77,7 +77,7 @@ func UtilityBranchFor(
 	branch.HasValue = true
 	if candidate.Value.Kind == ParsedValueKindArbitrary {
 		branch.IsArbitrary = true
-		// An author's own annotation wins over inference, matching Lookup: the engine trusts
+		// An author's own annotation wins over inference, matching Lookup: Tailwind trusts
 		// `bg-[color:var(--x)]` rather than inferring from a value it has already been told about.
 		if candidate.Value.DataType != "" {
 			branch.DataType = DataType(candidate.Value.DataType)

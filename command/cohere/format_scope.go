@@ -81,7 +81,7 @@ type formatScope struct {
 // is in the scope only when the program holds it and the walk admitted it: a scope drawn from the walk takes
 // each such file (the default scope, those not on record as formatted), and a named `.a` the program does not
 // hold, or the walk did not admit, leaves the named set, so a libfoo.a is never handed to the TypeScript
-// printer or the fix engine's parse guard. claimed is every `.a` file the program holds that the walk
+// printer or the fix pass's parse guard. claimed is every `.a` file the program holds that the walk
 // admitted, for the format record to keep their entries.
 func (scope formatScope) claimAdamic(held map[string]struct{}) (formatScope, []string) {
 	admitted := make(map[string]struct{}, len(scope.adamic))
@@ -207,17 +207,17 @@ func (scope formatScope) includes(fileName string) bool {
 // graph is what made css, markdown, json and yaml invisible, because a tsconfig enumerates
 // TypeScript by construction.
 //
-// The formatter could only speak TypeScript until the goja engine landed, so the type graph was an
+// The formatter could only speak TypeScript until goja landed, so the type graph was an
 // adequate universe by accident. That constraint was incidental and the pipeline mistook it for the
 // architecture.
 //
 // The description states what the walk enumerated rather than what it intended: the root, the count
-// before and after the engine's filter, and every declined extension by name. A file the engine
+// before and after the child's filter, and every declined extension by name. A file the child
 // cannot handle has to be a named zero rather than an absence, which is the one place in this
 // pipeline where a file could previously be silently missing.
 func (scope formatScope) narrowToEnumeration(enumeration format_files.Enumeration) formatScope {
 	if scope.Everything {
-		// A whole-tree scope becomes the enumeration itself: every file the walk found and the engine
+		// A whole-tree scope becomes the enumeration itself: every file the walk found and the child
 		// handles, rather than every file in the type graph.
 		index := make(map[string]struct{}, len(enumeration.Files))
 		for _, fileName := range enumeration.Files {
@@ -285,7 +285,7 @@ func (scope formatScope) narrowToEnumeration(enumeration format_files.Enumeratio
 	// The Everything guard is not redundant with the branch above. A whole-tree scope also has zero
 	// FileNames, so without it a whole-tree scope that reached here would take this early return and
 	// come back with Everything still set, and scopedTransform would then bypass filtering entirely
-	// and offer the engine files the walk never found. That is a real hole rather than a hypothetical:
+	// and offer the child files the walk never found. That is a real hole rather than a hypothetical:
 	// it is what a mutation deleting the branch above produced, and no fixture could see it because
 	// includes is never consulted for a scope that claims to be everything.
 	if !scope.Everything && len(scope.FileNames) == 0 {

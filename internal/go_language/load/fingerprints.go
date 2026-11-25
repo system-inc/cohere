@@ -111,7 +111,7 @@ func NewFingerprints() *Fingerprints {
 }
 
 // DirectoriesFingerprinted is how many directories fingerprints holds and how many times one was fingerprinted, which
-// the engine's tests read to see that a load of the run filled the ones the loads after it share (#t7h2sm4).
+// cohere-go's tests read to see that a load of the run filled the ones the loads after it share (#t7h2sm4).
 func (fingerprints *Fingerprints) DirectoriesFingerprinted() (int, int64) {
 	fingerprints.mutex.Lock()
 	defer fingerprints.mutex.Unlock()

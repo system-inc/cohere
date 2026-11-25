@@ -30,10 +30,10 @@ func TestABuildsReloadTakesItsFirstListing(test *testing.T) {
 	}
 
 	forgettingRoot := copyFixture(test, filepath.Join("testdata", "restore-from-host"))
-	forgetting, forgettingStream := runOverConfigured(test, forgettingRoot, exitFindings, func(engine *pipeline) {
+	forgetting, forgettingStream := runOverConfigured(test, forgettingRoot, exitFindings, func(pipeline *pipeline) {
 		// With no fingerprints the run's loads remember no listing, and under `--no-cache` the fingerprints read
 		// nothing else: no store keeps a listing for one to be read against.
-		engine.fingerprints = nil
+		pipeline.fingerprints = nil
 	}, "--no-cache", "--no-fix")
 	if forgetting.fingerprints != nil {
 		test.Fatal("the run with nothing remembered started its fingerprints over, so it remembered after all")
@@ -53,19 +53,19 @@ func TestABuildsReloadTakesItsFirstListing(test *testing.T) {
 func TestAListingBeforeAWriteIsNeverAnsweredAfterIt(test *testing.T) {
 	test.Parallel()
 	var first *load.Fingerprints
-	engine, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "long-lines")), exitFindings,
-		func(engine *pipeline) { first = engine.fingerprints }, "--no-cache")
-	if loads := engine.hostLoads.Load(); loads != 2 {
+	pipeline, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "long-lines")), exitFindings,
+		func(pipeline *pipeline) { first = pipeline.fingerprints }, "--no-cache")
+	if loads := pipeline.hostLoads.Load(); loads != 2 {
 		test.Fatalf("the host loaded %d times, want twice: before the wrap wrote and after", loads)
 	}
-	if engine.fingerprints == first {
+	if pipeline.fingerprints == first {
 		test.Fatal("the wrap's write left the run's fingerprints as they were")
 	}
 	if remembered, answered := first.ListingsRemembered(); remembered != 1 || answered != 0 {
 		test.Errorf("before the write, %d listings were remembered and %d asks answered, want the host's first "+
 			"load's one remembered and none answered", remembered, answered)
 	}
-	if remembered, answered := engine.fingerprints.ListingsRemembered(); remembered != 1 || answered != 0 {
+	if remembered, answered := pipeline.fingerprints.ListingsRemembered(); remembered != 1 || answered != 0 {
 		test.Errorf("after the write, %d listings were remembered and %d asks answered, want the host's load of the "+
 			"wrapped tree's one remembered, listed again, and none answered", remembered, answered)
 	}

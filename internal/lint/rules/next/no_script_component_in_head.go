@@ -146,7 +146,7 @@ func bindsToOneOf(ruleContext rule.Context, tagName *ast.Node, clauses map[*ast.
 		return false
 	}
 	// A nil checker is not hypothetical and it does not degrade gracefully. The declaration above
-	// asks for one, but the engine leaves it nil when the program could not be built, and the plain
+	// asks for one, but the linter leaves it nil when the program could not be built, and the plain
 	// test harness never has one at all. Dereferencing it panicked outright rather than going
 	// silent, which takes the whole run down instead of dropping one rule's findings. Found by the
 	// fixture written to assert the silence.

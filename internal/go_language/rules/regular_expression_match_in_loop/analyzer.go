@@ -40,7 +40,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6000",
 	"SA6000",
 	"Flags regexp.Match, MatchReader or MatchString given a constant pattern inside a loop: staticcheck's SA6000, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

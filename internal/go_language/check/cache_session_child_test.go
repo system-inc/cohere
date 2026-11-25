@@ -21,7 +21,7 @@ import (
 // sessionChildReply instead of running the tests. A session in a process of its own is how a test gets gob's type
 // numbers to move: gob numbers each type the first time a process encodes one and keeps the number for the
 // process's life, so within one process a fact's bytes never move, while across two that encoded other types first
-// they do, as two runs of the engine do.
+// they do, as two runs of cohere-go do.
 const sessionChildVariable = "COHERE_CHECK_SESSION_CHILD"
 
 // sessionChildRequest is one session another process runs: callsAnalyzer's rule over the module at Root, with the

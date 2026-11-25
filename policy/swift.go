@@ -6,17 +6,17 @@ import (
 	"strings"
 )
 
-// The Swift engine compiles policy in rather than reading it at run time: a released engine has no
+// cohere-swift compiles policy in rather than reading it at run time: a released cohere-swift has no
 // checkout beside it, and a file the front door hands it is one more thing that can go missing between
 // the two. So each policy file Swift reads becomes a generated Swift source holding the file's bytes
-// verbatim, which the engine parses exactly as it would have parsed the file.
+// verbatim, which cohere-swift parses exactly as it would have parsed the file.
 //
 // The generated files are checked in, written by `go run ./policy/tools/generate`, rather than made by a
 // SwiftPM build plugin. Measured 2026-10-03 (#2cqemcd) on a probe package that compiles in
 // Abbreviations.json: the plugin worked, reading the file from outside the package, and cost 4.1s on a
 // cold build (its generator is a second executable) and 0.19s on every no-op build. A checked-in file
 // costs neither, builds the same under every build system and toolchain the release supports, and can be
-// read and searched like any other source. What it costs is a copy that can go stale, so both engines
+// read and searched like any other source. What it costs is a copy that can go stale, so both languages
 // test it: TestSwiftFilesAreCurrent here, and the Swift tests compare the compiled-in bytes with the file
 // on disk.
 
@@ -33,7 +33,7 @@ const swiftStringIndentation = "        "
 // swiftDirectory is where the generated sources live, from the module root.
 const swiftDirectory = "swift/Sources/CohereSwift/Policy/"
 
-// swiftPolicyFiles are the policy the Swift engine compiles in, each with the type that carries it and
+// swiftPolicyFiles are the policy cohere-swift compiles in, each with the type that carries it and
 // what writes that type's source.
 var swiftPolicyFiles = []struct {
 	source   string
@@ -63,7 +63,7 @@ var swiftPolicyFiles = []struct {
 	}},
 }
 
-// SwiftFiles are the generated sources for all the policy the Swift engine compiles in.
+// SwiftFiles are the generated sources for all the policy cohere-swift compiles in.
 func SwiftFiles() ([]SwiftFile, error) {
 	files := make([]SwiftFile, 0, len(swiftPolicyFiles))
 	for _, policyFile := range swiftPolicyFiles {
@@ -88,7 +88,7 @@ func SwiftFiles() ([]SwiftFile, error) {
 //   - A multi-line literal reads every line ending as `\n`. A file with a carriage return is refused rather
 //     than changed.
 //
-// Every line is written in the house format, so the engine's own format check passes the file as
+// Every line is written in the house format, so cohere-swift's own format check passes the file as
 // generated: each line of text indented to the closing delimiter, which Swift strips from every line, and
 // an empty line left empty, which Swift allows. The line break before the delimiter is not part of the
 // string, so one is written after the text, and the text ends as the file ends, final newline or not.

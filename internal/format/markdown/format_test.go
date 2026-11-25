@@ -255,9 +255,9 @@ func compareFormat(test *testing.T, inputs []string) int {
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
 	for variantIndex, options := range formatVariants {
-		engine := golden.Engine(options)
+		formatter := golden.Formatter(options)
 		for _, input := range inputs {
-			expected, formatError := engine.Format("fixture.md", input)
+			expected, formatError := formatter.Format("fixture.md", input)
 			if formatError != nil {
 				test.Fatalf("the oracle failed on %q: %v", input, formatError)
 			}
@@ -289,8 +289,8 @@ func TestFormatFixturesMatchOracle(test *testing.T) {
 func TestFormatOracleCanFail(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
-	engine := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
-	expected, formatError := engine.Format("fixture.md", "* a")
+	formatter := oracle_testing.Open(test, test.Name()).Formatter(format_options.Default())
+	expected, formatError := formatter.Format("fixture.md", "* a")
 	if formatError != nil {
 		test.Fatal(formatError)
 	}
@@ -331,13 +331,13 @@ func TestExhaustiveDelimitersMatchOracle(test *testing.T) {
 
 	// The live oracle, not a golden (see oracle_testing): an opt-in measuring sweep of some 19,500 inputs that
 	// no default run reaches, so recording it would check in its answers for nothing a default run reads.
-	engine, newPrettierError := prettier.New(format_options.Default())
+	formatter, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
 	failures := 0
 	for _, input := range inputs {
-		expected, formatError := engine.Format("fixture.md", input)
+		expected, formatError := formatter.Format("fixture.md", input)
 		if formatError != nil {
 			continue
 		}

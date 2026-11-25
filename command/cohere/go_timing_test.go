@@ -34,7 +34,7 @@ func goTimingStream(test *testing.T, change func(record *contract.TimingRecord))
 	return lines
 }
 
-// goTimingRecord decodes a fixture's timing line as the engine's type.
+// goTimingRecord decodes a fixture's timing line as the child's type.
 func goTimingRecord(test *testing.T, line string) contract.TimingRecord {
 	test.Helper()
 	var record contract.TimingRecord
@@ -44,7 +44,7 @@ func goTimingRecord(test *testing.T, line string) contract.TimingRecord {
 	return record
 }
 
-// timingRecordLine is a timing record as the engine writes it, its kind first.
+// timingRecordLine is a timing record as the child writes it, its kind first.
 func timingRecordLine(test *testing.T, record contract.TimingRecord) string {
 	test.Helper()
 	encoded, encodeError := json.Marshal(record)
@@ -61,7 +61,7 @@ func renderGoTiming(test *testing.T, mode outputMode, timingRequested bool, line
 	activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	run := newEngineRun(stream, engineModeCheck, goLanguage("module"), "", time.Now())
+	run := newContractRun(stream, contractModeCheck, goLanguage("module"), "", time.Now())
 	run.timingRequested = timingRequested
 	for _, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
@@ -89,7 +89,7 @@ func timingSection(test *testing.T, output string) string {
 	return strings.Join(lines[:end], "\n") + "\n"
 }
 
-// TestAGoRunPrintsItsTimingTable: a Go run under `--timing` prints the engine's timing record in the shape of
+// TestAGoRunPrintsItsTimingTable: a Go run under `--timing` prints the child's timing record in the shape of
 // TypeScript's table (#3apgjer), under the lint line. The unit first, then each rule most expensive first with its
 // share of the rules' total, then each shared row by kind, the intermediate representation builds named apart, the
 // load's phases with their counts, the rows' coverage of the process's CPU computed from the record's own numbers,
@@ -115,7 +115,7 @@ func TestAGoRunPrintsItsTimingTable(test *testing.T) {
 			"across goroutines\n",
 		fmt.Sprintf("  %-*s %9s %9s %9s\n", nameWidth, "rule", "cpu", "packages", "calls"),
 		"shared: buildir, staticcheck's intermediate representation build, cost 8.0ms of CPU over 40 packages\n",
-		"shared: build_intermediate_representation, the engine's intermediate representation build, cost 3.0ms of "+
+		"shared: build_intermediate_representation, the child's intermediate representation build, cost 3.0ms of "+
 			"CPU over 3 packages\n",
 		"shared: syntax_dispatcher, a dispatcher's walk less its listeners, which are billed to their rules, cost "+
 			"1.5ms of CPU over 3 packages\n",
@@ -287,7 +287,7 @@ func TestAGoTimingRecordWithNoRulesSaysSo(test *testing.T) {
 	}
 }
 
-// TestAGoTimingRecordIsWrittenThroughUnderJson: under `--json` the record is one `timing` line, the engine's
+// TestAGoTimingRecordIsWrittenThroughUnderJson: under `--json` the record is one `timing` line, the child's
 // fields as it wrote them, before the summary, and no table.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoTimingRecordIsWrittenThroughUnderJson(test *testing.T) {
@@ -305,12 +305,12 @@ func TestAGoTimingRecordIsWrittenThroughUnderJson(test *testing.T) {
 	if timing < 0 || summary < timing {
 		test.Fatalf("no timing line before the summary:\n%s", output)
 	}
-	// Byte for byte: the fixture is written in the field order the engine encodes, which is the order written through.
-	engineLine := lines[slices.IndexFunc(lines, func(line string) bool {
+	// Byte for byte: the fixture is written in the field order the child encodes, which is the order written through.
+	contractLine := lines[slices.IndexFunc(lines, func(line string) bool {
 		return strings.HasPrefix(line, `{"kind":"timing"`)
 	})]
-	if written[timing] != engineLine {
-		test.Errorf("the timing line is\n%s\nwant the engine's\n%s", written[timing], engineLine)
+	if written[timing] != contractLine {
+		test.Errorf("the timing line is\n%s\nwant the child's\n%s", written[timing], contractLine)
 	}
 	forbidLines(test, output, "timing: rule CPU")
 }
@@ -369,7 +369,7 @@ func TestABrokenGoTimingRecordIsRefused(test *testing.T) {
 		})
 	}
 
-	// The engine writes `[]` for an empty list, so a list missing from the line is a broken record.
+	// The child writes `[]` for an empty list, so a list missing from the line is a broken record.
 	withoutRules := slices.Clone(lines)
 	withoutRules[timing] = strings.Replace(lines[timing], `"rules":[`, `"ruleRows":[`, 1)
 	if _, renderError := renderGoTiming(test, outputVerbose, true, withoutRules); renderError == nil ||

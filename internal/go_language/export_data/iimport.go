@@ -1,17 +1,17 @@
 // cohere:copied golang.org/x/tools@v0.50.0 internal/gcimporter/iimport.go
 // cohere:until golang.org/x/tools/go/gcexportdata writes and reads shallow
 // export data, as its internal gcimporter's IExportShallow and IImportShallow
-// do for gopls. Then the engine calls gcexportdata again and this copy goes
+// do for gopls. Then cohere-go calls gcexportdata again and this copy goes
 // away.
 //
 // cohere: an internal package of x/tools cannot be imported from this module,
-// so the engine carries its own copy of the shallow export and import it
+// so cohere-go carries its own copy of the shallow export and import it
 // caches types with, one file to each upstream file: iexport.go and
 // iimport.go, predeclared.go and the vestiges of bimport.go they call, and
 // the parts of internal/aliases and internal/typesinternal they call, in
 // subpackages of the same names. The unified reader, the archive reading
 // and pkgbits are not copied, and neither is any deep export or import, so
-// every read of the engine's export data is shallow, against packages the
+// every read of cohere-go's export data is shallow, against packages the
 // reader already holds.
 
 // Copyright 2018 The Go Authors. All rights reserved.
@@ -111,7 +111,7 @@ const (
 )
 
 // cohere: dropped: IImportData and IImportBundle, the deep imports. The
-// cohere: engine reads shallow export data only, with IImportShallow.
+// cohere: cohere-go reads shallow export data only, with IImportShallow.
 // A GetPackagesFunc function obtains the non-nil symbols for a set of
 // packages, creating and recursively importing them as needed. An
 // implementation should store each package symbol is in the Pkg
@@ -133,7 +133,7 @@ type GetPackagesItem struct {
 }
 
 // cohere: dropped: GetPackagesFromMap, which makes a fresh package for a path
-// cohere: its map lacks. A reader of the engine's export data holds every
+// cohere: its map lacks. A reader of cohere-go's export data holds every
 // cohere: package it reads against, so a path it lacks is an error, never a
 // cohere: second universe (see Read, beside this file).
 func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte, bundle bool, path string, shallow bool, reportf ReportFunc) (pkgs []*types.Package, err error) {

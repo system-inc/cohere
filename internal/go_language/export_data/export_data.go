@@ -2,10 +2,10 @@
 // declarations only, each object of another package they reach named by that package's path and the object's path in
 // it (objectpath), so a read needs every package the data names already in hand. Deep export data, which carries every
 // declaration of a dependency the package's API reaches, is twenty times the bytes on cohere's own root, and every
-// reader of the engine's export data holds each dependency complete anyway.
+// reader of cohere-go's export data holds each dependency complete anyway.
 //
 // Every other file of the package, and of its subpackages, is a copy of x/tools' internal gcimporter and what it calls
-// (see iexport.go's header). This one is the engine's one writer and one reader over the copy.
+// (see iexport.go's header). This one is cohere-go's one writer and one reader over the copy.
 package export_data
 
 import (

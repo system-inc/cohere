@@ -1,4 +1,4 @@
-// Package correctness_require_invariant_reason is the Go engine's rule that a panic says why it can never happen,
+// Package correctness_require_invariant_reason is cohere-go's rule that a panic says why it can never happen,
 // and that a Must function, which panics for its caller, runs only while the package initializes.
 //
 // A panic is a claim that a case cannot happen, and when the claim is wrong the process stops with a stack trace
@@ -48,7 +48,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_invariant_reason
 	"init function, and a function literal either calls on the spot. Files ending in _test.go are not judged.",
 	&listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var unexplainedPanicMessage = policy.MessageOf(Name, "unexplainedPanic")
@@ -66,7 +66,7 @@ func judgeFile(context *rule.Context, file *ast.File) {
 	}
 	indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 	if !isIndexes {
-		// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+		// Invariant: marker's result is always its Indexes, so another is a mistake in cohere-go, and the
 		// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 		panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 	}

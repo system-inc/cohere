@@ -12,8 +12,8 @@ import (
 	"testing"
 )
 
-// The verdict descriptor the dispatcher hands the engine is the engine's alone. A process it starts, the
-// Swift engine or any other, neither holds the descriptor nor finds the variable naming it, since a
+// The verdict descriptor the dispatcher hands the child is the child's alone. A process it starts,
+// cohere-swift or any other, neither holds the descriptor nor finds the variable naming it, since a
 // grandchild writing a byte to "descriptor 3" would write it into whatever 3 is there (#zqsdzbq).
 //
 // The descriptor arrives the way the dispatcher passes it, without close-on-exec, so a child would hold

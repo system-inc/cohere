@@ -11,8 +11,8 @@ import (
 )
 
 // An extra build loaded again reaches `--json` with each load's count checked from source, and a build under
-// `--timing` with what it held, as the engine's record writes them (#k8gty9e): the front door reads the build into
-// checkedBuild and writes it on, so a count the engine names and the front door leaves out would never reach a reader.
+// `--timing` with what it held, as the child's record writes them (#k8gty9e): the front door reads the build into
+// checkedBuild and writes it on, so a count the child names and the front door leaves out would never reach a reader.
 func TestABuildsRoundsCheckedFromSourceReachTheJson(test *testing.T) {
 	test.Parallel()
 
@@ -36,13 +36,13 @@ func TestABuildsRoundsCheckedFromSourceReachTheJson(test *testing.T) {
 	}
 	if reread.CheckedFromSource != 7 || !slices.Equal(reread.CheckedFromSourceRounds, []int{3, 4}) ||
 		reread.HeldAtLoadEndBytes != 64 || reread.HeldAtLintPeakBytes != 128 || reread.LintPeakOverLoadEnd != 2 {
-		test.Errorf("the front door wrote %s, want the engine's 7 checked from source over the rounds [3 4], and 64 "+
+		test.Errorf("the front door wrote %s, want the child's 7 checked from source over the rounds [3 4], and 64 "+
 			"and 128 bytes held, a ratio of 2", forwarded)
 	}
 }
 
-// Every field the engine's build record writes reaches checkedBuild by its json name, so `--json` drops none of what
-// the engine says of a build, and a field added to the record without the front door fails here rather than going
+// Every field the child's build record writes reaches checkedBuild by its json name, so `--json` drops none of what
+// the child says of a build, and a field added to the record without the front door fails here rather than going
 // missing in silence (#k8gty9e).
 func TestCheckedBuildCarriesEveryFieldOfTheBuildRecord(test *testing.T) {
 	test.Parallel()

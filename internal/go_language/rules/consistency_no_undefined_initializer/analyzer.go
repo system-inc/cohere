@@ -1,4 +1,4 @@
-// Package consistency_no_undefined_initializer is the Go engine's rule that a typed var does not restate its zero
+// Package consistency_no_undefined_initializer is cohere-go's rule that a typed var does not restate its zero
 // value.
 //
 // It is the Go form of ESLint core's no-undef-init. Go gives every variable its type's zero value, so `var count int`
@@ -43,7 +43,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_undefined_initializer
 	"error = nil), and offers to drop the initializer, since Go already gives the variable that value. A var with no "+
 	"type, a composite literal, and a named constant are not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads type information for the declared type and the
+// Rule is this rule's entry in cohere-go's registry. It reads type information for the declared type and the
 // initializer's constant value, and to know that a false or nil is the predeclared one.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 

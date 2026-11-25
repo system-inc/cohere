@@ -44,7 +44,7 @@ func capture(limit int) int {
 }
 `
 
-// constantSource holds constants declared in a function, which the engine does not take and the verified apply
+// constantSource holds constants declared in a function, which global_rename does not take and the verified apply
 // proves: a rename of one, and a second function where the new name collides with a variable.
 const constantSource = `package fixture
 
@@ -123,7 +123,7 @@ func TestTheListIsAppliedWhole(test *testing.T) {
 	}
 }
 
-// The engine refuses a rename that would capture another variable, a position that declares nothing is refused,
+// global_rename refuses a rename that would capture another variable, a position that declares nothing is refused,
 // and either refusal writes nothing at all, not even the requests that were accepted.
 func TestARefusalWritesNothing(test *testing.T) {
 	test.Parallel()

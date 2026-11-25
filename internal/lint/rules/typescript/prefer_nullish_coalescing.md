@@ -55,9 +55,9 @@ so the two mentions can drift apart.
 The ternary and `if` checks shipped late. Until 2026-10-04 the decoder parsed `ignoreTernaryTests` and
 `ignoreIfStatements` while neither check existed, so the options did nothing and this page described
 checks that never ran. ESLint, which does run them, found 64 sites in ahra that cohere never
-reported (#10kqgs6). The house sets turned the rule on with both options set to true in both engines,
-so neither engine reports those shapes while the sites are fixed. The options come off once ahra, www
-and api read 0 in both engines.
+reported (#10kqgs6). The house sets turned the rule on with both options set to true in both linters,
+so neither linter reports those shapes while the sites are fixed. The options come off once ahra, www
+and api read 0 in both linters.
 
 Measured with both options off, against ESLint with typescript-eslint 8.67.0 on the same trees, file
 by file, line and column:

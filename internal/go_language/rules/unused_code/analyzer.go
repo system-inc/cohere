@@ -18,7 +18,7 @@ import (
 // object, used, unused or quiet, which the original returns for staticcheck's runner to report and which the tests
 // beside this file hold to the original's expectations.
 //
-// It is an ordinary analyzer for now. The engine's registry of listeners (#29k62f4) is still being built, and moving
+// It is an ordinary analyzer for now. cohere-go's registry of listeners (#29k62f4) is still being built, and moving
 // onto it is a small change once it lands.
 var Analyzer = &analysis.Analyzer{
 	Name:       "U1000",

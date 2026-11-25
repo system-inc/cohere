@@ -13,8 +13,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
-// engineTestsStamp is the stamp the engine's tests write their tables under, in the engine's identity's place.
-const engineTestsStamp = "engine tests"
+// testsStamp is the stamp cohere-go's tests write their tables under, in cohere-go's identity's place.
+const testsStamp = "go_language tests"
 
 // standardLibraryFixture is the fixture whose standard-library packages the tests write tables of: it reaches
 // errors, fmt, log/slog, strings and unicode/utf8, and its two findings read fmt's facts and slog's positions.
@@ -37,7 +37,7 @@ func filledSystemCache(
 		prepare(root)
 	}
 	source := standardLibrarySource{stamp: stamp, systemCacheRoot: test.TempDir()}
-	filling := runEngineWith(test, root, source, registered, "--no-cache")
+	filling := runWith(test, root, source, registered, "--no-cache")
 	if filling.counts.SystemCacheWritten == 0 {
 		test.Fatalf("want the filling run to write the standard library to the system cache, got %+v", filling.counts)
 	}
@@ -60,10 +60,10 @@ func TestTheStandardLibraryComesFromTheSystemCacheUnderNoCache(test *testing.T) 
 
 	// The plain run computes the standard library, which the records restored from the system cache are held to.
 	coldSystemCacheFor(test)
-	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, written := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
-	plain := runCachedEngine(test, root, "--no-cache")
-	fromSystemCache := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	plain := runCached(test, root, "--no-cache")
+	fromSystemCache := runWith(test, root, reading, rules.All(), "--no-cache")
 	if fromSystemCache.counts != onlyFromSystemCache(fromSystemCache.counts) ||
 		fromSystemCache.counts.FromSystemCache != written || fromSystemCache.counts.SystemCacheWritten != 0 {
 		test.Fatalf("want all %d standard-library packages from the system cache, none written and nothing else "+
@@ -90,11 +90,11 @@ func TestTheSystemCachesEntriesChangeNoRecordInACachedRun(test *testing.T) {
 
 	// The plain run computes the standard library, which the records restored from the system cache are held to.
 	coldSystemCacheFor(test)
-	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
-	withoutTable := runCachedEngine(test, copyFixture(test, standardLibraryFixture), "--no-system-cache")
+	reading, written := filledSystemCache(test, rules.All(), testsStamp, nil)
+	withoutTable := runCached(test, copyFixture(test, standardLibraryFixture), "--no-system-cache")
 	root := copyFixture(test, standardLibraryFixture)
-	plain := runCachedEngine(test, root, "--no-cache")
-	cold := runEngineWith(test, root, reading, rules.All())
+	plain := runCached(test, root, "--no-cache")
+	cold := runWith(test, root, reading, rules.All())
 	if !cold.counts.On || cold.counts.Hit != 0 || cold.counts.FromSystemCache != written ||
 		cold.counts.Missed != withoutTable.counts.Missed-written || cold.counts.Written == 0 ||
 		cold.counts.Written+cold.counts.Unstorable > cold.counts.Missed {
@@ -104,7 +104,7 @@ func TestTheSystemCachesEntriesChangeNoRecordInACachedRun(test *testing.T) {
 	if cold.withoutCounts != plain.withoutCounts {
 		test.Fatalf("cold with the table\n%s\nplain\n%s", cold.withoutCounts, plain.withoutCounts)
 	}
-	warm := runEngineWith(test, root, reading, rules.All())
+	warm := runWith(test, root, reading, rules.All())
 	if warm.counts.Hit != cold.counts.Written || warm.counts.FromSystemCache != written ||
 		warm.counts.Missed != cold.counts.Missed-cold.counts.Written {
 		test.Fatalf("want every package written cold hit warm, beside the same from the system cache, cold %+v, "+
@@ -125,8 +125,8 @@ func equalEntries(before map[string]string, after map[string]string) bool {
 	return len(before) == len(after)
 }
 
-// The system cache's entries written under one engine identity restore nothing under another: every standard-library
-// package computes, and the records are the plain run's.
+// The system cache's entries written under one executable identity restore nothing under another: every
+// standard-library package computes, and the records are the plain run's.
 func TestASystemCacheUnderAnotherIdentityRestoresNothing(test *testing.T) {
 	test.Parallel()
 
@@ -134,9 +134,9 @@ func TestASystemCacheUnderAnotherIdentityRestoresNothing(test *testing.T) {
 	coldSystemCacheFor(test)
 	reading, _ := filledSystemCache(test, rules.All(), "release one", nil)
 	root := copyFixture(test, standardLibraryFixture)
-	plain := runCachedEngine(test, root, "--no-cache")
+	plain := runCached(test, root, "--no-cache")
 	reading.stamp = "release two"
-	other := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	other := runWith(test, root, reading, rules.All(), "--no-cache")
 	if other.counts.FromSystemCache != 0 || other.withoutCounts != plain.withoutCounts {
 		test.Fatalf("want nothing from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
 			other.counts, other.withoutCounts, plain.withoutCounts)
@@ -185,15 +185,15 @@ func TestASystemCacheUnderAnotherFactOptionRestoresNothing(test *testing.T) {
 			}
 		}
 	}
-	filled, written := filledSystemCache(test, registered, engineTestsStamp, settingMode("first"))
+	filled, written := filledSystemCache(test, registered, testsStamp, settingMode("first"))
 	for _, reading := range []struct {
 		mode            string
 		fromSystemCache int
 	}{{mode: "first", fromSystemCache: written}, {mode: "second"}} {
 		root := copyFixture(test, standardLibraryFixture)
 		settingMode(reading.mode)(root)
-		plain := runEngineWith(test, root, standardLibrarySource{}, registered, "--no-cache")
-		read := runEngineWith(test, root, filled, registered, "--no-cache")
+		plain := runWith(test, root, standardLibrarySource{}, registered, "--no-cache")
+		read := runWith(test, root, filled, registered, "--no-cache")
 		if read.counts.FromSystemCache != reading.fromSystemCache || read.withoutCounts != plain.withoutCounts {
 			test.Errorf("mode %s: want %d from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
 				reading.mode, reading.fromSystemCache, read.counts, read.withoutCounts, plain.withoutCounts)
@@ -204,15 +204,15 @@ func TestASystemCacheUnderAnotherFactOptionRestoresNothing(test *testing.T) {
 // The system cache's entries written under one build restore nothing under another: a run whose go flags name a build
 // tag keys every standard-library package apart, though no file the tag could choose is among them.
 //
-// Not parallel: it sets the process's own `GOFLAGS`, which every go command the engine runs reads.
+// Not parallel: it sets the process's own `GOFLAGS`, which every go command cohere-go runs reads.
 func TestASystemCacheUnderAnotherBuildRestoresNothing(test *testing.T) {
 	// The plain run computes the standard library, which the records restored from the system cache are held to.
 	coldSystemCacheFor(test)
-	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	test.Setenv("GOFLAGS", "-tags=probe")
 	root := copyFixture(test, standardLibraryFixture)
-	plain := runCachedEngine(test, root, "--no-cache")
-	other := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	plain := runCached(test, root, "--no-cache")
+	other := runWith(test, root, reading, rules.All(), "--no-cache")
 	if other.counts.FromSystemCache != 0 || other.withoutCounts != plain.withoutCounts {
 		test.Fatalf("want nothing from the system cache and the plain run's records, got %+v\n%s\nplain\n%s",
 			other.counts, other.withoutCounts, plain.withoutCounts)
@@ -267,7 +267,7 @@ func mirroredGoRoot(test *testing.T, goRoot string, changed string, suffix strin
 // utf8.go, the system cache filled there restores some packages and computes the rest once a comment is added to that
 // copy, and the records are the plain run's under the edited installation.
 //
-// Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
+// Not parallel: it sets the process's own `GOROOT`, which every go command cohere-go runs reads.
 func TestAStandardLibraryFileEditedInPlaceMisses(test *testing.T) {
 	// The plain run computes the standard library, which the records restored from the system cache are held to.
 	coldSystemCacheFor(test)
@@ -275,7 +275,7 @@ func TestAStandardLibraryFileEditedInPlaceMisses(test *testing.T) {
 	goRoot := goEnvironmentIn(test, root, nil)["GOROOT"]
 	mirror := mirroredGoRoot(test, goRoot, "src/unicode/utf8/utf8.go", "")
 	test.Setenv("GOROOT", mirror)
-	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, written := filledSystemCache(test, rules.All(), testsStamp, nil)
 	edited, openError := os.OpenFile(filepath.Join(mirror, "src", "unicode", "utf8", "utf8.go"),
 		os.O_APPEND|os.O_WRONLY, 0)
 	if openError != nil {
@@ -285,8 +285,8 @@ func TestAStandardLibraryFileEditedInPlaceMisses(test *testing.T) {
 	if closeError := edited.Close(); appendError != nil || closeError != nil {
 		test.Fatalf("editing utf8.go: %v %v", appendError, closeError)
 	}
-	plain := runCachedEngine(test, root, "--no-cache")
-	changed := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	plain := runCached(test, root, "--no-cache")
+	changed := runWith(test, root, reading, rules.All(), "--no-cache")
 	if changed.counts.FromSystemCache == 0 || changed.counts.FromSystemCache >= written {
 		test.Fatalf("want some of the %d packages from the system cache and unicode/utf8's importers computed, got %+v",
 			written, changed.counts)
@@ -301,11 +301,11 @@ func TestAStandardLibraryFileEditedInPlaceMisses(test *testing.T) {
 // real path restores nothing through the link, and the records are the plain run's there, structtag's finding naming
 // log/slog's line by the link.
 //
-// Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
+// Not parallel: it sets the process's own `GOROOT`, which every go command cohere-go runs reads.
 func TestTheSystemCacheKeysAGorootReachedThroughALinkApart(test *testing.T) {
 	// The plain run computes the standard library, which the records restored from the system cache are held to.
 	coldSystemCacheFor(test)
-	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
 	goRoot := goEnvironmentIn(test, root, nil)["GOROOT"]
 	linked, resolveError := filepath.EvalSymlinks(test.TempDir())
@@ -320,8 +320,8 @@ func TestTheSystemCacheKeysAGorootReachedThroughALinkApart(test *testing.T) {
 	if reported := goEnvironmentIn(test, root, nil)["GOROOT"]; reported != linked {
 		test.Fatalf("want go to report GOROOT as the link %s, got %s", linked, reported)
 	}
-	plain := runCachedEngine(test, root, "--no-cache")
-	read := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	plain := runCached(test, root, "--no-cache")
+	read := runWith(test, root, reading, rules.All(), "--no-cache")
 	if read.counts.FromSystemCache != 0 {
 		test.Fatalf("want nothing from the system cache through the link, got %+v", read.counts)
 	}
@@ -337,14 +337,14 @@ func TestTheSystemCacheKeysAGorootReachedThroughALinkApart(test *testing.T) {
 // The system cache's entries written under one `CGO_ENABLED` restore nothing under the other, since every
 // standard-library key holds it, and a package checked with cgo is another package than one checked without.
 //
-// Not parallel: it sets the process's own `CGO_ENABLED`, which every go command the engine runs reads.
+// Not parallel: it sets the process's own `CGO_ENABLED`, which every go command cohere-go runs reads.
 func TestASystemCacheUnderAnotherCgoSettingRestoresNothing(test *testing.T) {
-	reading, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
 	other := map[string]string{"1": "0", "0": "1"}[goEnvironmentIn(test, root, nil)["CGO_ENABLED"]]
 	test.Setenv("CGO_ENABLED", other)
-	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
-	read := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	plain := runCached(test, root, "--no-cache", "--no-system-cache")
+	read := runWith(test, root, reading, rules.All(), "--no-cache")
 	if read.counts.FromSystemCache != 0 || read.withoutCounts != plain.withoutCounts {
 		test.Fatalf("CGO_ENABLED=%s: want nothing from the system cache and the plain run's records, got %+v\n%s\n"+
 			"plain\n%s", other, read.counts, read.withoutCounts, plain.withoutCounts)

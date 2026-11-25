@@ -253,7 +253,7 @@ type Verification struct {
 }
 
 // Apply rewrites the files the result's edits touch, proves the result before writing any of it, and writes only
-// a proven result, the shape of workspace.ApplyVerified with this engine's cross-package fingerprint. It
+// a proven result, the shape of workspace.ApplyVerified with the renaming's cross-package fingerprint. It
 // fingerprints every root package with each edited identifier's expected new name, builds every rewritten file in
 // memory, reloads the whole workspace with those files as an overlay, and requires every identifier to resolve to
 // the same declaration as before under its expected name. Only when the reload has no package errors and no
@@ -389,7 +389,7 @@ func RewrittenFilesOver(result *Result, current map[string][]byte) (map[string][
 
 // Compare reads reloaded, a load of the tree with the rewrite in place, against expectation, and returns every
 // identifier compared and every mismatch. It loads nothing, so a caller that loads the rewrite its own way, as
-// the Go engine does with its overlay, proves that load the same way Apply proves its reload. Whether the load
+// cohere-go does with its overlay, proves that load the same way Apply proves its reload. Whether the load
 // type-checks is the caller's to require first, as LoadWithOverlay does.
 func Compare(expectation *Expectation, reloaded *workspace.Workspace) Verification {
 	after, _ := Fingerprint(reloaded)

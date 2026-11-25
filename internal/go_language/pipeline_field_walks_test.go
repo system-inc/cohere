@@ -55,10 +55,10 @@ var fieldWalkRows = []fieldWalkRow{
 
 // readsOfUser are the host's reads of the fixture's package user, not a test variant, failing the test when it has
 // none.
-func readsOfUser(test *testing.T, engine *pipeline, user string) *build_reads.Reads {
+func readsOfUser(test *testing.T, pipeline *pipeline, user string) *build_reads.Reads {
 	test.Helper()
 
-	for recorded, reads := range engine.buildRuns[0].reads {
+	for recorded, reads := range pipeline.buildRuns[0].reads {
 		if recorded.PkgPath == fieldWalksModule+"/"+user && recorded.ForTest == "" {
 			return reads
 		}
@@ -104,13 +104,13 @@ func foundBy(run buildRun, file string, upstream string) bool {
 func TestEveryWalkOfAnotherPackagesTypeStartsFromAWholeRead(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "field-walks")), exitFindings)
-	host, windows := engine.buildRuns[0], windowsRun(test, engine)
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "field-walks")), exitFindings)
+	host, windows := pipeline.buildRuns[0], windowsRun(test, pipeline)
 	for _, row := range fieldWalkRows {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()
 
-			lines := readLines(readsOfUser(test, engine, row.user))
+			lines := readLines(readsOfUser(test, pipeline, row.user))
 			for _, want := range row.reads {
 				if !slices.Contains(lines, want) {
 					test.Errorf("want %s's reads to hold %q, which %s's walk starts from, got %q", row.user, want,
@@ -135,7 +135,7 @@ func TestEveryWalkOfAnotherPackagesTypeStartsFromAWholeRead(test *testing.T) {
 	test.Run("a non-empty interface", func(test *testing.T) {
 		test.Parallel()
 
-		lines := readLines(readsOfUser(test, engine, "sized"))
+		lines := readLines(readsOfUser(test, pipeline, "sized"))
 		for _, typeName := range []string{"Printed", "Locked", "Encoded", "Hidden", "Channeled"} {
 			if !slices.Contains(lines, typeName+" MethodSet") || slices.Contains(lines, typeName+" Whole") {
 				test.Errorf("want sized to read %s's method set and not the whole of it, got %q", typeName, lines)

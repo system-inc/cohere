@@ -42,7 +42,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1002",
 	"SA1002",
 	"Flags a layout given as a constant to time.Parse that is not written in Go's reference time: staticcheck's "+
-		"SA1002, ported onto the engine's own intermediate representation.",
+		"SA1002, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

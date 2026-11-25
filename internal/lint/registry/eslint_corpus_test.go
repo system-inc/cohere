@@ -24,7 +24,7 @@ import (
  *
  * The rows are vendored in testdata/eslint-corpus/eslint-10.8.1, one file per rule, each with ESLint's
  * verdict recorded when it was extracted (internal/lint/tools/eslint_corpus/extract.mjs, which nothing
- * runs). Every row runs as a module named Case.ts in both engines. A row agrees when cohere reports
+ * runs). Every row runs as a module named Case.ts in both linters. A row agrees when cohere reports
  * findings at the same places ESLint does: the same start and end offsets, not only the same text.
  *
  * Every row that does not agree is listed in known-gaps.json under its rule, with the way it disagrees,

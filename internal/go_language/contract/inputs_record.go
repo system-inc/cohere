@@ -1,12 +1,12 @@
 package contract
 
-// InputsRecord is additive within contract 3, and the Go engine's alone: it declares every path whose bytes,
+// InputsRecord is additive within contract 3, and cohere-go's alone: it declares every path whose bytes,
 // listing or absence the run's verdict was decided from, so the front door can replay the verdict without starting
-// the engine when nothing it names has moved. The front door records what it can observe itself (the environment,
+// cohere-go when nothing it names has moved. The front door records what it can observe itself (the environment,
 // the settings, the binary); what `go list` and the load read happens in subprocesses and in this process, where it
-// cannot look, so the engine names it here.
+// cannot look, so cohere-go names it here.
 //
-// The standing rule: anything the loader, or a later cache of the engine's, reads to decide a verdict must appear in
+// The standing rule: anything the loader, or a later cache of cohere-go's, reads to decide a verdict must appear in
 // this record, since a read it leaves out is a replay that goes stale without a word. A superset only costs a miss.
 //
 // Every path is absolute and cleaned, each list sorted without duplicates, and each written `[]` when empty (see

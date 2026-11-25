@@ -40,7 +40,7 @@ func TestTableContainsTheKnownFamilies(test *testing.T) {
 		// A named scale rather than a numeric one. The generator probed only `4` and `2` at first,
 		// so every rounded family was absent: a root whose values the probe cannot express reports
 		// as having no families, which reads exactly like a root that has none. Found by diffing
-		// the table against the engine over the real corpus, not by a test.
+		// the table against Tailwind over the real corpus, not by a test.
 		{First: "rounded-tl", Second: "rounded-tr", Output: "rounded-t"},
 		{First: "rounded-bl", Second: "rounded-br", Output: "rounded-b"},
 		// Recursion: `mx + my => m` only completes a four-class collapse when `mb + mt => my` and
@@ -125,9 +125,9 @@ func TestTableEntriesAreWellFormed(test *testing.T) {
 		//
 		// Root equality is a different question, and the roots here are genuinely nested rather than
 		// disjoint: `max-w-screen` is a registered root that also reads as `max-w` plus the value
-		// `screen`. Measured on the engine, `max-w-sm max-w-screen-sm` canonicalizes to `max-w-96`,
+		// `screen`. Measured on Tailwind, `max-w-sm max-w-screen-sm` canonicalizes to `max-w-96`,
 		// which parses to root `max-w`, and neither input rewrites alone. So the merge is real, the
-		// output root is one of the inputs, and rejecting it would delete a family the engine has.
+		// output root is one of the inputs, and rejecting it would delete a family Tailwind has.
 		//
 		// The entry only became visible when the registry enumeration landed: `max-w-screen`
 		// advertises no class, so the class-list route never saw it and the pair was never probed.
@@ -145,7 +145,7 @@ func TestTableEntriesAreWellFormed(test *testing.T) {
 	}
 
 	if TailwindVersion == "" {
-		test.Fatal("the table records no Tailwind version, so a reader cannot tell which engine's opinion it holds")
+		test.Fatal("the table records no Tailwind version, so a reader cannot tell which Tailwind's opinion it holds")
 	}
 }
 
@@ -371,7 +371,7 @@ func TestPropertiesExcludeAtRuleDescriptors(test *testing.T) {
 // TestPropertyExtractionRejectsSelectorsAndKeyframes guards a defect a fixture set could not see.
 //
 // Twelve entries were pinned by name in this file and 1,132 were not, and the unchecked space is
-// where the bugs lived. A sweep comparing every entry against the engine found eleven wrong, all
+// where the bugs lived. A sweep comparing every entry against Tailwind found eleven wrong, all
 // from one cause: the extraction read the compiled CSS as though it were a single flat block.
 //
 //	`.slide-in-from-end:dir(ltr) { --enter-translate-x: 100%; }`
@@ -541,7 +541,7 @@ func TestValueDependentReadingsAreRecorded(test *testing.T) {
 //
 // So the table stays, and it stays for a stated reason rather than by default: the alternative is a
 // table of equal size describing something Tailwind does not own. `generate_collapse` measures it
-// against the engine by canonicalizing 57,970 root pairs, and refuses a second design system whose
+// against Tailwind by canonicalizing 57,970 root pairs, and refuses a second design system whose
 // registry matches the first, which is the guard that makes an invariance claim mean something.
 //
 // This test asserts the property-shorthand structure rather than the count, so a family added upstream

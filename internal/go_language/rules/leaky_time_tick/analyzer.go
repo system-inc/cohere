@@ -1,5 +1,5 @@
 // Package leaky_time_tick is staticcheck's SA1015, a call to time.Tick in a function that returns, whose ticker,
-// before Go 1.23, could never be stopped or collected and so leaked, ported onto the engine's own intermediate
+// before Go 1.23, could never be stopped or collected and so leaked, ported onto cohere-go's own intermediate
 // representation (#jqbskpv).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1015/sa1015.go, whose logic it keeps and
@@ -37,7 +37,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1015",
 	"SA1015",
 	"Flags time.Tick in a function that returns, outside tests and commands, where its ticker leaks before Go "+
-		"1.23: staticcheck's SA1015, ported onto the engine's own intermediate representation.",
+		"1.23: staticcheck's SA1015, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

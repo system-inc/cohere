@@ -20,7 +20,7 @@ import (
 // scratchFixtures are the fixtures whose packages the scratch's tests add, every one block 1's tests load.
 var scratchFixtures = []string{"layout", "methods", "lowering"}
 
-// chainLoad is the go_engine's build-facts-chain fixture loaded whole under the host: its package and the 51 of the
+// chainLoad is the go_language's build-facts-chain fixture loaded whole under the host: its package and the 51 of the
 // standard library it reaches through os, runtime, reflect and syscall among them, which give a scratch packages of
 // every size one after another, where block 1's fixtures are four small packages that import nothing.
 var chainLoad = sync.OnceValues(func() (loadedBuild, error) {

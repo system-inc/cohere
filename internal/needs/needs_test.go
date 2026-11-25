@@ -27,7 +27,7 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 		if runtime.GOOS == other {
 			other = "darwin"
 		}
-		Platform(test, other, "the engine ships there alone")
+		Platform(test, other, "cohere-swift ships there alone")
 		test.Fatal("Platform returned on another platform")
 	case "opt-in":
 		value := OptIn(test, "COHERE_NEEDS_OPT_IN", "it measures a tree of the asker's choosing")
@@ -63,7 +63,7 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 		{"tool", []string{"--- SKIP", "zsh is not on the path, and the benchmark is a zsh script"}, nil},
 		{
 			"platform",
-			[]string{"--- SKIP", "this test runs on", "since the engine ships there alone", runtime.GOOS},
+			[]string{"--- SKIP", "this test runs on", "since cohere-swift ships there alone", runtime.GOOS},
 			nil,
 		},
 		{"race", raceWant, nil},

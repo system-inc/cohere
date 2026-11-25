@@ -5,10 +5,10 @@ package go_language
 // the rules tree because a case's settings and options must reach its rule the way a project's do, through
 // settings.Load and configureRules, which this package keeps unexported.
 //
-// Each case runs as the engine runs a project: a module of its own on disk, loaded and type-checked by
-// load.Packages, and linted by check.Run. So the adapter sees what the engine reports, the engine's drop of a
+// Each case runs as cohere-go runs a project: a module of its own on disk, loaded and type-checked by
+// load.Packages, and linted by check.Run. So the adapter sees what cohere-go reports, cohere-go's drop of a
 // house rule's findings in a file go/ast.IsGenerated accepts included (check.go, generatedFiles). Whether that
-// drop is right is a separate engine question, for @system_cohere_go (textrules-decisions.md, "Whole-file drop
+// drop is right is a separate cohere-go question, for @system_cohere_go (textrules-decisions.md, "Whole-file drop
 // in Go"); this adapter measures it rather than ruling on it, and a case whose findings it drops fails its verdict,
 // so the drop can't pass a case as clean.
 
@@ -51,7 +51,7 @@ const textRulesModuleName = "example.com/text_rules"
 const textRulesSettingsFileName = "CohereSettings.json"
 
 // textRulesGoVersion is the go line of the repository's own go.mod, which each case's module declares, so a case
-// is type-checked at the language version the engine's own code is.
+// is type-checked at the language version cohere-go's own code is.
 func textRulesGoVersion(test *testing.T) string {
 	test.Helper()
 	// The test runs in its package's directory, internal/go_language, two below the module root.
@@ -74,7 +74,7 @@ func textRulesGoVersion(test *testing.T) string {
 // an analyzer of its own where its package can build one.
 func textRulesRules(test *testing.T, corpus *text_rules.Corpus, testCase text_rules.Case) []rule.Rule {
 	test.Helper()
-	entry, found := corpus.RuleFor(testCase.Family, text_rules.EngineGo)
+	entry, found := corpus.RuleFor(testCase.Family, text_rules.LanguageGo)
 	if !found {
 		test.Fatalf("the corpus has no family %s", testCase.Family)
 	}
@@ -205,9 +205,9 @@ type textRulesSettingsFile struct {
 	} `json:"go"`
 }
 
-// runTextRulesCase runs a case's rules over its Go source as the engine runs a project, and returns each finding of
+// runTextRulesCase runs a case's rules over its Go source as cohere-go runs a project, and returns each finding of
 // those rules in the case's file as a byte range of its source, the family's findings being the union of its
-// rules', with how many of their findings the engine withheld as generated. A refusal is the engine refusing the case's
+// rules', with how many of their findings cohere-go withheld as generated. A refusal is cohere-go refusing the case's
 // options before anything ran, which is the case's failure rather than the adapter's. Anything that keeps the case from
 // being measured at all, a load or type error or a crash, fails the test loudly, since it measures nothing.
 func runTextRulesCase(
@@ -233,8 +233,8 @@ func runTextRulesCase(
 	writeTextRulesFile(test, directory, "go.mod", fmt.Appendf(nil, "module %s\n\ngo %s\n", textRulesModuleName,
 		goVersion))
 	writeTextRulesFile(test, directory, textRulesSettingsFileName, textRulesSettings(test, ruleNames, testCase))
-	source := testCase.Sources[text_rules.EngineGo]
-	casePath := writeTextRulesFile(test, directory, testCase.FileName(text_rules.EngineGo), []byte(source))
+	source := testCase.Sources[text_rules.LanguageGo]
+	casePath := writeTextRulesFile(test, directory, testCase.FileName(text_rules.LanguageGo), []byte(source))
 
 	ruleSettings, settingsError := settings.Load(directory, "", knownRuleNames(rulesForCase), nil)
 	if settingsError != nil {
@@ -275,7 +275,7 @@ func runTextRulesCase(
 		test.FailNow()
 	}
 
-	lineStarts := text_rules.LineStarts(source, text_rules.EngineGo)
+	lineStarts := text_rules.LineStarts(source, text_rules.LanguageGo)
 	offsetOf := func(line int, column int) int {
 		if line < 1 || line > len(lineStarts) || column < 1 {
 			test.Fatalf("a rule reported %d:%d on %s, which is not in its %d lines", line, column,
@@ -300,11 +300,11 @@ func runTextRulesCase(
 	return found, withheldAsGenerated, nil
 }
 
-// judgeTextRulesCase is a case's comparison: its findings against its expectation, or, where the engine refused
+// judgeTextRulesCase is a case's comparison: its findings against its expectation, or, where cohere-go refused
 // the case's options, a verdict failure, since the rule never gave the verdict the case asks for. A control so
-// refused fails its count too, as a rule that never ran reported nothing. A finding the engine withheld as generated
-// is a verdict failure as well: the rule reported it and the engine dropped it, so what the case compares is the
-// engine's drop rather than the rule's verdict, and a case expecting nothing would otherwise pass on the drop.
+// refused fails its count too, as a rule that never ran reported nothing. A finding cohere-go withheld as generated
+// is a verdict failure as well: the rule reported it and cohere-go dropped it, so what the case compares is the
+// checker's drop rather than the rule's verdict, and a case expecting nothing would otherwise pass on the drop.
 func judgeTextRulesCase(
 	test *testing.T,
 	corpus *text_rules.Corpus,
@@ -316,18 +316,18 @@ func judgeTextRulesCase(
 	if refusal != nil {
 		return text_rules.Result{
 			Failure: text_rules.KindVerdict,
-			Detail: fmt.Sprintf("the engine refuses the case's options, so the rule never ran: %v",
+			Detail: fmt.Sprintf("cohere-go refuses the case's options, so the rule never ran: %v",
 				refusal),
 		}
 	}
 	if withheldAsGenerated > 0 {
 		return text_rules.Result{
 			Failure: text_rules.KindVerdict,
-			Detail: fmt.Sprintf("the engine dropped %d finding(s) of the rule as generated, since go/ast.IsGenerated "+
+			Detail: fmt.Sprintf("cohere-go dropped %d finding(s) of the rule as generated, since go/ast.IsGenerated "+
 				"accepts the file, so the rule's verdict never reached the comparison", withheldAsGenerated),
 		}
 	}
-	return text_rules.Compare(testCase, text_rules.EngineGo, found)
+	return text_rules.Compare(testCase, text_rules.LanguageGo, found)
 }
 
 // Every Go case in the corpus, through the rule its family names, held to the case's expectation and the ledger: a
@@ -341,7 +341,7 @@ func TestTextRulesConformanceGo(test *testing.T) {
 		test.Fatal(loadError)
 	}
 	goVersion := textRulesGoVersion(test)
-	cases := corpus.CasesFor(text_rules.EngineGo)
+	cases := corpus.CasesFor(text_rules.LanguageGo)
 	if len(cases) == 0 {
 		test.Fatal("the corpus has no Go cases, so this adapter would be green over nothing")
 	}
@@ -359,7 +359,7 @@ func TestTextRulesConformanceGo(test *testing.T) {
 			test.Parallel()
 			result := judgeTextRulesCase(test, corpus, goVersion, testCase)
 			compared.Add(1)
-			if judgeError := corpus.Judge(text_rules.EngineGo, testCase, result); judgeError != nil {
+			if judgeError := corpus.Judge(text_rules.LanguageGo, testCase, result); judgeError != nil {
 				test.Error(judgeError)
 			}
 		})
@@ -371,8 +371,8 @@ func TestTextRulesConformanceGo(test *testing.T) {
 const textRulesPlantedGeneratedSource = "// Code generated by hand. DO NOT EDIT.\n\npackage planted\n\n" +
 	"// This is REALLY important.\nvar plantedValue = 1\n"
 
-// A case the engine's drop of generated files reaches fails its verdict, rather than passing as clean: a planted
-// case, not from the corpus, expects clean on a generated file whose shouted word the rule reports and the engine
+// A case cohere-go's drop of generated files reaches fails its verdict, rather than passing as clean: a planted
+// case, not from the corpus, expects clean on a generated file whose shouted word the rule reports and cohere-go
 // withholds. Under a drop that was only logged, the case compared nothing found against nothing expected and
 // passed, so a corpus case expecting clean could pass on the drop instead of on the rule.
 func TestTextRulesConformanceGoFailsAGeneratedDrop(test *testing.T) {
@@ -389,8 +389,8 @@ func TestTextRulesConformanceGoFailsAGeneratedDrop(test *testing.T) {
 		Expect:    []text_rules.Span{},
 		Path:      "case",
 		Root:      "/project",
-		Languages: []text_rules.Engine{text_rules.EngineGo},
-		Sources:   map[text_rules.Engine]string{text_rules.EngineGo: textRulesPlantedGeneratedSource},
+		Languages: []text_rules.Language{text_rules.LanguageGo},
+		Sources:   map[text_rules.Language]string{text_rules.LanguageGo: textRulesPlantedGeneratedSource},
 	}
 	result := judgeTextRulesCase(test, corpus, textRulesGoVersion(test), planted)
 	if result.Failure != text_rules.KindVerdict {
@@ -414,10 +414,10 @@ func TestTextRulesConformanceGoComparatorCanFail(test *testing.T) {
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
-	// The warning-comments control, whose comment holds the word `fix`, a misplacement every engine's finding
+	// The warning-comments control, whose comment holds the word `fix`, a misplacement every language's finding
 	// there differs from.
 	var control text_rules.Case
-	for _, testCase := range corpus.CasesFor(text_rules.EngineGo) {
+	for _, testCase := range corpus.CasesFor(text_rules.LanguageGo) {
 		if testCase.Control && testCase.Family == textRulesComparatorFamily {
 			control = testCase
 		}
@@ -427,12 +427,12 @@ func TestTextRulesConformanceGoComparatorCanFail(test *testing.T) {
 	}
 	found, _, refusal := runTextRulesCase(test, corpus, textRulesGoVersion(test), control)
 	if refusal != nil {
-		test.Fatalf("the engine refuses the control %s's options: %v", control.Id(), refusal)
+		test.Fatalf("cohere-go refuses the control %s's options: %v", control.Id(), refusal)
 	}
 	if len(found) == 0 {
 		test.Fatalf("the rule reported nothing on the control %s", control.Id())
 	}
-	source := control.Sources[text_rules.EngineGo]
+	source := control.Sources[text_rules.LanguageGo]
 
 	asReported := control
 	asReported.Expect = nil
@@ -444,20 +444,20 @@ func TestTextRulesConformanceGoComparatorCanFail(test *testing.T) {
 		text := source[finding.Start:finding.End]
 		asReported.Expect = append(asReported.Expect, text_rules.Span{Covers: &text, Occurrence: 1})
 	}
-	if result := text_rules.Compare(asReported, text_rules.EngineGo, found); !result.Passed() {
+	if result := text_rules.Compare(asReported, text_rules.LanguageGo, found); !result.Passed() {
 		test.Errorf("held to exactly what it reported, the control failed: %s", result.Detail)
 	}
 
 	clean := control
 	clean.Expect = []text_rules.Span{}
-	if result := text_rules.Compare(clean, text_rules.EngineGo, found); result.Failure != text_rules.KindVerdict {
+	if result := text_rules.Compare(clean, text_rules.LanguageGo, found); result.Failure != text_rules.KindVerdict {
 		test.Errorf("expecting the control clean was not a verdict failure (%q): %s", result.Failure, result.Detail)
 	}
 
 	wrongWord := "fix"
 	misplaced := control
 	misplaced.Expect = []text_rules.Span{{Covers: &wrongWord, Occurrence: 1}}
-	if result := text_rules.Compare(misplaced, text_rules.EngineGo, found); result.Failure != text_rules.KindSpan {
+	if result := text_rules.Compare(misplaced, text_rules.LanguageGo, found); result.Failure != text_rules.KindSpan {
 		test.Errorf("expecting the control over %q was not a span failure (%q): %s", wrongWord, result.Failure,
 			result.Detail)
 	}

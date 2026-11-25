@@ -319,7 +319,7 @@ func (resolver *Resolver) reload(kind *Kind, object types.Object) {
 	}
 	if resolver.store.Reloaded(object.Pkg()) {
 		// Invariant: a kind's question returns no error, so one that has no answer ends the pass that asked it, which
-		// the engine's recovering run turns into that pass's error (check's recoveringRun), never into an answer.
+		// cohere-go's recovering run turns into that pass's error (check's recoveringRun), never into an answer.
 		panic(fmt.Sprintf("fact_resolver: asked %s of %s, of %s, which the run loaded from source to answer it and "+
 			"still never learned, so it has no answer", kind.Name, objectName(object), object.Pkg().Path()))
 	}

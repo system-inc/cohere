@@ -72,19 +72,19 @@ func plantedProbe(entered *enteredFiles) rule.Rule {
 	return rule.Rule{Name: plantedProbeName, Origin: rule.OriginHouse, Analyzer: analyzer, Listener: listener}
 }
 
-// runInheriting runs the engine over a copy of the syntax-inherit fixture with the registry's rules and the planted
+// runInheriting runs cohere-go over a copy of the syntax-inherit fixture with the registry's rules and the planted
 // probe, under `--no-cache` and extra, checking every build, inheriting or not, and returns the pipeline, its stream,
 // normalized, the files the probe entered over every build, and the copy's root.
 func runInheriting(test *testing.T, inherits bool, extra ...string) (*pipeline, string, map[string]int, string) {
 	test.Helper()
 	entered := &enteredFiles{entered: map[string]int{}}
 	root := copyFixture(test, syntaxInheritFixture)
-	engine, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), plantedProbe(entered)),
-		func(engine *pipeline) { engine.keepsInheritanceOff = !inherits },
+	pipeline, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), plantedProbe(entered)),
+		func(pipeline *pipeline) { pipeline.keepsInheritanceOff = !inherits },
 		append([]string{"--no-cache"}, extra...)...)
 	entered.lock.Lock()
 	defer entered.lock.Unlock()
-	return engine, normalize(stream, root), maps.Clone(entered.entered), root
+	return pipeline, normalize(stream, root), maps.Clone(entered.entered), root
 }
 
 // buildFindings are run's own findings of the planted probe, before the merge, sorted, each with its suggestions, and
@@ -113,9 +113,12 @@ func plantedFindings(stream string) []string {
 
 // windowsRecord is the stream's lint record's build record of windows, read by its place among the builds, the host's
 // first, decoded and as written.
-func windowsRecord(test *testing.T, engine *pipeline, stream string) (contract.BuildRecord, string) {
+func windowsRecord(test *testing.T, pipeline *pipeline, stream string) (contract.BuildRecord, string) {
 	test.Helper()
-	at := slices.IndexFunc(engine.buildRuns, func(run buildRun) bool { return run.build.OperatingSystem == "windows" })
+	at := slices.IndexFunc(
+		pipeline.buildRuns,
+		func(run buildRun) bool { return run.build.OperatingSystem == "windows" },
+	)
 	for line := range strings.SplitSeq(stream, "\n") {
 		if !strings.HasPrefix(line, `{"kind":"lint"`) {
 			continue
@@ -146,12 +149,12 @@ func windowsRecord(test *testing.T, engine *pipeline, stream string) (contract.B
 // files windows inherits stand there whatever windows says.
 func TestASyntaxOnlyRuleInheritsTheHostsFindingsOnTheFilesTheHostChecked(test *testing.T) {
 	test.Parallel()
-	engine, on, enteredOn, onRoot := runInheriting(test, true)
+	pipeline, on, enteredOn, onRoot := runInheriting(test, true)
 	walking, off, enteredOff, offRoot := runInheriting(test, false)
 	if inheritedCounts.ReplaceAllString(on, "") != off {
 		test.Errorf("inheriting changed the stream:\ninheriting\n%s\nwalking every file\n%s", on, off)
 	}
-	inherited, walked := buildFindings(windowsRun(test, engine), onRoot), buildFindings(windowsRun(test, walking),
+	inherited, walked := buildFindings(windowsRun(test, pipeline), onRoot), buildFindings(windowsRun(test, walking),
 		offRoot)
 	if len(walked) != 3 || !slices.Equal(inherited, walked) {
 		test.Errorf("windows found, inheriting\n%s\nwalking every file\n%s\nwant three, alike",
@@ -161,12 +164,12 @@ func TestASyntaxOnlyRuleInheritsTheHostsFindingsOnTheFilesTheHostChecked(test *t
 		test.Errorf("the planted probe found %d literals, want one in each of the three files:\n%s", len(found),
 			strings.Join(found, "\n"))
 	}
-	windows := windowsRun(test, engine)
+	windows := windowsRun(test, pipeline)
 	if windows.inheritedFiles != 2 || windows.inheritedFindings != 2 {
 		test.Errorf("windows inherited %d files and %d findings, want shared.go's and other.go's, one each",
 			windows.inheritedFiles, windows.inheritedFindings)
 	}
-	if record, _ := windowsRecord(test, engine, on); record.InheritedFiles != 2 || record.InheritedFindings != 2 {
+	if record, _ := windowsRecord(test, pipeline, on); record.InheritedFiles != 2 || record.InheritedFindings != 2 {
 		test.Errorf("windows's build record counts %d files and %d findings inherited, want 2 and 2",
 			record.InheritedFiles, record.InheritedFindings)
 	}
@@ -178,7 +181,7 @@ func TestASyntaxOnlyRuleInheritsTheHostsFindingsOnTheFilesTheHostChecked(test *t
 	}
 }
 
-// A fixing run writes nothing of an inherited finding's fix and offers it once (#y6q1x2j): the engine applies no
+// A fixing run writes nothing of an inherited finding's fix and offers it once (#y6q1x2j): cohere-go applies no
 // rule's suggestion but a naming rule's rename, which it takes from the host's own findings before any other build
 // runs, so the run without `--no-fix` leaves every file of the fixture as it was, its fix record applying nothing, and
 // the merge holds the host's finding on shared.go and windows's inherited one as one finding, its one suggestion's one
@@ -186,9 +189,9 @@ func TestASyntaxOnlyRuleInheritsTheHostsFindingsOnTheFilesTheHostChecked(test *t
 // that one edit too.
 func TestAFixingRunOffersAnInheritedFixOnce(test *testing.T) {
 	test.Parallel()
-	engine, on, _, root := runInheriting(test, true)
+	pipeline, on, _, root := runInheriting(test, true)
 	_, off, _, _ := runInheriting(test, false)
-	windows := windowsRun(test, engine)
+	windows := windowsRun(test, pipeline)
 	if windows.inheritedFindings == 0 {
 		test.Fatal("windows inherited nothing, so the run shows nothing of an inherited fix")
 	}
@@ -235,13 +238,13 @@ func TestAFixingRunOffersAnInheritedFixOnce(test *testing.T) {
 // nothing (#y6q1x2j): its record counts no file inherited, and the probe enters shared.go in both builds.
 func TestATimedRunWithExtraBuildsInheritsNothing(test *testing.T) {
 	test.Parallel()
-	engine, stream, entered, _ := runInheriting(test, true, "--timing")
-	windows := windowsRun(test, engine)
+	pipeline, stream, entered, _ := runInheriting(test, true, "--timing")
+	windows := windowsRun(test, pipeline)
 	if windows.inheritedFiles != 0 || windows.inheritedFindings != 0 {
 		test.Errorf("the timed windows build inherited %d files and %d findings, want none", windows.inheritedFiles,
 			windows.inheritedFindings)
 	}
-	if _, written := windowsRecord(test, engine, stream); strings.Contains(written, `"inherited`) {
+	if _, written := windowsRecord(test, pipeline, stream); strings.Contains(written, `"inherited`) {
 		test.Errorf("the timed windows build's record counts something inherited, want the counts left out: %s",
 			written)
 	}
@@ -265,11 +268,11 @@ func TestAFindingAnotherFileWithholdsIsNotInherited(test *testing.T) {
 	redundantReturn := rule.Namespace + "S1023"
 	windowsFindings := func(inherits bool) []string {
 		root := copyFixture(test, syntaxInheritGeneratedFixture)
-		engine, _, _ := runOverRegistered(test, root, exitFindings, rules.All(),
-			func(engine *pipeline) { engine.keepsInheritanceOff = !inherits },
+		pipeline, _, _ := runOverRegistered(test, root, exitFindings, rules.All(),
+			func(pipeline *pipeline) { pipeline.keepsInheritanceOff = !inherits },
 			"--no-cache", "--no-fix")
 		found := []string{}
-		for _, finding := range windowsRun(test, engine).result.Findings {
+		for _, finding := range windowsRun(test, pipeline).result.Findings {
 			if finding.Rule == redundantReturn {
 				found = append(found, fmt.Sprintf("%s:%d:%d %s", filepath.Base(finding.File), finding.Line,
 					finding.Column, finding.Message))
@@ -290,8 +293,8 @@ func TestAFindingAnotherFileWithholdsIsNotInherited(test *testing.T) {
 // inherits nothing (#y6q1x2j): its record counts no file inherited, and the probe enters shared.go in both builds.
 func TestABuildDependenceRunInheritsNothing(test *testing.T) {
 	test.Parallel()
-	engine, stream, entered, _ := runInheriting(test, true, "--build-dependence")
-	requireInheritedNothing(test, engine, stream, entered, 2)
+	pipeline, stream, entered, _ := runInheriting(test, true, "--build-dependence")
+	requireInheritedNothing(test, pipeline, stream, entered, 2)
 }
 
 // A run that renamed reads no findings cache, so its builds restore nothing from the host's run and windows inherits
@@ -309,27 +312,27 @@ func TestARenamedRunInheritsNothing(test *testing.T) {
 	if writeError := os.WriteFile(filepath.Join(root, "renamed.go"), []byte(renamed), 0o600); writeError != nil {
 		test.Fatal(writeError)
 	}
-	engine, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), plantedProbe(entered)), nil,
+	pipeline, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), plantedProbe(entered)), nil,
 		"--no-cache")
-	if !engine.renamed {
+	if !pipeline.renamed {
 		test.Fatalf("the run renamed nothing, so it shows nothing of a renamed run:\n%s", normalize(stream, root))
 	}
 	entered.lock.Lock()
 	defer entered.lock.Unlock()
-	requireInheritedNothing(test, engine, normalize(stream, root), entered.entered, 3)
+	requireInheritedNothing(test, pipeline, normalize(stream, root), entered.entered, 3)
 }
 
-// requireInheritedNothing fails test unless windows's build in engine's run inherited nothing: its run and its record
+// requireInheritedNothing fails test unless windows's build in pipeline's run inherited nothing: its run and its record
 // in stream count nothing inherited, and the probe entered shared.go the times the run's passes over it, windows's
 // among them, number.
-func requireInheritedNothing(test *testing.T, engine *pipeline, stream string, entered map[string]int, passes int) {
+func requireInheritedNothing(test *testing.T, pipeline *pipeline, stream string, entered map[string]int, passes int) {
 	test.Helper()
-	windows := windowsRun(test, engine)
+	windows := windowsRun(test, pipeline)
 	if windows.inheritedFiles != 0 || windows.inheritedFindings != 0 {
 		test.Errorf("windows inherited %d files and %d findings, want none", windows.inheritedFiles,
 			windows.inheritedFindings)
 	}
-	if _, written := windowsRecord(test, engine, stream); strings.Contains(written, `"inherited`) {
+	if _, written := windowsRecord(test, pipeline, stream); strings.Contains(written, `"inherited`) {
 		test.Errorf("windows's record counts something inherited, want the counts left out: %s", written)
 	}
 	if entered["shared.go"] != passes {

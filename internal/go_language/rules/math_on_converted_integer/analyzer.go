@@ -44,7 +44,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4015",
 	"SA4015",
 	"Flags math.Ceil, Floor, Trunc, IsNaN or IsInf given an integer converted to a float: staticcheck's SA4015, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

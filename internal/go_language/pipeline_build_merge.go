@@ -30,13 +30,13 @@ type buildOutcome struct {
 // a say on indexed, so a directive is judged only by the builds that compiled and analyzed its file. In scope is the
 // host's scope or a file in the paths the host's build constraints leave out, which another build compiles. ran are
 // the analyzer rules that ran, the same for every build.
-func (engine *pipeline) outcomeOf(run buildRun, ran []string) buildOutcome {
+func (pipeline *pipeline) outcomeOf(run buildRun, ran []string) buildOutcome {
 	inScope := func(file string) bool {
-		return engine.described.inScopeSet[file] || engine.described.constrainedInScope[file]
+		return pipeline.described.inScopeSet[file] || pipeline.described.constrainedInScope[file]
 	}
 	var files []string
 	for file := range run.said {
-		if _, read := engine.described.contents[file]; read && inScope(file) {
+		if _, read := pipeline.described.contents[file]; read && inScope(file) {
 			files = append(files, file)
 		}
 	}
@@ -47,7 +47,7 @@ func (engine *pipeline) outcomeOf(run buildRun, ran []string) buildOutcome {
 			found = append(found, each)
 		}
 	}
-	suppressed := engine.suppress(ran, found, files)
+	suppressed := pipeline.suppress(ran, found, files)
 	return buildOutcome{
 		said:              run.said,
 		kept:              suppressed.kept,

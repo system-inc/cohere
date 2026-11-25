@@ -221,7 +221,7 @@ func reportIfLabelIsRedundant(ruleContext rule.Context, jump *ast.Node, label *a
 // computes the same two offsets from the first token of the jump and from the label's range end.
 //
 // It declines when a comment sits inside that span, because the removal would delete it with no
-// warning and the engine applies a fix unattended. A comment outside the span is untouched and the
+// warning and the fix pass applies a fix unattended. A comment outside the span is untouched and the
 // repair is still offered, which is why `/*comment*/break A;` fixes and `break/**/ A;` does not.
 func extraLabelRemovalFix(ruleContext rule.Context, jump *ast.Node, label *ast.Node) (rule.Fix, bool) {
 	keywordStart := scanner.GetTokenPosOfNode(jump, ruleContext.SourceFile, false)
@@ -229,7 +229,7 @@ func extraLabelRemovalFix(ruleContext rule.Context, jump *ast.Node, label *ast.N
 	labelEnd := label.End()
 
 	// An ordering guard rather than a behavioral filter, kept as crash protection on a range the
-	// engine would otherwise be handed inverted.
+	// fix pass would otherwise be handed inverted.
 	//
 	// Its mutant survives and no input reaches it: a jump carrying a label always writes that label
 	// after the keyword, and a jump carrying none exits at the nil check above. Probed over eight
@@ -237,8 +237,8 @@ func extraLabelRemovalFix(ruleContext rule.Context, jump *ast.Node, label *ast.N
 	// a comment butted against the keyword, and none produced an inverted span. The verdict names
 	// those callers, so adding another caller voids it.
 	//
-	// It stays because a fix is applied unattended and an inverted range is the one repair the edit
-	// engine's parse check cannot refuse, and because keywordEnd is computed from a token length
+	// It stays because a fix is applied unattended and an inverted range is the one repair the fix
+	// pass's parse check cannot refuse, and because keywordEnd is computed from a token length
 	// rather than scanned, so a future jump kind reaching jumpKeywordText would land here silently.
 	if keywordEnd >= labelEnd {
 		return rule.Fix{}, false

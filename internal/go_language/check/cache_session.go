@@ -37,7 +37,7 @@ type Caching struct {
 	Files           cache.FileDigests
 
 	// Held is the bytes the run holds for a file, which its load parsed, and the keys hash in place of the disk's (see
-	// cache.Keys), nil for a caller that holds none. Every run of the engine sets it, so its entries are keyed by what
+	// cache.Keys), nil for a caller that holds none. Every run of cohere-go sets it, so its entries are keyed by what
 	// it checked without a second read of each file (#1sxhadk), and the editor's save, whose one file is the buffer,
 	// keys what it checked rather than the file the editor has not saved.
 	Held func(file string) ([]byte, bool)
@@ -69,7 +69,7 @@ type StandardLibraryCaching struct {
 	Context cache.StandardLibraryContext
 
 	// Toolchain is the Go version and `GOROOT` go env reports, which every standard-library dependence record's key
-	// holds beside the engine (StandardLibraryDependenceRecordKey, #6a3kjvz).
+	// holds beside cohere-go (StandardLibraryDependenceRecordKey, #6a3kjvz).
 	Toolchain string
 }
 
@@ -378,7 +378,7 @@ func (session *CacheSession) Restore(
 	analyzed []*packages.Package,
 ) map[*packages.Package]*load.Restored {
 	session.opened = true
-	// Every map starts empty, the keys and the files' digests too, since the engine restores a second load when the
+	// Every map starts empty, the keys and the files' digests too, since cohere-go restores a second load when the
 	// long-line wrap wrote a file, and keys this restore could not compute must not leave the first load's in their
 	// place, which the lint phase would save entries under, for packages it never analyzed, nor digests of the bytes
 	// the wrap replaced, which an extra build would read.
@@ -526,12 +526,12 @@ func (session *CacheSession) Keep(key [sha256.Size]byte, contents []byte) error 
 	return session.caching.Store.Put(cache.Key(key), contents)
 }
 
-// KeyFor is the key of what a run keeps under label that depends on the engine itself and the build, as gofmt's
-// verdicts depend on the gofmt the engine links: another engine or build never reads it.
+// KeyFor is the key of what a run keeps under label that depends on cohere-go itself and the build, as gofmt's
+// verdicts depend on the gofmt cohere-go links: another executable or build never reads it.
 func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
 	digest := sha256.New()
 	for _, part := range append([]string{label, session.caching.Context.FormatVersion,
-		session.caching.Context.EngineIdentity}, session.caching.Context.Build...) {
+		session.caching.Context.ExecutableIdentity}, session.caching.Context.Build...) {
 		// Ignored: a hash.Hash never returns an error from Write, and the zero byte ends each part.
 		_, _ = digest.Write(append([]byte(part), 0))
 	}

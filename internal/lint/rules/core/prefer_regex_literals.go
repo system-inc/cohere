@@ -822,8 +822,8 @@ func lineCommentContaining(text string, index int) int {
 // `esregexp.Compile` is deliberately not used, measured: it refuses the `v` flag outright and
 // refuses `\p{Script=Greek}`, both of which are valid JavaScript that upstream accepts, and it
 // accepts a bare `]` under `u` which JavaScript rejects. It answers a different question, whether
-// the pattern can be executed by the vendored engine, and a rule deciding whether to offer a
-// rewrite must not withhold one because our engine cannot run the pattern.
+// the pattern can be executed by the vendored regular expression package, and a rule deciding whether to offer a
+// rewrite must not withhold one because our regular expression package cannot run the pattern.
 //
 // So validity is answered structurally by the pattern walk, which returns false on a construct the
 // scanner cannot make sense of. That covers the shapes the corpus turns on: a bare quantifier with

@@ -48,7 +48,7 @@ func renamingPipelineOver(test *testing.T, fixture string) (*pipeline, *load.Loa
 	}
 	// What the description started beside its reads ends before the test and its directory do.
 	test.Cleanup(described.awaitStarted)
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request:       request,
 		described:     described,
 		registered:    rules.All(),
@@ -60,7 +60,7 @@ func renamingPipelineOver(test *testing.T, fixture string) (*pipeline, *load.Loa
 	if loadError != nil || len(loaded.Diagnostics) > 0 {
 		test.Fatalf("loading the fixture: %v %+v", loadError, loaded.Diagnostics)
 	}
-	return engine, loaded
+	return pipeline, loaded
 }
 
 // planParseUrl is the plan to rename the fixture's ParseURL to ParseUrl, which renames it in four files.
@@ -131,10 +131,10 @@ func TestAProofNamesTheRenamesItsRewriteBreaks(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			engine, loaded := renamingPipeline(test)
-			root := engine.described.workspace.Root
+			pipeline, loaded := renamingPipeline(test)
+			root := pipeline.described.workspace.Root
 			before := map[string][]byte{}
-			for _, file := range engine.described.readableOurs {
+			for _, file := range pipeline.described.readableOurs {
 				contents, readError := os.ReadFile(file)
 				if readError != nil {
 					test.Fatal(readError)
@@ -143,13 +143,13 @@ func TestAProofNamesTheRenamesItsRewriteBreaks(test *testing.T) {
 			}
 			space := workspace.FromLoaded(root, loaded.Roots, loaded.Packages, nil)
 			result := planParseUrl(test, space, loaded)
-			proved := engine.prove(space, map[string][]byte{}, result, global_rename.Options{})
+			proved := pipeline.prove(space, map[string][]byte{}, result, global_rename.Options{})
 			if proved.proof == nil || len(proved.failures) > 0 {
 				test.Fatalf("the plan's own rewrite failed its proof: %v", proved.failures)
 			}
 
 			testCase.plant(test, result, root)
-			failures := engine.prove(space, map[string][]byte{}, result, global_rename.Options{}).failures
+			failures := pipeline.prove(space, map[string][]byte{}, result, global_rename.Options{}).failures
 			reason, failed := failures[[2]string{"ParseURL", "ParseUrl"}]
 			if !failed || !strings.Contains(reason, testCase.reason) {
 				test.Fatalf("want ParseURL's rename failed as %q, got %v", testCase.reason, failures)
@@ -164,16 +164,16 @@ func TestAProofNamesTheRenamesItsRewriteBreaks(test *testing.T) {
 	}
 }
 
-// A rename that reaches a file only windows builds is proven under windows through the engine's own load of it, so a
+// A rename that reaches a file only windows builds is proven under windows through cohere-go's own load of it, so a
 // rewrite that leaves that file naming the old name fails there, naming the rename and the platform, though the
 // host's proof, which never reads the file, holds. The plan's own rewrite proves under windows and freebsd both.
 func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 	test.Parallel()
 
-	engine, loaded := renamingPipelineOver(test, "rename-platforms")
-	root := engine.described.workspace.Root
+	pipeline, loaded := renamingPipelineOver(test, "rename-platforms")
+	root := pipeline.described.workspace.Root
 	space := workspace.FromLoaded(root, loaded.Roots, loaded.Packages, nil)
-	options := global_rename.Options{LoadPlatform: engine.platformLoad(space, nil), RequireSoundPlatforms: true}
+	options := global_rename.Options{LoadPlatform: pipeline.platformLoad(space, nil), RequireSoundPlatforms: true}
 	var proposals []global_rename.Proposal
 	for _, analyzed := range loaded.Packages {
 		for identifier, object := range analyzed.TypesInfo.Defs {
@@ -193,7 +193,7 @@ func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 		test.Fatalf("want maxBytes renamed in both platforms' files and read under both, got %+v, %d twin edits, %v",
 			result.Accepted, len(result.TwinEdits), platforms)
 	}
-	if proved := engine.prove(space, map[string][]byte{}, result, options); proved.proof == nil ||
+	if proved := pipeline.prove(space, map[string][]byte{}, result, options); proved.proof == nil ||
 		len(proved.failures) > 0 {
 		test.Fatalf("the plan's own rewrite failed its proof: %v", proved.failures)
 	}
@@ -202,7 +202,7 @@ func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 	result.TwinEdits = slices.DeleteFunc(result.TwinEdits, func(edit rename.Edit) bool {
 		return edit.Filename == windowsFile
 	})
-	failures := engine.prove(space, map[string][]byte{}, result, options).failures
+	failures := pipeline.prove(space, map[string][]byte{}, result, options).failures
 	reason, failed := failures[[2]string{"maxBytes", "maximumBytes"}]
 	if !failed || !strings.Contains(reason, "windows/amd64") {
 		test.Fatalf("want maxBytes's rename failed under windows/amd64, got %v", failures)
@@ -215,9 +215,9 @@ func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 func TestAPlatformLoadIsMadeForEachCallAndKeptByNone(test *testing.T) {
 	test.Parallel()
 
-	engine, loaded := renamingPipelineOver(test, "rename-platforms")
-	space := workspace.FromLoaded(engine.described.workspace.Root, loaded.Roots, loaded.Packages, nil)
-	loadPlatform := engine.platformLoad(space, nil)
+	pipeline, loaded := renamingPipelineOver(test, "rename-platforms")
+	space := workspace.FromLoaded(pipeline.described.workspace.Root, loaded.Roots, loaded.Packages, nil)
+	loadPlatform := pipeline.platformLoad(space, nil)
 	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
 	first, firstError := loadPlatform(windows, nil)
 	if firstError != nil {
@@ -257,10 +257,10 @@ func TestAPlatformLoadIsMadeForEachCallAndKeptByNone(test *testing.T) {
 func TestAPlatformProofRefusesARenameThatCapturesAUse(test *testing.T) {
 	test.Parallel()
 
-	engine, loaded := renamingPipelineOver(test, "rename-capture")
-	root := engine.described.workspace.Root
+	pipeline, loaded := renamingPipelineOver(test, "rename-capture")
+	root := pipeline.described.workspace.Root
 	space := workspace.FromLoaded(root, loaded.Roots, loaded.Packages, nil)
-	options := global_rename.Options{LoadPlatform: engine.platformLoad(space, nil), RequireSoundPlatforms: true}
+	options := global_rename.Options{LoadPlatform: pipeline.platformLoad(space, nil), RequireSoundPlatforms: true}
 	edits := func(relative string, from int, every bool) []rename.Edit {
 		file := filepath.Join(root, filepath.FromSlash(relative))
 		contents, readError := os.ReadFile(file)
@@ -369,7 +369,7 @@ func TestANamingRuleLearningFactsThroughItsRequirementsGetsOneRound(test *testin
 // are most of a load's memory: the first load to plan over (rename), every platform's (platformLoad, which each
 // platform's proof loads through too) and the host's proof (prove). The load of the written tree (runRename) keeps
 // them, since the lint phase lints it and its rules learn facts from every dependency's syntax. Read from the rename's
-// source, each function by the loads it asks of loadPackages, the engine's one caller of package load's loads, and
+// source, each function by the loads it asks of loadPackages, cohere-go's one caller of package load's loads, and
 // whether each asks for the roots' syntax alone.
 func TestTheRenamesPlanLoadsKeepOnlyTheRootsSyntax(test *testing.T) {
 	test.Parallel()

@@ -27,7 +27,7 @@ var forbiddenArgumentsProperties = map[string]bool{
 //
 // Both properties throw in strict mode, and every module and class body is strict, so code reaching
 // for them either already fails or is running in the shrinking part of the language where it does
-// not. They also defeat the optimizations engines apply to functions whose callers are statically
+// not. They also defeat the optimizations runtimes apply to functions whose callers are statically
 // known, which is why the restriction exists rather than being merely stylistic.
 //
 // # The subscript form is not the same question
@@ -67,7 +67,7 @@ var NoCaller = rule.Rule[rule.NoOptions]{
 					Id: "noCaller",
 					Description: fmt.Sprintf(
 						"This uses `arguments.%s`. Both properties throw in strict mode, which "+
-							"every module and class body already is, and they prevent engines from "+
+							"every module and class body already is, and they prevent runtimes from "+
 							"optimizing functions whose callers would otherwise be statically "+
 							"known. Name the function and refer to it by name instead.",
 						name.Text()),

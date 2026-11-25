@@ -249,7 +249,7 @@ func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(
 			)
 			rule_testing.ExpectFindings(test, result, "noSeparateNamedExport")
 			if len(result.Diagnostics[0].Fixes) != 1 {
-				// One edit, not a deletion plus insertions. The engine applies a diagnostic's fixes
+				// One edit, not a deletion plus insertions. The fix pass applies a diagnostic's fixes
 				// independently, and a deletion landing without its insertion is the original
 				// defect.
 				test.Fatalf("expected the repair as one edit, got %d", len(result.Diagnostics[0].Fixes))

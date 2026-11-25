@@ -1,14 +1,14 @@
 // Package abbreviation is the house's abbreviation vocabulary, read from cohere's policy/Abbreviations.json rather
-// than written here as code, and the one reading of it every Go-hosted engine shares.
+// than written here as code, and the one reading of it every Go-hosted language shares.
 //
-// It is data because three engines read it. The TypeScript rule (nexus/consistency-no-abbreviated-identifier), the
-// Swift engine's naming rules and the Go engine's rule must judge the same words, so the list lives in one file
-// under policy/, and the interpretation of that file lives here, once, with no engine's syntax tree in sight. Each
+// It is data because three languages read it. The TypeScript rule (nexus/consistency-no-abbreviated-identifier),
+// cohere-swift's naming rules and cohere-go's rule must judge the same words, so the list lives in one file
+// under policy/, and the interpretation of that file lives here, once, with no language's syntax tree in sight. Each
 // entry carries its reason with it, so the file can be pruned by someone who was not there when it was written.
 //
-// What stays with each engine is policy: the TypeScript rule's framework exemptions and its rule.Message, the Go
+// What stays with each language is policy: the TypeScript rule's framework exemptions and its rule.Message, the Go
 // rule's reading of which names are its own. A finding here is a message id and the values its text needs, so each
-// engine renders the same ids with the same values from its own rule's entry in the policy message catalog.
+// language renders the same ids with the same values from its own rule's entry in the policy message catalog.
 //
 // # Order is part of the data
 //
@@ -33,7 +33,7 @@
 // A language's keyword can share an abbreviation's letters: JavaScript's `var` is a word, not short for "variable",
 // and it has no full word to expand to. policy/KeywordTerms.json names the exact spellings in which the capitalized
 // keyword means the keyword (`VarDeclaration`, `VarScoped`), and the segment form reads them here, once for the
-// TypeScript and Go engines, while Swift's port reads the same file compiled in (#hvyvfr5). A segment is the keyword
+// TypeScript and Go languages, while Swift's port reads the same file compiled in (#hvyvfr5). A segment is the keyword
 // term when a listed spelling starts there and ends at a word boundary, and the word is reported only where some
 // segment is not, so `NoVar` and `themeVar` still are.
 package abbreviation
@@ -66,7 +66,7 @@ const (
 )
 
 // The ids of the four messages a finding can carry, one per shape it takes. They are the ids in
-// policy/messages/consistency-no-abbreviated-identifier.json, which every engine's rule renders from. The id names
+// policy/messages/consistency-no-abbreviated-identifier.json, which every language's rule renders from. The id names
 // the shape, not the word: the word is already in the text, and the vocabulary's entries carry no id.
 const (
 	// AbbreviatedIdentifier is every whole-word and prefix finding, with the values `name` and `advice`.
@@ -169,7 +169,7 @@ type wordSegmentPatterns struct {
 var millisecondSegmentPattern = regexp.MustCompile(`([a-z])Ms($|[A-Z])`)
 
 // Policy is policy's file, read once. An invalid file panics at startup, which is the loud failure: a vocabulary
-// read wrongly would make every engine quietly judge less than it appears to.
+// read wrongly would make every language quietly judge less than it appears to.
 var Policy = mustLoad(
 	"policy/Abbreviations.json with policy/KeywordTerms.json",
 	policy.AbbreviationsFile(),
@@ -192,7 +192,7 @@ func mustLoad(name string, data []byte, keywordTerms []policy.KeywordTerm) *Voca
 }
 
 // Load reads a vocabulary file with the keyword terms that speak for its words, refusing an unknown key, any entry
-// the engines would read as something other than meant, and a keyword term no segment entry gives advice for.
+// the languages would read as something other than meant, and a keyword term no segment entry gives advice for.
 func Load(data []byte, keywordTerms []policy.KeywordTerm) (*Vocabulary, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
@@ -276,7 +276,7 @@ func Load(data []byte, keywordTerms []policy.KeywordTerm) (*Vocabulary, error) {
 	return loaded, nil
 }
 
-// validateEntry refuses an entry the engines would read as something other than meant.
+// validateEntry refuses an entry the languages would read as something other than meant.
 func validateEntry(entry *Entry) error {
 	// Letters alone, because Find tests the prefix, suffix and segment forms as literal text: `^db[A-Z]` is a name
 	// that begins with `db` and then an ASCII capital, which holds only while the abbreviation has nothing a pattern
@@ -353,7 +353,7 @@ func Capitalize(word string) string {
 	return strings.ToUpper(word[:1]) + word[1:]
 }
 
-// Finding is what the vocabulary says about a name before any engine's exemption.
+// Finding is what the vocabulary says about a name before any language's exemption.
 type Finding struct {
 	// Form and Entry are where the name matched and the word that matched. The TypeScript rule's framework
 	// exemptions are keyed on the two together.
@@ -365,7 +365,7 @@ type Finding struct {
 	// Spellings are the whole names the advice offers in place of the name, one per meaning in the entry's order,
 	// in the name's own case: `MaxLen` gives `MaxLength`. They are empty where the advice names no spelling, an
 	// advice-style form or a suffix's own advice. They are the advice's own list, not a second reading of the
-	// entry, so an engine that renames by them renames to exactly what the message says.
+	// entry, so a language that renames by them renames to exactly what the message says.
 	Spellings []string
 }
 

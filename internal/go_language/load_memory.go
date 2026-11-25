@@ -32,7 +32,7 @@ type loadMemory struct {
 
 // newLoadMemory is the run's memory across its loads, or nil when lateLimit says the run raises nothing, and in a test
 // that decided nothing (memory nil), which leaves the limit alone.
-func newLoadMemory(memory *engineMemory, singleThreaded bool) *loadMemory {
+func newLoadMemory(memory *memoryAccount, singleThreaded bool) *loadMemory {
 	if memory == nil {
 		return nil
 	}

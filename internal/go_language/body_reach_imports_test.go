@@ -38,9 +38,9 @@ func TestAPackageWhoseImportsDifferIsReachedWhole(test *testing.T) {
 			test.Parallel()
 
 			root := copyFixture(test, filepath.Join("testdata", "body-reach-imports", module))
-			on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-				engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-				engine.bodyDifferential = true
+			on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+				pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+				pipeline.bodyDifferential = true
 			}, "--no-cache", "--no-fix", "--build-dependence")
 
 			if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {

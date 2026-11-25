@@ -7,7 +7,7 @@ const (
 )
 
 // reviewedLiterals are string literals read in their files and judged unable to name a ctx field: by the name
-// the literal spells, then the file relative to the root, the reason. The engine still refuses a rename for any
+// the literal spells, then the file relative to the root, the reason. global_rename still refuses a rename for any
 // literal of that name in any other file.
 var reviewedLiterals = map[string]map[string]string{
 	"ctx": {

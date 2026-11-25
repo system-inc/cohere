@@ -15,7 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/timing_testing"
 )
 
-// timedKey stands in for the engine's key, rule.Timed, an analyzer that is never run.
+// timedKey stands in for cohere-go's key, rule.Timed, an analyzer that is never run.
 var timedKey = &analysis.Analyzer{
 	Name: "timed_key",
 	Doc:  "keys the run's collector and never runs",

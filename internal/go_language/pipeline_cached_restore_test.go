@@ -52,9 +52,9 @@ func TestACachedColdRunsBuildDeclinesAndReloadsAsUnderNoCache(test *testing.T) {
 func TestARenameAfterTheKeepReadsNothingTheKeepLetGo(test *testing.T) {
 	test.Parallel()
 
-	engine, _, noted := runOverNoted(test, copyFixture(test, filepath.Join("testdata", "rename-platforms")),
+	pipeline, _, noted := runOverNoted(test, copyFixture(test, filepath.Join("testdata", "rename-platforms")),
 		exitClean, nil)
-	if !engine.renamed {
+	if !pipeline.renamed {
 		test.Fatal("the run renamed nothing, so it tells nothing of the rounds after the first lint")
 	}
 	if strings.Contains(noted, "after the run kept its packages") {

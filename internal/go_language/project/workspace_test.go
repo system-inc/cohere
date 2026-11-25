@@ -130,7 +130,7 @@ func TestReadWorkspaceOfAModuleUnderAnotherWorkspaceTurnsTheWorkspaceOff(test *t
 
 // A go.mod go.work doesn't use is refused, by path and with the use line to add, rather than left ungated,
 // which is how the shims went untested. One in testdata, in a dot directory or inside a submodule is not.
-// Reading the workspace refuses nothing: for the engine an unlisted module is a project of its own.
+// Reading the workspace refuses nothing: for cohere-go an unlisted module is a project of its own.
 func TestRefuseUnlistedModulesNamesAModuleGoWorkDoesNotUse(test *testing.T) {
 	test.Parallel()
 	built := readFixture(test)

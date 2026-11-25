@@ -16,8 +16,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// The oracle for what prettier.Engine cannot be asked: proseWrap, which format_options.Options does not carry
-// and every corpus leaves at "preserve", and a file path the engine does not route (.prettierrc). These
+// The oracle for what prettier.Formatter cannot be asked: proseWrap, which format_options.Options does not carry
+// and every corpus leaves at "preserve", and a file path the formatter does not route (.prettierrc). These
 // run the same embedded bundles in their own runtime, with the option given.
 
 // Its answers are recorded (see oracle_testing), so the runtime is built only when they are recorded again.

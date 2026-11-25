@@ -11,7 +11,7 @@
 // packages. The two agree everywhere, so there is no differences fixture.
 //
 // The original finds the dial calls, and the declaration of a variable passed to one, through x/tools' internal type
-// index, which cohere cannot import. The port sits on the engine's syntax dispatcher instead, hearing each call,
+// index, which cohere cannot import. The port sits on cohere-go's syntax dispatcher instead, hearing each call,
 // assignment and value spec on the walk the dispatcher makes once for every syntax rule, and gathers both over the
 // package: each call whose callee typeutil.Callee names, gathered per callee and judged once the package is walked, in
 // the original's order of callees, and the declarations, read for the package's variables only once a variable is

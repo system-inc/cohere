@@ -44,7 +44,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1020",
 	"SA1020",
 	"Flags a constant address given to net/http.ListenAndServe whose port is neither a port number nor a service "+
-		"name: staticcheck's SA1020, ported onto the engine's own intermediate representation.",
+		"name: staticcheck's SA1020, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

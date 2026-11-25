@@ -13,7 +13,7 @@
 // term_list.go), keeping the order of their terms, since which term comes first decides the judgment. The registry
 // runs the port in the original's place, and the original stays the oracle: the parity tests beside this file run
 // both over the same packages. The two agree everywhere, so there is no differences fixture. The port sits on the
-// engine's syntax dispatcher, hearing each composite literal on the walk the dispatcher makes once for every syntax
+// checker's syntax dispatcher, hearing each composite literal on the walk the dispatcher makes once for every syntax
 // rule.
 package composite
 

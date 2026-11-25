@@ -78,26 +78,26 @@ func newPlainBits(declarations *plainDeclarations, loaded *load.Loaded) *plainBi
 // alone, once the graph is whole, nil when the run keeps no plain bits. A package the graph does not hold is answered
 // wide, both bits set for every object of it a unit reads, by live object or by name. The set is stamped with how long
 // the judgment waited for the graph and how long it took after.
-func (engine *pipeline) plainMustCheckOf(reachable []*packages.Package) *mustCheckSet {
-	bits := engine.plainBits
+func (pipeline *pipeline) plainMustCheckOf(reachable []*packages.Package) *mustCheckSet {
+	bits := pipeline.plainBits
 	if bits == nil {
 		return nil
 	}
 	waitStarted := time.Now()
-	engine.declarationsStepped(declarationsListedWaiting)
+	pipeline.declarationsStepped(declarationsListedWaiting)
 	<-bits.ready
 	started := time.Now()
-	engine.declarationsStepped(declarationsJudging)
+	pipeline.declarationsStepped(declarationsJudging)
 	built := make(map[string]*packages.Package, len(reachable))
 	for _, each := range reachable {
 		built[each.ID] = each
 	}
-	read := engine.sourceReader(nil, nil)
+	read := pipeline.sourceReader(nil, nil)
 	// The judgment's shared files and packages, and those without syntax, are the facts census's, which a plain run
 	// keeps none of.
 	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
 		withoutSyntax: map[string]bool{}, filesDiffer: map[string]bool{}}
-	difference := engine.listingDifference(bits.host, built, token.NewFileSet(), read,
+	difference := pipeline.listingDifference(bits.host, built, token.NewFileSet(), read,
 		func(file string) bool { return holdsLineDirectiveOnce(&bits.lineDirectives, file, read) }, judged)
 	difference.DependentObject = func(types.Object) (bool, bool) { return true, true }
 	difference.DependentName = func(string, string) (bool, bool, bool) { return true, true, false }
@@ -114,9 +114,9 @@ func (engine *pipeline) plainMustCheckOf(reachable []*packages.Package) *mustChe
 }
 
 // declarationsStepped tells a test's declarationsSteps hook, when one is set, that the graph reached step.
-func (engine *pipeline) declarationsStepped(step declarationsStep) {
-	if engine.declarationsSteps != nil {
-		engine.declarationsSteps(step)
+func (pipeline *pipeline) declarationsStepped(step declarationsStep) {
+	if pipeline.declarationsSteps != nil {
+		pipeline.declarationsSteps(step)
 	}
 }
 
@@ -128,21 +128,21 @@ func (engine *pipeline) declarationsStepped(step declarationsStep) {
 // side-loaded ones among them. A run with no session writes none.
 //
 // Mutates: bits gains what its side load added, why it failed and what the graph does not hold, and its ready closes
-func (engine *pipeline) completePlainBits(bits *plainBits, loaded *load.Loaded) func() {
-	session := engine.session
-	engine.declarationsStepped(declarationsRecordsWriting)
+func (pipeline *pipeline) completePlainBits(bits *plainBits, loaded *load.Loaded) func() {
+	session := pipeline.session
+	pipeline.declarationsStepped(declarationsRecordsWriting)
 	var failed int
 	var firstFailure error
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		bits.sideLoaded, bits.sideLoadProblem = engine.sideLoadStandardLibrary(bits.declarations, loaded)
+		bits.sideLoaded, bits.sideLoadProblem = pipeline.sideLoadStandardLibrary(bits.declarations, loaded)
 		for identifier := range bits.host.files {
 			if !bits.declarations.holds(identifier) {
 				bits.notHeld = append(bits.notHeld, identifier)
 			}
 		}
-		engine.declarationsStepped(declarationsReady)
+		pipeline.declarationsStepped(declarationsReady)
 		close(bits.ready)
 		if session != nil {
 			failed, firstFailure = session.WriteDeclarationsRecords(func(saved *packages.Package) ([]byte, bool) {
@@ -153,11 +153,18 @@ func (engine *pipeline) completePlainBits(bits *plainBits, loaded *load.Loaded) 
 	return func() {
 		<-done
 		if bits.sideLoadProblem != nil {
-			engine.note("the must-check census's standard-library side load failed, so every object of what it would "+
-				"have loaded is called dependent: %v", bits.sideLoadProblem)
+			pipeline.note(
+				"the must-check census's standard-library side load failed, so every object of what it would "+
+					"have loaded is called dependent: %v",
+				bits.sideLoadProblem,
+			)
 		}
 		if failed > 0 {
-			engine.note("the findings cache: %d declarations records not written, the first: %v", failed, firstFailure)
+			pipeline.note(
+				"the findings cache: %d declarations records not written, the first: %v",
+				failed,
+				firstFailure,
+			)
 		}
 	}
 }
@@ -169,7 +176,7 @@ func (engine *pipeline) completePlainBits(bits *plainBits, loaded *load.Loaded) 
 // (standardLibraryGraph), so its record can be written. It returns the IDs it added, sorted, and why the load failed,
 // when it did, every package it would have added then left out. The standard library is the only package in no
 // module that a module's load reaches, and none of it is a test variant.
-func (engine *pipeline) sideLoadStandardLibrary(
+func (pipeline *pipeline) sideLoadStandardLibrary(
 	declarations *plainDeclarations,
 	loaded *load.Loaded,
 ) ([]string, error) {
@@ -182,12 +189,12 @@ func (engine *pipeline) sideLoadStandardLibrary(
 	if len(paths) == 0 {
 		return nil, nil
 	}
-	if engine.sideLoadRefused != nil {
-		return nil, engine.sideLoadRefused
+	if pipeline.sideLoadRefused != nil {
+		return nil, pipeline.sideLoadRefused
 	}
-	sideLoaded, loadError := engine.loadPackages(loadRequest{
-		environment: engine.described.workspace.Environment(),
-		caching:     &load.Caching{GoEnvironment: engine.described.goEnvironment, WithoutTests: true},
+	sideLoaded, loadError := pipeline.loadPackages(loadRequest{
+		environment: pipeline.described.workspace.Environment(),
+		caching:     &load.Caching{GoEnvironment: pipeline.described.goEnvironment, WithoutTests: true},
 		patterns:    paths,
 	})
 	switch {
@@ -203,7 +210,7 @@ func (engine *pipeline) sideLoadStandardLibrary(
 			adding = append(adding, each)
 		}
 	})
-	engine.workPool().ForEach(len(adding), 0, func(index int) {
+	pipeline.workPool().ForEach(len(adding), 0, func(index int) {
 		declarations.addLoaded(adding[index], sideLoaded.Withheld[adding[index]].Declarations)
 	})
 	added := make([]string, 0, len(adding))

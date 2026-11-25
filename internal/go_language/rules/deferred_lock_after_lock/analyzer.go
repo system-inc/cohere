@@ -1,5 +1,5 @@
 // Package deferred_lock_after_lock is staticcheck's SA2003, a mutex locked and then, in the very next instruction,
-// locked again by a deferred call where unlocking it was meant, ported onto the engine's own intermediate
+// locked again by a deferred call where unlocking it was meant, ported onto cohere-go's own intermediate
 // representation (#tf4cb8g).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa2003/sa2003.go, whose logic it keeps and
@@ -38,7 +38,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA2003",
 	"SA2003",
 	"Flags a deferred call to Lock right after locking, where Unlock was likely meant: staticcheck's SA2003, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

@@ -20,7 +20,7 @@ func guardRecord(project string, model string, medianSeconds float64, quiet bool
 			Round:          round,
 			VerdictSeconds: medianSeconds,
 			SettledSeconds: medianSeconds,
-			EngineSeconds:  medianSeconds,
+			SummarySeconds: medianSeconds,
 			IdleBefore:     idle,
 			IdleAfter:      idle,
 			Quiet:          quiet,
@@ -101,7 +101,7 @@ func TestGuardJudgesTonightAgainstTheThreshold(test *testing.T) {
 			if result.Verdict != want.verdict {
 				test.Fatalf("ratio %g read %s, want %s", result.Ratio, result.Verdict, want.verdict)
 			}
-			// The commits bound the change, so a regression names both engines it lies between.
+			// The commits bound the change, so a regression names both binaries it lies between.
 			if result.BaselineCohereCommit != baseline.Cohere.Commit ||
 				result.TonightCohereCommit != tonight.Cohere.Commit {
 				test.Errorf("the result names cohere %s to %s", result.BaselineCohereCommit, result.TonightCohereCommit)
@@ -118,7 +118,7 @@ func TestGuardJudgesTonightAgainstTheThreshold(test *testing.T) {
 }
 
 // A night with no number is Unmeasured, never a pass and never an error: the machine was never quiet, or the
-// engine came from a modified tree. The reason names which, so the morning reader knows what to fix.
+// cohere came from a modified tree. The reason names which, so the morning reader knows what to fix.
 func TestGuardCallsANightWithNoNumberUnmeasured(test *testing.T) {
 	test.Parallel()
 	loaded := guardRecord("ahra", "Mac16,5", 30, false)
@@ -129,7 +129,7 @@ func TestGuardCallsANightWithNoNumberUnmeasured(test *testing.T) {
 		reason  string
 	}{
 		"no quiet run": {tonight: loaded, reason: "no Cold run tonight was quiet"},
-		"dirty engine": {tonight: dirty, reason: "built from a modified tree"},
+		"dirty cohere": {tonight: dirty, reason: "built from a modified tree"},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -161,7 +161,7 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 	otherCores := guardRecord("ahra", "Mac16,5", 10, true)
 	otherCores.Machine.Cores = 12
 	goAlone := guardRecord("cohere", "Mac16,5", 1.9, true)
-	goAlone.Engine = EngineGo
+	goAlone.ProjectKind = ProjectKindGoModule
 	goAloneChecking := goAlone
 	goAloneChecking.NoFix = true
 	everyBuild := goAloneChecking
@@ -195,14 +195,14 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 		"a Go project alone against the whole root": {
 			baseline: guardRecord("cohere", "Mac16,5", 10, true),
 			tonight:  goAlone,
-			refusal:  "checked the whole root and tonight checked the Go project alone",
+			refusal:  "checked the whole root and tonight checked the GoModule project alone",
 		},
 		"the whole root against a Go project alone": {
 			baseline: goAlone,
 			tonight:  guardRecord("cohere", "Mac16,5", 10, true),
-			refusal:  "checked the Go project alone and tonight checked the whole root",
+			refusal:  "checked the GoModule project alone and tonight checked the whole root",
 		},
-		// A checking run is never judged against a fixing one, either way round, on the same project and engine.
+		// A checking run is never judged against a fixing one, either way round, on the same project and project kind.
 		"a checking night against a fixing baseline": {
 			baseline: goAlone,
 			tonight:  goAloneChecking,
@@ -259,14 +259,14 @@ func TestGuardRefusesWhatIsNotComparable(test *testing.T) {
 	}
 }
 
-// Two runs narrowed to the same engine compare as two whole-root runs do: the engine bounds what is
+// Two runs narrowed to the same project kind compare as two whole-root runs do: cohere bounds what is
 // compared, and changes nothing else about the verdict.
-func TestGuardComparesRunsOfTheSameEngine(test *testing.T) {
+func TestGuardComparesRunsOfTheSameProjectKind(test *testing.T) {
 	test.Parallel()
 	baseline := guardRecord("cohere", "Mac16,5", 2, true)
-	baseline.Engine = EngineGo
+	baseline.ProjectKind = ProjectKindGoModule
 	tonight := guardRecord("cohere", "Mac16,5", 2.5, true)
-	tonight.Engine = EngineGo
+	tonight.ProjectKind = ProjectKindGoModule
 	result, guardError := Guard(baseline, tonight, 0.10)
 	if guardError != nil {
 		test.Fatal(guardError)

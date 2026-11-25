@@ -617,7 +617,7 @@ func sortCompComparePropsOrder(
 	referenceIndexesB := sortCompRefIndexes(methodsOrder, members[indexB], overrun)
 
 	// Upstream computes these with `propertiesInfos.indexOf(propA)`, an identity lookup that returns
-	// the first structurally-equal element in some engines' terms but is reference equality here.
+	// the first structurally-equal element in some runtimes' terms but is reference equality here.
 	// We are handed the positions directly, which is the same answer without the lookup.
 	classIndexA := indexA
 	classIndexB := indexB

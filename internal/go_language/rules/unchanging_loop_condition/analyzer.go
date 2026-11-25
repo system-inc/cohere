@@ -1,6 +1,6 @@
 // Package unchanging_loop_condition is staticcheck's SA4008, a three-clause for loop whose condition reads the variable
 // its init declares and whose post statement changes something else, so the condition reads one value on every pass,
-// ported onto the engine's own intermediate representation.
+// ported onto cohere's own intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4008/sa4008.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the loop's condition, where staticcheck's
@@ -25,7 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own. Check reads the value of each loop's condition from the
 // function's expression map, so the listener says so, and the package records that map wherever the rule runs.
 var Listener = rule.Listener{
@@ -40,7 +40,7 @@ var Listener = rule.Listener{
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4008",
 	"SA4008",
-	"Flags a for loop whose condition's variable never changes: staticcheck's SA4008, ported onto the engine's own "+
+	"Flags a for loop whose condition's variable never changes: staticcheck's SA4008, ported onto cohere-go's own "+
 		"intermediate representation.",
 	&Listener,
 )

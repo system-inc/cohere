@@ -5,7 +5,7 @@
 // Each helper is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/code, and answers as the original
 // does: a test beside each runs both over every node of a fixture and requires the same answer. Where the original
 // reads a pass, a helper reads a rule.Context, and where it reads the result of another of staticcheck's passes, the
-// helper takes the narrowest form of it, so a check on the engine's dispatcher asks it as a check on an analyzer does.
+// helper takes the narrowest form of it, so a check on cohere-go's dispatcher asks it as a check on an analyzer does.
 package staticcheck_code
 
 import (

@@ -176,7 +176,7 @@ func consistentTypeImportsSomeAreOnlyTypes(names []string) rule.Message {
 // # The repair is upstream's, delivered as one edit
 //
 // Upstream's fixer yields several primitive edits per report (an insertion before the declaration,
-// ` type` after `import`, a removal per moved specifier), and our engine refuses two insertions at
+// ` type` after `import`, a removal per moved specifier), and our fix pass refuses two insertions at
 // one point, measured at zero applied and 1024 rejections when those were proposed side by side. So
 // consistent_type_imports_fixer.go computes the same primitive edits, applies them to the declaration's
 // own text, and proposes the result as one replacement. Against upstream's corpus that reproduces

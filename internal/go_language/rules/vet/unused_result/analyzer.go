@@ -3,7 +3,7 @@
 // context.WithCancel returns a cancel function that must be called. Two lists name what is judged, each a flag: funcs,
 // the package-level functions by import path and name, and stringmethods, the names of methods of type
 // `func() string`, Error and String by default. A call in the body of a `for b.Loop()` benchmark loop is left alone,
-// since testing.B.Loop keeps its results alive by design. It sits on the engine's syntax dispatcher, hearing each
+// since testing.B.Loop keeps its results alive by design. It sits on cohere-go's syntax dispatcher, hearing each
 // expression statement on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/unusedresult/unusedresult.go,

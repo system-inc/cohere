@@ -225,7 +225,7 @@ func TestNoDivRegexRepairsExactlyTheEqualsSign(test *testing.T) {
 // TestNoDivRegexRepairIsIdempotent pins that the fixer's own output is clean.
 //
 // This is the property a semantic port would break: `/[=]foo/` is what the repair writes, and if
-// the rule reported it the edit engine would rewrite it again on the next pass. The positional test
+// the rule reported it the fix pass would rewrite it again on the next pass. The positional test
 // makes this fall out rather than needing a guard, and this pins it so a later rewrite toward a
 // pattern parse fails loudly instead of producing a rule that never settles.
 func TestNoDivRegexRepairIsIdempotent(test *testing.T) {

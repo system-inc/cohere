@@ -165,9 +165,9 @@ func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(test *testing.T) {
 // type that a function type cannot express, and one sits inside a module declaration.
 //
 // Four things are asserted per row. The ids say which direction ran. The spans say where the finding
-// points, which is the whole member. The applied source says what the edit engine will write
+// points, which is the whole member. The applied source says what the fix pass will write
 // unattended. And the suggestion, where there is one, says what a human accepting it would get,
-// which is the only way to see a repair the engine never applies.
+// which is the only way to see a repair the fix pass never applies.
 func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()
 

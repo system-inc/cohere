@@ -4,7 +4,7 @@
 // wrong signature is no compile error: the check just fails, sometimes mysteriously. A method whose first parameter
 // is not the interface's signal type, a `Scan` taking no `fmt.ScanState`, is taken to mean something else and left
 // alone, as are `WriteTo` with more than one parameter, and `Is`, `As` and `Unwrap` on a type that is not an error.
-// It sits on the engine's syntax dispatcher, hearing each function declaration and interface type on the walk the
+// It sits on cohere-go's syntax dispatcher, hearing each function declaration and interface type on the walk the
 // dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/stdmethods/stdmethods.go, whose

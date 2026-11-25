@@ -11,9 +11,9 @@ import (
  * The fork was reachable by two independent paths and only one of them was overridable.
  *
  * `internal/release` resolved COHERE_PRETTIER_FORK to decide which bundles it vouched for, while
- * this engine read a hardcoded constant to decide which bundles it loaded. Neither consulted the
+ * the formatter read a hardcoded constant to decide which bundles it loaded. Neither consulted the
  * other, so a machine that set the variable got a release guard reporting green about a directory
- * nothing loaded from, and an engine still reading a home directory on one laptop.
+ * nothing loaded from, and a formatter still reading a home directory on one laptop.
  *
  * The defect was not that either path was wrong. It was that they existed separately. These tests
  * hold the seam closed from both directions, because the failure was silent in both: the override
@@ -23,9 +23,9 @@ import (
 // TestOverrideReachesTheLoader is the regression, and it is written as the measurement that exposed
 // the defect rather than as an assertion about the code.
 //
-// Before the fix this exact probe returned a working engine: New succeeded with the variable pointed
+// Before the fix this exact probe returned a working formatter: New succeeded with the variable pointed
 // at a path that does not exist, because loadBundles read a constant. A test that only checked
-// BundleDirectory's return value would have passed against the broken engine too, since the constant
+// BundleDirectory's return value would have passed against the broken formatter too, since the constant
 // was never the thing being consulted. So this goes through New and demands a real failure.
 //
 // Not parallel: it points ForkPathVariable at a missing fork with test.Setenv, which a parallel test may not
@@ -44,7 +44,7 @@ func TestOverrideReachesTheLoader(test *testing.T) {
 }
 
 // TestOverrideIsTheOnlyKnobThatMoves is the other half, and it exists because the first test passes
-// for the wrong reason if the engine is simply always broken.
+// for the wrong reason if the formatter is simply always broken.
 //
 // A loader that failed unconditionally would satisfy the regression above while being useless. This
 // pins the default, and what the default is has changed: with no variable set the bundles come from
@@ -72,7 +72,7 @@ func TestOverrideIsTheOnlyKnobThatMoves(test *testing.T) {
 //
 // Before this, every formatter assertion in the package skipped on a machine without the fork, and
 // the package printed `ok` while measuring nothing. This asserts the opposite condition directly:
-// point the override at a path that does not exist, unset it, and the engine still builds. If this
+// point the override at a path that does not exist, unset it, and the formatter still builds. If this
 // fails, the binary is depending on a checkout again and the skip would come back with it.
 //
 // Not parallel: it clears ForkPathVariable with test.Setenv to pin the no-override default, which a parallel
@@ -81,7 +81,7 @@ func TestEmbeddedBundlesNeedNoFork(test *testing.T) {
 	test.Setenv(ForkPathVariable, "")
 
 	if _, newPrettierError := New(format_options.Default()); newPrettierError != nil {
-		test.Fatalf("building an engine from the embedded bundles: %v", newPrettierError)
+		test.Fatalf("building a formatter from the embedded bundles: %v", newPrettierError)
 	}
 }
 
@@ -112,21 +112,21 @@ func TestEmbedMatchesBundleFiles(test *testing.T) {
 	}
 }
 
-// TestReleaseResolvesThroughTheEngine is the guard against the two paths reappearing.
+// TestReleaseResolvesThroughTheFormatter is the guard against the two paths reappearing.
 //
 // `release` declares its own exported name for the variable, which is the shape the defect had. It
 // is an alias of this one rather than a copy, and a copy would be invisible: both spellings would be
 // the same string today and could drift apart in any later edit, with the drift producing exactly
 // the original defect again.
 //
-// The default path is no longer shared, and that is deliberate rather than a regression. The engine
+// The default path is no longer shared, and that is deliberate rather than a regression. The formatter
 // has no path-shaped default any more, so `release` declaring its own is two different questions
 // rather than one value with two homes. Only that file still asks the path-shaped one, and only
 // until its guard is reshaped to vouch for embedded bytes.
 //
 // It lives here rather than in `release` because `prettier` imports nothing internal, so this
 // direction is the one that cannot create a cycle.
-func TestReleaseResolvesThroughTheEngine(test *testing.T) {
+func TestReleaseResolvesThroughTheFormatter(test *testing.T) {
 	test.Parallel()
 
 	if ForkPathVariable != "COHERE_PRETTIER_FORK" {

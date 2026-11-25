@@ -198,7 +198,7 @@ func TestVerifyArrayParityStaysSilent(test *testing.T) {
 		{
 			name:   "a non-Verify decorator does not arm the rule",
 			source: "class Entity { @NotAVerifyDecorator() names: string[]; }",
-			reason: "The prefix test limits the rule to the validation engine's decorators.",
+			reason: "The prefix test limits the rule to the validator's decorators.",
 		},
 		{
 			name:   "a Set is not an array",

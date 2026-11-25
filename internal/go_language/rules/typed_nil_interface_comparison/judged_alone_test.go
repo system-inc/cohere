@@ -91,7 +91,7 @@ func declarationHolding(analyzed *packages.Package, position token.Pos) string {
 	return packageLevel
 }
 
-// findingsWhole runs the rule over roots as the engine does, the package built whole before the walk, and is its
+// findingsWhole runs the rule over roots as cohere-go does, the package built whole before the walk, and is its
 // findings, by package ID and then by the function declaration each lies in.
 func findingsWhole(test *testing.T, roots []*packages.Package) map[string]map[string][]string {
 	test.Helper()
@@ -198,7 +198,7 @@ func TestEachFunctionJudgedAloneFindsWhatTheWholeRunFinds(test *testing.T) {
 	options := check.DispatchOptions()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{alone}, loadEveryFixture(test), options)
 	if analyzeError != nil {
@@ -274,7 +274,7 @@ func TestAComparisonInATestFileAsksNoTriviality(test *testing.T) {
 	options := check.DispatchOptions()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{typed_nil_interface_comparison.Analyzer},
 		loaded.Roots, options)

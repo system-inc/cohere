@@ -19,9 +19,9 @@ import (
 )
 
 // factReachFixture is one package of the fact-reach fixture, checked from its source by the test itself, with no
-// engine run: its file set, its types, its type information, which alone names an `init` function's object, stage 1's
-// record of it, and the place of each function declared with a body, by its name, a method's as `Type.Method`, and in
-// the order declared, file by file in the order of their names, read from the syntax and never from the record under
+// cohere-go run: its file set, its types, its type information, which alone names an `init` function's object, stage
+// 1's record of it, and the place of each function declared with a body, by its name, a method's as `Type.Method`, and
+// in the order declared, file by file in the order of their names, read from the syntax and never from the record under
 // test.
 type factReachFixture struct {
 	fileSet  *token.FileSet

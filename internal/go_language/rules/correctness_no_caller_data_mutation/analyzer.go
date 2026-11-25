@@ -1,4 +1,4 @@
-// Package correctness_no_caller_data_mutation is the Go engine's rule that a function does not write into data its
+// Package correctness_no_caller_data_mutation is cohere-go's rule that a function does not write into data its
 // caller passed in.
 //
 // A slice, a map and a pointer share what they reach with the caller, so a write at one lands in the caller's data.
@@ -44,7 +44,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_no_caller_data_mutation"
 	"the buffer of a Read that implements io.Reader, function literals' parameters and a parameter the function "+
 	"reassigns or takes the address of are not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var callerDataMutationMessage = policy.MessageOf(Name, "callerDataMutation")

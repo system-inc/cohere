@@ -1,6 +1,6 @@
 // Package nil_func is vet's nilfunc pass, a comparison of a function with nil, which is always false with `==` and
 // always true with `!=`, since a declared function or method is never nil. A variable or field of function type may
-// be nil, so only a name that denotes a function itself is judged. It sits on the engine's syntax dispatcher, hearing
+// be nil, so only a name that denotes a function itself is judged. It sits on cohere-go's syntax dispatcher, hearing
 // each binary expression on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/nilfunc/nilfunc.go, whose logic

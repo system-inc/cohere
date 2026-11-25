@@ -1,4 +1,4 @@
-// Package correctness_require_checked_assertion is the Go engine's rule that a type assertion is checked: the
+// Package correctness_require_checked_assertion is cohere-go's rule that a type assertion is checked: the
 // comma-ok form or a type switch, never the single value that panics on a miss.
 //
 // A single-value assertion, value.(Type), is a claim the compiler cannot check, and when it is wrong the process
@@ -33,7 +33,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_checked_assertio
 	"variable cannot miss, and gets its own message asking for the switch's bound value instead; an assignment to "+
 	"the variable between the switch and the assertion is not looked for.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var uncheckedAssertionMessage = policy.MessageOf(Name, "uncheckedAssertion")

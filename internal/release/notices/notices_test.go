@@ -31,7 +31,7 @@ func committed(test *testing.T, name string) string {
 }
 
 // TestTheCommittedNoticesAreCurrent regenerates both files and requires the committed ones to match. It
-// is what fails when a dependency moves, the compiler's `NOTICE.txt` changes, the Swift engine resolves a
+// is what fails when a dependency moves, the compiler's `NOTICE.txt` changes, cohere-swift resolves a
 // new package or the curated list is edited, and the fix is always the same command.
 func TestTheCommittedNoticesAreCurrent(test *testing.T) {
 	test.Parallel()
@@ -106,7 +106,7 @@ func TestEverySwiftPackageIsCredited(test *testing.T) {
 		if !strings.Contains(notices, "\n### "+pin.Identity+"\n") ||
 			!strings.Contains(notices, "- Version: "+pin.Version+"\n") {
 			test.Errorf(
-				"the Swift engine resolves %s %s, and %s does not credit that version",
+				"cohere-swift resolves %s %s, and %s does not credit that version",
 				pin.Identity,
 				pin.Version,
 				ThirdPartyNoticesFileName,

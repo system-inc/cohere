@@ -139,7 +139,7 @@ func (provenance Provenance) describeCompiler() string {
 // describeProfile renders the profile the build carried: none, or its name and which one by its digest.
 //
 // Printed on every build, "none" included, since a release without a profile is a different binary from one
-// with it, by about 2% of the Go engine's CPU (#b2t9xmf), and a report should say which it came from. The
+// with it, by about 2% of cohere-go's CPU (#b2t9xmf), and a report should say which it came from. The
 // build info is the authority on whether there was one; a digest with no `-pgo` beside it is a stamp that
 // describes nothing this binary was compiled with, so it is not printed.
 func (provenance Provenance) describeProfile() string {

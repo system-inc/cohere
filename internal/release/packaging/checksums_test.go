@@ -292,20 +292,20 @@ func TestLauncherRefusesWhenAShippedFileIsMissing(test *testing.T) {
 	// cohere-swift, which cohere runs on a Mac without the launcher in between, so it is checked here or
 	// nowhere.
 	installation := stageInstalledRelease(test)
-	engine := filepath.Join(filepath.Dir(installation.binary), SwiftEngineFileName)
-	if removeError := os.Remove(engine); removeError != nil {
+	swiftBinary := filepath.Join(filepath.Dir(installation.binary), SwiftBinaryFileName)
+	if removeError := os.Remove(swiftBinary); removeError != nil {
 		test.Fatal(removeError)
 	}
-	installation.run(test, "--version").requireRefused(test, engine, "is missing")
+	installation.run(test, "--version").requireRefused(test, swiftBinary, "is missing")
 }
 
-func TestLauncherRefusesATamperedEngine(test *testing.T) {
+func TestLauncherRefusesATamperedSwiftBinary(test *testing.T) {
 	test.Parallel()
 
 	installation := stageInstalledRelease(test)
-	engine := filepath.Join(filepath.Dir(installation.binary), SwiftEngineFileName)
-	flipByte(test, engine)
-	installation.run(test, "--version").requireRefused(test, engine, "does not match the checksum")
+	swiftBinary := filepath.Join(filepath.Dir(installation.binary), SwiftBinaryFileName)
+	flipByte(test, swiftBinary)
+	installation.run(test, "--version").requireRefused(test, swiftBinary, "does not match the checksum")
 }
 
 func TestLauncherRunsTheOverrideUnchecked(test *testing.T) {
@@ -437,7 +437,7 @@ func stageFixturePlatform(test *testing.T, output string, target Target) {
 		test.Fatal(platformManifestError)
 	}
 	writeFile(test, filepath.Join(directory, "package.json"), string(manifest))
-	for _, name := range []string{BinaryFileName(target.GoOperatingSystem), SwiftEngineFileName} {
+	for _, name := range []string{BinaryFileName(target.GoOperatingSystem), SwiftBinaryFileName} {
 		writeFixtureExecutable(test, filepath.Join(directory, "bin", name))
 	}
 }

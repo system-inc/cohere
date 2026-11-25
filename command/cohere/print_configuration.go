@@ -119,7 +119,7 @@ func writeResolvedConfiguration(
 		Overrides   []printedOverride           `json:"overrides"`
 		Departures  map[string]printedDeparture `json:"departures"`
 		RuleAliases map[string]string           `json:"ruleAliases"`
-		// UnusedDisable is the engine's dead-directive check, set under `unused-disable` in a config's rules
+		// UnusedDisable is the child's dead-directive check, set under `unused-disable` in a config's rules
 		// but not a registered rule, so it stands apart from Rules, which --rules can always answer for. It
 		// is ESLint's linterOptions.reportUnusedDisableDirectives, as a severity.
 		UnusedDisable int                          `json:"unusedDisable"`

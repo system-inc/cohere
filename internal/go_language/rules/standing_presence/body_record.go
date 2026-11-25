@@ -81,7 +81,7 @@ func ReadBodies(
 
 // ReadPackage is what presence reads of the package read while its syntax and type information are whole: its bodies'
 // records (ReadBodies) and its marker interfaces' method names (ReadMarkers). The host's run takes it as its presence
-// reader (check.Options.FactReachPresence), so the engine's core never imports this package.
+// reader (check.Options.FactReachPresence), so cohere-go's core never imports this package.
 func ReadPackage(read *packages.Package) (map[fact_reach.Place]fact_reach.BodyRecord, []string) {
 	return ReadBodies(read.Fset, read.Syntax, read.TypesInfo, read.Types), ReadMarkers(read.Syntax, read.TypesInfo)
 }

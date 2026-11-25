@@ -22,9 +22,9 @@ import (
 // (ShardStamps) taken before they were read, so a run serves an entry only while the store holds exactly what the pack
 // was made of. A pack is the store's own file, the sha256 of its contents then its contents, as an entry is (Put),
 // under the store's `packs` directory, which no shard's two hex characters can name, so no Get reads it, in the
-// directory of the engine identity whose runs read it (PackPlace), so a new engine's runs can remove the packs no run
-// will read again (RemoveOtherEnginesPacks). Its contents are packMagic, packFormatVersion, each stamp in order of its
-// shard, and each entry in order of the key it was asked by.
+// directory of the executable identity whose runs read it (PackPlace), so a new executable's runs can remove the packs
+// no run will read again (RemoveOtherIdentitiesPacks). Its contents are packMagic, packFormatVersion, each stamp in
+// order of its shard, and each entry in order of the key it was asked by.
 
 // packDirectoryName is the directory of a store that holds its packs.
 const packDirectoryName = "packs"
@@ -37,7 +37,7 @@ const packMagic = "cohere go build pack\x00"
 const packFormatVersion uint32 = 2
 
 // PackMissing is why a pack was not read when there is none, which is no refusal: a build's first run, or a new
-// engine's, has none, and writes one.
+// executable's, has none, and writes one.
 const PackMissing = "missing"
 
 // The first word of why a pack that is there was refused, each ignored whole: a file that could not be read, one
@@ -67,17 +67,17 @@ type Pack struct {
 	Stamps  map[byte]int64
 }
 
-// PackPlace is where a store keeps a pack: in the directory of the engine identity whose runs read it (PackIdentity),
-// by its name (PackName).
+// PackPlace is where a store keeps a pack: in the directory of the executable identity whose runs read it
+// (PackIdentity), by its name (PackName).
 type PackPlace struct {
 	Identity Key
 	Name     Key
 }
 
-// PackIdentity is the directory of the packs that runs of the engine identity read: its digest, since an identity is
-// any string.
-func PackIdentity(engineIdentity string) Key {
-	return sha256.Sum256([]byte(engineIdentity))
+// PackIdentity is the directory of the packs that runs of the executable identity read: its digest, since an identity
+// is any string.
+func PackIdentity(executableIdentity string) Key {
+	return sha256.Sum256([]byte(executableIdentity))
 }
 
 // PackName is the name of a pack, from sections, each a list of parts, which the caller makes of whatever tells one
@@ -206,14 +206,14 @@ func (store *Store) WritePack(place PackPlace, entries []PackEntry, stamps map[b
 	return store.writeWhole(store.packPath(place), body)
 }
 
-// RemoveOtherEnginesPacks removes every pack of the store that runs of another engine identity than identity read,
-// once a run for the store (ShardStamps), file by file and then its identity's directory: each new engine, a release or
-// a rebuild, leaves every pack of the one before it where no run reads it again, about 21 MB at cohere's root
-// (#b2t9xmf). The project's store calls it, which nothing else trims; the system cache's trim ages its packs out. A
-// directory that is not an identity's, or a file in one that is neither a pack nor a pack's temporary file, is left
+// RemoveOtherIdentitiesPacks removes every pack of the store that runs of another executable identity than identity
+// read, once a run for the store (ShardStamps), file by file and then its identity's directory: each new executable, a
+// release or a rebuild, leaves every pack of the one before it where no run reads it again, about 21 MB at cohere's
+// root (#b2t9xmf). The project's store calls it, which nothing else trims; the system cache's trim ages its packs out.
+// A directory that is not an identity's, or a file in one that is neither a pack nor a pack's temporary file, is left
 // alone. It removes nothing recursively, so a link or a directory where a pack goes stays, and keeps its identity's
 // directory with it.
-func (store *Store) RemoveOtherEnginesPacks(identity Key) {
+func (store *Store) RemoveOtherIdentitiesPacks(identity Key) {
 	if !store.stamps.firstSweep(store.directory) {
 		return
 	}

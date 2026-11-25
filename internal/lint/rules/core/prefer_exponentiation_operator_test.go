@@ -147,9 +147,9 @@ func TestPreferExponentiationOperatorFires(test *testing.T) {
 		{"+Math.pow(++a, b)", 1, "+(++a**b)", true, false},
 		{"Math.pow(a, b + c)in d", 1, "a**(b + c)in d", true, false},
 		{"Math.pow(a, b) + Math.pow(c,\n d)", 2, "a**b + c**d", true, false},
-		// Reported three times and fixed by the engine over several passes. The rewrite is not
+		// Reported three times and fixed by the linter over several passes. The rewrite is not
 		// asserted here because the three fixes overlap, and `ExpectFixedSource` refuses to guess
-		// which one the engine applies first rather than silently picking. The findings are the
+		// which one the fix pass applies first rather than silently picking. The findings are the
 		// part this table can check; see the note below for the rewrite.
 		{"Math.pow(Math.pow(a, b), Math.pow(c, d))", 3, "", true, true},
 		{"Math.pow(a, b)**Math.pow(c, d)", 2, "(a**b)**c**d", true, false},
@@ -388,7 +388,7 @@ func TestPreferExponentiationOperatorObjectAliasDiverges(test *testing.T) {
 //
 // Three nested `Math.pow` calls produce three findings whose fixes overlap, since the outer call's
 // replacement span contains both inner ones. `ExpectFixedSource` refuses an overlapping set rather
-// than guessing an order, which is correct: the real engine has an overlap policy and a fixture
+// than guessing an order, which is correct: the real fix pass has an overlap policy and a fixture
 // must not reimplement it.
 //
 // So the findings are asserted here and the fix is asserted at the level that can be replayed, one

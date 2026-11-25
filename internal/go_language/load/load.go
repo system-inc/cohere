@@ -1,6 +1,6 @@
-// Package load is the Go engine's one type-checked read of a workspace: every package and dependency parsed and
+// Package load is cohere-go's one type-checked read of a workspace: every package and dependency parsed and
 // type-checked from source, as checker.Analyze requires, test variants included, and returned as go/packages
-// would have returned them. What the load could not list, parse or type-check is the engine's types phase, so
+// would have returned them. What the load could not list, parse or type-check is cohere-go's types phase, so
 // every such error comes back as a diagnostic, and a file the build constraints left out, which no rule will see,
 // comes back named rather than silently missed.
 //
@@ -14,7 +14,7 @@
 // does not run where go may not build. Every other package of it loads as on any other project, the findings
 // cache's export data and go list's kept answer included.
 //
-// It takes and returns plain values; the engine turns them into contract records.
+// It takes and returns plain values; cohere-go turns them into contract records.
 package load
 
 import (
@@ -106,7 +106,7 @@ type Loaded struct {
 	CgoTranslated bool
 
 	// CgoTranslatedPackages counts the packages whose cgo files the cgo tool translated, and CgoTranslationElapsed is
-	// how long the go list -compiled that ran it took. cgo's preprocessing is the one thing the engine has go build,
+	// how long the go list -compiled that ran it took. cgo's preprocessing is the one thing cohere-go has go build,
 	// so every run says how much there was: both are 0 on a load that translates nothing.
 	CgoTranslatedPackages int
 	CgoTranslationElapsed time.Duration
@@ -265,13 +265,13 @@ type Caching struct {
 	// Timeline is told the listing's end, as `listing.end`, the restore from the findings cache's beginning and end,
 	// as `restore.begin` and `restore.end`, and the load's first parse, as `parse.first`, under `--timeline`, nil for
 	// a load that tells nothing (#3v2zp7g). The restore runs before any package is parsed, so the four come in that
-	// order. The engine hands it to the host's load and to each extra build's.
+	// order. cohere-go hands it to the host's load and to each extra build's.
 	Timeline func(label string)
 
 	// Analyzes, when set, says which of the packages to analyze the caller's rules analyze, from each one's ID and
 	// files, before any is type-checked. One it turns down is still loaded and type-checked, for what imports it,
 	// its errors are still diagnostics and it counts in PackagesInWorkspace, and it is left out of Packages and of
-	// what the Restorer and Begin are given as the packages to analyze. The engine turns down a package with no file
+	// what the Restorer and Begin are given as the packages to analyze. cohere-go turns down a package with no file
 	// in scope, so a package every file of which git ignores is never linted. Nil analyzes every one.
 	Analyzes func(root *packages.Package) bool
 
@@ -316,7 +316,7 @@ type Caching struct {
 	// 67 ms of each extra build's, on the run's path (#ybjbqm2). Which placement wins was measured at cohere's root on
 	// Shackler, over every build: warm, with a findings store, beside beat inline by 0.05 s whatever slot the
 	// collection took; cold, under `--no-cache`, every core is busy to the run's end, and each build's lint paid more
-	// for the collection beside it than the host's load gained, inline winning by 0.02 to 0.05 s. So the engine sets it
+	// for the collection beside it than the host's load gained, inline winning by 0.02 to 0.05 s. So cohere-go sets it
 	// on a run with a findings store alone.
 	InputsBeside bool
 

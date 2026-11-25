@@ -208,9 +208,9 @@ func TestAShardDirectoryRemovedUnderTheStoreIsMadeAgain(test *testing.T) {
 	}
 }
 
-// The store that creates the project's `.cache/cohere` writes the ignore file there, so an engine run on its own leaves
-// no untracked cache in a repository whose rules say nothing of it (#6vhp0vd). A cache directory cleared whole while
-// the store runs is made again with its file, and one that was there already is left without one.
+// The store that creates the project's `.cache/cohere` writes the ignore file there, so a cohere-go run on its own
+// leaves no untracked cache in a repository whose rules say nothing of it (#6vhp0vd). A cache directory cleared whole
+// while the store runs is made again with its file, and one that was there already is left without one.
 func TestAStoreThatMakesTheCacheDirectoryLeavesItIgnoringItself(test *testing.T) {
 	test.Parallel()
 

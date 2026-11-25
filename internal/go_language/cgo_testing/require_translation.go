@@ -1,4 +1,4 @@
-// Package cgo_testing is for the Go engine's tests that load a project with cgo of its own, whose cgo go list
+// Package cgo_testing is for cohere-go's tests that load a project with cgo of its own, whose cgo go list
 // -compiled translates, which needs a go that compiles and a toolchain with cgo. Where either is missing such a test
 // skips, with the reason, and never fails: a toolchain without cgo, or a runner of prebuilt tests, as Loom's is, whose
 // stand-in go refuses every command that compiles. Any other failure of go fails the test, so a broken toolchain

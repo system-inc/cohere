@@ -23,7 +23,7 @@ func TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey(test *testing.T) {
 		return sha256.Sum256(append([]byte("dependence record "+version+" "), key[:]...))
 	}
 	standardLibraryKey := func(version string) cache.Key {
-		return cache.DigestOf([]byte("standard library dependence record "+version), []byte("engine"),
+		return cache.DigestOf([]byte("standard library dependence record "+version), []byte("executable"),
 			[]byte("toolchain"), key[:])
 	}
 	for _, each := range []struct {
@@ -35,7 +35,7 @@ func TestEachDependenceRecordIsReadOnlyUnderItsOwnVersionsKey(test *testing.T) {
 	}{
 		{"the host's", DependenceRecordVersion, "dependence-record-9", DependenceRecordKey(key), hostKey},
 		{"the standard library's", StandardLibraryDependenceRecordVersion, "standard-library-dependence-record-9",
-			StandardLibraryDependenceRecordKey(key, "engine", "toolchain"), standardLibraryKey},
+			StandardLibraryDependenceRecordKey(key, "executable", "toolchain"), standardLibraryKey},
 	} {
 		if each.version != each.want {
 			test.Errorf("%s records are at %q, want %q", each.name, each.version, each.want)

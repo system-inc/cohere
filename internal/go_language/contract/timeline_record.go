@@ -1,12 +1,12 @@
 package contract
 
-// TimelineRecord is additive within contract 3, and the Go engine's alone: under `--timeline` it says when each phase
-// of the run and each build began and ended, on one clock from the moment the engine package initialized, with the
+// TimelineRecord is additive within contract 3, and cohere-go's alone: under `--timeline` it says when each phase
+// of the run and each build began and ended, on one clock from the moment cohere-go package initialized, with the
 // process's CPU so far at each, so a reader sees where the wall time went and how many cores were busy between any two
 // stamps. It is written once, the last record before the summary, after the inputs record when there is one.
 //
 // The wall and the CPU start at different moments: the CPU at the process's start, the wall once the runtime and every
-// package the engine imports have initialized. So the cores between two stamps are a true figure, and the first
+// package cohere-go imports have initialized. So the cores between two stamps are a true figure, and the first
 // stamp's CPU over its wall is not one.
 //
 // A stamp is one of the run's by its build, its round and its label together, never two alike. A load or a check that
@@ -50,7 +50,7 @@ func (record TimelineRecord) MarshalJSON() ([]byte, error) {
 }
 
 // TimelineStamp is one moment of the run: the extra build it is of, empty for the host's run and the run's own steps,
-// its round, its label, such as `host.load.end` or a build's `gate.taken`, the wall since the engine package
+// its round, its label, such as `host.load.end` or a build's `gate.taken`, the wall since cohere-go package
 // initialized, and the process's user and system CPU from the process's start to then.
 type TimelineStamp struct {
 	// Build is the extra build's name (project.Build.String), such as `windows/amd64`, and omitted for the host's.

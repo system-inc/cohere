@@ -17,9 +17,9 @@ import (
 // tree, such as ahra, read the way the fixtures are. Unset, the proof reads the repository's fixtures alone.
 const parseFromCorpusVariable = "COHERE_PARSE_FROM_CORPUS"
 
-// The formatter takes the fix engine's guard's tree rather than parsing every TypeScript file a second time
+// The formatter takes the fix pass's guard's tree rather than parsing every TypeScript file a second time
 // (#dk2502g). This proves the two are one tree, on every TypeScript file of the fixtures and of any tree the
-// variable names: the guard's tree, captured from the transform the engine really calls, converts to an ESTree
+// variable names: the guard's tree, captured from the transform the formatter really calls, converts to an ESTree
 // equal, property for property and comment for comment, to the one a fresh parse converts to, and it is the
 // tree ParseTypeScriptFrom takes rather than one it refuses and parses again. The mutant is a tree of other
 // bytes: converted, it must differ, so the comparison could have failed, and ParseTypeScriptFrom must refuse it.
@@ -46,7 +46,7 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 			continue
 		}
 		if parses, _ := edit.Parses(fileName, text); !parses {
-			// The engine refuses a file that does not parse before the transform is reached.
+			// The formatter refuses a file that does not parse before the transform is reached.
 			unparseable++
 			continue
 		}
@@ -67,7 +67,7 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 			test.Fatalf("%s: %v", fileName, fixAndTransformTextError)
 		}
 		if guards == nil {
-			test.Errorf("%s: the engine handed the transform no tree", fileName)
+			test.Errorf("%s: the formatter handed the transform no tree", fileName)
 			continue
 		}
 		if !treeIsFor(fileName, text, guards) {

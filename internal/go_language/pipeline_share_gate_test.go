@@ -44,7 +44,7 @@ func writeSharedPackages(test *testing.T, root string) {
 	writeFixtureFiles(test, root, files)
 }
 
-// underCapRun runs the engine over root checking every build under the 8 GiB cap, so the memory, not a fixed rule,
+// underCapRun runs cohere-go over root checking every build under the 8 GiB cap, so the memory, not a fixed rule,
 // decides the width, with configure, when not nil, given the pipeline first, and extra as its switches. It returns
 // the pipeline, its stream as written and its stderr.
 func underCapRun(
@@ -55,11 +55,11 @@ func underCapRun(
 	extra ...string,
 ) (*pipeline, string, string) {
 	test.Helper()
-	return runOverNoted(test, root, wantExit, func(engine *pipeline) {
-		engine.memory = &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
+	return runOverNoted(test, root, wantExit, func(pipeline *pipeline) {
+		pipeline.memory = &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
 			Source: contract.MemorySourceCap}}
 		if configure != nil {
-			configure(engine)
+			configure(pipeline)
 		}
 	}, extra...)
 }
@@ -71,10 +71,10 @@ func shareGateRun(test *testing.T, root string, wantExit int, configure func(*pi
 	return underCapRun(test, root, wantExit, configure, "--no-cache")
 }
 
-// startPositions is each extra build of engine's described builds by name, at its position in the order the builds
+// startPositions is each extra build of pipeline's described builds by name, at its position in the order the builds
 // start in (heaviestFirst).
-func startPositions(engine *pipeline) map[string]int {
-	builds := engine.described.builds
+func startPositions(pipeline *pipeline) map[string]int {
+	builds := pipeline.described.builds
 	positions := map[string]int{}
 	for position, index := range heaviestFirst(builds[0], builds[1:]) {
 		positions[builds[1+index].String()] = position
@@ -89,23 +89,23 @@ func startPositions(engine *pipeline) map[string]int {
 // load holds (#ghb3rcn).
 func TestTheWidthIsTheHostsLiveHeapsWhenEveryShareIsLow(test *testing.T) {
 	test.Parallel()
-	engine, raw, _ := shareGateRun(test, lowShareBuilds(test), exitFindings, nil)
-	if len(engine.buildRuns) != 4 {
-		test.Fatalf("the run handed the merge %d runs, want the host's and three beside it", len(engine.buildRuns))
+	pipeline, raw, _ := shareGateRun(test, lowShareBuilds(test), exitFindings, nil)
+	if len(pipeline.buildRuns) != 4 {
+		test.Fatalf("the run handed the merge %d runs, want the host's and three beside it", len(pipeline.buildRuns))
 	}
 	lint := lintRecordOf(test, raw)
-	if !engine.buildsWidthFromHostLive || !lint.BuildsWidthFromHostLive {
+	if !pipeline.buildsWidthFromHostLive || !lint.BuildsWidthFromHostLive {
 		test.Fatalf("the width was decided from the host's live heap %t, recorded %t, want both: every share is low",
-			engine.buildsWidthFromHostLive, lint.BuildsWidthFromHostLive)
+			pipeline.buildsWidthFromHostLive, lint.BuildsWidthFromHostLive)
 	}
-	budget := uint64(math.Ceil(float64(engine.buildsWidthLiveBytes) * 1.2))
-	if engine.buildsWidthLiveBytes == 0 || engine.buildsWidthBuildBytes != budget {
+	budget := uint64(math.Ceil(float64(pipeline.buildsWidthLiveBytes) * 1.2))
+	if pipeline.buildsWidthLiveBytes == 0 || pipeline.buildsWidthBuildBytes != budget {
 		test.Errorf("the width was given a holding of %d bytes beside a live heap of %d, want 1.2 times the live "+
-			"heap, %d, and nothing measured", engine.buildsWidthBuildBytes, engine.buildsWidthLiveBytes, budget)
+			"heap, %d, and nothing measured", pipeline.buildsWidthBuildBytes, pipeline.buildsWidthLiveBytes, budget)
 	}
-	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, budget, false)
-	if engine.buildsAtOnce != want {
-		test.Errorf("the builds ran %d at once, want %d, the width the host's live heap gives", engine.buildsAtOnce,
+	want, _ := buildsWidth(3, false, pipeline.memory, pipeline.buildsWidthLiveBytes, budget, false)
+	if pipeline.buildsAtOnce != want {
+		test.Errorf("the builds ran %d at once, want %d, the width the host's live heap gives", pipeline.buildsAtOnce,
 			want)
 	}
 	for _, build := range lint.Builds[1:] {
@@ -132,9 +132,9 @@ func TestTheWidthIsMeasuredWhenABuildChecksMuchFromSource(test *testing.T) {
 		"internal/third/heavy_" + third + ".go": "package third\n\n// net/http is many packages the host's run " +
 			"never checked.\nimport _ \"net/http\"\n",
 	})
-	engine, raw, _ := shareGateRun(test, root, exitFindings, nil)
+	pipeline, raw, _ := shareGateRun(test, root, exitFindings, nil)
 	lint := lintRecordOf(test, raw)
-	if engine.buildsWidthFromHostLive || lint.BuildsWidthFromHostLive {
+	if pipeline.buildsWidthFromHostLive || lint.BuildsWidthFromHostLive {
 		test.Fatalf("the width was decided from the host's live heap, want it measured: the third platform checks "+
 			"net/http from source:\n%s", raw)
 	}
@@ -151,13 +151,20 @@ func TestTheWidthIsMeasuredWhenABuildChecksMuchFromSource(test *testing.T) {
 		test.Errorf("the builds' shares at the gate were%s, want the %s build's over %.2f", shares, third,
 			lowShareAtGate)
 	}
-	if engine.buildsWidthBuildBytes == 0 || engine.buildsWidthLiveBytes == 0 {
+	if pipeline.buildsWidthBuildBytes == 0 || pipeline.buildsWidthLiveBytes == 0 {
 		test.Fatalf("the width was given a holding of %d bytes beside a live heap of %d, want both measured",
-			engine.buildsWidthBuildBytes, engine.buildsWidthLiveBytes)
+			pipeline.buildsWidthBuildBytes, pipeline.buildsWidthLiveBytes)
 	}
-	want, _ := buildsWidth(3, false, engine.memory, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes, false)
-	if engine.buildsAtOnce != want {
-		test.Errorf("the builds ran %d at once, want %d, the width the measured holding gives", engine.buildsAtOnce,
+	want, _ := buildsWidth(
+		3,
+		false,
+		pipeline.memory,
+		pipeline.buildsWidthLiveBytes,
+		pipeline.buildsWidthBuildBytes,
+		false,
+	)
+	if pipeline.buildsAtOnce != want {
+		test.Errorf("the builds ran %d at once, want %d, the width the measured holding gives", pipeline.buildsAtOnce,
 			want)
 	}
 }
@@ -174,13 +181,13 @@ func TestABuildAfterOneThatFailedIsRefusedAtTheShareGate(test *testing.T) {
 	ready := map[int]bool{}
 	thirdMoved := make(chan struct{})
 	var thirdMoving sync.Once
-	var engine *pipeline
+	var ranPipeline *pipeline
 	var noted string
 	withinBesideWait(test, "the run whose second build fails", func() {
-		engine, _, noted = shareGateRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
-			engine.buildsWidthAtGateForced = 2
-			positions := startPositions(engine)
-			engine.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
+		ranPipeline, _, noted = shareGateRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
+			pipeline.buildsWidthAtGateForced = 2
+			positions := startPositions(pipeline)
+			pipeline.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
 				stepsLock.Lock()
 				steps[position] = append(steps[position], step)
 				stepsLock.Unlock()
@@ -188,14 +195,14 @@ func TestABuildAfterOneThatFailedIsRefusedAtTheShareGate(test *testing.T) {
 					thirdMoving.Do(func() { close(thirdMoved) })
 				}
 			}
-			engine.lintSteps = func(extra project.Build, step lintStep, _ int) {
+			pipeline.lintSteps = func(extra project.Build, step lintStep, _ int) {
 				if step == lintStepReady {
 					stepsLock.Lock()
 					ready[positions[extra.String()]] = true
 					stepsLock.Unlock()
 				}
 			}
-			engine.extraBuildEnds = func(extra project.Build, notes io.Writer) error {
+			pipeline.extraBuildEnds = func(extra project.Build, notes io.Writer) error {
 				position := positions[extra.String()]
 				noteTo(notes, "the planted note of the build started at %d", position)
 				switch position {
@@ -222,8 +229,8 @@ func TestABuildAfterOneThatFailedIsRefusedAtTheShareGate(test *testing.T) {
 		test.Errorf("the build before the failed one stepped %v at the share gate and reached its lint %t, want "+
 			"admitted and linted", steps[0], ready[0])
 	}
-	if engine.buildRuns != nil {
-		test.Errorf("a run whose build failed handed the merge %d runs, want none", len(engine.buildRuns))
+	if ranPipeline.buildRuns != nil {
+		test.Errorf("a run whose build failed handed the merge %d runs, want none", len(ranPipeline.buildRuns))
 	}
 	for _, want := range []string{"the planted note of the build started at 0", "the planted note of the build " +
 		"started at 1", ": the planted failure"} {
@@ -247,9 +254,9 @@ func TestBuildsPassTheShareGateInTheOrderTheyStarted(test *testing.T) {
 	laterLooked := make(chan struct{})
 	var laterLooking sync.Once
 	withinBesideWait(test, "the run held at the share gate", func() {
-		shareGateRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
-			engine.buildsWidthAtGateForced = 3
-			engine.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
+		shareGateRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
+			pipeline.buildsWidthAtGateForced = 3
+			pipeline.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
 				switch {
 				case step == shareGateAdmitted:
 					orderLock.Lock()
@@ -306,10 +313,10 @@ func TestABuildEndedBeforeTheShareGateStillLetsTheSharesBeJudged(test *testing.T
 func TestARunOverAnEmptyStoreTakesNoShareGate(test *testing.T) {
 	test.Parallel()
 	var stepped atomic.Int64
-	engine, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
-		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+	pipeline, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
+		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	})
-	if !engine.withFindingsStore() {
+	if !pipeline.withFindingsStore() {
 		test.Fatal("the run has no findings store, want one: the cache is on")
 	}
 	lint := lintRecordOf(test, raw)
@@ -317,13 +324,13 @@ func TestARunOverAnEmptyStoreTakesNoShareGate(test *testing.T) {
 		test.Fatalf("the host hit %d packages and missed %d, want every package missed: the store is empty",
 			lint.Cache.Hit, lint.Cache.Missed)
 	}
-	if stepped.Load() != 0 || engine.buildsWidthFromHostLive || lint.BuildsWidthFromHostLive {
+	if stepped.Load() != 0 || pipeline.buildsWidthFromHostLive || lint.BuildsWidthFromHostLive {
 		test.Errorf("a run over an empty store stepped %d times at the share gate and decided from the host's live "+
-			"heap %t, want neither", stepped.Load(), engine.buildsWidthFromHostLive)
+			"heap %t, want neither", stepped.Load(), pipeline.buildsWidthFromHostLive)
 	}
-	if engine.buildsWidthBuildBytes == 0 || lint.BuildsWidthPeakFactor != buildPeakOverLoadEndWithStore {
+	if pipeline.buildsWidthBuildBytes == 0 || lint.BuildsWidthPeakFactor != buildPeakOverLoadEndWithStore {
 		test.Errorf("the width was given a holding of %d bytes at a peak factor of %.1f, want one measured at %.1f",
-			engine.buildsWidthBuildBytes, lint.BuildsWidthPeakFactor, buildPeakOverLoadEndWithStore)
+			pipeline.buildsWidthBuildBytes, lint.BuildsWidthPeakFactor, buildPeakOverLoadEndWithStore)
 	}
 	for _, build := range lint.Builds[1:] {
 		if build.CheckedFromSourceAtGate == 0 {
@@ -343,10 +350,10 @@ func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.
 	// run is one run over root's store, its lint record, and how many steps its builds took at the share gate.
 	run := func() (contract.LintRecord, int64) {
 		var stepped atomic.Int64
-		engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
-			engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+		pipeline, raw, _ := underCapRun(test, root, exitFindings, func(pipeline *pipeline) {
+			pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 		})
-		if !engine.withFindingsStore() {
+		if !pipeline.withFindingsStore() {
 			test.Fatal("the run has no findings store, want one: the cache is on")
 		}
 		return lintRecordOf(test, raw), stepped.Load()
@@ -386,16 +393,16 @@ func TestAnAllHitWarmRunTakesTheShareGatesWidth(test *testing.T) {
 	root := lowShareBuilds(test)
 	underCapRun(test, root, exitFindings, nil)
 	var stepped atomic.Int64
-	engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
-		engine.buildsWidthAtGateForced = 3
-		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+	pipeline, raw, _ := underCapRun(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.buildsWidthAtGateForced = 3
+		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	})
 	lint := lintRecordOf(test, raw)
-	if lint.Cache.Missed != 0 || lint.Cache.Hit == 0 || len(engine.buildRuns) != 4 ||
-		engine.buildRuns[0].result.Host.EntriesKept() != 0 {
+	if lint.Cache.Missed != 0 || lint.Cache.Hit == 0 || len(pipeline.buildRuns) != 4 ||
+		pipeline.buildRuns[0].result.Host.EntriesKept() != 0 {
 		test.Fatalf("the warm run's host hit %d packages and missed %d, keeping %d entries for %d runs beside it, "+
 			"want every package hit, none kept, and three builds: the premise", lint.Cache.Hit, lint.Cache.Missed,
-			engine.buildRuns[0].result.Host.EntriesKept(), len(engine.buildRuns)-1)
+			pipeline.buildRuns[0].result.Host.EntriesKept(), len(pipeline.buildRuns)-1)
 	}
 	if stepped.Load() == 0 || !lint.BuildsWidthFromHostLive || lint.BuildsAtOnce != 3 {
 		test.Errorf("the warm run stepped %d times at the share gate and ran %d builds at once, from the host's live "+
@@ -416,19 +423,19 @@ func TestAWarmDependenceRunTakesTheMeasuredRule(test *testing.T) {
 	root := lowShareBuilds(test)
 	underCapRun(test, root, exitFindings, nil, "--build-dependence")
 	var stepped atomic.Int64
-	engine, raw, _ := underCapRun(test, root, exitFindings, func(engine *pipeline) {
+	pipeline, raw, _ := underCapRun(test, root, exitFindings, func(pipeline *pipeline) {
 		// A pebibyte under the cap: three builds held at the store's peak factor fill it only past 100 TB each. The
 		// limit is the record's alone, since a test's memory sets no limit on the runtime (newLoadMemory).
-		engine.memory = &engineMemory{record: contract.Memory{LimitBytes: 1 << 50, CapBytes: 1 << 50,
+		pipeline.memory = &memoryAccount{record: contract.Memory{LimitBytes: 1 << 50, CapBytes: 1 << 50,
 			Source: contract.MemorySourceCap}}
-		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	}, "--build-dependence")
 	lint := lintRecordOf(test, raw)
-	if !engine.censusKeepsHostRestoreOff || lint.Cache.Missed != 0 || lint.Cache.Hit == 0 ||
-		len(engine.buildRuns) != 4 {
+	if !pipeline.censusKeepsHostRestoreOff || lint.Cache.Missed != 0 || lint.Cache.Hit == 0 ||
+		len(pipeline.buildRuns) != 4 {
 		test.Fatalf("the warm dependence run kept the census's restore off %t, its host hitting %d packages and "+
 			"missing %d, with %d runs beside it, want on, every package hit, and three builds: the premise",
-			engine.censusKeepsHostRestoreOff, lint.Cache.Hit, lint.Cache.Missed, len(engine.buildRuns)-1)
+			pipeline.censusKeepsHostRestoreOff, lint.Cache.Hit, lint.Cache.Missed, len(pipeline.buildRuns)-1)
 	}
 	if stepped.Load() != 0 || lint.BuildsWidthFromHostLive || lint.BuildsWidthBuildBytes == 0 ||
 		lint.BuildsAtOnce != 3 {
@@ -445,35 +452,35 @@ func TestAWarmDependenceRunTakesTheMeasuredRule(test *testing.T) {
 // without a store, whatever its counts (hostMostlyHitStore).
 func TestOnlyAHostThatMostlyHitItsStoreLiftsTheGuard(test *testing.T) {
 	test.Parallel()
-	engine := &pipeline{
-		memory: &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
+	guardedPipeline := &pipeline{
+		memory: &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
 			Source: contract.MemorySourceCap}},
 		buildsWidthForced: 3,
 	}
-	if width, fixed := engine.fixedBuildsWidth(3, nil, false); width != 1 || !fixed {
+	if width, fixed := guardedPipeline.fixedBuildsWidth(3, nil, false); width != 1 || !fixed {
 		test.Errorf("a run whose host did not mostly hit its store, over a host that kept nothing, was given a width "+
 			"of %d, fixed %t, want 1, fixed", width, fixed)
 	}
-	if width, fixed := engine.fixedBuildsWidth(3, nil, true); width != 3 || !fixed {
+	if width, fixed := guardedPipeline.fixedBuildsWidth(3, nil, true); width != 3 || !fixed {
 		test.Errorf("a run whose host mostly hit its store, over a host that kept nothing, was given a width of %d, "+
 			"fixed %t, want the forced 3", width, fixed)
 	}
 	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil)}
 	for _, each := range []struct {
-		name   string
-		engine *pipeline
-		counts check.CacheCounts
-		want   bool
+		name     string
+		pipeline *pipeline
+		counts   check.CacheCounts
+		want     bool
 	}{
-		{name: "a store, every package hit", engine: withStore, counts: check.CacheCounts{On: true, Hit: 200},
+		{name: "a store, every package hit", pipeline: withStore, counts: check.CacheCounts{On: true, Hit: 200},
 			want: true},
-		{name: "a store, exactly at the line", engine: withStore, counts: check.CacheCounts{On: true, Hit: 90,
+		{name: "a store, exactly at the line", pipeline: withStore, counts: check.CacheCounts{On: true, Hit: 90,
 			Missed: 10}, want: true},
-		{name: "a store, cold", engine: withStore, counts: check.CacheCounts{On: true, Missed: 200}, want: false},
-		{name: "no store, nothing missed", engine: &pipeline{}, counts: check.CacheCounts{On: true, Hit: 200},
+		{name: "a store, cold", pipeline: withStore, counts: check.CacheCounts{On: true, Missed: 200}, want: false},
+		{name: "no store, nothing missed", pipeline: &pipeline{}, counts: check.CacheCounts{On: true, Hit: 200},
 			want: false},
 	} {
-		if got := each.engine.hostMostlyHitStore(each.counts); got != each.want {
+		if got := each.pipeline.hostMostlyHitStore(each.counts); got != each.want {
 			test.Errorf("%s: the host mostly hit its store %t, want %t", each.name, got, each.want)
 		}
 	}
@@ -488,7 +495,7 @@ func TestTheHostsMissedShareDecidesTheShareGateUnderAStore(test *testing.T) {
 	test.Parallel()
 	withStore := &pipeline{session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil)}
 	if !withStore.withFindingsStore() {
-		test.Fatal("the engine has no findings store, want one")
+		test.Fatal("cohere-go has no findings store, want one")
 	}
 	for _, each := range []struct {
 		name   string
@@ -534,12 +541,12 @@ func TestAReloadingBuildIsAdmittedAtTheShareGateOnce(test *testing.T) {
 	writeSharedPackages(test, root)
 	var admittedLock sync.Mutex
 	admitted := map[int]int{}
-	var engine *pipeline
+	var ranPipeline *pipeline
 	var raw string
 	withinBesideWait(test, "the run whose build reloads at a width of one", func() {
-		engine, raw, _ = shareGateRun(test, root, exitFindings, func(engine *pipeline) {
-			engine.buildsWidthAtGateForced = 1
-			engine.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
+		ranPipeline, raw, _ = shareGateRun(test, root, exitFindings, func(pipeline *pipeline) {
+			pipeline.buildsWidthAtGateForced = 1
+			pipeline.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
 				if step == shareGateAdmitted {
 					admittedLock.Lock()
 					admitted[position]++
@@ -548,8 +555,8 @@ func TestAReloadingBuildIsAdmittedAtTheShareGateOnce(test *testing.T) {
 			}
 		})
 	})
-	if engine.buildsAtOnce != 1 {
-		test.Fatalf("the width was %d, want the forced width of one", engine.buildsAtOnce)
+	if ranPipeline.buildsAtOnce != 1 {
+		test.Fatalf("the width was %d, want the forced width of one", ranPipeline.buildsAtOnce)
 	}
 	lint := lintRecordOf(test, raw)
 	index := slices.IndexFunc(lint.Builds, func(build contract.BuildRecord) bool {
@@ -580,9 +587,9 @@ func TestAReloadingBuildIsAdmittedAtTheShareGateOnce(test *testing.T) {
 // A build's wait at the share gate is its own figure, shareGateWaitMilliseconds, and its load time leaves it out
 // (#ghb3rcn), so load times read alike whatever a build's position. At a width of one the first build holds itself at
 // its end until the second waits behind it at the gate, so every build after the first waits there: each build's
-// record splits its loads' whole wall time, as the engine told it (buildLoadTimes), into loadMilliseconds and
+// record splits its loads' whole wall time, as cohere-go told it (buildLoadTimes), into loadMilliseconds and
 // shareGateWaitMilliseconds, which sum to it within the millisecond each figure's rounding down may lose, and every
-// build after the first was told a wait. The wait is read from what the engine told, not the record's milliseconds,
+// build after the first was told a wait. The wait is read from what cohere-go told, not the record's milliseconds,
 // since a wait under one rounds to none there.
 func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
 	test.Parallel()
@@ -591,23 +598,23 @@ func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
 	var wallsLock sync.Mutex
 	walls := map[string]time.Duration{}
 	waits := map[string]time.Duration{}
-	var engine *pipeline
+	var ranPipeline *pipeline
 	var raw string
 	withinBesideWait(test, "the run whose first build holds the rest at the share gate", func() {
-		engine, raw, _ = shareGateRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
-			engine.buildsWidthAtGateForced = 1
-			positions := startPositions(engine)
-			engine.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
+		ranPipeline, raw, _ = shareGateRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
+			pipeline.buildsWidthAtGateForced = 1
+			positions := startPositions(pipeline)
+			pipeline.shareGateSteps = func(_ project.Build, position int, step shareGateStep) {
 				if position == 1 && step == shareGateHeld {
 					secondHolding.Do(func() { close(secondHeld) })
 				}
 			}
-			engine.buildLoadTimes = func(extra project.Build, loadWall time.Duration, shareGateWait time.Duration) {
+			pipeline.buildLoadTimes = func(extra project.Build, loadWall time.Duration, shareGateWait time.Duration) {
 				wallsLock.Lock()
 				walls[extra.String()], waits[extra.String()] = loadWall, shareGateWait
 				wallsLock.Unlock()
 			}
-			engine.extraBuildEnds = func(extra project.Build, _ io.Writer) error {
+			pipeline.extraBuildEnds = func(extra project.Build, _ io.Writer) error {
 				if positions[extra.String()] != 0 {
 					return nil
 				}
@@ -620,16 +627,16 @@ func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
 			}
 		})
 	})
-	if engine.buildsAtOnce != 1 {
-		test.Fatalf("the width was %d, want the forced width of one", engine.buildsAtOnce)
+	if ranPipeline.buildsAtOnce != 1 {
+		test.Fatalf("the width was %d, want the forced width of one", ranPipeline.buildsAtOnce)
 	}
-	positions := startPositions(engine)
+	positions := startPositions(ranPipeline)
 	wallsLock.Lock()
 	defer wallsLock.Unlock()
 	for _, build := range lintRecordOf(test, raw).Builds[1:] {
 		wall, told := walls[build.Target]
 		if !told {
-			test.Errorf("the engine told no load time of the build %s", build.Target)
+			test.Errorf("cohere-go told no load time of the build %s", build.Target)
 			continue
 		}
 		split := build.LoadMilliseconds + build.ShareGateWaitMilliseconds
@@ -652,12 +659,12 @@ func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
 func TestADependenceRunTakesNoShareGate(test *testing.T) {
 	test.Parallel()
 	var stepped atomic.Int64
-	engine, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(engine *pipeline) {
-		engine.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
+	pipeline, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
+		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	}, "--no-cache", "--build-dependence")
-	if engine.withFindingsStore() || !engine.censusKeepsHostRestoreOff {
+	if pipeline.withFindingsStore() || !pipeline.censusKeepsHostRestoreOff {
 		test.Fatalf("the run has a store %t and keeps the census's restore off %t, want none and on",
-			engine.withFindingsStore(), engine.censusKeepsHostRestoreOff)
+			pipeline.withFindingsStore(), pipeline.censusKeepsHostRestoreOff)
 	}
 	lint := lintRecordOf(test, raw)
 	if stepped.Load() != 0 || lint.BuildsWidthFromHostLive || lint.BuildsWidthBuildBytes == 0 {

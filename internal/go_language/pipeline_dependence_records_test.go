@@ -33,10 +33,10 @@ var recordsSwitches = []string{"--build-dependence"}
 // graphVerdicts are every unit of every build's judgment of the host's graph, by build, package, file and start,
 // each file relative to root, and whether the build makes it dependent, so two runs over two copies of a fixture
 // compare.
-func graphVerdicts(test *testing.T, engine *pipeline, root string) map[string]bool {
+func graphVerdicts(test *testing.T, pipeline *pipeline, root string) map[string]bool {
 	test.Helper()
 	verdicts := map[string]bool{}
-	for _, run := range engine.buildRuns {
+	for _, run := range pipeline.buildRuns {
 		if run.judged == nil || run.judged.dependence == nil {
 			continue
 		}
@@ -308,7 +308,7 @@ func TestABackfillMissesOnceAndNeverCascades(test *testing.T) {
 // storedRecordKeys are the keys of the records root's store holds, of each kind: the host's, each under the key
 // check.DependenceRecordKey derives from a key the store holds, and the standard library's, every other file whose
 // body opens as a record does (check.StandardLibraryDependenceRecordKey, which no test can derive, since its key holds
-// the engine's identity).
+// cohere-go's identity).
 func storedRecordKeys(test *testing.T, root string) (map[cache.Key]bool, map[cache.Key]bool) {
 	test.Helper()
 	stored := map[cache.Key][]byte{}
@@ -343,14 +343,14 @@ func storedRecordKeys(test *testing.T, root string) (map[cache.Key]bool, map[cac
 }
 
 // A plain run never opens a record key of either kind, the host's or the standard library's (engine's condition on
-// #6a3kjvz, pieces 2 and 3): over the engine tests' table, a cold run with neither switch writes no record; over the
+// #6a3kjvz, pieces 2 and 3): over cohere-go tests' table, a cold run with neither switch writes no record; over the
 // store a run under `--build-dependence` then filled, with a record beside every entry and one of each
 // standard-library package it side-loaded, a warm run with neither switch reads no key of either kind and writes none,
 // while a warm run under the switch reads every one.
 //
 // Not parallel: cache.ObserveReads is the process's, and one observer at a time can be set.
 func TestAPlainRunReadsNoRecord(test *testing.T) {
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	reading := readingSystemCache(filled, "")
 	runOverNoted(test, root, exitClean, reading)
@@ -437,7 +437,7 @@ func TestABuildDependenceRunRefusesADeclarationsRecord(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "build-dependence-embedded"))
-	runOverConfigured(test, root, exitClean, func(engine *pipeline) { engine.mustCheckCensus = test.TempDir() },
+	runOverConfigured(test, root, exitClean, func(pipeline *pipeline) { pipeline.mustCheckCensus = test.TempDir() },
 		"--no-system-cache")
 	planted := storedDeclarationsRecords(test, root)
 	if len(planted) == 0 {

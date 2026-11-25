@@ -244,7 +244,7 @@ func seededSystemCache(test *testing.T) string {
 func TestASeededRunRestoresFromTheTemplateAndLeavesItAsItWas(test *testing.T) {
 	test.Parallel()
 
-	seeded := runCachedEngine(test, copyFixture(test, standardLibraryFixture), "--no-cache")
+	seeded := runCached(test, copyFixture(test, standardLibraryFixture), "--no-cache")
 	if seeded.counts.FromSystemCache == 0 {
 		test.Errorf("want the seeded run to restore the standard library from the template, got %+v", seeded.counts)
 	}

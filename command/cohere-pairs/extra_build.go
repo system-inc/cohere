@@ -1,7 +1,7 @@
 package main
 
 // extraBuild is the part of one entry of the lint record's builds the table reads, by the names
-// internal/go_language/contract's BuildRecord gives them, its own shape for the reason engineLine is. Each count is
+// internal/go_language/contract's BuildRecord gives them, its own shape for the reason goChildLine is. Each count is
 // left out of the record when it is 0, so a build without one reads 0.
 type extraBuild struct {
 	Target            string `json:"target"`

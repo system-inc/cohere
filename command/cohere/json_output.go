@@ -70,7 +70,7 @@ func changedFilesAsJson(files []changedFile) []changedFileJson {
 	return lines
 }
 
-// timingJson is a Go run's timing record under `--timing`, written through as the engine wrote it, its kind beside
+// timingJson is a Go run's timing record under `--timing`, written through as the child wrote it, its kind beside
 // its fields.
 type timingJson struct {
 	Kind string `json:"kind"`
@@ -79,14 +79,14 @@ type timingJson struct {
 
 // timingFields is contract.TimingRecord's fields without its methods. Embedded with its MarshalJSON, the record would
 // be encoded by it alone and the kind beside it dropped. Its lists are never nil here, since a record without them is
-// refused (engineRun.acceptTiming), so each is written `[]` when empty as the contract writes it.
+// refused (contractRun.acceptTiming), so each is written `[]` when empty as the contract writes it.
 type timingFields contract.TimingRecord
 
 func timingAsJson(record contract.TimingRecord) timingJson {
 	return timingJson{Kind: "timing", timingFields: timingFields(record)}
 }
 
-// timelineJson is a Go run's timeline record under `--timeline`, written through as the engine wrote it, its kind
+// timelineJson is a Go run's timeline record under `--timeline`, written through as the child wrote it, its kind
 // beside its fields.
 type timelineJson struct {
 	Kind string `json:"kind"`
@@ -94,8 +94,8 @@ type timelineJson struct {
 }
 
 // timelineFields is contract.TimelineRecord's fields without its methods, for the reason timingFields gives. Its stamps
-// are never nil here, since a record without them is refused (engineRun.acceptTimeline), so they are written `[]` when
-// empty as the contract writes them.
+// are never nil here, since a record without them is refused (contractRun.acceptTimeline), so they are written `[]`
+// when empty as the contract writes them.
 type timelineFields contract.TimelineRecord
 
 func timelineAsJson(record contract.TimelineRecord) timelineJson {
@@ -117,7 +117,7 @@ type summaryJson struct {
 	FormattingSeconds float64  `json:"formattingSeconds,omitempty"`
 	Cache             cacheUse `json:"cache"`
 
-	// PackageCache is what the Go engine's per-package findings cache did, absent for every other run.
+	// PackageCache is what cohere-go's per-package findings cache did, absent for every other run.
 	PackageCache *packageCacheUse `json:"packageCache,omitempty"`
 	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, absent when it raised none, for
 	// a replay, and for every other run.
@@ -131,7 +131,7 @@ type summaryJson struct {
 	// BuildsAtOnce is how many of those builds beside the host's ran side by side, absent when builds is.
 	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
 	// BuildsWidthLiveBytes is the host's live heap buildsAtOnce was decided from, absent when the decision needed none
-	// and for every other run, so a reader sees why the width was chosen without running the engine alone (#qwb6ns8).
+	// and for every other run, so a reader sees why the width was chosen without running the child alone (#qwb6ns8).
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
 	// BuildsWidthFromHostLive is whether that heap alone decided buildsAtOnce, every build's share at the share gate
 	// low (#ghb3rcn), absent when it did not and for every other run.

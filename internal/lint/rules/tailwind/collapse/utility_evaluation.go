@@ -1,8 +1,8 @@
 // The `@utility` evaluator: the component that answers the readings the descriptor table declines.
 //
 // Ported from `createCssUtility` and `resolveValueFunction` in `src/utilities.ts` at Tailwind
-// 4.3.3, read at the pinned tag rather than from the minified bundle, so a disagreement with the
-// engine is a finding rather than version skew.
+// 4.3.3, read at the pinned tag rather than from the minified bundle, so a disagreement with
+// Tailwind is a finding rather than version skew.
 //
 // # What this closes, and why it could not be another table axis
 //
@@ -30,7 +30,7 @@
 //
 // The single rule this file exists to implement is that an unresolvable `--value()` removes its
 // declaration from the body. A port that instead left the declaration in place with an empty or
-// literal value would agree with the engine on every class where every declaration resolves, which
+// literal value would agree with Tailwind on every class where every declaration resolves, which
 // is most of them, and would report `[]#4` for every one of the 18. That is the shape of failure
 // this component is tested against: see TestUtilityDropIsNotDefault, which mutates exactly this
 // rule and asserts the differential catches it.
@@ -51,8 +51,8 @@
 // And then the splice: when `--value(ratio)` resolved, every declaration that resolved a
 // *non-ratio* `--value()` is removed. `slide-in-from-top-1/2` reads `[]#1` and not `[]#2` because
 // of it, since `1` alone would otherwise satisfy the `integer` declaration. This is a removal after
-// the fact rather than a condition during the walk, and it is ordered that way here because the
-// engine cannot know a ratio resolved until it has walked past declarations that resolved without
+// the fact rather than a condition during the walk, and it is ordered that way here because
+// Tailwind cannot know a ratio resolved until it has walked past declarations that resolved without
 // one.
 //
 // # What is deliberately not ported
@@ -392,7 +392,7 @@ func (state *utilityEvaluation) resolveThemeArgument(argument, candidateValue st
 		// a `var()` reference for a normal entry and the literal only for an inlined one. The
 		// substituted text is what the declaration's value becomes, and while the reading counts
 		// declarations rather than reading their text, substituting the literal here would diverge
-		// from the engine on any consumer that does read it.
+		// from Tailwind on any consumer that does read it.
 		return state.evaluator.Theme.Resolve(candidateValue, true, []string{namespace}, ThemeOptionNone)
 	}
 
@@ -460,7 +460,7 @@ func (state *utilityEvaluation) resolveBareArgument(
 		}
 		// Reprinted with spaces around the slash, matching upstream, so the substituted text is
 		// `1 / 2` rather than `1/2`. A bare `1/2` inside a `calc()` would be a division the browser
-		// reads differently from the ratio the engine intends.
+		// reads differently from the ratio Tailwind intends.
 		return ParseValue(text.TrimWhitespace(parts[0]) + " / " + text.TrimWhitespace(parts[1])), true, true
 	case DataTypeNumber:
 		if !isValidSpacingMultiplier(resolved) {
@@ -480,7 +480,7 @@ func (state *utilityEvaluation) resolveBareArgument(
 //
 // `[*]` accepts anything. Otherwise the candidate's own typehint decides: `bg-[color:var(--x)]`
 // carries `color`, and an argument naming a different type is skipped rather than inferred, because
-// the author's annotation is a claim the engine trusts. With no typehint the value is inferred
+// the author's annotation is a claim Tailwind trusts. With no typehint the value is inferred
 // against the single named type.
 func (state *utilityEvaluation) resolveArbitraryArgument(
 	argument string,

@@ -16,7 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 )
 
-// failedKey stands in for the engine's key, an analyzer that is never run.
+// failedKey stands in for cohere-go's key, an analyzer that is never run.
 var failedKey = &analysis.Analyzer{
 	Name: "failed_key",
 	Doc:  "keys what a tolerant pass ran past and never runs",

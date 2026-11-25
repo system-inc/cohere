@@ -438,7 +438,7 @@ func TestAnEntryWhoseAnalysesAreOutOfOrderIsRefused(test *testing.T) {
 func TestAnEntryOfTheFormerFormatIsAMiss(test *testing.T) {
 	test.Parallel()
 
-	const former = "go-engine-cache-15"
+	const former = "go-language-cache-15"
 	if former == CacheFormatVersion {
 		test.Fatalf("the format is still %s, which held its analyses as a map", former)
 	}

@@ -1,5 +1,5 @@
 // Package misplaced_error_result is staticcheck's `ST1008`, a function returning an error before its last result,
-// ported onto the engine's syntax dispatcher.
+// ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1008/st1008.go, whose message it reports
 // word for word, at the misplaced result, with no range, as the original does, in generated files too, which the
@@ -14,7 +14,7 @@
 // intermediate representation's function holds, so the run builds no intermediate representation for this check.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package misplaced_error_result
 
 import (

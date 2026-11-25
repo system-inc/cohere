@@ -87,7 +87,7 @@ func TestEveryDirectoryReadsAsGoBuildReadsIt(test *testing.T) {
 	}
 }
 
-// The same holds at cohere's own root, under every build the engine checks it with, each listing the whole workspace
+// The same holds at cohere's own root, under every build cohere-go checks it with, each listing the whole workspace
 // through the one run's shared reads: the host's first, as its load comes before the builds', and then the extra
 // builds all at once, as they list side by side, each taking the reads it selects every file of alike
 // (PackageReads, #y8cf1wf). How many directories each build took and read again is logged.
@@ -167,7 +167,7 @@ func TestAHeldFileWrittenBetweenListingsIsReadAgain(test *testing.T) {
 }
 
 // A binary linked by another Go release than the copy's reads every directory through go/build, and the shared reads
-// say why, naming both releases, which the engine writes in its types record. The listing is the one the copy reads.
+// say why, naming both releases, which cohere-go writes in its types record. The listing is the one the copy reads.
 func TestAnotherGoReleaseReadsThroughGoBuildAndSaysSo(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()

@@ -168,7 +168,7 @@ func TestLaterOverridesWin(test *testing.T) {
 // An override that re-states a rule with a bare severity keeps the options already in force for the
 // file, as ESLint does and as a bare severity across `extends` already did. Found on api: its TS-file
 // override `"prefer-const": "error"` dropped the Nexus tier's ignoreReadBeforeAssign in cohere only, so
-// the two engines judged prefer-const differently on every TS file (#na0hgjz). An override that writes
+// the two linters judged prefer-const differently on every TS file (#na0hgjz). An override that writes
 // its own options still replaces them.
 func TestABareSeverityInAnOverrideKeepsTheOptionsInForce(test *testing.T) {
 	test.Parallel()
@@ -413,9 +413,9 @@ func TestUnimplementedTopLevelKeyIsRefused(test *testing.T) {
 	}
 }
 
-// TestAGoBlockIsLeftToTheGoEngine: one CohereSettings.json serves a repository holding both a tsconfig and
-// a go.mod, so the TypeScript loader accepts the Go engine's block and reads none of its rules as its own.
-func TestAGoBlockIsLeftToTheGoEngine(test *testing.T) {
+// TestAGoBlockIsLeftToCohereGo: one CohereSettings.json serves a repository holding both a tsconfig and
+// a go.mod, so the TypeScript loader accepts cohere-go's block and reads none of its rules as its own.
+func TestAGoBlockIsLeftToCohereGo(test *testing.T) {
 	test.Parallel()
 	path := filepath.Join(test.TempDir(), "CohereSettings.json")
 	contents := `{"rules": {"a-rule": "error"}, "go": {"rules": {"cohere-go/a-go-rule": ["warn", {"limit": 3}]}}}`
@@ -424,7 +424,7 @@ func TestAGoBlockIsLeftToTheGoEngine(test *testing.T) {
 	}
 	loaded, loadError := Load(path)
 	if loadError != nil {
-		test.Fatalf("a config with a go block was refused, so a repository holding both engines cannot lint "+
+		test.Fatalf("a config with a go block was refused, so a repository holding both languages cannot lint "+
 			"its TypeScript: %v", loadError)
 	}
 	if _, read := loaded.Rules["cohere-go/a-go-rule"]; read {

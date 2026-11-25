@@ -1,6 +1,6 @@
 // Package failed_type_assertion_read is staticcheck's SA9008, the else branch of an if statement whose initializer
 // type-asserts a variable into a new variable of the same name, `if x, ok := x.(T); ok`, reading that new variable,
-// which holds the zero value of the failed assertion and not the value asserted, ported onto the engine's own
+// which holds the zero value of the failed assertion and not the value asserted, ported onto cohere-go's own
 // intermediate representation (#tf4cb8g).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa9008/sa9008.go, whose logic it keeps and
@@ -8,7 +8,7 @@
 // places staticcheck's report.Related gives it, through staticcheck_report.Report and Related, and the identifier
 // written as staticcheck's report.Render writes it, through staticcheck_report.Render. The original walks the
 // package's if statements in its syntax and finds the function each one belongs to with ir.EnclosingFunction, handed
-// the package buildir built; the port walks each function's own syntax in the engine's own intermediate
+// the package buildir built; the port walks each function's own syntax in cohere-go's own intermediate
 // representation, leaving out the function literals inside it, which are functions of their own, and asks its
 // EnclosingFunction, go/ir's translated, the same question of the same package, which every function carries as its
 // Package, judging an if statement only in the function it names.
@@ -51,7 +51,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA9008",
 	"SA9008",
 	"Flags an else branch reading the variable a failed type assertion shadowed: staticcheck's SA9008, ported onto "+
-		"the engine's own intermediate representation.",
+		"cohere's own intermediate representation.",
 	&Listener,
 )
 

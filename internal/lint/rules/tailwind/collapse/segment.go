@@ -33,7 +33,7 @@ import (
 //   - A final part is always pushed, so the result is never empty and `segment("", ',')` is one
 //     empty string rather than nothing. isFamilyName and isLineWidth both depend on that: they
 //     count parts, and an empty result would make their `count > 0` and `every` tests answer the
-//     opposite of what the engine answers.
+//     opposite of what Tailwind answers.
 //   - A closing bracket that does not match the top of the stack is ignored rather than treated as
 //     an error, so `a)b,c` still splits on its comma.
 //   - The separator is compared as a single byte, matching `separator.charCodeAt(0)`, so a

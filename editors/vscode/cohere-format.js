@@ -22,7 +22,7 @@ const cohereBinaryOverrideVariable = 'COHERE_BINARY';
 // What a project runs to install cohere, said wherever cohere was not found.
 const installCommand = 'pnpm add -D @system-inc/cohere';
 
-// The arguments a save runs with: the gate's own, with no engine named, so a save formats with whatever
+// The arguments a save runs with: the gate's own, with no language named, so a save formats with whatever
 // cohere's default is.
 const saveArguments = ['--fix', '--format'];
 

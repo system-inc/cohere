@@ -2,7 +2,7 @@
 // of words, functions, and separators.
 //
 // Ported from `src/value-parser.ts` at the v4.3.3 tag, read at the tag rather than from the
-// minified bundle, so a disagreement with the engine is a finding rather than version skew.
+// minified bundle, so a disagreement with Tailwind is a finding rather than version skew.
 //
 // # What this is for
 //
@@ -18,12 +18,12 @@
 // A run of separator characters becomes one separator node holding the run verbatim, so
 // `foo(bar,  baz)` keeps its two spaces and reprints identically. This matters more than it looks:
 // the parser is used on values that must round-trip, and a parser that normalised `, ` to `,` would
-// agree with the engine on structure and disagree on every printed result.
+// agree with Tailwind on structure and disagree on every printed result.
 //
 // # Deliberate fidelity to JavaScript semantics
 //
 // Three behaviors here are consequences of how the upstream loop is written rather than of stated
-// intent. They are ported deliberately, are pinned by fixtures measured against the shipped engine,
+// intent. They are ported deliberately, are pinned by fixtures measured against the shipped Tailwind,
 // and each is called out at its branch below:
 //
 //   - A pending buffer in front of an unmatched `)` is discarded, because upstream flushes it with
@@ -58,7 +58,7 @@ const (
 //
 // One struct rather than an interface with three implementations, matching the upstream tagged
 // union. Callers switch on Kind, and Nodes is meaningful only for a function. The flat shape also
-// keeps the JSON encoding identical to the engine's, which is what lets the fixture be compared
+// keeps the JSON encoding identical to Tailwind's, which is what lets the fixture be compared
 // structurally without a translation layer in the test.
 type ValueNode struct {
 	Kind ValueNodeKind `json:"kind"`
@@ -182,7 +182,7 @@ func ParseValue(input string) []ValueNode {
 				// reaches the default branch, which appends it. Either way the escaped character
 				// arrives in the buffer whole. Verified by parsing every string of length 1 to 3
 				// over an alphabet of backslash, quotes, parens, separators and multi-byte
-				// characters against the engine: 2,379 inputs, no disagreement under either rule.
+				// characters against Tailwind: 2,379 inputs, no disagreement under either rule.
 				buffer.WriteString(normalized[index : index+2])
 				index++
 			} else {
@@ -228,7 +228,7 @@ func ParseValue(input string) []ValueNode {
 			// An unterminated string leaves `i` untouched upstream, so only the quote character
 			// itself is consumed and parsing resumes at the next character. `"a b` is therefore
 			// three nodes, not one: the word `"a`, a separator, and the word `b`. Advancing to the
-			// end of input instead would swallow the tail, which agrees with the engine on
+			// end of input instead would swallow the tail, which agrees with Tailwind on
 			// `"unterminated` and disagrees on every unterminated string that contains a
 			// separator.
 			buffer.WriteString(normalized[start : index+1])

@@ -53,7 +53,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1027",
 	"SA1027",
 	"Flags the address of a struct field that is not 64-bit aligned given to one of sync/atomic's 64-bit "+
-		"functions on a 32-bit platform: staticcheck's SA1027, ported onto the engine's own intermediate "+
+		"functions on a 32-bit platform: staticcheck's SA1027, ported onto cohere-go's own intermediate "+
 		"representation.",
 	&Listener,
 )

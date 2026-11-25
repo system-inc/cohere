@@ -111,9 +111,9 @@ func TestReadHeadRefusesWhatIsNotACommit(test *testing.T) {
 	}
 }
 
-// After the first run at a commit, the Swift engine's inputs are read from what that run kept, and git
+// After the first run at a commit, cohere-swift's inputs are read from what that run kept, and git
 // is not asked again: the module directory here stops being a repository at all, and the answer holds.
-func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
+func TestSwiftPackageInputsAreAskedOncePerCommit(test *testing.T) {
 	test.Parallel()
 
 	if _, lookPathError := exec.LookPath("git"); lookPathError != nil {
@@ -138,21 +138,21 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 	writeFile(test, filepath.Join(module, "swift", "Package.resolved"), "{}\n")
 	writeFile(test, filepath.Join(module, "swift", "Sources", "A.swift"), "let a = 1\n")
 	run("add", ".")
-	run("commit", "--quiet", "-m", "engine")
+	run("commit", "--quiet", "-m", "cohere-swift")
 	commit := run("rev-parse", "HEAD")
 
 	paths := Paths{ModuleDirectory: module, CacheDirectory: test.TempDir()}
-	first, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit)
-	if swiftEngineInputObjectsError != nil {
-		test.Fatal(swiftEngineInputObjectsError)
+	first, swiftPackageInputObjectsError := swiftPackageInputObjects(paths, commit)
+	if swiftPackageInputObjectsError != nil {
+		test.Fatal(swiftPackageInputObjectsError)
 	}
 
 	if renameError := os.Rename(filepath.Join(module, ".git"), filepath.Join(module, "not-git")); renameError != nil {
 		test.Fatal(renameError)
 	}
-	second, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit)
-	if swiftEngineInputObjectsError != nil {
-		test.Fatalf("the second run asked git again: %v", swiftEngineInputObjectsError)
+	second, swiftPackageInputObjectsError := swiftPackageInputObjects(paths, commit)
+	if swiftPackageInputObjectsError != nil {
+		test.Fatalf("the second run asked git again: %v", swiftPackageInputObjectsError)
 	}
 	if strings.Join(first, " ") != strings.Join(second, " ") {
 		test.Fatalf("the kept answer %v differs from git's %v", second, first)
@@ -164,7 +164,10 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 		test.Fatalf("expected one kept answer, found %v (err %v)", entries, readDirectoryError)
 	}
 	writeFile(test, filepath.Join(paths.CacheDirectory, "swift-inputs", entries[0].Name()), first[0]+"\n")
-	if _, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit); swiftEngineInputObjectsError == nil {
+	if _, swiftPackageInputObjectsError := swiftPackageInputObjects(
+		paths,
+		commit,
+	); swiftPackageInputObjectsError == nil {
 		test.Fatal("a kept answer with a missing object was trusted")
 	}
 }

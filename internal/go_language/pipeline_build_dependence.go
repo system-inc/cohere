@@ -64,15 +64,15 @@ type hostDependence struct {
 // callIndex is the run's call index (hostDependence.calls), built the first time a build's census asks for it,
 // once every build waits for the standard library's graph to end (dependenceOf), so it holds that graph whole, or none
 // of it when its side load failed, as each build's judgment does.
-func (engine *pipeline) callIndex() *build_dependence.CallIndex {
-	engine.dependence.callsOnce.Do(func() {
+func (pipeline *pipeline) callIndex() *build_dependence.CallIndex {
+	pipeline.dependence.callsOnce.Do(func() {
 		var standardLibrary *build_dependence.Graph
-		if engine.dependence.standardLibrary != nil {
-			standardLibrary = engine.dependence.standardLibrary.graph
+		if pipeline.dependence.standardLibrary != nil {
+			standardLibrary = pipeline.dependence.standardLibrary.graph
 		}
-		engine.dependence.calls = build_dependence.NewCallIndex(engine.dependence.graph, standardLibrary)
+		pipeline.dependence.calls = build_dependence.NewCallIndex(pipeline.dependence.graph, standardLibrary)
 	})
-	return engine.dependence.calls
+	return pipeline.dependence.calls
 }
 
 // holdsLineDirective is build_dependence.HoldsLineDirective of file as the run holds it (held), the bytes the load
@@ -87,8 +87,8 @@ func (engine *pipeline) callIndex() *build_dependence.CallIndex {
 // reaches here: it takes `--fix` alone, refusing `--lint` (invocation.go:125), so it asks for no lint phase, which
 // alone builds the host's graph (buildDependenceGraph) and runs the extra builds this judges (runLint), and runStdin
 // (pipeline_stdin.go:53-70) calls neither.
-func (engine *pipeline) holdsLineDirective(file string) bool {
-	return holdsLineDirectiveOnce(&engine.dependence.lineDirectives, file, engine.sourceReader(nil, nil))
+func (pipeline *pipeline) holdsLineDirective(file string) bool {
+	return holdsLineDirectiveOnce(&pipeline.dependence.lineDirectives, file, pipeline.sourceReader(nil, nil))
 }
 
 // holdsLineDirectiveOnce is build_dependence.HoldsLineDirective of file as read reads it, scanned once into scanned, a
@@ -140,7 +140,7 @@ type standardLibraryDependence struct {
 // judging dependence never overlaps with its load (lintOverlaps). A package with a file in scope is the workspace's,
 // its test variants included, and every other a dependency. It builds nothing unless the run judges dependence and the
 // lint phase has extra builds to judge, over a load that will be linted: one that failed or found a type error is left
-// alone, and so is the load the graph was built from already, which a rename that wrote nothing hands on. The engine
+// alone, and so is the load the graph was built from already, which a rename that wrote nothing hands on. cohere-go
 // keeps the graph, which every extra build reads. A package whose record the findings store holds, decoded as the
 // session read it, is added from its record (#6a3kjvz), whether the host restored it or checks it, and one the host
 // checks with none from its syntax, its record then written beside its entry
@@ -149,10 +149,14 @@ type standardLibraryDependence struct {
 // their own, beside the host's lint (standardLibraryGraph), once a run, since a rename never changes them. A record
 // that does not decode is the session's to say, and its package checked from source, so it has none here
 // (CacheSession.readDependenceRecords).
-func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError error) {
-	if !engine.request.judgesDependence() || !engine.keepsForBuilds() || !engine.request.requests(contract.PhaseLint) ||
-		loadError != nil || loaded == nil || len(loaded.Diagnostics) > 0 ||
-		engine.dependence != nil && engine.dependence.from == loaded {
+func (pipeline *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError error) {
+	if !pipeline.request.judgesDependence() ||
+		!pipeline.keepsForBuilds() ||
+		!pipeline.request.requests(contract.PhaseLint) ||
+		loadError != nil ||
+		loaded == nil ||
+		len(loaded.Diagnostics) > 0 ||
+		pipeline.dependence != nil && pipeline.dependence.from == loaded {
 		return
 	}
 	started := time.Now()
@@ -178,8 +182,8 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 			host.cgoFiles[each.ID] = cgoFiles
 		}
 		host.paths[each.ID] = each.PkgPath
-		if engine.session != nil {
-			records[index], _ = engine.session.DependenceRecord(each)
+		if pipeline.session != nil {
+			records[index], _ = pipeline.session.DependenceRecord(each)
 		}
 		if records[index] != nil && each.Types != nil {
 			host.decoded[each.Types] = true
@@ -194,8 +198,8 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 		// The standard library is the only package in no module that a module's load reaches, and none of it is a
 		// test variant here, since only the workspace's packages have tests built.
 		if each.Module == nil && each.ForTest == "" {
-			if engine.session != nil {
-				if record, isRecorded := engine.session.StandardLibraryRecord(each); isRecorded {
+			if pipeline.session != nil {
+				if record, isRecorded := pipeline.session.StandardLibraryRecord(each); isRecorded {
 					recordedStandardLibrary[each.PkgPath] = record
 					continue
 				}
@@ -203,42 +207,42 @@ func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError erro
 			restoredStandardLibrary = append(restoredStandardLibrary, each.PkgPath)
 		}
 	}
-	engine.workPool().ForEach(len(every), 0, func(index int) {
+	pipeline.workPool().ForEach(len(every), 0, func(index int) {
 		if records[index] != nil {
 			host.graph.AddDecoded(records[index])
 			return
 		}
 		if every[index].TypesInfo != nil {
-			host.graph.AddPackage(every[index], engine.described.hasFileInScope(every[index]),
+			host.graph.AddPackage(every[index], pipeline.described.hasFileInScope(every[index]),
 				loaded.Withheld[every[index]].Declarations)
 		}
 	})
-	if engine.session != nil {
+	if pipeline.session != nil {
 		graph := host.graph
-		engine.session.DependenceRecordsFrom(func(saved *packages.Package) ([]byte, bool) {
+		pipeline.session.DependenceRecordsFrom(func(saved *packages.Package) ([]byte, bool) {
 			return graph.EncodedRecord(saved.ID)
 		})
 	}
 	host.elapsed = time.Since(started)
 	switch {
-	case engine.dependence != nil && engine.dependence.standardLibrary != nil:
-		host.standardLibrary = engine.dependence.standardLibrary
+	case pipeline.dependence != nil && pipeline.dependence.standardLibrary != nil:
+		host.standardLibrary = pipeline.dependence.standardLibrary
 	case len(restoredStandardLibrary) > 0 || len(recordedStandardLibrary) > 0:
-		host.standardLibrary = engine.standardLibraryGraph(restoredStandardLibrary, recordedStandardLibrary,
+		host.standardLibrary = pipeline.standardLibraryGraph(restoredStandardLibrary, recordedStandardLibrary,
 			host.files)
 	}
-	engine.dependence = host
+	pipeline.dependence = host
 }
 
 // standardLibraryGraph starts the standard library's graph (standardLibraryDependence) on a goroutine of its own and
 // returns at once: paths, the standard-library packages the host restored with no record in the findings store, are
-// loaded from source by the engine's own loader (loadPackages), as the host's load would have checked them, under the
+// loaded from source by cohere-go's own loader (loadPackages), as the host's load would have checked them, under the
 // host's environment, on the run's pool, without tests, and every package the load reaches is added to the graph, so
 // the graph holds whatever they import too and needs no answers of its own. Its work takes the pool's slots beside the
 // host's lint, and the builds wait for it (awaitStandardLibrary). recorded are the records the store holds of the rest,
 // by path, each added as it is, its files those hostFiles name of it, the host's listing's, with no load at all when
 // paths is empty (#6a3kjvz).
-func (engine *pipeline) standardLibraryGraph(
+func (pipeline *pipeline) standardLibraryGraph(
 	paths []string,
 	recorded map[string]*build_dependence.Record,
 	hostFiles map[string][]string,
@@ -251,16 +255,16 @@ func (engine *pipeline) standardLibraryGraph(
 		side.files[path] = hostFiles[path]
 	}
 	side.packages = len(recorded)
-	workspace := engine.described.workspace
+	workspace := pipeline.described.workspace
 	go func() {
 		defer close(side.done)
 		if len(paths) == 0 {
 			return
 		}
 		started := time.Now()
-		loaded, loadError := engine.loadPackages(loadRequest{
+		loaded, loadError := pipeline.loadPackages(loadRequest{
 			environment: workspace.Environment(),
-			caching:     &load.Caching{GoEnvironment: engine.described.goEnvironment, WithoutTests: true},
+			caching:     &load.Caching{GoEnvironment: pipeline.described.goEnvironment, WithoutTests: true},
 			patterns:    paths,
 		})
 		side.loadElapsed = time.Since(started)
@@ -289,7 +293,7 @@ func (engine *pipeline) standardLibraryGraph(
 		if len(every) > 0 {
 			side.fileSet = every[0].Fset
 		}
-		engine.workPool().ForEach(len(every), 0, func(index int) {
+		pipeline.workPool().ForEach(len(every), 0, func(index int) {
 			side.graph.AddPackage(every[index], false, loaded.Withheld[every[index]].Declarations)
 		})
 		side.graphElapsed = time.Since(graphStarted)
@@ -300,22 +304,22 @@ func (engine *pipeline) standardLibraryGraph(
 // awaitStandardLibrary waits for the standard library's graph, if the host has one, and says on stderr when its side
 // load failed, so every object of the standard library a unit reads fails wide. otherBuilds calls it once, on the
 // pipeline's goroutine, before any extra build starts, so the builds' width is measured with the side load over.
-func (engine *pipeline) awaitStandardLibrary() {
-	if engine.dependence == nil || engine.dependence.standardLibrary == nil {
+func (pipeline *pipeline) awaitStandardLibrary() {
+	if pipeline.dependence == nil || pipeline.dependence.standardLibrary == nil {
 		return
 	}
-	side := engine.dependence.standardLibrary
+	side := pipeline.dependence.standardLibrary
 	<-side.done
 	if side.problem != nil {
-		engine.note("the standard library's side load for --build-dependence failed, so every object of it a unit "+
+		pipeline.note("the standard library's side load for --build-dependence failed, so every object of it a unit "+
 			"reads is called dependent: %v", side.problem)
 		return
 	}
 	// What the side load built from live packages is written into the findings store, for a later run to read in its
 	// place (#6a3kjvz), and never a record the graph took from the store. The session's counts were handed on with the
 	// host's result before the side load ended, so its failed writes are kept here and counted in the lint record.
-	if engine.session != nil && side.sideLoaded > 0 {
-		side.writeFailed, side.firstWriteFailure = engine.session.WriteStandardLibraryRecords(
+	if pipeline.session != nil && side.sideLoaded > 0 {
+		side.writeFailed, side.firstWriteFailure = pipeline.session.WriteStandardLibraryRecords(
 			func(path string) ([]byte, bool) {
 				if !side.loaded[path] {
 					return nil, false
@@ -323,7 +327,7 @@ func (engine *pipeline) awaitStandardLibrary() {
 				return side.graph.EncodedRecord(path)
 			})
 		if side.firstWriteFailure != nil {
-			engine.note("the findings cache: %v", side.firstWriteFailure)
+			pipeline.note("the findings cache: %v", side.firstWriteFailure)
 		}
 	}
 }
@@ -337,13 +341,13 @@ func (engine *pipeline) awaitStandardLibrary() {
 // session keeps records (KeepDependenceRecords). Seal resolves under the graph's lock, as the first build's Against
 // would have, so sealing adds no contention.
 // The standard library's graph is nil when its side load failed, and then there is nothing of it to seal.
-func (engine *pipeline) sealDependenceGraphs() {
-	if engine.dependence == nil {
+func (pipeline *pipeline) sealDependenceGraphs() {
+	if pipeline.dependence == nil {
 		return
 	}
-	engine.dependence.graph.Seal()
-	if engine.dependence.standardLibrary != nil && engine.dependence.standardLibrary.graph != nil {
-		engine.dependence.standardLibrary.graph.Seal()
+	pipeline.dependence.graph.Seal()
+	if pipeline.dependence.standardLibrary != nil && pipeline.dependence.standardLibrary.graph != nil {
+		pipeline.dependence.standardLibrary.graph.Seal()
 	}
 }
 
@@ -372,14 +376,14 @@ func (engine *pipeline) sealDependenceGraphs() {
 // dependencies count the standard library's units beside the host's, so its totals are those of a run whose host
 // checked every package from source. A run asked for the must-check census keeps the build's set in the judgment too,
 // from both graphs' differences and judgments, with what was answered wide (pipeline_must_check_census.go).
-func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDependence, *buildJudgment) {
-	if engine.dependence == nil {
+func (pipeline *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDependence, *buildJudgment) {
+	if pipeline.dependence == nil {
 		return nil, nil
 	}
 	// The builds start once the standard library's graph has ended (awaitStandardLibrary); a build that did not, as a
 	// test's might, waits for it here.
-	if engine.dependence.standardLibrary != nil {
-		<-engine.dependence.standardLibrary.done
+	if pipeline.dependence.standardLibrary != nil {
+		<-pipeline.dependence.standardLibrary.done
 	}
 	started := time.Now()
 	built := map[string]*packages.Package{}
@@ -387,18 +391,18 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	fileSet := token.NewFileSet()
 	// Every build-only file is parsed from the bytes the run holds of it, those the build's load parsed, or the disk's
 	// for one it holds nothing for (sourceReader).
-	read := engine.sourceReader(nil, nil)
+	read := pipeline.sourceReader(nil, nil)
 	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
 		withoutSyntax: map[string]bool{}, filesDiffer: map[string]bool{}}
-	difference := engine.listingDifference(hostListing{files: engine.dependence.files,
-		cgoFiles: engine.dependence.cgoFiles, paths: engine.dependence.paths}, built, fileSet, read,
-		engine.holdsLineDirective, judged)
-	standardLibrary := engine.dependence.standardLibrary
+	difference := pipeline.listingDifference(hostListing{files: pipeline.dependence.files,
+		cgoFiles: pipeline.dependence.cgoFiles, paths: pipeline.dependence.paths}, built, fileSet, read,
+		pipeline.holdsLineDirective, judged)
+	standardLibrary := pipeline.dependence.standardLibrary
 	var standardLibraryJudged *build_dependence.Dependence
 	var standardLibraryDiffering build_dependence.Difference
 	if standardLibrary != nil && standardLibrary.graph != nil {
-		standardLibraryDiffering = standardLibraryDifference(standardLibrary, engine.dependence.cgoFiles, built,
-			fileSet, read, engine.holdsLineDirective)
+		standardLibraryDiffering = standardLibraryDifference(standardLibrary, pipeline.dependence.cgoFiles, built,
+			fileSet, read, pipeline.holdsLineDirective)
 		standardLibraryJudged = standardLibrary.graph.Against(standardLibraryDiffering)
 	}
 	var standardLibraryGraph *build_dependence.Graph
@@ -409,22 +413,22 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	judged.standardLibrary, judged.counterparts = standardLibraryJudged, counterparts
 	// A host that restored nothing holds every package it reached, so nothing is asked, and a graph that asks nothing
 	// judges as block 1 always has.
-	if len(engine.dependence.restored) > 0 {
+	if len(pipeline.dependence.restored) > 0 {
 		difference.DependentObject = counterparts.DependentObject
 		// A package the host restored hands the graph its record (#6a3kjvz), which names an object of a package the
 		// graph does not hold by its path and local name rather than holding it.
 		difference.DependentName = counterparts.DependentName
 	}
-	judged.dependence = engine.dependence.graph.Against(difference)
+	judged.dependence = pipeline.dependence.graph.Against(difference)
 	counts := judged.dependence.Counts()
 	record := &contract.BuildDependence{
-		GraphMilliseconds:    int(engine.dependence.elapsed.Milliseconds()),
+		GraphMilliseconds:    int(pipeline.dependence.elapsed.Milliseconds()),
 		JudgmentMilliseconds: int(time.Since(started).Milliseconds()),
 	}
-	if len(engine.dependence.restored) > 0 {
+	if len(pipeline.dependence.restored) > 0 {
 		answered := counterparts.Counts()
 		record.Restored = &contract.RestoredDependence{
-			Packages:           len(engine.dependence.restored),
+			Packages:           len(pipeline.dependence.restored),
 			Answered:           answered.Answered,
 			WithoutCounterpart: answered.WithoutCounterpart,
 			WithoutPackage:     answered.WithoutPackage,
@@ -446,11 +450,11 @@ func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDepend
 	}
 	record.Workspace = dependenceCounts(counts.Workspace)
 	record.Dependencies = dependenceCounts(counts.Dependencies)
-	if engine.mustCheckCensus != "" {
+	if pipeline.mustCheckCensus != "" {
 		// A package the host restored with no record that the standard library's graph does not hold either is in no
 		// graph, so whatever of it a unit reads is answered wide, and it is in the set as NoGraph.
 		var notHeld []string
-		for identifier := range engine.dependence.restored {
+		for identifier := range pipeline.dependence.restored {
 			isHeld := false
 			// A judgment of the standard library's graph means the graph was built, so standardLibrary is not nil.
 			if standardLibraryJudged != nil {
@@ -489,7 +493,7 @@ type hostListing struct {
 // which the facts census and the body differential read.
 //
 // Mutates: judged gains the shared files, the shared packages, those without syntax and the packages whose files differ
-func (engine *pipeline) listingDifference(
+func (pipeline *pipeline) listingDifference(
 	host hostListing,
 	built map[string]*packages.Package,
 	fileSet *token.FileSet,
@@ -556,7 +560,7 @@ func (engine *pipeline) listingDifference(
 			continue
 		}
 		difference.BuildOnlyPackages[identifier] = true
-		buildOnly := build_dependence.PackageDifference{Workspace: engine.described.hasFileInScope(each)}
+		buildOnly := build_dependence.PackageDifference{Workspace: pipeline.described.hasFileInScope(each)}
 		for _, file := range each.GoFiles {
 			// Ignored: a package only the build has has no unit of the host's to seed, and a file of it that cannot
 			// be read or parsed only goes uncounted.
@@ -643,8 +647,8 @@ func filesDiffer(
 }
 
 // appendParsed is files with file's syntax after them, parsed alone from the bytes read gives, and whether it was. The
-// engine's read is the run's held bytes (sourceReader), those the build's load parsed, never the disk's again, which a
-// file rewritten once the run read it would make differ, hiding a method or a name the build was checked with. A
+// pipeline's read is the run's held bytes (sourceReader), those the build's load parsed, never the disk's again, which
+// a file rewritten once the run read it would make differ, hiding a method or a name the build was checked with. A
 // build-only file that cannot be read or does not parse fails the build's own load, whose type errors the record
 // already holds, so its units are left uncounted, and it is reported unparsed, for its package to be marked
 // (filesDiffer).

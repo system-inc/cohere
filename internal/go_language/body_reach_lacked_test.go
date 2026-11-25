@@ -34,11 +34,11 @@ func lackedCensus(
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	record := test.TempDir()
 	root := copyFixture(test, bodyReachLackedFixture)
-	on, _ = runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = censusFile
-		engine.bodyReachFromSourceRecord = record
+	on, _ = runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = censusFile
+		pipeline.bodyReachFromSourceRecord = record
 		if configure != nil {
-			configure(engine)
+			configure(pipeline)
 		}
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" ||
@@ -98,14 +98,14 @@ func TestAPackageTheBuildLacksStartsNoCarry(test *testing.T) {
 }
 
 // A package the two sides load in different modes still starts the carry, beside the packages the build lacks
-// (#wzre5eg): over the same fixture the host restores the standard library the engine tests' table holds from the
+// (#wzre5eg): over the same fixture the host restores the standard library cohere-go tests' table holds from the
 // system cache, export data, and windows, judging dependence, checks it from source. Scale may hold another load's
 // value for all the reach can tell of linked, so Scaled is reached by the load mode, as before. The check's line still
 // reads 0.
 func TestAPackageLoadedOtherwiseStillStartsTheCarryBesideALackedOne(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	on, reasons, drivers, written := lackedCensus(test, readingSystemCache(filled, ""))
 	if !on.dependence.exportData["fmt"] || !slices.Contains(on.buildRuns[1].fromSourceIdentifiers, "fmt") {
 		test.Fatalf("want fmt read from export data on the host and checked from source on windows, got %t and %v",
@@ -142,8 +142,8 @@ func Bounded(values [platformLimit]int) int {
 		test.Fatal(writeError)
 	}
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = censusFile
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = censusFile
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyReach == nil {
 		test.Fatalf("want windows's census, got %d runs", len(on.buildRuns))

@@ -2,7 +2,7 @@
 // 2006-02-01, year, day and month, which no common calendar standard writes, so 2006-01-02, year, month and day, was
 // almost surely meant. Only a layout the compiler knows, a constant, is judged; a layout held in a variable is left
 // alone. Where the layout is written as one string literal, the finding covers the mistake inside it and offers the
-// fix that swaps in 2006-01-02. It sits on the engine's syntax dispatcher, hearing each call on the walk the
+// fix that swaps in 2006-01-02. It sits on cohere-go's syntax dispatcher, hearing each call on the walk the
 // dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/timeformat/timeformat.go, whose

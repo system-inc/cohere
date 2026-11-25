@@ -34,7 +34,7 @@ func (target Target) String() string {
 
 // GoArm64Level is the arm64 feature level this target compiles for, as `GOARM64`, or "" for Go's default, v8.0.
 //
-// v8.4 on darwin/arm64 alone: every Apple silicon Mac implements it, and it took 0.34 user-s off the Go engine's
+// v8.4 on darwin/arm64 alone: every Apple silicon Mac implements it, and it took 0.34 user-s off cohere-go's
 // bar row at cohere's root on Shackler, findings identical (#b2t9xmf, #r6sqd2c). Linux and Windows on arm64 run
 // on v8.0 cores still in service, a Raspberry Pi 4 and the first Graviton among them, where a v8.4 binary would
 // die on an illegal instruction, so they keep the default.

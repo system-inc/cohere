@@ -56,14 +56,14 @@ func runSplicedGate(
 	test.Helper()
 	probe, held := spliceProbe()
 	root := copyFixture(test, filepath.Join("testdata", "standing-gates", module))
-	engine, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), probe),
-		func(engine *pipeline) {
-			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-			engine.standingBodies = switched
+	pipeline, stream, _ := runOverRegistered(test, root, exitFindings, append(rules.All(), probe),
+		func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			pipeline.standingBodies = switched
 		}, "--no-cache", "--no-fix", "--build-dependence")
 	held.lock.Lock()
 	defer held.lock.Unlock()
-	return engine, normalize(stream, root), root, slices.Clone(held.spliced)
+	return pipeline, normalize(stream, root), root, slices.Clone(held.spliced)
 }
 
 // unusedFindings are run's own U1000 findings, before the merge, sorted, with root written /project.

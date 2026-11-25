@@ -31,8 +31,8 @@ func TestAUniverseNameOneSideDeclaresReachesTheBodiesThatUseIt(test *testing.T) 
 
 			root := copyFixture(test, filepath.Join("testdata", "body-reach-universe-names", side))
 			on, standardOutput, standardError, exitCode := runOverExiting(test, root, rules.All(),
-				func(engine *pipeline) {
-					engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+				func(pipeline *pipeline) {
+					pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 				}, "--no-cache", "--no-fix", "--build-dependence")
 			if exitCode == exitBroken || exitCode == exitRefused {
 				test.Fatalf("the run exited %d:\n%s\n%s", exitCode, standardOutput, standardError)

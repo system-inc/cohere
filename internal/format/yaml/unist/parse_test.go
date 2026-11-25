@@ -609,7 +609,7 @@ const corpusSizeLimit = 1 << 20
 
 // TestCorpusParseMatchesUpstream compares every .yaml and .yml file under COHERE_YAML_CORPUS, and the
 // YAML front matter value of every .md file there, enumerated as the printer's corpus test enumerates
-// them: through the engine's ignore layers, into nested repositories. A measuring run.
+// them: through the formatter's ignore layers, into nested repositories. A measuring run.
 func TestCorpusParseMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	roots := needs.OptIn(

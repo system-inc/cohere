@@ -13,9 +13,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 )
 
-// memoryRun is the engine's stream over a fresh copy of the clean fixture under memory, and the one memory record in
+// memoryRun is cohere-go's stream over a fresh copy of the clean fixture under memory, and the one memory record in
 // it, which must sit just before the inputs (#5shepvt).
-func memoryRun(test *testing.T, memory *engineMemory) (line string, record contract.MemoryRecord) {
+func memoryRun(test *testing.T, memory *memoryAccount) (line string, record contract.MemoryRecord) {
 	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", "clean"))
 	var standardOutput bytes.Buffer
@@ -56,13 +56,13 @@ func memoryRun(test *testing.T, memory *engineMemory) (line string, record contr
 // memory record just before the inputs.
 func TestARunThatRaisedWritesItsRaisesBeforeTheInputs(test *testing.T) {
 	test.Parallel()
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 
 	_, record := memoryRun(test, capMemoryWatched(watch, watch.collecting))
 
 	var raised []int64
 	for _, limit := range watch.setLimits() {
-		if limit > engineMemoryCap {
+		if limit > memoryCap {
 			raised = append(raised, limit)
 		}
 	}

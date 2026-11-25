@@ -401,7 +401,7 @@ func TestTheCaptureMarksTheAnswersTheirKindSaysTypesAloneDecide(test *testing.T)
 // says no answer of the kind is its types' alone). initProbe's answer about the package's `init` function is handed
 // unmarked, among the package's answers and the run's alike, beside purity's about the same function, which purity's
 // hook marks. An unmarked answer about an `init` is one the host's side counts unplaced, so the package lints whole
-// in every build (go_engine's TestAnAnswerAboutAnInitIsLeftOutByItsMarkAlone): nobody has argued the kind's answer is
+// in every build (go_language's TestAnAnswerAboutAnInitIsLeftOutByItsMarkAlone): nobody has argued the kind's answer is
 // the same in every build, and the capture never takes a missing hook for that argument.
 func TestTheCaptureMarksNoAnswerOfAKindThatDeclaresNoHook(test *testing.T) {
 	test.Parallel()
@@ -419,7 +419,7 @@ func TestTheCaptureMarksNoAnswerOfAKindThatDeclaresNoHook(test *testing.T) {
 }
 
 // A package the run restored from the findings cache computed nothing, so the capture holds no side of it, and the
-// engine lints it whole: a cold run with the cache captures every package, and the warm run after it, which restores
+// cohere-go lints it whole: a cold run with the cache captures every package, and the warm run after it, which restores
 // them all, none.
 func TestARestoredPackageHasNoCapture(test *testing.T) {
 	test.Parallel()

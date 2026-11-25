@@ -324,7 +324,7 @@ func differentialCompareExpressions(unit differentialUnit, theirs *ir.Function,
 	return len(expressions), present, differentialDifference{}, false
 }
 
-// TestValueForExpressionIsEmptyWithTheModeOff builds a package without SetDebugMode, as the engine builds a
+// TestValueForExpressionIsEmptyWithTheModeOff builds a package without SetDebugMode, as cohere-go builds a
 // dependency, and holds its map empty: every expression in its syntax answers nil. The same package built with the
 // mode answers some, so the check can fail.
 func TestValueForExpressionIsEmptyWithTheModeOff(test *testing.T) {

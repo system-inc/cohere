@@ -19,7 +19,7 @@
 //
 // The first matching type in the caller's list wins, so the caller's type order is part of the
 // contract, not a detail of iteration. This is not theoretical: with the full type list in
-// declaration order the engine reads `1 2 3` as `line-width` rather than `vector`, and `serif` as
+// declaration order Tailwind reads `1 2 3` as `line-width` rather than `vector`, and `serif` as
 // `family-name` rather than `generic-name`, purely because the earlier type also matches. Callers
 // pass the order Tailwind's utility definitions pass, and this function preserves it.
 //
@@ -31,14 +31,14 @@
 // with no anchoring between number and unit, which is exactly where a transcribed regexp goes
 // subtly wrong. Scanning the number once and then testing the tail against a unit set is the same
 // grammar expressed so that the two halves cannot drift apart, and it is checked against the real
-// engine rather than against this reasoning.
+// Tailwind rather than against this reasoning.
 package tailwind
 
 import "strings"
 
 // DataType is one of the CSS data types Tailwind can infer.
 //
-// Spelled as the engine spells them, hyphens and all, because these strings cross into generated
+// Spelled as Tailwind spells them, hyphens and all, because these strings cross into generated
 // descriptor tables where a Go-flavored renaming would have to be undone on every comparison.
 type DataType string
 
@@ -62,7 +62,7 @@ const (
 	DataTypeVector         DataType = "vector"
 )
 
-// AllDataTypes is every type, in the order the engine's own `checks` table declares them.
+// AllDataTypes is every type, in the order Tailwind's own `checks` table declares them.
 //
 // Callers with no opinion about order should use this rather than building their own list, because
 // first-match-wins makes an ad-hoc order a silent behavior change. It is a function returning a
@@ -92,7 +92,7 @@ func AllDataTypes() []DataType {
 
 // InferDataType returns the first type in types that value satisfies, or empty when none do.
 //
-// The empty DataType stands for the engine's `null`. A separate boolean would be more idiomatic Go,
+// The empty DataType stands for Tailwind's `null`. A separate boolean would be more idiomatic Go,
 // but every caller of this in the port immediately compares the result against a descriptor's
 // declared type, and a two-value return turns each of those comparisons into a two-line dance
 // around a value that is already unambiguous: no type is a valid answer, not an error.
@@ -109,7 +109,7 @@ func InferDataType(value string, types []DataType) DataType {
 	return ""
 }
 
-// matchesDataType is the engine's `checks` table.
+// matchesDataType is Tailwind's `checks` table.
 //
 // An unknown type matches nothing, mirroring `checks[type]?.(value)`, where an absent entry makes
 // the optional call evaluate to undefined and the branch fall through. That matters because the
@@ -160,7 +160,7 @@ func matchesDataType(value string, dataType DataType) bool {
 // isUrl ports `IS_URL = /^url\(.*\)$/`.
 //
 // `.` in JavaScript regexps without the `s` flag does not match a newline, so a value containing one
-// between the parens is not a url to the engine even though the string plainly starts with `url(`
+// between the parens is not a url to Tailwind even though the string plainly starts with `url(`
 // and ends with `)`. Reproduced rather than tidied, because "the obvious reading" is how ports drift.
 func isUrl(value string) bool {
 	if !strings.HasPrefix(value, "url(") || !strings.HasSuffix(value, ")") {
@@ -399,8 +399,8 @@ func isPercentage(value string) bool {
 // `\s` in a JavaScript regexp is a wider set than a plain space: it includes tab, newline, form
 // feed, carriage return, vertical tab, non-breaking space, BOM, and the Unicode space separators.
 // Reproduced through isJavaScriptSpace rather than narrowed to ASCII, because narrowing would make
-// a value with a non-breaking space around the slash read as not-a-ratio here and as a ratio in the
-// engine.
+// a value with a non-breaking space around the slash read as not-a-ratio here and as a ratio in
+// Tailwind.
 func isFraction(value string) bool {
 	if hasMathFunction(value) {
 		return true
@@ -421,7 +421,7 @@ func isFraction(value string) bool {
 
 /* -------------------------------------------------------------------------- */
 
-// lengthUnits is the CSS length unit list, matched case-sensitively and exactly as the engine's
+// lengthUnits is the CSS length unit list, matched case-sensitively and exactly as Tailwind's
 // alternation matches it. `Q` is uppercase on purpose.
 var lengthUnits = []string{
 	"cm", "mm", "Q", "in", "pc", "pt", "px",
@@ -434,7 +434,7 @@ var lengthUnits = []string{
 // IsLength ports `IS_LENGTH.test(value) || IS_LENGTH_FN.test(value) || hasMathFn(value)`.
 //
 // `IS_LENGTH_FN = /^(--spacing)\(/i` is case-insensitive, which only matters for the letters, so
-// `--SPACING(` is a length to the engine.
+// `--SPACING(` is a length to Tailwind.
 //
 // Exported because the utility evaluator and the value parser both need to ask this directly rather
 // than through a one-element type list.
@@ -485,7 +485,7 @@ func isBackgroundPosition(value string) bool {
 // `cover,nonsense` is still a background size, on the strength of `cover` alone, while
 // `cover,a b c` is not, because the three-value part takes the explicit return. Upstream reads as
 // though it might be an oversight; it is reproduced rather than corrected, since the whole point of
-// this file is to answer what the engine answers.
+// this file is to answer what Tailwind answers.
 func isBackgroundSize(value string) bool {
 	count := 0
 	for _, size := range segment(value, ',') {

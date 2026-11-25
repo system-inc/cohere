@@ -23,10 +23,10 @@ import (
 )
 
 // hostTimeline is every stamp a cold run of every build over the other-builds fixture takes outside its extra builds,
-// in the order taken: the engine's start, the host's load, its check and its lint, the handover to the builds, and,
+// in the order taken: cohere-go's start, the host's load, its check and its lint, the handover to the builds, and,
 // after every build, the merge and the run's end.
 var hostTimeline = []string{
-	"engine.main.begin",
+	"main.begin",
 	"host.listing.end",
 	"host.restore.begin",
 	"host.restore.end",
@@ -61,7 +61,7 @@ var buildTimeline = []string{
 	"end",
 }
 
-// timelineRun is the engine's stream over root with the registry's rules and its findings cache in root's own store,
+// timelineRun is cohere-go's stream over root with the registry's rules and its findings cache in root's own store,
 // under `--no-fix` unless fixes, so nothing is written to the tree, and extra, its request changed by change when not
 // nil, its extra builds run width at once, as a test forces it (buildsWidthForced), and its exit, which the stream
 // agrees with, wantExit.
@@ -82,10 +82,10 @@ func timelineRun(
 	if change != nil {
 		change(&request)
 	}
-	_, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), func(engine *pipeline) {
-		engine.buildsWidthForced = width
+	_, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), func(pipeline *pipeline) {
+		pipeline.buildsWidthForced = width
 		// The width applies whether or not the builds restore from the host's run.
-		engine.buildsWidthUnguarded = true
+		pipeline.buildsWidthUnguarded = true
 	})
 	checkStream(test, standardOutput, exitCode)
 	if exitCode != wantExit {
@@ -517,11 +517,11 @@ func TestTheTimelineChangesNothingAboutTheRun(test *testing.T) {
 // first build that never ended reads as a failure rather than a run that never ends.
 func buildFirst(test *testing.T, first func(build project.Build) bool) func(*pipeline) {
 	ended := make(chan struct{})
-	return func(engine *pipeline) {
-		engine.buildsWidthForced = 2
+	return func(pipeline *pipeline) {
+		pipeline.buildsWidthForced = 2
 		// The width applies whether or not the builds restore from the host's run.
-		engine.buildsWidthUnguarded = true
-		engine.extraBuildStarts = func(extra project.Build) {
+		pipeline.buildsWidthUnguarded = true
+		pipeline.extraBuildStarts = func(extra project.Build) {
 			if first(extra) {
 				return
 			}
@@ -531,7 +531,7 @@ func buildFirst(test *testing.T, first func(build project.Build) bool) func(*pip
 				test.Errorf("the build %s was held for a first build that never ended", extra)
 			}
 		}
-		engine.extraBuildEnds = func(extra project.Build, _ io.Writer) error {
+		pipeline.extraBuildEnds = func(extra project.Build, _ io.Writer) error {
 			if first(extra) {
 				close(ended)
 			}

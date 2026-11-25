@@ -221,7 +221,7 @@ func TestDescriptorExemptionsAreStillNeeded(test *testing.T) {
 // would stop being harmless.
 func TestNoClassReachesTheTextDropCell(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
+	forEachTailwindSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
 
 		keys := system.Theme().KeysInNamespaces([]string{"--drop"})
 		if len(keys) == 0 {

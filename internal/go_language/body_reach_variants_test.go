@@ -32,10 +32,10 @@ func TestAPackageWhoseImportResolvesToAnotherPackageIsReachedWhole(test *testing
 	const rebuilt = "example.com/audit/via [example.com/audit.test]"
 	const external = "example.com/audit_test [example.com/audit.test]"
 	root := copyFixture(test, filepath.Join(bodyReachVariantsFixtures, "variant-through-dependency"))
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyReachFromSourceRecord = test.TempDir()
-		engine.bodyDifferential = true
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyReachFromSourceRecord = test.TempDir()
+		pipeline.bodyDifferential = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
@@ -99,10 +99,10 @@ func TestABodyNamingATypeOfAPackageBuiltAgainForItsTestsIsReached(test *testing.
 	const rebuilt = "example.com/audit/q [example.com/audit/p.test]"
 	const external = "example.com/audit/p_test [example.com/audit/p.test]"
 	root := copyFixture(test, filepath.Join(bodyReachVariantsFixtures, "variant-method-set"))
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyReachFromSourceRecord = test.TempDir()
-		engine.bodyDifferential = true
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyReachFromSourceRecord = test.TempDir()
+		pipeline.bodyDifferential = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
@@ -170,11 +170,11 @@ func TestABodyNamingAPackageTheBuildLacksByItsIdentifierIsReachedOverAWarmCache(
 	// run is one run over the copy, its findings cache on and in the copy's own store, with windows's build of it.
 	run := func() (*pipeline, buildRun) {
 		sharing := sharingSystemCache(systemCache)
-		on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-			sharing(engine)
-			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-			engine.bodyReachFromSourceRecord = test.TempDir()
-			engine.bodyDifferential = true
+		on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+			sharing(pipeline)
+			pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			pipeline.bodyReachFromSourceRecord = test.TempDir()
+			pipeline.bodyDifferential = true
 		}, "--no-fix", "--build-dependence")
 		if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 			test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))

@@ -133,7 +133,7 @@ func sourceFunction(function *intermediate_representation.Function) ast.Node {
 	return nil
 }
 
-// wholeFindings runs the rule over roots as the engine does, every function built first, and is its findings by the
+// wholeFindings runs the rule over roots as cohere-go does, every function built first, and is its findings by the
 // function each one's go statement is in, in the order the rule reported them.
 func wholeFindings(test *testing.T, roots []*packages.Package) map[string][]string {
 	test.Helper()

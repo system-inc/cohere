@@ -574,7 +574,7 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
 				test.Fatalf("suggestion %d is %q, want %q", testCase.index, suggestion.Message.Id, testCase.wantId)
 			}
 			// The harness applies fixes and not suggestions, so this replays the suggestion's own
-			// fixes the way the engine would: back to front, so an earlier edit cannot move the
+			// fixes the way the linter would: back to front, so an earlier edit cannot move the
 			// offsets a later one was computed against.
 			//
 			// The expectation is transformed the same way `RunTyped` transformed the input, rather
@@ -592,7 +592,7 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
 
 // applySuggestion replays one suggestion's fixes into the source, back to front.
 //
-// Same ordering the fix engine and `rule_testing.ExpectFixedSource` use, and for the same reason.
+// Same ordering the fix pass and `rule_testing.ExpectFixedSource` use, and for the same reason.
 // Written here rather than in the harness because it is the only rule in this batch that needs it
 // and the harness has no suggestion support at all; if a second rule wants it, it belongs there.
 func applySuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {

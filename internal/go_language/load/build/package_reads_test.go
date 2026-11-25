@@ -47,7 +47,7 @@ func TestEveryFieldBeyondTheTagsKeepsAReadFromBeingTaken(test *testing.T) {
 }
 
 // A file the run held when a build read its directory, and holds no longer when a later build lists it, is read again
-// from disk by that build, never taken from the read of the bytes it held (#y8cf1wf). The engine drops a file's hold
+// from disk by that build, never taken from the read of the bytes it held (#y8cf1wf). cohere-go drops a file's hold
 // when a write's reread fails (pipeline.reread); a write it rereads holds the new bytes instead, which the bytes'
 // comparison refuses. A build holding the same bytes takes the read, so the refusal is no read that is never taken.
 func TestAFileNoLongerHeldIsReadAgainFromDisk(test *testing.T) {

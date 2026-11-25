@@ -26,7 +26,7 @@ func writeRecord(test *testing.T, directory string, name string, medianSeconds f
 			Round:          round,
 			VerdictSeconds: medianSeconds,
 			SettledSeconds: medianSeconds,
-			EngineSeconds:  medianSeconds,
+			SummarySeconds: medianSeconds,
 			IdleBefore:     idle,
 			IdleAfter:      idle,
 			Quiet:          quiet,
@@ -204,7 +204,7 @@ func TestAcceptRefusesALoadedRecordAndAMissingReason(test *testing.T) {
 }
 
 // writeNarrowedRecord writes the record writeRecord writes, narrowed to the Go project alone, as
-// quiet_machine.sh's --engine Go records it.
+// quiet_machine.sh's --project-kind GoModule records it.
 func writeNarrowedRecord(test *testing.T, directory string, name string, medianSeconds float64) string {
 	test.Helper()
 	path := writeRecord(test, directory, name, medianSeconds, true)
@@ -212,7 +212,7 @@ func writeNarrowedRecord(test *testing.T, directory string, name string, medianS
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	record.Engine = bench_results.EngineGo
+	record.ProjectKind = bench_results.ProjectKindGoModule
 	encoded, encodeError := bench_results.Encode(record)
 	if encodeError != nil {
 		test.Fatal(encodeError)
@@ -223,9 +223,9 @@ func writeNarrowedRecord(test *testing.T, directory string, name string, medianS
 	return path
 }
 
-// A record narrowed to one engine's project never becomes a baseline, on either path that makes one: the first
-// night and -accept each exit 1 naming the engine, and write no baseline, no move and no verdict. The same
-// quiet record of the whole root is still made the baseline on both paths, so the refusal is the engine's alone.
+// A record narrowed to one project never becomes a baseline, on either path that makes one: the first
+// night and -accept each exit 1 naming cohere, and write no baseline, no move and no verdict. The same
+// quiet record of the whole root is still made the baseline on both paths, so the refusal is cohere's alone.
 func TestANarrowedRecordIsNeverABaseline(test *testing.T) {
 	test.Parallel()
 	records := test.TempDir()
@@ -246,9 +246,9 @@ func TestANarrowedRecordIsNeverABaseline(test *testing.T) {
 			if exit != 1 {
 				test.Fatalf("a narrowed record exited %d, want 1:\n%s", exit, said)
 			}
-			if !strings.Contains(said, "checked the Go project alone (engine Go)") ||
+			if !strings.Contains(said, "checked the GoModule project alone (project kind GoModule)") ||
 				!strings.Contains(said, "a baseline is a record of the whole root") {
-				test.Errorf("the refusal %q does not name the engine and the rule", said)
+				test.Errorf("the refusal %q does not name cohere and the rule", said)
 			}
 			if entries, readError := os.ReadDir(state); readError != nil || len(entries) != 0 {
 				test.Errorf("the state directory holds %v (%v)", entries, readError)

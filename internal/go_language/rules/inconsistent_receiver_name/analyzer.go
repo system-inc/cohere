@@ -1,5 +1,5 @@
 // Package inconsistent_receiver_name is staticcheck's `ST1016`, the methods of one type giving their receiver more
-// than one name, ported onto the engine's syntax dispatcher.
+// than one name, ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1016/st1016.go, whose message it reports
 // word for word, at the type's first method in its method set's order, with no range, as the original does. Like the
@@ -12,7 +12,7 @@
 // staticcheck helpers.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge. The original is NonDefault, off
+// and cohere-go runs one configuration, so there is nothing for the port to merge. The original is NonDefault, off
 // unless configured, which is the registry's to honor, not the check's.
 package inconsistent_receiver_name
 

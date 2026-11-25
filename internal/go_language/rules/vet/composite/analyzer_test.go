@@ -92,7 +92,7 @@ func TestPortMatchesOriginalWithTheAllowListOff(test *testing.T) {
 		"a", "typeparams", "parity")
 }
 
-// BenchmarkOverTheCheckPackage weighs the port over the engine's check package, a real package of the repository
+// BenchmarkOverTheCheckPackage weighs the port over cohere-go's check package, a real package of the repository
 // and one of its largest, whose unkeyed literals, slices of every kind among them, each have their type's terms
 // read. The package is loaded once and every prerequisite run once on it, so each iteration is the dispatcher's walk
 // with the port's listener alone, and the allocations reported are the walk's and the port's. It is skipped under

@@ -182,20 +182,20 @@ func TestAShardStampIsJudgedByTheSystemClockByDefault(test *testing.T) {
 	}
 }
 
-// A run removes the packs of other engines from each store directory once, at its first ask, however many builds
+// A run removes the packs of other executables from each store directory once, at its first ask, however many builds
 // write packs there or through however many stores, so no build after the first lists the directory again; another
 // directory is swept at its own first ask, and a store holding no stamps, or another run's, sweeps each time it asks.
-func TestARunSweepsEachStoreOfOtherEnginesPacksOnce(test *testing.T) {
+func TestARunSweepsEachStoreOfOtherIdentitiesPacksOnce(test *testing.T) {
 	test.Parallel()
 
-	ours := PackIdentity("this engine")
-	other := PackPlace{Identity: PackIdentity("another engine"), Name: PackName([]string{"other"})}
+	ours := PackIdentity("cohere-go")
+	other := PackPlace{Identity: PackIdentity("another executable"), Name: PackName([]string{"other"})}
 	swept := func(store *Store) bool {
 		test.Helper()
 		if writeError := store.WritePack(other, nil, nil); writeError != nil {
 			test.Fatal(writeError)
 		}
-		store.RemoveOtherEnginesPacks(ours)
+		store.RemoveOtherIdentitiesPacks(ours)
 		_, refused := store.ReadPack(other)
 		return refused == PackMissing
 	}
@@ -204,7 +204,7 @@ func TestARunSweepsEachStoreOfOtherEnginesPacksOnce(test *testing.T) {
 	run := NewShardStamps(nil)
 	first := Open(root, run)
 	if !swept(first) {
-		test.Error("the run's first ask left another engine's pack")
+		test.Error("the run's first ask left another executable's pack")
 	}
 	for name, store := range map[string]*Store{"the same store": first, "another store of the run": Open(root, run)} {
 		if swept(store) {
@@ -213,18 +213,18 @@ func TestARunSweepsEachStoreOfOtherEnginesPacksOnce(test *testing.T) {
 	}
 	elsewhere := Open(test.TempDir(), run)
 	if !swept(elsewhere) {
-		test.Error("the run's first ask of another directory left another engine's pack")
+		test.Error("the run's first ask of another directory left another executable's pack")
 	}
 	if swept(elsewhere) {
 		test.Error("the run swept another directory twice")
 	}
 	if !swept(Open(root, NewShardStamps(nil))) {
-		test.Error("another run's first ask left another engine's pack")
+		test.Error("another run's first ask left another executable's pack")
 	}
 	unstamped := Open(root, nil)
 	for ask := range 2 {
 		if !swept(unstamped) {
-			test.Errorf("a store holding no stamps left another engine's pack at its ask %d", ask+1)
+			test.Errorf("a store holding no stamps left another executable's pack at its ask %d", ask+1)
 		}
 	}
 }

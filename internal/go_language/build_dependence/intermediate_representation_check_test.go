@@ -50,7 +50,7 @@ const wideDifferencesListed = 200
 // predicate production hands NewPackage is each package's own.
 type controlFlows map[string]*ctrlflow.CFGs
 
-// controlFlowsOf runs ctrlflow over every package of loaded through the engine's own checker, every package a root so
+// controlFlowsOf runs ctrlflow over every package of loaded through cohere-go's own checker, every package a root so
 // none of them is let go of, as a run's checker runs it on each package and its dependencies: the facts each package
 // exports reach its importers' passes, so each predicate answers for its callees as production's does.
 func controlFlowsOf(test *testing.T, loaded loadedBuild) controlFlows {

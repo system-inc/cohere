@@ -26,7 +26,7 @@ import (
 )
 
 // demandDifferentialVariable names the tree the demand differential runs over: root for cohere's own module, or a
-// directory, whose every package it loads as the engine does. The standard library is its source folder, under
+// directory, whose every package it loads as cohere-go does. The standard library is its source folder, under
 // `GOROOT` set to the toolchain it belongs to.
 const demandDifferentialVariable = "COHERE_GO_IR_DEMAND_DIFFERENTIAL"
 
@@ -98,7 +98,7 @@ func TestDemandAnswersAsThePushOverATree(test *testing.T) {
 	requireDemandAnswersAsPush(test, workspace.Root, loaded.Packages)
 }
 
-// requireDemandAnswersAsPush runs the push beside SA4023 over roots, as the engine runs it, then asks the resolver of
+// requireDemandAnswersAsPush runs the push beside SA4023 over roots, as cohere-go runs it, then asks the resolver of
 // every function of every package the push judged, as that package's own reader, and fails on the first answer the
 // push's facts contradict, or on any verdict a fallback contradicted.
 func requireDemandAnswersAsPush(test *testing.T, described string, roots []*packages.Package) {
@@ -107,11 +107,11 @@ func requireDemandAnswersAsPush(test *testing.T, described string, roots []*pack
 	push := return_nil_ness.NewPushAnalyzer(&judged)
 	options := check.DispatchOptions()
 	options.Finished = func(*packages.Package) {
-		// Setting Finished lets a root's syntax go, as the engine's run does; the resolver keeps its own.
+		// Setting Finished lets a root's syntax go, as cohere-go's run does; the resolver keeps its own.
 	}
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{push, typed_nil_interface_comparison.Analyzer}, roots,
 		options)
@@ -230,7 +230,7 @@ func probeFixtures(test *testing.T, patterns ...string) probed {
 	options := check.DispatchOptions()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{probe}, loaded.Roots, options)
 	if analyzeError != nil {

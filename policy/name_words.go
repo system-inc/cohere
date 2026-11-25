@@ -8,7 +8,7 @@ import (
 // NameWords.json is the words a folder's or a file's name spells out and an identifier need not, beside
 // Abbreviations.json (#zyq63kk): `docs` is documentation on a path, and inside an identifier it is often the
 // plural of Prettier's doc. It has Abbreviations.json's shape, so internal/naming/abbreviation reads it with the
-// same loader, and internal/file_name_words judges a name's words by both. The Swift engine compiles in the same
+// same loader, and internal/file_name_words judges a name's words by both. cohere-swift compiles in the same
 // bytes (SwiftFiles).
 //
 //go:embed NameWords.json

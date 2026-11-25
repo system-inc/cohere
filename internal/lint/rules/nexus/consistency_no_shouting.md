@@ -19,7 +19,7 @@ tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 Tokens a hyphen or an ampersand joins are read whole first, as Nexus's `findUppercaseTokens` reads them (#1z7kbtz):
 a run with a digit anywhere or a part one letter long is an identifier, and nothing in it is shouting, so a fact id
 like `F-PROMISE-13` and a name like `AT&T` pass, while `WILL-NOT` has neither and each of its words is judged alone.
-Every engine reads runs the same way (`uppercaseTokens` in `internal/shouting/shouting.go`, and Swift's `words(in:)`),
+every language reads runs the same way (`uppercaseTokens` in `internal/shouting/shouting.go`, and Swift's `words(in:)`),
 held by corpus cases `sh29` to `sh31`.
 
 A run of `//` comments on consecutive lines, with nothing but whitespace between them, is masked as
@@ -31,14 +31,14 @@ each occurrence, and names it. The text rules corpus holds all three (`sh04`, `s
 span cases), task #34fejeq.
 
 A comment is read without its delimiters, as ESLint reads a comment's value: a `//` line loses its
-slashes and the one space after them, as the Go and Swift engines read one, and a block comment its
+slashes and the one space after them, as cohere-go and cohere-swift read one, and a block comment its
 `/*` and `*/`. The command patterns anchor at a line's start, so read whole, a command on a `//` line
 or in a one-line block comment opened on its slashes and its capitals were read as shouting (#xfa3q6w,
 corpus cases `sh24` and `sh25`; `TestConsistencyNoShoutingReadsACommentWithoutItsDelimiters`).
 
 The masks live in `internal/shouting/shouting.go`, and the safe list in `policy/Shouting.json`, which
-`internal/shouting/vocabulary.go` reads. The Go engine's `cohere-go/consistency-no-shouting` reads both
-too, and Swift compiles in the same list, so every engine agrees on what an acronym is.
+`internal/shouting/vocabulary.go` reads. cohere-go's `cohere-go/consistency-no-shouting` reads both
+too, and Swift compiles in the same list, so every language agrees on what an acronym is.
 
 Kirk's ruling on the 2026-10-01 review: all caps belongs in backticks, single quotes or double quotes
 unless it is on the safe list. The safe list is the authority for what an acronym is.
@@ -92,7 +92,7 @@ Go port afterwards and belongs in the original's list too.
   `maskWrappedDoubleQuotes` pairs only the quotes the one-line pass left over, one on each of two
   adjacent lines, so a stray inch mark cannot open a span that unmasks a later quote. Nexus's
   `Shouting.ts` took the same mask after its double-quote replace (Nexus 68fc7fb, #dhaawhz), so the
-  engines agree on that site.
+  linters agree on that site.
 - **Command lines are matched after the JSDoc gutter is stripped**, so a command inside a block
   comment is masked. Recorded in `maskCommandLines`.
 - **A sentence that wraps onto a command word is read** (#tp7ahz0). The original masks every line

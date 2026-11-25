@@ -1,6 +1,6 @@
-// Command cohere-parity is the census of the Go engine's ports against their originals over a real tree. A port's
+// Command cohere-parity is the census of cohere-go's ports against their originals over a real tree. A port's
 // tests hold it to its original over fixtures (internal/go_language/check/parity); this holds it over code nobody wrote
-// for the comparison, as the engine loads it, tests included, and prints where the two disagree.
+// for the comparison, as cohere-go loads it, tests included, and prints where the two disagree.
 //
 //	cohere-parity <directory>                     every pair over ./... of directory
 //	cohere-parity <directory> std                 the patterns to load, as go list takes them
@@ -213,8 +213,8 @@ type censusResult struct {
 	unexplained int
 }
 
-// census loads the packages patterns name from directory as the engine loads them, tests included, runs every
-// selected pair's original and port in one checker over what the engine analyzes, and judges each finding only the
+// census loads the packages patterns name from directory as cohere-go loads them, tests included, runs every
+// selected pair's original and port in one checker over what cohere-go analyzes, and judges each finding only the
 // port makes against its gains file, read relative to gainsRoot.
 func census(selected []censusPair, gainsRoot string, directory string, patterns []string) (censusResult, error) {
 	recordedGains := map[string][]gain{}

@@ -1,5 +1,5 @@
 // Package copied reads the header that declares a Go file a copy of upstream source: foreign code we carry, byte
-// for byte, until upstream ships what we needed from it. The engine withholds house rules' findings in such a file
+// for byte, until upstream ships what we needed from it. cohere-go withholds house rules' findings in such a file
 // and counts them, as it does for a generated file, while vet, tools and staticcheck still judge it. Restyling a
 // copy to the house would bury the one thing that matters about it, its diff against upstream.
 //

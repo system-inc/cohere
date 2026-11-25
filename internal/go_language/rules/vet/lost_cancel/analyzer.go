@@ -6,7 +6,7 @@
 // returning from it ends the process.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/lostcancel/lostcancel.go, whose
-// logic it keeps and whose messages it reports word for word, at the same positions. It sits on the engine's syntax
+// logic it keeps and whose messages it reports word for word, at the same positions. It sits on cohere-go's syntax
 // dispatcher, hearing each function declaration and literal on the walk the dispatcher makes once for every syntax
 // rule, where the original walks the package with an inspector of its own. Its listener requires the original's
 // other requirement, x/tools' public ctrlflow, and searches the control-flow graph ctrlflow builds for each function,

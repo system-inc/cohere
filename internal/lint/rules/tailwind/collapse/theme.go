@@ -10,7 +10,7 @@
 // running the generator against two repositories on the same Tailwind 4.3.3 produced tables that
 // differed, because each project's own `@theme` entries were baked in as though they were framework
 // facts. Measured on the corpus this file is tested against, ahra resolves 744 theme entries and
-// www-connected-app resolves 748, on the same engine. This is the code that reads the repository in
+// www-connected-app resolves 748, on the same Tailwind. This is the code that reads the repository in
 // front of us instead of shipping one repository's tokens as everyone's.
 //
 // # Insertion order is part of the contract, not an implementation detail
@@ -48,8 +48,8 @@
 // reports on the class literal in a user's source file, never on generated CSS.
 //
 // `markUsedVariable` and `ThemeOptionUsed` are ported, because the bit is observable through
-// `GetOptions` and a port that dropped it would silently answer a different bitfield than the
-// engine. Nothing in cohere calls it yet; see its doc comment.
+// `GetOptions` and a port that dropped it would silently answer a different bitfield than
+// Tailwind. Nothing in cohere calls it yet; see its doc comment.
 package tailwind
 
 import (
@@ -113,7 +113,7 @@ var ignoredThemeKeys = map[string][]string{
 // The match is exact equality or a `-` boundary, never a bare prefix. `--font-weightless` is not
 // ignored by `--font-weight` because `weightless` continues the word rather than starting a new
 // segment, and a port using `strings.HasPrefix(themeKey, ignored)` alone would drop it from the
-// `--font` namespace where the engine keeps it.
+// `--font` namespace where Tailwind keeps it.
 func isIgnoredThemeKey(themeKey, namespace string) bool {
 	for _, ignoredThemeKey := range ignoredThemeKeys[namespace] {
 		if themeKey == ignoredThemeKey || strings.HasPrefix(themeKey, ignoredThemeKey+"-") {
@@ -396,7 +396,7 @@ func (theme *Theme) PrefixKey(key string) string {
 // Upstream slices at `3 + prefix.length` unconditionally, without checking that the key actually
 // carries the prefix, and this does the same. On a key that lacks it the result is meaningless in
 // both implementations; reproducing the behaviour keeps the port faithful where a defensive check
-// would make it answer differently than the engine on malformed input.
+// would make it answer differently than Tailwind on malformed input.
 func (theme *Theme) unprefixKey(key string) string {
 	if theme.Prefix == "" {
 		return key
@@ -416,7 +416,7 @@ func (theme *Theme) unprefixKey(key string) string {
 //
 // The namespace match here is a bare prefix, not a `-` boundary, matching upstream. That is
 // observable: `--color-*: initial` also clears `--colorful-b`, because the directive strips the
-// `-*` and tests `strings.HasPrefix(key, "--color")`. It looks like a bug and it is the engine's
+// `-*` and tests `strings.HasPrefix(key, "--color")`. It looks like a bug and it is Tailwind's
 // behaviour, so the port reproduces it rather than improving on it.
 func (theme *Theme) ClearNamespace(namespace string, clearOptions ThemeOptions) {
 	ignored := ignoredThemeKeys[namespace]
@@ -506,7 +506,7 @@ func (theme *Theme) variableReference(themeKey string) (string, bool) {
 // MarkUsedVariable sets ThemeOptionUsed on a key and reports whether this call is what set it.
 //
 // Nothing in cohere calls this. It is ported because the bit it sets is readable through
-// GetOptions, so a Theme that silently lacked it would answer a different bitfield than the engine
+// GetOptions, so a Theme that silently lacked it would answer a different bitfield than Tailwind
 // for any consumer that did mark usage, and because the `!isUsed` return is the kind of
 // first-caller-wins signal that is easy to get backwards when written later from memory. The key is
 // unprefixed and unescaped first, matching GetOptions.

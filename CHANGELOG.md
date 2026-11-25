@@ -65,12 +65,12 @@ changed in cohere outside the sets is written under the same heading.
   kept in upstream's shape says so with a suppression naming `nexus/consistency-no-duplicate-function` or
   `cohere-go/consistency-no-duplicate-function` and its reason, and one that keeps nothing is listed. It is never
   a finding and never moves the exit code. `--json` writes `duplicate`, `duplicateRefused` and
-  `duplicateCoverage` lines. A Swift project's run says its report did not run, since its engine has none.
-- Go. A directory with a `go.work` or a `go.mod` is a Go project, checked by the Go engine, which is
-  `cohere` itself run as a child of itself (`cohere go-engine`), so there is nothing more to install. A
-  repository holding TypeScript, Swift and Go gets one report and one footer, counting each engine's
+  `duplicateCoverage` lines. A Swift project's run says its report did not run, since cohere-swift has none.
+- Go. A directory with a `go.work` or a `go.mod` is a Go project, checked by cohere-go, which is
+  `cohere` itself run as a child of itself (`cohere go-language`), so there is nothing more to install. A
+  repository holding TypeScript, Swift and Go gets one report and one footer, counting each language's
   projects, and the worst exit wins. A workspace checks every module its `go.work` uses, and a module
-  no workspace uses runs on its own, with a note when a workspace above it leaves it out. A Go engine
+  no workspace uses runs on its own, with a note when a workspace above it leaves it out. A cohere-go
   that crashes, prints nothing or stops early is reported as nothing checked, never as green.
 - A Go file only another build compiles (another `GOOS`, cgo, a build tag) is never read green over. A run
   checks every build the project's files name beside the machine's and merges their findings, so only a file
@@ -102,17 +102,17 @@ changed in cohere outside the sets is written under the same heading.
   check: its files' type errors are reported, they're never linted or formatted, and the footer counts them as
   `types-only`, as `typesOnly` in `--json`. Where both match a file, the entry naming `types` wins. `--verbose`
   and `--json` also list cohere's own defaults, `testdata` (kind `input`) and `Vendor` (kind `thirdParty`), with
-  their reasons. Each holds only where its tree is already skipped, by the Go engine, the format walk and the
-  Swift engine, so a file a tsconfig includes under either is still type-checked and linted, and neither is
+  their reasons. Each holds only where its tree is already skipped, by cohere-go, the format walk and the
+  cohere-swift, so a file a tsconfig includes under either is still type-checked and linted, and neither is
   ever an unused ignore.
 - `var` is a JavaScript keyword term, not an abbreviation. `policy/KeywordTerms.json` lists the exact names in
   which a capitalized `Var` means the keyword, `VarDeclaration`, `VarDeclarations`, `VarDeclared`, `VarKeyword`
   and `VarScoped`, each read only where the name's next word starts after it, so `isVarDeclaration` and
-  `TopLevelVarScopedDeclarations` read clean in every engine, while `NoVar`, `themeVar` and `VarScopedness` are
+  `TopLevelVarScopedDeclarations` read clean in every language, while `NoVar`, `themeVar` and `VarScopedness` are
   still told to write `Variable` or say they mean the keyword. A name holding a keyword term and another
-  abbreviation still reports the other. The list is decided once for every engine, and is never a project's
+  abbreviation still reports the other. The list is decided once for every language, and is never a project's
   `allowedSegments` entry.
-- A file's name is judged as a folder's is, in every engine, by two rules each with its corpus family
+- A file's name is judged as a folder's is, in every language, by two rules each with its corpus family
   (#2xt6v5r): `consistency-no-utils-file-name` refuses `util` or `utils` as a word of the name (`util.go`,
   `stringUtils.ts`, `ViewUtil.swift`, `util_test.go`), and `consistency-no-abbreviated-file-name` judges the
   name's words by `policy/Abbreviations.json`, read as the identifier they spell (`cfg.go`, `msgPrinter.ts`).
@@ -121,7 +121,7 @@ changed in cohere outside the sets is written under the same heading.
   rule's name, upstream's for a port, is the rule's and is set aside, and only the words beside it are judged:
   `max_lines.go` and `MaxClassesPerFileRule.ts` pass, `no_var_cfg.go` reports `cfg`. Only a name of two
   words or more does: `config.ts` is judged though `react-hooks/config` is registered. TypeScript reads its
-  registry, Swift its own, and Go every engine's names from `internal/rule_names`, which the generator writes
+  registry, Swift its own, and Go every language's names from `internal/rule_names`, which the generator writes
   beside `documentation/data/rules.json`, since a Go file in cohere is named for the TypeScript rule it ports.
   A name's words are cut at underscores, hyphens, dots, a Swift `+` and case, with what a tool reads set
   aside (`_test`, `_linux`, `_amd64`, `.test`, `.d`, `.config`), and a generated file, a name a tool requires
@@ -149,20 +149,33 @@ changed in cohere outside the sets is written under the same heading.
   only such names is refused, and so is a path or `--stdin-filepath` of a kind not named. A plain run is unchanged,
   its replay key included; a narrowed run never replays as a whole one, since only its projects' runs replay, each
   that project's plain run, and the kinds a format walk leaves out are in its key.
-- `--profile <file>` profiles a Go run's engine too (#r33n96f): the front door writes its own CPU profile to the
-  file, as before, and the Go engine, which does the run's work, writes its own beside it, `go` before the
-  extension (`run.pprof` gives `run.go.pprof`). The engine takes `--profile` itself, so release's training script
-  profiles it run directly. The Swift engine takes none, and a profiled Swift run says no Swift profile was
+- `--profile <file>` profiles a Go run's child too (#r33n96f): the front door writes its own CPU profile to the
+  file, as before, and cohere-go, which does the run's work, writes its own beside it, `go` before the
+  extension (`run.pprof` gives `run.go.pprof`). cohere-go takes `--profile` itself, so release's training script
+  profiles it run directly. cohere-swift takes none, and a profiled Swift run says no Swift profile was
   written. A narrowed run whose folder check sends its project to a run of its own profiles that run to
   `run.project.pprof`, where both processes once wrote one file and left neither whole.
 
 ### Changed
 
+- The word "engine" is gone from what cohere prints and reads (#9gjmwgs). Go is checked by cohere-go, the
+  hidden mode `cohere go-language` (was `cohere go-engine`), and a script that starts one reads the new names:
+  `COHERE_PROJECT_KIND` (was `COHERE_PROJECT_ENGINE`) with the values `TypeScriptProgram`, `SwiftPackage`,
+  `GoModule` and `Folder` (were `TypeScript`, `Swift`, `Go` and `Format`), and `COHERE_GO_CHILD` (was
+  `COHERE_GO_ENGINE_CHILD`). The override naming a cohere-swift to run is `COHERE_SWIFT_BINARY` (was
+  `COHERE_SWIFT_ENGINE`), announced as `cohere: running cohere-swift <path> named by COHERE_SWIFT_BINARY`, and the
+  values a run hands its children are `COHERE_SWIFT_BINARY_PATH` and `COHERE_SWIFT_BINARY_COMMIT`. `--version`
+  says `go:` and `swift:` where it said `go engine:` and `swift engine:`, and `cohere-swift was built from` where
+  it said `the Swift engine was built from`.
+  `--json` writes a build before the check as `{"kind":"programBuild","program":...}` (was `engineBuild` and
+  `engine`), and the timeline's first stamp is `main.begin` (was `engine.main.begin`). The root's format-only
+  project is labeled and counted as `Folder` (was `Format`). The findings cache, the kept listings and the run
+  cache take new versions, so the first run after an upgrade is cold.
 - cohere's own `docs/` is `documentation/`, and `internal/docs_data/` is `internal/documentation_data/`, package
   `documentation_data`, so the folder check reads cohere itself clean (#zyq63kk). The website's data is
   `documentation/data/` from here, written by `go run ./internal/documentation_data/tools/generate`, and a reader
   of `docs/data/` follows it at its next copy or pin. `documentation/` holds no Go, since the go command ignores a
-  package named documentation: every engine's rule names, which the Go file-name rule and the folder check read,
+  package named documentation: every language's rule names, which the Go file-name rule and the folder check read,
   are `internal/rule_names`, a Go file the same generator writes and its freshness check holds, where they were an
   embed of `rules.json`.
 - `.mts` and `.cts` files are formatted, as Prettier formats them: its typescript parser with no JSX, so a
@@ -196,7 +209,7 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   the line with its name, as in `⚠ 👑 lint did not run (CapturePhone)`, and a project that didn't finish or
   failed without a summary is named too. `--verbose` and `--phases` print each project's footer and the line
   counting the projects, as before, and `--json` is unchanged.
-- `--directory` naming a directory that holds more than one engine's project, a `tsconfig.json` beside a `go.work`
+- `--directory` naming a directory that holds more than one language's project, a `tsconfig.json` beside a `go.work`
   as Adamic's root holds them, checks each project there, as a run standing in that directory does, and reports them
   as one. It used to read the directory as TypeScript's alone and check nothing else, without saying so, and refused
   a Go switch as having no Go project.
@@ -214,10 +227,10 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   valid declaration merging, as lib.es5.d.ts's own `interface Array<T>` plus `declare var Array`. A project
   that wants it turns it on in its own settings. A `no-redeclare` disable comment is now unused, and so an
   error: delete it.
-- The abbreviation rule no longer guesses what `res`, `ch`, `dir`, `var` and `vars` mean. An audit of the Go
-  engine's renames found `res` made `response` where it meant a result or a map's reserve size, `ch` a channel
+- The abbreviation rule no longer guesses what `res`, `ch`, `dir`, `var` and `vars` mean. An audit of
+  cohere-go's renames found `res` made `response` where it meant a result or a map's reserve size, `ch` a channel
   where it was a rune, and `dir` a directory where it was a channel's direction. Their messages now name every
-  meaning, as `Use "result", "response", "resource" or "reserve", whichever it means`, and the Go engine's fix
+  meaning, as `Use "result", "response", "resource" or "reserve", whichever it means`, and cohere-go's fix
   no longer renames them. `Var` and `Vars` can mean JavaScript's var keyword, so they say what to write for a
   variable and ask for a name saying it means the keyword otherwise. The same names are found as before. A
   local error from a call whose name holds one of the words, as `os.ReadDir`'s, is no longer named for it.
@@ -226,7 +239,7 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   `ptr`, `typ`, `anon` and `deref` each name their one spelling, and `recv` (receiver or receive), `op`
   (operation, operator or operand) and `sel` (selection, selector or select) name every meaning. Each is judged
   only where its word ends, so `Condition`, `Change`, `Open`, `Function`, `Progress`, `Select` and `Type` never
-  read as one. A name or file name holding one is a new finding in every engine. A whole `typ` asks Go for a
+  read as one. A name or file name holding one is a new finding in every language. A whole `typ` asks Go for a
   descriptive name ending in `Type`, as `err` does, and a whole `func` asks for a name for its role, since
   `function` is reserved in TypeScript.
 - A rule key in `CohereSettings.json` that names no rule cohere has, at the top level or in an override, in the
@@ -243,7 +256,7 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
   `gaps.unguardedWorkspaceSums`.
 - cohere's cache directory ignores itself. The run that creates `.cache/cohere` writes a `.gitignore` in it holding
   `*`, so a run in a repository whose rules say nothing of `.cache/` leaves `git status` as it found it, where a cold
-  run left `.cache/` untracked. The front door, the Go engine's store and the Swift engine's scratch each write it,
+  run left `.cache/` untracked. The front door, cohere-go's store and cohere-swift's scratch each write it,
   whichever creates the directory first, and never over a file that is there. A `.cache/cohere` an older cohere made
   is left as it was, and `--verbose` still says when the project's own `.gitignore` doesn't ignore it.
 - Every library a run declares, a submodule or a nested repository, gets its own cohere cache at the run's start,

@@ -1,5 +1,5 @@
-// Package policy is the house policy every engine reads as data: what cohere's binary embeds here for its
-// TypeScript and Go engines, the Swift engine reads from the same file, so a decision about the house lands
+// Package policy is the house policy every language reads as data: what cohere's binary embeds here for its
+// TypeScript linter and cohere-go, cohere-swift reads from the same file, so a decision about the house lands
 // once and cannot drift between them.
 package policy
 

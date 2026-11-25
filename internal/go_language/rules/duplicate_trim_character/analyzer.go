@@ -42,7 +42,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1024",
 	"SA1024",
 	"Flags a constant cutset given to strings.Trim, TrimLeft or TrimRight that holds a character twice: "+
-		"staticcheck's SA1024, ported onto the engine's own intermediate representation.",
+		"staticcheck's SA1024, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

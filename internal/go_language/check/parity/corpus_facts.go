@@ -17,10 +17,10 @@ import (
 )
 
 // RequireIdenticalCorpusFacts runs original and port in one checker over every package of the tree at directory, as
-// the engine loads it, tests included, and over every package those import, the standard library's among them, and
+// cohere-go loads it, tests included, and over every package those import, the standard library's among them, and
 // requires the two to export the same facts on every package: each fact keyed by its package, its object's objectpath
 // and how the fact prints, since the two sides' fact types differ. It is the fact differential a port of a fact pass
-// passes before the engine reads it in the original's place (#w7zmvat), RequireIdenticalFacts over a whole tree rather
+// passes before cohere-go reads it in the original's place (#w7zmvat), RequireIdenticalFacts over a whole tree rather
 // than fixtures, and unlike that one it compares every fact a side exports on its own package's objects, those no
 // importer inherits as well, since a pass's result is built from them all.
 //

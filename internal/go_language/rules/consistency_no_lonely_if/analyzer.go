@@ -1,4 +1,4 @@
-// Package consistency_no_lonely_if is the Go engine's rule that an else block does not hold an if and nothing else.
+// Package consistency_no_lonely_if is cohere-go's rule that an else block does not hold an if and nothing else.
 //
 // It is the Go form of ESLint core's no-lonely-if. An else whose whole body is one if is an else-if written with an
 // extra pair of braces: the braces add a level of indentation and no branch, and every condition after the first
@@ -36,7 +36,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_lonely_if", "Flags an
 	"no branch. An else block holding anything beside the if, a labeled if, or an if in a then branch is left alone.",
 	&listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads only the syntax tree.
+// Rule is this rule's entry in cohere-go's registry. It reads only the syntax tree.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var lonelyIfMessage = policy.MessageOf(Name, "lonelyIf")

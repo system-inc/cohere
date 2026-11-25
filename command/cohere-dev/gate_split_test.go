@@ -23,14 +23,14 @@ func newSplitFixture(test *testing.T) *macBoxFixture {
 	writeFixtureFile(test, filepath.Join(worktree, "beta", "beta_test.go"),
 		"package beta\n\nimport \"testing\"\n\nfunc TestBeta(test *testing.T) {}\n")
 	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_language", "main_test.go"),
-		"package go_engine\n\nimport \"testing\"\n\nfunc TestEngine(test *testing.T) {}\n")
+		"package go_language\n\nimport \"testing\"\n\nfunc TestChecker(test *testing.T) {}\n")
 	fixture.git(worktree, "add", ".")
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("two packages more"))
 	fixture.reply("Sun2.passes", "7.5 3.5\n")
 	fixture.reply("Marin.passes", "7.5 3.5\n")
 	for _, box := range []string{"Sun2", "Marin"} {
-		fixture.reply(box+".shards", "example.com/fixture/internal/go_language 3 TestEngine TestEngineAgain "+
-			"TestEngineOnceMore TestEngineAtLast\n")
+		fixture.reply(box+".shards", "example.com/fixture/internal/go_language 3 TestChecker TestCheckerAgain "+
+			"TestCheckerOnceMore TestCheckerAtLast\n")
 	}
 	return fixture
 }
@@ -75,7 +75,7 @@ var splitFixtureRaces = "./internal/edit,./internal/go_language@" +
 // A landing with both gate boxes free splits its tests across them, both on the commit being landed (#bc8nf0r). With
 // no times kept yet it is the Square's starting split, internal/go_language alone on Sun2 and every other package and
 // every race token on Marin, each handed as import paths; the halves' one verdict lands it, its land line naming which
-// box ran which half, and its body names go_engine's shards, its time the slowest's; and the gate's times are written
+// box ran which half, and its body names go_language's shards, its time the slowest's; and the gate's times are written
 // from both halves, plain and -race. A second landing, with times
 // that make alpha the heaviest, still splits by the starting rule, since Elapsed is a binary's wall and not its CPU.
 // Neither runs a go test on Kirk's Mac.
@@ -205,9 +205,9 @@ func TestASplitGateRefusesUnlessBothHalvesAreGreenAndWhole(test *testing.T) {
 		},
 		{
 			name:    "a shard of Sun2's never ends a test it was dealt",
-			replies: map[string]string{"Sun2.shardomit": "TestEngineOnceMore"},
+			replies: map[string]string{"Sun2.shardomit": "TestCheckerOnceMore"},
 			said: []string{"the split gate's halves didn't cover its packages exactly once each, so its verdict is " +
-				"none: Sun2's shards: TestEngineOnceMore (example.com/fixture/internal/go_language) ended 0 times " +
+				"none: Sun2's shards: TestCheckerOnceMore (example.com/fixture/internal/go_language) ended 0 times " +
 				"across its shards"},
 		},
 		{

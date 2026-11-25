@@ -1,4 +1,4 @@
-// Package consistency_no_empty_function is the Go engine's rule that an empty function body says why it is empty.
+// Package consistency_no_empty_function is cohere-go's rule that an empty function body says why it is empty.
 //
 // An empty body reads the same whether it is a deliberate no-op, a method an interface asks for that this type has
 // nothing to do in, a callback that ignores what it is handed, or work someone meant to write and forgot. Only its
@@ -62,7 +62,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_empty_function", "Fla
 	"the never used method of a one-method unexported interface, which marks its variants' membership and does "+
 	"nothing by design.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads the syntax tree and its comments, and the type
+// Rule is this rule's entry in cohere-go's registry. It reads the syntax tree and its comments, and the type
 // information that tells a sealed union's marker from any other empty method.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 

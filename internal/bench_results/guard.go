@@ -18,13 +18,13 @@ const (
 	// GuardVerdictFaster is a quiet median faster than the baseline's by more than the threshold, which asks
 	// whether the baseline should move, since a guard against a slow baseline lets the gain be lost unseen.
 	GuardVerdictFaster GuardVerdict = "Faster"
-	// GuardVerdictUnmeasured is a night with no number to compare: the machine was never quiet, or the engine
+	// GuardVerdictUnmeasured is a night with no number to compare: the machine was never quiet, or cohere
 	// was built from a modified tree. It is never a pass, so a run of them is seen rather than read as green.
 	GuardVerdictUnmeasured GuardVerdict = "Unmeasured"
 )
 
 // GuardResult is one night's verdict and the numbers and commits it was reached from, so a regression names
-// the two engine commits that bound it.
+// the two cohere commits that bound it.
 type GuardResult struct {
 	Verdict               GuardVerdict `json:"verdict"`
 	Project               string       `json:"project"`
@@ -45,9 +45,9 @@ type GuardResult struct {
 // night's, so a creep of a few percent a night still trips once it adds up past the threshold.
 //
 // Records of different projects or machines are refused, since their numbers measure different work or different
-// hardware, and so are a record of the whole root and one narrowed to one engine's project (Record.Engine), which
+// hardware, and so are a record of the whole root and one narrowed to one project (Record.ProjectKind), which
 // measure different work on the same project, a host-only record and an every-build one (Record.EveryBuild), and two
-// that checked different builds (Record.Builds). A baseline with no quiet cold number, or from a modified engine, is
+// that checked different builds (Record.Builds). A baseline with no quiet cold number, or from a modified cohere, is
 // refused too: a baseline is a number someone can reproduce. A tonight with neither is Unmeasured, not an error,
 // because a loaded night is the machine's doing, not the record's, and the guard must still say the night was lost.
 func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, error) {
@@ -62,11 +62,11 @@ func Guard(baseline Record, tonight Record, threshold float64) (GuardResult, err
 			tonight.Project.Name,
 		)
 	}
-	if baseline.Engine != tonight.Engine {
+	if baseline.ProjectKind != tonight.ProjectKind {
 		return GuardResult{}, fmt.Errorf(
 			"the baseline checked %s and tonight checked %s, and runs of different scope are never compared",
-			checkedScope(baseline.Engine),
-			checkedScope(tonight.Engine),
+			checkedScope(baseline.ProjectKind),
+			checkedScope(tonight.ProjectKind),
 		)
 	}
 	if baseline.NoFix != tonight.NoFix {
@@ -176,13 +176,13 @@ func buildsKind(everyBuild bool) string {
 	return "the host's build alone"
 }
 
-// checkedScope says what a record with engine checked, for a refusal to name: the whole root, or one
-// engine's project alone.
-func checkedScope(engine Engine) string {
-	if engine == "" {
+// checkedScope says what a record narrowed to kind checked, for a refusal to name: the whole root, or one
+// project alone.
+func checkedScope(kind ProjectKind) string {
+	if kind == "" {
 		return "the whole root"
 	}
-	return fmt.Sprintf("the %s project alone", engine)
+	return fmt.Sprintf("the %s project alone", kind)
 }
 
 // UnmeasuredStreak is how many of the newest verdicts, newest last, are Unmeasured in a row: the nights the

@@ -31,7 +31,7 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 
 // The differences fixture sits under a stand-in for the user's cache directory, beside a staticcheck.conf that allows
 // what it holds. The original reads no staticcheck.conf for a file there and reports it, and the port reads the
-// engine's, which skips only Go's build caches, and leaves it alone, each a `drops:` record (#sc5qmy7).
+// checker's, which skips only Go's build caches, and leaves it alone, each a `drops:` record (#sc5qmy7).
 //
 // Not parallel: the harness moves the process's user cache directory while the two run.
 func TestPortDropsUnderTheUserCacheDirectory(test *testing.T) {

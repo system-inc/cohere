@@ -175,7 +175,7 @@ const message = "the quick brown fox jumps over the lazy dog, then keeps running
 		name: "a comment reflows from the long line, carrying words into the next line of the paragraph",
 		source: `package p
 
-// Reading answers the question the engine asks of a candidate class, using the theme the repository declares for its own
+// Reading answers the question the linter asks of a candidate class, using the theme the repository declares for its own
 // classes when there is one. The rest of the paragraph stays.
 //
 // A second paragraph is untouched.
@@ -183,7 +183,7 @@ func Reading() {}
 `,
 		want: `package p
 
-// Reading answers the question the engine asks of a candidate class, using the theme the repository declares for its
+// Reading answers the question the linter asks of a candidate class, using the theme the repository declares for its
 // own classes when there is one. The rest of the paragraph stays.
 //
 // A second paragraph is untouched.
@@ -652,7 +652,7 @@ func TestKeepCommentsLeavesEveryComment(test *testing.T) {
 	}
 }
 
-// fixPhaseOptions are the options the engine's fix phase wraps with.
+// fixPhaseOptions are the options cohere-go's fix phase wraps with.
 var fixPhaseOptions = Options{ReportedOnly: true, CuredOnly: true, KeepComments: true}
 
 // TestAChainNeverBreaksBetweenJoinedLiterals pins the fourth guard: a + joining two string literals, which

@@ -1075,9 +1075,9 @@ func TestConsistentTypeImportsDecoderDefaults(test *testing.T) {
 	}
 }
 
-// TestConsistentTypeImportsProposesOneEditPerFinding pins the shape the fix engine requires.
+// TestConsistentTypeImportsProposesOneEditPerFinding pins the shape the fix pass requires.
 //
-// The engine flattens a report's fixes into independent proposals and refuses two insertions at one
+// The fix pass flattens a report's fixes into independent proposals and refuses two insertions at one
 // point, so upstream's repair proposed as its several primitive edits applied nothing at all. The
 // repair here is one replacement per finding, and this is what keeps a later change from splitting
 // it back up. The `import()` annotation finding carries no repair, as upstream's does not.

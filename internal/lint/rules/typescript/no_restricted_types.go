@@ -70,9 +70,9 @@ var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
 //
 // # A fix and a suggestion are different offers, and the configuration chooses
 //
-// `fixWith` produces a fix, which the edit engine applies unattended. `suggest` produces
+// `fixWith` produces a fix, which the fix pass applies unattended. `suggest` produces
 // suggestions, which a human picks from. Reproducing that split is part of the port rather than a
-// detail: shipping a suggestion as a fix means the edit engine rewrites code upstream would only
+// detail: shipping a suggestion as a fix means the fix pass rewrites code upstream would only
 // have offered to rewrite.
 //
 // The two are not exclusive and an empty `fixWith` is not a fix, both measured rather than read.

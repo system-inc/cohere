@@ -78,9 +78,9 @@ type extractedContextFile struct {
 	KeysByNamespace     map[string][]string `json:"keysByNamespace"`
 	PropertyOrder       []string            `json:"propertyOrder"`
 	PerDeclarationRoots []string            `json:"perDeclarationRoots"`
-	// UnlistedStatics are statics the engine compiles and getClassList() does not advertise; see
+	// UnlistedStatics are statics Tailwind compiles and getClassList() does not advertise; see
 	// context.mjs. `order-none` is the only one on this design system, and it is a real class an
-	// author can write, so a table without it declines a class the engine reads.
+	// author can write, so a table without it declines a class Tailwind reads.
 	UnlistedStatics map[string]*extractedReading `json:"unlistedStatics"`
 }
 

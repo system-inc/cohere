@@ -1,7 +1,7 @@
 // Package slog is vet's slog pass, a call to a log/slog function or method taking alternating key-value pairs whose
 // arguments do not pair: an argument in a key position that is neither a string nor a slog.Attr, or a final key with no
 // value after it. It reads only the static types of the arguments, so an argument of an interface type may be either,
-// and the pass judges what follows it before it calls the call wrong. It sits on the engine's syntax dispatcher,
+// and the pass judges what follows it before it calls the call wrong. It sits on cohere-go's syntax dispatcher,
 // hearing each call on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/slog/slog.go, whose logic and

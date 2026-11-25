@@ -118,7 +118,7 @@ var NoParamReassign = rule.Rule[NoParamReassignOptions]{
 		ignored := compileIgnoredNames(settings)
 
 		checkFunction := func(node *ast.Node) {
-			// The engine hands every rule a nil checker when the program could not be built, and
+			// The linter hands every rule a nil checker when the program could not be built, and
 			// this rule can answer nothing without one. The failure mode without the guard is
 			// silence rather than a panic, because GetSymbolAtLocation tolerates a nil receiver,
 			// and a silent rule whose fixtures all pass is the worse of the two.

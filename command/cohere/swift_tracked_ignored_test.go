@@ -1,6 +1,6 @@
 //go:build darwin
 
-// The real Swift engine runs only on macOS, where it ships.
+// The real cohere-swift runs only on macOS, where it ships.
 
 package main
 
@@ -18,8 +18,8 @@ import (
 
 // A Swift run replays over an index git rewrote without changing what it decides, and runs again over one that newly
 // tracks a file the ignore rules exclude (#jem2gsa), as TestARunReplaysThroughAGitStatusAndNotThroughAGitAddForce
-// proves a TypeScript run does. The real engine names the index it read under `trackedIgnored`, so the front door keys
-// it on gitignore.TrackedIgnoredDigest over the scope the file set asked rather than on bytes every `git status`
+// proves a TypeScript run does. The real cohere-swift names the index it read under `trackedIgnored`, so the front door
+// keys it on gitignore.TrackedIgnoredDigest over the scope the file set asked rather than on bytes every `git status`
 // rewrites. Once with the package at the repository's root, and once below it, scoped to its own directory.
 //
 // Scratch.swift is a source of the package's one target that `.gitignore` excludes, so the run leaves it out; written
@@ -27,16 +27,16 @@ import (
 // in a hidden directory no walk of the package names a file of, so touching it moves only the index, which
 // `git status` rewrites.
 //
-// It builds the engine when this checkout's Swift sources changed since the last build, which takes minutes, so -short
+// It builds the child when this checkout's Swift sources changed since the last build, which takes minutes, so -short
 // leaves it out.
 func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testing.T) {
 	test.Parallel()
 	if testing.Short() {
-		test.Skip("runs the real Swift engine, built from this checkout when its sources changed")
+		test.Skip("runs the real cohere-swift, built from this checkout when its sources changed")
 	}
 	binary := buildCohere(test)
 	environment := []string{
-		dispatch.SwiftEngineOverrideVariable + "=" + builtSwiftEngine(test),
+		dispatch.SwiftBinaryOverrideVariable + "=" + builtSwiftBinary(test),
 		"PATH=" + toolsWithoutGit(test),
 	}
 	for _, layout := range []struct {
@@ -138,7 +138,7 @@ func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testin
 
 // In a linked worktree, a Swift run misses on the index's digest once `git add -f` tracks a file that only the
 // repository's shared info/exclude ignores (#dznkem5). A worktree's `.git` is a file, and git reads the info/exclude in
-// the common directory it shares with the main checkout. The engine excludes by that file and names the worktree's
+// the common directory it shares with the main checkout. The child excludes by that file and names the worktree's
 // own index under `trackedIgnored`, and since #vdbcswp gitignore.TrackedIgnoredDigest reads the same file, so tracking
 // a path it excludes moves the digest. A digest that did not read it would move nothing there, and the run would
 // replay a verdict that never checked the file.
@@ -149,15 +149,15 @@ func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testin
 func TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgnores(test *testing.T) {
 	test.Parallel()
 	if testing.Short() {
-		test.Skip("runs the real Swift engine, built from this checkout when its sources changed")
+		test.Skip("runs the real cohere-swift, built from this checkout when its sources changed")
 	}
 	binary := buildCohere(test)
 	environment := []string{
-		dispatch.SwiftEngineOverrideVariable + "=" + builtSwiftEngine(test),
+		dispatch.SwiftBinaryOverrideVariable + "=" + builtSwiftBinary(test),
 		"PATH=" + toolsWithoutGit(test),
 	}
 	// Left as the temp directory spells it, as a developer's shell does. On macOS it reaches /private through a link,
-	// so git, which writes the worktree's pointer by its real path, and the engine, given the link, spell the index
+	// so git, which writes the worktree's pointer by its real path, and the child, given the link, spell the index
 	// two ways, and the front door keys it on its digest only by comparing real paths (#ny1mv0y).
 	temporary := test.TempDir()
 	checkout := filepath.Join(temporary, "checkout")

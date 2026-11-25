@@ -1,6 +1,6 @@
 // Package yoda_condition is staticcheck's `ST1017`, a Yoda condition, an equality comparison that puts the constant
 // first, `if 42 == x`, where Go, which has no assignment inside a condition to guard against, reads `if x == 42`,
-// ported onto the engine's syntax dispatcher.
+// ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1017/st1017.go, whose message and fix it
 // reports word for word, at the comparison, with no range option, and withholds in a generated file as the original's
@@ -14,7 +14,7 @@
 // the dispatcher's walk.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package yoda_condition
 
 import (

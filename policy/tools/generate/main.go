@@ -1,5 +1,5 @@
-// Command generate writes the Swift sources that compile cohere's policy files into the Swift engine
-// (policy.SwiftFiles). Run it from the module root after editing a policy file the Swift engine reads:
+// Command generate writes the Swift sources that compile cohere's policy files into cohere-swift
+// (policy.SwiftFiles). Run it from the module root after editing a policy file cohere-swift reads:
 //
 //	go run ./policy/tools/generate          write the files
 //	go run ./policy/tools/generate -check   exit 1 if any is stale, writing nothing

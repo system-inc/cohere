@@ -1,4 +1,4 @@
-// Package correctness_no_process_exit_after_output is the Go engine's rule that a function does not end the process
+// Package correctness_no_process_exit_after_output is cohere-go's rule that a function does not end the process
 // while it holds deferred calls.
 //
 // os.Exit ends the process on the spot, and log.Fatal calls it, so neither runs a deferred call. A function that has
@@ -36,7 +36,7 @@ var Analyzer = &analysis.Analyzer{
 	Run:      run,
 }
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 
 var exitAfterOutputMessage = policy.MessageOf(Name, "exitAfterOutput")

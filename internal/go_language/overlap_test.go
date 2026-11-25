@@ -18,7 +18,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
-// overlapRun is one run of the engine over a fresh copy of a fixture: its stream and prose, normalized, and its exit
+// overlapRun is one run of cohere-go over a fresh copy of a fixture: its stream and prose, normalized, and its exit
 // code.
 type overlapRun struct {
 	stream   string
@@ -26,7 +26,7 @@ type overlapRun struct {
 	exitCode int
 }
 
-// runOverlapCase copies endToEnd's fixture, prepares it, and runs the engine over it under `--no-cache`, with the lint
+// runOverlapCase copies endToEnd's fixture, prepares it, and runs cohere-go over it under `--no-cache`, with the lint
 // phase beside the load or after it as overlaps says.
 func runOverlapCase(test *testing.T, endToEnd endToEndCase, overlaps bool) overlapRun {
 	test.Helper()

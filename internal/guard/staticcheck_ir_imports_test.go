@@ -21,7 +21,7 @@ var staticcheckIntermediateRepresentation = []string{
 	"honnef.co/go/tools/internal/passes/buildir",
 }
 
-// One program form (#kk4864m): every rule reads the engine's own intermediate representation, so no code of cohere's
+// One program form (#kk4864m): every rule reads cohere's own intermediate representation, so no code of cohere's
 // imports staticcheck's, and the run never builds buildir beside ours. Tests are exempt, since the parity harness
 // runs staticcheck's originals, which build on go/ir, and the representation's differential tests compare ours with
 // it. The walk must read the module's code, so a walk that read too few files to hold it fails rather than finding
@@ -40,7 +40,7 @@ func TestNoCodeImportsStaticchecksIntermediateRepresentation(test *testing.T) {
 		test.Fatalf("the walk read %d Go files under %s, too few to be the module's code", read, root)
 	}
 	for _, importer := range importers {
-		test.Errorf("%s imports %s, staticcheck's intermediate representation: read the engine's own, "+
+		test.Errorf("%s imports %s, staticcheck's intermediate representation: read the language's own, "+
 			"internal/go_language/intermediate_representation, through dispatch.IntermediateRepresentation or "+
 			"build_intermediate_representation", importer.file, importer.importPath)
 	}

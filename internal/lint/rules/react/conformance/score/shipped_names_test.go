@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/react/conformance"
 )
 
-// TestEveryWiredRuleIsAShippedRule keeps the engine's table and the categorisation's table joined.
+// TestEveryWiredRuleIsAShippedRule keeps the rule run's table and the categorisation's table joined.
 //
 // A rule wired here but absent from `ShippedRules` would run and then have its fixtures classified
 // as `no rule shipped`, so it would score nothing while appearing to work. The reverse is allowed
@@ -17,7 +17,7 @@ func TestEveryWiredRuleIsAShippedRule(test *testing.T) {
 	for _, upstream := range UpstreamNames() {
 		if _, shipped := react_conformance.ShippedRules[upstream]; !shipped {
 			test.Errorf(
-				"rule %q is wired in the engine but absent from ShippedRules, so its fixtures would be classified as unshipped",
+				"rule %q is wired in the rule run but absent from ShippedRules, so its fixtures would be classified as unshipped",
 				upstream,
 			)
 		}
@@ -30,7 +30,7 @@ func TestEveryWiredRuleIsAShippedRule(test *testing.T) {
 	}
 }
 
-// TestWiredRuleNamesMatchTheRegisteredRule checks the engine wires the rule it claims to.
+// TestWiredRuleNamesMatchTheRegisteredRule checks the rule run wires the rule it claims to.
 //
 // `RuleUnderTest.Upstream` names an upstream rule and `.Rule` carries a cohere rule value; nothing
 // structural stops those two disagreeing. This asserts the cohere rule's own `.Name` is the one
@@ -42,7 +42,7 @@ func TestWiredRuleNamesMatchTheRegisteredRule(test *testing.T) {
 		want := react_conformance.ShippedRules[upstream]
 		if got := Rules[upstream].Rule.Name; got != want {
 			test.Errorf(
-				"engine wires %q to cohere rule %q, but ShippedRules says %q implements it",
+				"rule run wires %q to cohere rule %q, but ShippedRules says %q implements it",
 				upstream,
 				got,
 				want,

@@ -75,7 +75,7 @@ func layerDirectory(corpusRoot string, layer corpusLayer) string {
 
 // prepareCorpus checks out every layer of a corpus as a repository of its own at its pin, each nested layer cloned into
 // the directory its gitlink names inside the checkout above it, as an initialized submodule sits. A corpus has to be a
-// checkout: the engine reads a submodule as a repository apart and leaves its files out, and a tree with no `.git`
+// checkout: the Go child reads a submodule as a repository apart and leaves its files out, and a tree with no `.git`
 // has no boundaries, so cohere's root counted its TypeScript/tsc module, 5,139 files, as its own, and adamic read
 // 126,043 findings against a checkout's 67,685 (#j9e4ejd, Pupa's first run). No layer is reached through a symbolic
 // link, since a root reached through one checks 0 files (#yyv7nr2). Each layer's status is held empty right after its

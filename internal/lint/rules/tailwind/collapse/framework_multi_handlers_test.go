@@ -8,7 +8,7 @@ import (
 // TestMultiDeclarationEmittersAgreeWithTheMeasuredReading is the acceptance test for the 152.
 //
 // Every row of `FrameworkMultiDeclarationUtilities` carries a `Reading` measured against the shipped
-// engine, and every root now carries an emitter transcribed from `utilities.ts` or, for five of
+// Tailwind, and every root now carries an emitter transcribed from `utilities.ts` or, for five of
 // them, from `compat/legacy-utilities.ts`. The two were produced by different means from different
 // sources, so `PropertySort(Emit(root, value))` against the stored reading is a real comparison.
 //

@@ -42,7 +42,7 @@ func TestEmptyTextAndNumericSeparatorsMatchTheFork(test *testing.T) {
 	}
 
 	options := format_options.Default()
-	oracle := oracle_testing.Open(test, test.Name()).Engine(options)
+	oracle := oracle_testing.Open(test, test.Name()).Formatter(options)
 	formatter := Formatter{Options: options}
 	compared, refusedByBoth := 0, 0
 	for _, each := range inputs {
@@ -92,7 +92,7 @@ func TestModuleAndCommonJsTypeScriptMatchTheFork(test *testing.T) {
 	text := "import  {join}  from \"node:path\"\nconst a  =   1\nconst b = <number>a\n" +
 		"const identity = <T>(value: T) => value\nexport default join(String(b), String(identity(a)))\n"
 	options := format_options.Default()
-	oracle := oracle_testing.Open(test, test.Name()).Engine(options)
+	oracle := oracle_testing.Open(test, test.Name()).Formatter(options)
 	formatter := Formatter{Options: options}
 	printed := map[string]string{}
 	for _, fileName := range []string{"probe.ts", "probe.mts", "probe.cts", "probe.tsx"} {

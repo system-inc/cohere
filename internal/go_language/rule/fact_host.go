@@ -7,7 +7,7 @@ import (
 )
 
 // FactHost keys, in a pass's ResultOf, the host's side of the pass's package for the facts' reach, a fact_reach.Host,
-// which the engine's checker hands every pass on a package when its checker.Options.FactHost is this key and its
+// which cohere-go's checker hands every pass on a package when its checker.Options.FactHost is this key and its
 // Options.FactHosts answers one for the package (#5vbs1np): what the host's run held of the package's facts and
 // answers, which an extra build's pass compares with its own before any rule runs there, so a function body the build
 // leaves to the host's findings is one whose every fact and answer reads the same in both (standing_facts). A package

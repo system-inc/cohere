@@ -35,7 +35,7 @@ type Print func(fileName string, text string, options format_options.Options) (s
 
 // PrintParsed is a Print that can take a tree of the text someone already parsed, rather than parsing it
 // again, and parses as Print does when the tree is nil or not the one it would build. Only the TypeScript
-// printer has one: its parse is typescript-go's, the same one the fix engine's guard runs first (#dk2502g).
+// printer has one: its parse is typescript-go's, the same one the fix pass's guard runs first (#dk2502g).
 type PrintParsed func(
 	fileName string,
 	text string,

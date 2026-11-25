@@ -37,7 +37,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1029",
 	"SA1029",
 	"Flags a key given to context.WithValue that is of a built in type, an empty anonymous struct, or a type that "+
-		"cannot be compared: staticcheck's SA1029, ported onto the engine's own intermediate representation.",
+		"cannot be compared: staticcheck's SA1029, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

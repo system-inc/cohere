@@ -115,20 +115,20 @@ type plantedEnds struct {
 	steps   *gateSteps
 }
 
-// configure has engine run its extra builds at the planted width, each ending as planted.
+// configure has cohere-go run its extra builds at the planted width, each ending as planted.
 //
-// Mutates: engine gains the forced width and the planted build ends
-func (planted plantedEnds) configure(engine *pipeline) {
-	engine.buildsWidthForced = planted.width
+// Mutates: pipeline gains the forced width and the planted build ends
+func (planted plantedEnds) configure(pipeline *pipeline) {
+	pipeline.buildsWidthForced = planted.width
 	if planted.steps != nil {
-		engine.lintSteps = planted.steps.step
+		pipeline.lintSteps = planted.steps.step
 	}
 	ended := map[int]chan struct{}{}
-	for place := range len(engine.described.builds) {
+	for place := range len(pipeline.described.builds) {
 		ended[place] = make(chan struct{})
 	}
-	engine.extraBuildEnds = func(extra project.Build, notes io.Writer) error {
-		place := slices.IndexFunc(engine.described.builds[1:], func(build project.Build) bool {
+	pipeline.extraBuildEnds = func(extra project.Build, notes io.Writer) error {
+		place := slices.IndexFunc(pipeline.described.builds[1:], func(build project.Build) bool {
 			return build.String() == extra.String()
 		})
 		defer close(ended[place])
@@ -149,14 +149,14 @@ func (planted plantedEnds) configure(engine *pipeline) {
 	}
 }
 
-// runPlanted runs the engine over a fresh copy of threeExtraBuilds, every build checked, under `--no-cache` with
+// runPlanted runs cohere-go over a fresh copy of threeExtraBuilds, every build checked, under `--no-cache` with
 // planted, and returns the pipeline, its stream normalized, its stderr with the root read as /project, and its stream
 // as written.
 func runPlanted(test *testing.T, planted plantedEnds, wantExit int) (*pipeline, string, string, string) {
 	test.Helper()
 	root := threeExtraBuilds(test)
-	engine, stream, noted := runOverNoted(test, root, wantExit, planted.configure, "--no-cache")
-	return engine, normalize(stream, root), strings.ReplaceAll(noted, root, "/project"), stream
+	pipeline, stream, noted := runOverNoted(test, root, wantExit, planted.configure, "--no-cache")
+	return pipeline, normalize(stream, root), strings.ReplaceAll(noted, root, "/project"), stream
 }
 
 // Extra builds run side by side write what they write one at a time, byte for byte, the notes on stderr included
@@ -169,15 +169,19 @@ func TestExtraBuildsSideBySideWriteWhatOneAtATimeWrites(test *testing.T) {
 	for _, width := range []int{1, 3} {
 		ends[width] = plantedEnds{width: width, failing: -1, waitsOn: map[int][]int{0: {1, 2}}}
 	}
-	oneEngine, oneStream, oneNoted, _ := runPlanted(test, ends[1], exitFindings)
-	threeEngine, threeStream, threeNoted, threeRaw := runPlanted(test, ends[3], exitFindings)
+	oneBuildPipeline, oneStream, oneNoted, _ := runPlanted(test, ends[1], exitFindings)
+	threeBuildsPipeline, threeStream, threeNoted, threeRaw := runPlanted(test, ends[3], exitFindings)
 
-	if len(oneEngine.buildRuns) != 4 || len(threeEngine.buildRuns) != 4 {
+	if len(oneBuildPipeline.buildRuns) != 4 || len(threeBuildsPipeline.buildRuns) != 4 {
 		test.Fatalf("the merge was handed %d and %d runs, want the host's and three beside it in each",
-			len(oneEngine.buildRuns), len(threeEngine.buildRuns))
+			len(oneBuildPipeline.buildRuns), len(threeBuildsPipeline.buildRuns))
 	}
-	if oneEngine.buildsAtOnce != 1 || threeEngine.buildsAtOnce != 3 {
-		test.Errorf("the builds ran %d and %d at once, want 1 and 3", oneEngine.buildsAtOnce, threeEngine.buildsAtOnce)
+	if oneBuildPipeline.buildsAtOnce != 1 || threeBuildsPipeline.buildsAtOnce != 3 {
+		test.Errorf(
+			"the builds ran %d and %d at once, want 1 and 3",
+			oneBuildPipeline.buildsAtOnce,
+			threeBuildsPipeline.buildsAtOnce,
+		)
 	}
 	if !strings.Contains(threeRaw, `"buildsAtOnce":3`) {
 		test.Errorf("the lint record of the run at width 3 does not say it:\n%s", threeRaw)
@@ -210,12 +214,12 @@ func TestAFailingMiddleBuildWritesWhatOneAtATimeWrites(test *testing.T) {
 	for _, width := range []int{1, 3} {
 		ends[width] = plantedEnds{width: width, failing: 1, waitsOn: map[int][]int{1: {2}}, steps: newGateSteps()}
 	}
-	oneEngine, oneStream, oneNoted, _ := runPlanted(test, ends[1], exitFindings)
-	var threeEngine *pipeline
+	oneBuildPipeline, oneStream, oneNoted, _ := runPlanted(test, ends[1], exitFindings)
+	var threeBuildsPipeline *pipeline
 	var threeStream string
 	var threeNoted string
 	withinBesideWait(test, "the run at width 3 whose middle build fails", func() {
-		threeEngine, threeStream, threeNoted, _ = runPlanted(test, ends[3], exitFindings)
+		threeBuildsPipeline, threeStream, threeNoted, _ = runPlanted(test, ends[3], exitFindings)
 	})
 	steps := ends[3].steps
 	steps.lock.Lock()
@@ -225,9 +229,12 @@ func TestAFailingMiddleBuildWritesWhatOneAtATimeWrites(test *testing.T) {
 	}
 	steps.lock.Unlock()
 
-	if oneEngine.buildRuns != nil || threeEngine.buildRuns != nil {
-		test.Errorf("a run whose build failed handed the merge %d and %d runs, want none", len(oneEngine.buildRuns),
-			len(threeEngine.buildRuns))
+	if oneBuildPipeline.buildRuns != nil || threeBuildsPipeline.buildRuns != nil {
+		test.Errorf(
+			"a run whose build failed handed the merge %d and %d runs, want none",
+			len(oneBuildPipeline.buildRuns),
+			len(threeBuildsPipeline.buildRuns),
+		)
 	}
 	if !strings.Contains(oneNoted, "the builds beside the host's were not checked: the build ") ||
 		!strings.Contains(oneNoted, ": the planted failure") {
@@ -258,10 +265,10 @@ func TestTheBuildsWidthReachesNoKey(test *testing.T) {
 	test.Parallel()
 	root := threeExtraBuilds(test)
 	configure := func(width int) func(*pipeline) {
-		return func(engine *pipeline) {
-			engine.keepsHostRestoreOff = true
-			engine.buildsWidthForced = width
-			engine.buildsWidthUnguarded = true
+		return func(pipeline *pipeline) {
+			pipeline.keepsHostRestoreOff = true
+			pipeline.buildsWidthForced = width
+			pipeline.buildsWidthUnguarded = true
 		}
 	}
 	one, oneRaw := runOverConfigured(test, root, exitFindings, configure(1))
@@ -301,25 +308,25 @@ func TestTheBuildsWidthReachesNoKey(test *testing.T) {
 // #b2t9xmf).
 func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
 	test.Parallel()
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 	// during is the limit at every look inside a load, as package load asks for a file's held bytes.
 	var during []int64
-	configure := func(engine *pipeline) {
-		engine.memory = capMemoryWatched(watch, watch.collecting)
-		engine.memory.duringLoad = func() {
+	configure := func(pipeline *pipeline) {
+		pipeline.memory = capMemoryWatched(watch, watch.collecting)
+		pipeline.memory.duringLoad = func() {
 			watch.lock.Lock()
 			defer watch.lock.Unlock()
 			during = append(during, watch.current)
 		}
-		engine.loads = newLoadMemory(engine.memory, false)
-		engine.buildsWidthForced = 3
+		pipeline.loads = newLoadMemory(pipeline.memory, false)
+		pipeline.buildsWidthForced = 3
 	}
-	engine, _ := runOverConfigured(test, threeExtraBuilds(test), exitFindings, configure, "--no-cache")
-	if engine.buildsAtOnce != 3 || len(engine.buildRuns) != 4 {
-		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(engine.buildRuns)-1,
-			engine.buildsAtOnce)
+	pipeline, _ := runOverConfigured(test, threeExtraBuilds(test), exitFindings, configure, "--no-cache")
+	if pipeline.buildsAtOnce != 3 || len(pipeline.buildRuns) != 4 {
+		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(pipeline.buildRuns)-1,
+			pipeline.buildsAtOnce)
 	}
-	ceiling := engineMemoryCap + lateMemoryAllowance
+	ceiling := memoryCap + lateMemoryAllowance
 	watch.lock.Lock()
 	defer watch.lock.Unlock()
 	if !watch.raised || len(watch.endedUnder) == 0 {
@@ -335,15 +342,15 @@ func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
 		test.Fatal("no look inside a load read the limit, so what the loads ran under went unread")
 	}
 	for index, limit := range during {
-		if limit != engineMemoryCap {
+		if limit != memoryCap {
 			test.Errorf("look %d of %d inside a load read a limit of %d, want the cap, %d", index+1, len(during),
-				limit, engineMemoryCap)
+				limit, memoryCap)
 		}
 	}
 	for index, limit := range watch.endedUnder {
-		if limit != engineMemoryCap {
+		if limit != memoryCap {
 			test.Errorf("load %d of %d ended under a limit of %d, want the cap, %d", index+1, len(watch.endedUnder),
-				limit, engineMemoryCap)
+				limit, memoryCap)
 		}
 	}
 }
@@ -356,10 +363,10 @@ func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
 // (#rmzehfg). The cap here is 8 GiB.
 func TestTheBuildsWidth(test *testing.T) {
 	test.Parallel()
-	underCap := &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
+	underCap := &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
 		Source: contract.MemorySourceCap}}
-	underSource := func(source contract.MemorySource) *engineMemory {
-		return &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
+	underSource := func(source contract.MemorySource) *memoryAccount {
+		return &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
 			Source: source}}
 	}
 	const gibibyte = uint64(1) << 30
@@ -367,7 +374,7 @@ func TestTheBuildsWidth(test *testing.T) {
 		name           string
 		extras         int
 		singleThreaded bool
-		memory         *engineMemory
+		memory         *memoryAccount
 		live           uint64
 		holding        uint64
 		withoutStore   bool
@@ -418,8 +425,8 @@ func TestTheBuildsWidth(test *testing.T) {
 // spare, and 3 with a store. The cap is 8 GiB but where a case says.
 func TestTheBuildsWidthSlack(test *testing.T) {
 	test.Parallel()
-	underLimit := func(limit uint64) *engineMemory {
-		return &engineMemory{record: contract.Memory{LimitBytes: int64(limit), CapBytes: int64(limit),
+	underLimit := func(limit uint64) *memoryAccount {
+		return &memoryAccount{record: contract.Memory{LimitBytes: int64(limit), CapBytes: int64(limit),
 			Source: contract.MemorySourceCap}}
 	}
 	const gibibyte = uint64(1) << 30
@@ -458,21 +465,21 @@ func TestTheBuildsWidthSlack(test *testing.T) {
 		// the slack adds the seventh alone.
 		{name: "never two past", extras: 10, limit: 70*gibibyte + 3*gibibyte/4, live: gibibyte,
 			holding: 4 * gibibyte, want: 7, wantSlack: true},
-		{name: "deeafbf4 under --no-cache", extras: 8, limit: uint64(engineMemoryCap), live: 569_200_000,
+		{name: "deeafbf4 under --no-cache", extras: 8, limit: uint64(memoryCap), live: 569_200_000,
 			holding: 1_069_200_000, want: 3},
-		{name: "deeafbf4 under --no-cache with 9.5 MB more live", extras: 8, limit: uint64(engineMemoryCap),
+		{name: "deeafbf4 under --no-cache with 9.5 MB more live", extras: 8, limit: uint64(memoryCap),
 			live: 578_700_000, holding: 1_069_200_000, want: 3, wantSlack: true},
-		{name: "root under --no-cache", extras: 7, limit: uint64(engineMemoryCap), live: 456_300_000,
+		{name: "root under --no-cache", extras: 7, limit: uint64(memoryCap), live: 456_300_000,
 			holding: 653_400_000, want: 5, wantSlack: true},
-		{name: "root with a store", extras: 7, limit: uint64(engineMemoryCap), live: 456_300_000,
+		{name: "root with a store", extras: 7, limit: uint64(memoryCap), live: 456_300_000,
 			holding: 653_400_000, withStore: true, want: 3},
 		// A phase-labelled throwaway binary inflates root's holding to 701.2 MB, where the fifth build fits by 9.5 MB
 		// and misses with 32 MB less room: a knife edge the release binary does not have, so a pair judging the width
 		// runs unlabelled binaries.
-		{name: "root at a labelled binary's holding", extras: 7, limit: uint64(engineMemoryCap), live: 470_600_000,
+		{name: "root at a labelled binary's holding", extras: 7, limit: uint64(memoryCap), live: 470_600_000,
 			holding: 701_200_000, want: 5, wantSlack: true},
 		{name: "root at a labelled binary's holding with 32 MB less room", extras: 7,
-			limit: uint64(engineMemoryCap) - 32_000_000, live: 470_600_000, holding: 701_200_000, want: 4},
+			limit: uint64(memoryCap) - 32_000_000, live: 470_600_000, holding: 701_200_000, want: 4},
 	} {
 		got, slack := buildsWidth(each.extras, false, underLimit(each.limit), each.live, each.holding, each.withStore)
 		if got != each.want || slack != each.wantSlack {
@@ -488,7 +495,7 @@ func TestTheBuildsWidthSlack(test *testing.T) {
 func TestTimingNamesABuildPastTheMeasuredPeak(test *testing.T) {
 	test.Parallel()
 	var standardError strings.Builder
-	engine := &pipeline{standardError: &standardError}
+	pipeline := &pipeline{standardError: &standardError}
 	record := contract.LintRecord{Builds: []contract.BuildRecord{
 		{Target: "darwin/arm64 cgo", Host: true},
 		{Target: "linux/arm64", HeldAtLoadEndBytes: 1000, HeldAtLintPeakBytes: 2170,
@@ -496,7 +503,7 @@ func TestTimingNamesABuildPastTheMeasuredPeak(test *testing.T) {
 		{Target: "windows/arm64", HeldAtLoadEndBytes: 1000, HeldAtLintPeakBytes: 2160,
 			LintPeakOverLoadEnd: lintPeakOverLoadEnd(1000, 2160)},
 	}}
-	engine.recordBuildsPeakProblems(&record)
+	pipeline.recordBuildsPeakProblems(&record)
 	if len(record.BuildsPeakProblems) != 1 {
 		test.Fatalf("the record names %d builds past the measured peak, want linux/arm64 alone: %q",
 			len(record.BuildsPeakProblems), record.BuildsPeakProblems)
@@ -565,11 +572,11 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	const garbageBytes = 512 << 20
 	const buildBytes = 256 << 20
 	hostLive := forcedLiveHeapBytes()
-	// Room for two peaks of the build, 2.5 times its budgeted holding, 1.2 times what it holds, each, since the engine
+	// Room for two peaks of the build, 2.5 times its budgeted holding, 1.2 times what it holds, each, since cohere-go
 	// here has no findings store, 6 holdings, and a quarter more: three peaks of the holding unbudgeted, 7.5, would
 	// fit in less, and the slack's third build, 3 times 1.2 times 2.16, 7.8 holdings, with 512 MiB to spare would not.
 	limit := int64(hostLive + 8*buildBytes + buildBytes/4)
-	engine := &pipeline{memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
+	pipeline := &pipeline{memory: &memoryAccount{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
 		Source: contract.MemorySourceCap}}}
 	build := make([]byte, buildBytes)
 	for index := range build {
@@ -578,8 +585,8 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 
 	runtime.GC()
 	// A run without a store takes the share gate whatever its host's counts, so its holding is budgeted.
-	gated := engine.takesShareGate(check.CacheCounts{})
-	collectedWidth, _, collectedHolding := engine.measuredBuildsWidth(8, hostLive, gated)
+	gated := pipeline.takesShareGate(check.CacheCounts{})
+	collectedWidth, _, collectedHolding := pipeline.measuredBuildsWidth(8, hostLive, gated)
 
 	garbage := make([]byte, garbageBytes)
 	for index := range garbage {
@@ -588,7 +595,7 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	runtime.GC()
 	runtime.KeepAlive(garbage)
 	// garbage is unreachable from here, and no collection has run since the last one counted it.
-	staleWidth, _, staleHolding := engine.measuredBuildsWidth(8, hostLive, gated)
+	staleWidth, _, staleHolding := pipeline.measuredBuildsWidth(8, hostLive, gated)
 	runtime.KeepAlive(build)
 
 	if collectedWidth != staleWidth {
@@ -608,7 +615,7 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 // A run with a findings store whose host missed everything, a cold fill, takes no share gate and budgets the first
 // build at what it measured, its holding itself, since the share gate's 1.2, buildHoldingBudget, was fitted without a
 // store, where the peak factor is 2.5 (#ghb3rcn), and a cold run with a store keeps main's schedule (#ybjbqm2). A
-// retained 256 MiB stands for the first build, measured by an engine whose session has a store, and the holding it is
+// retained 256 MiB stands for the first build, measured by a child whose session has a store, and the holding it is
 // given is within a sixteenth of it, well short of the 1.2 a run that takes the gate takes.
 //
 // Not parallel: it measures this process's live heap, which another test's run would move.
@@ -616,24 +623,24 @@ func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
 	const buildBytes = 256 << 20
 	hostLive := forcedLiveHeapBytes()
 	limit := int64(hostLive + 16*buildBytes)
-	engine := &pipeline{
-		memory: &engineMemory{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
+	pipeline := &pipeline{
+		memory: &memoryAccount{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
 			Source: contract.MemorySourceCap}},
 		session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil),
 	}
-	if !engine.withFindingsStore() {
-		test.Fatal("the engine has no findings store, want one")
+	if !pipeline.withFindingsStore() {
+		test.Fatal("cohere-go has no findings store, want one")
 	}
 	build := make([]byte, buildBytes)
 	for index := range build {
 		build[index] = 1
 	}
 	// Every package the host held missed, as over an empty store.
-	gated := engine.takesShareGate(check.CacheCounts{On: true, Missed: 100})
+	gated := pipeline.takesShareGate(check.CacheCounts{On: true, Missed: 100})
 	if gated {
 		test.Fatal("a run with a store whose host missed every package takes the share gate, want main's schedule")
 	}
-	_, _, holding := engine.measuredBuildsWidth(8, hostLive, gated)
+	_, _, holding := pipeline.measuredBuildsWidth(8, hostLive, gated)
 	runtime.KeepAlive(build)
 	// Within a sixteenth either way, since the rest of the heap moves by a little between the two collections.
 	if holding < buildBytes-buildBytes/16 || holding > buildBytes+buildBytes/16 {
@@ -648,13 +655,13 @@ func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
 func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
 	test.Parallel()
 
-	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
-		engine.keepsHostRestoreOff = true
-		engine.buildsWidthForced = 3
+	pipeline, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(pipeline *pipeline) {
+		pipeline.keepsHostRestoreOff = true
+		pipeline.buildsWidthForced = 3
 	}, "--no-cache")
-	if len(engine.buildRuns) != 4 || engine.buildsAtOnce != 1 {
+	if len(pipeline.buildRuns) != 4 || pipeline.buildsAtOnce != 1 {
 		test.Fatalf("with the restore off the run ran %d builds beside the host's, %d at once, want 3, one at a time",
-			len(engine.buildRuns)-1, engine.buildsAtOnce)
+			len(pipeline.buildRuns)-1, pipeline.buildsAtOnce)
 	}
 	if !strings.Contains(raw, `"buildsAtOnce":1`) {
 		test.Errorf("the lint record does not say one build at a time:\n%s", raw)
@@ -668,17 +675,17 @@ func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
 func TestBuildsThatRestoreNothingOverAColdStoreRunOneAtATime(test *testing.T) {
 	test.Parallel()
 
-	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
-		engine.keepsHostRestoreOff = true
-		engine.buildsWidthForced = 3
+	pipeline, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(pipeline *pipeline) {
+		pipeline.keepsHostRestoreOff = true
+		pipeline.buildsWidthForced = 3
 	})
-	if lint := lintRecordOf(test, raw); !engine.withFindingsStore() || lint.Cache.Hit != 0 || lint.Cache.Missed == 0 {
+	if lint := lintRecordOf(test, raw); !pipeline.withFindingsStore() || lint.Cache.Hit != 0 || lint.Cache.Missed == 0 {
 		test.Fatalf("the run has a store %t, its host hitting %d packages and missing %d, want a store and every "+
-			"package missed: the premise", engine.withFindingsStore(), lint.Cache.Hit, lint.Cache.Missed)
+			"package missed: the premise", pipeline.withFindingsStore(), lint.Cache.Hit, lint.Cache.Missed)
 	}
-	if len(engine.buildRuns) != 4 || engine.buildsAtOnce != 1 {
+	if len(pipeline.buildRuns) != 4 || pipeline.buildsAtOnce != 1 {
 		test.Fatalf("with the restore off over a cold store the run ran %d builds beside the host's, %d at once, "+
-			"want 3, one at a time", len(engine.buildRuns)-1, engine.buildsAtOnce)
+			"want 3, one at a time", len(pipeline.buildRuns)-1, pipeline.buildsAtOnce)
 	}
 	if !strings.Contains(raw, `"buildsAtOnce":1`) {
 		test.Errorf("the lint record does not say one build at a time:\n%s", raw)
@@ -705,22 +712,22 @@ func TestADependenceRunKeepsAPlainRunsWidth(test *testing.T) {
 		var kept []int
 		var restored []int
 		for _, temperature := range []string{"cold", "warm"} {
-			engine, raw := runOverConfigured(test, root, exitFindings,
-				func(engine *pipeline) { engine.buildsWidthForced = 3 }, switches...)
-			if len(engine.buildRuns) != 4 {
+			pipeline, raw := runOverConfigured(test, root, exitFindings,
+				func(pipeline *pipeline) { pipeline.buildsWidthForced = 3 }, switches...)
+			if len(pipeline.buildRuns) != 4 {
 				test.Fatalf("the %s run under %s handed the merge %d runs, want the host's and three beside it",
-					temperature, name, len(engine.buildRuns))
+					temperature, name, len(pipeline.buildRuns))
 			}
-			if !strings.Contains(raw, fmt.Sprintf(`"buildsAtOnce":%d`, engine.buildsAtOnce)) {
+			if !strings.Contains(raw, fmt.Sprintf(`"buildsAtOnce":%d`, pipeline.buildsAtOnce)) {
 				test.Errorf("the lint record of the %s run under %s does not say %d at once:\n%s", temperature, name,
-					engine.buildsAtOnce, raw)
+					pipeline.buildsAtOnce, raw)
 			}
 			fromHost := 0
-			for _, run := range engine.buildRuns[1:] {
+			for _, run := range pipeline.buildRuns[1:] {
 				fromHost += len(run.result.FromHost.Restored) + len(run.result.FromHost.Untouched)
 			}
-			widths = append(widths, engine.buildsAtOnce)
-			kept = append(kept, engine.buildRuns[0].result.Host.EntriesKept())
+			widths = append(widths, pipeline.buildsAtOnce)
+			kept = append(kept, pipeline.buildRuns[0].result.Host.EntriesKept())
 			restored = append(restored, fromHost)
 		}
 		return widths, kept, restored
@@ -811,10 +818,10 @@ func TestNoLintHoldsWeightBesideANearFullOne(test *testing.T) {
 	everyReady := make(chan struct{})
 	var readyLock sync.Mutex
 	ready := 0
-	configure := func(engine *pipeline) {
-		engine.buildsWidthForced = 3
-		extras := len(engine.described.builds) - 1
-		engine.lintSteps = func(extra project.Build, step lintStep, weight int) {
+	configure := func(pipeline *pipeline) {
+		pipeline.buildsWidthForced = 3
+		extras := len(pipeline.described.builds) - 1
+		pipeline.lintSteps = func(extra project.Build, step lintStep, weight int) {
 			steps.step(extra, step, weight)
 			switch step {
 			case lintStepReady:
@@ -832,10 +839,10 @@ func TestNoLintHoldsWeightBesideANearFullOne(test *testing.T) {
 			}
 		}
 	}
-	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache")
-	if engine.buildsAtOnce != 3 || len(engine.buildRuns) != 4 {
-		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(engine.buildRuns)-1,
-			engine.buildsAtOnce)
+	pipeline, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache")
+	if pipeline.buildsAtOnce != 3 || len(pipeline.buildRuns) != 4 {
+		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(pipeline.buildRuns)-1,
+			pipeline.buildsAtOnce)
 	}
 	for _, record := range extraBuildRecords(test, raw) {
 		windows := strings.HasPrefix(record.Target, "windows/")
@@ -878,9 +885,9 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 		defer rolesLock.Unlock()
 		return name == firstLight, name == secondLight
 	}
-	configure := func(engine *pipeline) {
-		engine.buildsWidthForced = 3
-		engine.lintSteps = func(extra project.Build, step lintStep, weight int) {
+	configure := func(pipeline *pipeline) {
+		pipeline.buildsWidthForced = 3
+		pipeline.lintSteps = func(extra project.Build, step lintStep, weight int) {
 			steps.step(extra, step, weight)
 			name := extra.String()
 			heavy := weight >= lintBudget
@@ -928,18 +935,18 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 			}
 		}
 	}
-	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache")
-	if engine.buildsAtOnce != 3 || len(engine.buildRuns) != 4 {
-		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(engine.buildRuns)-1,
-			engine.buildsAtOnce)
+	pipeline, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, configure, "--no-cache")
+	if pipeline.buildsAtOnce != 3 || len(pipeline.buildRuns) != 4 {
+		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(pipeline.buildRuns)-1,
+			pipeline.buildsAtOnce)
 	}
-	windows := slices.IndexFunc(engine.buildRuns, func(run buildRun) bool {
+	windows := slices.IndexFunc(pipeline.buildRuns, func(run buildRun) bool {
 		return run.build.OperatingSystem == "windows"
 	})
 	if windows < 1 {
 		test.Fatal("the run checked no windows build beside the host's")
 	}
-	windowsName := engine.buildRuns[windows].build.String()
+	windowsName := pipeline.buildRuns[windows].build.String()
 	steps.lock.Lock()
 	taken := slices.Clone(steps.taken)
 	steps.lock.Unlock()
@@ -962,24 +969,24 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 func TestManyLightBuildsAndANearFullOneNeverPassTheOneRaise(test *testing.T) {
 	test.Parallel()
 	steps := newGateSteps()
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 	// during is the limit at every look inside a load, as package load asks for a file's held bytes.
 	var during []int64
-	configure := func(engine *pipeline) {
-		engine.memory = capMemoryWatched(watch, watch.collecting)
-		engine.memory.duringLoad = func() {
+	configure := func(pipeline *pipeline) {
+		pipeline.memory = capMemoryWatched(watch, watch.collecting)
+		pipeline.memory.duringLoad = func() {
 			watch.lock.Lock()
 			defer watch.lock.Unlock()
 			during = append(during, watch.current)
 		}
-		engine.loads = newLoadMemory(engine.memory, false)
-		engine.buildsWidthForced = 4
-		engine.lintSteps = steps.step
+		pipeline.loads = newLoadMemory(pipeline.memory, false)
+		pipeline.buildsWidthForced = 4
+		pipeline.lintSteps = steps.step
 	}
-	engine, raw := runOverConfigured(test, nearFullWindows(test, 4), exitFindings, configure, "--no-cache")
-	if engine.buildsAtOnce != 4 || len(engine.buildRuns) != 8 {
-		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 7, 4 at once", len(engine.buildRuns)-1,
-			engine.buildsAtOnce)
+	pipeline, raw := runOverConfigured(test, nearFullWindows(test, 4), exitFindings, configure, "--no-cache")
+	if pipeline.buildsAtOnce != 4 || len(pipeline.buildRuns) != 8 {
+		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 7, 4 at once", len(pipeline.buildRuns)-1,
+			pipeline.buildsAtOnce)
 	}
 	heavy := 0
 	for _, record := range extraBuildRecords(test, raw) {
@@ -995,7 +1002,7 @@ func TestManyLightBuildsAndANearFullOneNeverPassTheOneRaise(test *testing.T) {
 		test.Errorf("lints held weight beside a near-full one: %q", steps.beside)
 	}
 	steps.lock.Unlock()
-	ceiling := engineMemoryCap + lateMemoryAllowance
+	ceiling := memoryCap + lateMemoryAllowance
 	watch.lock.Lock()
 	defer watch.lock.Unlock()
 	for _, limit := range watch.set {
@@ -1007,12 +1014,12 @@ func TestManyLightBuildsAndANearFullOneNeverPassTheOneRaise(test *testing.T) {
 		test.Fatal("no look inside a load read the limit, so what the loads ran under went unread")
 	}
 	for index, limit := range during {
-		if limit != engineMemoryCap {
+		if limit != memoryCap {
 			test.Errorf("look %d of %d inside a load read a limit of %d, want the cap, %d", index+1, len(during),
-				limit, engineMemoryCap)
+				limit, memoryCap)
 		}
 	}
-	raised := engine.loads.raisedTo()
+	raised := pipeline.loads.raisedTo()
 	if len(raised) == 0 {
 		test.Fatal("no load's raise landed, so the one raise went unread")
 	}
@@ -1028,13 +1035,13 @@ func TestManyLightBuildsAndANearFullOneNeverPassTheOneRaise(test *testing.T) {
 func TestOneBuildAtATimeNeverWaitsAtTheGate(test *testing.T) {
 	test.Parallel()
 	steps := newGateSteps()
-	engine, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, func(engine *pipeline) {
-		engine.buildsWidthForced = 1
-		engine.lintSteps = steps.step
+	pipeline, raw := runOverConfigured(test, nearFullWindows(test, 0), exitFindings, func(pipeline *pipeline) {
+		pipeline.buildsWidthForced = 1
+		pipeline.lintSteps = steps.step
 	}, "--no-cache")
-	if engine.buildsAtOnce != 1 || len(engine.buildRuns) != 4 {
+	if pipeline.buildsAtOnce != 1 || len(pipeline.buildRuns) != 4 {
 		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3, one at a time",
-			len(engine.buildRuns)-1, engine.buildsAtOnce)
+			len(pipeline.buildRuns)-1, pipeline.buildsAtOnce)
 	}
 	for _, record := range extraBuildRecords(test, raw) {
 		if record.LintWaited || record.LintWaitMilliseconds != 0 {

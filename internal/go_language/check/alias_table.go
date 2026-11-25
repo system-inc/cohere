@@ -44,7 +44,7 @@ type aliasTable struct {
 // newAliasTable is the table of the build context names, kept in store: one table for each context, as every key
 // it holds is one, since each folds the context in.
 func newAliasTable(store *cache.Store, context cache.Context) *aliasTable {
-	named := strings.Join(slices.Concat([]string{"alias table", context.FormatVersion, context.EngineIdentity},
+	named := strings.Join(slices.Concat([]string{"alias table", context.FormatVersion, context.ExecutableIdentity},
 		context.Build, []string{"rules"}, context.RuleSet), "\x00")
 	return &aliasTable{store: store, key: sha256.Sum256([]byte(named))}
 }

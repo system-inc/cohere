@@ -21,9 +21,9 @@ import (
 // loosened for no one. The value decides, not a list kept here, so a rule that grows a loosening option is held to
 // it with nothing to update.
 //
-// This sets flags on package-level analyzers, which outlive the run. That is safe because the engine is a child
+// This sets flags on package-level analyzers, which outlive the run. That is safe because cohere-go is a child
 // process that runs once, which Main enforces by refusing a second call, and the settings are the only thing that
-// sets them. A test running the engine in process many times (TestEndToEnd) gives any rule it configures an
+// sets them. A test running cohere-go in process many times (TestEndToEnd) gives any rule it configures an
 // analyzer of its own, which runCase checks.
 func configureRules(ruleSettings settings.Settings, registered []rule.Rule) error {
 	analyzerRules := map[string]rule.Rule{}
@@ -40,7 +40,7 @@ func configureRules(ruleSettings settings.Settings, registered []rule.Rule) erro
 		}
 		configured, isAnalyzer := analyzerRules[name]
 		if !isAnalyzer {
-			return fmt.Errorf("configuring %s: it is one of the engine's own rules and takes no options", name)
+			return fmt.Errorf("configuring %s: it is one of cohere-go's own rules and takes no options", name)
 		}
 		var options map[string]json.RawMessage
 		if decodeError := json.Unmarshal(setting.Options, &options); decodeError != nil {

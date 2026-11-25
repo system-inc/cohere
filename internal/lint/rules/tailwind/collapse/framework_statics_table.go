@@ -38,7 +38,7 @@ package tailwind
 // FrameworkStaticDeclarations is the compiled body of every static utility the framework registers.
 //
 // Keyed by class name. The value is the declaration sequence in the order PropertySort visits it,
-// which is the order the engine emitted, so a consumer walks it rather than re-deriving one.
+// which is the order Tailwind emitted, so a consumer walks it rather than re-deriving one.
 var FrameworkStaticDeclarations = map[string][]StaticDeclaration{
 	"-bottom-full":                 {{Property: "bottom", Value: "-100%", ValuePresent: true}},
 	"-bottom-px":                   {{Property: "bottom", Value: "-1px", ValuePresent: true}},

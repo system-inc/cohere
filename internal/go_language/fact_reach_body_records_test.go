@@ -147,12 +147,12 @@ func TestTheHostsSideAnswersABodysRecordByItsKey(test *testing.T) {
 func TestTheSideABuildIsHandedAnswersAStandingBodysRecord(test *testing.T) {
 	test.Parallel()
 	for _, switched := range []bool{true, false} {
-		engine, _, _, root := runStanding(test, switched, &heldRepresentations{})
-		if len(engine.buildRuns) != 2 || engine.buildRuns[1].bodyReach == nil {
+		pipeline, _, _, root := runStanding(test, switched, &heldRepresentations{})
+		if len(pipeline.buildRuns) != 2 || pipeline.buildRuns[1].bodyReach == nil {
 			test.Fatalf("switched %t, want the host's build and windows's census, got %d runs", switched,
-				len(engine.buildRuns))
+				len(pipeline.buildRuns))
 		}
-		handed, isHanded := engine.buildRuns[1].factHosts["example.com/standing"]
+		handed, isHanded := pipeline.buildRuns[1].factHosts["example.com/standing"]
 		if !isHanded {
 			test.Fatalf("switched %t, windows's build handed no side of example.com/standing", switched)
 		}
@@ -162,7 +162,7 @@ func TestTheSideABuildIsHandedAnswersAStandingBodysRecord(test *testing.T) {
 				switched, handed)
 		}
 		var kept []reachedBody
-		for _, body := range engine.buildRuns[1].bodyReach.bodies {
+		for _, body := range pipeline.buildRuns[1].bodyReach.bodies {
 			if body.name == "PlantedKept" {
 				kept = append(kept, body)
 			}

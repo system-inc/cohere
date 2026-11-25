@@ -25,14 +25,14 @@ type wave2bFixture struct {
 	} `json:"cases"`
 }
 
-// TestFrameworkMultiDeclarationUtilitiesMatchTheEngine is the wave-2b acceptance test.
+// TestFrameworkMultiDeclarationUtilitiesMatchTailwind is the wave-2b acceptance test.
 //
 // Scored as a lattice for the same reason wave 1 is: mutual silence is counted apart from agreement,
 // because a table that stopped answering scores perfectly on any comparison that folds the two.
 //
 // Each wave runs on the public theme's oracle and on ahra's (#f598zk0), each against the design system
 // it records.
-func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(test *testing.T) {
+func TestFrameworkMultiDeclarationUtilitiesMatchTailwind(test *testing.T) {
 	test.Parallel()
 	for _, name := range []string{
 		"wave2b_fixtures.json",
@@ -55,7 +55,7 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 	var agreed int
 	var bothDeclined int
 	var tableSilent int
-	var engineSilent int
+	var tailwindSilent int
 	var disagreements []string
 	var silentNames []string
 
@@ -84,10 +84,10 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 		case testCase.Reading == nil && !produced:
 			bothDeclined++
 		case testCase.Reading == nil && produced:
-			engineSilent++
+			tailwindSilent++
 			disagreements = append(
 				disagreements,
-				testCase.ClassName+": engine declined, table read "+formatReading(reading),
+				testCase.ClassName+": Tailwind declined, table read "+formatReading(reading),
 			)
 		case testCase.Reading != nil && !produced:
 			tableSilent++
@@ -100,7 +100,7 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 			}
 			disagreements = append(
 				disagreements,
-				testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading),
+				testCase.ClassName+": Tailwind "+formatReading(expected)+", table "+formatReading(reading),
 			)
 		}
 	}
@@ -108,13 +108,13 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 	sort.Strings(disagreements)
 	sort.Strings(silentNames)
 	test.Logf(
-		"wave 2b: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
+		"wave 2b: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, tailwind-silent %d, disagreed %d",
 		fixture.RootCount,
 		fixture.CaseCount,
 		agreed,
 		bothDeclined,
 		tableSilent,
-		engineSilent,
+		tailwindSilent,
 		len(disagreements),
 	)
 	// A silence is only allowed when the static table answers the class instead. `content-none` is
@@ -123,7 +123,7 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 	// else is a gap in this table wearing the same shape as a correct decline.
 	for _, className := range silentNames {
 		if _, found := FrameworkStaticDeclarations[className]; !found {
-			test.Errorf("%s: the engine reads it, this table declines, and no static registration covers it", className)
+			test.Errorf("%s: Tailwind reads it, this table declines, and no static registration covers it", className)
 		}
 	}
 	if len(silentNames) > 0 {
@@ -132,7 +132,7 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 
 	if agreed < 200 {
 		test.Errorf(
-			"only %d cases agreed of %d the engine answered; a table that stopped answering scores perfectly on any comparison counting only disagreements",
+			"only %d cases agreed of %d Tailwind answered; a table that stopped answering scores perfectly on any comparison counting only disagreements",
 			agreed,
 			fixture.Answered,
 		)
@@ -162,7 +162,7 @@ func TestFrameworkMultiDeclarationWrapperContributesNothing(test *testing.T) {
 	}
 	if grayscale.Reading.Count != 2 {
 		test.Errorf(
-			"grayscale reads %d declarations; the engine reads 2, so the at-root wrapper is being counted",
+			"grayscale reads %d declarations; Tailwind reads 2, so the at-root wrapper is being counted",
 			grayscale.Reading.Count,
 		)
 	}
@@ -185,7 +185,7 @@ func TestFrameworkMultiDeclarationWrapperContributesNothing(test *testing.T) {
 //
 // `ease-initial` reads `[]#1` where every other `ease-*` reads `[354]#2`, because `initial` is a
 // literal the handler answers directly rather than a value it wraps. The literal is checked before
-// resolution, so a repository declaring `--ease-initial` cannot shadow it, which is what the engine
+// resolution, so a repository declaring `--ease-initial` cannot shadow it, which is what Tailwind
 // does.
 func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(test *testing.T) {
 	test.Parallel()
@@ -215,7 +215,7 @@ func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(test *testing.T) {
 	}
 	if reading.Count != 1 || len(reading.Order) != 0 {
 		test.Errorf(
-			"ease-initial read %v#%d against a theme declaring --ease-initial; the engine reads []#1, so the literal must be checked before the theme",
+			"ease-initial read %v#%d against a theme declaring --ease-initial; Tailwind reads []#1, so the literal must be checked before the theme",
 			reading.Order,
 			reading.Count,
 		)

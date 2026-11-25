@@ -46,7 +46,7 @@ func noHtmlLinkForPagesMessage(hrefPath string) rule.Message {
 //
 // An earlier port here was oxlint's, which decides from the href's shape alone and reports every
 // href that looks internal. That is a different rule under the same name, and the ESLint twin runs
-// @next's, so the two engines disagreed on every relative href and on every project with no pages
+// @next's, so the two linters disagreed on every relative href and on every project with no pages
 // directory (#cn8sthd). Ruled by @system_cohere_lint_sets on #d21war2: port @next's route model.
 //
 // The root is the project root. Upstream reads `settings.next.rootDir` and falls back to the working

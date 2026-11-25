@@ -65,36 +65,36 @@ func (paths Paths) PruneLogPath() string {
 	return filepath.Join(paths.CacheDirectory, "prune.log")
 }
 
-// SwiftEngineDirectory is where the Swift engine's package lives inside the cohere module.
-func (paths Paths) SwiftEngineDirectory() string {
+// SwiftPackageDirectory is where cohere-swift's package lives inside the cohere module.
+func (paths Paths) SwiftPackageDirectory() string {
 	return filepath.Join(paths.ModuleDirectory, "swift")
 }
 
-// SwiftBuildDirectory is the scratch path the engine is built in.
+// SwiftBuildDirectory is the scratch path cohere-swift is built in.
 //
-// Its own, rather than the package's `.build`: that one belongs to whoever is developing the engine,
+// Its own, rather than the package's `.build`: that one belongs to whoever is developing cohere-swift,
 // and a build here taking its lock, or replacing its products mid-test, would be one process breaking
 // another for no reason a reader of either could see.
 func (paths Paths) SwiftBuildDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "swift-build")
 }
 
-// SwiftEngineBinaryPath is where the engine built from inputs with this hash lives, named the way
+// SwiftBinaryPath is where cohere-swift built from inputs with this hash lives, named the way
 // BinaryPath names cohere's, platform included.
-func (paths Paths) SwiftEngineBinaryPath(hash string) string {
+func (paths Paths) SwiftBinaryPath(hash string) string {
 	return filepath.Join(
 		paths.BinaryDirectory(),
 		fmt.Sprintf("cohere-swift-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash),
 	)
 }
 
-// SwiftSourceWorktree is the worktree the committed engine is built from.
+// SwiftSourceWorktree is the worktree the committed binary is built from.
 func (paths Paths) SwiftSourceWorktree() string {
 	return filepath.Join(paths.CacheDirectory, "swift-source")
 }
 
 // SwiftCommittedBuildDirectory is the SwiftPM scratch path for committed builds. Separate from the
-// working-tree engine's, because one scratch path fed two package directories would rebuild cold every
+// working-tree binary's, because one scratch path fed two package directories would rebuild cold every
 // time the other was used.
 func (paths Paths) SwiftCommittedBuildDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "swift-build-committed")

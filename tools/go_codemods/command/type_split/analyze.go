@@ -42,7 +42,7 @@ func goFileLiterals(syntax *ast.File) []string {
 }
 
 // hostBuild is whether context's build compiles a file, read as go/build reads it: the name's `GOOS` and `GOARCH`
-// suffix, a leading underscore or dot, the //go:build line, and cgo. cohere's Go engine loads packages with
+// suffix, a leading underscore or dot, the //go:build line, and cgo. cohere-go loads packages with
 // go/packages under the environment it runs in, so a file this rejects is one its rules never see.
 func hostBuild(context build.Context) func(directory string, name string, source []byte) bool {
 	return func(directory string, name string, source []byte) bool {
@@ -106,7 +106,7 @@ func parseGroups(
 				if strings.HasPrefix(comment.Text, "//go:build") {
 					buildExpression = strings.TrimSpace(strings.TrimPrefix(comment.Text, "//go:build"))
 				}
-				// The header cohere's copied package reads: the engine withholds every finding in such a file.
+				// The header cohere's copied package reads: cohere-go withholds every finding in such a file.
 				if strings.HasPrefix(strings.TrimSpace(strings.TrimPrefix(comment.Text, "//")), "cohere:copied") {
 					copied = true
 				}
@@ -329,7 +329,7 @@ func resolveAlias(name string, aliasOf map[string]string) string {
 	}
 }
 
-// isMarkerOnly mirrors cohere's internal/goengine/rules/markertype.IsMarkerOnly, which the rules call
+// isMarkerOnly mirrors cohere's internal/go_language/rules/markertype.IsMarkerOnly, which the rules call
 // and which a module outside cohere cannot import: methods are all markers, each with a receiver, no
 // parameters, no results and a body with no statements, the way a sum type's variant declares its
 // membership. None at all is no marker type.

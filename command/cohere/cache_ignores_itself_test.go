@@ -26,7 +26,7 @@ func gitInRepository(test *testing.T, repository string, arguments ...string) st
 
 // A cold cache-on run in a repository whose rules say nothing of `.cache/` leaves git status as it found it (#6vhp0vd):
 // the run that creates `.cache/cohere` writes an ignore file in it holding `*`, at a TypeScript root and at a Go root,
-// whose engine writes its own store there too. Each run is shown to have kept a cache, so the clean status is not a
+// whose child writes its own store there too. Each run is shown to have kept a cache, so the clean status is not a
 // run that wrote nothing, and the control takes the ignore file away, where git shows the cache.
 func TestAColdRunLeavesNoUntrackedCache(test *testing.T) {
 	test.Parallel()
@@ -63,9 +63,9 @@ func TestAColdRunLeavesNoUntrackedCache(test *testing.T) {
 			gitInRepository(test, root, "add", "--all")
 			gitInRepository(test, root, "-c", "user.name=cohere", "-c", "user.email=cohere@example.com",
 				"commit", "--quiet", "-m", "fixture")
-			// The child mark is emptied, since a front door that inherited it would refuse to start the Go engine. The
+			// The child mark is emptied, since a front door that inherited it would refuse to start cohere-go. The
 			// fixtures' JSON is not in the house format, and formatting is not this test's subject.
-			output, exitCode := runCohereWithEnvironment(test, binary, root, []string{goEngineChildVariable + "="},
+			output, exitCode := runCohereWithEnvironment(test, binary, root, []string{goChildVariable + "="},
 				"--no-fix", "--no-format")
 			if exitCode != 0 {
 				test.Fatalf("exit %d from a clean fixture:\n%s", exitCode, output)

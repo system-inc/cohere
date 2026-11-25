@@ -7,7 +7,7 @@ import (
 
 // A type switch's guard, `switch value := subject.(type)`, declares no object of its own: go/types gives each
 // case clause an implicit variable, typed for its case, and the guard's identifier names all of them. The
-// engine renames them as one: every clause variable of a switch takes the same new name or none does, and the
+// renaming renames them as one: every clause variable of a switch takes the same new name or none does, and the
 // guard's identifier is rewritten with them.
 
 // typeSwitchClauseVariables maps each clause variable of every type switch in files to the guard identifier

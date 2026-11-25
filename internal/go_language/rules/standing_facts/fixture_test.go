@@ -34,7 +34,7 @@ type fixture struct {
 	places map[string]fact_reach.Place
 }
 
-// loadFacts loads the facts fixture and what it imports, from source, as the engine loads a package. Each run of the
+// loadFacts loads the facts fixture and what it imports, from source, as cohere-go loads a package. Each run of the
 // checker takes a load of its own, since a run lets go of what it read of the packages below its roots.
 func loadFacts(test *testing.T) fixture {
 	test.Helper()
@@ -113,7 +113,7 @@ func imported(packagePath string, name string) build_reads.Identity {
 		Path: objectpath.Path(name), File: "/host/" + packagePath + ".go"}
 }
 
-// settle runs standing_facts on the fixture as the engine runs a rule's analyzer, the checker handing its pass host
+// settle runs standing_facts on the fixture as cohere-go runs a rule's analyzer, the checker handing its pass host
 // under rule.FactHost, or nothing for a nil host, and returns what the analyzer found and the run's resolver.
 func settle(test *testing.T, found fixture, host fact_reach.Host) (*standing_facts.Result, *fact_resolver.Resolver) {
 	test.Helper()
@@ -144,7 +144,7 @@ func analyze(
 	test.Helper()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{analyzer}, []*packages.Package{found.root}, options)
 	if analyzeError != nil {

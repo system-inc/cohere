@@ -31,7 +31,7 @@ const renameVerbName = "rename"
 //
 // The two defaults point opposite ways on purpose, and the asymmetry is the argument. `--fix`
 // defaults to on because a fix is reactive and bounded: a rule already decided the edit was safe,
-// the change is confined to a file the rule examined, and the engine's parse guard plus the type
+// the change is confined to a file the rule examined, and the child's parse guard plus the type
 // phase on the same run catch what is left. Nothing about running the gate is a statement of
 // intent, so the tool doing the obvious repair is a service rather than a surprise.
 //

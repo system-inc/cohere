@@ -36,7 +36,7 @@ func (counted *countedClock) clock() Clock {
 func TestANilRecorderDoesNothingAndReadsNoClock(test *testing.T) {
 	test.Parallel()
 	var recorder *Recorder
-	recorder.Stamp("engine.main.begin")
+	recorder.Stamp("main.begin")
 	asked := &atomic.Int64{}
 	if hook := recorder.Hook(countedName{asked: asked}, 0, ""); hook != nil {
 		test.Error("a nil recorder handed a hook, which would stamp a run that did not ask")
@@ -56,14 +56,14 @@ func TestARecorderKeepsEachStampInOrderWithItsWallAndCpu(test *testing.T) {
 	test.Parallel()
 	counted := &countedClock{start: time.Now(), known: true}
 	recorder := New(counted.start, counted.clock())
-	recorder.Stamp("engine.main.begin")
+	recorder.Stamp("main.begin")
 	Tell(recorder.Hook(countedName{asked: &atomic.Int64{}}, 1, ""), "gate.taken")
 	record := recorder.Record(false)
 	if record.Timed || record.Unavailable != "" {
 		test.Errorf("the record is timed %v, unavailable %q, want neither", record.Timed, record.Unavailable)
 	}
 	want := []contract.TimelineStamp{
-		{Label: "engine.main.begin", WallMicroseconds: 1000, UserMicroseconds: 500, SystemMicroseconds: 250},
+		{Label: "main.begin", WallMicroseconds: 1000, UserMicroseconds: 500, SystemMicroseconds: 250},
 		{Build: "windows/amd64", Round: 1, Label: "gate.taken", WallMicroseconds: 3000, UserMicroseconds: 1000,
 			SystemMicroseconds: 500},
 	}
@@ -81,7 +81,7 @@ func TestARecorderWithoutACpuClockSaysWhy(test *testing.T) {
 	test.Parallel()
 	counted := &countedClock{start: time.Now()}
 	recorder := New(counted.start, counted.clock())
-	recorder.Stamp("engine.main.begin")
+	recorder.Stamp("main.begin")
 	record := recorder.Record(false)
 	if record.Unavailable == "" || len(record.Stamps) != 1 {
 		test.Fatalf("the record is %+v, want one stamp and a reason", record)

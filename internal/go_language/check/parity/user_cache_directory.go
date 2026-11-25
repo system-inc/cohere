@@ -15,7 +15,7 @@ import (
 // and the port run over it, and at no other time: the fixtures load before it is set and every variable is put back
 // once they have run, failed or not. It is for an original that reads that directory, as staticcheck's config
 // analyzer does, skipping every file under it for one of Go's build cache, so it reads no staticcheck.conf for a
-// project kept there and reports what that project's staticcheck.conf allows, where the engine's own reads it
+// project kept there and reports what that project's staticcheck.conf allows, where cohere-go's own reads it
 // (#sc5qmy7). The difference is then held as any other, a `drops:` record for each finding the original alone makes.
 //
 // It sets the variable os.UserCacheDir reads on the machine's system: `XDG_CACHE_HOME`, set to userCacheDirectory; on

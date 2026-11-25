@@ -41,7 +41,7 @@ func bodiesIn(test *testing.T, root string) map[string][]byte {
 		if gob.NewDecoder(bytes.NewReader(contents[sumSize:])).Decode(&record) != nil {
 			return nil
 		}
-		if !strings.HasPrefix(record.Version, "go-engine-cache-") || record.Inline == nil {
+		if !strings.HasPrefix(record.Version, "go-language-cache-") || record.Inline == nil {
 			return nil
 		}
 		relative, relativeError := filepath.Rel(storeDirectory(root), path)
@@ -66,7 +66,7 @@ func TestTwoRunsOverOneTreeWriteTheSameBodies(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, standardLibraryFixture)
-	if cold := runCachedEngine(test, root, "--no-system-cache"); cold.counts.Written == 0 {
+	if cold := runCached(test, root, "--no-system-cache"); cold.counts.Written == 0 {
 		test.Fatalf("want the first run to write the store, got %+v", cold.counts)
 	}
 	first := bodiesIn(test, root)
@@ -74,7 +74,7 @@ func TestTwoRunsOverOneTreeWriteTheSameBodies(test *testing.T) {
 	if renameError := os.Rename(storeDirectory(root), filepath.Join(test.TempDir(), "first")); renameError != nil {
 		test.Fatal(renameError)
 	}
-	if cold := runCachedEngine(test, root, "--no-system-cache"); cold.counts.Hit != 0 || cold.counts.Written == 0 {
+	if cold := runCached(test, root, "--no-system-cache"); cold.counts.Hit != 0 || cold.counts.Written == 0 {
 		test.Fatalf("want the second run to hit nothing and write the store, got %+v", cold.counts)
 	}
 	second := bodiesIn(test, root)

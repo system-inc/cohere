@@ -11,7 +11,7 @@ import (
 
 // TestResolvingFormatsEachFileWithItsOwnDirectorysOptions: two repositories with different configs,
 // one formatter. Formatting api-phi-health with ahra's options is the bug prettier.Resolving exists to
-// prevent, and the native engine must not reintroduce it at the switch.
+// prevent, and the native formatter must not reintroduce it at the switch.
 func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(test *testing.T) {
 	test.Parallel()
 	Register(".resolvingprobe", func(fileName string, text string, options format_options.Options) (string, error) {

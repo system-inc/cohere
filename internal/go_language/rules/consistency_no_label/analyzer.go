@@ -1,4 +1,4 @@
-// Package consistency_no_label is the Go engine's rule that code jumps in the open, with no labels.
+// Package consistency_no_label is cohere-go's rule that code jumps in the open, with no labels.
 //
 // It is the Go form of no-labels: a label makes control leave a loop, or land on a line, somewhere a reader is not
 // looking, and the reader has to find the label to know where execution goes next. A function that returns says the
@@ -30,7 +30,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_label", "Flags every 
 	"the target of a labeled break or continue and of a goto alike, because a jump to a label lands where a reader "+
 	"is not looking.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. A label is syntax, so the rule reads no types.
+// Rule is this rule's entry in cohere-go's registry. A label is syntax, so the rule reads no types.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var labelMessage = policy.MessageOf(Name, "label")

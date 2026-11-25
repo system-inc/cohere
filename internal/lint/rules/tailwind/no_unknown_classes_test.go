@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/corpus"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -504,7 +504,7 @@ func TestExistenceIsNotReadFromPropertyTables(test *testing.T) {
 // half alone.
 func TestKnownRootWithUnknownValueIsReported(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 		system := designSystem.System
 
 		if classExistsIn("text-huge", system) {
@@ -712,7 +712,7 @@ func TestUnknownClassFixturesActuallyRan(test *testing.T) {
 // it skips naming COHERE_CORPUS_AHRA where the corpus is not set, and fails where it is set and the
 // stylesheet is missing (#sycrdr6). The stylesheet's tailwindcss is the vendored snapshot, the same
 // version ahra installs.
-func unknownFixtureLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
+func unknownFixtureLiveSystem(test *testing.T) *tailwindcollapse.LoadedDesignSystem {
 	test.Helper()
 
 	entryPoint := corpus.Ahra.Path(test, "app", "_theme", "styles", "theme.css")
@@ -721,7 +721,7 @@ func unknownFixtureLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSyste
 	}
 	packageRoot := unknownFixturePackageRoot(test)
 
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
@@ -736,7 +736,7 @@ func unknownFixtureLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSyste
 // The stylesheet is copied beside the corpus repository's `node_modules` rather than read in place,
 // because `@import "tailwindcss"` resolves through whichever `node_modules` is reachable from where
 // the file sits, and this checkout vendors none. Its own file comment says the same.
-func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
+func independentLiveSystem(test *testing.T) *tailwindcollapse.LoadedDesignSystem {
 	test.Helper()
 
 	// The theme is this package's own testdata, under its generator, so it is read from the package
@@ -773,7 +773,7 @@ func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
 		test.Fatalf("staging the independent stylesheet: %v", writeError)
 	}
 
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: findTailwindPackageRoot(staging, diskFileExists),
 	})
@@ -788,7 +788,7 @@ func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
 // `shadow--3` is the control this rule needs and the one a value check gets wrong most easily. It
 // reads as root `shadow-`, declared by `@utility shadow--*` with a `--shadow---3` through
 // `--shadow--9` scale behind it, and no framework description covers that shape. Asking a framework
-// description about it would report a class this repository writes and the engine compiles.
+// description about it would report a class this repository writes and Tailwind compiles.
 //
 // `content--0`, `border--0` and `background--0` are the same family, the trailing-dash roots
 // `4f23e9f` and `7a72125` found sitting in generated tables headed with a Tailwind version.
@@ -804,7 +804,7 @@ func TestRepositoryUtilityRootsAreNeverReported(test *testing.T) {
 
 	var checked int
 	for _, className := range []string{"shadow--3", "content--0", "border--0", "background--0"} {
-		candidates := tailwindengine.ParseCandidate(className, system)
+		candidates := tailwindcollapse.ParseCandidate(className, system)
 		if len(candidates) == 0 {
 			continue
 		}

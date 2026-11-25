@@ -149,7 +149,7 @@ func knowsArea(vocabulary map[string]bool, area string) bool {
 	return false
 }
 
-// nearestArea is a folder whose name is the area with its separators taken out, `go_engine` for `goengine`,
+// nearestArea is a folder whose name is the area with its separators taken out, `go_language` for `golanguage`,
 // or empty when none is: the likeliest meaning of an area the vocabulary does not hold.
 func nearestArea(vocabulary map[string]bool, area string) string {
 	plain := func(name string) string {

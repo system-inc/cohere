@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// The public twins of the engine assertions that needed a shape only a repository's own stylesheet had
+// The public twins of Tailwind assertions that needed a shape only a repository's own stylesheet had
 // (#f598zk0, tier B). The live originals stay opt-in through their corpus; these ask the same question of
 // testdata/public_theme, which declares each shape on purpose, so they run everywhere and fail where an
 // original would have skipped.

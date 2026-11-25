@@ -50,8 +50,8 @@ var everyStandardId = []string{errorsId, unsafeId, runtimeCgoId, fmtId, netId, h
 // standardContext is the context every test keys under unless it is the context being changed, its Goroot set to
 // the tree's.
 var standardContext = StandardLibraryContext{
-	FormatVersion:  "1",
-	EngineIdentity: "v0.2.0 4e1427954",
+	FormatVersion:      "1",
+	ExecutableIdentity: "v0.2.0 4e1427954",
 	Build: []string{"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=-tags=probe", "GOVERSION=go1.27.3",
 		"GOEXPERIMENT="},
 	Facts:  []string{`fact_purity {"strict":"false"}`, "nilness"},
@@ -185,7 +185,7 @@ func relocatedKeys(test *testing.T, keys map[string]Key) {
 	expectChanged(test, "the same files below another root", keys, moved, everyStandardId...)
 }
 
-// Each field of the context changes what it must, and only that: the format version, the engine identity, each
+// Each field of the context changes what it must, and only that: the format version, the executable identity, each
 // entry of the build and a fact analyzer's flag change every key; the loader changes the key of a package with cgo
 // files and of every package that imports one, and of no other; the C toolchain, `CGO_CFLAGS` alone, changes those
 // same keys under the cgo-translated loader and none under the source loader, where the cgo tool never runs; and the
@@ -204,8 +204,8 @@ func TestEachStandardLibraryContextFieldChangesWhatItMust(test *testing.T) {
 		}
 	}
 	cases := map[string]func(*testing.T){
-		"FormatVersion":  changeEvery(func(changed *StandardLibraryContext) { changed.FormatVersion += "+" }),
-		"EngineIdentity": changeEvery(func(changed *StandardLibraryContext) { changed.EngineIdentity += "+" }),
+		"FormatVersion":      changeEvery(func(changed *StandardLibraryContext) { changed.FormatVersion += "+" }),
+		"ExecutableIdentity": changeEvery(func(changed *StandardLibraryContext) { changed.ExecutableIdentity += "+" }),
 		"Build": func(test *testing.T) {
 			for index, entry := range standardContext.Build {
 				name, _, _ := strings.Cut(entry, "=")
@@ -390,17 +390,17 @@ func TestUnsafeIsKeyedByItsPathAloneInTheStandardLibrary(test *testing.T) {
 	expectChanged(test, "unsafe's file", keys, keyStandard(test, graph, standardContextAt(goroot)))
 }
 
-// No engine identity, or a root that is not absolute, keys nothing, and a standard-library file that cannot be read is
-// an error naming it, as in Keys.
+// No executable identity, or a root that is not absolute, keys nothing, and a standard-library file that cannot be read
+// is an error naming it, as in Keys.
 func TestStandardLibraryKeysRefuseWhatTheyCannotVouchFor(test *testing.T) {
 	test.Parallel()
 
 	goroot, graph := newStandardTree(test)
 	unidentified := standardContextAt(goroot)
-	unidentified.EngineIdentity = ""
+	unidentified.ExecutableIdentity = ""
 	relative := standardContextAt(goroot)
 	relative.Goroot = filepath.Join("go", "root")
-	for name, refused := range map[string]StandardLibraryContext{"no engine identity": unidentified,
+	for name, refused := range map[string]StandardLibraryContext{"no executable identity": unidentified,
 		"a relative root": relative} {
 		keys, keysError := StandardLibraryKeys([]*packages.Package{graph[httpId]}, refused, FileDigests{})
 		if keysError == nil {

@@ -52,11 +52,11 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 		if _, configureLintError := configureLint(graph, location, nil); configureLintError != nil {
 			test.Fatal(configureLintError)
 		}
-		engine, newResolvingError := native.NewResolving(directory)
+		formatter, newResolvingError := native.NewResolving(directory)
 		if newResolvingError != nil {
 			test.Fatal(newResolvingError)
 		}
-		enumeration, enumerateError := engine.Enumerate(directory)
+		enumeration, enumerateError := formatter.Enumerate(directory)
 		if enumerateError != nil {
 			test.Fatal(enumerateError)
 		}
@@ -70,7 +70,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 			graph,
 			graph.ProjectFiles(),
 			registry.All(),
-			func() (edit.Transform, []string) { return formatTransform(engine), enumeration.Files },
+			func() (edit.Transform, []string) { return formatTransform(formatter), enumeration.Files },
 			wholeTreeScope(),
 			graph.Anchor.Root(),
 			writeRootOf(test, graph.Anchor.Root()),

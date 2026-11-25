@@ -12,8 +12,8 @@ type Context struct {
 	// FormatVersion is the cache's own format version, so an entry written in another format is never read.
 	FormatVersion string
 
-	// EngineIdentity is ExecutableIdentity: the running executable covers every rule's code and embedded policy.
-	EngineIdentity string
+	// ExecutableIdentity is ExecutableIdentity: the running executable covers every rule's code and embedded policy.
+	ExecutableIdentity string
 
 	// Build is the build context, "GOOS=darwin" and the rest, in a fixed order, the loader included as
 	// "loader=source".
@@ -50,7 +50,7 @@ type Keyed struct {
 //
 // A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
 // imports, sorted by import path. The own digest is a sha256 over, in this order and each part length-prefixed: the
-// context (its format version, engine identity, rule set and build, hashed once for every package); the package's
+// context (its format version, executable identity, rule set and build, hashed once for every package); the package's
 // ID, PkgPath and Name; its Module's path, version and go version, and its replacement's; each of its GoFiles,
 // CompiledGoFiles, OtherFiles, EmbedFiles and IgnoredFiles as its path and the sha256 of its bytes; its import map,
 // path to ID, sorted by path; and its extra inputs. Since a package's key holds its dependencies' keys, a change
@@ -89,12 +89,12 @@ func Keys(
 		Files: FileDigests{byPath: digests}}, nil
 }
 
-// contextDigest is the run's Context hashed once, in the key's order: format version, engine identity, rule set,
+// contextDigest is the run's Context hashed once, in the key's order: format version, executable identity, rule set,
 // build.
 func contextDigest(shared Context) Key {
 	parts := newPartHash()
 	parts.text(shared.FormatVersion)
-	parts.text(shared.EngineIdentity)
+	parts.text(shared.ExecutableIdentity)
 	parts.texts(shared.RuleSet)
 	parts.texts(shared.Build)
 	return parts.sum()

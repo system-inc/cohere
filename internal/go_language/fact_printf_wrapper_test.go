@@ -44,14 +44,14 @@ func requireOwnFindingsAlike(test *testing.T, fixture string) {
 	var own [2][]string
 	for index, switched := range []bool{false, true} {
 		root := copyFixture(test, filepath.Join("testdata", fixture))
-		engine, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-			engine.standingBodies = switched
+		pipeline, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			pipeline.standingBodies = switched
 		}, "--no-cache", "--no-fix", "--build-dependence")
-		if len(engine.buildRuns) != 2 {
-			test.Fatalf("want the host's build and windows's, got %d runs", len(engine.buildRuns))
+		if len(pipeline.buildRuns) != 2 {
+			test.Fatalf("want the host's build and windows's, got %d runs", len(pipeline.buildRuns))
 		}
-		own[index] = rawFindings(engine.buildRuns[1], root)
+		own[index] = rawFindings(pipeline.buildRuns[1], root)
 	}
 	if !slices.Equal(own[0], own[1]) {
 		test.Errorf("windows's own findings with the standing bodies' switch on are\n%s\nwant those with it off\n%s",

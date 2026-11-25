@@ -13,7 +13,7 @@ import (
 
 // upstreamTestdata is a testdata of the test's own, holding staticcheck's own fixtures for `ST1018` at Go 1.0, read
 // where the module cache keeps them, copied byte for byte as go1.0, with the go.mod staticcheck's testutil lays over
-// the folder, `module example.com` at Go 1.0, written to disk beside it since the engine's load reads go.mod from
+// the folder, `module example.com` at Go 1.0, written to disk beside it since cohere-go's load reads go.mod from
 // disk. parity's calls take one testdata, and this package's cannot hold the copy, so the copy is the port's own.
 func upstreamTestdata(test *testing.T) string {
 	test.Helper()

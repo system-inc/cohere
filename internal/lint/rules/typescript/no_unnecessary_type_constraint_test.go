@@ -129,7 +129,7 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(test *testing.T) {
 // # These are suggestions rather than fixes, which is a decision and not a formality
 //
 // oxc calls `ctx.diagnostic_with_suggestion` and declares `suggestion` in its metadata, so the
-// engine does not apply this unattended. Confirmed against the release binary rather than read off
+// fix pass does not apply this unattended. Confirmed against the release binary rather than read off
 // the source: running `oxlint --fix` over every shape below changes not one byte, and
 // `--fix-suggestions` rewrites all of them.
 //
@@ -295,7 +295,7 @@ func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(test *testing.T) {
 					test.Errorf("finding %d does not carry the removal suggestion", index)
 				}
 				// A suggestion is not a fix, and the difference is the whole reason this rule does
-				// not rewrite files unattended. If the repair ever moves into Fixes, the engine
+				// not rewrite files unattended. If the repair ever moves into Fixes, the linter
 				// starts applying a comma-dependent rewrite without anyone agreeing to it.
 				if len(diagnostic.Fixes) != 0 {
 					test.Errorf("finding %d carries %d applicable fixes; the repair must stay a suggestion",

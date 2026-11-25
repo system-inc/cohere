@@ -1,7 +1,7 @@
 // Package appends is vet's appends pass, a call to the builtin append that passes the slice alone and no values to
 // append to it, which is always a no-op and often a sign of an underlying mistake. A function the package declares
 // under the name append, or a variable holding one, is not the builtin, so only a call the type checker resolves to
-// the builtin is judged. It sits on the engine's syntax dispatcher, hearing each call on the walk the dispatcher makes
+// the builtin is judged. It sits on cohere-go's syntax dispatcher, hearing each call on the walk the dispatcher makes
 // once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/appends/appends.go, whose logic

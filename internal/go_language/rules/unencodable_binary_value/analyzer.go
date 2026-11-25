@@ -48,7 +48,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1003",
 	"SA1003",
 	"Flags a value given to encoding/binary.Write of a type the package cannot encode: staticcheck's SA1003, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

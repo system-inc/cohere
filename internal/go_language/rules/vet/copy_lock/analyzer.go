@@ -4,7 +4,7 @@
 // such a value where it is copied: assigned, declared, placed in a composite literal, returned, passed to a call,
 // taken by a function as a receiver or parameter, bound by a range clause, or, from Go 1.22, copied into a fresh
 // loop variable on every iteration of a three-clause for loop. A composite literal or a call on the right is a new
-// value, not a copy, so it is not judged. It sits on the engine's syntax dispatcher, hearing the nine kinds it judges
+// value, not a copy, so it is not judged. It sits on cohere-go's syntax dispatcher, hearing the nine kinds it judges
 // on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/copylock/copylock.go, whose

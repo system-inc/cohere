@@ -15,7 +15,7 @@ import (
 	"weak"
 )
 
-// Memo is what a rule reads off each package, by the load the package belongs to. A run of the engine can load the
+// Memo is what a rule reads off each package, by the load the package belongs to. A run of cohere-go can load the
 // tree more than once, a rename's rounds each load it again, so an entry is a load's rather than the process's: it
 // holds its load's types, and is let go when the load's file set is collected.
 type Memo[Value any] struct {

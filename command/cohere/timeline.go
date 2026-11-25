@@ -11,8 +11,8 @@ import (
 // both prints line up. It widens past it to the longest step, a build's indented under its name.
 const timelineLabelWidth = timingNameWidth
 
-// printEngineTimeline renders a Go run's timeline record (#3v2zp7g) in printEngineTimings' shape: the unit first, that
-// the run had a timed run's shape when it did, then a row per stamp in the order taken, its wall on the engine's clock
+// printGoTimeline renders a Go run's timeline record (#3v2zp7g) in printContractTimings' shape: the unit first, that
+// the run had a timed run's shape when it did, then a row per stamp in the order taken, its wall on the child's clock
 // from the moment its package initialized, and the cores busy since the stamp before, the process's user and system CPU
 // between the two over the wall between them. A stretch where every core is busy reads near the machine's count, and
 // one where the run waited on a lock, a gate or a child reads near 0, which is what a reader of the map is looking for.
@@ -24,7 +24,7 @@ const timelineLabelWidth = timingNameWidth
 //
 // A record whose CPU could not be read leaves the cores column out rather than print zeros, as the timing table leaves
 // its CPU columns out, since no CPU is not zero CPU.
-func printEngineTimeline(out *bufio.Writer, record *contract.TimelineRecord) {
+func printGoTimeline(out *bufio.Writer, record *contract.TimelineRecord) {
 	if len(record.Stamps) == 0 {
 		fmt.Fprintf(out, "\ntimeline: nothing was stamped\n")
 		return
@@ -33,7 +33,7 @@ func printEngineTimeline(out *bufio.Writer, record *contract.TimelineRecord) {
 	for _, stamp := range record.Stamps {
 		labelWidth = max(labelWidth, len(timelineStep(stamp)))
 	}
-	fmt.Fprintf(out, "\ntimeline: when each step began or ended, as wall time since the engine started, and the cores "+
+	fmt.Fprintf(out, "\ntimeline: when each step began or ended, as wall time since the child started, and the cores "+
 		"busy since the step before, the process's CPU over the wall between them\n")
 	if record.Timed {
 		fmt.Fprintf(
@@ -59,7 +59,7 @@ func printEngineTimeline(out *bufio.Writer, record *contract.TimelineRecord) {
 			fmt.Fprintf(out, "  %-*s %9s\n", labelWidth, timelineStep(stamp), wall)
 			continue
 		}
-		// The first row has no cores: its wall starts as the engine's package initializes and its CPU at the process's
+		// The first row has no cores: its wall starts as the child's package initializes and its CPU at the process's
 		// start, so the one over the other is no figure.
 		busy := "-"
 		if index > 0 {

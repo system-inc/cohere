@@ -49,7 +49,7 @@ func fixtureRecords() []runRecord {
 		load := 0.4 + float64(len(records))
 		record.LoadBefore = &load
 		filesInScope, filesWalked, restored := 1200, 1180, 180
-		record.engineOutput = engineOutput{
+		record.goChildOutput = goChildOutput{
 			Findings:                findings,
 			FindingsMd5:             md5,
 			FilesInScope:            &filesInScope,

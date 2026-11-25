@@ -1,8 +1,8 @@
 // Package nil_ness is x/tools' nilness pass, a nil dereference, a nil panic or a comparison with nil whose outcome
-// the function's own control flow already decides, ported onto the engine's own intermediate representation
-// (#h173znj), so the run builds no x/tools single assignment form for this pass. The engine's representation is built
+// the function's own control flow already decides, ported onto cohere's own intermediate representation
+// (#h173znj), so the run builds no x/tools single assignment form for this pass. cohere-go's representation is built
 // as staticcheck's is, proven identical to it, so where the code below says how staticcheck's form is built, the
-// engine's is built the same.
+// checker's is built the same.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/nilness/nilness.go, whose logic it
 // keeps and whose messages it reports word for word. Where staticcheck's form is built differently from x/tools', the
@@ -16,7 +16,7 @@
 // comparison before that use sees the variable's known value where x/tools sees memory; it merges the same constant
 // from every edge into that constant, so a variable only ever assigned nil is known nil; it reads the value behind a
 // pointer in the caller of a method with a value receiver, where x/tools reads it in a wrapper out of sight; and
-// the engine's source functions, as buildir's do, include the closures of package-level initializers, which
+// cohere-go's source functions, as buildir's do, include the closures of package-level initializers, which
 // buildssa's leave out.
 package nil_ness
 
@@ -40,9 +40,9 @@ const Name = "nilness"
 
 // Doc is the rule's documentation.
 const Doc = "Flags a nil dereference, a panic with nil, and a comparison with nil the control flow already " +
-	"decides: x/tools' nilness, ported onto the engine's own intermediate representation."
+	"decides: x/tools' nilness, ported onto cohere's own intermediate representation."
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own.
 var Listener = rule.Listener{
 	FileLocal: true, IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}

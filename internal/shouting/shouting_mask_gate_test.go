@@ -133,7 +133,7 @@ func TestShoutingUppercaseGatePreservesTokens(test *testing.T) {
 		return tokens
 	}
 
-	// The gate as every engine applies it: checked on the text before masking.
+	// The gate as every language applies it: checked on the text before masking.
 	gatedTokens := func(body string) []string {
 		if !HasAdjacentUppercaseLetters(body) {
 			return nil

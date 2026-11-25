@@ -1,5 +1,5 @@
 // Package return_nil_ness judges whether each function's results may be nil, staticcheck's nilness facts ported onto
-// the engine's own intermediate representation, so the readers asking what a function returns read them without
+// cohere's own intermediate representation, so the readers asking what a function returns read them without
 // buildir (#w7zmvat).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/facts/nilness/nilness.go, whose algorithm it
@@ -39,7 +39,7 @@ import (
 // below it, and the resolver holds each of them, before a reader asks.
 var Analyzer = &analysis.Analyzer{
 	Name:       "return_nil_ness",
-	Doc:        "annotates return values with their nilness when a reader asks, staticcheck's nilness on the engine's own representation",
+	Doc:        "annotates return values with their nilness when a reader asks, staticcheck's nilness on cohere-go's own representation",
 	Run:        run,
 	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
 	ResultType: reflect.TypeFor[*Result](),

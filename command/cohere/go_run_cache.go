@@ -13,12 +13,12 @@ import (
 // The run cache for a Go root (#c387bta). A Go run uses the TypeScript run cache whole: the table in
 // .cache/cohere, the invocations it admits (runCacheEligible), the key, the clock, the tee, the replay and the
 // record. What differs is where the inputs come from. A TypeScript run's are observed by the recording
-// filesystem its graph build reads through. A Go run's are read by `go list` and the loader in the engine's
-// process, out of the front door's sight, so the engine declares them in its inputs record and the front door
-// adds what it knows itself: the settings file it hands the engine, and the facts in goRunCacheFacts.
+// filesystem its graph build reads through. A Go run's are read by `go list` and the loader in the child's
+// process, out of the front door's sight, so the child declares them in its inputs record and the front door
+// adds what it knows itself: the settings file it hands the child, and the facts in goRunCacheFacts.
 //
-// The replay is decided here, before the engine is started, so a run with nothing changed costs one stat of each
-// recorded input and never a process. Starting the engine at all would cost more than the whole budget.
+// The replay is decided here, before the child is started, so a run with nothing changed costs one stat of each
+// recorded input and never a process. Starting the child at all would cost more than the whole budget.
 
 // beginGoRunCache replays a recorded Go run and exits when every input is unchanged, and otherwise starts
 // recording this one. It does nothing for a run the run cache does not admit, `--no-cache` among them.
@@ -30,7 +30,7 @@ func beginGoRunCache(location projectLocation) {
 	facts := goRunCacheFacts(anchor, location.LintConfigFileName, activeOutput.Style.color, os.Environ(),
 		exec.LookPath)
 	// No section beyond the run's own: the findings, shapes and types sections serve a TypeScript graph's walk,
-	// and the Go engine walks none of them.
+	// and cohere-go walks none of them.
 	session := beginRunCacheSession(location.Root, anchor, program.CacheTableSections{}, facts...)
 	if session == nil {
 		return
@@ -62,11 +62,11 @@ var goKeyedVariables = []string{
 	"HOME", "XDG_CONFIG_HOME", "CC", "CXX", "PKG_CONFIG", "BURNTSUSHI_TOML_110", "COHERE_SYSTEM_CACHE",
 }
 
-// goRunCacheFacts is what a Go run's verdict depends on that is no file the engine reads, each a fact in the run's
+// goRunCacheFacts is what a Go run's verdict depends on that is no file the child reads, each a fact in the run's
 // key. Computed with no subprocess, since a replay pays for them and `go env` alone costs more than the replay may.
 //
-// The engine's name, so a root that holds a tsconfig too never replays one engine's run as the other's. The root
-// resolved and the settings file the engine reads, as a TypeScript run keys them. Whether the output is colored,
+// The child's name, so a root that holds a tsconfig too never replays one language's run as the other's. The root
+// resolved and the settings file the child reads, as a TypeScript run keys them. Whether the output is colored,
 // since a recording made for a terminal carries escape codes a replay into a pipe must not print. Every variable
 // whose name starts with `GO` or `CGO_`, by name and value, sorted: `GOFLAGS` (its `-tags` among it), `GOOS`,
 // `GOARCH`, `CGO_ENABLED`, `GOWORK`, `GOENV`, `GOTOOLCHAIN` and the rest each change what `go list` loads, and
@@ -74,10 +74,10 @@ var goKeyedVariables = []string{
 // command finds its own settings file, its default `GOPATH` and with it the module cache under them. `CC`, `CXX`
 // and `PKG_CONFIG`, since a package with cgo of its own is loaded through the cgo tool, whose compiler and headers
 // no record can name. `BURNTSUSHI_TOML_110`, which the TOML reader of staticcheck's config consults.
-// `COHERE_SYSTEM_CACHE`, which names the engine's system cache (#syscache): a run over another one restores and writes
+// `COHERE_SYSTEM_CACHE`, which names the child's system cache (#syscache): a run over another one restores and writes
 // other tables, which its records count, so it never replays one over the first. And the `go`
 // the loader will run, as PATH finds it and as its links resolve, so another toolchain on PATH misses even where
-// the engine's own record of the binary would not show it.
+// the child's own record of the binary would not show it.
 func goRunCacheFacts(
 	anchor program.PathAnchor,
 	settingsFile string,
@@ -86,7 +86,7 @@ func goRunCacheFacts(
 	lookPath func(string) (string, error),
 ) []string {
 	facts := []string{
-		"engine=Go",
+		"kind=" + string(projectKindGoModule),
 		"root=" + anchor.Resolved(),
 		"lint-config=" + anchor.Stable(settingsFile),
 		fmt.Sprintf("color=%t", color),
@@ -107,16 +107,16 @@ func goRunCacheFacts(
 	return facts
 }
 
-// declareGoRunCacheInputs declares a finished Go run's inputs to the run cache, as declareEngineRunCacheInputs does
-// for every engine. The directory holding a file is recorded only within the project's root and the directories the
-// engine listed, which lie in the roots it walked: a file outside them, the git index in a worktree's git directory
+// declareGoRunCacheInputs declares a finished Go run's inputs to the run cache, as declareContractRunCacheInputs does
+// for every language. The directory holding a file is recorded only within the project's root and the directories the
+// child listed, which lie in the roots it walked: a file outside them, the git index in a worktree's git directory
 // among them, is decided by its own signature, since its directory moves with every lock file git writes there.
-func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) {
+func declareGoRunCacheInputs(run *contractRun, exitCode int, settingsFile string) {
 	unnameable := ""
 	if run.cgoTranslated {
 		unnameable = "the load translated cgo, whose C headers and compiler the record cannot name"
 	}
-	if declareEngineRunCacheInputs(run, exitCode, settingsFile, unnameable) {
+	if declareContractRunCacheInputs(run, exitCode, settingsFile, unnameable) {
 		activeRunCache.recordedWithin = slices.Concat(activeRunCache.projectRoots, run.inputs.Directories)
 	}
 }

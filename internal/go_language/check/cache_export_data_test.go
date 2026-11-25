@@ -17,7 +17,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 )
 
-// sessionRun is one load and one run with a cache session of their own, as the engine makes them.
+// sessionRun is one load and one run with a cache session of their own, as cohere-go makes them.
 type sessionRun struct {
 	loaded  *load.Loaded
 	result  *Result
@@ -333,7 +333,7 @@ func TestAnEntryOfTheFormatBeforeRecordsIsAMiss(test *testing.T) {
 	if !stored {
 		test.Fatal("the cold run wrote no entry of user")
 	}
-	entry.Version = "go-engine-cache-11"
+	entry.Version = "go-language-cache-11"
 	var older bytes.Buffer
 	if encodeError := gob.NewEncoder(&older).Encode(entry); encodeError != nil {
 		test.Fatal(encodeError)
@@ -376,7 +376,7 @@ func TestAnEntryOfTheFormatBeforeShallowExportDataIsAMiss(test *testing.T) {
 	if putError := caching.Store.Put(exportDataKey(contentDigest(deep.Bytes())), deep.Bytes()); putError != nil {
 		test.Fatal(putError)
 	}
-	entry.Version = "go-engine-cache-13"
+	entry.Version = "go-language-cache-13"
 	var body bytes.Buffer
 	if encodeError := gob.NewEncoder(&body).Encode(entry); encodeError != nil {
 		test.Fatal(encodeError)

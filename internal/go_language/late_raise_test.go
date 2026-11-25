@@ -20,7 +20,7 @@ func (setter *limitSetter) setMemoryLimit(limit int64) int64 {
 	setter.lock.Lock()
 	defer setter.lock.Unlock()
 	setter.set = append(setter.set, limit)
-	return engineMemoryCap
+	return memoryCap
 }
 
 func (setter *limitSetter) limits() []int64 {
@@ -46,7 +46,7 @@ func waitFor(test *testing.T, what string, done func() bool) {
 func TestLateRaise(test *testing.T) {
 	previousPercent := debug.SetGCPercent(-1)
 	test.Cleanup(func() { debug.SetGCPercent(previousPercent) })
-	const limit = engineMemoryCap + lateMemoryAllowance
+	const limit = memoryCap + lateMemoryAllowance
 	notCollecting := func() bool { return false }
 
 	// Not parallel: it counts collections, as its parent does.

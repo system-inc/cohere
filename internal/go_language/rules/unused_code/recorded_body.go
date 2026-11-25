@@ -65,7 +65,7 @@ func (recorded RecordedBody) Files() []string {
 // false where the side holds none for packageId, the build's own package's ID. RecordsHeld is whether the side holds
 // the host's records of packageId at all, true only where the host's U1000 ran on the package with its records asked
 // and did not fail, though the package has no body, so a body with no record there is one the host could not record,
-// never one it was not asked to. The engine's side of each package for the facts' reach is one (rule.FactHost).
+// never one it was not asked to. cohere-go's side of each package for the facts' reach is one (rule.FactHost).
 type BodyRecordHost interface {
 	BodyRecord(packageId string, filename string, offset int) (RecordedBody, [sha256.Size]byte, bool)
 	RecordsHeld(packageId string) bool

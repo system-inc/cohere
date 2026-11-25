@@ -150,8 +150,8 @@ func (flow *typeNameFlow) index() {
 		return
 	}
 	flow.indexed = true
-	keyer := flow.analysis.engine.keyer
-	for _, analyzedPackage := range flow.analysis.engine.workspace.Analyzed {
+	keyer := flow.analysis.renaming.keyer
+	for _, analyzedPackage := range flow.analysis.renaming.workspace.Analyzed {
 		info := analyzedPackage.TypesInfo
 		recordParameters := func(function ast.Node, fields *ast.FieldList, result bool) {
 			if fields == nil {
@@ -450,7 +450,7 @@ func (flow *typeNameFlow) followSelector(state *flowState, item flowItem, select
 		flow.push(state, at(call), mode)
 		return
 	}
-	declaration, declared := flow.declarations[flow.analysis.engine.keyer.key(method)]
+	declaration, declared := flow.declarations[flow.analysis.renaming.keyer.key(method)]
 	if !declared || types.IsInterface(method.Signature().Recv().Type()) || declaration.declaration.Recv == nil {
 		state.read(item.mode)
 		return
@@ -515,8 +515,8 @@ func (flow *typeNameFlow) followCall(state *flowState, item flowItem, call *ast.
 		switch {
 		case path == "reflect" || nameBlindPackages[path]:
 			flow.push(state, at(call), item.mode)
-		case flow.analysis.engine.workspacePaths[path]:
-			declaration, found := flow.declarations[flow.analysis.engine.keyer.key(declared)]
+		case flow.analysis.renaming.workspacePaths[path]:
+			declaration, found := flow.declarations[flow.analysis.renaming.keyer.key(declared)]
 			signature := declared.Signature()
 			if !found || index < 0 || (signature.Recv() != nil && types.IsInterface(signature.Recv().Type())) {
 				state.read(item.mode)
@@ -574,7 +574,7 @@ func (flow *typeNameFlow) taintTarget(state *flowState, item flowItem, target as
 		state.read(item.mode)
 		return
 	}
-	if parameter, isParameter := flow.parameters[flow.analysis.engine.keyer.key(
+	if parameter, isParameter := flow.parameters[flow.analysis.renaming.keyer.key(
 		root,
 	)]; isParameter && !parameter.result {
 		state.read(item.mode)
@@ -615,7 +615,7 @@ func (flow *typeNameFlow) taintObject(state *flowState, variable *types.Var, mod
 		state.read(mode)
 		return
 	}
-	key := flow.analysis.engine.keyer.key(variable)
+	key := flow.analysis.renaming.keyer.key(variable)
 	if state.seenObjects[key]&mode == mode {
 		return
 	}
@@ -647,7 +647,7 @@ func (flow *typeNameFlow) taintResults(
 		state.read(mode)
 		return
 	}
-	key := flow.analysis.engine.keyer.key(declared)
+	key := flow.analysis.renaming.keyer.key(declared)
 	if state.seenResults[key]&mode == mode {
 		return
 	}

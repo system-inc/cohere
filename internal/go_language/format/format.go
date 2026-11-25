@@ -1,8 +1,8 @@
-// Package format is the Go engine's fix phase: gofmt over every file in scope, run before the load so the load
+// Package format is cohere-go's fix phase: gofmt over every file in scope, run before the load so the load
 // reads the formatted tree. A run either rewrites what gofmt would change or, for `--no-fix`, writes nothing
-// and says where each file would change, which the engine reports as one finding per file at that line. A run that
+// and says where each file would change, which cohere-go reports as one finding per file at that line. A run that
 // rewrites may also wrap each file's long lines once the load has found the types sound, through RunWrap and
-// Options.Wrap, keeping the wrap only when it is provably the same program and gofmt leaves it as it is. The engine's
+// Options.Wrap, keeping the wrap only when it is provably the same program and gofmt leaves it as it is. cohere-go's
 // rename, which runs after the wrap, wraps the files it rewrote in memory through WrapSource and writes them through
 // WriteAllAtomically, the same steps. Every write is of a file inside the run's root (write_root.WriteRoot): one
 // reached through a link to somewhere outside it is checked and never written, and named in Result.Withheld.
@@ -479,10 +479,10 @@ func WriteAtomically(root write_root.WriteRoot, file string, contents []byte) er
 var writesRefused atomic.Bool
 
 // RefuseWrites refuses, for the rest of the process, every write of a file through this package, which is every write
-// of a source file the engine makes: gofmt's, the long-line wrap's and the rename's all stage the new contents first
+// of a source file cohere-go makes: gofmt's, the long-line wrap's and the rename's all stage the new contents first
 // (stage). The editor's save is such a process: the file it formats is a buffer the editor holds unsaved, and the disk
 // is the user's, so a phase that wrote there, one added later included, would overwrite the file under the editor.
-// Process-wide, since the engine runs one project per process, so a test running a writing run in process never
+// Process-wide, since cohere-go runs one project per process, so a test running a writing run in process never
 // calls it.
 func RefuseWrites() {
 	writesRefused.Store(true)

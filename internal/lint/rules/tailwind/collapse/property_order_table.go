@@ -13,7 +13,7 @@
 //
 // Porting that comparator needs this list rather than a position per class. A per-class table was
 // built first and measured at 37,643 entries and 2.0 MB; this is the same answer in a few hundred
-// rows, verified exact against the engine over 2,465 real class literals and 296 shuffled ones.
+// rows, verified exact against Tailwind over 2,465 real class literals and 296 shuffled ones.
 
 package tailwind
 
@@ -393,7 +393,7 @@ var PropertyOrder = map[string]int{
 
 // VariantOrder is the position of each variant prefix in Tailwind's sort order.
 //
-// Asked of the engine rather than guessed. Ranking variants by prefix length put focus: before
+// Asked of Tailwind rather than guessed. Ranking variants by prefix length put focus: before
 // hover: because it is shorter, which is not the order Tailwind emits them in.
 var VariantOrder = map[string]int{
 	"*:":                       0,

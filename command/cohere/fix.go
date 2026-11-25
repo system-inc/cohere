@@ -173,7 +173,7 @@ func applyProposedFixes(
 	// reported; only the write is withheld, and counted per repository so the run says what it did not
 	// apply. A run that names a path has asked for it, and its stated scope admits the file as before.
 	byFileName := map[string][]edit.Proposal{}
-	// measuredOn is each file's digest of the text the walk read, which its proposals carry, so the engine
+	// measuredOn is each file's digest of the text the walk read, which its proposals carry, so the child
 	// refuses them against any other text (#bxmcf34). Hashed once per file with proposals.
 	measuredOn := map[string]edit.Digest{}
 	withheld := map[string]struct{}{}
@@ -241,7 +241,7 @@ func applyProposedFixes(
 	// Taking them from projectFiles is what made css, markdown, json and yaml invisible: a tsconfig
 	// enumerates TypeScript by construction, so a `.css` was never a candidate, and the coverage line
 	// could not even report it as skipped. The scope already holds the right set, walked from the
-	// project root with the ignore layers applied and filtered by what the engine handles.
+	// project root with the ignore layers applied and filtered by what the child handles.
 	//
 	// These are not filtered against the write scope, because the caller already built the format
 	// scope from it: a run with stated paths formats exactly those paths. A second filter here would
@@ -557,7 +557,7 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 
 // fixWriteRoot is where the fix phase may write: the project's root, every link resolved, so a file a link leads
 // outside it is checked and never written (#td3zta2). A root that cannot be resolved, which the run has already read,
-// leaves the zero WriteRoot, so every write is withheld and named rather than made blind, as the Go engine does, and a
+// leaves the zero WriteRoot, so every write is withheld and named rather than made blind, as cohere-go does, and a
 // run that writes says so first.
 func fixWriteRoot(root string, write bool) write_root.WriteRoot {
 	writeRoot, writeRootError := write_root.New(root)
@@ -609,7 +609,7 @@ func isLink(fileName string) bool {
 
 // recordFixedFiles keeps the fix phase's account in the run's summary: on a run that writes, the files it rewrote,
 // printed in the views that list them, and the files it would have rewritten and did not, since a link leads each
-// outside the root (#td3zta2). Those are the run's gap, in the footer and in --json, as the Go engine's are.
+// outside the root (#td3zta2). Those are the run's gap, in the footer and in --json, as cohere-go's are.
 //
 // A file that changed between the walk and the fix is the run's gap whether it writes or not, since its findings
 // describe bytes that are gone either way (#bxmcf34).
@@ -631,7 +631,7 @@ func recordFixedFiles(summary edit.Summary, root string, write bool) {
 }
 
 // reportNotWritten names each file a run that writes left as it was because a link leads it outside the
-// run's root, with where it really is, as the Go engine names its own (#hwz114g, #td3zta2). Every one,
+// run's root, with where it really is, as cohere-go names its own (#hwz114g, #td3zta2). Every one,
 // never a count alone: a gap nobody can find is half a gap.
 func reportNotWritten(out *bufio.Writer, notWritten []edit.NotWrittenFile) {
 	for _, file := range notWritten {
@@ -870,7 +870,7 @@ func walkNode(node *ast.Node, listeners rule.Listeners) {
 // is exactly what formatInParallel would have computed, and everything else is computed as it always was.
 //
 // A TypeScript file is formatted from the program's own tree where the program has one of exactly the bytes read,
-// already bound, rather than parsed twice more, once by the fix engine's guard and once by the printer (#dk2502g).
+// already bound, rather than parsed twice more, once by the fix pass's guard and once by the printer (#dk2502g).
 // programs is where the program arrives once it is built, or nil. Every other file goes first, so the program
 // has the time to be built while they are formatted, and a TypeScript file reached before then is parsed, as
 // before: nothing waits for the program.

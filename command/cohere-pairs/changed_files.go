@@ -12,7 +12,7 @@ import (
 )
 
 // changedFileOutcome says what became of a tracked file a run changed, as the progress and the table say it. Since
-// engine's #34r3v1y the engine's go no longer rewrites a tracked file, so one a run changed is a defect the pair is
+// #34r3v1y the Go child's go no longer rewrites a tracked file, so one a run changed is a defect the pair is
 // refused for (refusals), and it is put back all the same, so the measurement's later runs check the commit's tree
 // and the table that names the refusal is whole.
 const changedFileOutcome = "put back from its commit, and the pair is refused for it (#34r3v1y)"

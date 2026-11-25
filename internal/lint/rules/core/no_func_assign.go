@@ -104,7 +104,7 @@ var NoFunctionReassignment = rule.Rule[rule.NoOptions]{
 		// judging it once per overload would report each write once per overload.
 		judged := map[*ast.Node]bool{}
 		check := func(node *ast.Node) {
-			// The engine hands every rule a nil checker when the program could not be built, and
+			// The linter hands every rule a nil checker when the program could not be built, and
 			// this rule can answer nothing without one.
 			if ruleContext.TypeChecker == nil {
 				return

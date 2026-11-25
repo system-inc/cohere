@@ -1,4 +1,4 @@
-// Package consistency_no_else_return is the Go engine's rule that an else does not follow an if branch that always
+// Package consistency_no_else_return is cohere-go's rule that an else does not follow an if branch that always
 // returns.
 //
 // It is the Go form of ESLint core's no-else-return, and Go's own idiom agrees: the happy path runs down the left
@@ -37,7 +37,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_else_return", "Flags 
 	"statement is left alone, since dropping it would mean widening that variable's scope, and so is a labeled if.",
 	&listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads type information to tell whether an else uses a
+// Rule is this rule's entry in cohere-go's registry. It reads type information to tell whether an else uses a
 // variable an if's init statement declared.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 

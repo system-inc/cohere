@@ -19,8 +19,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
-// engineImportPath is the import path of the go_engine directory, by which a file's imports name the packages below it.
-const engineImportPath = "github.com/system-inc/cohere/internal/go_language/"
+// goLanguageImportPath is the import path of the go_language directory, by which a file's imports name the packages
+// below it.
+const goLanguageImportPath = "github.com/system-inc/cohere/internal/go_language/"
 
 // resolverAskers are the packages a rule's run reaches that take the run's fact resolver from a pass, by rule.Resolved
 // or fact_resolver.Of. The resolver holds every package of the run, so a question through it could read a package
@@ -101,24 +102,24 @@ var packageStateWriters = []string{
 	"staticcheck_configuration",
 }
 
-// engineSource is every package under the go_engine directory, parsed once for the tests that read it.
-var engineSource = sync.OnceValues(func() (map[string]*sourcePackage, error) {
-	return parseEngineSource("..")
+// goLanguageSource is every package under the go_language directory, parsed once for the tests that read it.
+var goLanguageSource = sync.OnceValues(func() (map[string]*sourcePackage, error) {
+	return parseGoLanguageSource("..")
 })
 
-// sourcePackage is one directory's non-test Go files under the go_engine directory, parsed for the imports that make
+// sourcePackage is one directory's non-test Go files under the go_language directory, parsed for the imports that make
 // the rules' reach and the names its packages call.
 type sourcePackage struct {
 	fileSet *token.FileSet
 	files   []*ast.File
 
-	// imports are the packages below the go_engine directory its files import, by their directory relative to it.
+	// imports are the packages below the go_language directory its files import, by their directory relative to it.
 	imports []string
 }
 
-// parseEngineSource is every directory under root, the go_engine directory, that holds a non-test Go file outside
+// parseGoLanguageSource is every directory under root, the go_language directory, that holds a non-test Go file outside
 // testdata, by its path relative to root.
-func parseEngineSource(root string) (map[string]*sourcePackage, error) {
+func parseGoLanguageSource(root string) (map[string]*sourcePackage, error) {
 	parsed := map[string]*sourcePackage{}
 	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
 		if walkError != nil {
@@ -151,7 +152,7 @@ func parseEngineSource(root string) (map[string]*sourcePackage, error) {
 			if unquoteError != nil {
 				return unquoteError
 			}
-			if below, isBelow := strings.CutPrefix(importPath, engineImportPath); isBelow &&
+			if below, isBelow := strings.CutPrefix(importPath, goLanguageImportPath); isBelow &&
 				!slices.Contains(parsed[relative].imports, below) {
 				parsed[relative].imports = append(parsed[relative].imports, below)
 			}
@@ -161,19 +162,19 @@ func parseEngineSource(root string) (map[string]*sourcePackage, error) {
 	return parsed, walkError
 }
 
-// parsedEngineSource is engineSource, failing the test when it could not be parsed.
-func parsedEngineSource(test *testing.T) map[string]*sourcePackage {
+// parsedGoLanguageSource is goLanguageSource, failing the test when it could not be parsed.
+func parsedGoLanguageSource(test *testing.T) map[string]*sourcePackage {
 	test.Helper()
 
-	parsed, parseError := engineSource()
+	parsed, parseError := goLanguageSource()
 	if parseError != nil {
-		test.Fatalf("parsing the go_engine directory: %v", parseError)
+		test.Fatalf("parsing the go_language directory: %v", parseError)
 	}
 	return parsed
 }
 
 // ruleReach is every package a rule's run can execute: the rules directory and everything below it, and every package
-// below the go_engine directory those import, directly or not.
+// below the go_language directory those import, directly or not.
 func ruleReach(parsed map[string]*sourcePackage) []string {
 	reached := map[string]bool{}
 	var queue []string
@@ -290,7 +291,7 @@ func requireOnlyKnown(
 func TestOnlyTheKnownRulesAskTheRunsFactResolver(test *testing.T) {
 	test.Parallel()
 
-	parsed := parsedEngineSource(test)
+	parsed := parsedGoLanguageSource(test)
 	requireOnlyKnown(test, resolverAskersIn(parsed, ruleReach(parsed)), resolverAskers, "resolverAskers",
 		"read that every question it asks reaches only the asker's import closure, through fact_resolver.Visible, "+
 			"and that its answer is the same whichever package asks first, before adding it",
@@ -324,7 +325,7 @@ func TestOnlyTheKnownAnalyzersLearnFacts(test *testing.T) {
 func TestOnlyTheKnownPackagesWritePackageStateFromAFunction(test *testing.T) {
 	test.Parallel()
 
-	parsed := parsedEngineSource(test)
+	parsed := parsedGoLanguageSource(test)
 	reach := loadedReach(test)
 	test.Logf("the rules' reach, %d packages, loaded with types in %s", len(reach.byDirectory), reach.wall)
 	var reached []*packages.Package
@@ -342,7 +343,7 @@ func TestOnlyTheKnownPackagesWritePackageStateFromAFunction(test *testing.T) {
 	found := map[string][]string{}
 	for _, analyzed := range reached {
 		if writes := packageStateWritesOf(analyzed, held, exempt); len(writes) > 0 {
-			found[strings.TrimPrefix(analyzed.PkgPath, engineImportPath)] = writes
+			found[strings.TrimPrefix(analyzed.PkgPath, goLanguageImportPath)] = writes
 		}
 	}
 	requireOnlyKnown(test, found, packageStateWriters, "packageStateWriters",

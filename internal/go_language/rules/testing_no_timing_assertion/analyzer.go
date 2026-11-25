@@ -1,4 +1,4 @@
-// Package testing_no_timing_assertion is the Go engine's rule that a test does not fail on how long its work took.
+// Package testing_no_timing_assertion is cohere-go's rule that a test does not fail on how long its work took.
 //
 // A test whose deadline is its assertion passes on a quiet machine and fails on a loaded one, so its verdict depends
 // on who else is running: cohere's tests share a pool with other agents' tests, and a busy pool makes every
@@ -45,7 +45,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "testing_no_timing_assertion", "Flags
 	"under load. A busy machine makes such a test fail by chance. Date math between times not read from the clock, "+
 	"context deadlines and benchmarks are not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var timingAssertionMessage = policy.MessageOf(Name, "timingAssertion")
@@ -78,7 +78,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 	if state.indexes == nil {
 		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 		if !isIndexes {
-			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// Invariant: marker's result is always its Indexes, so another is a mistake in cohere-go, and the
 			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}

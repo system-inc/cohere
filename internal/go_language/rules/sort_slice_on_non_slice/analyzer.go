@@ -40,7 +40,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1028",
 	"SA1028",
 	"Flags sort.Slice, sort.SliceStable or sort.SliceIsSorted given a value that is no slice: staticcheck's "+
-		"SA1028, ported onto the engine's own intermediate representation.",
+		"SA1028, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

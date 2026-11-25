@@ -889,7 +889,7 @@ func TestNoMisusedSpreadLeavesStringSpreadAlone(test *testing.T) {
 // TestNoMisusedSpreadSuggestions applies each suggested repair and compares the whole rewritten file
 // against the output upstream records for it.
 //
-// Every repair this rule offers is a suggestion, which the engine never applies unattended, so
+// Every repair this rule offers is a suggestion, which the fix pass never applies unattended, so
 // ExpectFixedSource cannot be used and the applier is the one await-thenable already needed.
 //
 // These 21 rows are where this rule can be wrong invisibly, and they cover both fixers. The await

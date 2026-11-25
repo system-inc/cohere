@@ -92,7 +92,7 @@ type NoMisusedSpreadOptions struct {
 //
 // Both are suggestions rather than fixes, and upstream declares no `fixable` at all. That is right:
 // awaiting a value changes when the surrounding code runs, and rewriting a Map spread changes the
-// shape of the result. Neither is a repair the engine may apply unattended.
+// shape of the result. Neither is a repair the fix pass may apply unattended.
 //
 // # What upstream's general fixer does that this does not, and why the corpus permits it
 //

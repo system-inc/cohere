@@ -1,4 +1,4 @@
-// Package correctness_require_response_status_check is the Go engine's rule that the body of a response net/http
+// Package correctness_require_response_status_check is cohere-go's rule that the body of a response net/http
 // returned is not read in a function that never asks whether the request succeeded.
 //
 // net/http returns a nil error for every response that arrives, whatever its status, so a 401, a 404 or a 500 comes
@@ -67,7 +67,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_response_status_
 	"read in a function that never reads its StatusCode or Status nor hands it elsewhere, because net/http returns a "+
 	"nil error on a 4xx or 5xx and the error body then reads as data.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var bodyReadWithoutStatusCheckMessage = policy.MessageOf(Name, "bodyReadWithoutStatusCheck")

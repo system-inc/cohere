@@ -125,14 +125,14 @@ func renderThirdPartyNotices(
 		}
 	}
 
-	builder.WriteString("## In the Swift engine\n\n")
+	builder.WriteString("## In cohere-swift\n\n")
 	builder.WriteString("In `cohere-swift`, which the two macOS packages ship beside `cohere`. Packages resolved by\n")
 	builder.WriteString("[swift/Package.resolved](swift/Package.resolved).\n\n")
 	for _, pin := range swiftPins {
 		license, known := swiftLicenses[pin.Identity]
 		if !known {
 			return nil, fmt.Errorf(
-				"the Swift engine resolves %s (%s), which has no license recorded in swiftLicenses",
+				"cohere-swift resolves %s (%s), which has no license recorded in swiftLicenses",
 				pin.Identity,
 				pin.Location,
 			)

@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/marker"
 )
 
-// Package is one type-checked package, with the files the engine may read and edit. Files left out (generated,
+// Package is one type-checked package, with the files global_rename may read and edit. Files left out (generated,
 // skipped by prefix) are never edited; only locals declared in Files are renamed, and a local never occurs
 // outside its own file, so nothing in a left-out file can be affected.
 type Package struct {
@@ -30,7 +30,7 @@ type Proposal struct {
 	NewName string
 }
 
-// Rejection is a proposal the engine refused, with where the object is declared and why.
+// Rejection is a proposal global_rename refused, with where the object is declared and why.
 type Rejection struct {
 	Object   types.Object
 	NewName  string
@@ -93,7 +93,7 @@ func Check(loadedPackage Package, proposals []Proposal) Plan {
 	for _, file := range loadedPackage.Files {
 		editableFiles[loadedPackage.FileSet.File(file.Pos())] = true
 	}
-	// A type switch's clause variables are the one kind of implicit object the engine renames, all together.
+	// A type switch's clause variables are the one kind of implicit object global_rename renames, all together.
 	clauseGuards := typeSwitchClauseVariables(loadedPackage.Info, loadedPackage.Files)
 
 	reject := func(object types.Object, newName string, reason string) {

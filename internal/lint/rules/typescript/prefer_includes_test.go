@@ -74,7 +74,7 @@ func TestPreferIncludesStaysSilentOnUpstreamPassCases(test *testing.T) {
 //
 // Three things are asserted per row. The ids say which of the two halves ran. The spans say where
 // the finding points, which for the comparison half is the whole comparison rather than the call.
-// And the applied source says what the edit engine will write unattended, which no message-id
+// And the applied source says what the fix pass will write unattended, which no message-id
 // assertion can see.
 func TestPreferIncludesFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()

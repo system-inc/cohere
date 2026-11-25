@@ -16,7 +16,7 @@ import (
 )
 
 // concurrencyTestName is a test whose name says it runs code at once: side by side, as extra builds and graphs run, and
-// beside the load, as the lint and a run's passes do, are the engine's words for it (#2xddz1z).
+// beside the load, as the lint and a run's passes do, are cohere's words for it (#2xddz1z).
 var concurrencyTestName = regexp.MustCompile(
 	`^Test\w*(Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad)`)
 

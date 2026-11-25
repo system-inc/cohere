@@ -342,7 +342,7 @@ func TestAModuleAGoWorkUsesThroughASymbolicLinkIsRead(test *testing.T) {
 	}
 }
 
-// A load that keeps go list's answer reads what one that asks go list reads: its Inputs, which the engine writes as
+// A load that keeps go list's answer reads what one that asks go list reads: its Inputs, which cohere-go writes as
 // the inputs record the front door's replay keys on, are the same paths, so the replay cannot tell the two apart. A
 // kept answer that lost a package's directory would name other files and directories.
 func TestAKeptListingReadsTheInputsGoListsAnswerReads(test *testing.T) {

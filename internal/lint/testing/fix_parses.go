@@ -12,7 +12,7 @@ import (
 // expectEachFixParses applies each finding's fix on its own to the source it was proposed against,
 // and fails the test when a source that parsed stops parsing.
 //
-// The engine refuses such a fix at write time (edit.Parses, "the rewritten file does not parse"), so
+// The fix pass refuses such a fix at write time (edit.Parses, "the rewritten file does not parse"), so
 // nothing breaks on disk, but the user sees a refused fix and the rule has proposed a wrong one. Three
 // rules did that on trpc and no fixture of theirs noticed, because a fixture asserts the rewrite it
 // expects on the shapes its author thought of, and the broken shapes were ones nobody wrote: a type
@@ -21,8 +21,8 @@ import (
 // rule, whatever its author was testing, so the next rule like those fails in the suite and not on
 // someone else's repository.
 //
-// One finding's edits are applied together, as the engine judges a fix alone (breaksParseAlone);
-// edits from different findings are not combined, since resolving their overlaps is the engine's job.
+// One finding's edits are applied together, as the fix pass judges a fix alone (breaksParseAlone);
+// edits from different findings are not combined, since resolving their overlaps is the linter's job.
 // A source that did not parse to begin with proves nothing either way and is skipped.
 func expectEachFixParses(test *testing.T, subject *ast.SourceFile, diagnostics []rule.Diagnostic) {
 	test.Helper()

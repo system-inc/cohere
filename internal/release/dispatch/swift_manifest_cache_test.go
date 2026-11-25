@@ -9,15 +9,15 @@ import (
 	"testing"
 )
 
-// An engine rebuilt after a tracked file was edited says its tree was modified. The manifest reads git's
+// A binary rebuilt after a tracked file was edited says its tree was modified. The manifest reads git's
 // answer into the build, and SwiftPM's shared manifest cache would otherwise hand back the answer from an
-// earlier evaluation of the same commit, so the rebuilt engine would call an edited tree clean. The stand-in
+// earlier evaluation of the same commit, so the rebuilt binary would call an edited tree clean. The stand-in
 // package's product prints the flag its manifest read, and the real build runs twice, clean then edited.
-func TestASwiftEngineRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
+func TestASwiftBinaryRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
 	test.Parallel()
 
 	if runtime.GOOS != "darwin" {
-		test.Skip("the Swift engine is built only on macOS")
+		test.Skip("cohere-swift is built only on macOS")
 	}
 	if _, lookPathError := exec.LookPath("swift"); lookPathError != nil {
 		test.Skip("no swift toolchain on PATH")
@@ -47,7 +47,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	}
 	git("init", "--quiet")
 	git("add", ".")
-	git("commit", "--quiet", "-m", "stand-in engine")
+	git("commit", "--quiet", "-m", "stand-in binary")
 
 	// One scratch path for both builds, as the cache directory is for every development build.
 	scratch := filepath.Join(module, ".scratch")
@@ -70,12 +70,12 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	}
 
 	if got := says(); got != "clean" {
-		test.Fatalf("an engine built from a clean tree says %q", got)
+		test.Fatalf("a binary built from a clean tree says %q", got)
 	}
 	writeFile(test, source, "#if TREE_MODIFIED\nprint(\"modified\")\n#else\nprint(\"clean\")\n#endif\n// edited\n")
 	if got := says(); got != "modified" {
 		test.Fatalf(
-			"an engine rebuilt after a tracked file was edited says %q, so its provenance would call the tree clean",
+			"a binary rebuilt after a tracked file was edited says %q, so its provenance would call the tree clean",
 			got,
 		)
 	}

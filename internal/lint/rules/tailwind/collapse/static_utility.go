@@ -14,7 +14,7 @@
 // can disagree with the walk; a table of declarations feeding the walk cannot.
 //
 // It also makes a wrong entry loud rather than plausible. A transposed reading is a number that
-// still sorts; a transposed property name is visible against the engine's own compiled tree, which
+// still sorts; a transposed property name is visible against Tailwind's own compiled tree, which
 // is what `internal/lint/rules/tailwind/tools/generate_statics/enumerate.mjs` captures.
 package tailwind
 
@@ -46,7 +46,7 @@ func FrameworkStaticReading(name string) (Reading, bool) {
 
 // nodesFromStaticDeclarations rebuilds the declaration nodes PropertySort walks.
 //
-// A flat list rather than a rule wrapping one. The generator already flattened the engine's tree in
+// A flat list rather than a rule wrapping one. The generator already flattened Tailwind's tree in
 // the order PropertySort visits it, and re-wrapping would add a container the walk would descend
 // into to reach the same sequence. Both produce the same reading; the flat form is what the
 // generator's output actually describes, and shaping the input to match the data avoids implying a

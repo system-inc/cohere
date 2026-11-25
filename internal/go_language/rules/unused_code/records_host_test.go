@@ -2,7 +2,7 @@ package unused_code
 
 import "crypto/sha256"
 
-// recordsHost is a host's side that answers what a recording run of U1000 handed on, as the engine's side answers
+// recordsHost is a host's side that answers what a recording run of U1000 handed on, as cohere-go's side answers
 // it: for its package's identifier alone, by a body's key, with the digest of the file the body was parsed from, and
 // nothing for a body whose file it holds no digest of.
 type recordsHost struct {

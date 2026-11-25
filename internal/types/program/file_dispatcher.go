@@ -127,8 +127,8 @@ func (dispatcher *fileDispatcher) slotFor(ruleName string) *ruleSlot {
 		}
 
 		// Readiness counts before suppression, since Adamic reads no disable comment, and a rule running
-		// measure-only reports nothing at all: its findings never print, fail the run or reach the edit
-		// engine with a fix.
+		// measure-only reports nothing at all: its findings never print, fail the run or reach the fix
+		// pass with a fix.
 		dispatcher.readiness.count(ruleName)
 		if dispatcher.readiness.hidden(ruleName) {
 			return

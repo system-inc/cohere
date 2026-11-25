@@ -384,9 +384,9 @@ func TestALandingLaysTheCorporaItsBoxLacks(test *testing.T) {
 	})
 }
 
-// The fork's lay builds exactly the bundles the engine loads from a fork's dist/prettier, BundleFiles, so a laid fork
+// The fork's lay builds exactly the bundles cohere loads from a fork's dist/prettier, BundleFiles, so a laid fork
 // can stand where Kirk's checkout stands.
-func TestTheForksLayBuildsEveryBundleTheEngineLoads(test *testing.T) {
+func TestTheForksLayBuildsEveryBundleTheFormatterLoads(test *testing.T) {
 	test.Parallel()
 	want := ""
 	for _, name := range prettier.BundleFiles {

@@ -37,7 +37,7 @@ const (
 // restoring nothing from the host's run (keepsHostRestoreOff), and with the walk and the findings cache on, each over a
 // copy of its own. Their streams must be byte for byte the same but for the counts of the restore, of the cache, and of
 // an extra build's packages analyzed, which its untouched packages leave out. wantExit is the exit every run makes. It
-// returns the walk's engine.
+// returns the walk's pipeline.
 func walkDifferential(test *testing.T, fixture string, wantExit int) *pipeline {
 	test.Helper()
 
@@ -49,8 +49,8 @@ func walkDifferential(test *testing.T, fixture string, wantExit int) *pipeline {
 	}
 	_, cached := runOverWith(test, copyFixture(test, fixture), wantExit)
 	for name, stream := range map[string]string{
-		"visiting every package":    configured(func(engine *pipeline) { engine.keepsWalkOff = true }),
-		"checking every package":    configured(func(engine *pipeline) { engine.keepsHostRestoreOff = true }),
+		"visiting every package":    configured(func(pipeline *pipeline) { pipeline.keepsWalkOff = true }),
+		"checking every package":    configured(func(pipeline *pipeline) { pipeline.keepsHostRestoreOff = true }),
 		"walking with the cache on": cached,
 	} {
 		if withoutCache(stream) != withoutCache(walked) {
@@ -102,19 +102,19 @@ func TestTheWalkHoldsTheMergeOfEveryFixture(test *testing.T) {
 	}
 }
 
-// buildRunOf is engine's run of the extra build that is or sets operatingSystemOrTag, failing the test when it has
+// buildRunOf is pipeline's run of the extra build that is or sets operatingSystemOrTag, failing the test when it has
 // none.
-func buildRunOf(test *testing.T, engine *pipeline, operatingSystemOrTag string) buildRun {
+func buildRunOf(test *testing.T, pipeline *pipeline, operatingSystemOrTag string) buildRun {
 	test.Helper()
-	at := slices.IndexFunc(engine.buildRuns, func(run buildRun) bool {
+	at := slices.IndexFunc(pipeline.buildRuns, func(run buildRun) bool {
 		return run.build.OperatingSystem == operatingSystemOrTag && !slices.Contains(run.build.Tags, "cohere_extra") ||
 			slices.Contains(run.build.Tags, operatingSystemOrTag)
 	})
 	if at < 1 {
 		test.Fatalf("the run checked no %s build beside the host's: %d builds", operatingSystemOrTag,
-			len(engine.buildRuns))
+			len(pipeline.buildRuns))
 	}
-	return engine.buildRuns[at]
+	return pipeline.buildRuns[at]
 }
 
 // copiesALock reports whether run found copylocks' copy of a lock in u's copy.go.
@@ -130,13 +130,13 @@ func copiesALock(run buildRun) bool {
 // finds the copy of the lock, which the host never finds. Under the walk's superset, a visited package's path joining
 // what changed, a walk that went by direct imports would visit u here too, by h, which reads s2: the mutant that
 // restores the direct imports is killed at the level of the set, by
-// TestADependenceSetHoldsWhatAWholeUseReachesPastTheDirectImports: at the engine's, every package between u and what
+// TestADependenceSetHoldsWhatAWholeUseReachesPastTheDirectImports: at cohere-go's, every package between u and what
 // changed reads what it exposes, and is visited.
 func TestTheSquaresUserIsVisitedAndJudged(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
-	host, windows := engine.buildRuns[0], buildRunOf(test, engine, "windows")
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
+	host, windows := pipeline.buildRuns[0], buildRunOf(test, pipeline, "windows")
 	if slices.Contains(windows.result.FromHost.Untouched, walkU) {
 		test.Errorf("windows left u untouched, %q, want it visited", windows.result.FromHost.Untouched)
 	}
@@ -157,8 +157,8 @@ func TestTheSquaresUserIsVisitedAndJudged(test *testing.T) {
 func TestAClosureLookupOfAnAbsentPackageReadsNothing(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
-	windows, tagged := buildRunOf(test, engine, "windows"), buildRunOf(test, engine, "cohere_extra")
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
+	windows, tagged := buildRunOf(test, pipeline, "windows"), buildRunOf(test, pipeline, "cohere_extra")
 	if slices.Contains(windows.result.FromHost.Untouched, walkHasher) {
 		test.Fatal("windows left hasher untouched, so nothing of hash changed there and the case proves nothing")
 	}
@@ -178,8 +178,8 @@ func TestATagBuildLeavesUntouchedAllButTheLeafsReaders(test *testing.T) {
 	// The walk judges what each build checks from source, the standard library's packages among them, so every run
 	// computes them rather than restore them from the template, as the warm system cache's case below does.
 	coldSystemCacheFor(test)
-	engine, streamed := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
-	tagged := buildRunOf(test, engine, "cohere_extra")
+	pipeline, streamed := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-square")), exitFindings)
+	tagged := buildRunOf(test, pipeline, "cohere_extra")
 	want := []string{walkDormant, walkH, walkHasher, walkLonely, walkOther, walkS1, walkS2, walkU}
 	slices.Sort(want)
 	// The standard library's packages are left untouched too, nothing of them changing under the tag.
@@ -195,7 +195,7 @@ func TestATagBuildLeavesUntouchedAllButTheLeafsReaders(test *testing.T) {
 			tagged.build, tagged.result.FromHost.Visited, tagged.result.FromHost.Declined[walkNeedsLeaf])
 	}
 	for index, record := range lintBuilds(test, streamed) {
-		run := engine.buildRuns[index]
+		run := pipeline.buildRuns[index]
 		if index == 0 {
 			continue
 		}
@@ -260,9 +260,9 @@ func TestAnUntouchedPackagesFilesAreTheHostsChecked(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "walk-square"))
-	engine, streamed := runOver(test, root, exitFindings)
+	pipeline, streamed := runOver(test, root, exitFindings)
 	dormantFile := filepath.Join(root, "dormant", "dormant.go")
-	tagged := buildRunOf(test, engine, "cohere_extra")
+	tagged := buildRunOf(test, pipeline, "cohere_extra")
 	if !slices.Contains(tagged.result.FromHost.Untouched, walkDormant) || tagged.said[dormantFile] ||
 		!tagged.untouchedFiles[dormantFile] {
 		test.Errorf("%s left dormant untouched %t, says on its file %t and carries it untouched %t, want "+
@@ -295,8 +295,8 @@ const (
 func TestAnUntouchedPackageAboveACheckDeclineStaysUntouched(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-reload")), exitFindings)
-	tagged := buildRunOf(test, engine, "cohere_extra")
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-reload")), exitFindings)
+	tagged := buildRunOf(test, pipeline, "cohere_extra")
 	if !strings.HasPrefix(tagged.result.FromHost.Declined[walkReloadLogger], "F ") ||
 		tagged.result.Cache.ReloadRoundsBy["hostDecline"] != 1 {
 		test.Fatalf("%s declined logger for %q over %v reloads, want at its check, by its fact, once", tagged.build,
@@ -361,8 +361,8 @@ const (
 func TestACheckDeclinesImporterIsRejudgedAndRestored(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-rejudge")), exitFindings)
-	windows := buildRunOf(test, engine, "windows")
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-rejudge")), exitFindings)
+	windows := buildRunOf(test, pipeline, "windows")
 	fromHost := windows.result.FromHost
 	if !strings.HasPrefix(fromHost.Declined[rejudgeLogger], "F ") ||
 		windows.result.Cache.ReloadRoundsBy["hostDecline"] != 1 {
@@ -384,8 +384,8 @@ func TestACheckDeclinesImporterIsRejudgedAndRestored(test *testing.T) {
 func TestARejudgedImporterOfAChangedAnswerDeclines(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-redecline")), exitFindings)
-	host, windows := engine.buildRuns[0], buildRunOf(test, engine, "windows")
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "walk-redecline")), exitFindings)
+	host, windows := pipeline.buildRuns[0], buildRunOf(test, pipeline, "windows")
 	fromHost := windows.result.FromHost
 	if !strings.HasPrefix(fromHost.Declined[redeclineOpener], "A ") ||
 		!strings.HasPrefix(fromHost.Declined[redeclineUser], "A ") {
@@ -439,15 +439,15 @@ func TestAThirdLoadReportsItsOwnHostRestoreCounts(test *testing.T) {
 	isWindows := func(extra project.Build) bool {
 		return extra.OperatingSystem == "windows" && !slices.Contains(extra.Tags, "cohere_extra")
 	}
-	engine, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.extraBuildLoads = func(extra project.Build) {
+	pipeline, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.extraBuildLoads = func(extra project.Build) {
 			if isWindows(extra) {
 				telling.Lock()
 				defer telling.Unlock()
 				windowsDeclines = append(windowsDeclines, map[string]string{})
 			}
 		}
-		engine.declinedAtLoad = func(extra project.Build, identifier string, why string) {
+		pipeline.declinedAtLoad = func(extra project.Build, identifier string, why string) {
 			if isWindows(extra) {
 				telling.Lock()
 				defer telling.Unlock()
@@ -455,7 +455,7 @@ func TestAThirdLoadReportsItsOwnHostRestoreCounts(test *testing.T) {
 			}
 		}
 	}, "--no-cache")
-	windows := buildRunOf(test, engine, "windows")
+	windows := buildRunOf(test, pipeline, "windows")
 	fromHost := windows.result.FromHost
 	if fromHost.ReloadRounds != 2 || windows.result.Cache.ReloadRoundsBy["hostDecline"] != 2 {
 		test.Fatalf("windows' check declines asked %d loads and the build loaded again %v, want two of each, or the "+

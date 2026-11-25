@@ -100,7 +100,7 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 }
 
 // ruleFinding is a rule's diagnostic as a runFinding, with the severity the settings give the rule for
-// its file. Unnamed rules report as errors, and so does the unused-disable engine diagnostic by default.
+// its file. Unnamed rules report as errors, and so does the unused-disable linter diagnostic by default.
 func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Configuration) runFinding {
 	finding := runFinding{
 		Severity:  "error",
@@ -148,7 +148,7 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	// Decided here, once the phases are known, and kept: a replay prints this count rather than judging the
 	// skips again against phases it did not run.
 	summary.Gaps.RulesSkippingEverything = summary.uncoveredSkips()
-	summary.Gaps.ModifiedBuild = release.Current().SourceTreeModified || report.engineSourceTreeModified
+	summary.Gaps.ModifiedBuild = release.Current().SourceTreeModified || report.contractSourceTreeModified
 	// The phase line's sentence points at notes only --verbose prints, so the footer says the gap itself:
 	// each path that finds one sets Gaps with its count. A gap nothing counted still shows, saying where
 	// to look, so no run falls short in silence.
@@ -175,7 +175,7 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	// that matched nothing (see ignore_account.go).
 	summary.IgnorePatterns = discoveredIgnores
 	summary.Findings += unusedIgnoreCount(discoveredIgnores)
-	summary.EngineBuilds = builtEngines()
+	summary.ProgramBuilds = builtPrograms()
 
 	// Discovery's ignores come after everything a recording keeps, just before the footer, which is where a
 	// replay says them too: after the recorded report (see replayRunCache).
@@ -190,7 +190,7 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 			footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
 	case outputJson:
 		writeDiscoveredIgnores(out)
-		printInvocation(out, "%s", engineBuildLines(summary.EngineBuilds)+summaryJsonLine(summaryAsJson(summary)))
+		printInvocation(out, "%s", programBuildLines(summary.ProgramBuilds)+summaryJsonLine(summaryAsJson(summary)))
 	default:
 		writeDiscoveredIgnores(out)
 		// One of several projects hands its summary to the root's one line instead (combined_footer.go).
@@ -201,9 +201,9 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	}
 }
 
-// changedFilesFrom is the edit engine's account of what it rewrote, as the summary keeps it: each path
+// changedFilesFrom is the fix pass's account of what it rewrote, as the summary keeps it: each path
 // relative to the project root, whether fixes landed, whether the formatter changed it, and the fixes by
-// rule. The engine names the formatter among a file's changers as "format".
+// rule. The child names the formatter among a file's changers as "format".
 func changedFilesFrom(files []edit.ChangedFile, root string) []changedFile {
 	changed := make([]changedFile, 0, len(files))
 	for _, file := range files {

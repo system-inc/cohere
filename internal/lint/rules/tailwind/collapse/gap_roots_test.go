@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-// gapRootResolutionCases is what the engine answers for each class, measured rather than reasoned.
+// gapRootResolutionCases is what Tailwind answers for each class, measured rather than reasoned.
 //
 // Every entry came from `designSystem.candidatesToCss([class])` on ahra's live design system, where
-// `null` is the engine refusing to compile the class at all. All 120 were measured again the same way on
-// testdata/public_theme and the engine answers each one identically there (#f598zk0), so the map holds
+// `null` is Tailwind refusing to compile the class at all. All 120 were measured again the same way on
+// testdata/public_theme and Tailwind answers each one identically there (#f598zk0), so the map holds
 // for both, and the test runs on both. That is the question `no-unknown-classes`
 // needs answered and the one these descriptions exist to answer in Go.
 //
@@ -88,7 +88,7 @@ var gapRootResolutionCases = map[string]bool{
 	// present because those two do parse functionally, which is a difference between the four that
 	// is worth having measured rather than assumed.
 
-	// `block`, `inline` and `flex` are deliberately absent. The engine compiles all three, and it
+	// `block`, `inline` and `flex` are deliberately absent. Tailwind compiles all three, and it
 	// compiles them as `staticUtility` registrations rather than through any functional path:
 	// utilities.ts:956 and :958 register `display: block` and `display: inline` directly. The
 	// descriptor extractor probed them as functional roots, which
@@ -97,7 +97,7 @@ var gapRootResolutionCases = map[string]bool{
 	//
 	// So a functional description refusing them is correct rather than a gap, and a caller must ask
 	// the static table before this one. Listing them here as `true` would make the description claim
-	// something it does not do, and as `false` would claim the engine refuses them, and both are
+	// something it does not do, and as `false` would claim Tailwind refuses them, and both are
 	// worse than saying why they are not cases.
 
 	// The negative spellings, which resolve exactly as their positive roots do.
@@ -105,12 +105,12 @@ var gapRootResolutionCases = map[string]bool{
 	"-bg-conic-30": true,
 }
 
-// Every checked-in description answers what the engine answers, class for class.
+// Every checked-in description answers what Tailwind answers, class for class.
 //
 // The two are independent claims: the descriptions were read from `utilities.ts` at the v4.3.3 tag
 // and the expectations were measured through `candidatesToCss`, so an agreement is evidence rather
 // than a restatement. That is the same discipline the three emitter slices were held to.
-func TestGapRootDescriptionsResolveWhatTheEngineCompiles(test *testing.T) {
+func TestGapRootDescriptionsResolveWhatTailwindCompiles(test *testing.T) {
 	test.Parallel()
 	for _, gapSystem := range []struct {
 		name string
@@ -138,7 +138,7 @@ func expectGapRootDescriptionsResolve(test *testing.T, system *LoadedDesignSyste
 	var undescribed int
 	var disagreements []string
 
-	for className, engineCompiles := range gapRootResolutionCases {
+	for className, tailwindCompiles := range gapRootResolutionCases {
 		candidates := ParseCandidate(className, system)
 		if len(candidates) == 0 {
 			unparsed++
@@ -155,12 +155,12 @@ func expectGapRootDescriptionsResolve(test *testing.T, system *LoadedDesignSyste
 		}
 
 		_, produced := ResolveFunctionalUtilityValue(candidate, description, system.Theme(), false)
-		if produced == engineCompiles {
+		if produced == tailwindCompiles {
 			agreed++
 			continue
 		}
 		disagreements = append(disagreements,
-			className+": the engine "+compiledWord(engineCompiles)+" it and the description "+compiledWord(produced))
+			className+": Tailwind "+compiledWord(tailwindCompiles)+" it and the description "+compiledWord(produced))
 	}
 
 	sort.Strings(disagreements)
@@ -223,7 +223,7 @@ func TestEveryGapRootIsDescribed(test *testing.T) {
 
 // An arbitrary colour carrying an alpha modifier resolves, on every root with a colour arm.
 //
-// `bg-[#FD555E]/15` is a hex with fifteen percent alpha and the engine compiles it. The check that
+// `bg-[#FD555E]/15` is a hex with fifteen percent alpha and Tailwind compiles it. The check that
 // decides this reads the arms, and a first version read only the multi-declaration table's theme
 // keys, so it never reached a gap root: `bg`, `border`, `text` and their kin refused every arbitrary
 // colour that carried a modifier.
@@ -236,7 +236,7 @@ func TestEveryGapRootIsDescribed(test *testing.T) {
 // this test.
 func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
+	forEachTailwindSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
 
 		var checked int
 		for root, description := range GapRootDescriptions {

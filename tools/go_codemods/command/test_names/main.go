@@ -1,6 +1,6 @@
 // Command testnames renames the testing handles of cohere's Go code to full words: a local `t *testing.T`
 // or `t`/`tb testing.TB` becomes `test`, `b *testing.B` becomes `benchmark`, `f *testing.F` becomes `fuzz`.
-// Every rename goes through the rename engine, which refuses any that would change what an identifier
+// Every rename goes through global_rename, which refuses any that would change what an identifier
 // resolves to; after writing, the tree is reloaded and every identifier's resolution compared.
 package main
 
@@ -468,7 +468,7 @@ var handleCommentReference = regexp.MustCompile(`t\.([A-Za-z_][A-Za-z0-9_]*)`)
 
 // handleCommentEdits rewrites `t.<Method>` to `test.<Method>` in the comments of each top-level declaration
 // (its doc and everything inside it) in which a `t` handle was renamed to `test`, where Method is a method of
-// *testing.T. A declaration that also holds a `t` handle the engine rejected is left alone, since its comments
+// *testing.T. A declaration that also holds a `t` handle global_rename rejected is left alone, since its comments
 // may name that one. It returns the edits and how many such references it left in rejected declarations.
 func handleCommentEdits(
 	goPackage *packages.Package,

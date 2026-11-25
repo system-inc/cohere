@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-// renderDuplicatesStream feeds records through a fresh Go engine run that asked for --duplicates or did not, and
-// ends it the way the engine would.
+// renderDuplicatesStream feeds records through a fresh cohere-go run that asked for --duplicates or did not, and
+// ends it the way the child would.
 func renderDuplicatesStream(test *testing.T, lines []string, requested bool) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	run := newEngineRun(stream, engineModeCheck, goLanguage("module"), "", time.Now())
+	run := newContractRun(stream, contractModeCheck, goLanguage("module"), "", time.Now())
 	run.duplicatesRequested = requested
 	for _, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
@@ -28,7 +28,7 @@ func renderDuplicatesStream(test *testing.T, lines []string, requested bool) (st
 	return out.String(), exitCode, finishError
 }
 
-// duplicatesRecord is a Go engine's duplicates record holding one group.
+// duplicatesRecord is cohere-go's duplicates record holding one group.
 const duplicatesRecord = `{"kind":"duplicates","ran":true,"floor":11,"files":1,"filesIgnored":0,"functions":3,` +
 	`"hashed":3,"groups":[{"digest":"01000000000000000000000000000000","size":19,"members":[` +
 	`{"file":"/project/scores.go","line":6,"name":"ScoreOne","size":19,"digest":"01000000000000000000000000000000"},` +
@@ -45,8 +45,8 @@ func streamWithDuplicates(test *testing.T) []string {
 }
 
 // A Go run that asked for --duplicates prints the report its record carries, and the run's exit code and findings
-// stay the engine's: the record is no finding.
-// Not parallel: engineRun's record acceptors set the package-level activeSummary
+// stay the child's: the record is no finding.
+// Not parallel: contractRun's record acceptors set the package-level activeSummary
 func TestADuplicatesRecordPrintsTheReportAndMovesNoVerdict(test *testing.T) {
 	output, exitCode, renderError := renderDuplicatesStream(test, streamWithDuplicates(test), true)
 	if renderError != nil || exitCode != 0 {
@@ -60,7 +60,7 @@ func TestADuplicatesRecordPrintsTheReportAndMovesNoVerdict(test *testing.T) {
 
 // Every way a duplicates record can break the contract is refused: one nobody asked for, one before the phases end,
 // a second one, and a run that asked and ended without one.
-// Not parallel: engineRun's record acceptors set the package-level activeSummary
+// Not parallel: contractRun's record acceptors set the package-level activeSummary
 func TestABrokenDuplicatesStreamIsRefused(test *testing.T) {
 	clean := contractFixture(test, "Clean.jsonl")
 	withRecord := streamWithDuplicates(test)
@@ -89,14 +89,14 @@ func TestABrokenDuplicatesStreamIsRefused(test *testing.T) {
 	}
 }
 
-// A Swift run under --duplicates checks as it would and says the report did not run, since its engine has none, so a
+// A Swift run under --duplicates checks as it would and says the report did not run, since the child has none, so a
 // root holding Swift beside TypeScript or Go is never refused for asking.
-// Not parallel: engineRun's record acceptors set the package-level activeSummary
+// Not parallel: contractRun's record acceptors set the package-level activeSummary
 func TestASwiftRunSaysItsDuplicatesReportDidNotRun(test *testing.T) {
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
-	run.duplicatesUnanswered = "the Swift engine has no duplicates report"
+	run := newContractRun(stream, contractModeCheck, swiftLanguage, "", time.Now())
+	run.duplicatesUnanswered = "cohere-swift has no duplicates report"
 	for _, line := range contractFixture(test, "Clean.jsonl") {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
 			test.Fatalf("a clean stream was refused: %v", acceptError)
@@ -107,7 +107,7 @@ func TestASwiftRunSaysItsDuplicatesReportDidNotRun(test *testing.T) {
 	if finishError != nil || exitCode != 0 {
 		test.Fatalf("exit %d, %v:\n%s", exitCode, finishError, out.String())
 	}
-	if !strings.Contains(out.String(), "not run: the Swift engine has no duplicates report") {
+	if !strings.Contains(out.String(), "not run: cohere-swift has no duplicates report") {
 		test.Errorf("the report did not say it did not run:\n%s", out.String())
 	}
 }

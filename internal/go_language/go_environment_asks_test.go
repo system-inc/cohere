@@ -25,9 +25,9 @@ func TestARunAsksGoEnvironmentOncePerBuild(test *testing.T) {
 	defer stop()
 	for _, run := range []string{"first", "second"} {
 		asks.Store(0)
-		engine, _ := runOverWith(test, root, exitClean)
-		if len(engine.buildRuns) != 2 {
-			test.Fatalf("the %s run checked %d builds, want the host's and one extra", run, len(engine.buildRuns))
+		pipeline, _ := runOverWith(test, root, exitClean)
+		if len(pipeline.buildRuns) != 2 {
+			test.Fatalf("the %s run checked %d builds, want the host's and one extra", run, len(pipeline.buildRuns))
 		}
 		if count := asks.Load(); count != 2 {
 			test.Errorf("the %s run asked go env %d times, want once per build, 2", run, count)

@@ -111,7 +111,7 @@ func list(directory string, environment []string, patterns []string) (*listing, 
 
 func runList(directory string, environment []string, patterns []string) (*listing, error) {
 	// No "--" before the patterns: a runner's stand-in go refuses any flag it does not know, that one too.
-	// -pgo=off, as the Go engine's loader lists (internal/go_language/load/listing.go): command/cohere holds the
+	// -pgo=off, as cohere-go's loader lists (internal/go_language/load/listing.go): command/cohere holds the
 	// release's default.pgo (#r6sqd2c), and under Go's default -pgo=auto go list prints each package that command
 	// imports a second time, as `testing [github.com/system-inc/cohere/command/cohere]`, so the command's own test
 	// files resolved against those copies and failed to type-check. Types are the same with or without a profile.

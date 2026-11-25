@@ -15,7 +15,7 @@ import (
 // GoAnswers are what go env and `go tool dist list` answered a test process, kept by everything that decides each
 // answer, so a run asking under what decided one asked before reads it rather than starting a child (#2htryg8). On
 // darwin go starts each child with fork, which marks the whole heap copy-on-write, so a test process running hundreds
-// of runs side by side faults on every page it next writes after each one; the engine's own run asks every time, since
+// of runs side by side faults on every page it next writes after each one; cohere-go's own run asks every time, since
 // a person's environment and toolchain move between runs. Nil in every run but a test's (Children.Answers); a failed
 // ask is never kept.
 type GoAnswers struct {

@@ -179,9 +179,9 @@ var _, _ = dep.Other(1)
 			}
 			root := written()
 			censusFile := filepath.Join(test.TempDir(), "reach.txt")
-			on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-				engine.bodyReachCensus = censusFile
-				engine.bodyDifferential = true
+			on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+				pipeline.bodyReachCensus = censusFile
+				pipeline.bodyDifferential = true
 			}, "--no-cache", "--no-fix", "--build-dependence")
 
 			tagged := slices.IndexFunc(on.buildRuns, func(run buildRun) bool {
@@ -285,9 +285,9 @@ var _, _ = dep.Other(1)
 			var streams [2][]string
 			for index, switched := range []bool{false, true} {
 				standingRoot := written()
-				switchedRun, stream := runOverConfigured(test, standingRoot, exitFindings, func(engine *pipeline) {
-					engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-					engine.standingBodies = switched
+				switchedRun, stream := runOverConfigured(test, standingRoot, exitFindings, func(pipeline *pipeline) {
+					pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+					pipeline.standingBodies = switched
 				}, "--no-cache", "--no-fix", "--build-dependence")
 				streams[index] = findingLines(normalize(stream, standingRoot))
 				at := slices.IndexFunc(switchedRun.buildRuns, func(run buildRun) bool {

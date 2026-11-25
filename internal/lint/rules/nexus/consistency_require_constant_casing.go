@@ -148,7 +148,7 @@ func messageUnlessLeadingUnderscore(message rule.Message, name string, suggestio
 //
 // A leading underscore passes neither casing, so `const _cache` is told `cache` and `export const
 // _Results` `Results`, with a message about the underscore: it is flagged on every name we declare, as
-// the Go and Swift engines flag it (Kirk, 2026-11-06, #4b337jk, case us05). A name of underscores only is
+// cohere-go and cohere-swift flag it (Kirk, 2026-11-06, #4b337jk, case us05). A name of underscores only is
 // no name, and has no word to advise.
 //
 // SCREAMING_SNAKE_CASE is deliberately not flagged here. It is neither casing, so it would fire, but

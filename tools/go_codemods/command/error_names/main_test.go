@@ -314,10 +314,10 @@ func TestErrorNames(test *testing.T) {
 	}
 }
 
-// TestCollidingNamesGoToTheEngine proposes two nested errors that both become readError where the inner
-// one's definition reads the outer one, and confirms the engine, not the generator, refuses the collision,
+// TestCollidingNamesGoToTheRenaming proposes two nested errors that both become readError where the inner
+// one's definition reads the outer one, and confirms global_rename, not the generator, refuses the collision,
 // while a sibling with the same name in its own scope is accepted.
-func TestCollidingNamesGoToTheEngine(test *testing.T) {
+func TestCollidingNamesGoToTheRenaming(test *testing.T) {
 	test.Parallel()
 	source := `package fixture
 

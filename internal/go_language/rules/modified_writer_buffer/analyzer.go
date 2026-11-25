@@ -1,6 +1,6 @@
 // Package modified_writer_buffer is staticcheck's SA1023, a Write method of io.Writer's signature that writes into
 // the buffer it was handed, by an element store or by an append onto it, which io.Writer's contract forbids even for a
-// moment, ported onto the engine's own intermediate representation (#kk4864m).
+// moment, ported onto cohere's own intermediate representation (#kk4864m).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1023/sa1023.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the store or the call, where staticcheck's
@@ -26,7 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own.
 var Listener = rule.Listener{
 	FileLocal: true, IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
@@ -38,7 +38,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1023",
 	"SA1023",
 	"Flags an io.Writer's Write method that modifies the buffer it is given: staticcheck's SA1023, ported onto the "+
-		"engine's own intermediate representation.",
+		"cohere's own intermediate representation.",
 	&Listener,
 )
 

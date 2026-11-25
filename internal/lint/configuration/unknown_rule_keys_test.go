@@ -19,7 +19,7 @@ func TestARuleKeyThatReachesNoRuleIsRefused(test *testing.T) {
 		"a known key loads": `{"rules": {"no-console": "error"}}`,
 		"a key qualifying a registered name on a slash boundary loads": `{"rules": {
 			"@typescript-eslint/no-unused-vars": "error", "nexus/no-console": "off"}}`,
-		"unused-disable, the engine's setting, loads at top level and in an override": `{
+		"unused-disable, the linter's setting, loads at top level and in an override": `{
 			"rules": {"unused-disable": "warn"},
 			"overrides": [{"files": ["**/*.test.ts"], "rules": {"unused-disable": "off"}}]}`,
 		"consistency-no-abbreviated-folder-name, discovery's folder check, loads on and off with a reason": `{

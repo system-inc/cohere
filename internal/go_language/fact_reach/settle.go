@@ -20,7 +20,7 @@
 // cgo package may declare, holds no record of any kind for either, whatever is recorded there.
 //
 // This package is the fixed point alone, over places, objects and questions it knows nothing more of. Who fills them,
-// from stage 1's record of what each declaration uses and from the host's facts, is the engine's pipeline.
+// from stage 1's record of what each declaration uses and from the host's facts, is cohere-go's pipeline.
 package fact_reach
 
 import "maps"

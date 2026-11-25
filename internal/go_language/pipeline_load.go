@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 )
 
-// loadRequest is what differs between the engine's loads of the workspace: every one reads the workspace's root and
+// loadRequest is what differs between cohere-go's loads of the workspace: every one reads the workspace's root and
 // patterns, and counts its readable files of ours (loadPackages).
 type loadRequest struct {
 	environment []string
@@ -25,20 +25,20 @@ type loadRequest struct {
 	patterns []string
 }
 
-// loadPackages is every load of the workspace the engine makes, the only caller of package load's loads in it (a test
+// loadPackages is every load of the workspace cohere-go makes, the only caller of package load's loads in it (a test
 // holds it to that), so the memory limit is the same story for each (loadMemory): the last load's late raise is
 // retired, the limit goes back to the cap, and this load's raise is armed before it starts, then told its end after
 // it (#44n0vap). Every load, the first, the long-line wrap's, the rename's and its proofs, a lint reload and an extra
 // build's, runs under the cap, and the raise may lift the limit at most once after each.
-func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) {
+func (pipeline *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) {
 	// Every go command started from here on is late (#sktb2y8).
-	engine.described.children.LoadBegins()
-	engine.loads.begin()
-	workspace := engine.described.workspace
+	pipeline.described.children.LoadBegins()
+	pipeline.loads.begin()
+	workspace := pipeline.described.workspace
 	// The workspace, unless this is the editor's save, which loads its file's package alone (stdinPackage).
-	patterns, census := workspace.Patterns(), engine.described.readableOurs
-	if engine.request.stdinPath != "" {
-		patterns, census = engine.stdinPackage()
+	patterns, census := workspace.Patterns(), pipeline.described.readableOurs
+	if pipeline.request.stdinPath != "" {
+		patterns, census = pipeline.stdinPackage()
 	}
 	if request.patterns != nil {
 		patterns, census = request.patterns, nil
@@ -48,56 +48,56 @@ func (engine *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) 
 	switch {
 	case request.rootSyntaxOnly:
 		loaded, loadError = load.PackagesWithRootSyntax(workspace.Root, workspace.Patterns(), request.environment,
-			engine.described.readableOurs, request.overlay)
+			pipeline.described.readableOurs, request.overlay)
 	case request.withOverlay:
 		loaded, loadError = load.PackagesWithOverlay(workspace.Root, patterns, request.environment, census,
 			request.overlay)
 	case request.caching != nil:
 		loaded, loadError = load.PackagesCached(workspace.Root, patterns, request.environment, census,
-			engine.watchedCaching(*request.caching))
+			pipeline.watchedCaching(*request.caching))
 	default:
 		loaded, loadError = load.Packages(workspace.Root, patterns, request.environment, census)
 	}
-	engine.loads.end()
+	pipeline.loads.end()
 	if loaded != nil && loaded.UnguardedWorkspaceSum != "" {
-		engine.unguardedSumsLock.Lock()
-		if engine.unguardedSums == nil {
-			engine.unguardedSums = map[string]bool{}
+		pipeline.unguardedSumsLock.Lock()
+		if pipeline.unguardedSums == nil {
+			pipeline.unguardedSums = map[string]bool{}
 		}
-		engine.unguardedSums[loaded.UnguardedWorkspaceSum] = true
-		engine.unguardedSumsLock.Unlock()
+		pipeline.unguardedSums[loaded.UnguardedWorkspaceSum] = true
+		pipeline.unguardedSumsLock.Unlock()
 	}
 	return loaded, loadError
 }
 
 // unguardedWorkspaceSums are the go.work.sum files any load of the run ran go list beside with no side copy of the
 // go.work, sorted, nil for none, for the summary.
-func (engine *pipeline) unguardedWorkspaceSums() []string {
-	engine.unguardedSumsLock.Lock()
-	defer engine.unguardedSumsLock.Unlock()
-	if len(engine.unguardedSums) == 0 {
+func (pipeline *pipeline) unguardedWorkspaceSums() []string {
+	pipeline.unguardedSumsLock.Lock()
+	defer pipeline.unguardedSumsLock.Unlock()
+	if len(pipeline.unguardedSums) == 0 {
 		return nil
 	}
-	return slices.Sorted(maps.Keys(engine.unguardedSums))
+	return slices.Sorted(maps.Keys(pipeline.unguardedSums))
 }
 
-// watchedCaching is caching as it is, unless a test watches inside its loads (engineMemory.duringLoad): then its held
+// watchedCaching is caching as it is, unless a test watches inside its loads (memoryAccount.duringLoad): then its held
 // reader calls the watch before each lookup, which is during the load.
-func (engine *pipeline) watchedCaching(caching load.Caching) load.Caching {
+func (pipeline *pipeline) watchedCaching(caching load.Caching) load.Caching {
 	// Every cached load of the run, the host's and every extra build's, takes its slots from the run's one pool,
 	// records the go commands it starts in the run's account, and names the directories of its roots from the run's
 	// walks of them.
-	caching.Pool = engine.workPool()
-	caching.Children = engine.described.children
-	caching.ModuleRootWalks = engine.moduleRootWalks
+	caching.Pool = pipeline.workPool()
+	caching.Children = pipeline.described.children
+	caching.ModuleRootWalks = pipeline.moduleRootWalks
 	// Each load collects its inputs beside it only in a run whose findings cache reads a store, the run's own fact
 	// (withFindingsStore, the host's session), the same for every load of the run: warm, beside wins, and cold, under
 	// `--no-cache`, every core is busy to the end and inline wins (load.Caching.InputsBeside).
-	caching.InputsBeside = engine.withFindingsStore()
-	if engine.memory == nil || engine.memory.duringLoad == nil {
+	caching.InputsBeside = pipeline.withFindingsStore()
+	if pipeline.memory == nil || pipeline.memory.duringLoad == nil {
 		return caching
 	}
-	held, during := caching.Held, engine.memory.duringLoad
+	held, during := caching.Held, pipeline.memory.duringLoad
 	caching.Held = func(file string) ([]byte, bool) {
 		during()
 		if held == nil {

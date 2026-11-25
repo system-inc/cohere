@@ -853,7 +853,7 @@ func TestNoArrowFunctionLifecycleStaticSplit(test *testing.T) {
 // Upstream's fixer maps each parameter to its identifier name, which is undefined for anything
 // that is not a plain identifier, so a destructured or defaulted parameter is written into the
 // repaired source as the literal text `undefined`. That silently deletes what the parameter said,
-// and the engine applies a fix unattended.
+// and the fix pass applies a fix unattended.
 //
 // This port reports those cases and declines the repair, which is the subset that can be shown
 // correct. The typed-parameter row is the one our tree actually contains and upstream's corpus

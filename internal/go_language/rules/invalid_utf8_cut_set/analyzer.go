@@ -43,7 +43,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1011",
 	"SA1011",
 	"Flags a constant cutset given to a function of the strings package that is not valid UTF-8: staticcheck's "+
-		"SA1011, ported onto the engine's own intermediate representation.",
+		"SA1011, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

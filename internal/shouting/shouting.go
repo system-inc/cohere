@@ -1,9 +1,9 @@
-// Package shouting is what counts as shouting in a comment, in one place, for every engine that judges comments.
+// Package shouting is what counts as shouting in a comment, in one place, for every language that judges comments.
 //
-// The TypeScript rule nexus/consistency-no-shouting and the Go engine's cohere-go/consistency-no-shouting both read
+// The TypeScript rule nexus/consistency-no-shouting and cohere-go's cohere-go/consistency-no-shouting both read
 // it, so an acronym added to the safe list, or a mask taught a new shape of code, quiets both at once. It lives in
 // its own package, importing nothing heavier than the standard library, because the nexus rules package links the
-// TypeScript checker and the Go engine must not. The Go engine's cohere-go/consistency-no-warning-comment reads its
+// TypeScript checker and cohere-go must not. cohere-go's cohere-go/consistency-no-warning-comment reads its
 // indented code block mask too, so the two Go rules agree on which lines of a doc comment are code shown verbatim.
 package shouting
 
@@ -31,7 +31,7 @@ import (
 // wears backticks, and inside them nothing is read as shouting.
 
 // The words that are never shouting, and the two-letter words that are, are policy/Shouting.json's, read by
-// vocabulary.go into allowedUppercaseTokens and shoutedTwoLetterWords, so every engine reads one list.
+// vocabulary.go into allowedUppercaseTokens and shoutedTwoLetterWords, so every language reads one list.
 
 var (
 	digitOrUnderscore = regexp.MustCompile(`[0-9_]`)
@@ -130,8 +130,8 @@ func MaskCodeAndCommands(text string) string {
 // blankKeepingNewlines replaces every match with spaces, leaving its newlines in place.
 //
 // One space per byte, not per rune, as every other mask here blanks, so the masked text keeps the
-// input's byte length. Blanking `www.點看.com` rune by rune once shrank it by four bytes, and the Go
-// engine, which slices one masked comment group by its comments' byte offsets, read past the end and
+// input's byte length. Blanking `www.點看.com` rune by rune once shrank it by four bytes, and
+// cohere-go, which slices one masked comment group by its comments' byte offsets, read past the end and
 // panicked on 12 of cohere's packages. A newline is one byte, and never part of a multi-byte rune.
 func blankKeepingNewlines(pattern *regexp.Regexp, text string) string {
 	return pattern.ReplaceAllStringFunc(text, func(match string) string {
@@ -278,7 +278,7 @@ func maskJsDocExamples(text string) string {
 // block, while an indented block written inside a JSDoc comment still is one. Mirrors nexus's
 // Shouting.ts, so the quieter and this rule agree on what is code.
 //
-// Exported for the Go engine's comment rules, which mask a comment group's GoCommentBody texts joined
+// Exported for cohere-go's comment rules, which mask a comment group's GoCommentBody texts joined
 // by newlines with it, so the shouting rule and the warning-comment rule agree on which lines of a doc
 // comment are a code block shown verbatim.
 func MaskIndentedCodeBlocks(masked string) string {
@@ -644,7 +644,7 @@ func HasAdjacentUppercaseLetters(text string) bool {
 }
 
 // QuotedTokenList renders the first few shouted tokens for a reader, so the finding names what to
-// look at rather than making them rescan the comment. It lives beside the tokens so every engine's
+// look at rather than making them rescan the comment. It lives beside the tokens so every language's
 // finding names them the same way.
 //
 // Capped because a banner line can hold a dozen, and a message that lists all of them is harder to
@@ -669,7 +669,7 @@ func QuotedTokenList(tokens []string) string {
 var generatedMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
 
 // IsGeneratedMarker reports whether a line comment's text, its slashes included, is the generated-code marker. Where in
-// a file the line counts is the engine's to say, since the convention places it before the first token.
+// a file the line counts is the language's to say, since the convention places it before the first token.
 func IsGeneratedMarker(commentText string) bool {
 	return generatedMarker.MatchString(commentText)
 }

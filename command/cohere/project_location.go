@@ -17,8 +17,8 @@ type projectLocation struct {
 	// changed, and where the format walk starts.
 	Root string
 
-	// Engine is which engine checks the project at Root, decided by the marker that made it the root.
-	Engine projectEngine
+	// Kind is which language checks the project at Root, decided by the marker that made it the root.
+	Kind projectKind
 
 	// ConfigFileName is the absolute path of the tsconfig that defines the program, and empty for a
 	// Swift package, which has none.

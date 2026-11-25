@@ -49,7 +49,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1026",
 	"SA1026",
 	"Flags a value given to encoding/json or encoding/xml to marshal whose type cannot be marshaled, such as a "+
-		"channel or a function: staticcheck's SA1026, ported onto the engine's own intermediate representation.",
+		"channel or a function: staticcheck's SA1026, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

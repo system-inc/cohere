@@ -61,7 +61,7 @@ func (watch *preludeWatch) toldSteps() []preludeStep {
 	return slices.Clone(watch.steps)
 }
 
-// runWatchingPrelude runs the engine over a copy of fixture, under `--no-cache` so the lint pass runs beside the load,
+// runWatchingPrelude runs cohere-go over a copy of fixture, under `--no-cache` so the lint pass runs beside the load,
 // with extra after its root, telling watch of each step of the prelude.
 func runWatchingPrelude(test *testing.T, fixture string, extra []string, watch *preludeWatch) {
 	test.Helper()
@@ -93,10 +93,10 @@ func watchedPipeline(
 	}
 	// What the description started beside its reads ends before the test and its directory do.
 	test.Cleanup(described.awaitStarted)
-	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, io.Discard, nil)
-	isolatePipeline(test, engine)
-	engine.watchPrelude = watch.told
-	return engine
+	pipeline := newPipeline(request, described, ruleSettings, registered, standardOutput, io.Discard, nil)
+	isolatePipeline(test, pipeline)
+	pipeline.watchPrelude = watch.told
+	return pipeline
 }
 
 // Under `--no-fix` the first load begins before gofmt's check returns: told when runFix has returned, the watch holds
@@ -184,10 +184,10 @@ func TestAPanicInGofmtsCheckBesideTheLoadEndsTheRun(test *testing.T) {
 		}
 	}
 	var standardOutput bytes.Buffer
-	engine := watchedPipeline(test, "unformatted-type-error", []string{"--no-fix"}, watch, &standardOutput)
+	pipeline := watchedPipeline(test, "unformatted-type-error", []string{"--no-fix"}, watch, &standardOutput)
 	recovered := func() (recovered any) {
 		defer func() { recovered = recover() }()
-		engine.run()
+		pipeline.run()
 		return nil
 	}()
 	if _, isGofmts := recovered.(gofmtPanic); !isGofmts {
@@ -230,8 +230,8 @@ func TestOnlyACheckLoadsBesideGofmt(test *testing.T) {
 		},
 	}
 	for _, each := range cases {
-		engine := &pipeline{request: each.request}
-		if beside := engine.loadsBesideFix(); beside != each.beside {
+		pipeline := &pipeline{request: each.request}
+		if beside := pipeline.loadsBesideFix(); beside != each.beside {
 			test.Errorf("%s loads beside gofmt %t, want %t", each.name, beside, each.beside)
 		}
 	}

@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // messageVariantOrder names both spellings, because the reader has to see the difference.
@@ -17,7 +17,7 @@ func messageVariantOrder(written string, sorted string) rule.Message {
 		Id: "variantOrder",
 		Description: "The variants on \"" + written + "\" are written in an order Tailwind does not " +
 			"emit them in; it compiles to the same CSS as \"" + sorted + "\", which is the spelling " +
-			"the engine's own sort produces. Nothing breaks either way, and that is why the two " +
+			"Tailwind's own sort produces. Nothing breaks either way, and that is why the two " +
 			"spellings accumulate side by side until a reader cannot tell whether a difference " +
 			"between two class lists is meaningful. Write it as \"" + sorted + "\".",
 	}
@@ -38,14 +38,14 @@ type EnforceConsistentVariantOrderOptions struct {
 //
 // # Why this is not a formatting rule
 //
-// Two variants on one class compile to nested rules, and the nesting order is decided by the
-// engine's own sort rather than by the order they were written in. So `dark:md:flex` and
+// Two variants on one class compile to nested rules, and the nesting order is decided by
+// Tailwind's own sort rather than by the order they were written in. So `dark:md:flex` and
 // `md:dark:flex` produce byte-identical CSS. Nothing catches the difference: not the compiler, not
 // the browser, not a screenshot. What it costs is the same thing every unenforced spelling costs,
 // which is that the next reader cannot tell whether two class lists differing only in variant order
 // differ for a reason.
 //
-// # The comparison is deliberately weaker than the engine's full sort
+// # The comparison is deliberately weaker than Tailwind's full sort
 //
 // This is the part a reader is most likely to get wrong, and it was measured against
 // eslint-plugin-better-tailwindcss 4.7.0 rather than inferred. Upstream's `compareVariantOrder`
@@ -55,7 +55,7 @@ type EnforceConsistentVariantOrderOptions struct {
 //
 // A variant carries the global flag when every selector it generates is free of `&`, which is
 // upstream's `hasGlobalSelector`. Those are the media and at-rule variants, and they must sort
-// ahead of anything scoped to an element because that is the nesting the engine emits. Among two
+// ahead of anything scoped to an element because that is the nesting Tailwind emits. Among two
 // globals the sort is descending by registration order, which is what makes `sm:lg:` report as
 // `lg:sm:` rather than the other way around.
 //
@@ -126,7 +126,7 @@ var EnforceConsistentVariantOrder = rule.Rule[EnforceConsistentVariantOrderOptio
 	},
 }
 
-// reportVariantOrder checks each class in one literal against the engine's variant sort.
+// reportVariantOrder checks each class in one literal against Tailwind's variant sort.
 func reportVariantOrder(ruleContext rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
 	system := designSystem.System
 	if system == nil {
@@ -177,7 +177,7 @@ func reportTemplateVariantOrder(
 // order can never collide: the framework's highest registration is under a hundred.
 const globalVariantFlag = 65536
 
-// sortedVariantSpelling returns the class rewritten with its variants in the engine's order.
+// sortedVariantSpelling returns the class rewritten with its variants in Tailwind's order.
 //
 // Reports false when the class has fewer than two variants, when the parser declined it, or when
 // the written order already matches. Upstream bails on each for the same reason: a class it cannot
@@ -200,7 +200,7 @@ const globalVariantFlag = 65536
 // upstream: `getVariantOrder` is handed every class in the literal, but the comparison only ever
 // runs between two variants of the same class, and a dense rank's relative order within a subset is
 // the relative order it has in the whole. A wider population shifts indices without reordering them.
-func sortedVariantSpelling(className string, system *tailwindengine.LoadedDesignSystem) (string, bool) {
+func sortedVariantSpelling(className string, system *tailwindcollapse.LoadedDesignSystem) (string, bool) {
 	prefix, root, hasVariants := splitVariantPrefix(className)
 	if !hasVariants {
 		return "", false
@@ -211,7 +211,7 @@ func sortedVariantSpelling(className string, system *tailwindengine.LoadedDesign
 		return "", false
 	}
 
-	parsed := tailwindengine.ParseCandidate(className, system)
+	parsed := tailwindcollapse.ParseCandidate(className, system)
 	if len(parsed) == 0 {
 		return "", false
 	}
@@ -315,7 +315,7 @@ func compareVariantOrder(left int, right int) int {
 // selectors and so could change its answer. That is a real divergence and it is bounded: it would
 // have to redefine a framework media variant as a selector-based one, which inverts the variant's
 // meaning rather than tuning it. The alternative, porting the selector machinery to ask the
-// question honestly, is the whole CSS half of the engine.
+// question honestly, is the whole CSS half of Tailwind.
 var globalSelectorVariants = map[string]bool{
 	"any-pointer-coarse": true,
 	"any-pointer-fine":   true,
@@ -352,8 +352,8 @@ var globalSelectorVariants = map[string]bool{
 // `[@media(hover)]` has no registration to look up. Both are still ordered, through the dense rank
 // the caller already has; they simply carry no flag, which is what puts them after every media
 // variant and matches upstream on both.
-func isGlobalVariant(variant tailwindengine.ParsedVariant, system *tailwindengine.LoadedDesignSystem) bool {
-	if variant.Kind != tailwindengine.ParsedVariantKindStatic {
+func isGlobalVariant(variant tailwindcollapse.ParsedVariant, system *tailwindcollapse.LoadedDesignSystem) bool {
+	if variant.Kind != tailwindcollapse.ParsedVariantKindStatic {
 		return false
 	}
 	if globalSelectorVariants[variant.Root] {

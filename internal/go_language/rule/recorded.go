@@ -6,7 +6,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Recorded keys, in a pass's ResultOf, the *build_reads.Reads of the pass's package, which the engine's checker hands
+// Recorded keys, in a pass's ResultOf, the *build_reads.Reads of the pass's package, which cohere-go's checker hands
 // every pass when its checker.Options.Recorded is this key and its Options.Reads is set (#b2t9xmf), nil for a package
 // the run records no reads of. A rule that asks another package something past its own syntax, a name in another
 // package's scope, an interface of its import closure, whether an object is deprecated, records the question and its

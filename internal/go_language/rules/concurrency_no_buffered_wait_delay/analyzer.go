@@ -1,4 +1,4 @@
-// Package concurrency_no_buffered_wait_delay is the Go engine's rule against exec.Cmd.WaitDelay on a command whose
+// Package concurrency_no_buffered_wait_delay is cohere-go's rule against exec.Cmd.WaitDelay on a command whose
 // output goes to memory, ported from Adamic's waitdelay.
 //
 // When a command's Stdout or Stderr is anything but an *os.File, exec copies it through a pipe of its own, and with
@@ -89,14 +89,14 @@ func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 // Analyzer runs the rule over one package, reporting what the shared syntax dispatcher's walk found for it.
 var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{
 	Name:      Name,
 	Origin:    rule.OriginHouse,
 	TypeAware: true,
 	Analyzer:  Analyzer,
 	Listener:  &listener,
-	// ConfiguredBy lets the engine list the rule as not configured rather than quiet, since it reports nothing
+	// ConfiguredBy lets cohere-go list the rule as not configured rather than quiet, since it reports nothing
 	// until cure names the cure package.
 	ConfiguredBy: []string{cureFlag},
 }
@@ -160,7 +160,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		}
 		table, isTable := context.ResultOf(positions.Analyzer).(*positions.Table)
 		if !isTable {
-			// Invariant: positions' result is always its Table, so another is a mistake in the engine, and the
+			// Invariant: positions' result is always its Table, so another is a mistake in cohere-go, and the
 			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 			panic(fmt.Sprintf("reading the line table: positions gave %T", context.ResultOf(positions.Analyzer)))
 		}

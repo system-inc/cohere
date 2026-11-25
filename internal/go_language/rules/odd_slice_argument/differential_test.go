@@ -15,7 +15,7 @@ import (
 )
 
 // factsDifferentialVariable names the tree the fact differential runs over: root for cohere's own module, or a
-// directory, whose every package it loads as the engine does. The standard library is its source folder, under
+// directory, whose every package it loads as cohere-go does. The standard library is its source folder, under
 // `GOROOT` set to the toolchain it belongs to.
 const factsDifferentialVariable = "COHERE_GO_IR_FACTS_DIFFERENTIAL"
 
@@ -40,7 +40,7 @@ func differentialTree(test *testing.T) string {
 }
 
 // The fact differential (#w7zmvat): over the whole tree COHERE_GO_IR_FACTS_DIFFERENTIAL names, and every package it
-// imports, staticcheck's SA5012 on buildir and the port on the engine's own intermediate representation export the
+// imports, staticcheck's SA5012 on buildir and the port on cohere's own intermediate representation export the
 // same marks on every package, failing on the first that differs. The original is staticcheck's own analyzer rather
 // than a kept copy of the port as it ran on buildir: its mark prints as the port's does, which is all the comparison
 // reads, and the port on buildir differed from it only in reporting a go or defer statement's call, never in a mark.

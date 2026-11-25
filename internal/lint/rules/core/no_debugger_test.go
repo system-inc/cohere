@@ -80,7 +80,7 @@ func TestNoDebuggerRemovesTheStatement(test *testing.T) {
 	// and passes every assertion above. Asserting the resulting source is what closes that.
 	// The leading indentation survives, because RemoveNode deletes the node and not the trivia
 	// before it. Asserted as it actually is rather than as it reads best: a fixture that states a
-	// tidier result than the engine produces is a fixture that will be "fixed" by making the engine
+	// tidier result than the fix pass produces is a fixture that will be "fixed" by making the linter
 	// wrong.
 	rule_testing.ExpectFixedSource(test, result, "export function run() {\n    \n}\n")
 }

@@ -9,9 +9,9 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
-// TestMain clears ForkPathVariable once for the package, so every engine a test builds loads the embedded
+// TestMain clears ForkPathVariable once for the package, so every formatter a test builds loads the embedded
 // bundles whatever the developer's shell exports. Clearing it per test with t.Setenv would hold every test
-// that builds an engine serial, since a test that calls t.Setenv cannot run in parallel. The tests in
+// that builds a formatter serial, since a test that calls t.Setenv cannot run in parallel. The tests in
 // forkpath_test.go that set the variable do so with t.Setenv, serially, and go test finishes every serial
 // test, restoring what it set, before any parallel test runs.
 func TestMain(suite *testing.M) {
@@ -23,7 +23,7 @@ func TestMain(suite *testing.M) {
 	os.Exit(suite.Run())
 }
 
-// newTestEngine builds an engine, and no longer skips when a fork is absent.
+// newTestFormatter builds a formatter, and no longer skips when a fork is absent.
 //
 // This function used to stat a directory and skip the whole file when it was missing, because the
 // bundles were build output of a checkout that only existed on one machine. That skip is gone, and
@@ -34,7 +34,7 @@ func TestMain(suite *testing.M) {
 // Worth keeping the record of why that skip was dangerous, because the same shape will be proposed
 // again for something else. A skip is truthful only to a reader who reads it, and the reader that
 // mattered was a CI summary printing `ok internal/prettier` and swallowing the line. Every assertion
-// in this file skipped, and the package reported as passing over an engine that could not load a
+// in this file skipped, and the package reported as passing over a formatter that could not load a
 // single bundle:
 //
 //	COHERE_PRETTIER_FORK=/nonexistent go test ./internal/prettier/
@@ -47,15 +47,15 @@ func TestMain(suite *testing.M) {
 // changes a plain run is the package not passing -- which forecloses every message-shaped fix and
 // left vendoring as the only real one.
 //
-// The engine loads the embedded bundles because TestMain clears ForkPathVariable for the whole package,
+// The formatter loads the embedded bundles because TestMain clears ForkPathVariable for the whole package,
 // so a fork a developer's shell points at cannot stand in for them.
-func newTestEngine(test *testing.T) *Engine {
+func newTestFormatter(test *testing.T) *Formatter {
 	test.Helper()
-	engine, newPrettierError := New(format_options.Default())
+	formatter, newPrettierError := New(format_options.Default())
 	if newPrettierError != nil {
-		test.Fatalf("building the engine from the embedded bundles: %v", newPrettierError)
+		test.Fatalf("building the formatter from the embedded bundles: %v", newPrettierError)
 	}
-	return engine
+	return formatter
 }
 
 // TestFormatsCrampedSource is the known-dirty control. A formatter that has never changed anything
@@ -63,8 +63,8 @@ func newTestEngine(test *testing.T) *Engine {
 func TestFormatsCrampedSource(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
-	formatted, formatError := engine.Format("probe.ts", "const   x=1\n")
+	formatter := newTestFormatter(test)
+	formatted, formatError := formatter.Format("probe.ts", "const   x=1\n")
 	if formatError != nil {
 		test.Fatalf("format: %v", formatError)
 	}
@@ -78,9 +78,9 @@ func TestFormatsCrampedSource(test *testing.T) {
 func TestLeavesFormattedSourceAlone(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
+	formatter := newTestFormatter(test)
 	source := "const x = 1;\n"
-	formatted, formatError := engine.Format("clean.ts", source)
+	formatted, formatError := formatter.Format("clean.ts", source)
 	if formatError != nil {
 		test.Fatalf("format: %v", formatError)
 	}
@@ -97,8 +97,8 @@ func TestLeavesFormattedSourceAlone(test *testing.T) {
 func TestPromiseIsDrained(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
-	formatted, formatError := engine.Format("probe.ts", "const x=1\n")
+	formatter := newTestFormatter(test)
+	formatted, formatError := formatter.Format("probe.ts", "const x=1\n")
 	if formatError != nil {
 		test.Fatalf("format: %v", formatError)
 	}
@@ -113,7 +113,7 @@ func TestPromiseIsDrained(test *testing.T) {
 func TestForkCustomizationsSurvive(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
+	formatter := newTestFormatter(test)
 	source := "function probe(a) {\n" +
 		"    if(a) {\n        a = 1;\n    }\n" +
 		"    else {\n        a = 2;\n    }\n" +
@@ -122,7 +122,7 @@ func TestForkCustomizationsSurvive(test *testing.T) {
 		"    switch(a) {\n        default:\n            break;\n    }\n" +
 		"    const f = function() {\n        return a;\n    };\n" +
 		"    return f();\n}\n"
-	formatted, formatError := engine.Format("probe.js", source)
+	formatted, formatError := formatter.Format("probe.js", source)
 	if formatError != nil {
 		test.Fatalf("format: %v", formatError)
 	}
@@ -141,9 +141,9 @@ func TestForkCustomizationsSurvive(test *testing.T) {
 func TestMarkdownTildeIsNotDoubled(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
+	formatter := newTestFormatter(test)
 	source := "Sizes: `Seed` (~25K tokens), `Warm` (~75K tokens).\n"
-	formatted, formatError := engine.Format("probe.md", source)
+	formatted, formatError := formatter.Format("probe.md", source)
 	if formatError != nil {
 		test.Fatalf("format: %v", formatError)
 	}
@@ -152,15 +152,15 @@ func TestMarkdownTildeIsNotDoubled(test *testing.T) {
 	}
 }
 
-// TestUnhandledTypeIsAnError proves the engine refuses rather than silently passing a file through.
+// TestUnhandledTypeIsAnError proves the formatter refuses rather than silently passing a file through.
 func TestUnhandledTypeIsAnError(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
-	if _, formatError := engine.Format("probe.rb", "puts 1\n"); formatError == nil {
+	formatter := newTestFormatter(test)
+	if _, formatError := formatter.Format("probe.rb", "puts 1\n"); formatError == nil {
 		test.Fatal("formatting a .rb file succeeded, want an error")
 	}
-	if engine.Handles("probe.rb") {
+	if formatter.Handles("probe.rb") {
 		test.Fatal("Handles said yes to .rb")
 	}
 }
@@ -170,8 +170,8 @@ func TestUnhandledTypeIsAnError(test *testing.T) {
 func TestSyntaxErrorSurfaces(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
-	_, formatError := engine.Format("broken.ts", "const x = {{{ broken\n")
+	formatter := newTestFormatter(test)
+	_, formatError := formatter.Format("broken.ts", "const x = {{{ broken\n")
 	if formatError == nil {
 		test.Fatal("formatting malformed source succeeded, want an error")
 	}
@@ -180,19 +180,19 @@ func TestSyntaxErrorSurfaces(test *testing.T) {
 	}
 }
 
-// TestFilepathReachesPrettier pins that the engine passes the file name, because Prettier's output
+// TestFilepathReachesPrettier pins that the formatter passes the file name, because Prettier's output
 // depends on it: `<T,>` on a single-parameter generic arrow is required in .tsx and dropped in .ts, and
 // Prettier tells the two apart by the path, not by the parser. Without a filepath both keep the comma.
 func TestFilepathReachesPrettier(test *testing.T) {
 	test.Parallel()
 
-	engine := newTestEngine(test)
+	formatter := newTestFormatter(test)
 	source := "const identity = <T,>(value: T) => value;\n"
 	for fileName, want := range map[string]string{
 		"probe.ts":  "const identity = <T>(value: T) => value;\n",
 		"probe.tsx": "const identity = <T,>(value: T) => value;\n",
 	} {
-		formatted, formatError := engine.Format(fileName, source)
+		formatted, formatError := formatter.Format(fileName, source)
 		if formatError != nil {
 			test.Fatalf("%s: %v", fileName, formatError)
 		}

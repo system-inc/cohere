@@ -35,11 +35,11 @@ func TestAPackageTheStoreAnsweredAQuestionAboutHasNoSideForTheFactsReach(test *t
 		}
 		request.standardLibrary.systemCacheRoot = systemCache
 		request.answersInPart = map[string]bool{"example.com/storeanswered/p": true}
-		engine, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), configure)
+		pipeline, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), configure)
 		if exitCode != exitClean && exitCode != exitFindings {
 			test.Fatalf("the run exited %d:\n%s\n%s", exitCode, standardOutput, standardError)
 		}
-		return engine
+		return pipeline
 	}
 	run(nil)
 	upper := filepath.Join(root, "q", "q.go")
@@ -52,7 +52,7 @@ func TestAPackageTheStoreAnsweredAQuestionAboutHasNoSideForTheFactsReach(test *t
 		test.Fatal(writeError)
 	}
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
-	edited := run(func(engine *pipeline) { engine.bodyReachCensus = censusFile })
+	edited := run(func(pipeline *pipeline) { pipeline.bodyReachCensus = censusFile })
 
 	if edited.factReachSides == nil {
 		test.Fatal("the edited run under the census made no sides for the facts' reach")

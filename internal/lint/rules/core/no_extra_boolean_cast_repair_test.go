@@ -656,7 +656,7 @@ func TestNoExtraBooleanCastFixesBooleanCalls(test *testing.T) {
 // The repairs that involve a double negation, which the shared harness cannot apply.
 //
 // `rule_testing.ExpectFixedSource` reads Fixes only, and correctly so: a Suggestion is not something the
-// engine applies, and a harness that silently applied one would be asserting a rewrite that never
+// fix pass applies, and a harness that silently applied one would be asserting a rewrite that never
 // happens in production. These 183 entries each carry at least one `!!` finding, whose repair is a
 // Suggestion, so they are applied here instead.
 //
@@ -1271,7 +1271,7 @@ func applyEveryRepair(sourceText string, result rule_testing.Result) string {
 
 // The two findings carry different repair kinds, and collapsing them is the defect this pins.
 //
-// `Boolean(x)` unwrapping is a Fix the engine applies unattended. `!!x` removal is a Suggestion a
+// `Boolean(x)` unwrapping is a Fix the fix pass applies unattended. `!!x` removal is a Suggestion a
 // human chooses. Upstream declares exactly this with `conditional_fix_or_conditional_suggestion`,
 // which is the only occurrence of that declaration in its 946 rules, so there is no second rule to
 // copy the shape from and nothing else in this package would notice if the two were swapped.

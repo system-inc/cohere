@@ -1,6 +1,6 @@
 // Package range_over_string_directly is staticcheck's S1029, a range over a string converted to a slice of runes
 // that drops the index, which ranging over the string directly does without allocating the slice, ported onto
-// the engine's own intermediate representation (#tf4cb8g).
+// cohere's own intermediate representation (#tf4cb8g).
 //
 // The original, honnef.co/go/tools@v0.8.1 simple/s1029/s1029.go, runs staticcheck's
 // sharedcheck.CheckRangeStringRunes, the very function SA6003 runs as well, and so does the port: it is ported once,

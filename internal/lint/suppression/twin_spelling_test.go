@@ -11,7 +11,7 @@ import (
 // ESLint matches a directive by exact id, and where Nexus' twin replaces a core rule only the twin's id
 // silences it, so a house directive has to be twin-spelled. cohere registers the core id, and the
 // plugin-qualified suffix match in matchesRuleName reads `nexus/no-use-before-define` as naming it, so
-// one spelling works in both engines with no table in cohere. The core spelling keeps working too: cohere
+// one spelling works in both languages with no table in cohere. The core spelling keeps working too: cohere
 // ships to users with no Nexus, whose core-spelled directives must not change meaning. Flagging a
 // core-spelled directive in a house repo is the parity tool's job, which knows the twins are loaded.
 func TestTwinSpelledAndCoreSpelledDirectivesBothSilenceTheCoreRule(test *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// The engine's identity is the sha256 of the running executable's bytes, the same on every call.
+// cohere-go's identity is the sha256 of the running executable's bytes, the same on every call.
 func TestExecutableIdentityIsTheExecutablesSha256(test *testing.T) {
 	test.Parallel()
 

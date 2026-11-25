@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/build_intermediate_representation"
 )
 
-// PackageFunctions is one package's functions as the hash read them, the Analyzer's result, which the engine's
+// PackageFunctions is one package's functions as the hash read them, the Analyzer's result, which cohere-go's
 // findings cache keeps in the package's entry so a package it restores still has them.
 type PackageFunctions struct {
 	Functions []duplicate_functions.Function
@@ -20,8 +20,8 @@ type PackageFunctions struct {
 	Unread    []Unread
 }
 
-// Unread is one function never read, and why. Kept one by one rather than counted, since the engine reads every
-// function of a package once more in its test variant and counts each once (see the engine's duplicates report).
+// Unread is one function never read, and why. Kept one by one rather than counted, since cohere-go reads every
+// function of a package once more in its test variant and counts each once (see cohere-go's duplicates report).
 type Unread struct {
 	File   string
 	Line   int
@@ -29,8 +29,8 @@ type Unread struct {
 	Reason duplicate_functions.NotReadReason
 }
 
-// Analyzer hashes every source function of a package, reading the engine's own intermediate representation, the one
-// build_intermediate_representation builds for the rules on it. It is no rule: it reports nothing, and the engine runs
+// Analyzer hashes every source function of a package, reading cohere's own intermediate representation, the one
+// build_intermediate_representation builds for the rules on it. It is no rule: it reports nothing, and cohere-go runs
 // it only under `--duplicates`.
 var Analyzer = &analysis.Analyzer{
 	Name: "canonical_function_hash",
@@ -91,7 +91,7 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 // hashFunction is one function's digest, or the instruction it holds that the hash does not model. Any other panic
-// is the analyzer's crash, which the engine's recovering run reports as one.
+// is the analyzer's crash, which cohere-go's recovering run reports as one.
 //
 // Mutates: hasher forgets which closures were being hashed when one is refused, so a refusal deep in a closure never
 // leaves a later function reading that closure by its name

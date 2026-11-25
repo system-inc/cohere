@@ -26,7 +26,7 @@
 // # What the gate already promised, and what this keeps
 //
 // `internal/lint/rules/tailwind/collapse/gate.go:227` takes `candidates[0]` with a measurement attached: the first
-// reading preserves every collapse the engine finds, over all 4,375 candidate pairs in the real
+// reading preserves every collapse Tailwind finds, over all 4,375 candidate pairs in the real
 // corpus, of which 75 collapse, with zero lost to that choice. This file takes the same first
 // reading for the same reason, so the property that was measured before the parser existed is the
 // property the parser is now used under.
@@ -43,7 +43,7 @@ package tailwind
 import (
 	"strings"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // splitCandidateIn breaks a class into prefix, root, value and importance, against a design system.
@@ -58,26 +58,26 @@ import (
 // asking rather than by guessing.
 func splitCandidateIn(
 	className string,
-	system *tailwindengine.LoadedDesignSystem,
+	system *tailwindcollapse.LoadedDesignSystem,
 ) (candidateParts, bool) {
 	if system == nil {
 		return candidateParts{}, false
 	}
 
-	parsed := tailwindengine.ParseCandidate(className, system)
+	parsed := tailwindcollapse.ParseCandidate(className, system)
 	if len(parsed) == 0 {
 		return candidateParts{}, false
 	}
 
 	// The first reading, matching `gate.go`'s own choice and the measurement attached to it. A
-	// later reading is a root the engine does not compile the class as, so bucketing by it would
+	// later reading is a root Tailwind does not compile the class as, so bucketing by it would
 	// group classes that never merge.
 	candidate := parsed[0]
 
 	// A static utility has no root-plus-value structure to merge on. `flex` and `items-center`
 	// reach here and are correctly excluded: the collapse families are relationships between
 	// functional roots, and a static has no value for the merge precondition to compare.
-	if candidate.Kind != tailwindengine.ParsedCandidateKindFunctional {
+	if candidate.Kind != tailwindcollapse.ParsedCandidateKindFunctional {
 		return candidateParts{}, false
 	}
 
@@ -162,7 +162,7 @@ func sourceValueAfterRoot(className string, root string) string {
 // current behaviour rather than a documented guarantee, and `ParsedValue.Fraction` is the field that
 // says what the text was; reconstructing it from two other fields would be relying on a coincidence
 // this comment had to measure to discover.
-func candidateValueText(candidate tailwindengine.ParsedCandidate) string {
+func candidateValueText(candidate tailwindcollapse.ParsedCandidate) string {
 	if candidate.Value == nil {
 		// A root with nothing after it, which is what `border-l` is. `rebuildClass` appends no dash
 		// for an empty value, so this reassembles exactly.
@@ -177,14 +177,14 @@ func candidateValueText(candidate tailwindengine.ParsedCandidate) string {
 	value := candidate.Value.Value
 	// Arbitrary and named spellings are kept apart by the brackets, because `w-4` and `w-[4]` are
 	// different classes and an arbitrary value's decoded text can coincide with a named one's.
-	if candidate.Value.Kind == tailwindengine.ParsedValueKindArbitrary {
+	if candidate.Value.Kind == tailwindcollapse.ParsedValueKindArbitrary {
 		value = "[" + value + "]"
 	}
 
 	if candidate.Modifier == nil {
 		return value
 	}
-	if candidate.Modifier.Kind == tailwindengine.ParsedModifierKindArbitrary {
+	if candidate.Modifier.Kind == tailwindcollapse.ParsedModifierKindArbitrary {
 		return value + "/[" + candidate.Modifier.Value + "]"
 	}
 	return value + "/" + candidate.Modifier.Value

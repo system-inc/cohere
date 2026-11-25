@@ -24,7 +24,7 @@ import (
 const loadPackagesPath = "github.com/system-inc/cohere/internal/go_language/load"
 
 // Every load of the workspace goes through loadPackages, which returns the limit to the cap before it and arms the
-// raise around it, so a load added anywhere else in the engine would run under whatever limit the last load's raise
+// raise around it, so a load added anywhere else in cohere-go would run under whatever limit the last load's raise
 // left. Read from the package's source, not its tests.
 func TestOnlyLoadPackagesLoads(test *testing.T) {
 	test.Parallel()
@@ -64,7 +64,7 @@ func TestOnlyLoadPackagesLoads(test *testing.T) {
 				calls++
 				if !allowed {
 					test.Errorf("%s calls load.%s outside loadPackages, so that load skips the memory limit's reset "+
-						"and its late raise; load through engine.loadPackages", fileSet.Position(call.Pos()),
+						"and its late raise; load through pipeline.loadPackages", fileSet.Position(call.Pos()),
 						selector.Sel.Name)
 				}
 				return true
@@ -119,7 +119,7 @@ func (watch *memoryWatch) setMemoryLimit(limit int64) int64 {
 	previous := watch.current
 	watch.current = limit
 	watch.set = append(watch.set, limit)
-	if limit > engineMemoryCap {
+	if limit > memoryCap {
 		watch.raised = true
 	}
 	return previous
@@ -151,7 +151,7 @@ func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 	if readError != nil {
 		test.Fatalf("reading %s: %v", file, readError)
 	}
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 	memory := capMemoryWatched(watch, watch.collecting)
 	memory.duringLoad = watch.duringLoad
 	var standardOutput bytes.Buffer
@@ -174,17 +174,17 @@ func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 			watch.raised)
 	}
 	for index, limit := range watch.endedUnder {
-		if limit != engineMemoryCap {
+		if limit != memoryCap {
 			test.Errorf("load %d of %d ended under a limit of %d, want the cap, %d", index+1, len(watch.endedUnder),
-				limit, engineMemoryCap)
+				limit, memoryCap)
 		}
 	}
 	if len(watch.duringAfterRaise) == 0 {
 		test.Fatal("no look inside a load came after the raise, so the reload's limit went unread")
 	}
 	for _, limit := range watch.duringAfterRaise {
-		if limit != engineMemoryCap {
-			test.Fatalf("a reload ran under a limit of %d, want the cap, %d, from its start", limit, engineMemoryCap)
+		if limit != memoryCap {
+			test.Fatalf("a reload ran under a limit of %d, want the cap, %d, from its start", limit, memoryCap)
 		}
 	}
 }
@@ -194,7 +194,7 @@ func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
 func TestALastLoadsRaiseLiftsNothingDuringTheNext(test *testing.T) {
 	previousPercent := debug.SetGCPercent(-1)
 	test.Cleanup(func() { debug.SetGCPercent(previousPercent) })
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 	// Every load ends with a collection in flight, so each raise waits on its sentinel's finalizer.
 	loads := newLoadMemory(capMemoryWatched(watch, func() bool { return true }), false)
 	loads.begin()
@@ -210,8 +210,8 @@ func TestALastLoadsRaiseLiftsNothingDuringTheNext(test *testing.T) {
 
 	watch.lock.Lock()
 	defer watch.lock.Unlock()
-	if watch.current != engineMemoryCap || watch.raised {
+	if watch.current != memoryCap || watch.raised {
 		test.Errorf("the first load's collection completing during the next load left the limit at %d (raised %t), "+
-			"want the cap, %d", watch.current, watch.raised, engineMemoryCap)
+			"want the cap, %d", watch.current, watch.raised, memoryCap)
 	}
 }

@@ -33,11 +33,11 @@ import (
 // the root it belongs to prints one line for all of them. Set only for a default run without `--phases`.
 const projectSummaryVariable = "COHERE_PROJECT_SUMMARY"
 
-// projectSummary is what a project's run hands its root: its summary, and the engines it built, which a summary's
+// projectSummary is what a project's run hands its root: its summary, and the programs it built, which a summary's
 // own encoding leaves out since no record keeps them.
 type projectSummary struct {
-	Summary      runSummary
-	EngineBuilds []engineBuild
+	Summary       runSummary
+	ProgramBuilds []programBuild
 }
 
 // handSummaryToRoot writes summary for the root this run is one project of, and reports whether it did, so the
@@ -48,7 +48,7 @@ func handSummaryToRoot(summary runSummary) bool {
 	if path == "" || activeOutput.Phases {
 		return false
 	}
-	encoded, encodeError := json.Marshal(projectSummary{Summary: summary, EngineBuilds: summary.EngineBuilds})
+	encoded, encodeError := json.Marshal(projectSummary{Summary: summary, ProgramBuilds: summary.ProgramBuilds})
 	if encodeError != nil {
 		return false
 	}
@@ -65,15 +65,15 @@ func readProjectSummary(path string) *projectSummary {
 	if json.Unmarshal(contents, handed) != nil {
 		return nil
 	}
-	handed.Summary.EngineBuilds = handed.EngineBuilds
+	handed.Summary.ProgramBuilds = handed.ProgramBuilds
 	return handed
 }
 
 // combinedFooter is the one line a root holding several projects ends its default run on: their summaries summed,
 // this run's time, and every project's gap with its name. facts carries what the root itself found: its unused
-// ignore patterns, failed coverage queries and the engines it built before its projects ran.
+// ignore patterns, failed coverage queries and the programs it built before its projects ran.
 func combinedFooter(runs []projectRun, facts overallFacts, total time.Duration, style textStyle) string {
-	combined := runSummary{Total: total, EngineBuilds: facts.EngineBuilds}
+	combined := runSummary{Total: total, ProgramBuilds: facts.ProgramBuilds}
 	var named []string
 	failed := false
 	for _, checked := range runs {
@@ -104,7 +104,7 @@ func combinedFooter(runs []projectRun, facts overallFacts, total time.Duration, 
 		combined.FilesChecked += summary.FilesChecked
 		combined.FilesCached += summary.FilesCached
 		combined.FilesTypesOnly += summary.FilesTypesOnly
-		combined.EngineBuilds = append(combined.EngineBuilds, summary.EngineBuilds...)
+		combined.ProgramBuilds = append(combined.ProgramBuilds, summary.ProgramBuilds...)
 		if summary.failed() {
 			failed = true
 		} else if checked.exitCode != 0 {

@@ -9,7 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/needs"
 )
 
-// TestCorpus formats a real file list with the shipped engine and writes each result, so the output
+// TestCorpus formats a real file list with the shipped formatter and writes each result, so the output
 // can be compared byte for byte against the Node CLI outside the test.
 //
 // Off by default and driven by environment variables, because it needs a checkout of the tree it
@@ -24,10 +24,10 @@ import (
 func TestCorpus(test *testing.T) {
 	test.Parallel()
 
-	listPath := needs.OptIn(test, "COHERE_CORPUS_LIST", "it measures the engine over a list of files")
+	listPath := needs.OptIn(test, "COHERE_CORPUS_LIST", "it measures the formatter over a list of files")
 	outDirectory := needs.OptIn(test, "COHERE_CORPUS_OUT", "it writes the measurement's outputs there")
 
-	engine := newTestEngine(test)
+	formatter := newTestFormatter(test)
 	listBytes, readError := os.ReadFile(listPath)
 	if readError != nil {
 		test.Fatalf("reading the list: %v", readError)
@@ -41,7 +41,7 @@ func TestCorpus(test *testing.T) {
 		if path == "" {
 			continue
 		}
-		if !engine.Handles(path) {
+		if !formatter.Handles(path) {
 			refused++
 			continue
 		}
@@ -49,7 +49,7 @@ func TestCorpus(test *testing.T) {
 		if readError != nil {
 			continue
 		}
-		text, formatError := engine.Format(path, string(source))
+		text, formatError := formatter.Format(path, string(source))
 		if formatError != nil {
 			failed++
 			test.Errorf("%s: %v", path, formatError)

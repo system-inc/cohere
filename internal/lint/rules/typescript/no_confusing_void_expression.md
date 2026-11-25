@@ -33,7 +33,7 @@ Fixtures: `TestNoConfusingVoidExpressionJudgesVoidNotUndefined` in
 statement, assigned, arrow and return position) and four reporting controls with a real `void`. It
 replaced `TestNoConfusingVoidExpressionCoversUndefinedReturns`, which pinned upstream's breadth.
 ESLint asks the same question through Nexus's `NexusTypeScriptEsLintPlugin`, whose wrapper drops a
-report whose constrained type carries no Void flag (Nexus 4e3395d), so the engines agree on both sites
+report whose constrained type carries no Void flag (Nexus 4e3395d), so the linters agree on both sites
 (#cn8sthd).
 
 ## Why this recommendation

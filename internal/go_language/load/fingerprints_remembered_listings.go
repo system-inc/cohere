@@ -3,7 +3,7 @@ package load
 import "crypto/sha256"
 
 // ListingsRemembered is how many listings fingerprints remembered and how many asks were answered from one, which the
-// engine's tests read to see a build's second listing answered from its first (#32594zm).
+// cohere-go's tests read to see a build's second listing answered from its first (#32594zm).
 func (fingerprints *Fingerprints) ListingsRemembered() (int64, int64) {
 	return fingerprints.listingsRemembered.Load(), fingerprints.listingsAnswered.Load()
 }

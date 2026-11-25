@@ -10,7 +10,7 @@ import (
 )
 
 // sharedListingTargets are the environments a run of targetedModuleFiles might list under, the host's first as the
-// engine lists it: three operating systems, a custom tag, and cgo both ways, each selecting other files of one
+// cohere-go lists it: three operating systems, a custom tag, and cgo both ways, each selecting other files of one
 // directory.
 var sharedListingTargets = [][]string{
 	{"GOOS=darwin", "GOARCH=arm64", "CGO_ENABLED=1", "GOFLAGS="},

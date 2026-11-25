@@ -145,7 +145,7 @@ type pipelineReport struct {
 	cacheOff bool
 
 	// cacheOffDetail is what `--no-cache` kept this run from, said after it; empty is the TypeScript pipeline's
-	// cache table and incremental build info. An engine run says what its engine keeps instead.
+	// cache table and incremental build info. A child run says what the child keeps instead.
 	cacheOffDetail string
 
 	// contentKeyedShapes is how many files' shapes this run keyed on their content, for want of a recorded
@@ -166,12 +166,12 @@ type pipelineReport struct {
 	graphLabel            string
 	graphNotBuiltSentence string
 
-	// engineSourceTreeModified is set when an external engine reports that it, too, was built from a
+	// contractSourceTreeModified is set when a child reports that it, too, was built from a
 	// modified tree. Its findings are the run's findings, so its provenance is the run's provenance.
-	engineSourceTreeModified bool
+	contractSourceTreeModified bool
 
 	// incompleteBeyondPhases says what was not checked when every phase ran and the run still fell
-	// short: a file the compiler left no record for, a file a rule crashed on, a file the engine could
+	// short: a file the compiler left no record for, a file a rule crashed on, a file the child could
 	// not read. Empty when nothing like that happened. The phase line cannot express it, so the
 	// coverage warning names it instead of pointing at phases that all say they ran.
 	incompleteBeyondPhases string
@@ -245,7 +245,7 @@ func (report *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, rea
 		}
 		// An opt-in phase nobody named was not deprived of anything by the bail.
 		if optInPhases[name] && !requested[name] {
-			// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both engines.
+			// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both languages.
 			report.record(name, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 			continue
 		}
@@ -310,12 +310,12 @@ func skippedAsNotRequested(record phaseRecord) bool {
 }
 
 // checkedEveryRequestedPhase reports whether every phase the caller asked for ran, which is what an
-// external engine's `complete` claims (swift/Contract.md).
+// child's `complete` claims (swift/Contract.md).
 //
 // It is checkedEverything with one difference: a phase skipped as not requested is not a gap, since
 // `--lint` asked for lint and got all of it. Every other skip of a reporting phase still is one, and so
 // is anything not reached. checkedEverything keeps its wider answer for the phase line, which says on a
-// narrowed run that the phases above did not check everything, true of `--lint` in either engine.
+// narrowed run that the phases above did not check everything, true of `--lint` in either language.
 func (report *pipelineReport) checkedEveryRequestedPhase() bool {
 	for _, record := range report.records {
 		if record.Outcome == outcomeNotReached {
@@ -400,7 +400,7 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 	//
 	// Silent on a clean build. A line on every ordinary run is one people learn to skip, which would
 	// cost exactly the case it exists for.
-	report.writeProvenanceWarning(out, release.Current().SourceTreeModified || report.engineSourceTreeModified)
+	report.writeProvenanceWarning(out, release.Current().SourceTreeModified || report.contractSourceTreeModified)
 
 	if report.rootNote != "" {
 		fmt.Fprintf(out, "  %s\n", report.rootNote)
@@ -449,7 +449,7 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 // incompleteness is what the run fell short of once every phase it was asked for ran: the sentence a path set, or,
 // when the gap is files that changed during the run (#bxmcf34) or whose fixes were not written, since a link leads
 // each outside the root, that. TypeScript's
-// run sets that gap with no engine record to decide the sentence, so it is read from the gap here (#td3zta2). A crash,
+// run sets that gap with no child's record to decide the sentence, so it is read from the gap here (#td3zta2). A crash,
 // or a file nothing checked, is the larger gap and keeps its own sentence.
 func (report *pipelineReport) incompleteness() string {
 	if report.incompleteBeyondPhases != "" {

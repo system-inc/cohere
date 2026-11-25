@@ -249,7 +249,7 @@ var Globals = rule.Rule[CompilerRuleOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				// The engine hands a rule a nil checker when the program could not be built. This
+				// The linter hands a rule a nil checker when the program could not be built. This
 				// rule can answer nothing without one, and the failure mode without the guard is
 				// silence rather than a panic, because `GetSymbolAtLocation` tolerates a nil
 				// receiver. Silence is the more dangerous of the two, so the guard is explicit and

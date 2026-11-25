@@ -115,8 +115,8 @@ func (walker *bitWalker) borrowedEnteringReferences(walked types.Type) []referen
 // Neither read turns on a word size, and no other read of the walk does, so no part of the bits assumes a 64-bit host:
 // SA1027 judges a field's offset on a 32-bit build alone, and the bits read alike there. Two tests hold it: the
 // pointed fixture's, loaded as 386 against arm as well as amd64 against arm64
-// (TestANamedTypesUnderlyingReadsAStructBehindAPointerNoExpressionNames), and go_engine's body-reach-pointed fixture's
-// (TestABodyReachingAStructThroughAPointerNoExpressionNamesIsReached).
+// (TestANamedTypesUnderlyingReadsAStructBehindAPointerNoExpressionNames), and go_language's body-reach-pointed
+// fixture's (TestABodyReachingAStructThroughAPointerNoExpressionNamesIsReached).
 func (walker *bitWalker) borrowedUnderlyingReferences(underlying types.Type) []reference {
 	clear(walker.seen)
 	walker.collected = walker.collected[:0]

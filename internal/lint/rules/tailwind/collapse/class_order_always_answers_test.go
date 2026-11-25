@@ -1,6 +1,6 @@
 package tailwind
 
-// classOrderAlwaysAnswers answers every class, including the ones the engine declined.
+// classOrderAlwaysAnswers answers every class, including the ones Tailwind declined.
 type classOrderAlwaysAnswers struct{}
 
 func (classOrderAlwaysAnswers) Name() string { return "always answers" }

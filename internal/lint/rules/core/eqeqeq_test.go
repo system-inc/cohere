@@ -295,7 +295,7 @@ func TestEqeqeqStaysSilent(test *testing.T) {
 // Which kind of repair each finding carries, which is the rule's central judgment.
 //
 // Twenty of upstream's findings carry a Fix and twenty-eight carry a Suggestion, and none carries
-// both. The split is not stylistic: a Fix is applied by the edit engine with nobody watching, and
+// both. The split is not stylistic: a Fix is applied by the fix pass with nobody watching, and
 // `a == b` becoming `a === b` can change what the program computes. A port that got the judgment
 // right and the ARM wrong would pass every count assertion above while rewriting the tree.
 func TestEqeqeqSplitsFixesFromSuggestions(test *testing.T) {
@@ -348,7 +348,7 @@ func TestEqeqeqSplitsFixesFromSuggestions(test *testing.T) {
 //
 // `ExpectFixedSource` replays every fix into the source and compares the whole rewritten file, so it
 // catches a repair that lands on the right span with the wrong text. Suggestions are deliberately
-// not applied here: the harness cannot apply them, and more importantly upstream's engine does not
+// not applied here: the harness cannot apply them, and more importantly upstream's linter does not
 // either, which is what `output: null` records for those twenty-six cases.
 //
 // The expectation is upstream's `output` verbatim, with no trailing-newline transform. That is

@@ -397,7 +397,7 @@ func TestAFolderCheckWhoseSettingsDoNotLoadFailsTheRun(test *testing.T) {
 }
 
 // A run discovery does not apply to still judges its project's folders when it lints the project whole: `--directory`
-// into one engine's project and `--tsconfig` each read red over a docs/ of Markdown, naming the folder, and green
+// into one language's project and `--tsconfig` each read red over a docs/ of Markdown, naming the folder, and green
 // once it is renamed, as the discovery path does (#zyq63kk, front door's review). Before, both printed green.
 func TestANarrowedRunJudgesItsProjectsFolders(test *testing.T) {
 	test.Parallel()
@@ -406,8 +406,8 @@ func TestANarrowedRunJudgesItsProjectsFolders(test *testing.T) {
 		directory string
 		arguments []string
 	}{
-		"--directory into one engine's project": {"", []string{"--no-fix", "--directory", "apps/web"}},
-		"--tsconfig":                            {"apps/web", []string{"--no-fix", "--tsconfig", "tsconfig.json"}},
+		"--directory into one language's project": {"", []string{"--no-fix", "--directory", "apps/web"}},
+		"--tsconfig": {"apps/web", []string{"--no-fix", "--tsconfig", "tsconfig.json"}},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()

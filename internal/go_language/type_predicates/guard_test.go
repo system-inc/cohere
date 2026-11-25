@@ -29,7 +29,7 @@ var fakeReflections = []string{
 	"honnef.co/go/tools/staticcheck/fakereflect",
 }
 
-// fieldWalker is a file under rules/ that reaches into a struct's fields, and either the row of go_engine's
+// fieldWalker is a file under rules/ that reaches into a struct's fields, and either the row of go_language's
 // fieldWalkRows that proves the walk starts from a use the restore from the host judges by the whole type
 // (#mjdf7ah), or why no importer's finding depends there on another package's type past what its reads record. Its
 // path is from rules/.
@@ -234,7 +234,7 @@ func unlistedFieldWalks(test *testing.T, root string, listed []fieldWalker) []st
 }
 
 // Every file under rules/ that reaches into a struct's fields, itself, through this package's walks or through
-// staticcheck's fake reflection, is listed with the row of go_engine's fieldWalkRows that proves its walk starts from
+// staticcheck's fake reflection, is listed with the row of go_language's fieldWalkRows that proves its walk starts from
 // a use the restore from the host judges by the whole type, or with why its finding depends on nothing of another
 // package's type past what the package's reads record (#mjdf7ah). Another package's unexported field is rendered
 // there only by these properties, so a walk that reads anything else of one needs a property too. A new walk fails here
@@ -246,7 +246,7 @@ func TestEveryRuleWalkOfAStructsFieldsIsRendered(test *testing.T) {
 	if len(unlisted) > 0 {
 		test.Errorf("these files reach into a struct's fields, which may be another package's type a reader holds "+
 			"only by member or by name, and whose unexported fields the restore from the host renders only by "+
-			"these properties:\n  %s\nList the file in fieldWalkers with a row of go_engine's fieldWalkRows that "+
+			"these properties:\n  %s\nList the file in fieldWalkers with a row of go_language's fieldWalkRows that "+
 			"proves its walk starts from a whole read, or with why it needs none:\n  %s",
 			strings.Join(Properties(), "\n  "), strings.Join(unlisted, "\n  "))
 	}

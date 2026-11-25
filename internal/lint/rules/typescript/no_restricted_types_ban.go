@@ -18,7 +18,7 @@ type NoRestrictedTypesBan struct {
 	// object's `message` key.
 	Message string
 
-	// FixWith produces a fix the edit engine applies unattended.
+	// FixWith produces a fix the fix pass applies unattended.
 	//
 	// A plain string rather than a pointer, deliberately, because upstream cannot distinguish an
 	// absent key from an empty one either: it tests the value's truthiness, so `fixWith: ""` means

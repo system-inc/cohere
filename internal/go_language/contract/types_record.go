@@ -5,7 +5,7 @@ type TypesRecord struct {
 	Diagnostics         int `json:"diagnostics"`
 	Files               int `json:"files"`
 	ElapsedMilliseconds int `json:"elapsedMilliseconds"`
-	// FilesWithoutRecord are files the engine cannot vouch for, each a gap that makes the run incomplete.
+	// FilesWithoutRecord are files cohere-go cannot vouch for, each a gap that makes the run incomplete.
 	FilesWithoutRecord []string `json:"filesWithoutRecord"`
 	// Build says in words how the type information was had.
 	Build string `json:"build"`
@@ -32,33 +32,33 @@ type TypesRecord struct {
 	// saw less of a dependency never reads like one that saw it whole.
 	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations"`
 
-	// CgoTranslation is additive within contract 3 too. The engine type-checks and never builds, but for one
+	// CgoTranslation is additive within contract 3 too. cohere-go type-checks and never builds, but for one
 	// exception: for a project with cgo files of its own, go list -compiled has the cgo tool translate every package
 	// with cgo files, the project's and its dependencies'. CgoTranslation says how much of that a run had, so the
 	// exception is never invisible: how many packages the cgo tool translated, and how long that took. On a load that
 	// translates nothing it is written as 0 and 0, never left out.
 	CgoTranslation CgoTranslation `json:"cgoTranslation"`
 
-	// Memory is additive within contract 3 too: the memory limit the engine's process ran under and where it came
-	// from, so `--verbose` can say why a run collected when it did. Left out when the engine was not started as a
+	// Memory is additive within contract 3 too: the memory limit cohere-go's process ran under and where it came
+	// from, so `--verbose` can say why a run collected when it did. Left out when cohere-go was not started as a
 	// process of its own, as in a test running it in process, since nothing was decided then.
 	Memory *Memory `json:"memory,omitempty"`
 
-	// HeadersUnshared is additive within contract 3, and the Go engine's alone: why the run's listings did not share
-	// each Go file's header, as they do through the engine's copy of go/build's directory read (#tb538na), so every
+	// HeadersUnshared is additive within contract 3, and cohere-go's alone: why the run's listings did not share
+	// each Go file's header, as they do through cohere-go's copy of go/build's directory read (#tb538na), so every
 	// build's listing parsed every header itself. That happens only in a binary linked by a Go release whose go/build
 	// is not the copy's, which reads the same listing at more CPU. Absent when they shared them.
 	HeadersUnshared string `json:"headersUnshared,omitempty"`
 }
 
-// MemorySource is where the engine's memory limit came from.
+// MemorySource is where cohere-go's memory limit came from.
 type MemorySource string
 
 const (
-	// MemorySourceEnvironment is a `GOGC` or `GOMEMLIMIT` the user set, which decides the collector, so the engine
+	// MemorySourceEnvironment is a `GOGC` or `GOMEMLIMIT` the user set, which decides the collector, so cohere-go
 	// sets nothing.
 	MemorySourceEnvironment MemorySource = "Environment"
-	// MemorySourceCap is the engine's cap, lower than half the memory available.
+	// MemorySourceCap is cohere-go's cap, lower than half the memory available.
 	MemorySourceCap MemorySource = "Cap"
 	// MemorySourceAvailable is half the memory available when the run started, lower than the cap.
 	MemorySourceAvailable MemorySource = "Available"

@@ -83,8 +83,8 @@ func ignoreAccountsOf(entries []configuration.IgnoreEntry, matched []int, root s
 
 // defaultIgnores are the trees cohere never enters, listed after the root's own entries so a reader sees each as
 // an ignore like any other, with its kind and its reason (#cxeq6jw). Each holds only where its tree is already
-// skipped: Go's testdata by the Go engine, which never enters one, and by the format walk and discovery, and
-// Vendor by the format walk and the Swift engine. Neither is a glob any check matches a file against, so a file a
+// skipped: Go's testdata by cohere-go, which never enters one, and by the format walk and discovery, and
+// Vendor by the format walk and cohere-swift. Neither is a glob any check matches a file against, so a file a
 // tsconfig includes under either is type-checked and linted as any other, and neither is ever a dead ignore,
 // since no settings file wrote it. Matched counts the directories by that name the walk's listings held.
 var defaultIgnores = []struct {
@@ -95,13 +95,13 @@ var defaultIgnores = []struct {
 	{
 		format_files.FixturesLayer,
 		configuration.IgnoreKindInput,
-		"Go's test fixtures, read by their tests byte for byte: the Go engine and the format walk never enter " +
+		"Go's test fixtures, read by their tests byte for byte: cohere-go and the format walk never enter " +
 			"a testdata directory, and a file a tsconfig includes there is still type-checked and linted.",
 	},
 	{
 		format_files.VendoredLayer,
 		configuration.IgnoreKindThirdParty,
-		"Somebody else's code, vendored whole: the format walk and the Swift engine never enter a Vendor " +
+		"Somebody else's code, vendored whole: the format walk and cohere-swift never enter a Vendor " +
 			"directory, and a file a tsconfig includes there is still type-checked and linted.",
 	},
 }

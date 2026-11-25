@@ -28,8 +28,8 @@ import "strings"
 //
 // Empty since 2026-10-04 (#cn8sthd). Every one of the 23 entries it held had stopped naming a
 // difference: the ESLint side now carries cohere's rulings through Nexus's twins and wrappers, the
-// gate's own rule bugs were fixed in Nexus, and the rest of the sites were rewritten so neither engine
-// reports them. Both engines read 0 on all 19 files the table named. An entry is added back when a
+// gate's own rule bugs were fixed in Nexus, and the rest of the sites were rewritten so neither language
+// reports them. Both linters read 0 on all 19 files the table named. An entry is added back when a
 // real difference is decided, with its anchor and its reason.
 var KnownGateDefects = []AcknowledgedDifference{}
 

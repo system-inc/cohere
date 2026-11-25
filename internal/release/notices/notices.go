@@ -269,7 +269,7 @@ func readModuleThirdPartyCredit(module Module) (name string, contents string, re
 	return "", "", nil
 }
 
-// swiftPin is one package the Swift engine resolves, from swift/Package.resolved.
+// swiftPin is one package cohere-swift resolves, from swift/Package.resolved.
 type swiftPin struct {
 	Identity string
 	Location string
@@ -279,7 +279,7 @@ type swiftPin struct {
 func readSwiftPins(moduleDirectory string) ([]swiftPin, error) {
 	contents, readError := os.ReadFile(filepath.Join(moduleDirectory, "swift", "Package.resolved"))
 	if readError != nil {
-		return nil, fmt.Errorf("reading the Swift engine's resolved packages: %w", readError)
+		return nil, fmt.Errorf("reading cohere-swift's resolved packages: %w", readError)
 	}
 	var resolved struct {
 		Pins []struct {

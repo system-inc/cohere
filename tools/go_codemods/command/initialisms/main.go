@@ -2,7 +2,7 @@
 // becomes `groupId`, `URL` becomes `Url`, `HTTPServer` becomes `HttpServer`, `EnforceForTSTypes` becomes
 // `EnforceForTsTypes`. Its candidates are exactly what the rules circle's
 // cohere-go/consistency-no-uppercase-initialism analyzer flags, with the same exemptions; every one goes through
-// the global rename engine (locals through the local engine first), which refuses any rename that could change
+// global_rename (locals through the local rename first), which refuses any rename that could change
 // what the program means. The rewrite is reloaded in memory and every identifier's resolution compared before
 // anything is written, and nothing is written unless every one matches.
 package main
@@ -72,7 +72,7 @@ func runCommandLine() int {
 	})
 }
 
-// guard is a type switch's bound name: go/types gives it no object, only one per clause, so no engine renames it.
+// guard is a type switch's bound name: go/types gives it no object, only one per clause, so no renaming reaches it.
 type guard struct {
 	position token.Position
 	name     string
@@ -96,7 +96,7 @@ func run(root string, skips []string, dryRun bool, options global_rename.Options
 	proposals, guards, generatedSkipped := findCandidates(loaded)
 	fmt.Fprintf(
 		streams.Output,
-		"candidates: %d declarations (plus %d type switch guards, which no engine renames; %d names in generated files left, as the analyzer leaves them)\n",
+		"candidates: %d declarations (plus %d type switch guards, which no renaming reaches; %d names in generated files left, as the analyzer leaves them)\n",
 		len(proposals),
 		len(guards),
 		generatedSkipped,
@@ -112,7 +112,7 @@ func run(root string, skips []string, dryRun bool, options global_rename.Options
 	if len(result.Unresolved)+len(result.SelectionModelMismatches)+len(result.SatisfactionModelMismatches) > 0 {
 		fmt.Fprintln(
 			streams.Errors,
-			"initialisms: the engine's model disagreed with go/types somewhere; the renames it touched were refused, the rest go on to the verified write",
+			"initialisms: global_rename's model disagreed with go/types somewhere; the renames it touched were refused, the rest go on to the verified write",
 		)
 	}
 	// The write reloads the whole workspace to prove it, so the plan is seen before that wait.
@@ -351,7 +351,7 @@ func report(loaded *workspace.Workspace, guards []guard, result *global_rename.R
 			trim(rejection.Reason),
 		)
 	}
-	fmt.Fprintln(streams.Output, "\ntype switch guards (refused, no engine renames them):")
+	fmt.Fprintln(streams.Output, "\ntype switch guards (refused, no renaming reaches them):")
 	for _, guard := range guards {
 		fmt.Fprintf(streams.Output, "  %s: %s -> %s\n", relative(guard.position), guard.name, houseName(guard.name))
 	}

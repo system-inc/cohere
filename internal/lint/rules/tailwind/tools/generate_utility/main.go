@@ -1,4 +1,4 @@
-// Command generate_utility captures what the shipped Tailwind engine does with a repository's
+// Command generate_utility captures what the shipped Tailwind does with a repository's
 // own `@utility` blocks, so that the Go evaluator in internal/lint/rules/tailwind/collapse/utility.go is tested against
 // measurements rather than against a reading of `createCssUtility`.
 //
@@ -121,7 +121,7 @@ func main() {
 		os.Stderr,
 		"wrote %s: tailwind %s, %d @utility blocks, %d roots resolving per declaration, "+
 			"%d registry classes the descriptor model declines, %d shadow-quirk probes recorded and not modelled, "+
-			"%d synthetic design systems, %d measured classes of which %d the engine rejects\n",
+			"%d synthetic design systems, %d measured classes of which %d Tailwind rejects\n",
 		*output,
 		summary.TailwindVersion,
 		len(summary.UtilityBlocks),
@@ -136,7 +136,7 @@ func main() {
 
 // enumerate runs the Node side and returns its JSON.
 //
-// The engine is JavaScript and there is no faithful way to ask it these questions from Go. The
+// Tailwind is JavaScript and there is no faithful way to ask it these questions from Go. The
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(theme string) ([]byte, error) {

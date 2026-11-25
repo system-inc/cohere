@@ -47,7 +47,7 @@ func makeNeutralDirectory(output string) (string, error) {
 
 // readyMachine checks the machine can measure with the network off, or under --prepare fills the module cache so it
 // can, returning the modules it filled in, empty when checking. Either way the go commands it ran may tidy a go.sum
-// in a side or a corpus, as the engine's go list does, so every changed tracked file is then put back and said.
+// in a side or a corpus, as the Go child's go list does, so every changed tracked file is then put back and said.
 func readyMachine(checked preflight, prepare bool, say progress) ([]string, error) {
 	neutral, neutralError := makeNeutralDirectory(checked.output)
 	if neutralError != nil {

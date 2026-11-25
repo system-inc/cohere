@@ -10,14 +10,14 @@ import (
 	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
-// language is one name `--languages` or `--formats` takes (#s7gt4bj): the flag that takes it, the engine whose
+// language is one name `--languages` or `--formats` takes (#s7gt4bj): the flag that takes it, the child whose
 // projects it checks, if any, and the files of its kind the house formatter formats, wherever they live, by
 // extension. A language is code, checked, linted and formatted; a format is a kind of file cohere only formats. Every
 // file a run checks is one language's or one format's, so a run naming some never checks the rest in silence.
 type language struct {
 	flag       string
 	name       string
-	engine     projectEngine
+	kind       projectKind
 	extensions []string
 }
 
@@ -33,16 +33,16 @@ const (
 // a checker of its own (Kirk's design on #s7gt4bj). Every extension the house formatter registers is one name's
 // (TestEveryFormattedExtensionIsOneLanguages).
 var languages = []language{
-	{flag: languagesFlagName, name: "go", engine: engineGo},
+	{flag: languagesFlagName, name: "go", kind: projectKindGoModule},
 	{
-		flag:   languagesFlagName,
-		name:   "typescript",
-		engine: engineTypeScript,
+		flag: languagesFlagName,
+		name: "typescript",
+		kind: projectKindTypeScriptProgram,
 		extensions: []string{
 			".ts", ".tsx", ".mts", ".cts", source_name.AdamicExtension, ".js", ".mjs", ".cjs", ".jsx",
 		},
 	},
-	{flag: languagesFlagName, name: "swift", engine: engineSwift},
+	{flag: languagesFlagName, name: "swift", kind: projectKindSwiftPackage},
 	{flag: formatsFlagName, name: "json", extensions: []string{".json"}},
 	{flag: formatsFlagName, name: "markdown", extensions: []string{".md"}},
 	{flag: formatsFlagName, name: "yaml", extensions: []string{".yaml", ".yml"}},
@@ -134,10 +134,10 @@ func (choice languageChoice) names(name string) bool {
 	return choice == nil || slices.Contains(choice, name)
 }
 
-// namesEngine reports whether the choice names the language whose projects an engine checks.
-func (choice languageChoice) namesEngine(engine projectEngine) bool {
+// namesKind reports whether the choice names the language whose projects a child checks.
+func (choice languageChoice) namesKind(kind projectKind) bool {
 	return slices.ContainsFunc(languages, func(known language) bool {
-		return known.engine == engine && choice.names(known.name)
+		return known.kind == kind && choice.names(known.name)
 	})
 }
 
@@ -243,26 +243,26 @@ func kindWord(kind language) string {
 // first. A run that discovers, from the root or a directory holding several, checks what was named wherever it lives,
 // a TypeScript program's JSON included (chooseLanguages). Nil when it is named, or when neither flag was.
 func refuseUnchosenLanguage(choice languageChoice, location projectLocation, locateError error) error {
-	if locateError != nil || choice.namesEngine(location.Engine) {
+	if locateError != nil || choice.namesKind(location.Kind) {
 		return nil
 	}
 	// The format project is no language's own: it formats each name's files, which its walk keeps by name.
-	if location.Engine == engineFormat && choice.formats() {
+	if location.Kind == projectKindFolder && choice.formats() {
 		return nil
 	}
 	return fmt.Errorf("this run names %s, and not %s, the language of the project at %s, so nothing was checked: run "+
 		"from the root, which checks what was named wherever it lives", sayList(choice),
-		languageOfEngine(location.Engine), location.Root)
+		languageOfKind(location.Kind), location.Root)
 }
 
-// languageOfEngine is the name `--languages` takes for the language an engine checks.
-func languageOfEngine(engine projectEngine) string {
+// languageOfKind is the name `--languages` takes for the language a child checks.
+func languageOfKind(kind projectKind) string {
 	for _, known := range languages {
-		if known.engine == engine {
+		if known.kind == kind {
 			return known.name
 		}
 	}
-	return string(engine)
+	return kind.label()
 }
 
 // choiceJson is what one of the two flags chose, as a record of the run's own under `--json`, written once before

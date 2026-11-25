@@ -770,7 +770,7 @@ func TestNoFallthroughCasesFromOurOwnReading(test *testing.T) {
 	test.Run("a suppression directive is not a fallthrough comment", func(test *testing.T) {
 		test.Parallel()
 		// Upstream lists this input as a *pass* case, and it is a pass case there because oxc's
-		// Tester runs the whole engine and the engine consumes the directive. Our
+		// Tester runs the whole linter and the fix pass consumes the directive. Our
 		// `rule_testing.Run` walks one rule and applies no suppressions, so the finding is expected
 		// here and `cohere` swallows it in a real run. The rule's own job is only to refuse to read
 		// `eslint-disable-next-line no-fallthrough` as permission to fall through, which it does:

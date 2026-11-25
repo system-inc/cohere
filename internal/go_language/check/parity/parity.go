@@ -116,7 +116,7 @@ func analyze(pairs []Pair, roots []*packages.Package) ([]Outcome, error) {
 		sideOf[pair.Original] = &outcomes[index].Original
 		sideOf[pair.Port] = &outcomes[index].Port
 	}
-	graph, analyzeError := checker.Analyze(analyzers, roots, engineOptions())
+	graph, analyzeError := checker.Analyze(analyzers, roots, portOptions())
 	if analyzeError != nil {
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(roots), analyzeError)
 	}
@@ -1116,11 +1116,11 @@ func asRecorded(findings []Finding) []Finding {
 	return recorded
 }
 
-// engineOptions is the checker's options for every run of the harness: those every run of the engine's rules sets
-// (see check.DispatchOptions), so a port runs in its tests as it runs in the engine. A dispatched rule's listener
-// is called only where its rule runs, and a port that reads the engine's own representation's expression map has it
+// portOptions is the checker's options for every run of the harness: those every run of cohere-go's rules sets
+// (see check.DispatchOptions), so a port runs in its tests as it runs in cohere-go. A dispatched rule's listener
+// is called only where its rule runs, and a port that reads cohere-go's own representation's expression map has it
 // only where its listener declares so: one that reads the map without declaring it finds nothing here, as it would in
-// the engine, never more here than there.
-func engineOptions() *checker.Options {
+// cohere-go, never more here than there.
+func portOptions() *checker.Options {
 	return check.DispatchOptions()
 }

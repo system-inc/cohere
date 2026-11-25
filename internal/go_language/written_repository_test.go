@@ -15,9 +15,9 @@ import (
 
 // writtenRepositoryFiles are the files writeRepository writes below `.git`, by path, with their bytes: what `git init`
 // writes there that git needs to read the repository, `HEAD` and the config, and the info/exclude git's template gives
-// every repository, which the engine names among a run's inputs (pipeline_inputs.go). The config is the one `git init`
-// writes under no config of the person's but for the lines it probes the file system for, and the engine reads only its
-// object format, SHA-1's when it names none. No index, as `git init` writes none: the engine names the index absent.
+// every repository, which cohere-go names among a run's inputs (pipeline_inputs.go). The config is the one `git init`
+// writes under no config of the person's but for the lines it probes the file system for, and cohere-go reads only its
+// object format, SHA-1's when it names none. No index, as `git init` writes none: cohere-go names the index absent.
 var writtenRepositoryFiles = map[string]string{
 	"HEAD":   "ref: refs/heads/main\n",
 	"config": "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n",
@@ -34,7 +34,7 @@ var writtenRepositoryFiles = map[string]string{
 var writtenRepositoryDirectories = []string{"objects", filepath.Join("refs", "heads"), filepath.Join("refs", "tags")}
 
 // writeRepository makes directory a git repository of its own, empty, without running git: the `.git` `git init`
-// would write, as far as git and the engine read it. A test's git child forks the test process, and on darwin each
+// would write, as far as git and cohere-go read it. A test's git child forks the test process, and on darwin each
 // fork makes every page of the heap fault again on its next write, so each fixture's `git init` cost the package's
 // process kernel time it spent on nothing (#2htryg8). A repository with gitlinks needs git's own index, which
 // git writes (copyFixture). TestAWrittenRepositoryReadsAsTheOneGitInitMakes holds the two alike.
@@ -58,7 +58,7 @@ func writeRepository(directory string) error {
 }
 
 // A repository written without git (writeRepository) reads as the one `git init` makes: git reads it, finding it,
-// telling its status and listing its index, as the engine lists a go.work root's gitlinks, and a run over a fixture's
+// telling its status and listing its index, as cohere-go lists a go.work root's gitlinks, and a run over a fixture's
 // copy in each writes the same stream, its inputs record naming the same `.git` files.
 func TestAWrittenRepositoryReadsAsTheOneGitInitMakes(test *testing.T) {
 	test.Parallel()
@@ -93,8 +93,8 @@ func TestAWrittenRepositoryReadsAsTheOneGitInitMakes(test *testing.T) {
 }
 
 // No git child of the package's tests reads the machine's git configuration (#2htryg8): TestMain seals the
-// environment every child inherits (sealedGitEnvironment), the engine's own `git ls-files` at a go.work's root among
-// them, which sets no environment of its own. A git started as the engine starts it, in a written repository, lists
+// environment every child inherits (sealedGitEnvironment), cohere-go's own `git ls-files` at a go.work's root among
+// them, which sets no environment of its own. A git started as cohere-go starts it, in a written repository, lists
 // configuration of the repository's scope alone, where a person's global file would list under its own scope.
 func TestNoGitChildOfTheTestsReadsTheMachinesConfiguration(test *testing.T) {
 	test.Parallel()
@@ -109,7 +109,7 @@ func TestNoGitChildOfTheTestsReadsTheMachinesConfiguration(test *testing.T) {
 	if writeError := writeRepository(repository); writeError != nil {
 		test.Fatal(writeError)
 	}
-	// The environment as inherited, as the engine's own git child takes it.
+	// The environment as inherited, as cohere-go's own git child takes it.
 	list := exec.Command("git", "config", "--list", "--show-scope")
 	list.Dir = repository
 	output, listError := list.Output()

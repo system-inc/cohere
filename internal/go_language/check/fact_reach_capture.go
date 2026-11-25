@@ -25,7 +25,7 @@ type BodyRecorder struct {
 }
 
 // FactReachCapture is what a host's run held of its facts for the facts' reach (#aswfm7a), read from the run's resolver
-// while it was alive: what the engine makes each package's host's side of, for an extra build to leave a function body
+// while it was alive: what cohere-go makes each package's host's side of, for an extra build to leave a function body
 // to the host's findings only when every fact and answer the body reads is the same in the build.
 type FactReachCapture struct {
 	// Packages are, by package ID, each analyzed package the run computed in. A package the run restored, or whose
@@ -98,7 +98,7 @@ type FactReachPackage struct {
 
 	// Bodies are what U1000's action on the package recorded of each function body it walked, under
 	// Options.RecordBodies (#xeafx79), with the digest of every file of the package, a later wave's counting, as
-	// Options.BodyRecorder read them (unused_code.BodyRecords, which only the engine and U1000 read): what an extra
+	// Options.BodyRecorder read them (unused_code.BodyRecords, which only cohere-go and U1000 read): what an extra
 	// build's U1000 splices in place of walking a body it leaves standing. They are nil where nothing asked, where the
 	// run was handed no recorder, where U1000 did not run on the package, or where it failed, and then the package's
 	// side answers no body's record, and a build walks every body of it.

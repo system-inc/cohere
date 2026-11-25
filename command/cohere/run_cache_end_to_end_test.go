@@ -22,7 +22,7 @@ import (
 // home, empty when the machine has none.
 var usersCacheDirectory string
 
-// TestMain gives every binary this package's tests launch a user cache of its own, and the Go engine a system cache
+// TestMain gives every binary this package's tests launch a user cache of its own, and cohere-go a system cache
 // of its own.
 //
 // Child processes inherit the test process's environment, so without this every test that runs the
@@ -46,7 +46,7 @@ func TestMain(suite *testing.M) {
 	// See held_output_guard_test.go: a command whose output never closes fails the binary with its holder
 	// named, rather than at -timeout with nothing said.
 	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, failHeldOutput)
-	// The Go engine's system cache, a directory of this test binary's own, whatever the shell set (#syscache).
+	// cohere-go's system cache, a directory of this test binary's own, whatever the shell set (#syscache).
 	removeSystemCache, isolateError := system_cache_testing.Isolate()
 	if isolateError != nil {
 		panic(isolateError)
@@ -68,7 +68,7 @@ func TestMain(suite *testing.M) {
 	os.Exit(code)
 }
 
-// Every binary the tests start, and every engine run in process, reads a system cache of the tests' own, never the
+// Every binary the tests start, and every language run in process, reads a system cache of the tests' own, never the
 // person's: `COHERE_SYSTEM_CACHE` is set, absolute, and outside their user cache directory (#syscache).
 func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
 	test.Parallel()

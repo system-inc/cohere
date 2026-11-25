@@ -911,7 +911,7 @@ func TestNoEmptyFunctionFires(test *testing.T) {
 
 // applyEmptyFunctionSuggestion replays a suggestion's fixes into the source, back to front.
 //
-// Same ordering the fix engine and `rule_testing.ExpectFixedSource` use, and for the same reason.
+// Same ordering the fix pass and `rule_testing.ExpectFixedSource` use, and for the same reason.
 // `rule_testing` has no suggestion support at all, so this lives here.
 func applyEmptyFunctionSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()

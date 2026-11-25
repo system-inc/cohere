@@ -82,7 +82,7 @@ func TestEveryVerdictPurityHoldsIsAnAnswerTheResolverHolds(test *testing.T) {
 		options := check.DispatchOptions()
 		resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 		if !isResolver {
-			test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+			test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 		}
 		graph, analyzeError := checker.Analyze([]*analysis.Analyzer{probe}, loaded.Roots, options)
 		if analyzeError != nil {

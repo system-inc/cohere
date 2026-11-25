@@ -17,9 +17,9 @@ import (
 
 // What a repository's index decides for a walk, digested, is what a run cache keys the index on (#m1daxxk): the
 // entries the ignore rules exclude, and every gitlink, each by its path and mode. These hold that against git itself
-// and against the index samples the Swift engine reads too, so the two engines' readers agree on what is tracked.
+// and against the index samples cohere-swift reads too, so the two languages' readers agree on what is tracked.
 
-// swiftSampleIgnore is the `.gitignore` of the repository the Swift engine's samples came from (swiftSamples).
+// swiftSampleIgnore is the `.gitignore` of the repository cohere-swift's samples came from (swiftSamples).
 const swiftSampleIgnore = "*.swift\nIgnored/\n"
 
 // sampleRepository is a repository whose index is contents, read under objectFormat, and whose root `.gitignore` is
@@ -48,8 +48,8 @@ func expectedDigest(scope string, entries ...string) string {
 	return hex.EncodeToString(digest.Sum(nil))
 }
 
-// TestTheGoReaderAgreesWithTheSwiftReaderOnItsSamples: every SHA-256 sample tracks, by Go's reader, exactly what the
-// Swift engine's tests require of its reader, and digests the four files `*.swift` excludes, whatever version wrote
+// TestTheGoReaderAgreesWithTheSwiftReaderOnItsSamples: every SHA-256 sample tracks, by Go's reader, exactly what
+// cohere-swift's tests require of its reader, and digests the four files `*.swift` excludes, whatever version wrote
 // them. The split and sparse samples, which the Swift reader falls back on, take no digest here.
 func TestTheGoReaderAgreesWithTheSwiftReaderOnItsSamples(test *testing.T) {
 	test.Parallel()

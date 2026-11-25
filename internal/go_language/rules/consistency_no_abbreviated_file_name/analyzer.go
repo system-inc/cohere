@@ -1,4 +1,4 @@
-// Package consistency_no_abbreviated_file_name is the Go engine's rule that a file's name abbreviates no word the house
+// Package consistency_no_abbreviated_file_name is cohere-go's rule that a file's name abbreviates no word the house
 // spells out, by the vocabulary cohere-go/consistency-no-abbreviated-identifier reads, policy/Abbreviations.json:
 // cfg.go, msg_printer.go and error_msg_test.go are each reported once, at the file's start (#2xt6v5r).
 //
@@ -11,7 +11,7 @@
 //
 // A file named for a registered rule holds the rule's name, upstream's for a port, which is not the file's author's to
 // spell out: max_lines.go is max-lines, and no_var_cfg.go is no-var and `cfg`, judged on `cfg` alone. The names are
-// every engine's, from internal/rule_names (registeredRuleNames). Otherwise the identifier rule's reading of whose a
+// every language's, from internal/rule_names (registeredRuleNames). Otherwise the identifier rule's reading of whose a
 // name is has no counterpart here: a file's name is the package's own.
 // A generated file's name is its generator's, so a file go/ast.IsGenerated accepts is not judged, and neither is
 // doc.go, whose name the Go project's convention fixes, nor a file of a package under a folder whose files are someone
@@ -38,13 +38,13 @@ const Name = "cohere-go/consistency-no-abbreviated-file-name"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_abbreviated_file_name",
 	Doc: "Flags every file whose name abbreviates a word in policy/Abbreviations.json, the house vocabulary every " +
-		"engine shares, once at the file's start: the name's words, cut at its underscores with go/build's _test " +
+		"language shares, once at the file's start: the name's words, cut at its underscores with go/build's _test " +
 		"and build-constraint suffixes set aside, are judged as the camelCase identifier they spell. A generated " +
 		"file, doc.go, and a file under a vendor, third_party or testdata folder are not judged.",
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It reads file names and the import path, which a load has
+// Rule is this rule's entry in cohere-go's registry. It reads file names and the import path, which a load has
 // before any type is checked, so it reads no type information.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
@@ -54,9 +54,9 @@ var messages = map[string]policy.MessageHandle{
 	file_name_words.AbbreviatedFileNameAdvice: policy.MessageOf(Name, file_name_words.AbbreviatedFileNameAdvice),
 }
 
-// registeredRuleNames are every engine's rule names, from internal/rule_names, which the website's data generator
+// registeredRuleNames are every language's rule names, from internal/rule_names, which the website's data generator
 // writes beside rules.json, read once. A Go file is named for a rule as often for a TypeScript one,
-// internal/lint/rules/core/max_lines.go for max-lines, as for one of this engine's, and this engine's registry holds
+// internal/lint/rules/core/max_lines.go for max-lines, as for one of cohere-go's, and cohere-go's registry holds
 // only its own, so the names are the generated list of every registry's rather than knownRuleNames.
 var registeredRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
 	return file_name_words.NewRuleNames(rule_names.RuleNames())
@@ -86,7 +86,7 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 		id, values := file_name_words.Advice(fileName, finding.Entry)
 		// A point at the file's start rather than a range, since the finding is about the file's name and no text
-		// inside the file is to blame, as every engine's folder finding is.
+		// inside the file is to blame, as every language's folder finding is.
 		pass.Report(analysis.Diagnostic{
 			Pos:      file.FileStart,
 			End:      file.FileStart,

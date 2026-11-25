@@ -37,7 +37,7 @@ func newSpinningRule() rule.Rule {
 	}
 }
 
-// timedRun is the engine's stream over a fresh copy of the clean fixture, with the planted spinning rule and the
+// timedRun is cohere-go's stream over a fresh copy of the clean fixture, with the planted spinning rule and the
 // rule that reports every file registered, under extra, and each record's kind in order.
 func timedRun(test *testing.T, extra ...string) (stream string, kinds []string) {
 	test.Helper()

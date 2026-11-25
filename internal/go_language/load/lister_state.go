@@ -101,7 +101,7 @@ func (state *listerState) ran(index int, goEnvironment *GoEnvironment, collector
 		})
 		if keeps && command.failure == nil {
 			// Ignored: a build context the store could not keep is asked of go list again next run, which is all its
-			// keeping saves, and the store says why it kept none (the engine's systemCache).
+			// keeping saves, and the store says why it kept none (cohere-go's systemCache).
 			_ = state.predictedContext.store.Keep(key, command.output)
 		}
 	})

@@ -33,7 +33,7 @@ import (
 // The table is only safe to bake because a repository cannot move a framework registration. Upstream
 // `Variants.set` assigns kind and applyFn onto an existing record and never touches `order`, so a
 // repository redefining `dark` changes the selector it emits without changing where it sorts, and a
-// `@custom-variant` under a new name appends instead of displacing. Measured on the engine, two new
+// `@custom-variant` under a new name appends instead of displacing. Measured on Tailwind, two new
 // names appended at 83 and 84 and moved nothing.
 //
 // If a release ever made a redefinition renumber, every class carrying a variant would sort against

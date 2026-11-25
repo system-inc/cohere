@@ -31,7 +31,7 @@ const (
 	labelPackage     = "example.com/builds/internal/label"
 )
 
-// runOver runs the engine over root with the registry's rules and the findings cache off, so two runs over copies of
+// runOver runs cohere-go over root with the registry's rules and the findings cache off, so two runs over copies of
 // one fixture read alike, with extra after the root, and returns the pipeline it ran and its stream, normalized. The
 // run must exit wantExit.
 func runOver(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
@@ -42,8 +42,8 @@ func runOver(test *testing.T, root string, wantExit int, extra ...string) (*pipe
 // runOverWith is runOver with the findings cache as extra leaves it, on and in root's own store by default.
 func runOverWith(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
 	test.Helper()
-	engine, stream := runOverRaw(test, root, wantExit, extra...)
-	return engine, normalize(stream, root)
+	pipeline, stream := runOverRaw(test, root, wantExit, extra...)
+	return pipeline, normalize(stream, root)
 }
 
 // runOverRaw is runOverWith's run with its stream as written, for a test that reads what normalize hides, such as
@@ -63,8 +63,8 @@ func runOverConfigured(
 	extra ...string,
 ) (*pipeline, string) {
 	test.Helper()
-	engine, stream, _ := runOverNoted(test, root, wantExit, configure, extra...)
-	return engine, stream
+	pipeline, stream, _ := runOverNoted(test, root, wantExit, configure, extra...)
+	return pipeline, stream
 }
 
 // runOverNoted is runOverConfigured with what the run noted on stderr beside its stream, both as written.
@@ -89,11 +89,11 @@ func runOverRegistered(
 	extra ...string,
 ) (*pipeline, string, string) {
 	test.Helper()
-	engine, standardOutput, standardError, exitCode := runOverExiting(test, root, registered, configure, extra...)
+	pipeline, standardOutput, standardError, exitCode := runOverExiting(test, root, registered, configure, extra...)
 	if exitCode != wantExit {
 		test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, wantExit, standardOutput, standardError)
 	}
-	return engine, standardOutput, standardError
+	return pipeline, standardOutput, standardError
 }
 
 // runOverExiting is runOverRegistered's run with the exit it made returned rather than required, for a run over a
@@ -123,7 +123,7 @@ func runOverRequest(
 	configure func(*pipeline),
 ) (*pipeline, string, string, int) {
 	test.Helper()
-	// Made as the engine makes it as the command line is read (runOverlapping), nil for a run without `--timeline`.
+	// Made as cohere-go makes it as the command line is read (runOverlapping), nil for a run without `--timeline`.
 	request.timeline = newTimeline(request)
 	ruleSettings, settingsError := loadSettings(request, registered)
 	if settingsError != nil {
@@ -132,7 +132,7 @@ func runOverRequest(
 	if optionsError := configureRules(ruleSettings, registered); optionsError != nil {
 		test.Fatal(optionsError)
 	}
-	// The settings' targets are builds the census checks, handed to the description as the engine hands them, so
+	// The settings' targets are builds the census checks, handed to the description as cohere-go hands them, so
 	// a tree whose settings name a target is checked under it here too (runOverlapping).
 	request.targets = ruleSettings.Targets
 	// The system cache of the run's own, unless the request names one, given before the description opens it, so its
@@ -146,13 +146,13 @@ func runOverRequest(
 	test.Cleanup(described.awaitStarted)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, &standardError, nil)
+	pipeline := newPipeline(request, described, ruleSettings, registered, &standardOutput, &standardError, nil)
 	if configure != nil {
-		configure(engine)
+		configure(pipeline)
 	}
-	isolatePipeline(test, engine)
-	exitCode := engine.run()
-	return engine, standardOutput.String(), standardError.String(), exitCode
+	isolatePipeline(test, pipeline)
+	exitCode := pipeline.run()
+	return pipeline, standardOutput.String(), standardError.String(), exitCode
 }
 
 // By default a module with a file only windows builds and one only the cohere_extra tag builds is checked under
@@ -281,9 +281,9 @@ func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 		return root
 	}
 	// reasons is the project record's reason for each file it left out, by its path below root.
-	reasons := func(engine *pipeline, root string) map[string]string {
+	reasons := func(pipeline *pipeline, root string) map[string]string {
 		byFile := map[string]string{}
-		for _, excluded := range engine.described.record.Excluded {
+		for _, excluded := range pipeline.described.record.Excluded {
 			relative, relativeError := filepath.Rel(root, excluded.File)
 			if relativeError != nil {
 				test.Fatal(relativeError)
@@ -337,7 +337,7 @@ func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
 func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	restoringNothing := func(engine *pipeline) { engine.keepsHostRestoreOff = true }
+	restoringNothing := func(pipeline *pipeline) { pipeline.keepsHostRestoreOff = true }
 	cold, coldRaw := runOverConfigured(test, root, exitFindings, restoringNothing)
 	warm, warmRaw := runOverConfigured(test, root, exitFindings, restoringNothing)
 	coldStream, warmStream := normalize(coldRaw, root), normalize(warmRaw, root)
@@ -383,18 +383,18 @@ func TestOtherBuildsHashOnlyTheFilesTheHostsDidNot(test *testing.T) {
 	// The template's fill hashes files of its own, so it is filled before the count is read (templateFilled).
 	templateFilled(test)
 	before := cache.FilesHashed()
-	engine, _ := runOverWith(test, root, exitFindings)
+	pipeline, _ := runOverWith(test, root, exitFindings)
 	hashed := cache.FilesHashed() - before
-	if len(engine.buildRuns) != 3 {
-		test.Fatalf("the merge was handed %d runs, want 3", len(engine.buildRuns))
+	if len(pipeline.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3", len(pipeline.buildRuns))
 	}
 	hostFiles := map[string]bool{}
 	ownFiles := 0
-	for file := range engine.buildRuns[0].files.Paths() {
+	for file := range pipeline.buildRuns[0].files.Paths() {
 		hostFiles[file] = true
 	}
 	want := int64(len(hostFiles))
-	for _, extra := range engine.buildRuns[1:] {
+	for _, extra := range pipeline.buildRuns[1:] {
 		shared, own := 0, 0
 		for file := range extra.files.Paths() {
 			if hostFiles[file] {
@@ -439,7 +439,7 @@ func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
 	if writeError := os.WriteFile(file, []byte(describeFile), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	engine, stream := runOverWith(test, root, exitFindings)
+	pipeline, stream := runOverWith(test, root, exitFindings)
 	if !strings.Contains(stream, `"fixedBy":{"cohere-go/consistency-no-long-line":1}`) {
 		test.Fatalf("want the wrap to break the long line of %s, got\n%s", file, stream)
 	}
@@ -447,11 +447,11 @@ func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
 	if readError != nil || string(wrapped) == describeFile {
 		test.Fatalf("the run left %s as it was (%v)", file, readError)
 	}
-	if len(engine.buildRuns) != 3 {
-		test.Fatalf("the merge was handed %d runs, want 3", len(engine.buildRuns))
+	if len(pipeline.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3", len(pipeline.buildRuns))
 	}
 	onDisk := sha256.Sum256(wrapped)
-	for _, run := range engine.buildRuns {
+	for _, run := range pipeline.buildRuns {
 		digest, held := run.files.Digest(file)
 		if !held || digest != onDisk {
 			test.Errorf("%s keyed %s at %x (held %t), want the wrapped bytes on disk, %x", run.build, file, digest,
@@ -508,9 +508,9 @@ func withoutHostRestore(stream string) string {
 func TestOtherBuildsOverOneBuildRunNothingExtra(test *testing.T) {
 	test.Parallel()
 	clean := filepath.Join("testdata", "clean")
-	engine, onStream := runOver(test, copyFixture(test, clean), exitClean)
-	if engine.buildRuns != nil {
-		test.Errorf("the merge was handed %d runs over a module one build covers", len(engine.buildRuns))
+	pipeline, onStream := runOver(test, copyFixture(test, clean), exitClean)
+	if pipeline.buildRuns != nil {
+		test.Errorf("the merge was handed %d runs over a module one build covers", len(pipeline.buildRuns))
 	}
 	_, offStream := runOver(test, copyFixture(test, clean), exitClean, "--host-build-only")
 	if onStream != offStream {
@@ -526,7 +526,7 @@ func TestOtherBuildsOverOneBuildRunNothingExtra(test *testing.T) {
 func TestOtherBuildsWriteTheMergedVerdict(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
-	engine, stream := runOver(test, root, exitFindings)
+	pipeline, stream := runOver(test, root, exitFindings)
 	var lint contract.LintRecord
 	var found []contract.FindingRecord
 	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
@@ -554,16 +554,16 @@ func TestOtherBuildsWriteTheMergedVerdict(test *testing.T) {
 	// the merge writes in the order it was handed the runs.
 	for index, build := range lint.Builds {
 		wantAdded := 0
-		if engine.buildRuns[index].build.OperatingSystem == "windows" {
+		if pipeline.buildRuns[index].build.OperatingSystem == "windows" {
 			wantAdded = 1
 		}
-		if build.AnalyzedPackages+build.Untouched != len(engine.buildRuns[0].analyzed) {
+		if build.AnalyzedPackages+build.Untouched != len(pipeline.buildRuns[0].analyzed) {
 			test.Errorf("the build %s analyzed %d packages and left %d untouched, want every one of the %d its load "+
-				"holds", engine.buildRuns[index].build, build.AnalyzedPackages, build.Untouched,
-				len(engine.buildRuns[0].analyzed))
+				"holds", pipeline.buildRuns[index].build, build.AnalyzedPackages, build.Untouched,
+				len(pipeline.buildRuns[0].analyzed))
 		}
 		if build.FindingsAdded != wantAdded || build.FindingsDropped != 0 {
-			test.Errorf("the build %s added %d and dropped %d, want %d and 0", engine.buildRuns[index].build,
+			test.Errorf("the build %s added %d and dropped %d, want %d and 0", pipeline.buildRuns[index].build,
 				build.FindingsAdded, build.FindingsDropped, wantAdded)
 		}
 	}
@@ -637,7 +637,7 @@ func sortedKeys(set map[string]bool) string {
 // A type error only another build finds is a finding of the run, written in the lint phase as a compiler finding, and
 // the lint record counts it in typeErrors beside its findings, so the phase's finding records are what its record
 // says (#rw6tg3a): before, the record counted the rule findings alone, and the front door refused the run as an
-// engine that broke its contract. The fixture's windows-only file names a constant no build declares.
+// child that broke its contract. The fixture's windows-only file names a constant no build declares.
 func TestAnOtherBuildsTypeErrorIsCountedInTheLintRecord(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
@@ -827,11 +827,11 @@ func TestATargetTheToolchainDoesNotListIsRefusedAtLoad(test *testing.T) {
 // got before the listing ended, so the count is held to more than one listing's, never to an exact multiple.
 func TestTheBuildsOfARunShareTheirDirectoryReads(test *testing.T) {
 	test.Parallel()
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
-	if len(engine.buildRuns) != 3 {
-		test.Fatalf("the run checked %d builds, want 3", len(engine.buildRuns))
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
+	if len(pipeline.buildRuns) != 3 {
+		test.Fatalf("the run checked %d builds, want 3", len(pipeline.buildRuns))
 	}
-	directories, reads := engine.reads.Held()
+	directories, reads := pipeline.reads.Held()
 	if directories == 0 || reads <= int64(directories) {
 		test.Errorf("the run's shared reads hold %d directories, asked %d times, so the extra builds did not read "+
 			"through the host's", directories, reads)

@@ -138,7 +138,7 @@ func TestReactComponentRequirePropertiesParameterStaysSilent(test *testing.T) {
 // immediately and says exactly where.
 //
 // It is a suggestion rather than a fix precisely because of that. This shipped as a fix, which the
-// engine applies unattended, so the whole argument for an intentional visible break rested on a
+// fix pass applies unattended, so the whole argument for an intentional visible break rested on a
 // human reading a diff nothing showed them. A fix preserves what the code means; this changes it by
 // design, so the author has to be the one who accepts it.
 //

@@ -89,11 +89,11 @@ func TestChosenLanguagesRunWhereverTheirFilesLive(test *testing.T) {
 		return discovery{
 			Root: "/root",
 			Projects: []discoveredProject{
-				{Directory: ".", Engine: engineGo},
-				{Directory: "web", Engine: engineTypeScript},
-				{Directory: "web", Engine: engineTypeScript, ConfigFile: "tsconfig.app.json"},
-				{Directory: "swift", Engine: engineSwift},
-				{Directory: ".", Engine: engineFormat},
+				{Directory: ".", Kind: projectKindGoModule},
+				{Directory: "web", Kind: projectKindTypeScriptProgram},
+				{Directory: "web", Kind: projectKindTypeScriptProgram, ConfigFile: "tsconfig.app.json"},
+				{Directory: "swift", Kind: projectKindSwiftPackage},
+				{Directory: ".", Kind: projectKindFolder},
 			},
 			FormattableKinds: map[string]map[string]int{
 				".":   {".json": 3, ".md": 1},
@@ -104,7 +104,7 @@ func TestChosenLanguagesRunWhereverTheirFilesLive(test *testing.T) {
 	running := func(found discovery) []string {
 		var said []string
 		for _, project := range found.Projects {
-			said = append(said, project.Directory+" "+string(project.Engine))
+			said = append(said, project.Directory+" "+project.Kind.label())
 		}
 		return said
 	}
@@ -126,20 +126,20 @@ func TestChosenLanguagesRunWhereverTheirFilesLive(test *testing.T) {
 	// programs' directory to it.
 	jsonAlone := discovered()
 	jsonAlone.chooseLanguages(languageChoice{"json"}, true)
-	if !slices.Equal(running(jsonAlone), []string{". Format", "web Format"}) {
+	if !slices.Equal(running(jsonAlone), []string{". Folder", "web Folder"}) {
 		test.Errorf(
 			"json runs %v, want the root's format project and one of the programs' directory",
 			running(jsonAlone),
 		)
 	}
-	if yield := jsonAlone.formatYield(discoveredProject{Directory: ".", Engine: engineFormat}); !slices.Equal(
+	if yield := jsonAlone.formatYield(discoveredProject{Directory: ".", Kind: projectKindFolder}); !slices.Equal(
 		yield.Directories,
 		[]string{"/root/web"},
 	) {
 		test.Errorf("the root's format project leaves %v to others, want the programs' directory", yield.Directories)
 	}
 	if yield := jsonAlone.formatYield(
-		discoveredProject{Directory: "web", Engine: engineFormat},
+		discoveredProject{Directory: "web", Kind: projectKindFolder},
 	); len(yield.Directories) != 0 {
 		test.Errorf("the programs' format project leaves its own directory %v to others", yield.Directories)
 	}
@@ -170,13 +170,13 @@ func TestAPlainRunsYieldIsAsItWasAndARunThatDoesNotFormatConvertsNothing(test *t
 		return discovery{
 			Root: "/root",
 			Projects: []discoveredProject{
-				{Directory: "web", Engine: engineTypeScript},
-				{Directory: "web", Engine: engineTypeScript, ConfigFile: "tsconfig.app.json"},
+				{Directory: "web", Kind: projectKindTypeScriptProgram},
+				{Directory: "web", Kind: projectKindTypeScriptProgram, ConfigFile: "tsconfig.app.json"},
 			},
 			FormattableKinds: map[string]map[string]int{"web": {".json": 1}},
 		}
 	}
-	root := discoveredProject{Directory: ".", Engine: engineFormat}
+	root := discoveredProject{Directory: ".", Kind: projectKindFolder}
 	whole := discovered()
 	whole.chooseLanguages(nil, true)
 	if yield := whole.formatYield(root); !slices.Equal(yield.Directories, []string{"/root/web", "/root/web"}) {
@@ -208,15 +208,22 @@ func TestANamedFileInALanguageNotNamedIsRefused(test *testing.T) {
 	}
 }
 
-// The front door answers `--languages` for a Go or Swift run it hands an engine, so neither engine's run refuses it
+// The front door answers `--languages` for a Go or Swift run it hands a child, so neither language's run refuses it
 // as a flag it does not take (#s7gt4bj).
 func TestAGoOrSwiftRunTakesLanguages(test *testing.T) {
 	test.Parallel()
 	given := map[string]bool{languagesFlagName: true, formatsFlagName: true}
 	value := func(string) string { return "go,swift" }
 	location := projectLocation{Root: "/project", ArgumentBase: "/project", WorkingDirectory: "/project"}
-	for name, flags := range map[string]engineFlags{"Go": goFlags, "Swift": swiftFlags} {
-		if _, _, refusal := engineArguments(goLanguage("module"), flags, location, given, value, nil); refusal != nil {
+	for name, flags := range map[string]contractFlags{"Go": goFlags, "Swift": swiftFlags} {
+		if _, _, refusal := contractArguments(
+			goLanguage("module"),
+			flags,
+			location,
+			given,
+			value,
+			nil,
+		); refusal != nil {
 			test.Errorf("a %s run refused --languages: %v", name, refusal)
 		}
 	}
@@ -226,7 +233,7 @@ func TestAGoOrSwiftRunTakesLanguages(test *testing.T) {
 func TestTheSummaryLineNamesWhatLanguagesLeftOut(test *testing.T) {
 	test.Parallel()
 	found := discovery{LeftOutLanguages: []string{"swift", "markdown"}}
-	runs := []projectRun{{project: discoveredProject{Directory: ".", Engine: engineGo}, label: "."}}
+	runs := []projectRun{{project: discoveredProject{Directory: ".", Kind: projectKindGoModule}, label: "."}}
 	if line := summaryLine(found, runs); !strings.Contains(line, "left out: swift, markdown") {
 		test.Errorf("the summary line reads %q", line)
 	}
@@ -284,7 +291,7 @@ func TestTheLeftOutLanguagesMoveTheYieldsEncodingOnlyWhenNamed(test *testing.T) 
 func TestTheFootersNameWhatLanguagesLeftOut(test *testing.T) {
 	test.Parallel()
 	want := "⚠ left out: swift, markdown"
-	facts := overallFacts{ProjectsByEngine: map[string]int{"Go": 1}, LeftOut: []string{"swift", "markdown"}}
+	facts := overallFacts{ProjectsByKind: map[string]int{"Go": 1}, LeftOut: []string{"swift", "markdown"}}
 	if line := overallFooter(facts, plain); !strings.Contains(line, want) || !strings.HasPrefix(line, "✓ 💎 ") {
 		test.Errorf("the overall footer reads %q, want a green naming %q", line, want)
 	}
@@ -301,7 +308,7 @@ func TestTheFootersNameWhatLanguagesLeftOut(test *testing.T) {
 // pointed at the root, which checks a named language wherever it lives (#s7gt4bj).
 func TestARunNamingAProjectWhoseLanguageIsNotNamedIsRefused(test *testing.T) {
 	test.Parallel()
-	location := projectLocation{Root: "/root/app", Engine: engineSwift}
+	location := projectLocation{Root: "/root/app", Kind: projectKindSwiftPackage}
 	refusal := refuseUnchosenLanguage(languageChoice{"go", "typescript"}, location, nil)
 	if refusal == nil || !strings.Contains(refusal.Error(),
 		"this run names go and typescript, and not swift, the language of the project at /root/app") {
@@ -309,7 +316,7 @@ func TestARunNamingAProjectWhoseLanguageIsNotNamedIsRefused(test *testing.T) {
 	}
 	if refuseUnchosenLanguage(languageChoice{"swift"}, location, nil) != nil ||
 		refuseUnchosenLanguage(nil, location, nil) != nil ||
-		refuseUnchosenLanguage(languageChoice{"json"}, projectLocation{Engine: engineFormat}, nil) != nil {
+		refuseUnchosenLanguage(languageChoice{"json"}, projectLocation{Kind: projectKindFolder}, nil) != nil {
 		test.Errorf("a project in a named language, a run that named none, or a format project of a named kind, was " +
 			"refused")
 	}

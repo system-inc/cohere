@@ -7,11 +7,11 @@ package tailwind
 //
 // Reading no longer decides what a candidate reads. The ported handle bodies in
 // frameworkmultihandlers.go emit declarations and `readingOf` runs PropertySort over them, the same
-// two steps the engine takes. Reading stays because it is the independent measurement the acceptance
+// two steps Tailwind takes. Reading stays because it is the independent measurement the acceptance
 // test compares those emitters against: corrupting one row fails that test while leaving the
 // differential at full agreement, which is what makes the two sides genuinely separate claims.
 type FrameworkMultiDeclarationUtility struct {
-	// Reading is what this root reads for any value that resolves, as measured against the engine.
+	// Reading is what this root reads for any value that resolves, as measured against Tailwind.
 	//
 	// Read by the acceptance test rather than by the resolution path. See the type's doc comment.
 	Reading Reading
@@ -68,7 +68,7 @@ func (utility FrameworkMultiDeclarationUtility) Description() *FunctionalUtility
 //
 // The literal check runs before resolution, matching upstream: a root-defined keyword is answered by
 // the handler directly and never reaches the theme. Checking after would let a repository declaring
-// `--ease-initial` shadow the literal, which the engine does not allow.
+// `--ease-initial` shadow the literal, which Tailwind does not allow.
 func (utility FrameworkMultiDeclarationUtility) ReadingFor(
 	root string,
 	candidate *ParsedCandidate,
@@ -87,7 +87,7 @@ func (utility FrameworkMultiDeclarationUtility) ReadingFor(
 		// `accent-current` compiles and `current` is absent from `--color`: they are Tailwind's own
 		// built-ins, resolved by the colour path before the theme is consulted at all. A colour root
 		// therefore answers them at its ordinary reading, and without this the theme lookup fails and
-		// the table declines eighteen classes the engine reads. Same bucket `bareReading` carries in
+		// the table declines eighteen classes Tailwind reads. Same bucket `bareReading` carries in
 		// descriptor.go, for the same reason.
 		if utility.AcceptsColorKeywords && colorKeywords[candidate.Value.Value] {
 			return utility.readingOf(root, "", ResolvedUtilityValue{})
@@ -99,10 +99,10 @@ func (utility FrameworkMultiDeclarationUtility) ReadingFor(
 	// `basis`, `size`, `leading`, `indent`, `space-x` and the border spacings compile to no CSS at
 	// all: upstream's `spacingUtility` passes `defaultValue: null`, which is not the same as omitting
 	// it, and the `--spacing` namespace answers a null candidate value, so the theme lookup succeeds
-	// where the engine refuses.
+	// where Tailwind refuses.
 	//
 	// A first attempt keyed this on `DefaultValuePresent` and broke `blur`, which has no default and
-	// answers anyway. So the flag is measured per root against the engine rather than derived from
+	// answers anyway. So the flag is measured per root against Tailwind rather than derived from
 	// the shape, which is the same lesson wave 2b's readings taught.
 	if candidate.Value == nil && utility.RefusesEmptyValue {
 		return Reading{}, false
@@ -143,7 +143,7 @@ func (utility FrameworkMultiDeclarationUtility) readingOf(
 // The literal branch runs first and on the candidate's own value rather than on the resolved one,
 // matching ReadingFor and matching upstream: a root-defined keyword is answered by the handler
 // directly and never reaches the theme. Checking after resolution would let a repository declaring
-// `--ease-initial` shadow the literal, which the engine does not allow.
+// `--ease-initial` shadow the literal, which Tailwind does not allow.
 //
 // Returns nil for a root with no ported emitter, for the same reason the single-declaration Emit
 // does: a fallback would leave the acceptance test comparing a table against itself.

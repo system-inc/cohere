@@ -66,7 +66,7 @@ func (scratch *workerScratch) namer(typesPackage *types.Package, encoder *object
 
 // release readies scratch for the next package: every map emptied and every slice cut to nothing with its elements
 // zeroed, and the type information, encoder and record it pointed at dropped, so a scratch waiting in the pool holds
-// no object of the package it last added, whose syntax and types the engine lets go once the package's rules end.
+// no object of the package it last added, whose syntax and types cohere-go lets go once the package's rules end.
 func (scratch *workerScratch) release() {
 	clear(scratch.walker.seen)
 	scratch.walker.collected = emptied(scratch.walker.collected)

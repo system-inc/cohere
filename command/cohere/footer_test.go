@@ -238,7 +238,7 @@ func TestFooterGolden(test *testing.T) {
 			want:    "✓ 💎 0.7s (480 rules • 3 checked • 3,923 cached • 2 builds • 4,100 nodes)",
 		},
 		{
-			// The engine writes no builds for a run of one, and one says nothing a footer does not already.
+			// The child writes no builds for a run of one, and one says nothing a footer does not already.
 			name: "a Go run of the host's build alone",
 			summary: func(summary *runSummary) {
 				summary.Builds = []checkedBuild{{Target: "darwin/arm64", Host: true}}
@@ -403,7 +403,7 @@ var uncheckedConditions = []struct {
 	{
 		name: "Swift files no target compiles",
 		plant: func(summary *runSummary) {
-			summary.Gaps.Unchecked = []uncheckedEngineFile{
+			summary.Gaps.Unchecked = []uncheckedContractFile{
 				{File: "/package/Stray/A.swift", Reason: "no target of this package compiles it", Language: "Swift"},
 				{File: "/package/Stray/B.swift", Reason: "no target of this package compiles it", Language: "Swift"},
 			}
@@ -413,7 +413,7 @@ var uncheckedConditions = []struct {
 	{
 		name: "a Go file only another platform builds",
 		plant: func(summary *runSummary) {
-			summary.Gaps.Unchecked = []uncheckedEngineFile{
+			summary.Gaps.Unchecked = []uncheckedContractFile{
 				{
 					File:     "/module/open_windows.go",
 					Reason:   "excluded by build constraints on darwin/arm64",
@@ -562,7 +562,7 @@ func TestFooterGroupsCounts(test *testing.T) {
 
 func TestOverallFooterGolden(test *testing.T) {
 	test.Parallel()
-	engines := map[string]int{"TypeScript": 2, "Swift": 1}
+	kinds := map[string]int{"TypeScript": 2, "Swift": 1}
 	cases := []struct {
 		name  string
 		facts overallFacts
@@ -570,27 +570,27 @@ func TestOverallFooterGolden(test *testing.T) {
 	}{
 		{
 			name:  "every project green",
-			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines},
+			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByKind: kinds},
 			want:  "✓ 💎 8.1s • 3 projects: 1 Swift, 2 TypeScript",
 		},
 		{
-			name:  "one engine",
-			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: map[string]int{"TypeScript": 2}},
+			name:  "one child",
+			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByKind: map[string]int{"TypeScript": 2}},
 			want:  "✓ 💎 8.1s • 2 projects",
 		},
 		{
 			name: "a project failed",
 			facts: overallFacts{
-				Total:            8100 * time.Millisecond,
-				ProjectsByEngine: engines,
-				Failed:           []string{"www (exit 1)"},
+				Total:          8100 * time.Millisecond,
+				ProjectsByKind: kinds,
+				Failed:         []string{"www (exit 1)"},
 			},
 			want: "✗ ☠️ 8.1s • 3 projects: 1 Swift, 2 TypeScript → ☠️ www (exit 1)",
 		},
 		{
 			// A project that did not finish checked nothing, so the run cannot be green.
 			name:  "a project did not finish",
-			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, Unfinished: 1},
+			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByKind: kinds, Unfinished: 1},
 			want:  "✗ ☠️ 8.1s • 3 projects: 1 Swift, 2 TypeScript • ⚠ 1 project did not finish",
 		},
 	}

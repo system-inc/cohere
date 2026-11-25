@@ -2,7 +2,7 @@
 // variable it added to, `x = atomic.AddUint64(&x, 1)`. The Add is atomic and the assignment after it is not, so a
 // write racing between the two is lost. Whether the two sides name the same variable is judged by their text as gofmt
 // prints it, so `x` and `&x` match, as do `*pointer` and `pointer`, and nothing finer is tried. It sits on the
-// engine's syntax dispatcher, hearing each assignment on the walk the dispatcher makes once for every syntax rule.
+// checker's syntax dispatcher, hearing each assignment on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/atomic/atomic.go, whose logic it
 // keeps and whose message it reports word for word, at the same position. The registry runs the port in the

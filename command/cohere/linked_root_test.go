@@ -1,6 +1,6 @@
 //go:build unix
 
-// The stand-in Go engine here is a /bin/sh script, as go_engine_test.go's are, so the file builds on Unix.
+// The stand-in Go child here is a /bin/sh script, as go_language_test.go's are, so the file builds on Unix.
 package main
 
 import (
@@ -15,7 +15,7 @@ import (
 
 // A plain cohere at a Go root reached through a symbolic link checks what it checks at the root's real path
 // (#yyv7nr2): the same finding, the same count of files checked and the same exit, its output the same but for how
-// long each run took. Before the engine resolved its root, the run at the link counted no file and passed green.
+// long each run took. Before the child resolved its root, the run at the link counted no file and passed green.
 func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -30,7 +30,7 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 		"beta/beta.go": "// Package beta is two.\npackage beta\n\nimport \"example.com/linked/alpha\"\n\n" +
 			"// Size reads alpha.\nconst Size = alpha.MAX_SIZE\n",
 	})
-	// The Go engine reads the repository's index, so the fixture is a repository git knows.
+	// cohere-go reads the repository's index, so the fixture is a repository git knows.
 	initialize := exec.Command("git", "init", "--quiet")
 	initialize.Dir = real
 	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
@@ -39,8 +39,8 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 	if linkError := os.Symlink(real, linked); linkError != nil {
 		test.Fatalf("linking the root: %v", linkError)
 	}
-	// The child mark is emptied, since a front door that inherited it would refuse to start the engine at all.
-	environment := []string{goEngineChildVariable + "="}
+	// The child mark is emptied, since a front door that inherited it would refuse to start the child at all.
+	environment := []string{goChildVariable + "="}
 	atReal, realExit := runCohereWithEnvironment(test, binary, real, environment, "--no-fix", "--no-cache")
 	// PWD names the link, as a shell that changed into it says: os.Getwd answers with it, and a child given the
 	// parent's PWD would read the kernel's answer instead, which is the real path, and never meet the link at all.
@@ -67,12 +67,12 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 	}
 }
 
-// A Go engine whose types record names files its load reached and its census never counted is never complete through
+// cohere-go whose types record names files its load reached and its census never counted is never complete through
 // the front door (#yyv7nr2, #hd5bsqh): a stream that says so and calls itself incomplete fails with the gap, the footer
 // counting the files and the account naming the first, and one that calls itself complete beside them is refused,
 // since that is a green over files nothing checked.
 //
-// Not parallel: it drives check runs through engineRun, whose record acceptors set the package-level activeSummary.
+// Not parallel: it drives check runs through contractRun, whose record acceptors set the package-level activeSummary.
 func TestACensusThatMissedTheLoadIsNeverComplete(test *testing.T) {
 	stream := func(complete bool, exitCode int) string {
 		return "cat <<'RECORDS'\n" + strings.Join([]string{
@@ -100,10 +100,10 @@ func TestACensusThatMissedTheLoadIsNeverComplete(test *testing.T) {
 	missed := "its load reached 2 files in the module that its census never counted, /project/a/a.go in " +
 		"example.com/project/a first"
 
-	// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
+	// Not parallel: it drives a check run through contractRun, which sets the package-level activeSummary.
 	test.Run("an incomplete run names the census", func(test *testing.T) {
 		activeSummary = runSummary{}
-		out, exitCode, runError := runFakeGoEngine(test, stream(false, 1))
+		out, exitCode, runError := runFakeGoChild(test, stream(false, 1))
 		if runError != nil || exitCode != 1 {
 			test.Fatalf("exit %d, err %v, want 1 and no refusal\n%s", exitCode, runError, out)
 		}
@@ -121,10 +121,10 @@ func TestACensusThatMissedTheLoadIsNeverComplete(test *testing.T) {
 		}
 	})
 
-	// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
+	// Not parallel: it drives a check run through contractRun, which sets the package-level activeSummary.
 	test.Run("a run that calls itself complete is refused", func(test *testing.T) {
 		activeSummary = runSummary{}
-		out, exitCode, runError := runFakeGoEngine(test, stream(true, 0))
+		out, exitCode, runError := runFakeGoChild(test, stream(true, 0))
 		if runError == nil || !strings.Contains(runError.Error(), "calls the run complete, and "+missed) {
 			test.Fatalf("exit %d, err %v, want the stream refused for calling itself complete\n%s", exitCode,
 				runError, out)
@@ -133,7 +133,7 @@ func TestACensusThatMissedTheLoadIsNeverComplete(test *testing.T) {
 }
 
 // A run through a linked root and a run at its real path share one replay key, and a link pointed at another tree
-// shares none with the first (#hd5bsqh): the key holds the resolved root and the engine names its inputs at it, so the
+// shares none with the first (#hd5bsqh): the key holds the resolved root and the child names its inputs at it, so the
 // run at the link replays the real path's run, and once the link names another tree its run checks that tree and
 // writes that tree's verdict, never the first tree's.
 func TestARunThroughALinkedRootReplaysItsRealPathsRunAndNoOtherTreesRun(test *testing.T) {
@@ -159,7 +159,7 @@ func TestARunThroughALinkedRootReplaysItsRealPathsRunAndNoOtherTreesRun(test *te
 	if linkError := os.Symlink(first, linked); linkError != nil {
 		test.Fatalf("linking the root: %v", linkError)
 	}
-	environment := []string{goEngineChildVariable + "="}
+	environment := []string{goChildVariable + "="}
 	atLink := append(slices.Clone(environment), "PWD="+linked)
 	// The footer's marker, since the account says "not replayed" of a run that was not.
 	replayedMarker := "• replayed"

@@ -60,7 +60,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1031",
 	"SA1031",
 	"Flags an encoder of encoding/ascii85, base32, base64 or hex given a destination and a source that overlap: "+
-		"staticcheck's SA1031, ported onto the engine's own intermediate representation.",
+		"staticcheck's SA1031, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

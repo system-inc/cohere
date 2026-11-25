@@ -1,6 +1,6 @@
 //go:build unix
 
-// Every run here goes through stand-in shell scripts for swift, xcrun and the engine, so the file builds on
+// Every run here goes through stand-in shell scripts for swift, xcrun and the child, so the file builds on
 // Unix, as projects_test.go does (#tejf9bc).
 
 package main
@@ -86,25 +86,25 @@ func readLogFile(test *testing.T, log string) string {
 }
 
 // A repository of several Swift packages asks `swift --version` once, in the run that starts the others, and
-// every engine in the tree, coverage queries and project runs alike, is handed that answer and the `swift`
+// every language in the tree, coverage queries and project runs alike, is handed that answer and the `swift`
 // xcrun named, rather than asking again (#nkk91tv). A value the caller's shell carries is never one of them:
 // only a process whose own parent published it may trust it, so a stale toolchain cannot reach a cache key.
 func TestAProcessTreeAsksTheSwiftToolchainOnce(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	root := coveringRepository(test)
-	covering, _ := coveringSwiftEngine(
+	covering, _ := coveringSwiftBinary(
 		test,
 		coverageAnswerThrough(root, root, filepath.Join(contractDirectory(test), "Clean.jsonl")),
 	)
 	seen := filepath.Join(test.TempDir(), "seen")
-	engine := fakeSwiftEngine(test,
+	swiftBinary := fakeSwiftBinary(test,
 		"printf '%s|%s\\n' \"$(printf '%s' \"$COHERE_SWIFT_VERSION_OUTPUT\" | tr '\\n' ' ')\" "+
 			"\"$COHERE_SWIFT_EXECUTABLE\" >> '"+seen+"'\nexec '"+covering+"' \"$@\"")
 	toolchain, log := fakeToolchain(test, true)
 
 	output, _ := runWithToolchain(test, binary, root, toolchain, []string{
-		"COHERE_SWIFT_ENGINE=" + engine,
+		"COHERE_SWIFT_BINARY=" + swiftBinary,
 		"COHERE_SWIFT_VERSION_OUTPUT=stale swiftlang-1.0.0",
 		"COHERE_SWIFT_EXECUTABLE=/stale/swift",
 		"COHERE_SWIFT_RESOLVED_BY=1",
@@ -118,19 +118,19 @@ func TestAProcessTreeAsksTheSwiftToolchainOnce(test *testing.T) {
 	lines := strings.Split(strings.TrimSpace(readLogFile(test, seen)), "\n")
 	want := fakeSwiftVersion + " Target: arm64-apple-macosx |" + filepath.Join(toolchain, "swift")
 	if len(lines) < 4 {
-		test.Fatalf("the engine ran %d times, want the 4 coverage queries and the 2 checks:\n%s", len(lines), output)
+		test.Fatalf("the child ran %d times, want the 4 coverage queries and the 2 checks:\n%s", len(lines), output)
 	}
 	for _, line := range lines {
 		if strings.TrimSpace(line) != strings.TrimSpace(want) {
-			test.Errorf("an engine was handed %q, want the tree's one answer %q", line, want)
+			test.Errorf("a child was handed %q, want the tree's one answer %q", line, want)
 		}
 	}
 }
 
-// A run trusts an engine and a toolchain it inherits only from its own parent: given them by the process that
-// started it, it runs that engine and asks nothing; given the same values by anyone else, it drops them and
-// resolves its own, here through a `swift` that does not answer, so the engine it was handed never runs.
-func TestARunTrustsAnInheritedSwiftEngineOnlyFromItsParent(test *testing.T) {
+// A run trusts a child and a toolchain it inherits only from its own parent: given them by the process that
+// started it, it runs that cohere-swift and asks nothing; given the same values by anyone else, it drops them and
+// resolves its own, here through a `swift` that does not answer, so the child it was handed never runs.
+func TestARunTrustsAnInheritedSwiftBinaryOnlyFromItsParent(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	root := newRepository(test, map[string]string{
@@ -147,23 +147,29 @@ func TestARunTrustsAnInheritedSwiftEngineOnlyFromItsParent(test *testing.T) {
 	} {
 		test.Run(trust.name, func(test *testing.T) {
 			test.Parallel()
-			engine, log := loggingSwiftEngine(test)
+			swiftBinary, log := loggingSwiftBinary(test)
 			toolchain, asked := fakeToolchain(test, false)
 			output, exitCode := runWithToolchain(test, binary, root, toolchain, []string{
-				"COHERE_SWIFT_ENGINE_PATH=" + engine,
+				"COHERE_SWIFT_BINARY_PATH=" + swiftBinary,
 				"COHERE_SWIFT_VERSION_OUTPUT=" + fakeSwiftVersion,
 				"COHERE_SWIFT_RESOLVED_BY=" + trust.resolvedBy,
 			}, "--no-fix")
 			ran := readLogFile(test, log) != ""
 			if trust.trusted {
 				if exitCode != 0 || !ran || readLogFile(test, asked) != "" {
-					test.Errorf("a run did not take the engine and toolchain its parent resolved "+
-						"(exit %d, engine ran %t, asked %q):\n%s", exitCode, ran, readLogFile(test, asked), output)
+					test.Errorf(
+						"a run did not take the child and toolchain its parent resolved "+
+							"(exit %d, cohere-swift ran %t, asked %q):\n%s",
+						exitCode,
+						ran,
+						readLogFile(test, asked),
+						output,
+					)
 				}
 				return
 			}
 			if exitCode == 0 || ran {
-				test.Errorf("a run took an engine its parent did not resolve (exit %d, engine ran %t):\n%s",
+				test.Errorf("a run took a child its parent did not resolve (exit %d, cohere-swift ran %t):\n%s",
 					exitCode, ran, output)
 			}
 		})

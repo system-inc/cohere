@@ -13,7 +13,7 @@ import (
 // sits at one stable path beside the hash it was built from. Go stamped those facts itself, read apart from
 // that hash, so a binary built in one state went on being served to a tree in another (#50wtb2s): built
 // dirty, it said so after the work was committed, and built clean, it said clean beside a dirty tree, and a
-// clean commit sends the Swift engine to that commit rather than the working tree. Each step here changes
+// clean commit sends cohere-swift to that commit rather than the working tree. Each step here changes
 // only the tree's state, never a Go source, and reads what the served binary says about itself.
 func TestADevelopmentBinaryReportsTheStateOfTheTreeItIsServedTo(test *testing.T) {
 	test.Parallel()

@@ -12,7 +12,7 @@ import (
 // starts about 6,450 children, and on darwin each fork write-protects the whole heap, so the faults grow with the heap
 // and with the threads faulting together: one process on 8 threads took 426s wall and 2,143s of system time, and four
 // processes of 2 threads ran the same 431 top-level tests in 127s wall and about 440s of system time (#2htryg8). In
-// the last split gate Sun2's half was go_engine alone, 707s.
+// the last split gate Sun2's half was go_language alone, 707s.
 //
 // The box lists the package's top-level tests, deals them round-robin into a shard per two of its cores, runs every
 // shard at once and prints each one's JSON after the marker naming its tests (sharedBoxShards). Kirk's Mac reads the

@@ -26,7 +26,7 @@ func TestNoInvalidRegexpFires(test *testing.T) {
 		// ways, and a rule listening only for `new` is silent on half the calls anyone writes.
 		{"a plain call rather than new", "export const a = RegExp('[');\n"},
 
-		// Flags. An unknown flag is a SyntaxError rather than something the engine ignores.
+		// Flags. An unknown flag is a SyntaxError rather than something the regular expression parser ignores.
 		{"an unknown flag", "export const a = new RegExp('.', 'z');\n"},
 		{"a duplicated flag", "export const a = new RegExp('.', 'ii');\n"},
 
@@ -108,8 +108,8 @@ func TestNoInvalidRegexpStaysSilent(test *testing.T) {
 	}
 }
 
-// A local named RegExp is whatever the caller passed, and a pattern under `v` has a grammar the engine
-// does not parse, so both stay silent, as ESLint's corpus pins the first and its validator accepts the
+// A local named RegExp is whatever the caller passed, and a pattern under `v` has a grammar the regular expression
+// parser does not parse, so both stay silent, as ESLint's corpus pins the first and its validator accepts the
 // second (#jjfa7qb). The global with a broken pattern still reports, so the silence is not the rule
 // going quiet.
 func TestNoInvalidRegexpAsksForTheGlobalAndLeavesVPatternsAlone(test *testing.T) {

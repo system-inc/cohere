@@ -31,7 +31,7 @@ type Message struct {
 
 // Fix is a proposed replacement of a range of source text.
 //
-// A rule proposes; it never applies. The edit engine owns what actually lands, because it is the
+// A rule proposes; it never applies. The fix pass owns what actually lands, because it is the
 // only component that can see every proposal at once and reason about the cases a single rule
 // cannot: two fixes overlapping the same bytes, one fix shifting the offsets every later fix was
 // computed against, and a rewrite that parses as something other than what the author meant.
@@ -355,7 +355,7 @@ const PatternTimedOutNotePrefix = "pattern timed out: "
 //
 // and `from /* pinned */ 'fs'` loses the comment permanently.
 //
-// The reason this is worse than cosmetic: **the corrupted output still parses.** The edit engine
+// The reason this is worse than cosmetic: **the corrupted output still parses.** The fix pass
 // refuses a rewrite that breaks syntax, and that guard never fires here, so the damage sails
 // through with every downstream check green. A range wider than the rule intended is damage that
 // validation downstream is structurally unable to detect. The parse guard is necessary and not
@@ -366,7 +366,7 @@ const PatternTimedOutNotePrefix = "pattern timed out: "
 // so the safe form is also the convenient one, and the shape that eats trivia is not reachable by
 // accident.
 //
-// Found by @system_cohere_lint_fix, running real rules through the engine on three trivia shapes
+// Found by @system_cohere_lint_fix, running real rules through the linter on three trivia shapes
 // rather than reasoning about the ranges. Upstream tsgolint gets this right via
 // `utils.TrimNodeTextRange`; our port dropped the step, most likely because the signature had no
 // SourceFile to trim with.
@@ -422,22 +422,22 @@ func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 // own span already said exactly what it meant. That split is why the safe form is also the
 // convenient one, and why the trivia-eating shape is unreachable rather than merely discouraged.
 //
-// Two properties of the engine that consumes these are worth knowing before writing a fix.
+// Two properties of the linter that consumes these are worth knowing before writing a fix.
 //
 // A Fix must preserve meaning, because it is applied unattended. When the correct edit requires
 // choosing between alternatives only the author can rank, that is a Suggestion instead, and the
-// engine never applies suggestions. core.NoCaseDeclarations is the shipped example: wrapping a case
+// fix pass never applies suggestions. core.NoCaseDeclarations is the shipped example: wrapping a case
 // clause in braces changes what the code means, so it reports a Suggestion even though the edit is
 // mechanical and unambiguous. Mechanical is not the test; meaning-preserving is.
 //
 // Fixes reported together are not applied together. ProposalsFrom flattens a diagnostic's fixes into
 // independent proposals, so overlap resolution may admit one and refuse the other. A pair that only
-// means something jointly needs grouping in the engine first; reporting them side by side does not
+// means something jointly needs grouping in the linter first; reporting them side by side does not
 // buy atomicity. core.NoCaseDeclarations shows this too: its InsertBefore and InsertAfter are an
 // opening and a closing brace, and half of that pair is broken code. It is safe today only because
-// it is a Suggestion and never reaches the engine. See ProposalsFrom in internal/fix.
+// it is a Suggestion and never reaches the linter. See ProposalsFrom in internal/fix.
 //
-// The engine's refusal guard checks that the rewritten file parses, and parsing is necessary rather
+// The fix pass's refusal guard checks that the rewritten file parses, and parsing is necessary rather
 // than sufficient. Anything sayable in valid syntax about a name that no longer exists slips
 // through it: a rename that updates a usage and misses its declaration produces a file that parses
 // and does not compile, and the guard has no reason to fire.
@@ -450,7 +450,7 @@ func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 // parses. Measured: one diagnostic on that ordering against two on the other, and the rewritten
 // source fails to type-check with "cannot find name".
 //
-// So a fix that renames anything carries an obligation the engine cannot discharge for it: every
+// So a fix that renames anything carries an obligation the fix pass cannot discharge for it: every
 // reference to the old name must move in the same pass, and a fixture has to assert it on both
 // orderings, since either one alone passes. The failure also repairs the evidence of itself, because
 // the rule's own fix silences the finding that would have reported the rest of the work.

@@ -15,7 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/timing"
 )
 
-// panicFramesShown is how many of a panic's frames a crash names, as many as the engine's own recover names for an
+// panicFramesShown is how many of a panic's frames a crash names, as many as cohere-go's own recover names for an
 // analyzer's panic.
 const panicFramesShown = 5
 
@@ -91,7 +91,7 @@ func newListenerRun(
 	return run
 }
 
-// function calls the Function of the listener's walk over the engine's own intermediate representation on function.
+// function calls the Function of the listener's walk over cohere's own intermediate representation on function.
 func (run *listenerRun) function(function *intermediate_representation.Function) {
 	if run.crash != nil || run.registered.listener.IntermediateRepresentation.Function == nil {
 		return
@@ -104,7 +104,7 @@ func (run *listenerRun) function(function *intermediate_representation.Function)
 	run.registered.listener.IntermediateRepresentation.Function(run.context, function)
 }
 
-// instruction calls the Instruction of the listener's walk over the engine's own intermediate representation on
+// instruction calls the Instruction of the listener's walk over cohere's own intermediate representation on
 // instruction, a kind the walk lists.
 func (run *listenerRun) instruction(instruction intermediate_representation.Instruction) {
 	if run.crash != nil {
@@ -120,7 +120,7 @@ func (run *listenerRun) instruction(instruction intermediate_representation.Inst
 	run.registered.listener.IntermediateRepresentation.Instruction(run.context, instruction)
 }
 
-// functionExit calls the FunctionExit of the listener's walk over the engine's own intermediate representation on
+// functionExit calls the FunctionExit of the listener's walk over cohere's own intermediate representation on
 // function, once its instructions have been heard.
 func (run *listenerRun) functionExit(function *intermediate_representation.Function) {
 	if run.crash != nil || run.registered.listener.IntermediateRepresentation.FunctionExit == nil {
@@ -181,7 +181,7 @@ func (run *listenerRun) measured(listen func()) {
 }
 
 // recoverCrash, deferred around each call, records a panic in the listener as the rule's crash on the package,
-// spelled as the engine spells an analyzer's panic, so a dispatched rule's crash reads as it did when the rule was an
+// spelled as cohere-go spells an analyzer's panic, so a dispatched rule's crash reads as it did when the rule was an
 // analyzer of its own.
 func (run *listenerRun) recoverCrash() {
 	recovered := recover()
@@ -210,7 +210,7 @@ func (run *listenerRun) outcome() Outcome {
 // listenerRun method, or the syntax walk's callNodes, that called the check, read as check.panicFrames reads them for
 // an analyzer: it runs in the deferred recover, where the panicking frames are still on the stack below
 // runtime.gopanic, and the runtime's own frames are left out, since a nil dereference passes through several. It is a
-// copy rather than a call because the engine's is unexported in package check, which a rule package does not import.
+// copy rather than a call because cohere-go's is unexported in package check, which a rule package does not import.
 func panicFrames() string {
 	callers := make([]uintptr, 64)
 	frames := runtime.CallersFrames(callers[:runtime.Callers(0, callers)])

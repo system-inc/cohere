@@ -1,4 +1,4 @@
-// Package security_no_interpolated_sql_string is the Go engine's rule that a value is bound to a SQL query as a
+// Package security_no_interpolated_sql_string is cohere-go's rule that a value is bound to a SQL query as a
 // parameter, not written into its text.
 //
 // It is the twin of the TypeScript rule nexus/security-no-interpolated-sql-string and reads SQL the same way,
@@ -91,7 +91,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "security_no_interpolated_sql_string"
 	"name, a placeholder list or a number built into a query is left alone, since no bound parameter can take its "+
 	"place.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var interpolatedSqlStringMessage = policy.MessageOf(Name, "interpolatedSqlString")

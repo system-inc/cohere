@@ -91,7 +91,7 @@ func TestAPassNotAskedRecordsNoBody(test *testing.T) {
 // declaring what it uses outside it, none its own, and the sha256 of every file's bytes as the pass read them,
 // declared.go's though it holds no body. Neither record is flagged, so each is summarizable. A file the pass cannot
 // read again has no digest, while its body's record is still handed on, so the host's side answers no record there
-// (go_engine's factReachPackage.BodyRecord). Any other analyzer's result holds none.
+// (go_language's factReachPackage.BodyRecord). Any other analyzer's result holds none.
 func TestAnAskedRunHandsEachBodyOnWithTheFileItWasParsedFrom(test *testing.T) {
 	test.Parallel()
 	asked := true

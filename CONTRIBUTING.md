@@ -69,8 +69,8 @@ go build ./...
 go run ./command/cohere
 ```
 
-`cohere` checks itself: a bare `cohere --no-fix` at the root runs the Go engine over this module and the
-Swift engine over `swift/`, and both read 0. Go's own toolchain gates it too: `gofmt -l .`,
+`cohere` checks itself: a bare `cohere --no-fix` at the root runs cohere-go over this module and
+cohere-swift over `swift/`, and both read 0. Go's own toolchain gates it too: `gofmt -l .`,
 `go vet ./...`, `go test ./...`, `go build ./...`.
 
 Heavy Go work goes through `cohere-dev`, which takes a token from the machine's pool and runs with Go
@@ -106,7 +106,7 @@ main and second the head, checks the worktree out at it, gates that tree through
 main to it, checkout and all (#4v9pmef). The gate runs `go vet`, the rule CPU budget, the whole module's
 tests, the docs data check, and last cohere itself on the tree (#06g3f7x): it builds cohere at that tree and
 refuses the landing unless a bare `cohere --no-fix` there reads 0 findings, 0 type errors and no gap, every
-engine, printing what it found. Main's
+language, printing what it found. Main's
 first-parent line gains that one commit per landing, and the branch's own history, its merges of main
 included, stays one hop off it. The branch itself doesn't move, and the worktree is left at the landing,
 detached. Nothing landed this way moves main during another's gate. A commit to main by hand does, and
@@ -160,7 +160,7 @@ script sets each corpus's variable to its laid copy. A box that lacks one names 
 lays it from the checkout its corpora file names, carried on a gap of its own, and asks the box again. ahra goes
 without `data/`, which no test reads. ahra and connected are installed from their pnpm lockfiles and the
 Prettier fork from its yarn.lock, with no install scripts, then the eight bundles cohere embeds built into its
-`dist/`, which the engine loads when the fork is set; Structure is a repository holding every commit a test reads
+`dist/`, which the formatter loads when the fork is set; Structure is a repository holding every commit a test reads
 through `At`. A corpus's place is its commit and the digest of how it is laid, so changing the lay lays it again,
 and laying a corpus anew removes the copy before it. To move a pin, change its
 constant and say why: the next landing on each box lays it. A corpus the corpora file doesn't name is said on
@@ -170,11 +170,11 @@ Every landing measures itself, and nothing lands unmeasured (`land_performance.g
 land pushes the gated commit to Loom's feed and, in Shackler's gap, under `~/scratch/system_cohere_tools/performance`,
 lays the root at that commit and deeafbf4 once, checks the pinned Go toolchain, and builds cohere as a release's Go
 build, `CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'`, on a Go cache she keeps. Over an empty system store for
-that binary it runs the Go engine with a clean environment under `/usr/bin/time -l`: the cold row at the root, 2 fills
+that binary it runs cohere-go with a clean environment under `/usr/bin/time -l`: the cold row at the root, 2 fills
 and 3 rounds, deeafbf4's, 2 and 2, a warm run after one that fills the project store, and one `--timeline` run. It
 writes `Performance.jsonc` at the root of the tree that lands: each time a `median` with its `minimum` and
-`maximum` in milliseconds, every key spelled whole (schema 2), what each row
-`checked` by the engine's own records (its lint record's files walked and its findings, which every round of the row
+`maximum` in milliseconds, every key spelled whole and the measurement under `checks` (schema 3), what each row
+`checked` by cohere-go's own records (its lint record's files walked and its findings, which every round of the row
 must agree on, or the landing refuses), her cpu, cores and load before and after, that she was held quiet, the build,
 the timeline's wall areas, and a note against main's file before it. A row reads "slower by" or "faster by" so much
 only when its range clears the old one, otherwise "level", and another machine or build, or a row that checked other
@@ -234,7 +234,7 @@ Cohere's own Go went from 37,889 findings to 0 in two days, and this is how, so 
 way. The names, the line lengths and the file layout went through typed codemods, written once and checked to
 the end. What was left went through waves of light agents, each holding one package's judgment.
 
-**The codemods are in `tools/go_codemods`.** Every rename goes through the rename engines, a library
+**The codemods are in `tools/go_codemods`.** Every rename goes through global_rename and the local rename, a library
 in `internal/go_rename`: `rename` (one package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
 the same object under the new names, checked to a fixpoint. The rewrite is reloaded in memory and compared
 before anything is written, and checked again from disk. A name someone else owns (a field an encoder reads by
@@ -247,7 +247,7 @@ refused, and the refusal is listed with its reason. The passes:
 - `word_names`, `initialisms`: the abbreviation vocabulary in `policy/Abbreviations.json` and initialisms
   written as words. `-global` reaches across packages. A word with several meanings (`pos`) is listed for a
   person, never given its first.
-- `named_renames`, `hand_names`: a person's chosen names, one declaration a line, through the same engines.
+- `named_renames`, `hand_names`: a person's chosen names, one declaration a line, through the same renamings.
 - `octal_prefix`: each literal the octal-prefix rule flags, `0644` written as `0o644`, through the same reload,
   every literal of a rewritten file proven to keep its constant value.
 - `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words; a bare `cohere` runs the
@@ -505,11 +505,10 @@ run, because a version missing one platform resolves to nothing there and gets r
 against a release that looked fine everywhere else.
 
 The release is profile-guided (#r6sqd2c): every target compiles with `-pgo=command/cohere/default.pgo`, and
-darwin/arm64 alone with `GOARM64=v8.4`, which every Apple silicon Mac meets. Together they took about 2% of the Go
-engine's CPU off the bar row at cohere's root (#b2t9xmf). The profile is committed, so a build from a commit
+darwin/arm64 alone with `GOARM64=v8.4`, which every Apple silicon Mac meets. Together they took about 2% of cohere-go's CPU off the bar row at cohere's root (#b2t9xmf). The profile is committed, so a build from a commit
 reproduces, and it is never made by hand: `internal/release/tools/train_profile.sh`, run on a box from a cohere
 checkout, builds that commit with no profile, runs the front door with `--profile` on Adamic and Loom at the commits
-it names (two `--no-cache` runs and one cold run each), merges the Go engine's profiles into
+it names (two `--no-cache` runs and one cold run each), merges cohere-go's profiles into
 `command/cohere/default.pgo` and prints the digest, and the profile lands in a commit of its own that quotes what it
 printed. Rerun it to regenerate the profile. It never trains on a tree the benchmarks time, since that would write a
 fitted gain into the record: not cohere's root, which the bar row and bench/ measure, and not deeafbf4, which every
@@ -571,7 +570,7 @@ without a minor. The section goes
 above the last one in `CHANGELOG.md`, and what changed in cohere outside the sets is written under the
 same heading by hand. Each release is tagged `v<version>`, which is what the next one diffs against.
 
-The Swift engine's contract is not a compatibility surface. The front door and `cohere-swift` ship in
+cohere-swift's contract is not a compatibility surface. The front door and `cohere-swift` ship in
 one package, and the release refuses to stage a pair that speak different contract versions, so a
 contract change needs no version of its own.
 

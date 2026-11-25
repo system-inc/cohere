@@ -27,7 +27,7 @@ import (
 // a unit.
 //
 // In a package checked as written the plain Go files' units hang on the C side too, and carry the mark with the rest
-// (fakesCgo): the engine's load empties every function body and every var initializer that reaches cgo there, in any
+// (fakesCgo): cohere-go's load empties every function body and every var initializer that reaches cgo there, in any
 // file of the package, before the graph collects it (load.withholdCgoDeclarations), so such a unit reaches the
 // collector with no read and no edge to tie it to a cgo file's unit, and a build that translates the package, or has
 // cgo off and compiles a `!cgo` file in the cgo file's place, as every other platform's does, checks its body, or

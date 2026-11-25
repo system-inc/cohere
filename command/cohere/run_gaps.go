@@ -10,7 +10,7 @@ type runGaps struct {
 	// file it fails the run: see runCrash.
 	RuleCrashes int `json:"ruleCrashes"`
 	// Crashes is each crash the two counts above count, named: the file, the rule for a rule crash, and the
-	// cause, a panic in a TypeScript run and the engine's own sentence in an engine's. A count with no reason
+	// cause, a panic in a TypeScript run and the child's own sentence in a child's. A count with no reason
 	// is a gap nobody can act on, so the list is always as long as the two counts together, and it is the
 	// same record `--json` prints as a `crash` line.
 	Crashes []runCrash `json:"crashes,omitempty"`
@@ -19,7 +19,7 @@ type runGaps struct {
 	FormattingNotChecked    bool `json:"formattingNotChecked"`
 	NothingToCheck          bool `json:"nothingToCheck"`
 	// SourceFiles is how many files of its language the project held before anything kept one out of a check, set
-	// only when NothingToCheck is: a TypeScript program's own files, or the files an engine's project record counts
+	// only when NothingToCheck is: a TypeScript program's own files, or the files a child's project record counts
 	// in its package. It is the fact a run that checked nothing fails on, and Excluded is only its explanation, so a
 	// file kept out for a reason no path counted still fails the run, named as unrecorded (#08cv2mp).
 	SourceFiles int `json:"sourceFiles,omitempty"`
@@ -28,7 +28,7 @@ type runGaps struct {
 	// footer names each reason and the rule that decided it: a run that checked nothing never reads as a pass
 	// (#08cv2mp). A project with no file of its language at all has none, and keeps the warning alone.
 	Excluded []excludedReason `json:"excluded,omitempty"`
-	// CensusMissed is each file an engine's load reached in its project that its census never counted, with its
+	// CensusMissed is each file a child's load reached in its project that its census never counted, with its
 	// package (#yyv7nr2, #hd5bsqh), as at a root or a go.work use reached through a symbolic link, where the census
 	// once walked nothing. No count of the run accounts for such a file, SourceFiles included, so it fails the run,
 	// and the footer says so in place of a project with no file to check.
@@ -66,16 +66,16 @@ type runGaps struct {
 	// (#46ern7e, #4jxsbzr): a generated file, or an import, reference or types entry that resolves to nothing.
 	// None was proposed or written, and formatting ran alone.
 	FixesHeld bool `json:"fixesHeld,omitempty"`
-	// Unchecked is the files an engine's run listed as not checked for a reason other than the ones its language
-	// says nobody expects checked (engineLanguage.ExpectedExclusionReasons). In a Swift run that today means no
+	// Unchecked is the files a child's run listed as not checked for a reason other than the ones its language
+	// says nobody expects checked (contractLanguage.ExpectedExclusionReasons). In a Swift run that today means no
 	// target of the package compiles them and they are no standalone script the run checks alone (#13nbb1s), less
 	// those the runs of the Swift projects below it account for (#ybspptb). In a Go run it means a file only another
-	// platform builds, or one that imports "C" while cgo is off, under `--host-build-only`, since the engine then
+	// platform builds, or one that imports "C" while cgo is off, under `--host-build-only`, since the child then
 	// checks the host's build alone; by default a file another build checked is expected, and only one no build the
 	// run checked compiles stays (#72n9mq0, #qqyq61s). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
-	Unchecked []uncheckedEngineFile `json:"unchecked,omitempty"`
-	// NotWritten is the files an engine's fix phase would have written and did not, since each is reached through a
+	Unchecked []uncheckedContractFile `json:"unchecked,omitempty"`
+	// NotWritten is the files a child's fix phase would have written and did not, since each is reached through a
 	// symbolic link to a real path outside the root (#hwz114g). Each was checked, its findings stand, and its fixes
 	// were withheld, so a fix of this project never writes another's files. A gap that makes the run incomplete, named
 	// with where each file really is.
@@ -92,13 +92,13 @@ type runGaps struct {
 	// file, rule and pattern.
 	PatternTimeouts []patternTimeout `json:"patternTimeouts,omitempty"`
 	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
-	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
+	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the child sends
 	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
 	// counted, with its package and how many errors it held, so a reader can find what went unsaid.
 	WithheldInDependencyCgo []withheldCgoFile `json:"withheldInDependencyCgo,omitempty"`
 	// WithheldDependencyCgoDeclarations counts the declarations of dependencies with cgo files that every rule
 	// was given without their bodies or initial values, since no cgo tool ran. A gap, not a failure, as the
-	// files above are. Counted and not named because the engine counts them and names none: they are spread
+	// files above are. Counted and not named because the child counts them and names none: they are spread
 	// over whole packages, and the count is what says the rules saw less of those dependencies than all of it.
 	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations,omitempty"`
 	// UnguardedWorkspaceSums is each go.work.sum a Go run's go list ran beside with no side copy of its go.work
@@ -166,7 +166,7 @@ func (gaps *runGaps) addExcluded(reason string, source string, files int) {
 }
 
 // notWrittenSentence is the run's account when every phase ran and its only gap is files whose fixes were not written,
-// each reached through a link outside the root. TypeScript's run and an engine's say it in the same words.
+// each reached through a link outside the root. TypeScript's run and a child's say it in the same words.
 const notWrittenSentence = "the notes above name the files whose fixes were not written, each reached through a link " +
 	"outside the root"
 

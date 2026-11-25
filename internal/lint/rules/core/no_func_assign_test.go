@@ -98,7 +98,7 @@ func TestNoFunctionReassignmentStaysSilent(test *testing.T) {
 
 // The span, which the message-id fixtures above cannot see.
 //
-// Upstream labels the write rather than the declaration, and our engine has one range per finding.
+// Upstream labels the write rather than the declaration, and our linter has one range per finding.
 // A port pointing at the function declaration passes every fixture above, because `ExpectFindings`
 // asserts ids and count and nothing else.
 //
@@ -184,7 +184,7 @@ func TestNoFunctionReassignmentNeedsTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
 	if !NoFunctionReassignment.NeedsTypeChecker {
-		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the linter will not lock the file")
 	}
 	rule_testing.ExpectClean(test,
 		rule_testing.Run(test, NoFunctionReassignment, functionReassignmentFile, "function foo() {}; foo = bar;"))

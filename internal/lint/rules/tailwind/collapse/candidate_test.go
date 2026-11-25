@@ -19,7 +19,7 @@ import (
 // way round, and let every `border-b` in the repository resolve to the wrong utility silently.
 //
 // The fixture also carries the design system's own tables, so this test answers the parser's four
-// questions with the same 1,236 utility roots and 88 variant roots the engine had. Without that
+// questions with the same 1,236 utility roots and 88 variant roots Tailwind had. Without that
 // this would be a test of a stub.
 
 type candidateCorpus struct {
@@ -56,12 +56,12 @@ type candidateCorpus struct {
 	Cases []candidateCase `json:"cases"`
 }
 
-// fixtureVariant is one variant root's registration, as the engine reported it.
+// fixtureVariant is one variant root's registration, as Tailwind reported it.
 type fixtureVariant struct {
 	Kind string `json:"kind"`
 	// Compounds and CompoundsWith are the bitmask upstream calls `Compounds`. They are carried as
-	// the raw integers the engine held rather than decoded here, so the compatibility test in this
-	// package is the same bitwise-and the engine performs.
+	// the raw integers Tailwind held rather than decoded here, so the compatibility test in this
+	// package is the same bitwise-and Tailwind performs.
 	Compounds     int `json:"compounds"`
 	CompoundsWith int `json:"compoundsWith"`
 }
@@ -75,12 +75,12 @@ type fixtureCompoundsProbe struct {
 	CompoundsWith bool   `json:"compoundsWith"`
 }
 
-// candidateCase is one class and the ordered readings the engine produced for it.
+// candidateCase is one class and the ordered readings Tailwind produced for it.
 type candidateCase struct {
 	Name   string `json:"name"`
 	Source string `json:"source"`
 	Input  string `json:"input"`
-	// Candidates is null only when the engine threw, which no case in the corpus does. An empty
+	// Candidates is null only when Tailwind threw, which no case in the corpus does. An empty
 	// array is a real reading: the class is not a utility.
 	Candidates []fixtureCandidate `json:"candidates"`
 	Threw      *string            `json:"threw"`
@@ -147,7 +147,7 @@ func loadCandidateCorpus(test *testing.T) candidateCorpus {
 	return corpus
 }
 
-// fixtureDesignSystem answers the parser's four questions from the tables the engine reported, so a
+// fixtureDesignSystem answers the parser's four questions from the tables Tailwind reported, so a
 // disagreement in this suite is a parser defect and can be nothing else.
 type fixtureDesignSystem struct {
 	prefix       string
@@ -306,7 +306,7 @@ func describeParsedVariant(variant ParsedVariant) string {
 	}
 }
 
-// candidatesFromFixture converts the engine's serialized readings into the port's type, so the
+// candidatesFromFixture converts Tailwind's serialized readings into the port's type, so the
 // comparison is between two values of the same Go type and the conversion is an explicit step this
 // test controls rather than something struct tags do invisibly.
 func candidatesFromFixture(test *testing.T, fixtures []fixtureCandidate) []ParsedCandidate {
@@ -404,12 +404,12 @@ func variantFromFixture(test *testing.T, fixture fixtureVariantNode) ParsedVaria
 	return variant
 }
 
-// TestParseCandidateMatchesEngine is the whole contract: for every class in the corpus, the readings
-// this port produces are the readings the engine produced, in the same order.
+// TestParseCandidateMatchesTailwind is the whole contract: for every class in the corpus, the readings
+// this port produces are the readings Tailwind produced, in the same order.
 //
 // The counts are printed on success rather than only on failure, because a suite that ran six cases
 // and a suite that ran five thousand are indistinguishable from a green line.
-func TestParseCandidateMatchesEngine(test *testing.T) {
+func TestParseCandidateMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
@@ -423,7 +423,7 @@ func TestParseCandidateMatchesEngine(test *testing.T) {
 			// No case in the corpus does this, and if a future capture produces one it is a finding
 			// about the corpus rather than about the port.
 			test.Errorf(
-				"%s: the engine threw %q; this port has no error path to compare against",
+				"%s: Tailwind threw %q; this port has no error path to compare against",
 				testCase.Name,
 				*testCase.Threw,
 			)
@@ -443,7 +443,7 @@ func TestParseCandidateMatchesEngine(test *testing.T) {
 		actualText := describeParsedCandidates(actual)
 		if expectedText != actualText {
 			test.Errorf(
-				"%s: reading %s (%s)\nengine:\n%sport:\n%s",
+				"%s: reading %s (%s)\ntailwind:\n%sport:\n%s",
 				testCase.Name, quoteForDiff(testCase.Input), testCase.Source, expectedText, actualText,
 			)
 		}
@@ -577,13 +577,13 @@ func TestBorderBReadsBothWaysInOrder(test *testing.T) {
 	}
 }
 
-// TestCompoundsForSelectorsMatchesEngine pins the one design-system answer the port computes rather
+// TestCompoundsForSelectorsMatchesTailwind pins the one design-system answer the port computes rather
 // than looks up.
 //
 // Every other question the parser asks is a table lookup the fixture can answer directly. An
 // arbitrary child variant's compounding is not: it is derived from the selector text, so the
 // derivation is ported and has to be measured like everything else.
-func TestCompoundsForSelectorsMatchesEngine(test *testing.T) {
+func TestCompoundsForSelectorsMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadCandidateCorpus(test)
 	designSystem := newFixtureDesignSystem(corpus)
@@ -602,7 +602,7 @@ func TestCompoundsForSelectorsMatchesEngine(test *testing.T) {
 		actual := designSystem.VariantCompoundsWith(probe.Parent, child)
 		if actual != probe.CompoundsWith {
 			test.Errorf(
-				"compoundsWith(%s, %s) = %t, engine says %t",
+				"compoundsWith(%s, %s) = %t, Tailwind says %t",
 				probe.Parent, quoteForDiff(probe.Selector), actual, probe.CompoundsWith,
 			)
 		}
@@ -709,7 +709,7 @@ func TestGateCandidatesSeparatesWhatMustNotMerge(test *testing.T) {
 
 // TestArbitraryTypehintIsSplitFromTheValue pins the coupling the descriptor table depends on.
 //
-// `bg-[color:var(--x)]` carries an author-written type annotation. The engine trusts that
+// `bg-[color:var(--x)]` carries an author-written type annotation. Tailwind trusts that
 // annotation instead of inferring, which matters because `InferDataType` declines `var(...)`
 // outright: without the annotation reaching the table, every annotated class falls to the axis
 // fallback and reads as something else. The descriptor lookup reads `Value.DataType` and expects

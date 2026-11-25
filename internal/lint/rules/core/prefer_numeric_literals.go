@@ -28,7 +28,7 @@ func preferNumericLiteralsMessage(system string, functionName string) rule.Messa
 		Id: messagePreferNumericLiteralsId,
 		Description: fmt.Sprintf("Use %s literals instead of %s(). "+
 			"A literal says the value in the base it was written in, with no call to read and no "+
-			"radix argument to get wrong, and the engine reads it at parse time rather than at "+
+			"radix argument to get wrong, and the runtime reads it at parse time rather than at "+
 			"every evaluation.", system, functionName),
 	}
 }

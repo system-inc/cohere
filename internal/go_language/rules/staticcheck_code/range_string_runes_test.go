@@ -22,10 +22,10 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
 )
 
-// rangeStringRunesAnalyzer runs the port over every source function of a package in the engine's own intermediate
+// rangeStringRunesAnalyzer runs the port over every source function of a package in cohere-go's own intermediate
 // representation, as SA6003's and S1029's ports do, a plain analyzer over the representation's SourceFunctions with
 // the context staticcheck_report.PassContext builds around pass.Report, so the test reads the port's findings straight
-// off it, outside the engine's dispatcher. It requires ExpressionReader, since the port reads ValueForExpression.
+// off it, outside cohere-go's dispatcher. It requires ExpressionReader, since the port reads ValueForExpression.
 var rangeStringRunesAnalyzer = &analysis.Analyzer{
 	Name: "RangeStringRunes",
 	Doc:  "runs staticcheck_code.RangeStringRunes over every function, to compare with staticcheck's",

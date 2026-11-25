@@ -51,11 +51,11 @@ func TestANoFixRunFormatsAChangedFileWithNoRulesOnce(test *testing.T) {
 		if _, configureLintError := configureLint(graph, location, nil); configureLintError != nil {
 			test.Fatal(configureLintError)
 		}
-		engine, newResolvingError := native.NewResolving(directory)
+		formatter, newResolvingError := native.NewResolving(directory)
 		if newResolvingError != nil {
 			test.Fatal(newResolvingError)
 		}
-		enumeration, enumerateError := engine.Enumerate(directory)
+		enumeration, enumerateError := formatter.Enumerate(directory)
 		if enumerateError != nil {
 			test.Fatal(enumerateError)
 		}
@@ -67,7 +67,7 @@ func TestANoFixRunFormatsAChangedFileWithNoRulesOnce(test *testing.T) {
 		// Every format of every file, the speculation's and the pass after the walk's alike.
 		formats := map[string]int{}
 		var mutex sync.Mutex
-		inner := formatTransform(engine)
+		inner := formatTransform(formatter)
 		counting := func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 			mutex.Lock()
 			formats[filepath.Base(fileName)]++

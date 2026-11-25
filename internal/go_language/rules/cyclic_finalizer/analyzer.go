@@ -1,5 +1,5 @@
 // Package cyclic_finalizer is staticcheck's SA5005, a finalizer that closes over the object it finalizes, so the object
-// is never unreachable and the finalizer never runs, ported onto the engine's own intermediate representation
+// is never unreachable and the finalizer never runs, ported onto cohere's own intermediate representation
 // (#tey4xje).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5005/sa5005.go, whose logic it keeps and
@@ -39,7 +39,7 @@ var Listener = rule.Listener{
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA5005",
 	"SA5005",
-	"Flags a finalizer that closes over the object it finalizes: staticcheck's SA5005, ported onto the engine's own "+
+	"Flags a finalizer that closes over the object it finalizes: staticcheck's SA5005, ported onto cohere-go's own "+
 		"intermediate representation.",
 	&Listener,
 )

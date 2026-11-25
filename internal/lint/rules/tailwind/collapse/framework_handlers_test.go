@@ -7,8 +7,8 @@ import (
 
 // TestEmittedDeclarationsAgreeWithTheMeasuredProperty is the acceptance test for the ported handles.
 //
-// Every row of `FrameworkFunctionalUtilities` carries a `Property` that was measured against the
-// engine before any handle body was ported, and every root now carries an emitter transcribed from
+// Every row of `FrameworkFunctionalUtilities` carries a `Property` that was measured against
+// Tailwind before any handle body was ported, and every root now carries an emitter transcribed from
 // `utilities.ts`. The two were produced by different means from different sources, so forcing them
 // to agree class for class is a real comparison rather than a table checking itself.
 //

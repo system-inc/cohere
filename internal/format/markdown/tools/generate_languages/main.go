@@ -7,7 +7,7 @@
 //
 // embed.js formats a fenced code block when inferParser (src/utilities/infer-parser.js) finds a parser
 // for its info string, by language name, then alias, then extension, over options.plugins reversed and
-// flattened into their languages. The engine passes prettierPlugins, an object the standalone build
+// flattened into their languages. The formatter passes prettierPlugins, an object the standalone build
 // turns into Object.values in evaluation order, so the order and the lists are read from the evaluated
 // bundles rather than from linguist, which would drift from what the oracle ran.
 package main

@@ -87,7 +87,7 @@ type markdownCorpus struct {
 	options format_options.Options
 }
 
-// markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the engine's
+// markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the formatter's
 // ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 	test.Helper()
@@ -171,7 +171,7 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 // to name the languages a miss belongs to.
 func standInEmbeds(
 	options format_options.Options,
-	engine *prettier.Engine,
+	formatter *prettier.Formatter,
 	fellBack map[string]bool,
 ) printing.TextToDoc {
 	native := TextToDoc(options, "markdown", nil)
@@ -186,7 +186,7 @@ func standInEmbeds(
 		if fileName == "" {
 			return nil, fmt.Errorf("no file name for parser %s", parserOrFile)
 		}
-		formatted, formatError := engine.Format(fileName, text)
+		formatted, formatError := formatter.Format(fileName, text)
 		if formatError != nil {
 			return nil, formatError
 		}
@@ -233,16 +233,16 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			engines := map[format_options.Options]*prettier.Engine{}
+			formatters := map[format_options.Options]*prettier.Formatter{}
 			for job := range queue {
-				engine := engines[job.options]
-				if engine == nil {
+				formatter := formatters[job.options]
+				if formatter == nil {
 					var newPrettierError error
-					if engine, newPrettierError = prettier.New(job.options); newPrettierError != nil {
-						outcomes <- outcome{job: job, detail: "engine: " + newPrettierError.Error()}
+					if formatter, newPrettierError = prettier.New(job.options); newPrettierError != nil {
+						outcomes <- outcome{job: job, detail: "formatter: " + newPrettierError.Error()}
 						continue
 					}
-					engines[job.options] = engine
+					formatters[job.options] = formatter
 				}
 				source, readError := os.ReadFile(job.path)
 				if readError != nil {
@@ -250,7 +250,7 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 					continue
 				}
 				input := perturbMarkdown(string(source))
-				expected, formatError := engine.Format(job.path, input)
+				expected, formatError := formatter.Format(job.path, input)
 				if formatError != nil {
 					outcomes <- outcome{job: job, oracleFailed: true, detail: formatError.Error()}
 					continue
@@ -272,7 +272,7 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 					standIn, formatError := markdown.Format(
 						input,
 						job.options,
-						standInEmbeds(job.options, engine, fellBack),
+						standInEmbeds(job.options, formatter, fellBack),
 					)
 					if formatError == nil && standIn == expected && len(fellBack) > 0 {
 						var parsers []string

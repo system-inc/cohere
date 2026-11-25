@@ -234,7 +234,7 @@ func (hosted *factReachPackage) Declared(place fact_reach.Place) []fact_reach.Ob
 }
 
 // unusedBodyRecorder is U1000's, the analyzer and reader the host's run captures each package's records of its bodies
-// by (check.Options.BodyRecorder), which the engine hands check, so the engine's core names no rule package (#f5g7ym6).
+// by (check.Options.BodyRecorder), which cohere-go hands check, so cohere-go's core names no rule package (#f5g7ym6).
 var unusedBodyRecorder = check.BodyRecorder{Analyzer: unused_code.Analyzer,
 	RecordedOf: func(analyzerResult any) (any, bool) { return unused_code.RecordedOf(analyzerResult) }}
 

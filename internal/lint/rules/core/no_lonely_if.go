@@ -80,7 +80,7 @@ var messageUnexpectedLonelyIf = rule.Message{
 // subscript, and `baz++` followed by anything becomes an operand. The same sources with a semicolon
 // are fixed, and both spellings are in the corpus for the comparison.
 //
-// A wrong fix here is worse than no fix, because the engine's only guard is that the result parses
+// A wrong fix here is worse than no fix, because the fix pass's only guard is that the result parses
 // and every one of these parses. So the finding still fires in all five and only the repair is
 // withheld, which is upstream's own trade.
 var NoLonelyIf = rule.Rule[rule.NoOptions]{

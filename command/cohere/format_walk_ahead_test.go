@@ -10,24 +10,24 @@ import (
 	"github.com/system-inc/cohere/internal/format/native"
 )
 
-// countingEngine is a format engine whose walks are counted, so a test can tell a walk taken from ahead from
+// countingFormatter is a formatter whose walks are counted, so a test can tell a walk taken from ahead from
 // one made on the spot.
-type countingEngine struct {
+type countingFormatter struct {
 	*native.Resolving
 	walks int
 }
 
-func (engine *countingEngine) Enumerate(root string) (format_files.Enumeration, error) {
-	engine.walks++
-	return engine.Resolving.Enumerate(root)
+func (formatter *countingFormatter) Enumerate(root string) (format_files.Enumeration, error) {
+	formatter.walks++
+	return formatter.Resolving.Enumerate(root)
 }
 
 // Not parallel: it sets aheadFormatWalk, the package-level walk the fix phase takes, which a run in this
 // package beside it could take or replace.
 //
 // The format walk begun beside the graph build is the walk the fix phase would have made (#679s763): taken
-// for the same engine and root, it equals a walk made on the spot, and it is taken once. A walk of another
-// root, or by another engine, is made on the spot.
+// for the same formatter and root, it equals a walk made on the spot, and it is taken once. A walk of another
+// root, or by another formatter, is made on the spot.
 func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 	root := test.TempDir()
 	for name, contents := range map[string]string{
@@ -65,39 +65,39 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 		test.Fatalf("the fixture's walk found %d files, too few for a match to prove anything", len(direct.Files))
 	}
 
-	engine := &countingEngine{Resolving: resolving}
-	startFormatWalkAhead(engine, root, nil)
-	taken, enumerateFormatTreeError := enumerateFormatTree(engine, root)
+	formatter := &countingFormatter{Resolving: resolving}
+	startFormatWalkAhead(formatter, root, nil)
+	taken, enumerateFormatTreeError := enumerateFormatTree(formatter, root)
 	if enumerateFormatTreeError != nil {
 		test.Fatal(enumerateFormatTreeError)
 	}
-	if engine.walks != 1 {
-		test.Fatalf("the engine walked %d times for one walk begun ahead and taken", engine.walks)
+	if formatter.walks != 1 {
+		test.Fatalf("the child walked %d times for one walk begun ahead and taken", formatter.walks)
 	}
 	if !reflect.DeepEqual(taken, direct) {
 		test.Fatalf("the walk begun ahead differs from a direct walk\nahead:  %+v\ndirect: %+v", taken, direct)
 	}
 	if _, enumerateFormatTreeError := enumerateFormatTree(
-		engine,
+		formatter,
 		root,
-	); enumerateFormatTreeError != nil || engine.walks != 2 {
-		test.Errorf("a second call took the same walk again (%d walks)", engine.walks)
+	); enumerateFormatTreeError != nil || formatter.walks != 2 {
+		test.Errorf("a second call took the same walk again (%d walks)", formatter.walks)
 	}
 
-	startFormatWalkAhead(engine, root, nil)
+	startFormatWalkAhead(formatter, root, nil)
 	// Waited for, so the counts below never race the walk's goroutine.
 	<-aheadFormatWalk.done
-	other := &countingEngine{Resolving: resolving}
+	other := &countingFormatter{Resolving: resolving}
 	if _, enumerateFormatTreeError := enumerateFormatTree(
 		other,
 		root,
 	); enumerateFormatTreeError != nil || other.walks != 1 {
-		test.Errorf("another engine took the walk begun for this one (%d walks of its own)", other.walks)
+		test.Errorf("another formatter took the walk begun for this one (%d walks of its own)", other.walks)
 	}
 	if _, enumerateFormatTreeError := enumerateFormatTree(
-		engine,
+		formatter,
 		filepath.Join(root, "other"),
-	); enumerateFormatTreeError != nil || engine.walks != 4 {
-		test.Errorf("a walk of another root was taken from the walk begun ahead (%d walks)", engine.walks)
+	); enumerateFormatTreeError != nil || formatter.walks != 4 {
+		test.Errorf("a walk of another root was taken from the walk begun ahead (%d walks)", formatter.walks)
 	}
 }

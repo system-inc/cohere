@@ -112,9 +112,9 @@ func ResolveFrozen(paths Paths) (FrozenBinary, error) {
 // isCohereBinaryName reports whether a file in the binary cache is a cohere binary.
 //
 // Matched against the exact names cohere binaries are given rather than a shared prefix, because the
-// cache holds other executables. A bare `cohere-` prefix also matched the Swift engine
+// cache holds other executables. A bare `cohere-` prefix also matched cohere-swift
 // (`cohere-swift-*`) and the launcher itself (`cohere-dispatch`). Measured 2026-10-02: the newest file
-// in the cache was `cohere-swift-current`, so `--frozen` would have exec'd the Swift engine as cohere.
+// in the cache was `cohere-swift-current`, so `--frozen` would have exec'd cohere-swift as cohere.
 // A half-written build carries `.partial-` until it is proven and renamed, and the development
 // binary's recorded hash ends in `.hash`; neither is something to run.
 func isCohereBinaryName(name string) bool {

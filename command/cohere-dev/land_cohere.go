@@ -18,7 +18,7 @@ import (
 // The gate's fifth step runs cohere on the tree it lands (#06g3f7x). Main at 80ac82fd read 8 findings on a bare
 // `cohere --no-fix` at cohere's own root, and both landings that brought them had gated green: the gate ran go
 // vet, the rule CPU budget, the tests and the docs check, and never cohere on cohere. Now a landing is refused
-// unless every engine's run reads 0 findings, 0 type errors and no gap, so main can't go red under our own rules.
+// unless every language's run reads 0 findings, 0 type errors and no gap, so main can't go red under our own rules.
 //
 // The run checks every build cohere's Go files name beside the host's, as every run does without `--host-build-only`
 // (#72n9mq0, #qqyq61s). A run of the host's build alone names each file only another platform or tag builds as a gap,
@@ -103,7 +103,7 @@ func checkCohere(worktree string, build func() []string, run func() []string) (i
 		}
 		return 1, true
 	}
-	fmt.Fprintf(streams.Errors, "cohere-dev: cohere on the tree reads 0, every engine, no gaps (%s)\n",
+	fmt.Fprintf(streams.Errors, "cohere-dev: cohere on the tree reads 0, every language, no gaps (%s)\n",
 		time.Since(started).Round(time.Second))
 	return 0, true
 }

@@ -59,7 +59,7 @@ func everyBuildUnchecked(test *testing.T, output string) (map[string]string, int
 	var summary struct {
 		Builds []checkedBuild `json:"builds"`
 		Gaps   struct {
-			Unchecked []uncheckedEngineFile `json:"unchecked"`
+			Unchecked []uncheckedContractFile `json:"unchecked"`
 		} `json:"gaps"`
 	}
 	if decodeError := json.Unmarshal([]byte(summaryJsonOf(test, output)), &summary); decodeError != nil {

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/corpus"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // The corpus placement measurement for the rules moved onto the live design system.
@@ -105,7 +105,7 @@ func livePlacementSystem(test *testing.T, spelling string) DesignSystemResult {
 	if packageRoot == "" {
 		return DesignSystemResult{Error: os.ErrNotExist}
 	}
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
@@ -189,17 +189,17 @@ func TestUnknownClassesPlacesEveryCorpusClass(test *testing.T) {
 //
 // A placement drop of 2,141 with an unchanged finding count is exactly the shape that should be
 // distrusted, so it is decomposed here rather than asserted away. Every dropped class is one whose
-// first engine reading is static, and a static has no root-plus-value structure for a collapse
+// first Tailwind reading is static, and a static has no root-plus-value structure for a collapse
 // family to relate: `flex`, `block`, `border-dashed`, `cursor-pointer`. 135 distinct classes, 2,141
 // occurrences, zero unparseable and zero unexplained.
 //
-// The shipped prefix walk placed them because it forced a functional reading that the engine does not
+// The shipped prefix walk placed them because it forced a functional reading that Tailwind does not
 // take: it read `border-dashed` as root `border` with value `dashed`, when `parseCandidate` returns
 // `border-dashed` as a static first. Those placements never became findings, because a static's
 // bucket never matches a collapse family, so the rule's output is unchanged and 2,141 wasted lookups
 // are gone.
 //
-// `overflow-x-hidden overflow-y-hidden => overflow-hidden` is a real engine collapse between two
+// `overflow-x-hidden overflow-y-hidden => overflow-hidden` is a real Tailwind collapse between two
 // statics, and this rule reported it neither before nor after. It is a static collapse, which the
 // rule's own doc comment places out of scope alongside the single-class rewrites.
 func TestCanonicalClassesPlacementIsAccountedFor(test *testing.T) {
@@ -232,15 +232,15 @@ func TestCanonicalClassesPlacementIsAccountedFor(test *testing.T) {
 					continue
 				}
 
-				// Every class the live split declines must be one the engine reads as something other
+				// Every class the live split declines must be one Tailwind reads as something other
 				// than a functional utility, or the decline is a lost answer rather than a correct
 				// one.
-				parsed := tailwindengine.ParseCandidate(className, designSystem.System)
+				parsed := tailwindcollapse.ParseCandidate(className, designSystem.System)
 				switch {
 				case len(parsed) == 0:
 					droppedOther++
 					droppedExamples[className] = "no reading at all"
-				case parsed[0].Kind == tailwindengine.ParsedCandidateKindFunctional:
+				case parsed[0].Kind == tailwindcollapse.ParsedCandidateKindFunctional:
 					// A functional class the split declined is a lost answer, since the split's only
 					// other exit is a design system it could not read.
 					droppedOther++
@@ -292,7 +292,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(test *testing.T) {
 	}
 
 	// The decomposition, and it is the assertion that makes the placement drop reviewable rather than
-	// merely reported. A class the live split declines for any reason other than "the engine does not
+	// merely reported. A class the live split declines for any reason other than "Tailwind does not
 	// read this as a functional utility" is an answer the migration lost.
 	if droppedOther != 0 {
 		names := make([]string, 0, len(droppedExamples))
@@ -515,7 +515,7 @@ func TestConflictingClassesPerRepositoryPlacement(test *testing.T) {
 //
 // It is deleted along with the tables it read, because a comparison with one side missing is not a
 // comparison. What survives is the per-repository placement above, which catches the rule going
-// quiet, and `TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld` in the engine package,
+// quiet, and `TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld` in Tailwind package,
 // which pins each distinction the deleted tables encoded, including this `text` one in both
 // directions.
 

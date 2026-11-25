@@ -1,6 +1,6 @@
 // Package range_over_rune_conversion is staticcheck's SA6003, a range over a string converted to a slice of runes
 // that drops the index, where ranging over the string itself yields the same runes without allocating the slice,
-// ported onto the engine's own intermediate representation (#tf4cb8g).
+// ported onto cohere's own intermediate representation (#tf4cb8g).
 //
 // The original runs staticcheck's sharedcheck.CheckRangeStringRunes, from honnef.co/go/tools@v0.8.1
 // internal/sharedcheck/lint.go, the very function S1029 runs as well, and so does the port: it is ported once, as
@@ -34,7 +34,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6003",
 	"SA6003",
 	"Flags ranging over a string converted to a slice of runes when the index goes unused: staticcheck's SA6003, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

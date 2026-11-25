@@ -48,7 +48,7 @@ func (stoodFunction) Took(string, string, int, int) {
 }
 
 // On the census path, check.Run with Options.FactReachSettle and Options.StandingAfter both standing_facts, as the
-// engine sets them, the build of the representation follows standing_facts as the dispatchers do (#e4rd5dw), so it
+// cohere-go sets them, the build of the representation follows standing_facts as the dispatchers do (#e4rd5dw), so it
 // holds the package's standing bodies and leaves the package unbuilt: where every run the representation's dispatcher
 // starts is confined on the file, the dispatcher builds only Kept, and Stood, which stands, is never built. Were the
 // build not to follow, it would hold no answer and build the package whole, Stood included.

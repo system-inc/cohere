@@ -318,7 +318,7 @@ var _ = importer.Default
 			dropped: "override unusable",
 		},
 		{
-			name: "an override the engine rejects leaves the type without falling back",
+			name: "an override global_rename rejects leaves the type without falling back",
 			sources: map[string]string{"a.go": `package fixture
 
 type composeContext struct{ depth int }
@@ -329,7 +329,7 @@ func (ctx *composeContext) Depth() int {
 }
 `},
 			want:    []string{"func (ctx *composeContext) Depth() int {"},
-			dropped: "engine rejected the override",
+			dropped: "global_rename rejected the override",
 		},
 		{
 			name: "an imported initialism takes two words",
@@ -446,7 +446,7 @@ func (r *cachedSwiftRun) Both() string {
 				"func (r *cachedSwiftRun) Name() string { return r.name }",
 				"func (r *cachedSwiftRun) Both() string",
 			},
-			dropped: "engine rejected every candidate",
+			dropped: "global_rename rejected every candidate",
 		},
 		{
 			name: "a one-word type whose name is rejected is left",
@@ -462,7 +462,7 @@ func (e *Engine) Reset() {
 }
 `},
 			want:    []string{"func (e *Engine) Count() int { return e.count }", "func (e *Engine) Reset() {"},
-			dropped: "engine rejected the one-word name, no two-word name",
+			dropped: "global_rename rejected the one-word name, no two-word name",
 		},
 		{
 			name: "a receiver to rename in a skipped file leaves the type",

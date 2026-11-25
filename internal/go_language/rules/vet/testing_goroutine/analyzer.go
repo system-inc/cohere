@@ -21,7 +21,7 @@
 // original's unchecked assertion on a parameter's type, which panics on a parameter typed `*a.b.T`, is checked here;
 // such a parameter does not type-check, and the checker runs neither on a package that does not.
 //
-// The port sits on the engine's syntax dispatcher, hearing each go statement and each call on the walk the dispatcher
+// The port sits on cohere-go's syntax dispatcher, hearing each go statement and each call on the walk the dispatcher
 // makes once for every syntax rule, and judges the regions they start once the walk has covered the package. The
 // original's walk does not descend into a function declaration that takes no test, and the dispatcher's descends into
 // everything, so the port leaves alone what it hears within such a declaration, which the stack names.

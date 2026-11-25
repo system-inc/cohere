@@ -15,7 +15,7 @@ import (
 )
 
 // `--print-config` answers what runs on a file, rule by registered rule, in ESLint's shape, so a parity
-// check can diff the two engines (#mnmx9s4). The cases are the ones a key listing gets wrong: an
+// check can diff the two linters (#mnmx9s4). The cases are the ones a key listing gets wrong: an
 // override turning a rule off for one path, a rule nobody configured, and a core rule configured only
 // through its typescript-eslint twin's key.
 func TestPrintConfigResolvesEveryRegisteredRuleForAFile(test *testing.T) {
@@ -282,7 +282,7 @@ func TestPrintConfigSettingsReaders(test *testing.T) {
 	}
 }
 
-// The inherited twin lies outside the old five-name list. A scoped twin and the engine diagnostic
+// The inherited twin lies outside the old five-name list. A scoped twin and the child diagnostic
 // exercise per-file resolution; replacing the inherited twin with its core name removes the alias.
 func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 	test.Parallel()
@@ -357,7 +357,7 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 		test.Errorf("scoped alias = %v", aliases)
 	}
 	checkSeverity(rules, configuration.SeverityOff)
-	// The default is asked of the engine's resolver, so its next default change requires no print fix.
+	// The default is asked of the child's resolver, so its next default change requires no print fix.
 	for _, fixture := range []struct {
 		level string
 		want  configuration.Severity
@@ -395,7 +395,7 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 	}
 }
 
-// printedUnusedDisable is what TestPrintConfigAliasesAndUnusedDisable reads back: the engine setting's own
+// printedUnusedDisable is what TestPrintConfigAliasesAndUnusedDisable reads back: the child setting's own
 // key, and the rules it must stay out of.
 type printedUnusedDisable struct {
 	severity *int

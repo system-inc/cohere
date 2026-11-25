@@ -27,7 +27,7 @@ const preferConstFile = "/repository/source/PreferConst.ts"
 //
 // Blocks 2, 3 and 4 are framework single-file-component sources. Upstream skips `.svelte` and
 // `.vue` entirely in `should_run`, because oxlint parses only their `<script>` block and a binding
-// the template reassigns therefore looks never-reassigned. Our engine is fed TypeScript files and
+// the template reassigns therefore looks never-reassigned. Our linter is fed TypeScript files and
 // never sees those extensions, so those five cases are not portable and are recorded here rather
 // than transcribed into fixtures that would assert nothing. Block 4's astro case is upstream's own
 // known-wrong entry: it fails on a file oxlint cannot parse as JavaScript.
@@ -833,7 +833,7 @@ func TestPreferConstWithholdsTheFix(test *testing.T) {
 
 	// A list where one declarator is reassigned. Rewriting the shared keyword would make the
 	// reassigned one a const that is then written to, which is source that parses and does not
-	// compile: the one failure the fix engine structurally cannot refuse.
+	// compile: the one failure the fix pass structurally cannot refuse.
 	test.Run("a list where another declarator is written", func(test *testing.T) {
 		test.Parallel()
 		source := "let x = 'x', y = 'y'; x = 1"

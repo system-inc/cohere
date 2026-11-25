@@ -12,7 +12,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -67,7 +67,7 @@ const designSystemTokensStylesheet = `@theme {
 // designSystemFrameworkStylesheet stands in for the installed `tailwindcss` package's index.css.
 //
 // Small on purpose. This suite is about when the design system is built, not about what the
-// framework's own theme resolves to, and that question already has 22,521 engine-compared answers
+// framework's own theme resolves to, and that question already has 22,521 Tailwind-compared answers
 // in `internal/tailwind`. A test that pulled in the real framework stylesheet here would be slower
 // and would fail for reasons belonging to another component.
 //
@@ -196,7 +196,7 @@ func designSystemWalk(test *testing.T, root string, subject rule.Rule[rule.NoOpt
 // failure has no symptom other than time: every finding is correct, every test passes, and the run
 // is twenty-five times slower. So the claim is a counter here rather than a sentence.
 // Not parallel: it resets the package designSystemCache and asserts the process-wide
-// tailwindengine.BuildsSoFar moved by exactly one, so a parallel test building a design system or walking
+// tailwindcollapse.BuildsSoFar moved by exactly one, so a parallel test building a design system or walking
 // another program (which evicts the cache's one slot) would add builds and hand later files a different
 // pointer.
 func TestDesignSystemIsBuiltOncePerProgram(test *testing.T) {
@@ -205,9 +205,9 @@ func TestDesignSystemIsBuiltOncePerProgram(test *testing.T) {
 	root := designSystemProject(test, 40)
 	probe := &designSystemProbe{}
 
-	before := tailwindengine.BuildsSoFar()
+	before := tailwindcollapse.BuildsSoFar()
 	graph := designSystemWalk(test, root, probe.rule())
-	built := tailwindengine.BuildsSoFar() - before
+	built := tailwindcollapse.BuildsSoFar() - before
 
 	if probe.files < 40 {
 		test.Fatalf("the probe saw %d files; fewer than the 40 laid down means a per-file rebuild "+
@@ -304,12 +304,12 @@ func TestDesignSystemCacheKeyIsTheProgram(test *testing.T) {
 // gets one of its own, which a cache that returned an error on every miss would also pass the first
 // test while failing every rule.
 // Not parallel: it resets the package designSystemCache and asserts the process-wide
-// tailwindengine.BuildsSoFar moved by exactly two, which any parallel test building a design system would
+// tailwindcollapse.BuildsSoFar moved by exactly two, which any parallel test building a design system would
 // inflate.
 func TestDesignSystemBuildsAgainForASecondProgram(test *testing.T) {
 	resetDesignSystemCacheForTest()
 
-	before := tailwindengine.BuildsSoFar()
+	before := tailwindcollapse.BuildsSoFar()
 
 	firstProbe := &designSystemProbe{}
 	designSystemWalk(test, designSystemProject(test, 2), firstProbe.rule())
@@ -317,7 +317,7 @@ func TestDesignSystemBuildsAgainForASecondProgram(test *testing.T) {
 	secondProbe := &designSystemProbe{}
 	designSystemWalk(test, designSystemProject(test, 2), secondProbe.rule())
 
-	if built := tailwindengine.BuildsSoFar() - before; built != 2 {
+	if built := tailwindcollapse.BuildsSoFar() - before; built != 2 {
 		test.Fatalf("two programs should produce exactly two builds, got %d", built)
 	}
 	if firstProbe.results[0].System == secondProbe.results[0].System {
@@ -459,19 +459,19 @@ func TestDesignSystemComposesTheRepositorysOwnContributions(test *testing.T) {
 	}
 
 	// Both arities of `@utility` are registered, under the kind their name declares.
-	if !system.HasUtility("scrollbar-none", tailwindengine.UtilityKindStatic) {
+	if !system.HasUtility("scrollbar-none", tailwindcollapse.UtilityKindStatic) {
 		test.Error("`@utility scrollbar-none` should register a static utility")
 	}
-	if !system.HasUtility("fade-in", tailwindengine.UtilityKindFunctional) {
+	if !system.HasUtility("fade-in", tailwindcollapse.UtilityKindFunctional) {
 		test.Error("`@utility fade-in-*` should register a functional utility rooted at `fade-in`")
 	}
-	if system.HasUtility("fade-in", tailwindengine.UtilityKindStatic) {
+	if system.HasUtility("fade-in", tailwindcollapse.UtilityKindStatic) {
 		test.Error("`@utility fade-in-*` is functional; reading it as static would let `fade-in` bare compile")
 	}
 
 	// The framework's roots still answer, since the repository's blocks are consulted first and
 	// then fall through rather than replacing the registry.
-	if !system.HasUtility("bg", tailwindengine.UtilityKindFunctional) {
+	if !system.HasUtility("bg", tailwindcollapse.UtilityKindFunctional) {
 		test.Error("a framework root stopped resolving, so the repository's blocks are shadowing the registry")
 	}
 
@@ -520,13 +520,13 @@ func TestDesignSystemCustomVariantsRegisterWithoutMovingFrameworkOnes(test *test
 @custom-variant pointer-coarse (@media (pointer: coarse));
 `)
 
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint: entryPoint,
 		Resolve:    resolve,
-		FrameworkVariants: []tailwindengine.FrameworkVariant{
-			{Name: "hover", Kind: tailwindengine.ParsedVariantKindStatic},
-			{Name: "dark", Kind: tailwindengine.ParsedVariantKindStatic},
-			{Name: "group", Kind: tailwindengine.ParsedVariantKindCompound},
+		FrameworkVariants: []tailwindcollapse.FrameworkVariant{
+			{Name: "hover", Kind: tailwindcollapse.ParsedVariantKindStatic},
+			{Name: "dark", Kind: tailwindcollapse.ParsedVariantKindStatic},
+			{Name: "group", Kind: tailwindcollapse.ParsedVariantKindCompound},
 		},
 	})
 	if loadDesignSystemError != nil {
@@ -590,11 +590,11 @@ func TestDesignSystemVariantRegistrationOrderIsDeterministic(test *testing.T) {
 	entryPoint := designSystemWriteStylesheet(test, stylesheet)
 
 	orderOf := func() map[string]int {
-		system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 			EntryPoint: entryPoint,
 			Resolve:    resolve,
-			FrameworkVariants: []tailwindengine.FrameworkVariant{
-				{Name: "hover", Kind: tailwindengine.ParsedVariantKindStatic},
+			FrameworkVariants: []tailwindcollapse.FrameworkVariant{
+				{Name: "hover", Kind: tailwindcollapse.ParsedVariantKindStatic},
 			},
 		})
 		if loadDesignSystemError != nil {
@@ -680,7 +680,7 @@ func TestDesignSystemRefusesRatherThanHalfBuilding(test *testing.T) {
 		test.Run(aCase.name, func(test *testing.T) {
 			test.Parallel()
 			entryPoint := designSystemWriteStylesheet(test, aCase.stylesheet)
-			system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+			system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 				EntryPoint: entryPoint,
 				Resolve:    resolve,
 			})
@@ -704,7 +704,7 @@ func TestDesignSystemRefusesRatherThanHalfBuilding(test *testing.T) {
 // final merge, so the cache is reached concurrently by construction. This is the assertion that
 // holds under `-race`; without it the mutex is a claim rather than a tested property.
 // Not parallel: it resets the package designSystemCache and asserts the process-wide
-// tailwindengine.BuildsSoFar moved by exactly one across its 64 goroutines, which any parallel test
+// tailwindcollapse.BuildsSoFar moved by exactly one across its 64 goroutines, which any parallel test
 // building a design system would inflate.
 func TestDesignSystemIsSafeUnderTheParallelWalk(test *testing.T) {
 	resetDesignSystemCacheForTest()
@@ -715,10 +715,10 @@ func TestDesignSystemIsSafeUnderTheParallelWalk(test *testing.T) {
 		test.Fatalf("building the program: %v", buildError)
 	}
 
-	before := tailwindengine.BuildsSoFar()
+	before := tailwindcollapse.BuildsSoFar()
 
 	var waitGroup sync.WaitGroup
-	systems := make([]*tailwindengine.LoadedDesignSystem, 64)
+	systems := make([]*tailwindcollapse.LoadedDesignSystem, 64)
 	for index := range systems {
 		waitGroup.Add(1)
 		go func() {
@@ -728,7 +728,7 @@ func TestDesignSystemIsSafeUnderTheParallelWalk(test *testing.T) {
 	}
 	waitGroup.Wait()
 
-	if built := tailwindengine.BuildsSoFar() - before; built != 1 {
+	if built := tailwindcollapse.BuildsSoFar() - before; built != 1 {
 		test.Fatalf("64 concurrent asks produced %d builds; the mutex is not covering the whole "+
 			"read-modify-write", built)
 	}
@@ -762,7 +762,7 @@ func TestDesignSystemLoadCost(test *testing.T) {
 	const iterations = 50
 	start := time.Now()
 	for range iterations {
-		if _, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		if _, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 			EntryPoint: entryPoint,
 			Resolve:    resolve,
 		}); loadDesignSystemError != nil {
@@ -794,7 +794,7 @@ func designSystemWriteStylesheet(test *testing.T, contents string) string {
 // Lets a test supply an in-memory `@import` graph without laying out a node_modules tree, which
 // keeps the failure cases above readable. A specifier this map does not name resolves relative to
 // the importing file, matching NodeStylesheetResolver's default arm.
-func designSystemFixtureResolver(bySpecifier map[string]string) tailwindengine.StylesheetResolver {
+func designSystemFixtureResolver(bySpecifier map[string]string) tailwindcollapse.StylesheetResolver {
 	directory := ""
 	return func(specifier, base string) (string, error) {
 		contents, isNamed := bySpecifier[specifier]

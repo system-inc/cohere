@@ -3,7 +3,7 @@
 //
 // Go's test cache keys a test's result on the linked test binary and on what the test's own process opens: a file by
 // its size and modification time, a directory by every entry's name, size and modification time. Both loaders, the
-// engine's load and the tests' go_types, list packages with go list in a subprocess, so nothing of a listing was
+// language's load and the tests' go_types, list packages with go list in a subprocess, so nothing of a listing was
 // keyed. A test whose fixtures go list found replayed its pass when a fixture file was added: a rule's fixtures read
 // 70 diagnostics against 70 where the truth was 75 against 75, and a planted file no want expected read
 // `ok (cached)`.

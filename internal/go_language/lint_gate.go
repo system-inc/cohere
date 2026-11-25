@@ -43,7 +43,7 @@ func lintWeight(checkedFromSource int, packagesLoaded int) int {
 // build's share of its packages checked from source is exact only once its load has ended, and two near-full builds
 // linting side by side under the cap cost about 70 user-s and 6 to 8 s of wall at cohere's root, so each build takes
 // its weight (lintWeight) between its load and its rules. golang.org/x/sync's semaphore is only an indirect dependency
-// of the module, and the go_engine package had no weighted one, so this is its own.
+// of the module, and the go_language package had no weighted one, so this is its own.
 //
 // A build is admitted at once only when the budget holds it and nobody is in line, so a light build that arrives after
 // a waiting heavy one waits behind it rather than pass it, and a heavy build is never starved.

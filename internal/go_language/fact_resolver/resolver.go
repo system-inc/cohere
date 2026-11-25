@@ -87,7 +87,7 @@ type Resolver struct {
 	// unsure counts, by each package's types, the unsure answers its analysis was handed (see Unsure).
 	unsure sync.Map
 
-	// held is a test's hand on the run's answers, nil in every engine run (see HoldAnswers).
+	// held is a test's hand on the run's answers, nil in every real run (see HoldAnswers).
 	held Held
 
 	// askers are the bodies whose rules asked each answer, nil but in a run that measures the facts' reach (see
@@ -127,7 +127,7 @@ type Kind struct {
 	// an answer is its types' alone takes an argument of its own, as an order bound does.
 	//
 	// Neither a cgo package nor a test variant hands a reader that leaves out a marked answer with no declaration
-	// (go_engine's factReachBuilder.answer) one an ordinary package would not. A function the cgo tool generates is
+	// (go_language's factReachBuilder.answer) one an ordinary package would not. A function the cgo tool generates is
 	// declared by its object in a file of the package, as any function is, and a package the tool translated holds no
 	// record of its declarations at all, its outputs naming symbols by go:linkname, so no side is made of it. A test
 	// variant is a package of its own, with its own answers and record, whose `init` functions declare no object, as

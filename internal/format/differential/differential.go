@@ -10,7 +10,7 @@
 //
 // The predecessor of this harness (internal/format/comparison) treated every tree file as a fixed point
 // of Prettier, so any change a candidate proposed was a divergence. That no longer holds. The projects
-// run Prettier with prettier-plugin-tailwindcss, and the embedded engine runs core Prettier without
+// run Prettier with prettier-plugin-tailwindcss, and the embedded formatter runs core Prettier without
 // it, so the tree is a fixed point of a different formatter than the one being matched. Class order is
 // cohere's lint fixer's job, not the format phase's. So the oracle output is computed, never assumed.
 //
@@ -18,7 +18,7 @@
 //
 // The corpora are almost entirely already formatted. A candidate that returns its input unchanged
 // matches every file the oracle leaves alone and would report a high overall score while having no
-// line-breaking engine at all. So every tally carries the subset the oracle actually rewrites, and the
+// line-breaking logic at all. So every tally carries the subset the oracle actually rewrites, and the
 // identity rate on that subset is reported separately. That subset is where formatting ability shows;
 // the rest only proves a candidate does not break formatted code.
 //
@@ -43,7 +43,7 @@ import (
 
 // Formatter is either side of the comparison.
 //
-// It is the shape prettier.Engine already has, so the embedded Prettier is an oracle with no adapter,
+// It is the shape prettier.Formatter already has, so the embedded Prettier is an oracle with no adapter,
 // and a native printer only has to say which files it handles and format them.
 type Formatter interface {
 	Handles(fileName string) bool
@@ -52,7 +52,7 @@ type Formatter interface {
 
 // NewFormatter builds one Formatter for one worker.
 //
-// A factory rather than a value because the embedded engine is a goja runtime and goja runtimes are not
+// A factory rather than a value because the embedded formatter is a goja runtime and goja runtimes are not
 // safe for concurrent use. Each worker owns its own instance, so parallelism never shares one.
 type NewFormatter func() (Formatter, error)
 

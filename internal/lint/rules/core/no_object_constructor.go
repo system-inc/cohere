@@ -51,7 +51,7 @@ var messageUseLiteralAfterSemicolon = rule.Message{
 //
 // Upstream declares `hasSuggestions` and offers no fix, so the repair is one a human chooses. That
 // is ported as-is: replacing a call with a literal is mechanical here only because the argument list
-// is empty, and the engine should not be rewriting expressions unattended on the strength of that.
+// is empty, and the linter should not be rewriting expressions unattended on the strength of that.
 //
 // The replacement text is `{}` or `({})` depending on position, and which one is not cosmetic. An
 // object literal at the start of an expression statement parses as a block, so `Object()` alone on a

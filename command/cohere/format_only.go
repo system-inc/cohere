@@ -66,7 +66,7 @@ func formatOnlyUnchecked(summary edit.Summary, scope formatScope) []uncheckedFil
 			unchecked = append(unchecked, uncheckedFile{FileName: file.FileName, Reason: file.Reason})
 		}
 	}
-	// A file the engine could not process at all never reached the formatter, and one whose formatted text
+	// A file the child could not process at all never reached the formatter, and one whose formatted text
 	// did not parse was refused. Either way nothing about its formatting is known.
 	for _, fileName := range summary.FilesFailed {
 		unchecked = append(unchecked, uncheckedFile{

@@ -12,7 +12,7 @@ type Function struct {
 	// value is assigned to.
 	Name string `json:"name"`
 
-	// Size is the instructions that compute something, which the floor is measured in. Each engine counts its own
+	// Size is the instructions that compute something, which the floor is measured in. Each language counts its own
 	// IR's (see each hasher), and the floor was measured on each.
 	Size int `json:"size"`
 
@@ -30,8 +30,8 @@ type Refusal struct {
 	Name   string        `json:"name"`
 	Reason RefusalReason `json:"reason"`
 
-	// Detail says more where the reason alone does not: the syntax kind of an unsupported node, the instruction an
-	// engine does not model.
+	// Detail says more where the reason alone does not: the syntax kind of an unsupported node, the instruction a
+	// language does not model.
 	Detail string `json:"detail,omitempty"`
 }
 
@@ -52,7 +52,7 @@ type Place struct {
 type Group struct {
 	Digest Digest `json:"digest"`
 
-	// Size is the smallest member's, which for members of one digest differs only where an engine counts a part it
+	// Size is the smallest member's, which for members of one digest differs only where a language counts a part it
 	// hashes by identity.
 	Size int `json:"size"`
 

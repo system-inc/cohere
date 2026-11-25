@@ -12,7 +12,7 @@ import (
 )
 
 // loadElsewhere loads the fixture with go/packages itself and gives FromLoaded its roots and analyzed variants as
-// the Go engine's load chooses them (internal/go_language/load's analyzedOfGraph), here by ForTest, where Load
+// cohere-go's load chooses them (internal/go_language/load's analyzedOfGraph), here by ForTest, where Load
 // chooses by ID.
 func (fixture fixture) loadElsewhere(test *testing.T) *workspace.Workspace {
 	test.Helper()
@@ -70,7 +70,7 @@ func (fixture fixture) loadElsewhere(test *testing.T) *workspace.Workspace {
 	return workspace.FromLoaded(root, roots, analyzed, nil)
 }
 
-// A plan over packages loaded elsewhere, as the Go engine's load gives them, is the plan over Load's: the same
+// A plan over packages loaded elsewhere, as cohere-go's load gives them, is the plan over Load's: the same
 // renames accepted and refused for the same reasons, with the same edits, across a package, its in-package and
 // external tests, an importer, an interface renamed with its implementation, and a name a string literal spells.
 func TestPlanOverFromLoadedIsThePlanOverLoad(test *testing.T) {
@@ -203,7 +203,7 @@ func TestAHostOnlyPlanRefusesARenameReachingAFileTheHostDoesNotBuild(test *testi
 	}
 }
 
-// A plan made over a load that read a rewrite from memory, as the engine's second round of renames is, rewrites each
+// A plan made over a load that read a rewrite from memory, as the renaming's second round of renames is, rewrites each
 // file from those bytes: the first round's GroupId becomes GroupKey in both files. Rewritten from disk instead, the
 // edits find GroupID where they expect GroupId and the rewrite is refused.
 func TestRewrittenFilesOverRewritesFromTheBytesInMemory(test *testing.T) {

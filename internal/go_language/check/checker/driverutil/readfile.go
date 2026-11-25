@@ -35,7 +35,7 @@ func CheckedReadFile(pass *analysis.Pass, readFile ReadFileFunc) ReadFileFunc {
 	// of pass.Files on every call, until a name matches, so a rule that
 	// reads each of a package's files, as the long-line rule does, asks it
 	// a number of times that grows with the square of the files, and every
-	// ask writes the file set's last-file cache, which all of the engine's
+	// ask writes the file set's last-file cache, which all of cohere-go's
 	// goroutines share. Here the names of pass.Files are read once for the
 	// pass, on the first call that needs them, under sync.OnceValue since
 	// the dispatcher may call from several goroutines at once. A name among

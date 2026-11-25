@@ -35,10 +35,10 @@ var fixtureEnvironment = []string{"GOWORK=off", "CGO_ENABLED=0", "GOFLAGS="}
 
 // fixtureContext is the context every test keys under unless it is the context being changed.
 var fixtureContext = Context{
-	FormatVersion:  "1",
-	EngineIdentity: "engine",
-	Build:          []string{"GOOS=linux", "GOARCH=amd64", "loader=source"},
-	RuleSet:        []string{"first", `second {"limit":2}`},
+	FormatVersion:      "1",
+	ExecutableIdentity: "executable",
+	Build:              []string{"GOOS=linux", "GOARCH=amd64", "loader=source"},
+	RuleSet:            []string{"first", `second {"limit":2}`},
 }
 
 // printKeysVariable, set, makes the test binary print the chain's keys and exit, so a test can compare them with
@@ -568,9 +568,9 @@ func TestPartsThatRunTogetherAlikeKeyApart(test *testing.T) {
 
 	_, keys := loadedFixture(test)
 	for name, contexts := range map[string][2]Context{
-		"the format version and the engine": {
-			{FormatVersion: "ab", EngineIdentity: "c"},
-			{FormatVersion: "a", EngineIdentity: "bc"},
+		"the format version and cohere-go": {
+			{FormatVersion: "ab", ExecutableIdentity: "c"},
+			{FormatVersion: "a", ExecutableIdentity: "bc"},
 		},
 		"two rules": {
 			{RuleSet: []string{"ab", "c"}},

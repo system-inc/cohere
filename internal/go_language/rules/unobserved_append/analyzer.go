@@ -1,5 +1,5 @@
 // Package unobserved_append is staticcheck's SA4010, a call to append whose result nothing reads but other appends,
-// extending a slice no one else can see, ported onto the engine's own intermediate representation.
+// extending a slice no one else can see, ported onto cohere's own intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4010/sa4010.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the call, where staticcheck's report puts it.
@@ -23,7 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own.
 var Listener = rule.Listener{
 	FileLocal: true, IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
@@ -35,7 +35,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4010",
 	"SA4010",
 	"Flags a call to append whose result is never observed anywhere: staticcheck's SA4010, ported onto the "+
-		"engine's own intermediate representation.",
+		"cohere's own intermediate representation.",
 	&Listener,
 )
 

@@ -9,13 +9,13 @@ import (
 )
 
 // The abbreviation vocabulary, policy/Abbreviations.json, is read and interpreted in
-// internal/naming/abbreviation, which the Go engine's twin of this rule reads too, so the words, their
-// forms and the order they are judged in live once for every engine (#2cqemcd for the file itself).
+// internal/naming/abbreviation, which cohere-go's twin of this rule reads too, so the words, their
+// forms and the order they are judged in live once for every language (#2cqemcd for the file itself).
 //
 // What stays here is this rule's own policy: the framework exemptions in the rule's listener, and its
 // findings as nexus's rule.Message, rendered from this rule's entry in the policy message catalog.
 
-// vocabulary is policy's file as every engine reads it, loaded once by the package that interprets it.
+// vocabulary is policy's file as every language reads it, loaded once by the package that interprets it.
 var vocabulary = abbreviation.Policy
 
 // abbreviationTexts are the rule's four messages by the id a vocabulary finding names. The vocabulary

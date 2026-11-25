@@ -11,9 +11,9 @@ import (
 
 // KeywordTerms.json is the vocabulary of a language's keywords whose letters Abbreviations.json also lists as an
 // abbreviation, JavaScript's `var` above all, with the exact spellings in which the capitalized keyword means the
-// keyword (#hvyvfr5). internal/naming/abbreviation reads it, so the TypeScript and Go engines share the one reading,
-// and the Swift engine compiles in the same bytes (SwiftFiles). It is data rather than code, beside Brands.json, so a
-// spelling joins as a reviewed decision about the house made once for every engine, never a project's
+// keyword (#hvyvfr5). internal/naming/abbreviation reads it, so the TypeScript linter and cohere-go share the one
+// reading, and cohere-swift compiles in the same bytes (SwiftFiles). It is data rather than code, beside Brands.json,
+// so a spelling joins as a reviewed decision about the house made once for every language, never a project's
 // allowedSegments entry.
 //
 //go:embed KeywordTerms.json

@@ -29,10 +29,10 @@ func TestARootReachedThroughALinkChecksWhatItsRealPathDoes(test *testing.T) {
 		test.Fatalf("linking the root: %v", linkError)
 	}
 	_, atReal := runOver(test, real, exitFindings, "--no-fix")
-	engine, atLink := runOverRaw(test, linked, exitFindings, "--no-cache", "--no-fix")
-	if engine.described.record.FilesInPackage == 0 || engine.described.record.Root != real {
+	pipeline, atLink := runOverRaw(test, linked, exitFindings, "--no-cache", "--no-fix")
+	if pipeline.described.record.FilesInPackage == 0 || pipeline.described.record.Root != real {
 		test.Fatalf("the run at the link counted %d files under %s, want the real path's %s and its files",
-			engine.described.record.FilesInPackage, engine.described.record.Root, real)
+			pipeline.described.record.FilesInPackage, pipeline.described.record.Root, real)
 	}
 	if normalized := normalize(atLink, real); normalized != atReal {
 		test.Errorf("the run at the link wrote\n%s\nand at the real path\n%s", normalized, atReal)
@@ -47,19 +47,19 @@ func TestARootReachedThroughALinkChecksWhatItsRealPathDoes(test *testing.T) {
 func TestACensusOfNothingBesideALoadOfPackagesIsNeverComplete(test *testing.T) {
 	test.Parallel()
 
-	emptied := func(engine *pipeline) {
-		engine.described.census.Files, engine.described.census.Ours = nil, nil
-		engine.described.inScope, engine.described.readableOurs = nil, nil
-		engine.described.inScopeSet = map[string]bool{}
-		engine.described.record.FilesInPackage, engine.described.record.FilesOurs = 0, 0
-		engine.described.record.FilesInScope = 0
+	emptied := func(pipeline *pipeline) {
+		pipeline.described.census.Files, pipeline.described.census.Ours = nil, nil
+		pipeline.described.inScope, pipeline.described.readableOurs = nil, nil
+		pipeline.described.inScopeSet = map[string]bool{}
+		pipeline.described.record.FilesInPackage, pipeline.described.record.FilesOurs = 0, 0
+		pipeline.described.record.FilesInScope = 0
 	}
-	engine, stream, noted := runOverNoted(test, copyFixture(test, filepath.Join("testdata", "clean")), exitFindings,
+	pipeline, stream, noted := runOverNoted(test, copyFixture(test, filepath.Join("testdata", "clean")), exitFindings,
 		emptied, "--no-cache", "--no-fix")
-	if len(engine.censusMissed) != 2 || !strings.Contains(stream, `"censusMissed":[`) ||
+	if len(pipeline.censusMissed) != 2 || !strings.Contains(stream, `"censusMissed":[`) ||
 		!strings.Contains(stream, `"complete":false`) {
 		test.Errorf("want the types record to name the 2 files the census missed and the run incomplete, got %v:\n%s",
-			engine.censusMissed, stream)
+			pipeline.censusMissed, stream)
 	}
 	if !strings.Contains(noted, "that its census never counted") {
 		test.Errorf("want a note naming the census, got\n%s", noted)
@@ -78,14 +78,16 @@ func TestAFileTheLoadReachedAndTheCensusNeverCountedLeavesTheRunIncomplete(test 
 
 	root := copyFixture(test, filepath.Join("testdata", "clean"))
 	var left string
-	leftOut := func(engine *pipeline) {
-		left = engine.described.census.Files[0]
-		engine.described.census.Files = engine.described.census.Files[1:]
+	leftOut := func(pipeline *pipeline) {
+		left = pipeline.described.census.Files[0]
+		pipeline.described.census.Files = pipeline.described.census.Files[1:]
 	}
-	engine, stream, _ := runOverNoted(test, root, exitFindings, leftOut, "--no-cache", "--no-fix")
-	if len(engine.censusMissed) != 1 || engine.censusMissed[0].File != left || engine.censusMissed[0].Package == "" {
+	pipeline, stream, _ := runOverNoted(test, root, exitFindings, leftOut, "--no-cache", "--no-fix")
+	if len(pipeline.censusMissed) != 1 ||
+		pipeline.censusMissed[0].File != left ||
+		pipeline.censusMissed[0].Package == "" {
 		test.Fatalf("want %s named as the one file the census missed, with its package, got %v", left,
-			engine.censusMissed)
+			pipeline.censusMissed)
 	}
 	if !strings.Contains(stream, `"complete":false`) {
 		test.Errorf("want the run incomplete:\n%s", stream)
@@ -113,13 +115,13 @@ func TestAFileTheConstraintsLeftOutAndTheCensusNeverCountedIsNamed(test *testing
 		}
 	}
 	elsewhere := filepath.Join(root, "elsewhere.go")
-	leftOut := func(engine *pipeline) {
-		engine.described.census.Files = slices.DeleteFunc(slices.Clone(engine.described.census.Files),
+	leftOut := func(pipeline *pipeline) {
+		pipeline.described.census.Files = slices.DeleteFunc(slices.Clone(pipeline.described.census.Files),
 			func(file string) bool { return file == elsewhere })
 	}
-	engine, _, _ := runOverNoted(test, root, exitFindings, leftOut, "--no-cache", "--no-fix")
-	if len(engine.censusMissed) != 1 || engine.censusMissed[0].File != elsewhere {
-		test.Errorf("want %s named as the one file the census missed, got %v", elsewhere, engine.censusMissed)
+	pipeline, _, _ := runOverNoted(test, root, exitFindings, leftOut, "--no-cache", "--no-fix")
+	if len(pipeline.censusMissed) != 1 || pipeline.censusMissed[0].File != elsewhere {
+		test.Errorf("want %s named as the one file the census missed, got %v", elsewhere, pipeline.censusMissed)
 	}
 }
 
@@ -153,10 +155,10 @@ func TestAModuleAGoWorkUsesThroughALinkIsCounted(test *testing.T) {
 	if linkError := os.Symlink(elsewhere, filepath.Join(root, "linked")); linkError != nil {
 		test.Fatalf("linking the module: %v", linkError)
 	}
-	engine, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
+	pipeline, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
 	throughLink := filepath.Join(root, "linked", "linked.go")
-	if len(engine.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
-		test.Errorf("want no file missed and the run complete, got %v:\n%s", engine.censusMissed, stream)
+	if len(pipeline.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
+		test.Errorf("want no file missed and the run complete, got %v:\n%s", pipeline.censusMissed, stream)
 	}
 	for _, file := range []string{filepath.Join(root, "real", "real.go"), throughLink} {
 		if !strings.Contains(stream, `"kind":"finding"`) || !strings.Contains(stream, `"file":"`+file+`"`) {
@@ -202,15 +204,19 @@ func TestARepositoryOfItsOwnBelowAModuleIsCountedAndExcluded(test *testing.T) {
 		"nested.go":            "// Package nested is one.\npackage nested\n",
 		"clone/inner/inner.go": "// Package inner is two.\npackage inner\n\n// INNER_ONE shouts.\nconst INNER_ONE = 1\n",
 	}, ".", "clone")
-	engine, stream := runOverRaw(test, root, exitClean, "--no-cache", "--no-fix")
+	pipeline, stream := runOverRaw(test, root, exitClean, "--no-cache", "--no-fix")
 	inner := filepath.Join(root, "clone", "inner", "inner.go")
-	if len(engine.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
-		test.Errorf("want nothing missed and the run complete, got %v:\n%s", engine.censusMissed, stream)
+	if len(pipeline.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
+		test.Errorf("want nothing missed and the run complete, got %v:\n%s", pipeline.censusMissed, stream)
 	}
-	if !slices.ContainsFunc(engine.described.record.Excluded, func(excluded contract.ExcludedFile) bool {
+	if !slices.ContainsFunc(pipeline.described.record.Excluded, func(excluded contract.ExcludedFile) bool {
 		return excluded.File == inner && excluded.Reason == project.InRepositoryOfItsOwn
 	}) {
-		test.Errorf("want %s excluded as in a repository of its own, got %+v", inner, engine.described.record.Excluded)
+		test.Errorf(
+			"want %s excluded as in a repository of its own, got %+v",
+			inner,
+			pipeline.described.record.Excluded,
+		)
 	}
 }
 
@@ -244,21 +250,21 @@ func TestALinkedUsesFilesAreJudgedByTheRepositoryHoldingTheirRealPath(test *test
 	if linkError := os.Symlink(filepath.Join(base, "elsewhere"), filepath.Join(root, "linked")); linkError != nil {
 		test.Fatalf("linking the module: %v", linkError)
 	}
-	engine, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
+	pipeline, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
 	kept, ignored := filepath.Join(root, "linked", "kept.go"), filepath.Join(root, "linked", "ignored.go")
-	if len(engine.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
-		test.Errorf("want nothing missed and the run complete, got %v:\n%s", engine.censusMissed, stream)
+	if len(pipeline.censusMissed) != 0 || !strings.Contains(stream, `"complete":true`) {
+		test.Errorf("want nothing missed and the run complete, got %v:\n%s", pipeline.censusMissed, stream)
 	}
-	if !slices.Contains(engine.described.census.Ours, kept) || !strings.Contains(stream, `"file":"`+kept+`"`) {
+	if !slices.Contains(pipeline.described.census.Ours, kept) || !strings.Contains(stream, `"file":"`+kept+`"`) {
 		test.Errorf("want %s ours, the root's pattern governing nothing through the link, and its finding:\n%s",
 			kept, stream)
 	}
-	if !slices.ContainsFunc(engine.described.record.Excluded, func(excluded contract.ExcludedFile) bool {
+	if !slices.ContainsFunc(pipeline.described.record.Excluded, func(excluded contract.ExcludedFile) bool {
 		return excluded.File == ignored && excluded.Reason == project.IgnoredByGit &&
 			strings.HasSuffix(excluded.Source, "elsewhere/.gitignore:1")
 	}) {
 		test.Errorf("want %s ignored by its own repository's .gitignore, got %+v", ignored,
-			engine.described.record.Excluded)
+			pipeline.described.record.Excluded)
 	}
 }
 
@@ -289,7 +295,7 @@ func TestALinkedUseIntoTheSameRepositoryIsJudgedAtItsRealPath(test *testing.T) {
 	if linkError := os.Symlink(filepath.Join(root, "vendored"), filepath.Join(root, "linked")); linkError != nil {
 		test.Fatalf("linking the module: %v", linkError)
 	}
-	engine, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
+	pipeline, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--no-fix")
 	kept, ignored := filepath.Join(root, "linked", "kept.go"), filepath.Join(root, "linked", "ignored.go")
 	// A finding names its file, as the project record's excluded files do too, so a finding is read by its kind.
 	foundIn := func(file string) bool {
@@ -297,14 +303,14 @@ func TestALinkedUseIntoTheSameRepositoryIsJudgedAtItsRealPath(test *testing.T) {
 			return strings.HasPrefix(line, `{"kind":"finding"`) && strings.Contains(line, `"file":"`+file+`"`)
 		})
 	}
-	if !slices.Contains(engine.described.census.Ours, kept) || !foundIn(kept) {
+	if !slices.Contains(pipeline.described.census.Ours, kept) || !foundIn(kept) {
 		test.Errorf("want %s ours, its link-named pattern governing nothing, and its finding:\n%s", kept, stream)
 	}
-	if foundIn(ignored) || !slices.ContainsFunc(engine.described.record.Excluded,
+	if foundIn(ignored) || !slices.ContainsFunc(pipeline.described.record.Excluded,
 		func(excluded contract.ExcludedFile) bool {
 			return excluded.File == ignored && excluded.Reason == project.IgnoredByGit
 		}) {
 		test.Errorf("want %s ignored at its real path and no finding of it, got %+v:\n%s", ignored,
-			engine.described.record.Excluded, stream)
+			pipeline.described.record.Excluded, stream)
 	}
 }

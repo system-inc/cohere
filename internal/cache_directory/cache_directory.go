@@ -6,7 +6,7 @@
 // Only the call that made the directory writes the file, and never over one that is there: a directory that already
 // existed is the project's to keep as it is, a cache an older cohere made without the file among them, which the
 // front door's note still names (prepareCacheDirectory). The front door, the TypeScript cache table and content
-// pack, and the Go engine's store each make the directory through Make, and the Swift engine through its own
+// pack, and cohere-go's store each make the directory through Make, and cohere-swift through its own
 // CacheDirectory (swift/Sources/CohereSwift/Pipeline/CacheDirectory.swift), which writes the same bytes.
 package cache_directory
 

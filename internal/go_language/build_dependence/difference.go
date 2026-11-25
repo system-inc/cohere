@@ -80,7 +80,7 @@ var (
 // HoldsLineDirective reports whether file, as read reads it, holds a comment of a line directive's shape (#mtrjfyn): a
 // comment token, never text in a string or in a comment's prose, either `//line ` at the very start of its line or
 // `/*line ` anywhere (isLineDirective), the comments go/scanner, which go/parser and so the load run, reads as
-// directives. read is the caller's, so its bytes are the ones the graph was built from, which in the engine are the
+// directives. read is the caller's, so its bytes are the ones the graph was built from, which in cohere-go are the
 // run's held bytes rather than the disk's again (pipeline.holdsLineDirective). A file read cannot read is said to hold
 // one, failing wide.
 //

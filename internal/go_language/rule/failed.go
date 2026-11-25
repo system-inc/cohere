@@ -7,7 +7,7 @@ import (
 )
 
 // Failed keys, in a pass's ResultOf, the prerequisites that failed on the pass's package and that the pass runs past,
-// a map[*analysis.Analyzer]error from each failed analyzer to its error, which the engine's checker hands an action it
+// a map[*analysis.Analyzer]error from each failed analyzer to its error, which cohere-go's checker hands an action it
 // tolerates when its checker.Options.Failed is this key. A dispatcher is such an action: it requires every one of its
 // listeners' Requires, so one listener's requirement failing on a package would otherwise fail the dispatcher there,
 // and every rule on it. With the map, the dispatcher starts every listener but those whose own requirements failed.

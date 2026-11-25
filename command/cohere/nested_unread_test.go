@@ -43,7 +43,7 @@ func TestANestedRepositoryThatCannotBeReadStopsNothing(test *testing.T) {
 		test.Errorf("the run stopped on the nested repository: %s", summary.Error)
 	}
 
-	output, _ := runWithEngine(test, binary, "", root, "--no-fix")
+	output, _ := runWithSwiftBinary(test, binary, "", root, "--no-fix")
 	if !strings.Contains(output, "⚠ nested repositories not read: ") {
 		test.Errorf("the footer does not name the gap:\n%s", output)
 	}

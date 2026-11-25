@@ -1,4 +1,4 @@
-// Command generate_variant captures how the real Tailwind engine orders variants, so that the
+// Command generate_variant captures how Tailwind itself orders variants, so that the
 // Go port in internal/lint/rules/tailwind/collapse/variant.go is tested against measurements rather than against a
 // reading of the TypeScript source.
 //
@@ -9,14 +9,14 @@
 //
 // The distinction this tool enforces is the one generate_theme enforces, and for this component
 // it lands on `getVariantOrder`. Reading `variants.ts` suggests every variant holds a fixed
-// position, and cohere has shipped a 145-entry table of exactly that shape. Asking the engine says
+// position, and cohere has shipped a 145-entry table of exactly that shape. Asking Tailwind says
 // the position is assigned per run over only the variants that were parsed, densely, with ties
 // collapsed: `hover` is index 0 in a run that parsed two variants and index 1 in a run that parsed
-// six. No static table can represent that, and a port built from one agrees with the engine on any
+// six. No static table can represent that, and a port built from one agrees with Tailwind on any
 // corpus whose variant set happens to match the table's and diverges silently on every other.
 //
-// `-corpus` names a JSON array of `{name, path, sourceRoot}`. The stylesheet at `path` is what the
-// engine loads; `sourceRoot` is the tree this tool harvests real class lists from, so the fixture
+// `-corpus` names a JSON array of `{name, path, sourceRoot}`. The stylesheet at `path` is what
+// Tailwind loads; `sourceRoot` is the tree this tool harvests real class lists from, so the fixture
 // carries the class lists two real repositories actually wrote rather than only the ones a test
 // author thought to invent. Both repositories in the default corpus declare their own
 // `@custom-variant dark`, which is the per-repository fact the whole port exists to respect. Either
@@ -92,13 +92,13 @@ func main() {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
 				os.Stderr,
-				"%s is stale: the engine now orders variants differently. Re-run without -check and read the diff.\n",
+				"%s is stale: Tailwind now orders variants differently. Re-run without -check and read the diff.\n",
 				*output,
 			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
-		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
+		fmt.Fprintf(os.Stderr, "%s matches Tailwind\n", *output)
 		return
 	}
 
@@ -164,7 +164,7 @@ type corpusEntry struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	// SourceRoot is the tree real class lists are harvested from. Separate from Path because the
-	// stylesheet the engine loads lives inside the tree rather than beside it.
+	// stylesheet Tailwind loads lives inside the tree rather than beside it.
 	SourceRoot string `json:"sourceRoot"`
 	// ClassLists is filled in by this tool and read by the Node side.
 	ClassLists [][]string `json:"classLists,omitempty"`
@@ -172,7 +172,7 @@ type corpusEntry struct {
 
 // enumerate harvests the corpus, runs the Node side, and returns its JSON.
 //
-// The engine is JavaScript and there is no faithful way to ask it these questions from Go. The
+// Tailwind is JavaScript and there is no faithful way to ask it these questions from Go. The
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot, corpusPath string, maximumClassLists int) ([]byte, error) {
@@ -254,7 +254,7 @@ func readCorpus(corpusPath string, maximumClassLists int) ([]corpusEntry, error)
 // narrower rather than try to catch up. That reader resolves callees, template literals and
 // variable-name patterns through a real TypeScript AST, and the classes it recovers from an
 // interpolated template are fragments rather than lists a user wrote. What this fixture needs is
-// whole class lists exactly as written, because a list is the unit the engine sorts. A quoted
+// whole class lists exactly as written, because a list is the unit Tailwind sorts. A quoted
 // attribute value is the one form guaranteed to be a complete list, so that is the only form
 // harvested. Missing a list costs corpus size, which is measurable; harvesting a fragment costs
 // correctness of the comparison, which is not.

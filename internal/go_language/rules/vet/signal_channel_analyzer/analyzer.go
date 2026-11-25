@@ -8,7 +8,7 @@
 // message and fix it reports word for word and edit for edit, at the same position, wherever the two report. The
 // registry runs the port in the original's place, and the original stays the oracle: the parity tests beside this
 // file run both over the same packages, and the differences fixture holds every shape where they disagree. It sits on
-// the engine's syntax dispatcher, hearing each declaration with a value and each call on the walk the dispatcher makes
+// cohere-go's syntax dispatcher, hearing each declaration with a value and each call on the walk the dispatcher makes
 // once for every syntax rule, and judges the calls once the walk has gathered every declaration of the package.
 //
 // It differs where it is right, in four ways.

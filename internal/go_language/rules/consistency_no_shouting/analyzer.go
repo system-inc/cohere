@@ -1,9 +1,9 @@
-// Package consistency_no_shouting is the Go engine's rule that a comment speaks in a normal voice.
+// Package consistency_no_shouting is cohere-go's rule that a comment speaks in a normal voice.
 //
 // All-caps reads as aggression, and it spreads: a reader mirrors the register of what they are answering, so one
 // shouted comment ratchets a file's comments into block capitals until emphasis means nothing. The judgment of what
 // counts as shouting, the acronym safe list and the masks that hide code, lives in internal/shouting, which the
-// TypeScript rule nexus/consistency-no-shouting reads too, so the two engines agree on what an acronym is.
+// TypeScript rule nexus/consistency-no-shouting reads too, so the two rules agree on what an acronym is.
 //
 // Go writes its doc comments as a run of // lines where TypeScript writes one block comment, so a comment group is
 // masked as one text, each // line's slashes and the one space after them set aside the way a block comment's
@@ -40,7 +40,7 @@ var Analyzer = &analysis.Analyzer{
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
 var shoutingInCommentMessage = policy.MessageOf(Name, "shoutingInComment")

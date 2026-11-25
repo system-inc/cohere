@@ -13,7 +13,7 @@ import (
 )
 
 // consistencyNoWarningCommentText is the rule's message, whose wording lives in
-// `policy/messages/consistency-no-warning-comment.json`, shared with the Go engine's twin.
+// `policy/messages/consistency-no-warning-comment.json`, shared with cohere-go's twin.
 var consistencyNoWarningCommentText = policy.MessageOf("nexus/consistency-no-warning-comment", "warningComment")
 
 // ConsistencyNoWarningComment bans a task left for later in a comment: `TODO`, `FIXME` or `XXX` as a whole word.
@@ -26,8 +26,8 @@ var consistencyNoWarningCommentText = policy.MessageOf("nexus/consistency-no-war
 // A deferred task kept in a comment rots there: the code around it reads as finished to every reader not looking at
 // that line, and the task is done only if someone happens to edit the file. It belongs where tasks are tracked.
 //
-// The judgment is internal/warning_comment's, which the Go engine's cohere-go/consistency-no-warning-comment reads
-// too, so the two engines report the same words: in capitals, whole, anywhere in any comment, outside backticks and
+// The judgment is internal/warning_comment's, which cohere-go's cohere-go/consistency-no-warning-comment reads
+// too, so the two linters report the same words: in capitals, whole, anywhere in any comment, outside backticks and
 // code blocks, each finding on its word. ESLint's `no-warning-comments`, which this replaces in the style set, matched
 // case-insensitively and only at a comment's start, so it reported a lowercase todo and missed a word mid-sentence or
 // on a block comment's second line.
@@ -69,7 +69,7 @@ var ConsistencyNoWarningComment = rule.Rule[rule.NoOptions]{
 }
 
 // warningCommentGroups gathers a file's comments into the groups go/ast forms for Go, so a run of comments reads as
-// one text in both engines and a backtick pair or a code block spanning its lines is seen whole. A comment joins the
+// one text in both languages and a backtick pair or a code block spanning its lines is seen whole. A comment joins the
 // group before it when only whitespace separates them and it starts no further down than the line after the group's
 // last comment ends. A group opened by a trailing comment, one with code before it on its line, takes only the
 // comments on that same line, as go/parser groups a line comment, so the passage under a line of code is its own.

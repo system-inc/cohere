@@ -1,4 +1,4 @@
-// Package consistency_no_console is the Go engine's rule that only a command writes to the process's own standard
+// Package consistency_no_console is cohere-go's rule that only a command writes to the process's own standard
 // output and error.
 //
 // A command's output is its interface, so package main prints, and so does a test, whose output the person running
@@ -42,7 +42,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_console", "Flags fmt.
 	"file, since only a command knows where the process's standard output and error go. A write to any other writer, "+
 	"fmt.Fprintln given one or a *log.Logger's method, is left alone.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads the types to tell fmt's Println from any other.
+// Rule is this rule's entry in cohere-go's registry. It reads the types to tell fmt's Println from any other.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var consistencyNoConsoleMessage = policy.MessageOf(Name, "consistencyNoConsole")

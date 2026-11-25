@@ -1,4 +1,4 @@
-// Package consistency_no_screaming_snake_case is the Go engine's rule that a name we declare is spelled in MixedCaps,
+// Package consistency_no_screaming_snake_case is cohere-go's rule that a name we declare is spelled in MixedCaps,
 // with no underscore inside it, and that a value local to a function opens lower-case.
 //
 // Go already says whether a name is exported by the case of its first letter, and a capital already marks where one
@@ -71,7 +71,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_screaming_snake_case"
 	"argument is exactly that name (os.Getenv(\"DATABASE_URL\")), and a name whose suggested form would not be an "+
 	"identifier (type_ would be the keyword type).", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var screamingSnakeCaseMessage = policy.MessageOf(Name, "screamingSnakeCase")

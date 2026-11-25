@@ -1,6 +1,6 @@
 //go:build unix
 
-// Run through runWithEngine, which projects_test.go defines for Unix alone (#tejf9bc).
+// Run through runWithSwiftBinary, which projects_test.go defines for Unix alone (#tejf9bc).
 
 package main
 
@@ -30,7 +30,7 @@ func TestAProjectWhoseTsconfigFailsToLoadIsJudgedByThatFailureAlone(test *testin
 		"wire/source/server.ts": "import { start } from \"absent-package\";\n\nexport function serve(): void {\n" +
 			"  debugger;\n  start().listen.now();\n}\n",
 	})
-	output, exitCode := runWithEngine(test, binary, "", root, "--no-fix", "--no-format")
+	output, exitCode := runWithSwiftBinary(test, binary, "", root, "--no-fix", "--no-format")
 	if exitCode == 0 {
 		test.Fatalf("a project whose tsconfig does not load passed the run:\n%s", output)
 	}

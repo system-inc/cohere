@@ -1,6 +1,6 @@
 //go:build unix
 
-// The stand-in Swift engine here is a /bin/sh script, so the file builds on Unix.
+// The stand-in cohere-swift here is a /bin/sh script, so the file builds on Unix.
 
 package main
 
@@ -19,7 +19,7 @@ import (
 
 // TestAMixedRunUnderJsonWritesOnlyRecordsToStdout: a repository holding a TypeScript program and a Swift
 // package is checked as two projects, and under `--json` every line of stdout is a record, while what a
-// project's run wrote to stderr, here the note that the Swift engine was named by the override, reaches
+// project's run wrote to stderr, here the note that cohere-swift was named by the override, reaches
 // stderr. The two used to share stdout, so a program reading the records met a line of prose.
 func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	test.Parallel()
@@ -28,9 +28,9 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	engine := filepath.Join(test.TempDir(), "cohere-swift")
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
 	if writeError := executable_testing.WriteFile(
-		engine,
+		swiftBinary,
 		[]byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755,
 	); writeError != nil {
@@ -47,7 +47,7 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	command := exec.Command(binary, "--no-fix", "--json")
 	command.Dir = root
 	// Never a replay: the run record lives in the root's own .cache/cohere, and the root is new.
-	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine)
+	command.Env = append(os.Environ(), "COHERE_SWIFT_BINARY="+swiftBinary)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	command.Stdout, command.Stderr = &standardOutput, &standardError
@@ -75,7 +75,7 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 		test.Errorf("expected a summary record for each of the two projects, found %v:\n%s",
 			labels, standardOutput.String())
 	}
-	if !strings.Contains(standardError.String(), "named by COHERE_SWIFT_ENGINE") {
+	if !strings.Contains(standardError.String(), "named by COHERE_SWIFT_BINARY") {
 		test.Errorf("the Swift project's note did not reach stderr:\nstderr:\n%s", standardError.String())
 	}
 }

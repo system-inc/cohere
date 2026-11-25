@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 func messageDeprecatedClassReplaceable(className string, replacement string) rule.Message {
@@ -53,7 +53,7 @@ type deprecation struct {
 // deprecations is the table upstream keeps, ported directly.
 //
 // This is a real table rather than a computation, which is why it ports cleanly: unlike collapsing,
-// nothing here is derived from the theme, so there is no engine to ask. It does go stale with each
+// nothing here is derived from the theme, so there is no Tailwind to ask. It does go stale with each
 // Tailwind release that renames something, and the staleness is visible the same way the collapse
 // table's is: a class this does not know is simply not reported, so the cost of falling behind is
 // silence rather than a wrong answer.
@@ -174,7 +174,7 @@ var NoDeprecatedClasses = rule.Rule[NoDeprecatedClassesOptions]{
 //
 // Each finding's fix rewrites its own class and nothing else. The whole-literal rewrite this replaced
 // was attached to every finding, so a literal with two deprecated classes proposed the same edit
-// twice and the engine refused the second, and the rewrite also claimed every separator, colliding
+// twice and Tailwind refused the second, and the rewrite also claimed every separator, colliding
 // with `no-unnecessary-whitespace` in the same pass. See class_tokens.go.
 //
 // A repeat of an earlier class is reported and not renamed: `no-duplicate-classes` deletes it, and
@@ -362,14 +362,14 @@ func buildClass(variants string, base string, important bool) string {
 //
 // It reads the version the collapse table was generated against rather than asking the filesystem,
 // so both tables describe the same Tailwind. A rule reporting renames from a newer release than the
-// one the tables were built from would be reporting an engine nobody here is running.
-var tailwindVersionForDeprecations = func() string { return tailwindengine.TailwindVersion }
+// one the tables were built from would be reporting Tailwind nobody here is running.
+var tailwindVersionForDeprecations = func() string { return tailwindcollapse.TailwindVersion }
 
 // tailwindAtLeast reports whether the Tailwind this table was generated against is new enough for a
 // deprecation to apply.
 //
 // A project on Tailwind 4.0 is not wrong to write `bg-left-top`, because 4.1 is what renamed it. The
-// version comes from the collapse table, which records the engine that produced it, so both tables
+// version comes from the collapse table, which records Tailwind that produced it, so both tables
 // describe the same Tailwind rather than drifting apart.
 func tailwindAtLeast(major int, minor int) bool {
 	installedMajor, installedMinor := parseTailwindVersion(tailwindVersionForDeprecations())

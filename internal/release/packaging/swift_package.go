@@ -11,20 +11,20 @@ import (
 	"strings"
 )
 
-// MinimumSwiftEngineMacOs is the oldest macOS a released cohere-swift may require.
+// MinimumSwiftBinaryMacOs is the oldest macOS a released cohere-swift may require.
 //
-// The engine's own floor is macOS 15, set by Synchronization's Mutex, and @system_cohere_swift
+// cohere-swift's own floor is macOS 15, set by Synchronization's Mutex, and @system_cohere_swift
 // measured it. The release reads the minimum from the built binary itself and refuses anything above
-// this. Otherwise a Package.swift that drifted back to a newer deployment target would ship an engine
+// this. Otherwise a Package.swift that drifted back to a newer deployment target would ship a binary
 // that will not even launch on most of the Macs people have, and nothing would say so until a user
 // ran it.
-const MinimumSwiftEngineMacOs = "15.0"
+const MinimumSwiftBinaryMacOs = "15.0"
 
-// SwiftSourceTreeModifiedVariable states the engine's `sourceTreeModified` to its manifest, "true" or
+// SwiftSourceTreeModifiedVariable states cohere-swift's `sourceTreeModified` to its manifest, "true" or
 // "false", in place of the manifest reading git (swift/Package.swift).
 //
-// The development launcher states it, because it names the engine it caches by the same answer, read
-// once, so the engine it serves reports the state its name holds (#50wtb2s). A release states nothing:
+// The development launcher states it, because it names cohere-swift it caches by the same answer, read
+// once, so cohere-swift it serves reports the state its name holds (#50wtb2s). A release states nothing:
 // its manifest reads git, and an inherited value is taken out of its environment.
 const SwiftSourceTreeModifiedVariable = "COHERE_SWIFT_SOURCE_TREE_MODIFIED"
 
@@ -50,20 +50,20 @@ func swiftArchitecture(goArchitecture string) (string, error) {
 	return "", fmt.Errorf("no Swift architecture is known for GOARCH %s", goArchitecture)
 }
 
-// buildSwiftEngine builds cohere-swift for target into destination, and refuses a product that is not
+// buildSwiftBinary builds cohere-swift for target into destination, and refuses a product that is not
 // the executable it should be.
 //
-// It resolves first and then builds with automatic resolution off, so the engine is built from exactly
+// It resolves first and then builds with automatic resolution off, so cohere-swift is built from exactly
 // the dependency versions Package.resolved records. It asks SwiftPM where the product went rather than
 // assuming a path, because Swift 6.3 and 6.4 put it in different places.
 //
-// The engine names commit as what it was built from. Swift has no `-ldflags -X`, so the commit goes
+// cohere-swift names commit as what it was built from. Swift has no `-ldflags -X`, so the commit goes
 // into EngineReleaseStamp.generated.swift beside EngineVersion, which reads it only under
 // COHERE_RELEASE_STAMP, and the file is removed after the build. It is gitignored, so writing it
 // leaves the manifest's `hasUncommittedChanges` as it was (measured by @system_cohere_swift and here).
 // The build runs in the checkout rather than an export because outside git the manifest reads no
 // git information and calls the tree modified.
-func buildSwiftEngine(
+func buildSwiftBinary(
 	moduleDirectory string,
 	scratchRoot string,
 	target Target,
@@ -77,9 +77,9 @@ func buildSwiftEngine(
 
 	packageDirectory := filepath.Join(moduleDirectory, "swift")
 	// The manifest evaluated now, never a cached evaluation. The manifest reads
-	// `Context.gitInformation.hasUncommittedChanges` into the engine's provenance, and SwiftPM's shared
+	// `Context.gitInformation.hasUncommittedChanges` into cohere-swift's provenance, and SwiftPM's shared
 	// manifest cache answers from an earlier evaluation of the same commit. Measured: a tracked file
-	// edited after a clean build still built an engine that said its tree was clean, and with the
+	// edited after a clean build still built a binary that said its tree was clean, and with the
 	// cache off the same build said modified.
 	location := []string{
 		"--package-path",
@@ -90,12 +90,12 @@ func buildSwiftEngine(
 		"none",
 	}
 
-	stamp := filepath.Join(packageDirectory, "Sources", "CohereSwift", "Command", SwiftEngineStampFileName)
+	stamp := filepath.Join(packageDirectory, "Sources", "CohereSwift", "Command", SwiftReleaseStampFileName)
 	stampSource := "#if COHERE_RELEASE_STAMP\n    enum EngineReleaseStamp { static let commit = \"" +
 		commit +
 		"\" }\n#endif\n"
 	if writeError := os.WriteFile(stamp, []byte(stampSource), 0o644); writeError != nil {
-		return fmt.Errorf("writing the Swift engine's commit stamp: %w", writeError)
+		return fmt.Errorf("writing cohere-swift's commit stamp: %w", writeError)
 	}
 	// Ignored: the stamp is gitignored and read only under COHERE_RELEASE_STAMP, which only a release build sets,
 	// and every release writes it again before building, so one left behind changes no release.
@@ -105,20 +105,20 @@ func buildSwiftEngine(
 	resolve.Stdout = os.Stderr
 	resolve.Stderr = os.Stderr
 	if runError := resolve.Run(); runError != nil {
-		return fmt.Errorf("resolving the Swift engine's dependencies: %w", runError)
+		return fmt.Errorf("resolving cohere-swift's dependencies: %w", runError)
 	}
 
-	arguments := append([]string{"build", "-c", "release", "--arch", architecture, "--product", SwiftEngineFileName,
+	arguments := append([]string{"build", "-c", "release", "--arch", architecture, "--product", SwiftBinaryFileName,
 		"--disable-automatic-resolution", "-Xswiftc", "-DCOHERE_RELEASE_STAMP"}, location...)
 	build := exec.Command("swift", arguments...)
 	// The manifest reads git for a release. A stated answer inherited from whoever ran the release would be
-	// compiled into the engine instead.
+	// compiled into cohere-swift instead.
 	build.Env = WithoutVariable(os.Environ(), SwiftSourceTreeModifiedVariable)
 	build.Stdout = os.Stderr
 	build.Stderr = os.Stderr
 	if runError := build.Run(); runError != nil {
 		return fmt.Errorf(
-			"building the Swift engine for %s (swift %s): %w",
+			"building cohere-swift for %s (swift %s): %w",
 			target,
 			strings.Join(arguments, " "),
 			runError,
@@ -127,16 +127,16 @@ func buildSwiftEngine(
 
 	binPath, outputError := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
 	if outputError != nil {
-		return fmt.Errorf("asking SwiftPM where it put the Swift engine for %s: %w", target, outputError)
+		return fmt.Errorf("asking SwiftPM where it put cohere-swift for %s: %w", target, outputError)
 	}
-	product := filepath.Join(strings.TrimSpace(string(binPath)), SwiftEngineFileName)
+	product := filepath.Join(strings.TrimSpace(string(binPath)), SwiftBinaryFileName)
 
 	contents, readError := os.ReadFile(product)
 	if readError != nil {
-		return fmt.Errorf("swift build reported success but left no engine at %s: %w", product, readError)
+		return fmt.Errorf("swift build reported success but left no binary at %s: %w", product, readError)
 	}
 	if writeError := os.WriteFile(destination, contents, 0o755); writeError != nil {
-		return fmt.Errorf("staging the Swift engine: %w", writeError)
+		return fmt.Errorf("staging cohere-swift: %w", writeError)
 	}
 
 	if requireExecutableFormatError := requireExecutableFormat(
@@ -148,7 +148,7 @@ func buildSwiftEngine(
 	if requireArchitectureError := requireArchitecture(destination, architecture); requireArchitectureError != nil {
 		return requireArchitectureError
 	}
-	return requireMinimumMacOs(destination, MinimumSwiftEngineMacOs)
+	return requireMinimumMacOs(destination, MinimumSwiftBinaryMacOs)
 }
 
 // requireSwiftContract refuses a package whose cohere and cohere-swift would refuse each other.
@@ -156,16 +156,16 @@ func buildSwiftEngine(
 // Each side refuses a version it does not speak, so a mismatched pair fails on its first Swift run,
 // which on a released package is a user's first Swift run. The contract is read from the staged cohere's
 // `--version` rather than from a constant here, because a copy of the number is a third version that can
-// disagree with both binaries while agreeing with the test that checks it. The engine is asked with the
+// disagree with both binaries while agreeing with the test that checks it. cohere-swift is asked with the
 // same `--contract` flag the front door passes, and its record is checked too, because the contract
 // counts the flag and the record as two independent ways for the versions to disagree.
 //
 // Both binaries are run, so the darwin-amd64 package is checked under Rosetta on Apple silicon. A host
 // that cannot run one fails here by name rather than skipping the check.
 //
-// The record's commit must be the one the engine was stamped with, so an engine built without the
+// The record's commit must be the one cohere-swift was stamped with, so a binary built without the
 // stamp, which says `dev`, is never staged.
-func requireSwiftContract(coherePath string, enginePath string, commit string) error {
+func requireSwiftContract(coherePath string, swiftBinaryPath string, commit string) error {
 	var cohereError bytes.Buffer
 	versionCommand := exec.Command(coherePath, "--version")
 	versionCommand.Stderr = &cohereError
@@ -191,20 +191,20 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 			"the staged %s names no Swift contract in --version (it printed %q), so whether %s speaks it cannot be checked",
 			coherePath,
 			strings.TrimSpace(string(versionOutput)),
-			SwiftEngineFileName,
+			SwiftBinaryFileName,
 		)
 	}
 
-	var engineError bytes.Buffer
-	engineCommand := exec.Command(enginePath, "--contract", contract, "--version")
-	engineCommand.Stderr = &engineError
-	engineOutput, outputError := engineCommand.Output()
+	var binaryError bytes.Buffer
+	binaryCommand := exec.Command(swiftBinaryPath, "--contract", contract, "--version")
+	binaryCommand.Stderr = &binaryError
+	binaryOutput, outputError := binaryCommand.Output()
 	if outputError != nil {
 		return fmt.Errorf("the staged %s refused contract %d, which the cohere beside it speaks: %w: %s",
-			enginePath, expected, outputError, strings.TrimSpace(engineError.String()))
+			swiftBinaryPath, expected, outputError, strings.TrimSpace(binaryError.String()))
 	}
 
-	firstLine, _, _ := strings.Cut(strings.TrimSpace(string(engineOutput)), "\n")
+	firstLine, _, _ := strings.Cut(strings.TrimSpace(string(binaryOutput)), "\n")
 	var record struct {
 		Kind     string `json:"kind"`
 		Contract *int   `json:"contract"`
@@ -216,14 +216,14 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 	); decodeError != nil || record.Kind != "provenance" || record.Contract == nil {
 		return fmt.Errorf(
 			"the staged %s answered --version with %q, not a provenance record naming its contract",
-			enginePath,
+			swiftBinaryPath,
 			firstLine,
 		)
 	}
 	if *record.Contract != expected {
 		return fmt.Errorf(
 			"the staged %s speaks contract %d, and the cohere beside it speaks contract %d",
-			enginePath,
+			swiftBinaryPath,
 			*record.Contract,
 			expected,
 		)
@@ -231,7 +231,7 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 	if record.Commit != commit {
 		return fmt.Errorf(
 			"the staged %s says it was built from %q, and this release builds commit %s",
-			enginePath,
+			swiftBinaryPath,
 			record.Commit,
 			commit,
 		)
@@ -239,7 +239,7 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 	return nil
 }
 
-// readReleaseCommit is the full commit the release builds from, which the Swift engine is stamped with.
+// readReleaseCommit is the full commit the release builds from, which cohere-swift is stamped with.
 func readReleaseCommit(moduleDirectory string) (string, error) {
 	output, outputError := exec.Command("git", "-C", moduleDirectory, "rev-parse", "HEAD").Output()
 	if outputError != nil {
@@ -254,8 +254,8 @@ func readReleaseCommit(moduleDirectory string) (string, error) {
 
 // requireArchitecture refuses a binary that is not built for exactly architecture.
 //
-// The Go binary gets its architecture from `GOARCH` and cannot be wrong without failing to build. The
-// Swift engine gets its from a separate `--arch` flag, so a package could carry an engine for the other
+// The Go binary gets its architecture from `GOARCH` and cannot be wrong without failing to build.
+// cohere-swift gets its from a separate `--arch` flag, so a package could carry a binary for the other
 // Mac, and on Apple silicon Rosetta would hide it.
 func requireArchitecture(path string, architecture string) error {
 	output, outputError := exec.Command("lipo", "-archs", path).Output()
@@ -299,7 +299,7 @@ func requireMinimumMacOs(path string, allowed string) error {
 	}
 	if newer {
 		return fmt.Errorf(
-			"%s requires macOS %s, and a released engine must launch on macOS %s; lower the deployment target in swift/Package.swift",
+			"%s requires macOS %s, and a released binary must launch on macOS %s; lower the deployment target in swift/Package.swift",
 			path,
 			minimum,
 			allowed,

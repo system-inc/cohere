@@ -19,8 +19,8 @@ import (
 // body by BodyAt and its export data by digest from the store, so a record a pack serves whose body or export data the
 // store has lost since is a miss, as it is read from the store. The pack is written at the save when the run read or
 // wrote a record it did not hold, a shard's stamp moved, or it was missing or refused, so a warm run whose pack served
-// everything writes nothing. The host's session keeps none. The project's packs are kept by engine identity, and the
-// run's first write of one removes every other engine's (cache.Store.RemoveOtherEnginesPacks).
+// everything writes nothing. The host's session keeps none. The project's packs are kept by executable identity, and
+// the run's first write of one removes every other executable's (cache.Store.RemoveOtherIdentitiesPacks).
 
 // PackCounts is what an extra build's session did with its packs over every load of the run: the packs read whole and
 // those missing, the records they served, those they held whose shard had moved, read from the store, the keys asked
@@ -38,7 +38,7 @@ type PackCounts struct {
 }
 
 // KeepBuildPacks has the session, an extra build's, read and write a pack of each store it reads records from, the
-// project's and the system cache's, named by the build and the engine, and the system cache's by project, the
+// project's and the system cache's, named by the build and cohere-go, and the system cache's by project, the
 // project's root, too (#b2t9xmf). Each store's pack is judged by the run's shard stamps the store holds (cache.Open),
 // which every build of the run shares, and a store holding none keeps no pack.
 func (session *CacheSession) KeepBuildPacks(project string) {
@@ -60,9 +60,9 @@ func (session *CacheSession) openPacks(loader string) {
 	if store := session.caching.Store; store != nil && store.ShardStamps() != nil {
 		keyContext := session.keyContextOf(loader)
 		// The project's pack is named by every part of the context its keys hold, so another build, rule set or
-		// engine never reads it, and a run with another loader has its own.
-		packs.open(store, false, cache.PackPlace{Identity: cache.PackIdentity(keyContext.EngineIdentity),
-			Name: cache.PackName([]string{"project"}, []string{keyContext.FormatVersion, keyContext.EngineIdentity},
+		// executable never reads it, and a run with another loader has its own.
+		packs.open(store, false, cache.PackPlace{Identity: cache.PackIdentity(keyContext.ExecutableIdentity),
+			Name: cache.PackName([]string{"project"}, []string{keyContext.FormatVersion, keyContext.ExecutableIdentity},
 				keyContext.Build, keyContext.RuleSet)})
 	}
 	if session.KeepsSystemCache() && session.standardLibraryContext != nil &&
@@ -77,9 +77,9 @@ func (session *CacheSession) openPacks(loader string) {
 // machine checking the same build never write over each other's pack each run.
 func systemPackPlace(context cache.StandardLibraryContext, project string) cache.PackPlace {
 	return cache.PackPlace{
-		Identity: cache.PackIdentity(context.EngineIdentity),
+		Identity: cache.PackIdentity(context.ExecutableIdentity),
 		Name: cache.PackName([]string{"system", project},
-			[]string{context.FormatVersion, context.EngineIdentity, context.Loader, context.Goroot}, context.Build,
+			[]string{context.FormatVersion, context.ExecutableIdentity, context.Loader, context.Goroot}, context.Build,
 			context.Facts, context.CgoToolchain),
 	}
 }
@@ -170,7 +170,7 @@ func (session *CacheSession) putRecord(store *cache.Store, key cache.Key, entry 
 // it was read or written (ShardStamps). A shard a store of the run has changed since, this session's writes included,
 // is moved, and recorded as none, as is a stamp not trusted as it was read, within two seconds of the clock then
 // (cache.ShardStamps): the next run reads that shard from the store. The first project pack the run writes removes
-// the packs of every other engine (cache.Store.RemoveOtherEnginesPacks).
+// the packs of every other executable (cache.Store.RemoveOtherIdentitiesPacks).
 // A pack that could not be written is a problem of its store, never a finding: the next run reads that store's records
 // one by one, as it would with no pack.
 func (session *CacheSession) writePacks() {
@@ -204,7 +204,7 @@ func (session *CacheSession) writePacks() {
 			packs.counts.Written++
 			// The system cache's trim ages its packs out; nothing trims the project's but this.
 			if !pack.system {
-				pack.store.RemoveOtherEnginesPacks(pack.place.Identity)
+				pack.store.RemoveOtherIdentitiesPacks(pack.place.Identity)
 			}
 			// A reload's Restore serves from what this save wrote, and a save after it compares with it: the entries
 			// and the stamps together, so no entry is ever served by a stamp taken of another's read.

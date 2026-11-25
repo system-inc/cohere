@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// declineEverything is the implementation used to measure the corpus without a rule engine.
+// declineEverything is the implementation used to measure the corpus without a rule run.
 //
 // It declines rather than returning an empty result, for the reason NothingImplemented documents:
 // an empty result is the claim "I found no errors here", which is a wrong answer on a corpus where
@@ -20,7 +20,7 @@ func (everything declineEverything) Analyze(Fixture) (Result, error) {
 // TestAggregatedScoreAgainstReactsOwnFixtures is the number this package exists to produce.
 //
 // It is deliberately run against an implementation that answers nothing, and that is not a
-// placeholder. Wiring cohere's rule engine in here would require building a TypeScript program per
+// placeholder. Wiring cohere's rule run in here would require building a TypeScript program per
 // fixture (roughly a second each, so about five minutes for the corpus) inside a suite whose
 // stated design property is that it costs 0.3 to 0.8 seconds and therefore never gets gated behind
 // a tag. Paying that to watch 293 fixtures land in a decline bucket that is already decidable from
@@ -41,7 +41,7 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(test *testing.T) {
 
 	report, aggregateError := Aggregate(
 		fixtures,
-		declineEverything{reason: "scored without a rule engine; see the note on this test"},
+		declineEverything{reason: "scored without a rule run; see the note on this test"},
 	)
 	if aggregateError != nil {
 		test.Fatalf("aggregating: %v", aggregateError)
@@ -90,9 +90,9 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(test *testing.T) {
 	// 18 fixtures carry a stated divergence, and every other addressable fixture lands in
 	// `not scored` because the implementation handed in here declines everything.
 	//
-	// That is deliberate and it is why this package still depends on nothing in the rule engine.
+	// That is deliberate and it is why this package still depends on nothing in the rule run.
 	// The same partition with real rules running is
-	// `react_conformance_score.TestAggregateWithTheRuleEngineWired`, and the two are meant to differ:
+	// `react_conformance_score.TestAggregateWithTheRulesWired`, and the two are meant to differ:
 	// this one answers "what could be asked", that one answers "what did the rules say".
 	if got := report.Counts[VerdictStatedDivergence]; got != 18 {
 		test.Errorf("stated-divergence %d, want 18", got)
@@ -228,7 +228,7 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 		{
 			Name:    "not scored: the implementation declined",
 			Fixture: globalsFixture,
-			Error:   &UnsupportedError{Reason: "no rule engine was run"},
+			Error:   &UnsupportedError{Reason: "no rule run was run"},
 			Want:    VerdictNotScored,
 		},
 		{

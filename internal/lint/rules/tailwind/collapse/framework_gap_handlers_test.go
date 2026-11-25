@@ -27,7 +27,7 @@ var gapRoots = []string{
 // gapProbe is one measured cell of a root's descriptor and the branch that should reproduce it.
 //
 // A descriptor row is three parallel axes, each holding a type map, a namespace map, a fallback and
-// an empty reading. Every populated cell is an independent measurement against the engine, so each
+// an empty reading. Every populated cell is an independent measurement against Tailwind, so each
 // one is a separate comparison here rather than one comparison per root.
 type gapProbe struct {
 	// name is what the cell is, for a failure message: `Absent.ByType[length]`.
@@ -162,7 +162,7 @@ var gapCellsMeasuredElsewhere = map[string]string{
 // TestGapRootEmittersAgreeWithTheirMeasuredReadings is the acceptance test for this slice.
 //
 // Every one of the 57 roots has a `baseDescriptors` row carrying a measured `{order, count}` per
-// value type, produced by asking the engine rather than by reading the source. Every root now also
+// value type, produced by asking Tailwind rather than by reading the source. Every root now also
 // has an emitter transcribed from `utilities.ts`. The two were produced by different means from
 // different sources, so forcing them to agree cell for cell is a real comparison.
 //
@@ -211,7 +211,7 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(test *testing.T) {
 				continue
 			}
 			disagreements = append(disagreements,
-				root+" "+probe.name+": the engine measured "+formatReading(probe.reading)+
+				root+" "+probe.name+": Tailwind measured "+formatReading(probe.reading)+
 					", the ported handle emits "+describeDeclarations(emitted)+" reading "+formatReading(computed))
 		}
 	}

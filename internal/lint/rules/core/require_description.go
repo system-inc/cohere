@@ -35,7 +35,7 @@ var RequireDescriptionIgnorable = []string{
 // `Ignore` names directive kinds to skip, in upstream's vocabulary. A cohere spelling is ignored by
 // the kind it shares with its `eslint-` twin, so `ignore: ["eslint-disable-next-line"]` also skips
 // `cohere-disable-next-line`. ESLint never sees a `cohere-` comment at all, so this extends the key's
-// meaning only over comments the other engine cannot read.
+// meaning only over comments the other linter cannot read.
 //
 // `AdditionalDirectives` is upstream's escape hatch for other tools' comment directives (`c8`,
 // `istanbul`), and is ported as upstream wrote it.
@@ -73,8 +73,8 @@ type RequireDescriptionOptions struct {
 //     as line comments, a multi-line `/* eslint-disable-line ... */`, and a block whose continuation
 //     lines carry `*`. Upstream reports none of them because in ESLint none of them do anything.
 //     In cohere each one suppresses, so it is a suppression without a reason, which is exactly what
-//     Kirk asked this rule to refuse. This is the one place the engines diverge, and it diverges only
-//     where the engines' directive grammars already do.
+//     Kirk asked this rule to refuse. This is the one place the linters diverge, and it diverges only
+//     where the linters' directive grammars already do.
 //
 // # A reason is ESLint's grammar, in both arms
 //

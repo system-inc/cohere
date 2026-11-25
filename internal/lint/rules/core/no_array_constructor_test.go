@@ -410,8 +410,8 @@ func TestNoArrayConstructorKeepsCommentsAmongArguments(test *testing.T) {
 //
 // The rewrite turns two statements into one. `Fn` followed by `Array()` is an identifier statement
 // and a call statement; `Fn` followed by `[]` is the single element access `Fn[]`. The output
-// parses, so the edit engine's syntax guard cannot refuse it, which is exactly the failure the
-// engine is structurally unable to catch. ESLint reaches the same conclusion from the other side and
+// parses, so the fix pass's syntax guard cannot refuse it, which is exactly the failure the
+// fix pass is structurally unable to catch. ESLint reaches the same conclusion from the other side and
 // emits `;[...]` for this case under a distinct message id.
 //
 // The claim under test is not that the rewrite is wrong everywhere. It is that the rule cannot tell

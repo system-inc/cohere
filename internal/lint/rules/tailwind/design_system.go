@@ -58,7 +58,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // DesignSystemResult is one program's design system, or the reason there is none.
@@ -69,7 +69,7 @@ import (
 // case where there is not even a design system to show for it.
 type DesignSystemResult struct {
 	// System is the loaded design system, nil when Err is set.
-	System *tailwindengine.LoadedDesignSystem
+	System *tailwindcollapse.LoadedDesignSystem
 	// Table is this design system's descriptor table, nil when Err is set.
 	//
 	// Built here rather than by each rule, and that is the same claim the whole file makes about the
@@ -77,11 +77,11 @@ type DesignSystemResult struct {
 	// a table built per rule or per file is the per-file rebuild this file exists to refuse, wearing
 	// a different name. It costs a few map copies over the framework's roots plus one PropertySort
 	// per static `@utility` block, on a path the build counter already guards.
-	Table *tailwindengine.Table
+	Table *tailwindcollapse.Table
 	// Canonicalizer answers what this design system's Tailwind rewrites one class to, nil when Err is
 	// set. Built here for the reason Table is: it remembers its answers, and a run asks it about the same
 	// classes from every file (#15swfzq).
-	Canonicalizer *tailwindengine.Canonicalizer
+	Canonicalizer *tailwindcollapse.Canonicalizer
 	// Error is why no design system could be built, nil when System is set.
 	//
 	// A rule holding this must decline rather than report zero findings. See the failing-safe note
@@ -224,7 +224,7 @@ func loadDesignSystemThrough(
 	if stylesheetResolverAtError != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Error: stylesheetResolverAtError}
 	}
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 		Resolve:             resolve,
@@ -232,7 +232,7 @@ func loadDesignSystemThrough(
 	if loadDesignSystemError != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Error: loadDesignSystemError}
 	}
-	// The stylesheets themselves are read by the engine, which does not take a filesystem, so each
+	// The stylesheets themselves are read by Tailwind, which does not take a filesystem, so each
 	// one in the `@import` graph is stated through the program's afterwards. That records it as a
 	// present input with its signature, which is all the cache needs: it re-signs the file on the
 	// next run and misses when the file moved.
@@ -248,11 +248,11 @@ func loadDesignSystemThrough(
 // loadedDesignSystemResult is the result for a design system that built, with everything a run derives
 // from it once: the descriptor table and the canonicalizer. Both places that load one build it here, so a
 // third derived piece cannot reach one and miss the other.
-func loadedDesignSystemResult(system *tailwindengine.LoadedDesignSystem, entryPoint string) DesignSystemResult {
+func loadedDesignSystemResult(system *tailwindcollapse.LoadedDesignSystem, entryPoint string) DesignSystemResult {
 	return DesignSystemResult{
 		System:        system,
-		Table:         tailwindengine.NewTable(system),
-		Canonicalizer: tailwindengine.NewCanonicalizer(system),
+		Table:         tailwindcollapse.NewTable(system),
+		Canonicalizer: tailwindcollapse.NewCanonicalizer(system),
 		EntryPoint:    entryPoint,
 	}
 }
@@ -368,7 +368,7 @@ func resetDesignSystemCacheForTest() {
 //
 // For reporting and for tests. Absolute paths in a test failure message name a machine rather than
 // a repository, and a failure a reader cannot place is one they cannot act on.
-func stylesheetsUnder(root string, system *tailwindengine.LoadedDesignSystem) []string {
+func stylesheetsUnder(root string, system *tailwindcollapse.LoadedDesignSystem) []string {
 	if system == nil {
 		return nil
 	}

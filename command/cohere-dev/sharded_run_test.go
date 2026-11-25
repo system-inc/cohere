@@ -35,7 +35,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 if [ -n "$list" ]; then
-  if [ -n "${SHARD_LIST_FAILS:-}" ]; then echo "# $package"; echo "engine_test.go:3:1: expected declaration"; exit 1; fi
+  if [ -n "${SHARD_LIST_FAILS:-}" ]; then echo "# $package"; echo "checker_test.go:3:1: expected declaration"; exit 1; fi
   printf '%s\n' TestOne TestTwo BenchmarkThree TestFour ExampleFive TestSix FuzzSeven TestEight TestNine TestTen \
     TestEleven TestTwelve
   printf 'ok  \t%s\t0.1s\n' "$package"
@@ -243,14 +243,14 @@ func TestTheGatesShardsDealEveryListedTestOnceAcrossTwoThreadProcesses(test *tes
 func TestAShardedPackageReadsAsOnePackageAndItsShardsCoverItsListing(test *testing.T) {
 	test.Parallel()
 	event := func(action string, name string) string {
-		return `{"Action":"` + action + `","Package":"m/engine","Test":"` + name + `"}`
+		return `{"Action":"` + action + `","Package":"m/checker","Test":"` + name + `"}`
 	}
 	end := func(action string, seconds float64) string {
-		return fmt.Sprintf(`{"Action":"%s","Package":"m/engine","Elapsed":%g}`, action, seconds)
+		return fmt.Sprintf(`{"Action":"%s","Package":"m/checker","Elapsed":%g}`, action, seconds)
 	}
-	listing := boxShardListingMarker + "m/engine TestA TestB TestC"
+	listing := boxShardListingMarker + "m/checker TestA TestB TestC"
 	shard := func(index int, count int, names string) string {
-		return fmt.Sprintf("%s%d of %d m/engine %s", boxShardMarker, index, count, names)
+		return fmt.Sprintf("%s%d of %d m/checker %s", boxShardMarker, index, count, names)
 	}
 	// green is the whole run of two shards, TestA and TestC in the first and TestB in the second, every test passing.
 	green := []string{`{"Action":"pass","Package":"m/plain","Elapsed":2}`, listing,
@@ -265,34 +265,34 @@ func TestAShardedPackageReadsAsOnePackageAndItsShardsCoverItsListing(test *testi
 	}{
 		{name: "every shard green", lines: green},
 		{name: "a red shard", lines: slices.Concat(green[:7], []string{shard(2, 2, "TestB"), event("fail", "TestB"),
-			end("fail", 9)}), failedTests: []string{"m/engine TestB"}},
+			end("fail", 9)}), failedTests: []string{"m/checker TestB"}},
 		// Its shards fell short too, which the red is said before.
 		{name: "a red shard whose run also left a test unended", lines: slices.Concat(green[:5],
 			[]string{end("pass", 4), shard(2, 2, "TestB"), event("fail", "TestB"), end("fail", 9)}),
-			failedTests: []string{"m/engine TestB"},
-			gaps:        []string{"TestC (m/engine) ended 0 times across its shards"}},
+			failedTests: []string{"m/checker TestB"},
+			gaps:        []string{"TestC (m/checker) ended 0 times across its shards"}},
 		{name: "a shard's JSON missing a listed test", lines: slices.Concat(green[:5], green[6:]),
-			gaps: []string{"TestC (m/engine) ended 0 times across its shards"}},
+			gaps: []string{"TestC (m/checker) ended 0 times across its shards"}},
 		{name: "a test in two shards", lines: slices.Concat(green[:7], []string{shard(2, 2, "TestB TestC"),
 			event("pass", "TestB"), event("pass", "TestC"), end("pass", 9)}), gaps: []string{
-			"TestC (m/engine) is in shards 1 and 2",
-			"TestC (m/engine) ended 2 times across its shards, in shards 1 and 2"}},
+			"TestC (m/checker) is in shards 1 and 2",
+			"TestC (m/checker) ended 2 times across its shards, in shards 1 and 2"}},
 		{name: "a test in no shard", lines: slices.Concat(green[:2], []string{shard(1, 2, "TestC"),
 			event("pass", "TestC"), end("pass", 4)}, green[7:]), gaps: []string{
-			"TestA (m/engine), which its listing holds, is in no shard",
-			"TestA (m/engine) ended 0 times across its shards"}},
+			"TestA (m/checker), which its listing holds, is in no shard",
+			"TestA (m/checker) ended 0 times across its shards"}},
 		{name: "a shard never said", lines: green[:7], gaps: []string{
-			"shard 2 of 2 of m/engine never said its tests", "shard 2 of 2 of m/engine ended its test binary 0 times",
-			"TestB (m/engine), which its listing holds, is in no shard",
-			"TestB (m/engine) ended 0 times across its shards"}},
+			"shard 2 of 2 of m/checker never said its tests", "shard 2 of 2 of m/checker ended its test binary 0 times",
+			"TestB (m/checker), which its listing holds, is in no shard",
+			"TestB (m/checker) ended 0 times across its shards"}},
 		{name: "a shard whose test binary never ended", lines: green[:len(green)-1], gaps: []string{
-			"shard 2 of 2 of m/engine ended its test binary 0 times"}},
+			"shard 2 of 2 of m/checker ended its test binary 0 times"}},
 		{name: "a shard's test the listing doesn't hold", lines: slices.Concat(green[:7], []string{
 			shard(2, 2, "TestB TestD"), event("pass", "TestB"), event("pass", "TestD"), end("pass", 9)}),
-			gaps: []string{"TestD (m/engine) is in shard 2, which its listing doesn't hold",
-				"TestD (m/engine) ended, which its listing doesn't hold"}},
+			gaps: []string{"TestD (m/checker) is in shard 2, which its listing doesn't hold",
+				"TestD (m/checker) ended, which its listing doesn't hold"}},
 		{name: "a shard past its count", lines: slices.Concat(green, []string{shard(3, 2, "TestB")}), gaps: []string{
-			"shard 3 of m/engine is past its 2 shards", "TestB (m/engine) is in shards 2 and 3"}},
+			"shard 3 of m/checker is past its 2 shards", "TestB (m/checker) is in shards 2 and 3"}},
 	} {
 		verdict := readTestJson([]byte(boxMarker + "0123 on darwin/arm64\n" + strings.Join(row.lines, "\n") + "\n"))
 		verdict.box = "Sun2"
@@ -305,8 +305,8 @@ func TestAShardedPackageReadsAsOnePackageAndItsShardsCoverItsListing(test *testi
 		refusal := verdict.shardRefusal()
 		switch {
 		case len(row.failedTests) > 0:
-			if refusal != "" || !slices.Equal(verdict.packagesFailed, []string{"m/engine"}) ||
-				!strings.Contains(verdict.failureReport(), "m/engine TestB") {
+			if refusal != "" || !slices.Equal(verdict.packagesFailed, []string{"m/checker"}) ||
+				!strings.Contains(verdict.failureReport(), "m/checker TestB") {
 				test.Errorf("%s: a red shard read as refusal %q, packages %v failed, report:\n%s", row.name, refusal,
 					verdict.packagesFailed, verdict.failureReport())
 			}
@@ -317,12 +317,12 @@ func TestAShardedPackageReadsAsOnePackageAndItsShardsCoverItsListing(test *testi
 			}
 		default:
 			if refusal != "" || verdict.packagesPassed != 2 ||
-				!slices.Equal(verdict.packagesReported, []string{"m/plain", "m/engine"}) ||
-				verdict.packageSeconds["m/engine"] != 9 {
+				!slices.Equal(verdict.packagesReported, []string{"m/plain", "m/checker"}) ||
+				verdict.packageSeconds["m/checker"] != 9 {
 				test.Errorf("%s: read as refusal %q, %d passed, %v reported, %gs", row.name, refusal,
-					verdict.packagesPassed, verdict.packagesReported, verdict.packageSeconds["m/engine"])
+					verdict.packagesPassed, verdict.packagesReported, verdict.packageSeconds["m/checker"])
 			}
-			if want := "slowest test binaries m/engine 9.0s (slowest of 2 shards), m/plain 2.0s"; verdict.
+			if want := "slowest test binaries m/checker 9.0s (slowest of 2 shards), m/plain 2.0s"; verdict.
 				timingReport() != want {
 				test.Errorf("%s: the timing reads %q, want %q", row.name, verdict.timingReport(), want)
 			}

@@ -13,7 +13,7 @@ import (
 
 // systemCache is the run's system cache (#syscache): a second store beside the project's, in the user's cache
 // directory rather than any project's, which holds every standard-library package's entry under its key in its
-// build's context, read and written as the project's store is, by every run of the same engine on the machine,
+// build's context, read and written as the project's store is, by every run of the same executable on the machine,
 // whatever project it checks. It is found once a run, before any build reads it, and handed to every build's
 // lintCache, and, opened before the project is described, to the early start, which keeps each build's context go list
 // answers there (contexts).

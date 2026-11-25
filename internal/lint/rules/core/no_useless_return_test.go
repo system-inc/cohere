@@ -180,12 +180,12 @@ func TestNoUselessReturnFires(test *testing.T) {
 			wantFixed: "function wrapper() { if (foo) { bar();  } else { baz(); } }",
 		},
 		// Upstream's recorded output keeps the second `return;`, and that is an artifact of its
-		// fix engine rather than of the rule. Measured: it reports both returns and both fixes
+		// fix pass rather than of the rule. Measured: it reports both returns and both fixes
 		// rewrite the whole function, range [0,47], because upstream wraps every repair in
 		// FixTracker.retainEnclosingFunction to avoid conflicting with no-else-return. Two
 		// overlapping fixes cannot both apply in one pass, so ESLint drops the second and its
 		// corpus records the intermediate text. Run to a fixed point it produces exactly what
-		// is asserted here, and so does our engine in one pass, since our fixes are the two
+		// is asserted here, and so does our linter in one pass, since our fixes are the two
 		// return statements themselves and do not overlap.
 		{
 			name:      "invalid8",

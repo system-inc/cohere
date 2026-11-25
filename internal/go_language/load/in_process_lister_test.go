@@ -115,7 +115,7 @@ func TestInProcessListingIsGoListsAnswer(test *testing.T) {
 	}
 }
 
-// The same holds on cohere's own repository, listed as the engine lists it: the workspace's patterns and environment
+// The same holds on cohere's own repository, listed as cohere-go lists it: the workspace's patterns and environment
 // from project.ReadWorkspace, every package of cohere, its dependencies and the standard library.
 func TestInProcessListingIsGoListsAnswerOnCohere(test *testing.T) {
 	test.Parallel()

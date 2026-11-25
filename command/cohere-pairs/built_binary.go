@@ -24,7 +24,7 @@ type builtBinary struct {
 	commit string
 	path   string
 	sha256 string
-	// everyBuildArguments are what every run of the binary's engine is given to check every build the corpus's files
+	// everyBuildArguments are what every run of the binary's Go child is given to check every build the corpus's files
 	// name, read from the binary once it is built (see everyBuildArguments).
 	everyBuildArguments []string
 }

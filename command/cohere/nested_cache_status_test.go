@@ -101,7 +101,7 @@ func libraryFixture(test *testing.T) (string, string) {
 
 // A run that only answers, `--version`, a rule list, the resolved configuration or the cache dump, checks nothing,
 // so it makes no cache in any library (#spdcohere). `cohere --version` made each library's `.cache/cohere`, and the
-// quiet bench, which runs it in its copy to pin the engine, read the copy's tree as changed under its runs and lost
+// quiet bench, which runs it in its copy to pin the child, read the copy's tree as changed under its runs and lost
 // the night. A checking run still makes it, which TestALibrarysCacheLeavesBothRepositoriesClean holds.
 func TestARunThatOnlyAnswersMakesNoCacheInALibrary(test *testing.T) {
 	test.Parallel()

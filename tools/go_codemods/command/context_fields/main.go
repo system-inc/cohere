@@ -2,12 +2,12 @@
 // exactly Context declared in a package of the workspace: the field takes its type's package name in front,
 // so `ctx rule.Context` becomes `ruleContext`, at its declaration and at every selector and composite literal
 // key that names it, in every package. It is contextnames' rule for a local, applied to a field, which only
-// the cross-package engine can rename. A field of any other type is left, and listed.
+// global_rename can rename. A field of any other type is left, and listed.
 //
 // A field is refused, never numbered, when some selector of it sits where the new name already means
 // something else: a method holding a `ruleContext` parameter and reading `walker.ctx` would read
 // `walker.ruleContext` beside `ruleContext`, two names for what may be two contexts. Every other rename goes
-// through the global rename engine, which refuses any that could change what the program means; the rewrite
+// through global_rename, which refuses any that could change what the program means; the rewrite
 // is reloaded in memory and every identifier's resolution compared before anything is written.
 package main
 
@@ -155,7 +155,7 @@ func renameFields(root string, skips []string, dryRun bool, output *bufio.Writer
 		return 0
 	}
 	if len(result.Unresolved)+len(result.SelectionModelMismatches)+len(result.SatisfactionModelMismatches) > 0 {
-		fmt.Fprintf(errorOutput, "%s: the engine's model disagreed with go/types somewhere; the renames it touched "+
+		fmt.Fprintf(errorOutput, "%s: global_rename's model disagreed with go/types somewhere; the renames it touched "+
 			"were refused, the rest go on to the verified write\n", commandName)
 	}
 	// The write reloads the whole workspace to prove it, so the plan is seen before that wait.
@@ -331,7 +331,7 @@ func report(
 	fmt.Fprintf(output, "accepted: %d\n", len(result.Accepted))
 	fmt.Fprintf(
 		output,
-		"refused: %d by the engine, %d for a collision in scope\n",
+		"refused: %d by global_rename, %d for a collision in scope\n",
 		len(result.Rejections),
 		len(collisions),
 	)
@@ -378,7 +378,7 @@ func report(
 			trim(found.declared),
 		)
 	}
-	fmt.Fprintln(output, "\nrefused by the engine:")
+	fmt.Fprintln(output, "\nrefused by global_rename:")
 	for _, rejection := range result.Rejections {
 		fmt.Fprintf(
 			output,

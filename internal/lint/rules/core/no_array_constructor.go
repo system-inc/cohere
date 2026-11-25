@@ -108,10 +108,10 @@ var messageUseAnArrayLiteral = rule.Message{
 // Measured directly on our parser: before the rewrite the block holds an identifier statement and a
 // call statement, after it holds one `ElementAccessExpression`. Upstream comments the pair out of
 // its fix table with "These currently produce invalid syntax, need to fix the fixer" but still
-// declares the rule `fix`, so its engine applies the rewrite unattended on exactly the input it
+// declares the rule `fix`, so its fix pass applies the rewrite unattended on exactly the input it
 // knows it gets wrong.
 //
-// This is the failure the brief singles out as the one an engine structurally cannot refuse: the
+// This is the failure the brief singles out as the one a fix pass structurally cannot refuse: the
 // output parses, so no syntax guard fires, and the meaning changed anyway. So the rewrite is offered
 // as a suggestion a human accepts rather than a fix applied unattended. That is not caution about
 // the common case, where `[]` is plainly right; it is that the rule cannot tell the common case from

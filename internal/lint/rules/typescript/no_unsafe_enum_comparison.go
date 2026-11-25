@@ -72,7 +72,7 @@ var (
 // # The suggestion is not ported, and that is a stated decline
 //
 // `meta.hasSuggestions` is true and `meta.fixable` is absent, so upstream offers a repair a human
-// chooses rather than one the edit engine applies. 16 corpus cases carry one.
+// chooses rather than one the fix pass applies. 16 corpus cases carry one.
 //
 // The suggestion rewrites the literal side into an enum member reference, which needs
 // `getEnumKeyForLiteral`: it matches a static value against each enum literal, then reconstructs a

@@ -1,4 +1,4 @@
-// Package consistency_no_lone_block is the Go engine's rule that a bare block earns its braces by scoping something.
+// Package consistency_no_lone_block is cohere-go's rule that a bare block earns its braces by scoping something.
 //
 // It is the Go form of ESLint core's no-lone-blocks. A block standing on its own among statements opens a scope, and
 // in Go that is sometimes the point: braces around a `:=` keep a short-lived variable from leaking into the rest of
@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_lone_block", "Flags a
 	"braces scope nothing and only indent the code. A bare block that declares something is Go's way of scoping a "+
 	"variable and is left alone.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. A bare block and what it declares are syntax, so the rule
+// Rule is this rule's entry in cohere-go's registry. A bare block and what it declares are syntax, so the rule
 // reads no types.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 

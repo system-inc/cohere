@@ -16,9 +16,9 @@ import (
 // from source beside the host's lint for its graph (the side load). When it does, the host's session writes each such
 // package's record, built from the side load's live packages, into the store under a key derived from the package's
 // own standard-library key (StandardLibraryDependenceRecordKey), and a later run with a store reads it back in place
-// of the side load. Any doubt is a miss: a record of another format, release, build, file, engine or toolchain is under
-// another key, and one that does not decode is a problem, said, and loaded again, so its record is written over. A
-// record names its files as the side load did, by their paths below this `GOROOT`, which its key holds through the
+// of the side load. Any doubt is a miss: a record of another format, release, build, file, executable or toolchain is
+// under another key, and one that does not decode is a problem, said, and loaded again, so its record is written over.
+// A record names its files as the side load did, by their paths below this `GOROOT`, which its key holds through the
 // toolchain, so a record is never read under another installation.
 
 // StandardLibraryDependenceRecordVersion is the format of a standard-library dependence record as the store keeps it,
@@ -33,16 +33,16 @@ import (
 const StandardLibraryDependenceRecordVersion = "standard-library-dependence-record-9"
 
 // StandardLibraryDependenceRecordKey is where the store keeps the dependence record of the standard-library package
-// whose standard-library key is standardLibraryKey (cache.StandardLibraryKeys), written by the engine whose identity is
-// engineIdentity under toolchain, the Go version and `GOROOT` go env reports. The standard-library key holds the
-// cache's format, the release stamp, the build and every file's bytes by its path below `GOROOT`; the engine and the
-// toolchain are hashed in beside it, so a record another engine, another toolchain or another installation wrote is
+// whose standard-library key is standardLibraryKey (cache.StandardLibraryKeys), written by cohere-go whose identity is
+// executableIdentity under toolchain, the Go version and `GOROOT` go env reports. The standard-library key holds the
+// cache's format, the release stamp, the build and every file's bytes by its path below `GOROOT`; cohere-go and the
+// toolchain are hashed in beside it, so a record another executable, another toolchain or another installation wrote is
 // never read.
 func StandardLibraryDependenceRecordKey(
-	standardLibraryKey cache.Key, engineIdentity string, toolchain string,
+	standardLibraryKey cache.Key, executableIdentity string, toolchain string,
 ) cache.Key {
 	return cache.DigestOf([]byte("standard library dependence record "+StandardLibraryDependenceRecordVersion),
-		[]byte(engineIdentity), []byte(toolchain), standardLibraryKey[:])
+		[]byte(executableIdentity), []byte(toolchain), standardLibraryKey[:])
 }
 
 // standardLibraryRecordKey is keyed's record key, and whether it has one: a standard-library package the session
@@ -53,7 +53,11 @@ func (session *CacheSession) standardLibraryRecordKey(keyed *packages.Package) (
 	if !isKeyed || standardLibrary == nil || !session.restoredFromSystemCache(keyed) {
 		return cache.Key{}, false
 	}
-	return StandardLibraryDependenceRecordKey(key, session.caching.Context.EngineIdentity, standardLibrary.Toolchain),
+	return StandardLibraryDependenceRecordKey(
+			key,
+			session.caching.Context.ExecutableIdentity,
+			standardLibrary.Toolchain,
+		),
 		true
 }
 
@@ -156,27 +160,27 @@ func (session *CacheSession) WriteStandardLibraryRecords(
 }
 
 // StandardLibraryDeclarationsRecordKey is where the system cache's store keeps the declarations-only record of the
-// standard-library package whose standard-library key is standardLibraryKey (#anfjtr3), written by the engine whose
-// identity is engineIdentity under toolchain, as StandardLibraryDependenceRecordKey keys a whole one in the project's
-// store, apart from it by its own words and version (DeclarationsRecordVersion). It is kept in the system cache's
-// store beside the package's entry, since the record, as the entry, holds nothing of any project's, so every project,
-// and a run under `--no-cache`, which has no store of its own, reads the one record. The whole records' version,
-// DependenceRecordVersion, is hashed in beside its own, as DeclarationsRecordKey hashes it, since the engine's identity
-// a stamp sets can stay one across binaries whose collectors record otherwise.
+// standard-library package whose standard-library key is standardLibraryKey (#anfjtr3), written by cohere-go whose
+// identity is executableIdentity under toolchain, as StandardLibraryDependenceRecordKey keys a whole one in the
+// project's store, apart from it by its own words and version (DeclarationsRecordVersion). It is kept in the system
+// cache's store beside the package's entry, since the record, as the entry, holds nothing of any project's, so every
+// project, and a run under `--no-cache`, which has no store of its own, reads the one record. The whole records'
+// version, DependenceRecordVersion, is hashed in beside its own, as DeclarationsRecordKey hashes it, since cohere-go's
+// identity a stamp sets can stay one across binaries whose collectors record otherwise.
 func StandardLibraryDeclarationsRecordKey(
-	standardLibraryKey cache.Key, engineIdentity string, toolchain string,
+	standardLibraryKey cache.Key, executableIdentity string, toolchain string,
 ) cache.Key {
-	return standardLibraryDeclarationsRecordKeyAt(DependenceRecordVersion, standardLibraryKey, engineIdentity,
+	return standardLibraryDeclarationsRecordKeyAt(DependenceRecordVersion, standardLibraryKey, executableIdentity,
 		toolchain)
 }
 
 // standardLibraryDeclarationsRecordKeyAt is StandardLibraryDeclarationsRecordKey with dependenceVersion as the whole
 // records' version, which a test names apart from DependenceRecordVersion to see the key move with it.
 func standardLibraryDeclarationsRecordKeyAt(
-	dependenceVersion string, standardLibraryKey cache.Key, engineIdentity string, toolchain string,
+	dependenceVersion string, standardLibraryKey cache.Key, executableIdentity string, toolchain string,
 ) cache.Key {
 	return cache.DigestOf([]byte("standard library declarations record "+DeclarationsRecordVersion),
-		[]byte(dependenceVersion), []byte(engineIdentity), []byte(toolchain), standardLibraryKey[:])
+		[]byte(dependenceVersion), []byte(executableIdentity), []byte(toolchain), standardLibraryKey[:])
 }
 
 // standardLibraryDeclarationsKey is keyed's declarations-only record key in the system cache's store, and whether it
@@ -188,7 +192,11 @@ func (session *CacheSession) standardLibraryDeclarationsKey(keyed *packages.Pack
 	if !isKeyed || standardLibrary == nil || keyed.Module != nil || !session.KeptBySystemCache(keyed) {
 		return cache.Key{}, false
 	}
-	return StandardLibraryDeclarationsRecordKey(key, standardLibrary.Context.EngineIdentity, standardLibrary.Toolchain),
+	return StandardLibraryDeclarationsRecordKey(
+			key,
+			standardLibrary.Context.ExecutableIdentity,
+			standardLibrary.Toolchain,
+		),
 		true
 }
 

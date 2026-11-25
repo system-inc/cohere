@@ -1,7 +1,7 @@
 // Package struct_tag is vet's structtag pass, a struct field tag that reflect.StructTag.Get cannot read as written,
 // a json or xml tag on a field those encodings never see because it is unexported, and a json or xml name two
 // fields of one struct both claim, embedded structs' fields included at the depth their embedding puts them. It sits
-// on the engine's syntax dispatcher, hearing each struct type on the walk the dispatcher makes once for every syntax
+// on cohere-go's syntax dispatcher, hearing each struct type on the walk the dispatcher makes once for every syntax
 // rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/structtag/structtag.go, whose

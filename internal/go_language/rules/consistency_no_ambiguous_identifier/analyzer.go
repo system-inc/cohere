@@ -1,4 +1,4 @@
-// Package consistency_no_ambiguous_identifier is the Go engine's rule that a name is a word, not a letter.
+// Package consistency_no_ambiguous_identifier is cohere-go's rule that a name is a word, not a letter.
 //
 // A name is read everywhere it is used and declared only once, so the keystrokes a single letter saves are saved at
 // the declaration and paid for at every read. The repair is the word the letter stands for: `count`, `rowIndex`,
@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_ambiguous_identifier"
 	"the declaration to learn what it holds. An uppercase letter, a type parameter by convention, is not judged.",
 	&listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var singleLetterMessage = policy.MessageOf(Name, "noSingleLetter")
@@ -124,8 +124,8 @@ func judgeTypeSwitchGuard(context *rule.Context, statement *ast.TypeSwitchStmt, 
 // holds, one except in a type switch, and stack is the nodes enclosing identifier, its parent last.
 func judge(context *rule.Context, identifier *ast.Ident, declaredTypes []types.Type, stack []ast.Node) {
 	// One lowercase ASCII letter, the line both twins draw: an uppercase letter is a type parameter by convention, so
-	// the TypeScript and Swift rules leave it alone and the three engines judge the same names. The blank identifier is
-	// out too: it is Go's grammar for no name, not a name.
+	// the TypeScript and Swift rules leave it alone and the three languages judge the same names. The blank identifier
+	// is out too: it is Go's grammar for no name, not a name.
 	if len(identifier.Name) != 1 || identifier.Name[0] < 'a' || identifier.Name[0] > 'z' {
 		return
 	}

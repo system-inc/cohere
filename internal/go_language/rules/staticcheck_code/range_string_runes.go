@@ -14,7 +14,7 @@ import (
 // rangeStringRunesMessage is the original's message, word for word.
 const rangeStringRunesMessage = "should range over string, not []rune(string)"
 
-// RangeStringRunes judges one function of the engine's own intermediate representation: each range statement of its
+// RangeStringRunes judges one function of cohere's own intermediate representation: each range statement of its
 // syntax that drops the index and ranges over a string converted to a slice of runes, where nothing else reads the
 // slice, so ranging over the string itself yields the same runes without allocating. It is a Function callback of
 // rule.IntermediateRepresentationListener, and it is staticcheck's sharedcheck.CheckRangeStringRunes, the one function

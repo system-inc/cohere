@@ -234,7 +234,7 @@ func findingsOf(
 	fileName func(string) string,
 ) []Finding {
 	test.Helper()
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{analyzer}, roots, engineOptions())
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{analyzer}, roots, portOptions())
 	if analyzeError != nil {
 		test.Fatalf("analyzing %d packages: %v", len(roots), analyzeError)
 	}

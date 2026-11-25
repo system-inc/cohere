@@ -35,7 +35,7 @@ var messageRedundantDoubleNegation = rule.Message{
 //
 // # The two findings are not the same kind of finding
 //
-// Unwrapping `Boolean(x)` is a Fix and the engine applies it unattended, because in a position that
+// Unwrapping `Boolean(x)` is a Fix and the fix pass applies it unattended, because in a position that
 // already coerces, `Boolean(x)` and `x` are indistinguishable to everything downstream.
 //
 // Removing `!!` is a Suggestion instead. That looks inconsistent and it is deliberate: the two

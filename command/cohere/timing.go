@@ -15,7 +15,7 @@ import (
 )
 
 // timingNameWidth is the width of a timing table's name column, TypeScript's and Go's alike, so the two tables line up
-// the same way. Go's widens past it to its longest rule name (printEngineTimings).
+// the same way. Go's widens past it to its longest rule name (printContractTimings).
 const timingNameWidth = 42
 
 // printTimings renders per-rule cost, most expensive first.
@@ -336,10 +336,10 @@ func printCoverage(out *bufio.Writer, timings *program.Timings) {
 }
 
 // staticcheckIntermediateRepresentation is the analyzer name of staticcheck's intermediate representation build,
-// which the Go engine runs beside its own while both are in use.
+// which cohere-go runs beside its own while both are in use.
 const staticcheckIntermediateRepresentation = "buildir"
 
-// printEngineTimings renders a Go run's timing record (#3apgjer) in printTimings' shape, so a Go rule is timed
+// printContractTimings renders a Go run's timing record (#3apgjer) in printTimings' shape, so a Go rule is timed
 // before it lands as a TypeScript one is: the unit first, and that the extra builds restored nothing when the run had
 // any (printExtraBuildsFromSource), then a row per rule, most expensive first with its share of the rules' total, then
 // the shared work no single rule owns, the load's phases, what the rows cover of the process's CPU, and what measuring
@@ -352,12 +352,12 @@ const staticcheckIntermediateRepresentation = "buildir"
 //
 // What no row measures is said as its own figure against the process's CPU and never spread over the rows, for the
 // reason printCoverage gives: a share column that sums to 100 percent reads as a run fully explained.
-func printEngineTimings(out *bufio.Writer, record *contract.TimingRecord) {
+func printContractTimings(out *bufio.Writer, record *contract.TimingRecord) {
 	if len(record.Rules) == 0 {
 		printNothingToMeasure(out)
 		return
 	}
-	// Sorted here though the engine sorts them too, so the table is most expensive first whatever order a record
+	// Sorted here though the child sorts them too, so the table is most expensive first whatever order a record
 	// arrives in.
 	rules := slices.Clone(record.Rules)
 	slices.SortStableFunc(rules, func(left, right contract.RuleTiming) int {
@@ -446,7 +446,14 @@ func printEngineTimings(out *bufio.Writer, record *contract.TimingRecord) {
 		counted(load.ExportDataPackages, "package", "packages"))
 
 	measuring := microseconds(record.MeasuringCpuMicroseconds)
-	printEngineTimingCoverage(out, microseconds(record.ProcessCpuMicroseconds), ruleCpu, sharedCpu, loadCpu, measuring)
+	printContractTimingCoverage(
+		out,
+		microseconds(record.ProcessCpuMicroseconds),
+		ruleCpu,
+		sharedCpu,
+		loadCpu,
+		measuring,
+	)
 	fmt.Fprintf(out, "  measuring: %s cost %s, already taken out of the rows above\n",
 		counted(int(record.MeasuredCalls), "measured call", "measured calls"), formatMilliseconds(measuring))
 }
@@ -464,10 +471,10 @@ func printExtraBuildsFromSource(out *bufio.Writer, extraBuilds int) {
 		counted(extraBuilds, "extra build", "extra builds"))
 }
 
-// printEngineTimingCoverage says what the rows sum to against every CPU microsecond the process spent, and names the
+// printContractTimingCoverage says what the rows sum to against every CPU microsecond the process spent, and names the
 // rest as what no row measures. A process whose CPU could not be read states no share, since a share of an unknown
 // is a guess. Rows that sum past the process are said to, because then some work sits in two rows.
-func printEngineTimingCoverage(
+func printContractTimingCoverage(
 	out *bufio.Writer,
 	processCpu time.Duration,
 	ruleCpu time.Duration,
@@ -495,14 +502,14 @@ func printEngineTimingCoverage(
 }
 
 // sharedTimingLabel names a shared row and says what kind of work it is. The intermediate representation builds are
-// named apart, staticcheck's and the engine's own, so a reader sees which of the two a cost belongs to.
+// named apart, staticcheck's and the child's own, so a reader sees which of the two a cost belongs to.
 func sharedTimingLabel(row contract.SharedTiming) string {
 	switch row.Kind {
 	case contract.SharedIntermediateRepresentation:
 		if row.Name == staticcheckIntermediateRepresentation {
 			return row.Name + ", staticcheck's intermediate representation build"
 		}
-		return row.Name + ", the engine's intermediate representation build"
+		return row.Name + ", the child's intermediate representation build"
 	case contract.SharedDispatcher:
 		return row.Name + ", a dispatcher's walk less its listeners, which are billed to their rules"
 	}

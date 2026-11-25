@@ -1,4 +1,4 @@
-// Package rule is what the Go engine knows about one of its rules beyond the analyzer that runs it: the
+// Package rule is what cohere-go knows about one of its rules beyond the analyzer that runs it: the
 // name a finding carries, where the rule came from, and the upstream name a ported rule keeps.
 package rule
 
@@ -10,7 +10,7 @@ import (
 )
 
 // Namespace opens every Go rule's name, as `cohere-swift/` opens every Swift rule's, so a finding line
-// says which engine's rule it is before a reader gets to the rule.
+// says which language's rule it is before a reader gets to the rule.
 const Namespace = "cohere-go/"
 
 // Origin is where a rule came from. Its values are serialized, so they are spelled as swift/Rules.json
@@ -29,7 +29,7 @@ const (
 	OriginTools Origin = "tools"
 )
 
-// Rule is one rule of the Go engine: an analyzer, plus the naming and provenance cohere adds to it.
+// Rule is one rule of cohere-go: an analyzer, plus the naming and provenance cohere adds to it.
 //
 // The analyzer is a plain *analysis.Analyzer so that vet's suite, staticcheck, analysistest and the facts
 // analyzers share across packages all work unchanged. Everything cohere needs on top of that lives here,
@@ -44,11 +44,11 @@ type Rule struct {
 	UpstreamName string
 	// TypeAware is whether the rule reads type information, for the docs, as swift/Rules.json's typeAware.
 	TypeAware bool
-	// Analyzer is what runs. Its options are flags on Analyzer.Flags, which the engine sets from the
+	// Analyzer is what runs. Its options are flags on Analyzer.Flags, which cohere-go sets from the
 	// options object of the rule's entry in the settings.
 	Analyzer *analysis.Analyzer
 	// ConfiguredBy names the options without which the rule reports nothing, each a flag on Analyzer.Flags.
-	// While any of them is empty the engine lists the rule in the lint record's rulesNotConfigured, so a rule
+	// While any of them is empty cohere-go lists the rule in the lint record's rulesNotConfigured, so a rule
 	// that cannot report reads as not configured rather than as quiet.
 	ConfiguredBy []string
 	// Listener is what a dispatched rule hears of each package, and nil for a rule whose analyzer walks the package

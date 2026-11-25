@@ -3,7 +3,7 @@
 Each `version-N.index` is a `.git/index` written by real git (2.54.0) for one small repository, and each
 `version-N.paths` beside it lists, one per line in the index's byte order, exactly the tracked paths a reader
 must yield from it: every path once, whatever its stage or flags. The object format is SHA-1. Both cohere's
-Go reader (`internal/gitignore/tracked_index.go`) and the Swift engine's read these same bytes, so neither may be
+Go reader (`internal/gitignore/tracked_index.go`) and cohere-swift's read these same bytes, so neither may be
 regenerated for one reader alone.
 
 The repository holds a nested directory, a path with a space, and four paths under

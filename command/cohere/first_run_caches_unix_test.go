@@ -1,6 +1,6 @@
 //go:build unix
 
-// The stand-in Swift engine here is a /bin/sh script, as combined_footer_unix_test.go's is, so the file builds on Unix.
+// The stand-in cohere-swift here is a /bin/sh script, as combined_footer_unix_test.go's is, so the file builds on Unix.
 
 package main
 
@@ -23,10 +23,16 @@ func TestEveryProjectRunThatKeepsACacheHasItsDirectoryBeforeAnyRunStarts(test *t
 	test.Parallel()
 	root := test.TempDir()
 	launches := []projectLaunch{
-		{project: discoveredProject{Directory: ".", Engine: engineGo}, arguments: []string{"--no-fix"}},
-		{project: discoveredProject{Directory: "swift", Engine: engineSwift}, arguments: []string{"--no-fix"}},
-		{project: discoveredProject{Directory: "web", Engine: engineTypeScript}, arguments: []string{"--no-cache"}},
-		{project: discoveredProject{Directory: "timed", Engine: engineGo}, arguments: []string{"--timing"}},
+		{project: discoveredProject{Directory: ".", Kind: projectKindGoModule}, arguments: []string{"--no-fix"}},
+		{
+			project:   discoveredProject{Directory: "swift", Kind: projectKindSwiftPackage},
+			arguments: []string{"--no-fix"},
+		},
+		{
+			project:   discoveredProject{Directory: "web", Kind: projectKindTypeScriptProgram},
+			arguments: []string{"--no-cache"},
+		},
+		{project: discoveredProject{Directory: "timed", Kind: projectKindGoModule}, arguments: []string{"--timing"}},
 	}
 	for _, launch := range launches {
 		if makeError := os.MkdirAll(filepath.Join(root, launch.project.Directory), 0o755); makeError != nil {
@@ -53,12 +59,12 @@ func TestAFreshTreesSecondRunReplaysItsGoSide(test *testing.T) {
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
-	swiftEngine := filepath.Join(test.TempDir(), "cohere-swift")
-	if writeError := executable_testing.WriteFile(swiftEngine, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
+	swiftBinary := filepath.Join(test.TempDir(), "cohere-swift")
+	if writeError := executable_testing.WriteFile(swiftBinary, []byte("#!/bin/sh\ncat '"+fixture+"'\n"),
 		0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	environment := []string{"COHERE_SWIFT_ENGINE=" + swiftEngine, goEngineChildVariable + "="}
+	environment := []string{"COHERE_SWIFT_BINARY=" + swiftBinary, goChildVariable + "="}
 	for tree := range 12 {
 		test.Run(fmt.Sprintf("tree %d", tree), func(test *testing.T) {
 			test.Parallel()

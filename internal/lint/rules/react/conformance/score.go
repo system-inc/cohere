@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Implementation is what a candidate rule engine has to provide to be scored.
+// Implementation is what a candidate rule run has to provide to be scored.
 //
 // One method, and it hands back `{message, line}` pairs. That is upstream's own backend-comparison
 // contract from `RustBackendComparison-test.ts`, and it is the narrowest surface that can still

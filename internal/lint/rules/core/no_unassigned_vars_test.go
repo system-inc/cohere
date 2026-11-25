@@ -196,7 +196,7 @@ func TestNoUnassignedVariablesNeedsTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
 	if !NoUnassignedVariables.NeedsTypeChecker {
-		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the linter will not lock the file")
 	}
 	rule_testing.ExpectClean(
 		test,

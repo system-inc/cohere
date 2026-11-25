@@ -16,9 +16,9 @@ import (
 
 // proposeFromRules runs real rules over the current text and collects their fixes.
 //
-// Every synthetic test in this package hands the engine proposals a test author wrote, which proves
-// the engine's arithmetic and proves nothing about whether a real rule's ranges line up with it.
-// This closes that: the offsets come from the parser, through a shipped rule, into the engine, and
+// Every synthetic test in this package hands the fix pass proposals a test author wrote, which proves
+// the fix pass's arithmetic and proves nothing about whether a real rule's ranges line up with it.
+// This closes that: the offsets come from the parser, through a shipped rule, into the fix pass, and
 // the assertion is on the resulting file.
 //
 // Driving real rules this way is what surfaced the trivia defect these tests now pin. Reasoning
@@ -82,7 +82,7 @@ func walkForRules(node *ast.Node, listeners rule.Listeners) {
 }
 
 // A real rule's fix must land at the right bytes and produce a file that still parses. This is the
-// end-to-end proof: the rule computes ranges against a real parse, and the engine applies them.
+// end-to-end proof: the rule computes ranges against a real parse, and the fix pass applies them.
 func TestARealRuleFixLandsCorrectly(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -180,7 +180,7 @@ func TestARealRuleConvergesInTwoPasses(test *testing.T) {
 // rather than only in the rule package's: the corrupted output still parses. The refusal guard here
 // catches a rewrite that breaks syntax, and this one does not break syntax: it silently ate a
 // space, a newline, or an entire comment, and every downstream check stayed green. A helper handing
-// the engine a range wider than the rule meant is damage no validation downstream can detect. The
+// the fix pass a range wider than the rule meant is damage no validation downstream can detect. The
 // parse guard is necessary and not sufficient, and this fixture is the standing proof of that gap.
 //
 // Fixed in internal/rule/rule.go, which now trims through `TokenRange`. The three shapes below are
@@ -337,7 +337,7 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 // budget runs out. It is written as a probe rather than found in the catalog because no shipped rule
 // does this today: every ReportNodeWithFixes site emits one fix that removes its own trigger. The
 // guard is worth having precisely because it is unreachable now: it costs nothing today and the
-// first rule to get this wrong will be caught by the engine rather than by a developer reading a
+// first rule to get this wrong will be caught by the fix pass rather than by a developer reading a
 // file full of nested braces.
 var nonSilencingRule = rule.Rule[rule.NoOptions]{
 	Name: "probe-never-silences",
@@ -374,7 +374,7 @@ var nonSilencingRule = rule.Rule[rule.NoOptions]{
 
 // A file that exhausts the pass budget is left exactly as it was found.
 //
-// The engine used to keep the last pass that parsed, reasoning that it was a valid file. It is: ten
+// The fix pass used to keep the last pass that parsed, reasoning that it was a valid file. It is: ten
 // passes of this rule produce `{ { { ... } } }`, which parses and is nobody's code. Parsing and
 // being finished are different properties, and only the first one was ever checked.
 func TestAFileThatDoesNotConvergeIsNotWritten(test *testing.T) {
@@ -489,7 +489,7 @@ var siblingOverlapRule = rule.Rule[rule.NoOptions]{
 
 // Two fixes from one diagnostic are judged separately, and one can land while its sibling is refused.
 //
-// The engine documents this at ProposalsFrom and resolveOverlaps; this is the observation. The file
+// The fix pass documents this at ProposalsFrom and resolveOverlaps; this is the observation. The file
 // is written with half of an edit that no rule proposed as a whole, and it parses, so the refusal
 // guard has no reason to fire. That combination is the reason the multi-fix hazard is worth a
 // warning rather than a shrug: the failure is silent by construction.

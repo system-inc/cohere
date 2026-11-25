@@ -94,7 +94,7 @@ func lintCache(
 	}
 	identity, identityError := cache.ExecutableIdentity()
 	if identityError != nil {
-		return nil, fmt.Errorf("identifying the engine: %w", identityError)
+		return nil, fmt.Errorf("identifying cohere-go: %w", identityError)
 	}
 	var standardLibrary *check.StandardLibraryCaching
 	// The standard library is keyed apart when there is a system cache to keep it.
@@ -102,11 +102,11 @@ func lintCache(
 		standardLibrary = &check.StandardLibraryCaching{
 			System: system.store,
 			Context: cache.StandardLibraryContext{
-				FormatVersion:  check.CacheFormatVersion,
-				EngineIdentity: cmp.Or(source.stamp, identity),
-				Build:          standardLibraryBuild(values),
-				CgoToolchain:   cgoToolchain(values),
-				Goroot:         values["GOROOT"],
+				FormatVersion:      check.CacheFormatVersion,
+				ExecutableIdentity: cmp.Or(source.stamp, identity),
+				Build:              standardLibraryBuild(values),
+				CgoToolchain:       cgoToolchain(values),
+				Goroot:             values["GOROOT"],
 			},
 			// A standard-library dependence record is written under the toolchain that loaded it (#6a3kjvz).
 			Toolchain: cmp.Or(source.toolchain, values["GOVERSION"]+" "+values["GOROOT"]),
@@ -119,10 +119,10 @@ func lintCache(
 		Store:       cache.Open(workspace.Root, stamps),
 		ExtraInputs: newStaticcheckConfigurationInputs().inputs,
 		Context: cache.Context{
-			FormatVersion:  check.CacheFormatVersion,
-			EngineIdentity: identity,
-			Build:          cacheBuild(values),
-			RuleSet:        cacheRuleSet(enabled),
+			FormatVersion:      check.CacheFormatVersion,
+			ExecutableIdentity: identity,
+			Build:              cacheBuild(values),
+			RuleSet:            cacheRuleSet(enabled),
 		},
 		StandardLibrary: standardLibrary,
 		CgoToolchain:    cgoToolchain(values),
@@ -134,8 +134,8 @@ func lintCache(
 // names an overlay: go list then reads each file the overlay replaces from the overlay, and a key of the system cache
 // holds the bytes on disk, never the overlay's, so a build under one would keep and restore analyses of bytes it does
 // not have (#57wgzhp). go takes an overlay of a file below `GOROOT`, so every build under an overlay keeps no system
-// cache, failing closed, whichever files it names. `GOFLAGS` is the one road: go reads no other flags of the engine's
-// go commands from outside, and the engine's own overlays, the rename's proofs, load with no findings cache at all
+// cache, failing closed, whichever files it names. `GOFLAGS` is the one road: go reads no other flags of cohere-go's
+// go commands from outside, and cohere-go's own overlays, the rename's proofs, load with no findings cache at all
 // (loadRequest.withOverlay). An -overlay with no file names none.
 func overlaidGoFlags(goFlags string) bool {
 	for _, field := range strings.Fields(goFlags) {
@@ -162,10 +162,10 @@ func cgoToolchain(values map[string]string) []string {
 // (standardLibraryBuild), since the check of a package nothing reports on reads it as much as one's that is.
 const processGodebug = "GODEBUG"
 
-// processEnvironment are the engine process's own variables an analyzer reads, each named in the build context
+// processEnvironment are cohere-go process's own variables an analyzer reads, each named in the build context
 // whether it is set or not. asmdecl and framepointer read the target from go/build's build.Default, which comes from
 // the process's `GOOS` and `GOARCH`, not from go env, so the two can differ. staticcheck's TOML parser, which reads
-// staticcheck.conf, reads `BURNTSUSHI_TOML_110`. The engine's own `GODEBUG` can change what go/types makes of a
+// staticcheck.conf, reads `BURNTSUSHI_TOML_110`. cohere-go's own `GODEBUG` can change what go/types makes of a
 // package, as gotypesalias did until go1.27 removed it (export_data/predeclared.go), so every key holds it, the
 // standard library's too (processGodebug): no go/types setting is honored now, and holding it costs only a miss.
 var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110", processGodebug}
@@ -195,7 +195,7 @@ func cacheBuild(values map[string]string) []string {
 	return build
 }
 
-// processVariable is the engine process's own variable name as a build context names it, whether it is set or not.
+// processVariable is cohere-go process's own variable name as a build context names it, whether it is set or not.
 func processVariable(name string) string {
 	value, set := os.LookupEnv(name)
 	if !set {
@@ -213,8 +213,8 @@ func processVariable(name string) string {
 // besides. -buildvcs decides whether go stamps version control into a main package of the main module, which can refuse
 // that package's build where go cannot read the tree's version control, and no standard-library package is one, so it
 // changes nothing of one either way; with it in the key, a run under `GOFLAGS=-buildvcs=false`, as every cohere
-// worktree and cohere-dev set, would key the standard library apart from a run without it (#30kzgj1). The engine's own
-// key keeps it (load.VerdictFlags). Every other flag stays, as in the engine's key (#s5h4q2t): -tags and -race choose
+// worktree and cohere-dev set, would key the standard library apart from a run without it (#30kzgj1). cohere-go's own
+// key keeps it (load.VerdictFlags). Every other flag stays, as in cohere-go's key (#s5h4q2t): -tags and -race choose
 // which files a package holds, and -n can decide whether a load succeeds at all.
 var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcacherw", "buildvcs"}
 

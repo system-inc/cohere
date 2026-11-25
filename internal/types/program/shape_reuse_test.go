@@ -553,7 +553,7 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 			body, bodyCache, bodyShapes := shapeWalk(test, root, rules, cache, shapes)
 			ran := counter.snapshot()
 			cold := plainWalk(test, root, rules)
-			// Global scripts and augmentations participate in the engine's content-keyed global
+			// Global scripts and augmentations participate in the checker's content-keyed global
 			// component. The module-only cases can replay; globals conservatively rerun.
 			global := positive || tc.name == "global-augmentation-inside-function"
 			bodyRuns := 0

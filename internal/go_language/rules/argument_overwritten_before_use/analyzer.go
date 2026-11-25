@@ -1,5 +1,5 @@
 // Package argument_overwritten_before_use is staticcheck's SA4009, a parameter assigned in its function's body before
-// anything reads the value the caller passed, ported onto the engine's own intermediate representation.
+// anything reads the value the caller passed, ported onto cohere's own intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4009/sa4009.go, whose logic it keeps and
 // whose messages it reports word for word: the finding from the start to the end of the parameter's name, and beside
@@ -29,7 +29,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own.
 var Listener = rule.Listener{
 	FileLocal: true, IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4009",
 	"SA4009",
 	"Flags a function argument overwritten before its first use: staticcheck's SA4009, ported onto the "+
-		"engine's own intermediate representation.",
+		"cohere's own intermediate representation.",
 	&Listener,
 )
 

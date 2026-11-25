@@ -15,7 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 )
 
-// strippedPass is a pass over the fixture package at path, loaded and type-checked whole as the engine loads one, and
+// strippedPass is a pass over the fixture package at path, loaded and type-checked whole as cohere-go loads one, and
 // then with the body of the function named stripped taken away, as a build that strips a standing body holds the
 // package: its types know what the body did, its syntax no longer says it.
 func strippedPass(test *testing.T, path string, stripped string) *analysis.Pass {

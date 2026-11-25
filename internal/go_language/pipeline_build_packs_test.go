@@ -19,12 +19,12 @@ import (
 )
 
 // projectStoreDirectory is the findings store of the project at root, whose packs are in its `packs` directory, each
-// in its engine identity's.
+// in its executable identity's.
 func projectStoreDirectory(root string) string {
 	return filepath.Join(root, ".cache", "cohere", "go")
 }
 
-// packFiles are the pack files of every store directory of directories, of every engine identity, sorted.
+// packFiles are the pack files of every store directory of directories, of every executable identity, sorted.
 func packFiles(test *testing.T, directories ...string) []string {
 	test.Helper()
 	var files []string
@@ -60,9 +60,9 @@ func packedKeys(test *testing.T, directories ...string) map[cache.Key]bool {
 // as a run's would be had its stores been written a while before (#b2t9xmf). The stamps are set first, so the system
 // cache's store, which sharingSystemCache opens, holds them, as every store of the run does.
 func packingLater(systemRoot string) func(*pipeline) {
-	return func(engine *pipeline) {
-		engine.shardStamps = cache.NewShardStamps(func() time.Time { return time.Now().Add(time.Hour) })
-		sharingSystemCache(systemRoot)(engine)
+	return func(pipeline *pipeline) {
+		pipeline.shardStamps = cache.NewShardStamps(func() time.Time { return time.Now().Add(time.Hour) })
+		sharingSystemCache(systemRoot)(pipeline)
 	}
 }
 
@@ -201,9 +201,9 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 	systemRoot := test.TempDir()
-	sharing := func(engine *pipeline) {
-		packingLater(systemRoot)(engine)
-		engine.keepsHostRestoreOff = true
+	sharing := func(pipeline *pipeline) {
+		packingLater(systemRoot)(pipeline)
+		pipeline.keepsHostRestoreOff = true
 	}
 	runOverConfigured(test, root, exitFindings, sharing)
 	stores := []string{projectStoreDirectory(root), systemStoreDirectory(systemRoot)}
@@ -270,7 +270,7 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	engine, emptied := runOverConfigured(test, root, exitFindings, sharing)
+	pipeline, emptied := runOverConfigured(test, root, exitFindings, sharing)
 	packs := packsOf(test, emptied)
 	if packs.RecordsServed == 0 {
 		test.Fatalf("want the packs to serve the records whose export data went, got %+v", packs)
@@ -278,7 +278,7 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 	// The root package, edited, and windows' separator, whose export data went, at the least: two, where a build whose
 	// store held its export data checks the root package alone.
 	windows := 0
-	for _, run := range engine.buildRuns[1:] {
+	for _, run := range pipeline.buildRuns[1:] {
 		if run.build.String() != "windows/"+runtime.GOARCH {
 			continue
 		}
@@ -298,7 +298,8 @@ func TestARecordServedWhoseEntryWentIsAMiss(test *testing.T) {
 	}
 }
 
-// packPlaceOf is the place of the pack file at path, its engine identity's directory and its name, each a key in hex.
+// packPlaceOf is the place of the pack file at path, its executable identity's directory and its name, each a key in
+// hex.
 func packPlaceOf(test *testing.T, path string) cache.PackPlace {
 	test.Helper()
 	keyOf := func(name string) cache.Key {

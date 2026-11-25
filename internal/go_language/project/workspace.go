@@ -1,5 +1,5 @@
 // Package project reads which modules a Go root owns and which `.go` files are ours, before anything is
-// loaded. cohere-dev's landing gate and the Go engine both read it, so the two can never disagree about which
+// loaded. cohere-dev's landing gate and cohere-go both read it, so the two can never disagree about which
 // modules a repository builds.
 //
 // A root is the directory of a go.work or of a go.mod. A go.work's modules are its use directives, read with
@@ -53,7 +53,7 @@ type Workspace struct {
 }
 
 // ReadWorkspace reads the modules a root owns. Without a go.work it is the root module alone. A module
-// the go.work does not use is not refused here: the engine reads it as a project of its own, and a gate
+// the go.work does not use is not refused here: cohere-go reads it as a project of its own, and a gate
 // that refuses one calls RefuseUnlistedModules too.
 func ReadWorkspace(root string) (Workspace, error) {
 	absoluteRoot, absoluteError := filepath.Abs(root)

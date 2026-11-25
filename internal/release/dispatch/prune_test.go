@@ -41,7 +41,7 @@ func TestPruneRemovesExactlyWhatNoRunCanReach(test *testing.T) {
 		"cohere-" + platformTag() + "-old01",
 		"cohere-" + platformTag() + "-old02",
 		"cohere-" + platformTag() + "-old03",
-		// Ten old Swift engines, the newest eight kept.
+		// Ten old cohere-swift binaries, the newest eight kept.
 		"cohere-swift-" + platformTag() + "-old00",
 		"cohere-swift-" + platformTag() + "-old01",
 		// A partial whose writer is long gone.

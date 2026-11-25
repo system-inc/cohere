@@ -2889,7 +2889,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## In the Swift engine
+## In cohere-swift
 
 In `cohere-swift`, which the two macOS packages ship beside `cohere`. Packages resolved by
 [swift/Package.resolved](swift/Package.resolved).

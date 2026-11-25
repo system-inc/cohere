@@ -42,7 +42,7 @@ const searchBudget = 1 << 20
 // the component names that platform and the tag together. No build sets tags that compile a program of its own,
 // which would put it beside its directory's package (breaks).
 //
-// Each file's bytes are what reader hands it, asked in census order, and it has no other way to them, so the engine
+// Each file's bytes are what reader hands it, asked in census order, and it has no other way to them, so cohere-go
 // hands it the bytes it read once for the whole run and no file is opened twice (#ghb3rcn). A file reader cannot give
 // is unbuilt, its reason the error wrapped as readSource wraps any.
 func BuildsFor(
@@ -61,7 +61,7 @@ func BuildsFor(
 	for _, file := range census.Ours {
 		read, readError := readSource(file, reader)
 		if readError != nil {
-			// The engine names an unreadable file as a gap of its own; no build can say it compiles one.
+			// cohere-go names an unreadable file as a gap of its own; no build can say it compiles one.
 			unbuilt = append(unbuilt, Unbuilt{File: file, Reason: readError.Error()})
 			continue
 		}

@@ -67,10 +67,10 @@ func TestTheHostsSuppressionIsComputedOnlyWhenNoMergeReplacesIt(test *testing.T)
 			root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 			writeFixtureFiles(test, root, map[string]string{"internal/separator/split.go": splitFile})
 			var suppressed atomic.Int32
-			engine, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-				engine.hostSuppressed = func() { suppressed.Add(1) }
+			pipeline, stream := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+				pipeline.hostSuppressed = func() { suppressed.Add(1) }
 				if each.failBuild {
-					engine.extraBuildEnds = func(project.Build, io.Writer) error {
+					pipeline.extraBuildEnds = func(project.Build, io.Writer) error {
 						return errors.New("the planted failure")
 					}
 				}
@@ -78,8 +78,8 @@ func TestTheHostsSuppressionIsComputedOnlyWhenNoMergeReplacesIt(test *testing.T)
 			if got := suppressed.Load(); got != each.wantCount {
 				test.Errorf("the host's suppression was computed %d times, want %d", got, each.wantCount)
 			}
-			if each.failBuild && engine.buildRuns != nil {
-				test.Fatalf("the merge was handed %d runs, want none: every build failed", len(engine.buildRuns))
+			if each.failBuild && pipeline.buildRuns != nil {
+				test.Fatalf("the merge was handed %d runs, want none: every build failed", len(pipeline.buildRuns))
 			}
 			lint := lintRecordOf(test, stream)
 			if lint.WithheldBySuppression[consistency_no_else_return.Name] != 1 {
@@ -118,16 +118,16 @@ func TestARunWhoseBuildsMergeIndexesEachFileOnce(test *testing.T) {
 	var lock sync.Mutex
 	builtByFile := map[string]int{}
 	built := 0
-	engine, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.suppressionIndexes.built = func(file string) {
+	pipeline, stream := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.suppressionIndexes.built = func(file string) {
 			lock.Lock()
 			defer lock.Unlock()
 			builtByFile[file]++
 			built++
 		}
 	}, "--no-cache", "--no-fix")
-	if len(engine.buildRuns) < 2 {
-		test.Fatalf("the merge was handed %d runs, want the host's and at least one other", len(engine.buildRuns))
+	if len(pipeline.buildRuns) < 2 {
+		test.Fatalf("the merge was handed %d runs, want the host's and at least one other", len(pipeline.buildRuns))
 	}
 	if built != len(builtByFile) {
 		test.Errorf("the run indexed %d times over %d files, want each once: %v", built, len(builtByFile), builtByFile)

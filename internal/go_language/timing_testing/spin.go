@@ -1,4 +1,4 @@
-// Package timing_testing is for the Go engine's tests of `--timing` (#3apgjer), which plant an analyzer, a listener
+// Package timing_testing is for cohere-go's tests of `--timing` (#3apgjer), which plant an analyzer, a listener
 // or a rule that spends a known amount of its own thread's CPU and read what the run billed it.
 package timing_testing
 

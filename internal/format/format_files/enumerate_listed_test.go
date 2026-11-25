@@ -10,7 +10,7 @@ import (
 
 // listedTree is a tree with everything the walk decides on: git's ignore files at two depths, the house list
 // and ignorePatterns, a nested clone and a submodule's gitlink, symbolic links to a file, a directory and
-// nothing, a file of a type no engine formats, and Adamic `.a` files, one held back and one in an ignored
+// nothing, a file of a type no formatter formats, and Adamic `.a` files, one held back and one in an ignored
 // directory, so the hold-back and the ignore layer before it both decide something.
 func listedTree(test *testing.T) string {
 	test.Helper()

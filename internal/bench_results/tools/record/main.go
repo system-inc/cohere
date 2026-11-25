@@ -2,17 +2,17 @@
 // (internal/bench_results). quiet_machine.sh --record runs it after the copy's tree is checked, from the
 // module root:
 //
-//	go run ./internal/bench_results/tools/record -runs <runs.tsv> -engine <engine> -project <name> \
+//	go run ./internal/bench_results/tools/record -runs <runs.tsv> -binary <cohere> -project <name> \
 //	  -project-commit <sha> -idle-floor <percent> -settle <seconds> -rounds <n> -modes <Cold,Warm,...> \
-//	  -band <percent> [-stopped-early] [-edit <path>] [-project-engine Go] [-no-fix] [-every-build] \
+//	  -band <percent> [-stopped-early] [-edit <path>] [-project-kind GoModule] [-no-fix] [-every-build] \
 //	  -gogc <value> -gomemlimit <value> -gomaxprocs <value>
 //
-// The Go settings are what the benchmark saw in its environment, each empty when unset, and -project-engine
-// names the one engine whose project every run checked alone, absent for a run of the whole root. -no-fix says the
+// The Go settings are what the benchmark saw in its environment, each empty when unset, and -project-kind
+// names the kind of the one project every run checked alone, absent for a run of the whole root. -no-fix says the
 // cold and idle runs checked without fixing, and -every-build that every run asked to check every build the Go files
 // name. The builds the cold and idle runs checked are read from the runs table.
 //
-// The engine's commit and whether its tree was modified come from the binary's own build info, not from
+// cohere's commit and whether its tree was modified come from the binary's own build info, not from
 // its --version prose, so a binary that names no commit is refused rather than recorded as clean.
 package main
 
@@ -34,7 +34,7 @@ import (
 
 func main() {
 	runsPath := flag.String("runs", "", "the run's runs.tsv")
-	engine := flag.String("engine", "", "the pinned engine binary every run used")
+	binary := flag.String("binary", "", "the pinned cohere binary every run used")
 	project := flag.String("project", "", "the project's name")
 	projectCommit := flag.String("project-commit", "", "the commit the copy was extracted at")
 	idleFloor := flag.Float64("idle-floor", 0, "the share of all cores, in percent, idle before and after a quiet run")
@@ -44,7 +44,7 @@ func main() {
 	band := flag.Float64("band", 0, "the early stop's agreement band, in percent")
 	stoppedEarly := flag.Bool("stopped-early", false, "the run stopped early because its quiet runs agreed")
 	edit := flag.String("edit", "", "the file the Edit runs changed, when Edit was measured")
-	projectEngine := flag.String("project-engine", "", "the engine whose project every run checked alone, if one")
+	projectKind := flag.String("project-kind", "", "the kind of the one project every run checked alone, if one")
 	noFix := flag.Bool("no-fix", false, "the cold and idle runs checked without fixing")
 	everyBuild := flag.Bool("every-build", false, "every run asked to check every build the Go files name")
 	goEnvironment := bench_results.GoEnvironment{}
@@ -60,7 +60,7 @@ func main() {
 	}
 	path, recordError := record(
 		*runsPath,
-		*engine,
+		*binary,
 		*project,
 		*projectCommit,
 		*idleFloor,
@@ -70,7 +70,7 @@ func main() {
 		*band,
 		*stoppedEarly,
 		*edit,
-		bench_results.Engine(*projectEngine),
+		bench_results.ProjectKind(*projectKind),
 		*noFix,
 		*everyBuild,
 		&goEnvironment,
@@ -86,22 +86,22 @@ func main() {
 }
 
 func record(
-	runsPath, engine, project, projectCommit string,
+	runsPath, binary, project, projectCommit string,
 	idleFloor, settle float64,
 	rounds int,
 	measured []bench_results.Mode,
 	band float64,
 	stoppedEarly bool,
 	edit string,
-	projectEngine bench_results.Engine,
+	projectKind bench_results.ProjectKind,
 	noFix bool,
 	everyBuild bool,
 	goEnvironment *bench_results.GoEnvironment,
 	out string,
 ) (string, error) {
-	cohere, engineProvenanceError := engineProvenance(engine)
-	if engineProvenanceError != nil {
-		return "", engineProvenanceError
+	cohere, binaryProvenanceError := binaryProvenance(binary)
+	if binaryProvenanceError != nil {
+		return "", binaryProvenanceError
 	}
 	machine, thisMachineError := thisMachine()
 	if thisMachineError != nil {
@@ -124,7 +124,7 @@ func record(
 		Band:          band,
 		StoppedEarly:  stoppedEarly,
 		Edit:          edit,
-		Engine:        projectEngine,
+		ProjectKind:   projectKind,
 		NoFix:         noFix,
 		EveryBuild:    everyBuild,
 		Builds:        builds,
@@ -149,15 +149,15 @@ func record(
 	return path, os.WriteFile(path, encoded, 0o644)
 }
 
-// engineProvenance is the engine's commit, its first --version line and whether it was built from a modified tree, as
-// the engine states them (internal/release/packaging's Provenance). The launcher builds from a committed snapshot with
+// binaryProvenance is cohere's commit, its first --version line and whether it was built from a modified tree, as
+// cohere states them (internal/release/packaging's Provenance). The launcher builds from a committed snapshot with
 // VCS stamping off and stamps the commit itself, so the commit comes from the `commit:` line, lengthened to the full
 // commit by this repository, and the tree was modified when the `source:` line is printed or the binary's own
 // vcs.modified stamp says so.
-func engineProvenance(engine string) (bench_results.Cohere, error) {
-	output, outputError := exec.Command(engine, "--version").Output()
+func binaryProvenance(binary string) (bench_results.Cohere, error) {
+	output, outputError := exec.Command(binary, "--version").Output()
 	if outputError != nil {
-		return bench_results.Cohere{}, fmt.Errorf("%s --version: %w", engine, outputError)
+		return bench_results.Cohere{}, fmt.Errorf("%s --version: %w", binary, outputError)
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	cohere := bench_results.Cohere{Version: strings.TrimSpace(lines[0])}
@@ -175,14 +175,14 @@ func engineProvenance(engine string) (bench_results.Cohere, error) {
 		}
 	}
 	if short == "" {
-		return cohere, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", engine)
+		return cohere, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", binary)
 	}
 	full, outputError := exec.Command("git", "rev-parse", "--verify", "--quiet", short+"^{commit}").Output()
 	if outputError != nil {
-		return cohere, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
+		return cohere, fmt.Errorf("%s was built from %s, which this repository does not have", binary, short)
 	}
 	cohere.Commit = strings.TrimSpace(string(full))
-	if info, readFileError := buildinfo.ReadFile(engine); readFileError == nil {
+	if info, readFileError := buildinfo.ReadFile(binary); readFileError == nil {
 		for _, setting := range info.Settings {
 			if setting.Key == "vcs.modified" && setting.Value == "true" {
 				cohere.Dirty = true
@@ -232,7 +232,7 @@ func thisMachine() (bench_results.Machine, error) {
 	return machine, nil
 }
 
-// readRuns reads quiet_machine.sh's runs table: mode, round, verdict_s, settled_s, engine_s, findings,
+// readRuns reads quiet_machine.sh's runs table: mode, round, verdict_s, settled_s, summary_s, findings,
 // cache, load_before, load_after, idle_before, idle_after, quiet, exit, primes, builds, tab-separated, with a header
 // line the script prints apart. It also gives the builds the cold and idle runs checked, which must be the same in
 // each: a record names one set of builds for the number Guard compares.
@@ -287,7 +287,7 @@ func readRuns(path string) ([]bench_results.Run, []string, error) {
 			Round:          int(numbers[1]),
 			VerdictSeconds: numbers[2],
 			SettledSeconds: numbers[3],
-			EngineSeconds:  numbers[4],
+			SummarySeconds: numbers[4],
 			LoadBefore:     numbers[7],
 			LoadAfter:      numbers[8],
 			IdleBefore:     numbers[9],

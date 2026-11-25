@@ -1,4 +1,4 @@
-// Package correctness_require_declared_walk is the Go engine's rule that a directory walk reaching outside its
+// Package correctness_require_declared_walk is cohere-go's rule that a directory walk reaching outside its
 // package declares what it reads.
 //
 // A test planner that keys each package's tests by the package's Go closure, its own testdata, and the reads lines
@@ -56,13 +56,13 @@ var Analyzer = newAnalyzer()
 // pointer: a repository with no such planner leaves it empty, and the rule reports nothing.
 const readsFileOption = "readsFile"
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{
 	Name:      Name,
 	Origin:    rule.OriginHouse,
 	TypeAware: true,
 	Analyzer:  Analyzer,
-	// ConfiguredBy lets the engine list the rule as not configured rather than quiet, since it reports nothing
+	// ConfiguredBy lets cohere-go list the rule as not configured rather than quiet, since it reports nothing
 	// until readsFile names the reads file.
 	ConfiguredBy: []string{readsFileOption},
 }

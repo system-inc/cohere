@@ -84,7 +84,7 @@ func noUnusedVariablesFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase
 }
 
 // applyFixesOnce is ESLint's one pass: fixes sorted by start, then end, and one that starts at or before
-// the last applied end is skipped. The edit engine resolves overlaps the same way, earliest claim first.
+// the last applied end is skipped. The fix pass resolves overlaps the same way, earliest claim first.
 func applyFixesOnce(source string, fixes []rule.Fix) string {
 	sorted := append([]rule.Fix{}, fixes...)
 	sort.SliceStable(sorted, func(first, second int) bool {

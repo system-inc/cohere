@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 func messageInconsistentClassOrder(ordered string) rule.Message {
@@ -100,16 +100,16 @@ func classOrderOptionsFrom(configured EnforceConsistentClassOrderOptions) classO
 //
 // # The comparator
 //
-// Three dimensions, and each was found by a differential against the engine rather than by reading
+// Three dimensions, and each was found by a differential against Tailwind rather than by reading
 // upstream, which delegates the whole question to `getClassOrder` in three lines.
 //
 // Unranked classes sort first, and their source order is preserved. `group` and `peer` generate no
-// CSS of their own and exist to be referenced by `group-hover:` on other elements, so the engine
+// CSS of their own and exist to be referenced by `group-hover:` on other elements, so Tailwind
 // ranks them null and expresses no opinion about where they go. So does every class that compiles
 // to nothing: one that does not parse (`ahralia-splash`, `notavariant:flex`) and one whose value
 // does not resolve (`text-dark` where the theme has no `dark` colour).
 //
-// That the engine has no opinion is the whole point: this dimension is not ported from
+// That Tailwind has no opinion is the whole point: this dimension is not ported from
 // `getClassOrder`, it is a convention chosen on top of it, and the corpus measurement below cannot
 // speak to it. The convention is Tailwind's own Prettier plugin's, whose comparator returns -1 for
 // any null against a ranked class and 0 for two nulls under a stable sort: `flex peer group
@@ -124,20 +124,20 @@ func classOrderOptionsFrom(configured EnforceConsistentClassOrderOptions) classO
 // on the committed trees (`text-dark`, `dark:bg-dark-2`, `hover:content`, and three more).
 //
 // A class that parses and resolves and that this port still cannot place is not treated as null.
-// The engine ranks it, so hoisting it would be a rewrite the plugin never makes, and the literal is
+// Tailwind ranks it, so hoisting it would be a rewrite the plugin never makes, and the literal is
 // declined instead: a port gap stays a missing finding rather than becoming a wrong fix.
 //
-// Then variant position, because the engine groups by variant before anything else. Ordering by
-// root first agreed with the engine on 51% of the corpus; adding the variant dimension and taking
+// Then variant position, because Tailwind groups by variant before anything else. Ordering by
+// root first agreed with Tailwind on 51% of the corpus; adding the variant dimension and taking
 // representatives from unprefixed classes took it to 91%.
 //
 // Then the class's own position. That last one cannot be reduced to a position per root: 84 of
 // 1,210 root groups are non-contiguous in the global order and those 84 hold 18,936 of the 37,643
 // ranked classes, so a root table with an exception list saves nothing.
 //
-// Measured over the whole corpus: 2,465 of 2,465 literals ordered identically to the engine. That
+// Measured over the whole corpus: 2,465 of 2,465 literals ordered identically to Tailwind. That
 // number covers the ranked dimensions only. `getClassOrder` returns null for the markers, so a
-// literal containing one has no engine answer to be identical to, and the agreement was never
+// literal containing one has no Tailwind answer to be identical to, and the agreement was never
 // evidence about their placement in either direction.
 //
 // # The fix moves classes and leaves every separator where it was
@@ -252,8 +252,8 @@ func declineListeners(ruleContext rule.Context, ruleName string, designSystem De
 
 // reportClassOrder compares a literal's class order against this repository's own design system.
 //
-// The whole literal is resolved in one population before anything is sorted, which is the shape the
-// engine's own ordering requires rather than a convenience. See class_order_key.go: a variant's
+// The whole literal is resolved in one population before anything is sorted, which is the shape
+// Tailwind's own ordering requires rather than a convenience. See class_order_key.go: a variant's
 // index is a rank among exactly the variants this list contains, so there is no per-class key to
 // compute and no pairwise comparator that could compute one.
 func reportClassOrder(
@@ -447,15 +447,15 @@ func slotFixes(slots []classToken, ordered []string) []rule.Fix {
 
 // orderClasses is the plugin's order for one literal, or false when this port cannot decide it.
 //
-// With the defaults, the engine's nulls lead in source order and the ranked classes follow in the
-// engine's order. A class that parses and resolves and still cannot be placed is a gap in this port
+// With the defaults, Tailwind's nulls lead in source order and the ranked classes follow in
+// Tailwind's order. A class that parses and resolves and still cannot be placed is a gap in this port
 // rather than a null, so the literal is declined: ordering the rest around it would be guessing.
 //
 // The options are upstream's `sortClassNames`. `asc` and `desc` sort the classes as strings and ask
-// the engine nothing. Otherwise every class falls in one of three groups, and upstream's comparator
+// Tailwind nothing. Otherwise every class falls in one of three groups, and upstream's comparator
 // is that grouping, decided in its order: a component class first, then an unknown one, then a ranked
 // one. Component and unknown classes go at the start or the end by their position option and keep
-// source order or sort by their order option; ranked classes keep the engine's order. Upstream's
+// source order or sort by their order option; ranked classes keep Tailwind's order. Upstream's
 // comparator is a consistent order over those keys, so a stable sort here gives what its stable
 // `toSorted` gives.
 func orderClasses(classes []string, designSystem DesignSystemResult, ordering classOrderOptions) ([]string, bool) {
@@ -502,7 +502,7 @@ func orderClasses(classes []string, designSystem DesignSystemResult, ordering cl
 		return 0
 	}
 	// within orders two classes of one group: by their order option for component and unknown
-	// classes, by the engine's rank for ranked ones.
+	// classes, by Tailwind's rank for ranked ones.
 	within := func(className string, other string, groupOf int) int {
 		order := ordering.unknownOrder
 		switch {
@@ -566,7 +566,7 @@ func compareJavaScriptStrings(left string, right string) int {
 	return 1
 }
 
-// partitionUnranked splits off every class the engine ranks null, keeping source order in both.
+// partitionUnranked splits off every class Tailwind ranks null, keeping source order in both.
 //
 // `getClassOrder` returns null for a class that produces no CSS: the markers, which exist to be
 // referenced by `group-hover:` on another element, and any class that does not compile. Both slices
@@ -585,7 +585,7 @@ func partitionUnranked(classes []string, designSystem DesignSystemResult) (unran
 	return unranked, ranked
 }
 
-// classCompilesIn reports whether the engine would emit CSS for a class, and so rank it.
+// classCompilesIn reports whether Tailwind would emit CSS for a class, and so rank it.
 //
 // The same two questions `no-unknown-classes` asks, minus its allowances for markers and arbitrary
 // properties, which it accepts as known for its own reasons: a marker is known and still unranked.
@@ -595,10 +595,10 @@ func classCompilesIn(className string, designSystem DesignSystemResult) bool {
 	if designSystem.System == nil {
 		return true
 	}
-	return anyCandidateResolves(tailwindengine.ParseCandidate(className, designSystem.System), designSystem.System)
+	return anyCandidateResolves(tailwindcollapse.ParseCandidate(className, designSystem.System), designSystem.System)
 }
 
-// isMarkerClass reports whether a class is one of the markers the engine ranks null.
+// isMarkerClass reports whether a class is one of the markers Tailwind ranks null.
 //
 // Checked against the whole class and against its base, because `dark:group` is still the marker
 // and a variant prefix does not give it a reading.
@@ -613,7 +613,7 @@ func isMarkerClass(className string) bool {
 // splitVariants separates a class's variant prefix from the rest.
 //
 // Deliberately not `dissectClass`: importance is part of the class for ordering purposes, since
-// `px-4` and `px-4!` are different entries in the engine's order, while for the deprecation table
+// `px-4` and `px-4!` are different entries in Tailwind's order, while for the deprecation table
 // they are the same utility.
 func splitVariants(className string) (string, string) {
 	index := strings.LastIndex(className, ":")

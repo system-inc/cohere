@@ -312,7 +312,7 @@ func consistentTypeDefinitionsInterfaceFixes(ruleContext rule.Context, node *ast
 	//
 	// Built as one insertion rather than one per heritage type, and that is load-bearing rather than
 	// tidy. Upstream emits a separate `insertTextAfter` per type and ESLint applies same-position
-	// insertions in the order proposed; the edit engine here applies fixes back to front so that an
+	// insertions in the order proposed; the fix pass here applies fixes back to front so that an
 	// earlier replacement cannot move offsets a later one was computed against, which reverses a run
 	// of insertions sharing a position. Measured: `interface A extends B, C {}` repaired to
 	// `type A = {...} & C & B`, valid TypeScript that names the constraints in the wrong order and

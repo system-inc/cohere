@@ -287,7 +287,7 @@ func normalizeAppPath(route string) string {
 }
 
 // dynamicSegments is upstream's `/\[.*\]/g`. JavaScript's `.` stops at four line terminators where
-// Go's stops at one, so they are spelled out. Leftmost and greedy in both engines, so one match runs
+// Go's stops at one, so they are spelled out. Leftmost and greedy in both languages, so one match runs
 // from the first `[` to the last `]` and every dynamic segment between them becomes one wildcard.
 var dynamicSegments = regexp.MustCompile("\\[[^\n\r\u2028\u2029]*\\]")
 

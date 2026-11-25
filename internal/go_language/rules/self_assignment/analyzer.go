@@ -1,5 +1,5 @@
 // Package self_assignment is staticcheck's SA4018, an assignment of a variable or an expression to itself, which does
-// nothing, ported as a check on syntax, reached through the engine's own intermediate representation, that reports
+// nothing, ported as a check on syntax, reached through cohere's own intermediate representation, that reports
 // through the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4018/sa4018.go, whose logic it keeps and
@@ -31,7 +31,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, whose syntax it walks when the function is a top-level one, so each assignment is
 // judged once. It listens to that walk, not the syntax's, because it reads function_purity's facts, which are built
 // from our representation and so only on a package without errors, as the original runs, and the walk over
@@ -49,7 +49,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4018",
 	"SA4018",
 	"Flags an assignment of a variable to itself: staticcheck's SA4018, ported as a check on syntax reached "+
-		"through the engine's own intermediate representation.",
+		"through cohere's own intermediate representation.",
 	&Listener,
 )
 

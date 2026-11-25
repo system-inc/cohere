@@ -1,4 +1,4 @@
-// Command generate_data_type captures what the real Tailwind engine infers for a corpus of CSS
+// Command generate_data_type captures what Tailwind itself infers for a corpus of CSS
 // value shapes, so that the Go port in internal/tailwind can be tested against measurements rather
 // than against a reading of the TypeScript source.
 //
@@ -7,11 +7,11 @@
 //	go run ./internal/lint/rules/tailwind/tools/generate_data_type \
 //	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
-// The distinction this tool exists to enforce is that reading the source and asking the engine are
+// The distinction this tool exists to enforce is that reading the source and asking Tailwind are
 // different claims, and they disagree. Read `infer-data-type.ts` and `serif` is a generic-name.
-// Ask the engine with the full type list and `serif` is a family-name, because family-name is
+// Ask Tailwind with the full type list and `serif` is a family-name, because family-name is
 // earlier in the list and also matches. Every expectation in the emitted fixture is an answer the
-// shipped engine gave, so a port that agrees with it agrees with production.
+// shipped Tailwind gave, so a port that agrees with it agrees with production.
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes an answer show up as a failing gate instead of a silent behavior
@@ -69,13 +69,13 @@ func main() {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
 				os.Stderr,
-				"%s is stale: the engine now answers differently. Re-run without -check and read the diff.\n",
+				"%s is stale: Tailwind now answers differently. Re-run without -check and read the diff.\n",
 				*output,
 			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
-		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
+		fmt.Fprintf(os.Stderr, "%s matches Tailwind\n", *output)
 		return
 	}
 

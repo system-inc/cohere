@@ -1,4 +1,4 @@
-// Package consistency_no_grouped_var is the Go engine's rule that inside a function each var and const declares one
+// Package consistency_no_grouped_var is cohere-go's rule that inside a function each var and const declares one
 // name on its own line.
 //
 // It is the Go form of one-var: a reader of a function body meets one name, its type and its value together, declared
@@ -35,7 +35,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_grouped_var", "Flags,
 	"block, since iota counts only within one. Package-level declarations and := short declarations, including the "+
 	"parallel assignment Go writes for a swap, are not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads the type of a lone value to tell a multi-return
+// Rule is this rule's entry in cohere-go's registry. It reads the type of a lone value to tell a multi-return
 // call or comma-ok read, whose names cannot be split, from a list of names that can, and resolves each `iota` to the
 // predeclared one, so a local that shadows the name does not excuse a block.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // The `tsconfig` option, ported from better-tailwindcss 4.7.0 (#ewss35z).
@@ -473,10 +473,10 @@ func resolveStylesheetPath(
 // front of enhanced-resolve's own lookup.
 func tsconfigStylesheetResolver(
 	mapping *tsconfigPaths,
-	next tailwindengine.StylesheetResolver,
+	next tailwindcollapse.StylesheetResolver,
 	readFile func(path string) (string, bool),
 	fileExists func(path string) bool,
-) tailwindengine.StylesheetResolver {
+) tailwindcollapse.StylesheetResolver {
 	if mapping == nil {
 		return next
 	}

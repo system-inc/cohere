@@ -44,7 +44,7 @@ func messageNoSeparateNamedExport() rule.Message {
 //
 // The first version of this fixer deleted the statement and nothing else, on the belief that the
 // build would break loudly and the fixer's convergence check would catch it. Neither holds: the
-// engine checks that the rewritten file parses, and an unexported component parses perfectly. Every
+// fix pass checks that the rewritten file parses, and an unexported component parses perfectly. Every
 // file importing it then fails to resolve, which is the same loss that unexported six interfaces
 // across the structure library through `consistent-indexed-object-style`. Measured on
 // `function Thing() {...} const helper = 1; export { Thing, helper };`, which it rewrote with neither

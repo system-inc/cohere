@@ -256,7 +256,7 @@ var logicalAssignmentLongForm = map[ast.Kind]string{
 // A bare identifier is safe. A member access is not, because `a.b` may be a getter and the
 // shorthand reads it once where the long form read it twice, so upstream offers those as
 // suggestions instead. That split is not cosmetic here either: `ReportNodeWithFixes` is applied by
-// the edit engine with nobody watching, and `ReportNodeWithSuggestions` is not.
+// the fix pass with nobody watching, and `ReportNodeWithSuggestions` is not.
 //
 // The one place a member access is fixed is the second shape, where upstream additionally accepts
 // an access whose object is an identifier, `this` or `super` and whose key is not itself an access.

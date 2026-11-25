@@ -1,4 +1,4 @@
-// Package consistency_require_one_type_per_file is the Go engine's rule that a file serves at most one type with
+// Package consistency_require_one_type_per_file is cohere-go's rule that a file serves at most one type with
 // methods.
 //
 // It is the Go form of max-classes-per-file: when each file serves one type, the file's name is an index, so a reader
@@ -33,7 +33,7 @@ var Analyzer = &analysis.Analyzer{
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It resolves every receiver through the types, so a pointer,
+// Rule is this rule's entry in cohere-go's registry. It resolves every receiver through the types, so a pointer,
 // an alias or a generic receiver's type arguments never hide the type a method belongs to.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 

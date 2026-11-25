@@ -13,108 +13,108 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// The development engine is cached by a hash, and it reports whether its own inputs, the files that hash
-// reads, differ from their commit. A hash that leaves that state out serves an engine built in one state to
-// a tree in the other (#50wtb2s): a clean tree was refused at land for an engine built while a file was
-// dirty, and a dirty tree could be told its build was clean. These tests resolve the development engine
+// The development binary is cached by a hash, and it reports whether its own inputs, the files that hash
+// reads, differ from their commit. A hash that leaves that state out serves a binary built in one state to
+// a tree in the other (#50wtb2s): a clean tree was refused at land for a binary built while a file was
+// dirty, and a dirty tree could be told its build was clean. These tests resolve the development binary
 // with the fixture's stand-in for SwiftPM, which reports the state it was handed, and read what each
-// engine says about itself. Where a test changes the state without changing the inputs' contents, only the
-// bit in the hash can tell the two engines apart.
+// language says about itself. Where a test changes the state without changing the inputs' contents, only the
+// bit in the hash can tell the two binaries apart.
 
 // testSwiftVersionOutput is what `swift --version` prints, as the resolver is handed it.
 const testSwiftVersionOutput = "Apple Swift version 6.4 (" + testToolchain + ")\nTarget: arm64-apple-macosx26.0\n"
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in.
-func TestAnEngineBuiltFromADirtyTreeIsNotServedOnceTheTreeIsClean(test *testing.T) {
+func TestASwiftBinaryBuiltFromADirtyTreeIsNotServedOnceTheTreeIsClean(test *testing.T) {
 	fixture := newSwiftFixture(test)
 	writeFile(test, fixture.rule(), "two\n")
 
 	dirty, built := fixture.resolveDevelopment(test)
-	if !built || !engineSaysModified(test, dirty) {
-		test.Fatalf("an engine built from an uncommitted rule says it is clean (built=%v)", built)
+	if !built || !binarySaysModified(test, dirty) {
+		test.Fatalf("a binary built from an uncommitted rule says it is clean (built=%v)", built)
 	}
 
-	// Committed as it stands, so the engine's inputs read exactly as they did and only their state moved.
+	// Committed as it stands, so cohere-swift's inputs read exactly as they did and only their state moved.
 	fixture.commit(test, "swift")
 	clean, built := fixture.resolveDevelopment(test)
-	if engineSaysModified(test, clean) {
+	if binarySaysModified(test, clean) {
 		test.Fatalf(
-			"the clean tree was served an engine that says its tree was modified (built=%v, the same binary: %v)",
+			"the clean tree was served a binary that says its tree was modified (built=%v, the same binary: %v)",
 			built,
 			clean == dirty,
 		)
 	}
 	if !built || clean == dirty {
-		test.Fatalf("the clean tree was served the dirty tree's engine (built=%v)", built)
+		test.Fatalf("the clean tree was served the dirty tree's binary (built=%v)", built)
 	}
 	fixture.expectEveryBuildWasTold(test)
 }
 
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in.
-func TestAnEngineBuiltFromACleanTreeIsNotServedOnceTheTreeIsDirty(test *testing.T) {
+func TestASwiftBinaryBuiltFromACleanTreeIsNotServedOnceTheTreeIsDirty(test *testing.T) {
 	fixture := newSwiftFixture(test)
 
 	clean, built := fixture.resolveDevelopment(test)
-	if !built || engineSaysModified(test, clean) {
-		test.Fatalf("an engine built from a clean tree says it was modified (built=%v)", built)
+	if !built || binarySaysModified(test, clean) {
+		test.Fatalf("a binary built from a clean tree says it was modified (built=%v)", built)
 	}
 
 	// A new commit, then the rule put back on disk as the first commit held it: the inputs read as they did
-	// for the clean engine above, and now they differ from their commit.
+	// for the clean binary above, and now they differ from their commit.
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 	writeFile(test, fixture.rule(), "one\n")
 	dirty, built := fixture.resolveDevelopment(test)
-	if !engineSaysModified(test, dirty) {
+	if !binarySaysModified(test, dirty) {
 		test.Fatalf(
-			"the dirty tree was served an engine that claims a clean build (built=%v, the same binary: %v)",
+			"the dirty tree was served a binary that claims a clean build (built=%v, the same binary: %v)",
 			built,
 			dirty == clean,
 		)
 	}
 	if !built || dirty == clean {
-		test.Fatalf("the dirty tree was served the clean tree's engine (built=%v)", built)
+		test.Fatalf("the dirty tree was served the clean tree's binary (built=%v)", built)
 	}
 	fixture.expectEveryBuildWasTold(test)
 }
 
-// The engine's bit covers its own inputs and nothing else in the repository: a change anywhere else, the
-// engine's tests included, leaves it clean and its engine where it was, and a change to its sources sets it,
+// cohere-swift's bit covers its own inputs and nothing else in the repository: a change anywhere else, the
+// language's tests included, leaves it clean and cohere-swift where it was, and a change to its sources sets it,
 // tracked or untracked.
 //
 // Not parallel: newSwiftFixture swaps the package variable buildSwiftProduct for its own stand-in.
-func TestTheEngineBitCoversOnlyTheEnginesOwnInputs(test *testing.T) {
+func TestTheSwiftTreeBitCoversOnlyTheSwiftPackagesOwnInputs(test *testing.T) {
 	fixture := newSwiftFixture(test)
 	clean, _ := fixture.resolveDevelopment(test)
-	if engineSaysModified(test, clean) {
-		test.Fatal("an engine built from a clean tree says it was modified")
+	if binarySaysModified(test, clean) {
+		test.Fatal("a binary built from a clean tree says it was modified")
 	}
 
 	outside := map[string]string{
-		"a tracked edit outside swift/":        ".gitignore",
-		"an untracked file outside swift/":     "notes.txt",
-		"a tracked edit to the engine's tests": filepath.Join("swift", "Tests", "RuleTests.swift"),
-		"an untracked file beside the package": filepath.Join("swift", "notes.txt"),
+		"a tracked edit outside swift/":          ".gitignore",
+		"an untracked file outside swift/":       "notes.txt",
+		"a tracked edit to cohere-swift's tests": filepath.Join("swift", "Tests", "RuleTests.swift"),
+		"an untracked file beside the package":   filepath.Join("swift", "notes.txt"),
 	}
 	for change, path := range outside {
 		writeFile(test, filepath.Join(fixture.repository, path), "uncommitted\n")
-		engine, built := fixture.resolveDevelopment(test)
-		if engineSaysModified(test, engine) || built || engine != clean {
-			test.Errorf("%s marked the engine modified or moved it (built=%v)", change, built)
+		swiftBinary, built := fixture.resolveDevelopment(test)
+		if binarySaysModified(test, swiftBinary) || built || swiftBinary != clean {
+			test.Errorf("%s marked cohere-swift modified or moved it (built=%v)", change, built)
 		}
 	}
 
 	added := filepath.Join(fixture.repository, "swift", "Sources", "New.swift")
 	writeFile(test, added, "// nobody committed this\n")
-	if engine, _ := fixture.resolveDevelopment(test); !engineSaysModified(test, engine) {
-		test.Error("an untracked file under swift/Sources left the engine clean")
+	if swiftBinary, _ := fixture.resolveDevelopment(test); !binarySaysModified(test, swiftBinary) {
+		test.Error("an untracked file under swift/Sources left cohere-swift clean")
 	}
 	if removeError := os.Remove(added); removeError != nil {
 		test.Fatal(removeError)
 	}
 	writeFile(test, fixture.rule(), "one, uncommitted\n")
-	if engine, _ := fixture.resolveDevelopment(test); !engineSaysModified(test, engine) {
-		test.Error("a tracked edit under swift/Sources left the engine clean")
+	if swiftBinary, _ := fixture.resolveDevelopment(test); !binarySaysModified(test, swiftBinary) {
+		test.Error("a tracked edit under swift/Sources left cohere-swift clean")
 	}
 	fixture.expectEveryBuildWasTold(test)
 }
@@ -160,13 +160,13 @@ func TestTheSwiftBuildIsHandedOnlyTheStatedTreeState(test *testing.T) {
 	}
 }
 
-// The engine's real manifest takes the stated answer over git's, both ways, and reads git when nothing is
+// cohere-swift's real manifest takes the stated answer over git's, both ways, and reads git when nothing is
 // stated. The stand-in package's manifest is the real one's `sourceTreeModified`, copied from it here, so
-// the expression under test is the one the engine builds with.
-func TestTheEngineManifestPrefersTheStatedTreeState(test *testing.T) {
+// the expression under test is the one cohere-swift builds with.
+func TestTheSwiftManifestPrefersTheStatedTreeState(test *testing.T) {
 	test.Parallel()
 	if runtime.GOOS != "darwin" {
-		test.Skip("the Swift engine is built only on macOS")
+		test.Skip("cohere-swift is built only on macOS")
 	}
 	if _, lookPathError := exec.LookPath("swift"); lookPathError != nil {
 		test.Skip("no swift toolchain on PATH")
@@ -194,7 +194,7 @@ func TestTheEngineManifestPrefersTheStatedTreeState(test *testing.T) {
 	writeFile(test, filepath.Join(module, ".gitignore"), ".scratch/\n")
 	gitCommand(test, module, "init", "-q")
 	gitCommand(test, module, "add", ".")
-	gitCommand(test, module, "commit", "-q", "-m", "stand-in engine")
+	gitCommand(test, module, "commit", "-q", "-m", "stand-in binary")
 
 	scratch := filepath.Join(module, ".scratch")
 	says := func(environment []string) string {
@@ -211,17 +211,17 @@ func TestTheEngineManifestPrefersTheStatedTreeState(test *testing.T) {
 	}
 
 	if got := says(nil); got != "clean" {
-		test.Fatalf("a clean tree with nothing stated built an engine that says %q", got)
+		test.Fatalf("a clean tree with nothing stated built a binary that says %q", got)
 	}
 	if got := says(stating("true")); got != "modified" {
-		test.Errorf("a clean tree stated modified built an engine that says %q", got)
+		test.Errorf("a clean tree stated modified built a binary that says %q", got)
 	}
 	writeFile(test, filepath.Join(module, "notes.txt"), "uncommitted\n")
 	if got := says(stating("false")); got != "clean" {
-		test.Errorf("a dirty tree stated clean built an engine that says %q", got)
+		test.Errorf("a dirty tree stated clean built a binary that says %q", got)
 	}
 	if got := says(nil); got != "modified" {
-		test.Errorf("a dirty tree with nothing stated built an engine that says %q", got)
+		test.Errorf("a dirty tree with nothing stated built a binary that says %q", got)
 	}
 }
 
@@ -254,12 +254,12 @@ func TestTheTreeStateReadsInAWorktreeWhoseSubmoduleIsASymlink(test *testing.T) {
 	}
 }
 
-// resolveDevelopment resolves the engine from the fixture's working tree, failing the test on error.
+// resolveDevelopment resolves cohere-swift from the fixture's working tree, failing the test on error.
 func (fixture *swiftFixture) resolveDevelopment(test *testing.T) (string, bool) {
 	test.Helper()
-	binaryPath, built, resolveSwiftEngineError := ResolveSwiftEngine(fixture.paths, "", 2, testSwiftVersionOutput)
-	if resolveSwiftEngineError != nil {
-		test.Fatalf("resolving the development engine: %v", resolveSwiftEngineError)
+	binaryPath, built, resolveSwiftBinaryError := ResolveSwiftBinary(fixture.paths, "", 2, testSwiftVersionOutput)
+	if resolveSwiftBinaryError != nil {
+		test.Fatalf("resolving the development binary: %v", resolveSwiftBinaryError)
 	}
 	return binaryPath, built
 }
@@ -275,8 +275,8 @@ func (fixture *swiftFixture) expectEveryBuildWasTold(test *testing.T) {
 	}
 }
 
-// engineSaysModified is the sourceTreeModified an engine's provenance record reports.
-func engineSaysModified(test *testing.T, binaryPath string) bool {
+// binarySaysModified is the sourceTreeModified a binary's provenance record reports.
+func binarySaysModified(test *testing.T, binaryPath string) bool {
 	test.Helper()
 	var record struct {
 		Kind               string `json:"kind"`

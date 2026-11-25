@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	goenginerule "github.com/system-inc/cohere/internal/go_language/rule"
+	golanguagerule "github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -72,8 +72,8 @@ type SwiftVerdict struct {
 
 var ruleSourceNotes = map[string]string{
 	"name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
-	"language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), " +
-		"the Go engine's (internal/go_language/rules), swift/Rules.json for Swift",
+	"language": "the registry the row comes from: the TypeScript linter's (internal/lint/registry), " +
+		"cohere-go's (internal/go_language/rules), swift/Rules.json for Swift",
 	"namespace": "the registered name, before its last slash",
 	"origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; " +
 		"for Swift, the origin each rule declares (swift/Rules.json); " +
@@ -262,13 +262,13 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 	return rows, nil
 }
 
-// buildGoRows renders one row per Go engine rule, with fixKind "fix" for each rule fixing names, the rules a run
+// buildGoRows renders one row per cohere-go rule, with fixKind "fix" for each rule fixing names, the rules a run
 // without --no-fix fixes. The registry's own Validate refuses a rule outside the namespace, with an origin it does
 // not know, or with an upstream name its origin forbids or lacks, a house rule outside the naming scheme refuses the
 // build here, as a TypeScript or Swift one does, and so does a fixing rule the registry does not hold, so the docs
 // never claim a fix for a rule they do not list.
-func buildGoRows(registered []goenginerule.Rule, fixing []string) ([]RuleRow, error) {
-	namespace := strings.TrimSuffix(goenginerule.Namespace, "/")
+func buildGoRows(registered []golanguagerule.Rule, fixing []string) ([]RuleRow, error) {
+	namespace := strings.TrimSuffix(golanguagerule.Namespace, "/")
 	rows := make([]RuleRow, 0, len(registered))
 	for _, goRule := range registered {
 		if validateError := goRule.Validate(); validateError != nil {
@@ -282,8 +282,8 @@ func buildGoRows(registered []goenginerule.Rule, fixing []string) ([]RuleRow, er
 			UpstreamName: goRule.UpstreamName,
 			TypeAware:    goRule.TypeAware,
 		}
-		if goRule.Origin == goenginerule.OriginHouse {
-			leaf := strings.TrimPrefix(goRule.Name, goenginerule.Namespace)
+		if goRule.Origin == golanguagerule.OriginHouse {
+			leaf := strings.TrimPrefix(goRule.Name, golanguagerule.Namespace)
 			parsed, parseError := policy.Naming.ParseRuleName(namespace, leaf)
 			if parseError != nil {
 				return nil, fmt.Errorf("documentation_data: %s: %w", goRule.Name, parseError)

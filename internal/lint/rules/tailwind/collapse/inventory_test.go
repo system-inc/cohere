@@ -104,7 +104,7 @@ var tablesExemptFromTheInventory = map[string]bool{
 //	                                     ported so far; canonical_unported.json counts the rest
 //	variantCanonicalizations         1   its VARIANT_CANONICALIZATIONS, the same way
 //	FrameworkSuggestions           237   each functional root's `suggest` recipe: literals, theme
-//	                                     namespaces and flags, never keys. Probed from the engine by
+//	                                     namespaces and flags, never keys. Probed from Tailwind by
 //	                                     generate_suggestions and held, through BuildClassList, to
 //	                                     `getClassList()` on four themes
 //	FrameworkStaticSuggested       890   every static the registry holds, and whether its `suggest`
@@ -114,7 +114,7 @@ var tablesExemptFromTheInventory = map[string]bool{
 //	FrameworkStaticNested           15   the statics whose compiled body nests a rule or an at-rule,
 //	                                     which the flat statics table loses, so a signature declines
 //	FrameworkRootProperties        315   every property a functional root's classes declare in a
-//	                                     signature, by arm, probed from the engine; the bound a class
+//	                                     signature, by arm, probed from Tailwind; the bound a class
 //	                                     this port cannot compile is held to, checked class by class
 //	                                     on three themes
 //	signatureVariadicExpansions     11   expand-declaration.ts's VARIADIC_EXPANSION_MAP

@@ -181,7 +181,7 @@ func TestLogicalAssignmentOperatorsSuggestions(test *testing.T) {
 				test.Fatalf("offered %d suggestions, want %d", len(offered), len(testCase.suggestions))
 			}
 			// A suggestion must never arrive alongside a fix: the two report calls are exclusive
-			// upstream, and a rule offering both would have the edit engine apply the repair a
+			// upstream, and a rule offering both would have the fix pass apply the repair a
 			// human was meant to choose.
 			if len(result.Diagnostics[0].Fixes) != 0 {
 				test.Fatalf("a suggestion case also carried %d fixes, which would be applied unattended",
@@ -274,7 +274,7 @@ func TestLogicalAssignmentOperatorsDeclinesToRepair(test *testing.T) {
 // TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions asserts the getter judgment directly,
 // rather than only through the outputs it produces.
 //
-// The distinction is what the edit engine acts on: a fix is applied with nobody watching and a
+// The distinction is what the fix pass acts on: a fix is applied with nobody watching and a
 // suggestion is not. A rule that offered everything as a fix would rewrite getters across the tree
 // and every one of its message-id fixtures would stay green, which is why this is asserted as its
 // own property.

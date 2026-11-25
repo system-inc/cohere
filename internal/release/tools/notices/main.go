@@ -3,7 +3,7 @@
 //
 //	go run ./internal/release/tools/notices
 //
-// Run it from the module root after a dependency, the compiler pin, the Swift engine's packages or the
+// Run it from the module root after a dependency, the compiler pin, cohere-swift's packages or the
 // curated list changes. A test in internal/release/notices fails, naming this command, when the committed
 // files differ from what it would write.
 package main

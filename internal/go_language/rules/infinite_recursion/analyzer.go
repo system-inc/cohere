@@ -1,5 +1,5 @@
 // Package infinite_recursion is staticcheck's SA5007, a function that calls itself on every path to its end, so it
-// recurses until the stack runs out, ported onto the engine's own intermediate representation (#tey4xje).
+// recurses until the stack runs out, ported onto cohere's own intermediate representation (#tey4xje).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5007/sa5007.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the call's syntax, where staticcheck's report

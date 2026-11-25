@@ -480,7 +480,7 @@ func TestParseRegexCharacterClassBackspaceBInClass(test *testing.T) {
 func TestParseRegexCharacterClassRawAstral(test *testing.T) {
 	test.Parallel()
 	// Raw 👍 in a class. Under non-u, this is a single-element single-rune
-	// pattern (4 UTF-8 bytes); the regex engine in JS would see it as 2
+	// pattern (4 UTF-8 bytes); a JavaScript runtime's matcher would see it as 2
 	// surrogate code units, but we leave that responsibility to the caller
 	// (e.g. the misleading-character-class rule passes string-literal data
 	// already split into surrogates by ParseJSStringLiteralSource).

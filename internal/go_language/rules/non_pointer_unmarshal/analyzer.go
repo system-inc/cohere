@@ -45,7 +45,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1014",
 	"SA1014",
 	"Flags a value that is not a pointer given to an encoding/json or encoding/xml function that unmarshals into it: "+
-		"staticcheck's SA1014, ported onto the engine's own intermediate representation.",
+		"staticcheck's SA1014, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

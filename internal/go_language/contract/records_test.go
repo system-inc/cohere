@@ -22,20 +22,20 @@ var (
 	contractFixtures = filepath.Join("..", "..", "..", "swift", "Contract", "*.jsonl")
 )
 
-// kindsNotWritten are the contract's record kinds this engine does not write, each with why.
+// kindsNotWritten are the contract's record kinds cohere-go does not write, each with why.
 var kindsNotWritten = map[Kind]string{
-	"unused":         "the --unused report, which the Go engine refuses until staticcheck's unused is wired",
+	"unused":         "the --unused report, which cohere-go refuses until staticcheck's unused is wired",
 	"unusedCoverage": "the --unused report's coverage, written only beside unused records",
 }
 
-// fieldsNotWritten are contract fields this engine leaves out on purpose, by kind. ProvenanceRecord's
+// fieldsNotWritten are contract fields cohere-go leaves out on purpose, by kind. ProvenanceRecord's
 // comment says why for its two, and LintRecord.FilesReplayed's for filesReplayed.
 var fieldsNotWritten = map[Kind][]string{
 	KindProvenance: {"swiftSyntax", "swiftFormat"},
 	KindLint:       {"filesReplayed"},
 }
 
-// additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
+// additiveFields are fields cohere-go writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
 	KindFix: {"notWritten"},
@@ -462,8 +462,8 @@ func TestEveryRecordWritesTheContractsFields(test *testing.T) {
 			test.Errorf("%s is written and the contract shows no such record", record.kind())
 			continue
 		}
-		// An additive field the contract does not show yet is left out of the comparison. One it shows, as the Swift
-		// engine's NotWritten.jsonl shows `notWritten`, is compared like any other (#723rzxm).
+		// An additive field the contract does not show yet is left out of the comparison. One it shows, as
+		// cohere-swift's NotWritten.jsonl shows `notWritten`, is compared like any other (#723rzxm).
 		for _, additive := range additiveFields[record.kind()] {
 			if _, present := ours[additive]; !present {
 				test.Errorf("%s does not write its additive field %s", record.kind(), additive)
@@ -499,7 +499,7 @@ func TestEveryRecordWritesTheContractsFields(test *testing.T) {
 // pin, and each fixture's order passes the Writer's refusals. The comparison is of decoded values, not
 // bytes: the fixtures captured from real Swift runs have their keys sorted by Swift's encoder, and key
 // order is not part of JSON. Provenance is exempt, since it leaves out the Swift library versions on
-// purpose, and so is a fix record from before `changedFiles`, which this engine always writes.
+// purpose, and so is a fix record from before `changedFiles`, which cohere-go always writes.
 func TestFixtureRecordsReencodeToTheSameJson(test *testing.T) {
 	test.Parallel()
 	newRecord := map[Kind]func() Record{
@@ -576,7 +576,7 @@ func TestFixtureRecordsReencodeToTheSameJson(test *testing.T) {
 			if decodeError := json.Unmarshal([]byte(line), &original); decodeError != nil {
 				test.Fatal(decodeError)
 			}
-			// A fixture from before an additive field has none, and this engine always writes it.
+			// A fixture from before an additive field has none, and cohere-go always writes it.
 			for _, additive := range additiveFields[envelope.Kind] {
 				if !strings.Contains(line, `"`+additive+`"`) {
 					delete(reencoded, additive)
@@ -681,7 +681,7 @@ func TestInputsRecordWritesEmptyListsAsLists(test *testing.T) {
 }
 
 // TestInputsRecordRoundTrips decodes a written inputs record and writes it again, so the front door, which decodes
-// the line into its own type, reads back every path the engine declared, in order.
+// the line into its own type, reads back every path cohere-go declared, in order.
 func TestInputsRecordRoundTrips(test *testing.T) {
 	test.Parallel()
 	written := InputsRecord{

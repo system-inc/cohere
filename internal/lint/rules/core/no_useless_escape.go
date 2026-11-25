@@ -71,7 +71,7 @@ type NoUselessEscapeOptions struct {
 //
 // Deleting the backslash from an escape the language did not need cannot change what the code
 // means, because "the language did not need it" is precisely the predicate the rule computes. That
-// is the fix-versus-suggestion line: a fix preserves meaning and the engine applies it unattended.
+// is the fix-versus-suggestion line: a fix preserves meaning and the fix pass applies it unattended.
 // It is also why the predicate has to be exactly right rather than approximately right, and why the
 // fixtures assert the rewritten source rather than the finding count. A count-only fixture passes
 // for a fix that writes the right character at the wrong offset, which here would eat the character

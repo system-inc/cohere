@@ -59,7 +59,7 @@ func decideFiles() map[string]string {
 }
 
 // decideBuild is windows's run over root, restoring from host, with no store, as under `--no-cache`, and its work on
-// a pool of slots, as the engine's builds share one, loaded again until no reload is asked, with what it restored from
+// a pool of slots, as cohere-go's builds share one, loaded again until no reload is asked, with what it restored from
 // the host, its time blanked, since it is the one count that differs between two runs. With no store nothing is
 // written through, so the reload restores again from the host what held at the first load, rather than hit it in the
 // build's own store, and its counts, the last load's, name it.
@@ -68,7 +68,7 @@ func decideBuild(test *testing.T, root string, host *HostRun, slots int) HostRes
 	rules := throughRules()
 	caching := cachingAt(test.TempDir(), rules)
 	caching.Store = nil
-	// The build's keys hold its target, as the engine's do, so they never meet the host's.
+	// The build's keys hold its target, as cohere-go's do, so they never meet the host's.
 	caching.Context.Build = append(caching.Context.Build, "GOOS=windows")
 	caching.Pool = bounded.NewPool(slots)
 	session := NewCacheSession(caching, rules)

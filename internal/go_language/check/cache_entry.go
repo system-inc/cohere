@@ -25,7 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 )
 
-// CacheFormatVersion is the version of the cache entry's format, which the engine hashes into every key as the
+// CacheFormatVersion is the version of the cache entry's format, which cohere-go hashes into every key as the
 // cache's own, so an entry written in another format is never read. It changes whenever cacheEntry or anything it
 // holds changes shape, Finding included, or what a field means: at 5, Output became a digest of the package's API and
 // facts by value rather than of their bytes (#z14ch7c), so an entry written at 4 holds a digest no second key of 5
@@ -45,8 +45,9 @@ import (
 // declared functions and their parameters (Placed), each file's and kind's name once (storedPlaced), which an entry of
 // 14 has none of (#k7k3wwc). At 16, an entry holds its analyses as a list in order of slot (storedSlotAnalysis), each
 // one's facts in order too, where an entry of 15 held a map by slot, which gob wrote in another order every time
-// (#g9kaytv).
-const CacheFormatVersion = "go-engine-cache-16"
+// (#g9kaytv). At 17 the stamp is spelled go-language where 16 and every earlier one said go-engine (#9gjmwgs): the
+// entry's shape is 16's, and the new number with the new name makes every entry written before it a clean miss.
+const CacheFormatVersion = "go-language-cache-17"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.

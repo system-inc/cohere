@@ -124,7 +124,7 @@ var NoGlobalAssign = rule.Rule[NoGlobalAssignOptions]{
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				// The engine hands every rule a nil checker when the program could not be built,
+				// The linter hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one. A mutant removing this survives
 				// the fixtures, because typescript-go tolerates a nil receiver on this path and
 				// returns no symbol, so the rule goes silent either way. That is an implementation

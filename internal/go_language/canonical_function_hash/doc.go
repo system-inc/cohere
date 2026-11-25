@@ -2,7 +2,7 @@
 // functions get one digest exactly when they compute the same thing, whatever their names or the order of their
 // independent statements.
 //
-// It reads the engine's own intermediate representation (internal/go_language/intermediate_representation), the very
+// It reads cohere's own intermediate representation (internal/go_language/intermediate_representation), the very
 // functions rules/build_intermediate_representation builds once per package for the rules on it, in single-assignment
 // form with locals lifted, and hashes them by the spec proven on #6rj7jw7 (its attachment duplicate-hash-spec.md):
 //

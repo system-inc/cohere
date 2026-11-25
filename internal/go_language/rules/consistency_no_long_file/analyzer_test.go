@@ -58,7 +58,7 @@ func TestAnalyzerWithAStricterLimit(test *testing.T) {
 }
 
 // A limit that is not a whole number of lines, one or more, is refused when it is set, so a bad setting fails the
-// engine's configuration instead of flagging every file or naming a line no file has.
+// checker's configuration instead of flagging every file or naming a line no file has.
 func TestLimitRefusesWhatIsNotALineCount(test *testing.T) {
 	test.Parallel()
 	for _, text := range []string{"0", "-1", "", "many", "2000.5"} {
@@ -71,7 +71,7 @@ func TestLimitRefusesWhatIsNotALineCount(test *testing.T) {
 
 // With max set to 3,000, a file of 2,100 lines, past the house limit, is clean and its neighbour of 3,001 is flagged
 // at its 3,001st, so a looser limit is taken and moves the finding with it as a stricter one does. Whether the
-// settings give a reason for it is the engine's check, not this rule's.
+// settings give a reason for it is cohere-go's check, not this rule's.
 func TestAnalyzerWithALooserLimit(test *testing.T) {
 	test.Parallel()
 	analyzer := consistency_no_long_file.NewAnalyzer()
@@ -83,7 +83,7 @@ func TestAnalyzerWithALooserLimit(test *testing.T) {
 
 // The max option takes a looser limit as it takes a stricter one, and its value says by its own type which it is: a
 // limit above the house's 2,000 loosens and names the house limit, and the house limit itself and anything below it
-// does not, so the engine asks for a departure for 2,001 and 3,000 alone.
+// does not, so cohere-go asks for a departure for 2,001 and 3,000 alone.
 func TestLimitSaysWhetherItLoosens(test *testing.T) {
 	test.Parallel()
 	for text, wantLoosens := range map[string]bool{"1": false, "1500": false, "2000": false, "2001": true,

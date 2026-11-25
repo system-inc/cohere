@@ -99,7 +99,7 @@ var housePlugins = map[string]bool{"adamic": true, "base": true, "nexus": true, 
 
 // reportUnknownRuleReferences reports every rule name a disable or enable comment wrote that can only
 // be a mistake, the way ESLint does: rule id the unknown name, anchored on the whole comment, message
-// beginning with ESLint's own sentence so the two engines read alike (measured on 10.8.1). A name that is
+// beginning with ESLint's own sentence so the two linters read alike (measured on 10.8.1). A name that is
 // a real rule cohere doesn't run is counted into unrun instead, for a --verbose note, and never reported.
 //
 // Ruled by @system_cohere (#v1ah2qq): a repository written for ESLint names plugin rules cohere has not
@@ -109,7 +109,7 @@ var housePlugins = map[string]bool{"adamic": true, "base": true, "nexus": true, 
 //   - an unprefixed name ESLint ships is a core rule cohere doesn't run: unrun;
 //   - an unprefixed name ESLint does not ship is a typo, since ESLint's core is fully known: reported;
 //   - a name under one of our own plugins is a typo or a stale prefix, since cohere is their reference
-//     engine and runs every rule they have: reported, with the registered name when there is one;
+//     linter and runs every rule they have: reported, with the registered name when there is one;
 //   - a name under any other plugin is a rule cohere doesn't run: unrun. It is not told cohere's rule of
 //     the same bare name, which belongs to another plugin and may not be the same rule.
 //
@@ -154,13 +154,13 @@ func reportUnknownRuleReferences(sourceFile *ast.SourceFile, directives *suppres
 // something on a path over 3,481 files. That cost was never measured and is not what this pays:
 // this sorts findings, not files, and the whole ahra tree returned 52 on 2026-10-01.
 //
-// File then position is the order ESLint and tsc print, so a reader comparing the engines reads the
+// File then position is the order ESLint and tsc print, so a reader comparing the linters reads the
 // same sequence in both. Rule name, message id and description only break ties at one range, and
 // they make the order total, so a rule that reports in map order cannot leak that order out.
 //
 // It is also the boundary the lint cache's note asks for (lint_cache.go, HashRuleSet): a warm run
 // replaying stored findings and a cold run walking fresh return one sequence, and cache state cannot
-// decide it. The fix phase is unaffected either way, because the edit engine orders its proposals
+// decide it. The fix phase is unaffected either way, because the fix pass orders its proposals
 // itself before resolving overlaps.
 func sortDiagnostics(diagnostics []rule.Diagnostic) {
 	fileName := func(diagnostic rule.Diagnostic) string {

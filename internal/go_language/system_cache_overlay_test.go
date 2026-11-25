@@ -20,9 +20,9 @@ import (
 // Not parallel: it sets the go environment of the process, which every go command of the run in it reads
 func TestARunWithAnOverlayKeepsNothingInTheSystemCache(test *testing.T) {
 	root := copyFixture(test, standardLibraryFixture)
-	source := standardLibrarySource{stamp: engineTestsStamp, systemCacheRoot: test.TempDir()}
-	runEngineWith(test, root, source, rules.All(), "--no-cache")
-	warm := runEngineWith(test, root, source, rules.All(), "--no-cache")
+	source := standardLibrarySource{stamp: testsStamp, systemCacheRoot: test.TempDir()}
+	runWith(test, root, source, rules.All(), "--no-cache")
+	warm := runWith(test, root, source, rules.All(), "--no-cache")
 	if warm.counts.FromSystemCache == 0 {
 		test.Fatalf("want the system cache warm with the standard library, got %+v", warm.counts)
 	}
@@ -52,7 +52,7 @@ func TestARunWithAnOverlayKeepsNothingInTheSystemCache(test *testing.T) {
 		if writeError := os.WriteFile(overlaid, append(slices.Clone(contents), appended...), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}
-		withOverlay, noted := runEngineNoting(test, root, source, rules.All(), nil, "--no-cache")
+		withOverlay, noted := runNoting(test, root, source, rules.All(), nil, "--no-cache")
 		if withOverlay.counts.FromSystemCache != 0 || withOverlay.counts.SystemCacheWritten != 0 ||
 			!strings.Contains(withOverlay.counts.SystemCacheNotKept, "-overlay") {
 			test.Errorf("want nothing restored from the system cache or written to it under -overlay, and why, got "+

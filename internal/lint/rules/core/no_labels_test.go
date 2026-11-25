@@ -395,7 +395,7 @@ func TestNoLabelsAnswersShapesEslintRefusesToParse(test *testing.T) {
 //	A: while(a) {} A: while(b) { break A; }
 //
 // Two sequential labels sharing a name, which is legal (unlike the nested duplicate above, which is
-// a parse error in both engines' grammars) and which eslint 10.8.1 accepts with no fatal and
+// a parse error in both linters' grammars) and which eslint 10.8.1 accepts with no fatal and
 // reports clean under allowLoop. Without the pop, the first `A` is still on the stack when the
 // second is pushed, so a search finding the stale entry first would answer about the wrong label.
 // Both labels here wrap loops so the verdict is the same either way; what the case actually pins is

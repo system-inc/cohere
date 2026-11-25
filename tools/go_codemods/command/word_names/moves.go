@@ -110,7 +110,7 @@ func tailAfterType(stem string, typeName string) (string, bool) {
 	return "", false
 }
 
-// spellingKey and snakeCase are the rule's own, internal/goengine/rules/consistency_require_matching_file_name, kept
+// spellingKey and snakeCase are the rule's own, internal/go_language/rules/consistency_require_matching_file_name, kept
 // to their letter so a moved file is one the rule accepts.
 func spellingKey(text string) string {
 	return strings.Map(func(character rune) rune {

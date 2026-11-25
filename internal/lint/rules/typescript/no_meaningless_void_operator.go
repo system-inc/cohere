@@ -92,7 +92,7 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (NoMeaninglessVoidOperat
 // When `checkNever` is on and every constituent is `void`, `undefined` or `never`, the repair is a
 // suggestion. `never` means control does not return from that expression at all, so removing the
 // operator is a judgment about code the type system says is unreachable, and upstream declines to
-// make it unattended. Shipping that as a fix would have the edit engine rewriting it silently.
+// make it unattended. Shipping that as a fix would have the fix pass rewriting it silently.
 //
 // The two tests are nested rather than exclusive, and the order matters: `void | never` under
 // `checkNever` satisfies the first predicate, because a union's `every` is over its constituents and

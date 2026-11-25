@@ -1,7 +1,7 @@
 // Package errors_as is vet's errorsas pass, a call to errors.As whose second argument is not a pointer to a type
 // implementing error, or to an interface type: errors.As panics on such a target, and on a pointer to error, which
 // every error matches, it says nothing a plain assignment would not. A target of type any is always allowed, since it
-// is often a value handed on from somewhere else. It sits on the engine's syntax dispatcher, hearing each call on the
+// is often a value handed on from somewhere else. It sits on cohere-go's syntax dispatcher, hearing each call on the
 // walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/errorsas/errorsas.go, whose logic

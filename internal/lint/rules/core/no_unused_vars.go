@@ -632,7 +632,7 @@ func hasDefaultOnTheWayToItsParameter(declaration *ast.Node) bool {
 // global and the option changes nothing; cohere reads a file with no top-level import or export as a
 // script, as TypeScript does and as no-implicit-globals and strict here do. ESLint's flat config
 // parses every `.ts` file as a module whatever its shape, so on a TypeScript file with no import or
-// export the two engines disagree under this option, and cohere's reading is the one the compiler
+// export the two linters disagree under this option, and cohere's reading is the one the compiler
 // holds: that file's top-level names are visible to every other file in the program.
 //
 // In a script, measured on the installed 8.71.0 under `sourceType: "script"`:

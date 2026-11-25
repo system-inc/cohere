@@ -20,51 +20,51 @@ func TestCapMemory(test *testing.T) {
 		want contract.Memory
 	}{
 		{
-			name: "a ceiling above the cap is lowered to the cap", current: 20 << 30, set: []int64{engineMemoryCap},
+			name: "a ceiling above the cap is lowered to the cap", current: 20 << 30, set: []int64{memoryCap},
 			want: contract.Memory{
-				LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: contract.MemorySourceCap,
+				LimitBytes: memoryCap, CapBytes: memoryCap, Source: contract.MemorySourceCap,
 				AvailableBytes: available,
 			},
 		},
 		{
-			name: "the cap itself is left alone and named the cap", current: engineMemoryCap,
+			name: "the cap itself is left alone and named the cap", current: memoryCap,
 			want: contract.Memory{
-				LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: contract.MemorySourceCap,
+				LimitBytes: memoryCap, CapBytes: memoryCap, Source: contract.MemorySourceCap,
 				AvailableBytes: available,
 			},
 		},
 		{
 			name: "a ceiling below the cap is never raised", current: 4 << 30,
 			want: contract.Memory{
-				LimitBytes: 4 << 30, CapBytes: engineMemoryCap, Source: contract.MemorySourceAvailable,
+				LimitBytes: 4 << 30, CapBytes: memoryCap, Source: contract.MemorySourceAvailable,
 				AvailableBytes: available,
 			},
 		},
 		{
 			name: "no limit, from memory the policy could not read, gets the cap as a bound", current: math.MaxInt64,
-			set: []int64{engineMemoryCap},
+			set: []int64{memoryCap},
 			want: contract.Memory{
-				LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: contract.MemorySourceUnreadable,
+				LimitBytes: memoryCap, CapBytes: memoryCap, Source: contract.MemorySourceUnreadable,
 			},
 		},
 		{
 			name: "GOGC in the environment wins", environment: map[string]string{"GOGC": "100"}, current: math.MaxInt64,
 			want: contract.Memory{
-				CapBytes: engineMemoryCap, Source: contract.MemorySourceEnvironment, Environment: "GOGC=100",
+				CapBytes: memoryCap, Source: contract.MemorySourceEnvironment, Environment: "GOGC=100",
 			},
 		},
 		{
 			name: "GOMEMLIMIT in the environment wins", environment: map[string]string{"GOMEMLIMIT": "20GiB"},
 			current: 20 << 30,
 			want: contract.Memory{
-				LimitBytes: 20 << 30, CapBytes: engineMemoryCap, Source: contract.MemorySourceEnvironment,
+				LimitBytes: 20 << 30, CapBytes: memoryCap, Source: contract.MemorySourceEnvironment,
 				Environment: "GOMEMLIMIT=20GiB",
 			},
 		},
 		{
 			name: "a variable set empty still wins", environment: map[string]string{"GOGC": ""}, current: math.MaxInt64,
 			want: contract.Memory{
-				CapBytes: engineMemoryCap, Source: contract.MemorySourceEnvironment, Environment: "GOGC=",
+				CapBytes: memoryCap, Source: contract.MemorySourceEnvironment, Environment: "GOGC=",
 			},
 		},
 	}
@@ -104,7 +104,7 @@ func TestCapMemory(test *testing.T) {
 
 func TestLateLimit(test *testing.T) {
 	test.Parallel()
-	const raised = engineMemoryCap + lateMemoryAllowance
+	const raised = memoryCap + lateMemoryAllowance
 	cases := []struct {
 		name           string
 		source         contract.MemorySource
@@ -119,11 +119,11 @@ func TestLateLimit(test *testing.T) {
 		},
 		{
 			name: "the raise stops at the ceiling the policy set", source: contract.MemorySourceCap,
-			inheritedBytes: engineMemoryCap + 512<<20, want: engineMemoryCap + 512<<20, wantRaises: true,
+			inheritedBytes: memoryCap + 512<<20, want: memoryCap + 512<<20, wantRaises: true,
 		},
 		{
 			name: "a ceiling at the cap leaves no room to raise", source: contract.MemorySourceCap,
-			inheritedBytes: engineMemoryCap,
+			inheritedBytes: memoryCap,
 		},
 		{
 			name: "a single-threaded run is never raised", source: contract.MemorySourceCap, inheritedBytes: 32 << 30,
@@ -147,9 +147,9 @@ func TestLateLimit(test *testing.T) {
 	for _, late := range cases {
 		test.Run(late.name, func(test *testing.T) {
 			test.Parallel()
-			memory := engineMemory{
+			memory := memoryAccount{
 				record: contract.Memory{
-					LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: late.source,
+					LimitBytes: memoryCap, CapBytes: memoryCap, Source: late.source,
 				},
 				inheritedBytes: late.inheritedBytes,
 			}

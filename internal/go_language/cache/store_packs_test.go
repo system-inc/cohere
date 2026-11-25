@@ -17,7 +17,7 @@ import (
 // samplePackPlace is a pack's place for the tests, samplePackEntries what it holds: one entry read for its own key, one
 // read through an alias, whose asked and stored keys differ, and an empty one, and samplePackStamps its shards' stamps.
 var (
-	samplePackPlace = PackPlace{Identity: PackIdentity("test engine"),
+	samplePackPlace = PackPlace{Identity: PackIdentity("test executable"),
 		Name: PackName([]string{"test"}, []string{"pack"})}
 	samplePackStamps  = map[byte]int64{0x01: 1_700_000_000_123_456_789, 0x03: -1, 0x04: 0}
 	samplePackEntries = []PackEntry{
@@ -28,7 +28,7 @@ var (
 )
 
 // A pack written is read back whole, each entry under the key it was asked by with the key it was stored under, and
-// each shard's stamp, and lives in the store's `packs` directory, in its engine identity's, where no Get reads it.
+// each shard's stamp, and lives in the store's `packs` directory, in its executable identity's, where no Get reads it.
 func TestAPackWrittenIsReadBack(test *testing.T) {
 	test.Parallel()
 
@@ -41,7 +41,7 @@ func TestAPackWrittenIsReadBack(test *testing.T) {
 	}
 	if _, statError := os.Stat(filepath.Join(store.directory, "packs", samplePackPlace.Identity.String(),
 		samplePackPlace.Name.String())); statError != nil {
-		test.Fatalf("the pack is not in its engine's directory of the store's packs directory: %v", statError)
+		test.Fatalf("the pack is not in cohere-go's directory of the store's packs directory: %v", statError)
 	}
 	read, refused := store.ReadPack(samplePackPlace)
 	if refused != "" {
@@ -256,8 +256,8 @@ func TestTheTrimTakesAPackAsAnEntry(test *testing.T) {
 	root := test.TempDir()
 	directory := filepath.Join(root, "go", "store")
 	store := OpenAt(directory, nil)
-	unread := PackPlace{Identity: PackIdentity("an engine"), Name: PackName([]string{"unread"})}
-	read := PackPlace{Identity: PackIdentity("an engine"), Name: PackName([]string{"read"})}
+	unread := PackPlace{Identity: PackIdentity("an executable"), Name: PackName([]string{"unread"})}
+	read := PackPlace{Identity: PackIdentity("an executable"), Name: PackName([]string{"read"})}
 	for _, place := range []PackPlace{unread, read} {
 		if writeError := store.WritePack(place, samplePackEntries, nil); writeError != nil {
 			test.Fatal(writeError)

@@ -35,7 +35,7 @@ import (
 //     and with no install scripts, since the tests read installed packages (tailwindcss, @types/react).
 //   - connected: the same, nothing left out.
 //   - the Prettier fork: its tree, then its yarn.lock installed by the yarn it vendors, since its oracles run node
-//     inside it, and the eight bundles cohere embeds built into its dist/, since with the fork set the engine loads
+//     inside it, and the eight bundles cohere embeds built into its dist/, since with the fork set cohere loads
 //     its bundles from there (internal/format/prettier's Bundles). Built at the pin on Sun2 they matched the embedded
 //     ones byte for byte (Nov 16); the fork's whole build doesn't finish on a box, since its oxc plugin runs a yarn
 //     of its own, and none of the eight needs it.

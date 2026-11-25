@@ -34,8 +34,8 @@
 // horizontal dependencies, so that an analyzer with a large Result and no
 // facts, such as buildir, did not start on every package at once.
 //
-// Measured on cohere's own root under the engine's 5 GiB memory cap
-// (collection off, the limit driving it), the engine alone, cold, four
+// Measured on cohere's own root under cohere-go's 5 GiB memory cap
+// (collection off, the limit driving it), cohere-go alone, cold, four
 // interleaved runs each, the same records in every run, at a load
 // average of 35 to 41:
 //
@@ -44,7 +44,7 @@
 //	schedule:  8.2 to 11.7s wall, 45 to 48s user (mean 45.9),
 //	          5.45 to 5.53 GB peak, 10 collections
 //
-// The cap is what the engine ships, so the cap regime is the one that
+// The cap is what cohere-go ships, so the cap regime is the one that
 // decides: at GOGC=100 a collector with twice the live heap to spare
 // never works at a limit.
 //
@@ -64,7 +64,7 @@
 // Peak RSS is the cap's either way, about 5.6 GB, since with collection
 // off the heap grows to the limit before the first cycle.
 //
-// The fourth is the restore, the seam the engine's per-package findings
+// The fourth is the restore, the seam cohere-go's per-package findings
 // cache goes through. Options.Restored names the packages whose findings
 // and facts the cache already holds. An action on such a package gets no
 // horizontal prerequisites, so nothing on the package runs. It still
@@ -76,12 +76,12 @@
 // action exported that its importers read.
 //
 // The fifth is Options.ReadFile, the option upstream keeps unexported
-// under its "TODO(adonovan): expose ReadFile", exported. The engine
+// under its "TODO(adonovan): expose ReadFile", exported. cohere-go
 // holds every file in scope as its load parsed it, and gives each pass
 // those bytes, so a rule that reads the source, as the long-line rule
 // reads every file, reads none from disk again. CheckedReadFile still
 // guards which files a pass may read. Measured on cohere's own root,
-// the engine alone, cold, two runs each at a load average of 13 to 17,
+// cohere-go alone, cold, two runs each at a load average of 13 to 17,
 // the long-line rule's CPU went from 0.56 to 0.65s, 0.53 to 0.59s of it
 // in os.ReadFile, to 0.19 to 0.20s, none of it reading a file.
 //
@@ -95,7 +95,7 @@
 // workers run the queue, the package on the longest weighted path to the
 // end of the graph first, and execOnce runs its prerequisites inline,
 // where each has already finished. Measured on cohere's own root, the
-// engine alone, cold, six interleaved runs each, the same records in
+// cohere-go alone, cold, six interleaved runs each, the same records in
 // every run, at a load average of 4.9 to 15.7, medians:
 //
 //	before: 3.91s wall, 31.0s user, 3.31s sys, lint 2.59s
@@ -108,7 +108,7 @@
 // in its ResultOf under that analyzer, the set of analyzers whose
 // actions on the same package require this action: the horizontal
 // dependents the first change already counts as readers of its Result.
-// The engine's dispatchers walk a package once for every rule
+// cohere-go's dispatchers walk a package once for every rule
 // registered on them, and a rule registers as its package initializes,
 // whether or not a run enables it; the set is how a dispatcher calls
 // only the listeners of the rules this graph runs, per graph, with no
@@ -235,7 +235,7 @@
 // the rule reports the host's findings there as its own.
 // Options.StandingAfter names an analyzer whose action on a package
 // every follower's action there follows, a follower being an analyzer
-// Options.FollowsStanding names, the engine's dispatchers and the build
+// Options.FollowsStanding names, cohere-go's dispatchers and the build
 // of its representation, which then leaves unbuilt what stands for
 // every rule its dispatcher starts: Analyze adds the edge, no analyzer's
 // Requires changes, and StandingBodies is asked with that action's
@@ -264,7 +264,7 @@
 // read is of a map nothing writes again. Under Options.SanityCheck the
 // copy stays, since it is what exercises each fact's encoding. Measured on
 // cohere's own tree, every package a root, under ctrlflow, printf and
-// deprecated, the analyzers whose facts an engine run pushes, by
+// deprecated, the analyzers whose facts a cohere-go run pushes, by
 // BenchmarkFactInheritance's measure pointed at the tree in place of its
 // standard-library package, three runs of two rounds each:
 //

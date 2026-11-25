@@ -46,13 +46,13 @@ type runSummary struct {
 	Formatting time.Duration
 
 	Cache cacheUse
-	// PackageCache is what the Go engine's per-package findings cache did, nil for every other run.
+	// PackageCache is what cohere-go's per-package findings cache did, nil for every other run.
 	PackageCache *packageCacheUse
 	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, in order, nil when it raised
 	// none and for every other run (#5shepvt). A replay raised nothing, so it carries none.
 	MemoryRaisedToBytes []int64
 	// HeadersUnshared is why a Go run's listings did not share each Go file's header (#fnsk1jv), empty when they
-	// shared them and for every other run. A replay started no engine, so it carries none.
+	// shared them and for every other run. A replay started no child, so it carries none.
 	HeadersUnshared string
 	// Builds is every build a Go run checked when it checked more than one, the host's first, nil for a run of one
 	// build and every other run. A replay keeps them, since the verdict it repeats was merged from them.
@@ -116,9 +116,9 @@ type runSummary struct {
 	// Swift is what only a Swift run says of itself, nil for every other run and for a Swift run with nothing to say.
 	Swift *swiftSummary
 
-	// EngineBuilds are the engines this invocation built before it checked, which no record or replay keeps,
-	// since a build is this invocation's (engine_build.go).
-	EngineBuilds []engineBuild `json:"-"`
+	// ProgramBuilds are the children this invocation built before it checked, which no record or replay keeps,
+	// since a build is this invocation's (program_build.go).
+	ProgramBuilds []programBuild `json:"-"`
 
 	// IgnorePatterns are the root's ignorePatterns as this invocation's discovery counted them, which no record
 	// keeps, since discovery runs again on every run (ignore_account.go). Findings already counts each dead one
@@ -211,32 +211,32 @@ func (summary runSummary) filesFormatted() int {
 	return count
 }
 
-// uncheckedEngineFile is one file of an engine run's gap: the file as the engine names it, the engine's reason for
-// leaving it out, and the language whose engine left it, which the footer's marker names, "Swift files not checked".
+// uncheckedContractFile is one file of a child run's gap: the file as the child names it, the child's reason for
+// leaving it out, and the language whose child left it, which the footer's marker names, "Swift files not checked".
 // The format phase's own unchecked files are uncheckedFile (format_only.go), a different fact.
-type uncheckedEngineFile struct {
+type uncheckedContractFile struct {
 	File     string `json:"file"`
 	Reason   string `json:"reason"`
 	Language string `json:"language"`
 }
 
-// notWrittenFile is one file a fix phase did not write: the file as the engine reached it, and its real path, outside
-// the root. The same fields the Go engine's fix record writes (internal/go_language/contract.NotWrittenFile), so the
+// notWrittenFile is one file a fix phase did not write: the file as the child reached it, and its real path, outside
+// the root. The same fields cohere-go's fix record writes (internal/go_language/contract.NotWrittenFile), so the
 // record decodes into it and `--json` writes it as is.
 type notWrittenFile struct {
 	File     string `json:"file"`
 	RealPath string `json:"realPath"`
 }
 
-// censusMissedFile is a file an engine's load reached that its census never counted, with its package (#hd5bsqh):
-// the same fields the Go engine's types record writes (internal/go_language/contract.CensusMissedFile).
+// censusMissedFile is a file a child's load reached that its census never counted, with its package (#hd5bsqh):
+// the same fields cohere-go's types record writes (internal/go_language/contract.CensusMissedFile).
 type censusMissedFile struct {
 	Package string `json:"package"`
 	File    string `json:"file"`
 }
 
 // withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,
-// the file as the engine names it, and how many errors it held. The same fields the Go engine's types record
+// the file as the child names it, and how many errors it held. The same fields cohere-go's types record
 // writes (internal/go_language/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
 type withheldCgoFile struct {
 	Package string `json:"package"`

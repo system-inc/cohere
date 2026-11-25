@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-// The fixture corpus is the record of what the engine actually does, captured from a real Tailwind
+// The fixture corpus is the record of what Tailwind actually does, captured from a real Tailwind
 // 4.3.3 design system built from the real theme.css, and checked in as JSON next to this test.
 //
-// It is generated rather than transcribed, because a hand-copied expectation is a claim about the
-// engine rather than a measurement of it, and every one of the three approaches that lost findings
+// It is generated rather than transcribed, because a hand-copied expectation is a claim about
+// Tailwind rather than a measurement of it, and every one of the three approaches that lost findings
 // during the migration looked correct when read.
 
 // fixtureCorpus is the shape of testdata/gate_fixtures.json.
@@ -20,17 +20,17 @@ type fixtureCorpus struct {
 	Fixtures        []gateFixture `json:"fixtures"`
 }
 
-// gateFixture is one literal, what the engine said about it, and the bucket key per class.
+// gateFixture is one literal, what Tailwind said about it, and the bucket key per class.
 type gateFixture struct {
 	Literal string   `json:"literal"`
 	Classes []string `json:"classes"`
-	// EngineCollapses is what the real engine reported. Empty means the engine stayed silent.
-	EngineCollapses []engineCollapse `json:"engineCollapses"`
+	// TailwindCollapses is what the real Tailwind reported. Empty means Tailwind stayed silent.
+	TailwindCollapses []tailwindCollapse `json:"engineCollapses"`
 	// BucketKeys is the key the JavaScript gate computed per class, which the Go gate must match
 	// exactly. Matching the verdict through different keys would be luck rather than a port.
 	BucketKeys map[string]string `json:"bucketKeys"`
-	// ParsedCandidates feeds the recorded parser below, so the Go gate is exercised against the
-	// engine's real readings rather than against a Go reimplementation of parsing.
+	// ParsedCandidates feeds the recorded parser below, so the Go gate is exercised against
+	// Tailwind's real readings rather than against a Go reimplementation of parsing.
 	ParsedCandidates map[string][]Candidate `json:"parsedCandidates"`
 	// DeclaredValues is what each class compiles to, for the static bucketing path.
 	DeclaredValues map[string][]string `json:"declaredValues"`
@@ -41,13 +41,13 @@ type gateFixture struct {
 	DeclaredProperties map[string][]string `json:"declaredProperties"`
 }
 
-type engineCollapse struct {
+type tailwindCollapse struct {
 	Input  []string `json:"input"`
 	Output string   `json:"output"`
 }
 
-func (fixture gateFixture) engineFoundCollapse() bool {
-	return len(fixture.EngineCollapses) > 0
+func (fixture gateFixture) tailwindFoundCollapse() bool {
+	return len(fixture.TailwindCollapses) > 0
 }
 
 func loadFixtures(test *testing.T) fixtureCorpus {
@@ -80,7 +80,7 @@ func gateForFixture(fixture gateFixture) *Gate {
 
 // TestCorpusDiscriminates proves the corpus can fail before anything is measured on it.
 //
-// A fixture set where nothing collapses would let a gate that never asks the engine score perfectly.
+// A fixture set where nothing collapses would let a gate that never asks Tailwind score perfectly.
 // The tree this rule guards is already canonical, which is exactly the condition under which a
 // broken gate looks correct, so the corpus has to carry known-collapsing cases and this has to
 // confirm they are there.
@@ -91,7 +91,7 @@ func TestCorpusDiscriminates(test *testing.T) {
 	collapsing := 0
 	silent := 0
 	for _, fixture := range corpus.Fixtures {
-		if fixture.engineFoundCollapse() {
+		if fixture.tailwindFoundCollapse() {
 			collapsing++
 		} else {
 			silent++
@@ -99,10 +99,10 @@ func TestCorpusDiscriminates(test *testing.T) {
 	}
 
 	if collapsing == 0 {
-		test.Fatal("no fixture collapses, so a gate that never asks the engine would pass every test here")
+		test.Fatal("no fixture collapses, so a gate that never asks Tailwind would pass every test here")
 	}
 	if silent == 0 {
-		test.Fatal("no fixture stays silent, so a gate that always asks the engine would pass every test here")
+		test.Fatal("no fixture stays silent, so a gate that always asks Tailwind would pass every test here")
 	}
 
 	test.Logf("corpus: %d collapsing, %d silent, tailwind %s", collapsing, silent, corpus.TailwindVersion)
@@ -110,7 +110,7 @@ func TestCorpusDiscriminates(test *testing.T) {
 
 // TestGateNeverLosesACollapse is the assertion the whole package exists to satisfy.
 //
-// For every literal the real engine found a collapse in, the gate must send it to the engine. A
+// For every literal the real Tailwind found a collapse in, the gate must send it to Tailwind. A
 // failure here is the silent kind: the rule keeps running, the tree keeps looking clean, and a real
 // finding stops being reported.
 func TestGateNeverLosesACollapse(test *testing.T) {
@@ -119,14 +119,14 @@ func TestGateNeverLosesACollapse(test *testing.T) {
 
 	checked := 0
 	for _, fixture := range corpus.Fixtures {
-		if !fixture.engineFoundCollapse() {
+		if !fixture.tailwindFoundCollapse() {
 			continue
 		}
 		checked++
 
 		gate := gateForFixture(fixture)
-		if !gate.NeedsEngine(fixture.Classes, nil) {
-			test.Errorf("gate suppressed %q, but the engine collapses it into %v",
+		if !gate.NeedsTailwind(fixture.Classes, nil) {
+			test.Errorf("gate suppressed %q, but Tailwind collapses it into %v",
 				fixture.Literal, collapseOutputs(fixture))
 		}
 	}
@@ -175,12 +175,12 @@ func TestGateSkipsWhatItCan(test *testing.T) {
 	skipped := 0
 	asked := 0
 	for _, fixture := range corpus.Fixtures {
-		if fixture.engineFoundCollapse() {
+		if fixture.tailwindFoundCollapse() {
 			continue
 		}
 
 		gate := gateForFixture(fixture)
-		if gate.NeedsEngine(fixture.Classes, nil) {
+		if gate.NeedsTailwind(fixture.Classes, nil) {
 			asked++
 			test.Logf("gate still asks about silent literal %q (safe, but costs a call)", fixture.Literal)
 		} else {
@@ -254,7 +254,7 @@ func TestKnownWrongGatesLoseFindings(test *testing.T) {
 			for _, literal := range lost {
 				fixture := fixtureByLiteral(corpus, literal)
 				gate := gateForFixture(fixture)
-				if !gate.NeedsEngine(fixture.Classes, nil) {
+				if !gate.NeedsTailwind(fixture.Classes, nil) {
 					test.Errorf("the real gate also loses %q, which the %q shortcut was supposed to "+
 						"be alone in losing", literal, testCase.name)
 				}
@@ -268,7 +268,7 @@ func brokenGateLosses(corpus fixtureCorpus, key func(gateFixture, string) string
 	var lost []string
 
 	for _, fixture := range corpus.Fixtures {
-		if !fixture.engineFoundCollapse() {
+		if !fixture.tailwindFoundCollapse() {
 			continue
 		}
 
@@ -335,8 +335,8 @@ func fixtureByLiteral(corpus fixtureCorpus, literal string) gateFixture {
 }
 
 func collapseOutputs(fixture gateFixture) []string {
-	outputs := make([]string, 0, len(fixture.EngineCollapses))
-	for _, collapse := range fixture.EngineCollapses {
+	outputs := make([]string, 0, len(fixture.TailwindCollapses))
+	for _, collapse := range fixture.TailwindCollapses {
 		outputs = append(outputs, collapse.Output)
 	}
 	return outputs
@@ -351,10 +351,10 @@ func contains(values []string, want string) bool {
 	return false
 }
 
-// TestUnparseableClassesNeverGroup guards the case that has no engine answer at all.
+// TestUnparseableClassesNeverGroup guards the case that has no Tailwind answer at all.
 //
 // A project-specific class such as `background--2/50` is not something Tailwind can read. Grouping
-// every unreadable class under one empty key would make them send each other to the engine forever,
+// every unreadable class under one empty key would make them send each other to Tailwind forever,
 // and grouping them with a real class would let one suppress a question about the other.
 func TestUnparseableClassesNeverGroup(test *testing.T) {
 	test.Parallel()
@@ -368,22 +368,22 @@ func TestUnparseableClassesNeverGroup(test *testing.T) {
 	gate := NewGate(parser)
 
 	if gate.GroupKey("mystery-one") == gate.GroupKey("mystery-two") {
-		test.Fatal("two unparseable classes shared a bucket, so each would send the other to the engine")
+		test.Fatal("two unparseable classes shared a bucket, so each would send the other to Tailwind")
 	}
 	if gate.CouldRewriteAlone("mystery-one") {
-		test.Fatal("an unparseable class cannot be canonicalized, so it is not worth an engine call")
+		test.Fatal("an unparseable class cannot be canonicalized, so it is not worth Tailwind call")
 	}
 	if !gate.CannotCollapse([]string{"mystery-one", "mystery-two"}) {
 		test.Fatal("two unparseable classes cannot collapse into each other")
 	}
 }
 
-// TestRecordedSingleRewriteForcesAnEngineCall covers the feedback path.
+// TestRecordedSingleRewriteForcesATailwindCall covers the feedback path.
 //
 // The gate can see that `z-[1]` is worth asking about but not that it is `z-1`. Once an authority
-// says so, every later literal containing it must reach the engine, including ones where no two
+// says so, every later literal containing it must reach Tailwind, including ones where no two
 // classes share a bucket.
-func TestRecordedSingleRewriteForcesAnEngineCall(test *testing.T) {
+func TestRecordedSingleRewriteForcesATailwindCall(test *testing.T) {
 	test.Parallel()
 	parser := recordedParser{
 		candidates: map[string][]Candidate{
@@ -395,8 +395,10 @@ func TestRecordedSingleRewriteForcesAnEngineCall(test *testing.T) {
 	gate := NewGate(parser)
 
 	classes := []string{"z-[1]", "flex"}
-	if !gate.NeedsEngine(classes, nil) {
-		test.Fatal("an arbitrary value is always worth one engine call, because only the theme knows if it has a name")
+	if !gate.NeedsTailwind(classes, nil) {
+		test.Fatal(
+			"an arbitrary value is always worth one Tailwind call, because only the theme knows if it has a name",
+		)
 	}
 
 	// Once asked, it should not be asked again by the singles path.
@@ -407,15 +409,15 @@ func TestRecordedSingleRewriteForcesAnEngineCall(test *testing.T) {
 
 	// But a recorded rewrite must still force the call, because the literal genuinely has a finding.
 	gate.RecordSingleRewrites([]string{"z-[1]"})
-	if !gate.NeedsEngine(classes, alreadyChecked) {
-		test.Fatal("a class known to rewrite alone must always reach the engine")
+	if !gate.NeedsTailwind(classes, alreadyChecked) {
+		test.Fatal("a class known to rewrite alone must always reach Tailwind")
 	}
 }
 
 // TestDuplicateClassesDoNotFakeACollapse guards a false positive rather than a false negative.
 //
 // `flex flex` is a different rule's finding. If the gate treated the repeat as two classes sharing a
-// bucket, every duplicate in the tree would buy an engine call and report nothing.
+// bucket, every duplicate in the tree would buy Tailwind call and report nothing.
 func TestDuplicateClassesDoNotFakeACollapse(test *testing.T) {
 	test.Parallel()
 	parser := recordedParser{
@@ -426,7 +428,7 @@ func TestDuplicateClassesDoNotFakeACollapse(test *testing.T) {
 	}
 	gate := NewGate(parser)
 
-	if gate.NeedsEngine([]string{"flex", "flex"}, map[string]bool{"flex": true}) {
+	if gate.NeedsTailwind([]string{"flex", "flex"}, map[string]bool{"flex": true}) {
 		test.Fatal("a repeated class is a duplicate, not a collapse")
 	}
 }

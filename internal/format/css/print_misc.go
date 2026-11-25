@@ -6,7 +6,7 @@ package css
 // toLowerCase) spelled out once.
 //
 // Upstream's adjustStrings and adjustNumbers run regular expressions with a backreference and lookahead,
-// which Go's regexp does not have. Each is a scanner here that takes the match the backtracking engine
+// which Go's regexp does not have. Each is a scanner here that takes the match the backtracking matcher
 // would take, explained where it is written. Offsets are bytes; every character these patterns test is
 // ASCII, and every non-ASCII code unit falls in the same class (U+0080 to U+FFFF) as each of its UTF-8
 // bytes, so stepping by byte finds the same matches upstream finds stepping by UTF-16 code unit.

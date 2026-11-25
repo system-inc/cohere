@@ -73,7 +73,7 @@ type Sort struct {
 // PropertySort computes the reading of a compiled utility from its declaration list.
 //
 // Ported from `getPropertySort` in `src/compile.ts`. Three details decide correctness, and each was
-// measured against the shipped 4.3.3 engine rather than inferred from the source.
+// measured against the shipped 4.3.3 Tailwind rather than inferred from the source.
 //
 // # It is breadth-first, and that is observable
 //
@@ -123,7 +123,7 @@ func PropertySort(nodes []*Node) Sort {
 // propertySort is PropertySort plus the sequence of declaration properties it visited, in visit
 // order.
 //
-// The sequence exists so that a test can assert the traversal order against the engine's, on the
+// The sequence exists so that a test can assert the traversal order against Tailwind's, on the
 // real function rather than on a reimplementation of it. Order is a sorted set and Count is a total,
 // so both are insensitive to visit order on most input; without observing the sequence directly, a
 // depth-first PropertySort passes every assertion that can be made about its return value.

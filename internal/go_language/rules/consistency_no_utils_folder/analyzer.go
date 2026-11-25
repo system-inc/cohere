@@ -1,4 +1,4 @@
-// Package consistency_no_utils_folder is the Go engine's rule that no file lives in a folder named utils or util, in
+// Package consistency_no_utils_folder is cohere-go's rule that no file lives in a folder named utils or util, in
 // any casing and with any leading underscores, or in a package named that in its package clause.
 //
 // A folder named for nothing in particular collects everything, and Go's own guidance on package names says the same
@@ -32,7 +32,7 @@ var Analyzer = &analysis.Analyzer{
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It reads the import path and the package clause, both of
+// Rule is this rule's entry in cohere-go's registry. It reads the import path and the package clause, both of
 // which a load has before any type is checked, so it reads no type information.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
@@ -102,7 +102,7 @@ func replacement(name string) string {
 
 // report flags file at its start, a point rather than a range, since the finding is about the file's path and no
 // text inside the file is to blame. A finding in a generated file is reported like any other and left to the
-// engine, which withholds a house rule's findings there and counts them.
+// checker, which withholds a house rule's findings there and counts them.
 func report(pass *analysis.Pass, file *ast.File, message policy.MessageHandle, values map[string]string) {
 	pass.Report(analysis.Diagnostic{
 		Pos:      file.FileStart,

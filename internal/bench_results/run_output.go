@@ -11,13 +11,13 @@ import (
 // free to change, and when it moved to one line every reader of it read nothing, so the benchmark reads
 // the contract instead.
 //
-// A root holding several projects prints a summary for each (`.`, `. (Format)`, `swift`), and they run side
-// by side, so the run is all of them: the longest engine time, every finding, and a cache use that holds for
-// every project. Reading only the last one timed a Swift project on ahra and missed a Go engine that never
+// A root holding several projects prints a summary for each (`.`, `. (Folder)`, `swift`), and they run side
+// by side, so the run is all of them: the longest summary time, every finding, and a cache use that holds for
+// every project. Reading only the last one timed a Swift project on ahra and missed cohere-go that never
 // ran on cohere's root (#7z52pqf).
 type RunOutput struct {
-	// EngineSeconds is the engine's own wall clock for the run: the longest project's.
-	EngineSeconds float64
+	// SummarySeconds is cohere's own wall clock for the run: the longest project's.
+	SummarySeconds float64
 	// Findings is every finding the run reported, whichever phase found it: lint findings, type errors,
 	// and files the formatter would change.
 	Findings int
@@ -75,7 +75,7 @@ func ParseRunOutput(output []byte) (RunOutput, error) {
 		if reason := summary.checkedLess(); reason != "" {
 			return RunOutput{}, fmt.Errorf("the project %q did less than a developer's run: %s", summary.Label, reason)
 		}
-		result.EngineSeconds = max(result.EngineSeconds, summary.Seconds)
+		result.SummarySeconds = max(result.SummarySeconds, summary.Seconds)
 		result.Findings += summary.Findings + summary.TypeErrors + summary.WouldChange
 		everyOff = everyOff && summary.Cache.Off
 		everyReplayed = everyReplayed && summary.Cache.Replayed

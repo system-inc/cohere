@@ -57,7 +57,7 @@ func walkDeadDirectiveFixture(
 	return result
 }
 
-// Each shape checks the finding's own comment range and the edit engine's exact output. The
+// Each shape checks the finding's own comment range and the fix pass's exact output. The
 // filtered and live shapes share the dead fixture's rule set; mutants removing either eligibility
 // or usage checks must turn those negative fixtures red. Fixes are re-walked to prove convergence.
 func TestDeadDisableFindingsAndFixes(test *testing.T) {

@@ -1,4 +1,4 @@
-// Package consistency_no_long_line is the Go engine's rule that a line fits in 120 columns.
+// Package consistency_no_long_line is cohere-go's rule that a line fits in 120 columns.
 //
 // A line past the limit runs off the edge of a review pane or a split editor, and its end goes unread. gofmt never
 // wraps a line, so the limit is the writer's to keep. What cannot wrap is left alone: an import path, a //go:
@@ -49,7 +49,7 @@ var Analyzer = &analysis.Analyzer{
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It reads the syntax tree and the source, never the types.
+// Rule is this rule's entry in cohere-go's registry. It reads the syntax tree and the source, never the types.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
 var longLineMessage = policy.MessageOf(Name, "longLine")

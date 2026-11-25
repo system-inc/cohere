@@ -136,7 +136,7 @@ func (context *context) transformAstBlockValue(
 }
 
 // headerPattern is /([+-]?)(\d*)([+-]?)$/u. Go's regexp finds the leftmost match and prefers what a
-// backtracking engine prefers, as JavaScript's does, and \d is ASCII in both.
+// backtracking matcher prefers, as JavaScript's does, and \d is ASCII in both.
 var headerPattern = regexp.MustCompile(`([+-]?)(\d*)([+-]?)$`)
 
 // parseHeader is upstream's parseHeader: the chomping and the explicit indentation, nil for null.

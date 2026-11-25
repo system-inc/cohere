@@ -1,6 +1,6 @@
 package contract
 
-// TimingRecord is additive within contract 3, and the Go engine's alone: under `--timing` it says what the run's CPU
+// TimingRecord is additive within contract 3, and cohere-go's alone: under `--timing` it says what the run's CPU
 // went to, so the front door prints for a Go run the table `cohere --timing` prints for TypeScript, and a rule can be
 // timed before it lands (#3apgjer). It is written once, after the lint record and before inputs and the summary.
 //
@@ -106,7 +106,7 @@ type SharedTiming struct {
 type SharedKind string
 
 const (
-	// SharedIntermediateRepresentation is the engine's intermediate representation build.
+	// SharedIntermediateRepresentation is cohere-go's intermediate representation build.
 	SharedIntermediateRepresentation SharedKind = "intermediateRepresentation"
 	// SharedDispatcher is a dispatcher's walk, less the calls into its listeners.
 	SharedDispatcher SharedKind = "dispatcher"

@@ -12,7 +12,7 @@ import (
 // that reports in the right place and rewrites wrongly is indistinguishable, at the message-id
 // layer, from a correct one.
 //
-// These assert a single fix pass, which is what upstream's RuleTester records. The real engine
+// These assert a single fix pass, which is what upstream's RuleTester records. The real linter
 // loops to a fixed point, and three of these cases converge somewhere else because the second
 // pass merges declarations the first one only just created. Asserting the fixed point here would
 // disagree with upstream's own expectations on exactly those three.

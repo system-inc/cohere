@@ -21,7 +21,7 @@ import (
 //     before a newer commit landed execs its own within milliseconds. So recency covers every live
 //     reference: the newest few of each kind, and anything touched within the last hour, which is far
 //     past any build or resolve and covers a build that is still writing its `.partial-` file.
-//   - Files other members own are kept by name: `cohere-swift-current` is a hand-built engine their
+//   - Files other members own are kept by name: `cohere-swift-current` is a hand-built binary their
 //     proving-ground checks exec directly, and the launcher itself lives here.
 //   - Anything the prune does not recognise is kept and reported. A name it cannot classify is a name
 //     it has no business deleting.
@@ -50,8 +50,8 @@ var prunedByName = map[string]string{
 	developmentBinaryName:           "the --dev binary",
 	developmentBinaryName + ".hash": "the --dev binary's recorded inputs",
 	"cohere-dispatch":               "the launcher",
-	"cohere-swift-current":          "@system_cohere_swift's proving-ground engine",
-	"cohere-swift-current.tmp":      "@system_cohere_swift's engine mid-install",
+	"cohere-swift-current":          "@system_cohere_swift's proving-ground binary",
+	"cohere-swift-current.tmp":      "@system_cohere_swift's binary mid-install",
 }
 
 // PrunedFile is one file, or one directory of the compiler or snapshot cache, that a prune removes.

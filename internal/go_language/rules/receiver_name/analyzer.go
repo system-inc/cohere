@@ -1,5 +1,5 @@
 // Package receiver_name is staticcheck's `ST1006`, a method's receiver named "self" or "this", which says nothing of
-// what the receiver is, or "_", where an unused receiver leaves its name out, ported onto the engine's syntax
+// what the receiver is, or "_", where an unused receiver leaves its name out, ported onto cohere-go's syntax
 // dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1006/st1006.go, whose messages it
@@ -11,7 +11,7 @@
 // check. From each type on, the two read the same go/types answers through the same staticcheck helpers.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package receiver_name
 
 import (

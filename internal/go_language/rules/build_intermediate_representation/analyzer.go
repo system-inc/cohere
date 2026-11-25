@@ -1,4 +1,4 @@
-// Package build_intermediate_representation builds the engine's own intermediate representation of a package, the
+// Package build_intermediate_representation builds cohere's own intermediate representation of a package, the
 // one in internal/go_language/intermediate_representation, for the readers that move onto it from staticcheck's
 // (#g0rwdw1). It stands where staticcheck's buildir stands for go/ir: the program and package are created from the
 // pass's types and syntax with the no-return predicate buildir gives go/ir, and Result lists the source functions in
@@ -40,7 +40,7 @@ import (
 // end the same calls in the same `Panic`.
 var Analyzer = &analysis.Analyzer{
 	Name: "build_intermediate_representation",
-	Doc: "creates and builds the package in the engine's own intermediate representation, for the readers that " +
+	Doc: "creates and builds the package in cohere's own intermediate representation, for the readers that " +
 		"later passes are",
 	Run:        run,
 	ResultType: reflect.TypeFor[*Result](),
@@ -49,7 +49,7 @@ var Analyzer = &analysis.Analyzer{
 
 // ExpressionReader is what an analyzer requires, beside Analyzer itself, to read Function.ValueForExpression of the
 // package Analyzer builds. Analyzer records the expression map for a package exactly when an analyzer requiring
-// ExpressionReader requires Analyzer there, which it reads from the set of its dependents the engine's checker hands
+// ExpressionReader requires Analyzer there, which it reads from the set of its dependents cohere-go's checker hands
 // each pass under rule.Dependents. A rule's analyzer runs only on the packages a run checks, and only when the run
 // enables the rule, so the workspace's packages get the map where a reader of it is on, and a dependency, built for
 // facts, never does.
@@ -69,7 +69,7 @@ var ExpressionReader = &analysis.Analyzer{
 	},
 }
 
-// Sharer is what the engine's checker hands every pass under rule.Resolved, the run's fact resolver, which builds the
+// Sharer is what cohere-go's checker hands every pass under rule.Resolved, the run's fact resolver, which builds the
 // functions of a package it judges in the representation the readers walk, so a root's is built once in a run, not
 // once here and once again for the facts the run's entries hold (#wt5vaft). ReadersPackage is the package whose types
 // are packageTypes as NewPackage creates it for the readers, created on the first call, by the resolver's first

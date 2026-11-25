@@ -104,7 +104,7 @@ func TestAFixRunNeverWritesThroughALinkOutsideTheRoot(test *testing.T) {
 			assertGapNamesNotWritten(test, output, notWritten)
 			continue
 		}
-		// Each by name with where it really is, the footer's gap, and the run read as short, in the Go engine's
+		// Each by name with where it really is, the footer's gap, and the run read as short, in cohere-go's
 		// words (#hwz114g), so a run that withheld a write never ends on a clean bill of health.
 		for _, file := range notWritten {
 			if reached := file.File + " → " + file.RealPath; !strings.Contains(output, "not written: "+reached) {

@@ -176,13 +176,13 @@ func TestStdinNeedsFix(test *testing.T) {
 // this binary, so the two cannot drift. The extension registers its formatter for the extensions listed,
 // and they must be exactly the ones the stdin mode acts on, both decided by the file name's extension: fixes
 // for a name edit.TypeScriptParsable claims (runStdin's stdinProposals), formatting for one native has a
-// printer for, and gofmt and the Go engine's fixes for a `.go` name, the one suffix the Go engine's census
+// printer for, and gofmt and cohere-go's fixes for a `.go` name, the one suffix cohere-go's census
 // reads as source (runGoStdin). A file type left off would never be fixed or formatted on save, and one added
 // that cohere does nothing with would be handed to it for nothing.
 //
 // The refusal is the start of what the front door says when the project a file is in has no stdin path, a
 // Swift package's, which the extension takes as a decline rather than an error, so it must begin the
-// sentence every engine without one prints.
+// sentence every language without one prints.
 //
 // Read from Go, not from node: native's registry is the set, and reading it here needs nothing but the file.
 func TestTheEditorSavesWhatStdinFormats(test *testing.T) {
@@ -218,13 +218,13 @@ func TestTheEditorSavesWhatStdinFormats(test *testing.T) {
 		return "true"
 	}
 	location := projectLocation{Root: "/work/project", ArgumentBase: "/work/project"}
-	_, _, swiftError := engineArguments(swiftLanguage, swiftFlags, location, given, value, nil)
+	_, _, swiftError := contractArguments(swiftLanguage, swiftFlags, location, given, value, nil)
 	if swiftError == nil || !strings.HasPrefix(swiftError.Error(), save.Refusal) {
 		test.Errorf("Swift's refusal of a save does not begin %q: %v", save.Refusal, swiftError)
 	}
-	// Go's save forwards the path to its engine, absolute, rather than refusing it.
-	goArguments, _, goError := engineArguments(goLanguage("module"), goFlags, location, given, value, nil)
+	// Go's save forwards the path to the child, absolute, rather than refusing it.
+	goArguments, _, goError := contractArguments(goLanguage("module"), goFlags, location, given, value, nil)
 	if goError != nil || !slices.Contains(goArguments, "/work/project/Probe.ts") {
-		test.Errorf("Go's save was not forwarded to its engine: %q, %v", goArguments, goError)
+		test.Errorf("Go's save was not forwarded to the child: %q, %v", goArguments, goError)
 	}
 }

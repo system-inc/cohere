@@ -50,7 +50,7 @@ package tailwind
 import (
 	"regexp"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // alwaysKnownClasses are markers Tailwind treats specially rather than as utilities.
@@ -80,7 +80,7 @@ var arbitraryPropertyPattern = regexp.MustCompile(`^\[[^\]]+:[^\]]*\]$`)
 // cannot load a design system reporting every class in the tree as unknown would bury a real
 // codebase in findings, which is strictly worse than the silence design_system.go's failing-safe
 // note argues for.
-func classExistsIn(className string, system *tailwindengine.LoadedDesignSystem) bool {
+func classExistsIn(className string, system *tailwindcollapse.LoadedDesignSystem) bool {
 	if system == nil {
 		return true
 	}
@@ -109,14 +109,17 @@ func classExistsIn(className string, system *tailwindengine.LoadedDesignSystem) 
 	// unreadable, which is correct: `notavariant:flex` compiles to nothing.
 	// Any candidate that resolves, not only the first. `shadow--0` is the repository's `shadow--*`
 	// first and the framework's `shadow` second, and only the second compiles.
-	return anyCandidateResolves(tailwindengine.ParseCandidate(className, system), system)
+	return anyCandidateResolves(tailwindcollapse.ParseCandidate(className, system), system)
 }
 
 // anyCandidateResolves reports whether some reading of a class resolves to a value the design system
-// has, which is when the engine emits CSS for it.
-func anyCandidateResolves(candidates []tailwindengine.ParsedCandidate, system *tailwindengine.LoadedDesignSystem) bool {
+// has, which is when Tailwind emits CSS for it.
+func anyCandidateResolves(
+	candidates []tailwindcollapse.ParsedCandidate,
+	system *tailwindcollapse.LoadedDesignSystem,
+) bool {
 	for index := range candidates {
-		if tailwindengine.ClassValueResolvesIn(&candidates[index], system) {
+		if tailwindcollapse.ClassValueResolvesIn(&candidates[index], system) {
 			return true
 		}
 	}

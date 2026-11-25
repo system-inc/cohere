@@ -261,7 +261,7 @@ func TestLayoutCountsOnLinux(test *testing.T) {
 	}
 }
 
-// A graph that does not hold a dependency, as the engine's does not hold one checked without syntax, judges the
+// A graph that does not hold a dependency, as cohere-go's does not hold one checked without syntax, judges the
 // packages it holds as the whole graph does once the whole graph's dependent objects answer for the dependency's, and
 // without them calls the units that read the dependency's dependent objects independent.
 func TestDependentObjectsAnswerForAPackageTheGraphDoesNotHold(test *testing.T) {
@@ -301,7 +301,7 @@ func TestDependentObjectsAnswerForAPackageTheGraphDoesNotHold(test *testing.T) {
 }
 
 // restoredFromExportData is host's workspace packages checked again against the dependency's types read from export
-// data, as the engine's host reads a package it restored from the system cache: each object the workspace reads of
+// data, as cohere-go's host reads a package it restored from the system cache: each object the workspace reads of
 // the dependency is another than the one the dependency's own load declares, and a graph of these packages holds
 // nothing of the dependency.
 func restoredFromExportData(test *testing.T, host loadedBuild) loadedBuild {
@@ -373,7 +373,7 @@ func (importer importerFunction) Import(path string) (*types.Package, error) {
 	return importer(path)
 }
 
-// The engine's host restores the standard library from export data, so its graph holds none of it, and a graph of its
+// cohere-go's host restores the standard library from export data, so its graph holds none of it, and a graph of its
 // own, loaded from source, judges it (#ss4t5g6). Here the workspace is checked against the dependency read from export
 // data, a graph of the dependency alone is judged on linux, and its judgment answers for each object the workspace
 // reads through that object's counterpart, found by its path: every workspace unit's verdict is then the whole

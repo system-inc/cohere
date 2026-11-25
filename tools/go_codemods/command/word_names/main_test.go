@@ -94,7 +94,7 @@ func typeCheck(test *testing.T, source string) rename.Package {
 	return rename.Package{FileSet: fileSet, Types: packageTypes, Info: info, Files: []*ast.File{file}}
 }
 
-// TestWordnamesRenamesLocalsAsTheFormsSay runs each fixture through planPackage and the engine, and checks
+// TestWordnamesRenamesLocalsAsTheFormsSay runs each fixture through planPackage and global_rename, and checks
 // what became of the local named in the case: its new name, or that it kept its name, and why.
 func TestWordnamesRenamesLocalsAsTheFormsSay(test *testing.T) {
 	test.Parallel()
@@ -428,7 +428,7 @@ func (cfg configuration) get() int { return cfg.value }`, "cfg", "", otherGenera
 			locals, _ := planPackage(renamePackage, loadedVocabulary)
 			plan, _ := checkQualified(renamePackage, locals)
 			if len(plan.Rejections) > 0 && testCase.want != "" {
-				test.Fatalf("the engine rejected %+v", plan.Rejections)
+				test.Fatalf("global_rename rejected %+v", plan.Rejections)
 			}
 
 			var object types.Object

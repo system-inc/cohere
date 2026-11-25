@@ -9,7 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // messageShorthandClasses names the longhands and the class that replaces them.
@@ -216,7 +216,7 @@ var EnforceShorthandClasses = rule.Rule[EnforceShorthandClassesOptions]{
 		configured, isConfigured := options.Read()
 
 		// nil when there is no design system to ask, and classExistsIn answers true for nil.
-		var system *tailwindengine.LoadedDesignSystem
+		var system *tailwindcollapse.LoadedDesignSystem
 		if ruleContext.Program != nil {
 			if designSystem := DesignSystemForProgramAt(
 				ruleContext.Program,
@@ -273,7 +273,7 @@ var EnforceShorthandClasses = rule.Rule[EnforceShorthandClassesOptions]{
 }
 
 // shorthandsExistIn reports whether every class a collapse would suggest is one the design system has.
-func shorthandsExistIn(shorthands []string, system *tailwindengine.LoadedDesignSystem) bool {
+func shorthandsExistIn(shorthands []string, system *tailwindcollapse.LoadedDesignSystem) bool {
 	for _, shorthand := range shorthands {
 		if !classExistsIn(shorthand, system) {
 			return false

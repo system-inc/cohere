@@ -105,7 +105,7 @@ func representationProbe(held *heldRepresentations) rule.Rule {
 	return rule.Rule{Name: representationProbeName, Origin: rule.OriginHouse, Analyzer: analyzer, Listener: listener}
 }
 
-// runStanding runs the engine over a copy of the standing-bodies fixture with the registry's rules, the standing probe
+// runStanding runs cohere-go over a copy of the standing-bodies fixture with the registry's rules, the standing probe
 // and the representation probe, both declared PerUnit, under the body reach census with `--no-cache --no-fix
 // --build-dependence`, every build checked as a plain run's are, with the standing bodies' switch as switched, keeping
 // each build's package in the representation in held, and returns the pipeline, its stream, normalized, the literals
@@ -118,17 +118,17 @@ func runStanding(
 	test.Helper()
 	heard := &heardLiterals{heard: map[string]int{}, inFile: map[*token.File]int{}}
 	root := copyFixture(test, standingBodiesFixture)
-	engine, stream, _ := runOverRegistered(test, root, exitFindings,
+	pipeline, stream, _ := runOverRegistered(test, root, exitFindings,
 		append(rules.All(), standingProbe(heard), representationProbe(held)),
-		func(engine *pipeline) {
-			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-			engine.standingBodies = switched
-			engine.plantedInputs = map[string]rules.Declared{standingProbeName: {Inputs: rules.InputsPerUnit},
+		func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			pipeline.standingBodies = switched
+			pipeline.plantedInputs = map[string]rules.Declared{standingProbeName: {Inputs: rules.InputsPerUnit},
 				representationProbeName: {Inputs: rules.InputsPerUnit}}
 		}, "--no-cache", "--no-fix", "--build-dependence")
 	heard.lock.Lock()
 	defer heard.lock.Unlock()
-	return engine, normalize(stream, root), maps.Clone(heard.heard), root
+	return pipeline, normalize(stream, root), maps.Clone(heard.heard), root
 }
 
 // rawFindings are run's own findings, every rule's, before the merge, sorted, with root, the run's copy of the fixture,
@@ -156,15 +156,15 @@ func builtIn(held *heldRepresentations, filename string) map[string]bool {
 	return built
 }
 
-// windowsOutcome is windows's own outcome in engine's run over root, after its own //cohere:ignore comments
+// windowsOutcome is windows's own outcome in pipeline's run over root, after its own //cohere:ignore comments
 // (outcomeOf), as sorted lines with root written /project: each finding kept, each one a directive withheld, and each
 // directive finding, an unused directive's among them. ran are every rule the run's registry holds.
-func windowsOutcome(engine *pipeline, root string) []string {
+func windowsOutcome(pipeline *pipeline, root string) []string {
 	ran := []string{standingProbeName, representationProbeName}
 	for _, registered := range rules.All() {
 		ran = append(ran, registered.Name)
 	}
-	outcome := engine.outcomeOf(engine.buildRuns[1], ran)
+	outcome := pipeline.outcomeOf(pipeline.buildRuns[1], ran)
 	lines := []string{}
 	for _, each := range outcome.kept {
 		lines = append(lines, fmt.Sprintf("kept %+v", each))
@@ -190,7 +190,7 @@ func TestTheStandingBodiesSwitchLeavesBodiesStandingOnTheCensusPathAlone(test *t
 
 	for _, each := range []struct {
 		name     string
-		engine   *pipeline
+		pipeline *pipeline
 		standing bool
 	}{
 		{"off by default, on the census path", &pipeline{bodyReachCensus: "reach.txt",
@@ -204,7 +204,7 @@ func TestTheStandingBodiesSwitchLeavesBodiesStandingOnTheCensusPathAlone(test *t
 		{"on, under the census, judging no build's dependence", &pipeline{standingBodies: true,
 			bodyReachCensus: "reach.txt"}, false},
 	} {
-		if standing := each.engine.leavesBodiesStanding(); standing != each.standing {
+		if standing := each.pipeline.leavesBodiesStanding(); standing != each.standing {
 			test.Errorf("%s: the run leaves bodies standing %t, want %t", each.name, standing, each.standing)
 		}
 	}
@@ -223,8 +223,10 @@ func TestARuleIsConfinedWhenDispatchedAndDeclaredPerUnitOrFileSyntax(test *testi
 	}
 	planted := plantedProbe(&enteredFiles{entered: map[string]int{}})
 	registered := append(rules.All(), planted)
-	engine := &pipeline{plantedInputs: map[string]rules.Declared{plantedProbeName: {Inputs: rules.InputsPerUnit}}}
-	confined := engine.standingConfinedRules(registered)
+	plantedPipeline := &pipeline{
+		plantedInputs: map[string]rules.Declared{plantedProbeName: {Inputs: rules.InputsPerUnit}},
+	}
+	confined := plantedPipeline.standingConfinedRules(registered)
 
 	listenerComposes, walkerPerUnit := "", ""
 	for _, each := range registered {
@@ -521,7 +523,7 @@ func Other() {}
 `},
 }
 
-// runStandingGate runs the engine over a copy of the standing gate module named, its standingGateWritten files written
+// runStandingGate runs cohere-go over a copy of the standing gate module named, its standingGateWritten files written
 // into it, with the registry's rules, under the body reach census with `--no-cache --no-fix --build-dependence`, with
 // the standing bodies' switch as switched, and returns the pipeline, its stream, normalized, and the copy's root.
 func runStandingGate(test *testing.T, module string, switched bool) (*pipeline, string, string) {
@@ -530,11 +532,11 @@ func runStandingGate(test *testing.T, module string, switched bool) (*pipeline, 
 	for name, contents := range standingGateWritten[module] {
 		writeTestFile(test, filepath.Join(root, name), contents)
 	}
-	engine, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.standingBodies = switched
+	pipeline, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.standingBodies = switched
 	}, "--no-cache", "--no-fix", "--build-dependence")
-	return engine, normalize(stream, root), root
+	return pipeline, normalize(stream, root), root
 }
 
 // findsGate is whether run's own findings, before the merge, hold gate's: its rule, at its line in its file, with its
@@ -649,9 +651,9 @@ func TestAStandingBodyKeepsNoGateAnotherFileOfItsBuildFlips(test *testing.T) {
 			}
 			for _, each := range []struct {
 				switched string
-				engine   *pipeline
+				pipeline *pipeline
 			}{{"off", off}, {"on", on}} {
-				host, other := findsGate(each.engine.buildRuns[0], gate), findsGate(each.engine.buildRuns[1], gate)
+				host, other := findsGate(each.pipeline.buildRuns[0], gate), findsGate(each.pipeline.buildRuns[1], gate)
 				if host != (gate.finder == "host") || other != (gate.finder == "build") {
 					test.Errorf("with the switch %s %s at %s:%d %q is found by the host %t and by the other build "+
 						"%t, want it found by %s", each.switched, gate.rule, gate.file, gate.line, gate.fragment, host,

@@ -23,7 +23,7 @@ type sourceFile struct {
 	// built is whether the build the rules run under compiles this file, so its methods make a type count.
 	built bool
 	// judged is whether the one type per file and file name rules report in this file: a built file that is
-	// neither generated nor a declared copy of upstream source, whose findings the engine withholds.
+	// neither generated nor a declared copy of upstream source, whose findings cohere-go withholds.
 	judged bool
 	// importNames maps each import's bound name to its import spec, blank and dot imports excluded.
 	importNames map[string]*ast.ImportSpec

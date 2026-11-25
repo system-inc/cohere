@@ -90,7 +90,7 @@ var NoTemplateCurlyInString = rule.Rule[rule.NoOptions]{
 //
 // A `${` that never closes does not end the search, because a later one may close: `'${a${b}'`
 // holds no complete placeholder starting at the first dollar and a complete one starting at the
-// second, and upstream's regex engine backtracks to find it. Restarting the scan one byte past each
+// second, and upstream's regular expression matcher backtracks to find it. Restarting the scan one byte past each
 // failed opening is what reproduces that.
 func containsTemplatePlaceholder(text string) bool {
 	for searchFrom := 0; ; {

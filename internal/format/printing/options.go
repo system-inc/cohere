@@ -6,7 +6,7 @@ type Options[N Node[N], S any, A any] struct {
 	OriginalText string
 
 	// Settings is the language's own per-print state, the resolved options and whatever its printer keeps
-	// beside them, typed by the language so this package does not import the oracle engine's package.
+	// beside them, typed by the language so this package does not import the oracle formatter's package.
 	Settings S
 
 	// EmbeddedLanguageFormatting is upstream's option: "auto" (the default) or "off".

@@ -166,7 +166,7 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(test *testing.T) {
 
 		addReference := suggestions[0]
 		if testCase.wantRemove != "" {
-			// Order matters: an engine applying one suggestion unattended takes the first, and
+			// Order matters: a fix pass applying one suggestion unattended takes the first, and
 			// upstream's first is the removal.
 			if suggestions[0].Message.Id != "forwardRefRemoveWrapper" {
 				test.Errorf("%q offered %q first, want the removal", testCase.source, suggestions[0].Message.Id)

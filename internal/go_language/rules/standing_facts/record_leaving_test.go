@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/unused_code"
 )
 
-// recordsHost is fakeHost with the host's U1000 records of its package beside it, answered as the engine's side
+// recordsHost is fakeHost with the host's U1000 records of its package beside it, answered as cohere-go's side
 // answers them (unused_code.BodyRecordHost, unused_code.FileDigestHost): for identifier alone, and only where held. A
 // test changes what it answers by withheld, the bodies it answers no record of, ownDigests, a body's own file answered
 // with another digest, and fileDigests, a file answered with another digest wherever a record names it.

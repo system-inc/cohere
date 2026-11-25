@@ -41,10 +41,10 @@ var cacheOff bool
 var processStart = time.Now()
 
 func main() {
-	// The Go engine is this binary in a hidden mode, matched before anything reads the command line or starts
-	// a run cache, since an engine is neither a front door nor a run of its own.
-	if len(os.Args) > 1 && os.Args[1] == goEngineVerb {
-		os.Exit(streams.Finish(runGoEngineVerb(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)))
+	// cohere-go is this binary in a hidden mode, matched before anything reads the command line or starts
+	// a run cache, since a child is neither a front door nor a run of its own.
+	if len(os.Args) > 1 && os.Args[1] == goLanguageVerb {
+		os.Exit(streams.Finish(runGoLanguageVerb(os.Args[2:], os.Stdin, os.Stdout, os.Stderr)))
 	}
 	if runError := run(); runError != nil {
 		// A failure of the tool is never recorded by the run cache, and the recording stops before the
@@ -135,20 +135,20 @@ func run() error {
 	// incremental build info.
 	noCache := flag.Bool("no-cache", false,
 		"read nothing from and write nothing to this project's caches (the cache table and the tsconfig's incremental build info), so every phase computes from source")
-	// Go's alone for now, forwarded to its engine (goFlags), and accepted by the others, which keep no system cache:
+	// Go's alone for now, forwarded to the child (goFlags), and accepted by the others, which keep no system cache:
 	// Swift's run answers it at the front door and forwards nothing (swiftFlags), and TypeScript's reads nothing of it.
 	flag.Bool("no-system-cache", false,
-		"in a Go project, neither read nor write the Go engine's system cache, the standard library's entries it "+
+		"in a Go project, neither read nor write cohere-go's system cache, the standard library's entries it "+
 			"keeps in the user's cache directory for every project, so the standard library is computed; changes "+
 			"nothing in TypeScript and Swift projects yet")
-	// Go's alone, forwarded to its engine and to nothing else (goFlags, withoutGoOnlySwitches), and read through given.
+	// Go's alone, forwarded to the child and to nothing else (goFlags, withoutGoOnlySwitches), and read through given.
 	// A Go run checks every build its files name by default (#qqyq61s), so a file only another platform, cgo setting
 	// or build tag compiles is checked; this narrows the run to the machine's own build, and names each such file as
 	// a gap (#72n9mq0).
 	flag.Bool("host-build-only", false,
 		"in a Go project, check only this machine's build, not every build its files name (another GOOS, cgo, a "+
 			"build tag), and name each file only another build compiles as not checked")
-	// Go's alone, forwarded to its engine and to nothing else (goFlags, withoutGoOnlySwitches), and read through given.
+	// Go's alone, forwarded to the child and to nothing else (goFlags, withoutGoOnlySwitches), and read through given.
 	// It changes nothing of the run, where --timing turns the cache off and runs the builds one at a time, so the map
 	// it prints is of the run a person makes (#3v2zp7g).
 	flag.Bool("timeline", false,
@@ -241,11 +241,11 @@ func run() error {
 	stdinFilePath := flag.String("stdin-filepath", "",
 		"with --fix, read one file's text from stdin and print what --fix (and --format, if named) would write for the file at this path, writing nothing to disk")
 	// A profile of a cold run: a profiled run is never one the run cache replays, since only a bare run
-	// or `--no-fix` is. A Go engine child writes its own beside it, its engine's name before the extension
-	// (engineProfilePath), since a Go run's work is the child's (#r33n96f).
+	// or `--no-fix` is. cohere-go child writes its own beside it, the child's name before the extension
+	// (contractProfilePath), since a Go run's work is the child's (#r33n96f).
 	// The backquoted word is the argument's name in the help, which is how the flag package spells one.
 	profilePath := flag.String("profile", "",
-		"write a Go CPU profile of the run to `file`, for go tool pprof, and the Go engine's beside it, named go")
+		"write a Go CPU profile of the run to `file`, for go tool pprof, and cohere-go's beside it, named go")
 	// The view. A run prints the files it rewrote, its findings and one footer line; these widen it.
 	verbose := flag.Bool("verbose", false,
 		"print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total")
@@ -289,7 +289,7 @@ func run() error {
 	// use.
 	//
 	// Decided before the listings rather than after them, because inside a Swift package every one of
-	// them is the Swift engine's question: `cohere --rules` there lists the rules that would run there.
+	// them is cohere-swift's question: `cohere --rules` there lists the rules that would run there.
 	workingDirectory, workingDirectoryError := os.Getwd()
 	if workingDirectoryError != nil {
 		return fmt.Errorf("resolving the working directory: %w", workingDirectoryError)
@@ -307,13 +307,13 @@ func run() error {
 		ConfigFileNameGiven:     given["tsconfig"],
 		LintConfigFileName:      *lintConfigFileName,
 		LintConfigFileNameGiven: given["lint-config"],
-		Engine:                  projectEngine(os.Getenv(projectEngineVariable)),
+		Kind:                    projectKind(os.Getenv(projectKindVariable)),
 	})
 
 	startRunCacheClock(location, locateError, given)
 
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
-	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
+	// its own child and reports them as one (#f9nftxz). One project is checked here, as it always was.
 	atNamedDirectory := namedDirectoryHoldsSeveral(given, flag.Args(), location, locateError)
 	discovers := discoveryApplies(given, flag.Args()) || atNamedDirectory
 	if chooseError := chooseNamedRunLanguages(discovers, choice, location, locateError); chooseError != nil {
@@ -383,10 +383,10 @@ func run() error {
 		}
 	}
 
-	if locateError == nil && location.Engine == engineSwift {
-		exitCode, runSwiftEngineError := runSwiftEngine(location, given, flag.Args())
-		if runSwiftEngineError != nil {
-			return runSwiftEngineError
+	if locateError == nil && location.Kind == projectKindSwiftPackage {
+		exitCode, runSwiftProjectError := runSwiftProject(location, given, flag.Args())
+		if runSwiftProjectError != nil {
+			return runSwiftProjectError
 		}
 		// Through the run cache, which records a Swift verdict (see beginSwiftRunCache), as a Go run's exit goes.
 		if exitCode != 0 {
@@ -394,10 +394,10 @@ func run() error {
 		}
 		return nil
 	}
-	if locateError == nil && location.Engine == engineGo {
-		exitCode, goEngineError := runGoEngine(location, given, flag.Args())
-		if goEngineError != nil {
-			return goEngineError
+	if locateError == nil && location.Kind == projectKindGoModule {
+		exitCode, runGoProjectError := runGoProject(location, given, flag.Args())
+		if runGoProjectError != nil {
+			return runGoProjectError
 		}
 		// Through the run cache, which records a Go verdict (see beginGoRunCache): a failing tree's exit is one, and
 		// exiting around it would leave the run unrecorded and the last of its output in the tee's pipe.
@@ -535,7 +535,7 @@ func run() error {
 	// The format project at a root no TypeScript project holds is formatting and nothing else: there is no
 	// program to type-check or lint, so whatever its parent was given, a bare run, `--fix` or `--no-fix`, it
 	// formats alone, writing or not as the parent's run does. Discovery adds it only to a run that formats.
-	if locateError == nil && location.Engine == engineFormat {
+	if locateError == nil && location.Kind == projectKindFolder {
 		*fixOnly = false
 		*formatOnly = true
 		*unusedReport, *unusedAll, *unusedDeep, *duplicatesRequested = false, false, false, false
@@ -679,7 +679,7 @@ func run() error {
 	// beside the graph build, instead of after it: the walk reads only the disk, and on ahra it was about
 	// 100ms between the graph and the fix phase on a cold run (#679s763). A formatter that cannot load is
 	// reported where it always was. See startFormatWalkAhead.
-	var formatter formatEngine
+	var formatter fileFormatter
 	var formatterError error
 	if runFix {
 		formatter, formatterError = configuredFormatter(!*noFormat && (*explainFile == "" || *format || *formatAll))
@@ -1290,7 +1290,7 @@ func run() error {
 
 		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.
 		// Every phase after this must read the new text or it reports findings against source that no
-		// longer exists, which is the same stale-read corruption the edit engine refuses internally,
+		// longer exists, which is the same stale-read corruption the fix pass refuses internally,
 		// one level up.
 		if mutate && fixSummary.FilesChanged > 0 && (runTypes || runLint) {
 			rebuiltGraph, rebuildDuration, rebuildGraphError := rebuildGraph(
@@ -1602,7 +1602,7 @@ func run() error {
 
 	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
-		// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both engines.
+		// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both languages.
 		report.record(phaseUnused, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 	} else {
 		unusedStart := time.Now()
@@ -1661,7 +1661,7 @@ func run() error {
 //
 // The graph is a snapshot of the bytes as they were when it was built. Once the fix phase rewrites
 // a file, every later phase reading that graph is reading source that no longer exists: the same
-// stale-read corruption the edit engine refuses internally, one level up and with a wider blast
+// stale-read corruption the fix pass refuses internally, one level up and with a wider blast
 // radius, because a type diagnostic against deleted text points at a line nobody can find.
 //
 // It costs a full rebuild, which is why it only happens when something actually changed.
@@ -1727,7 +1727,7 @@ func configureLint(
 		return nil, fmt.Errorf("loading the lint config: %w", loadError)
 	}
 	// The project's own file, which discovery may not have read: a run naming a directory, a tsconfig or a
-	// path discovers nothing. A file the command line named is the Swift engine's to read wherever it sits
+	// path discovers nothing. A file the command line named is cohere-swift's to read wherever it sits
 	// (see configuration.CheckSwiftBlockHasAReader), and a missing one is zero config, with no block.
 	if !location.LintConfigFileNameGiven && isRegularFile(location.LintConfigFileName) {
 		if checkSwiftBlockHasAReaderError := configuration.CheckSwiftBlockHasAReader(

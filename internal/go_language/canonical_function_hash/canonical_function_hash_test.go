@@ -26,7 +26,7 @@ var (
 	fixture     hashedFixture
 )
 
-// hashFixture runs the analyzer, through our intermediate representation as the engine runs it, over the fixture's
+// hashFixture runs the analyzer, through our intermediate representation as cohere-go runs it, over the fixture's
 // packages and their test variants, once for every test in the package.
 func hashFixture(test *testing.T) hashedFixture {
 	test.Helper()
@@ -168,7 +168,7 @@ func TestGeneratedCopiedAndBodylessFunctionsAreUnread(test *testing.T) {
 }
 
 // The test variant reads the package's functions again beside its test files' own. The two readings agree, name the
-// same file and line, and so are one function to the engine, which counts each place once.
+// same file and line, and so are one function to cohere-go, which counts each place once.
 func TestTheTestVariantReadsEachFunctionAtItsOwnPlace(test *testing.T) {
 	test.Parallel()
 	hashed := hashFixture(test)

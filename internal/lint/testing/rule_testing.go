@@ -227,10 +227,10 @@ func ExpectSameFindings(test *testing.T, control Result, treatment Result) {
 // entire migration, because until now the harness had no way to say what a fix should produce.
 //
 // Fixes are applied back to front so that an earlier fix's replacement cannot move the offsets a
-// later one was computed against. That is the same ordering the fix engine uses, for the same
+// later one was computed against. That is the same ordering the fix pass uses, for the same
 // reason, and doing it differently here would test a rewrite nobody performs.
 //
-// Overlapping fixes are refused rather than resolved. The engine has an overlap policy and this is
+// Overlapping fixes are refused rather than resolved. The fix pass has an overlap policy and this is
 // not the place to reimplement it: a fixture that silently applied one of two conflicting fixes
 // would assert a result the real pipeline never produces.
 func ExpectFixedSource(test *testing.T, result Result, wantSource string) {
@@ -263,7 +263,7 @@ func ExpectFixedSource(test *testing.T, result Result, wantSource string) {
 	for _, fix := range fixes {
 		if fix.end > previousStart {
 			test.Fatalf(
-				"fixes overlap at [%d,%d): the engine resolves overlaps and a fixture must not guess which one wins",
+				"fixes overlap at [%d,%d): the fix pass resolves overlaps and a fixture must not guess which one wins",
 				fix.start,
 				fix.end,
 			)

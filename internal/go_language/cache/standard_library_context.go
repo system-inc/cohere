@@ -14,15 +14,15 @@ const rootMarker = "$GOROOT/"
 
 // StandardLibraryContext is what every standard-library package's key shares in one run. It names nothing of the
 // machine but what can change a standard-library entry, its installation's root among them, so a key computed on one
-// machine equals the key on any other with the same engine, Go version, target, fact analyzers and `GOROOT`.
+// machine equals the key on any other with the same executable, Go version, target, fact analyzers and `GOROOT`.
 type StandardLibraryContext struct {
 	// FormatVersion is the cache's own format version, so an entry written in another format is never read.
 	FormatVersion string
 
-	// EngineIdentity names the engine whose entries these are, as Context's EngineIdentity does: ExecutableIdentity
-	// for a run reading and writing the system cache, so an engine reads only what it wrote itself, or a stamp a test
-	// gives in its place. StandardLibraryKeys refuses an empty one.
-	EngineIdentity string
+	// ExecutableIdentity names cohere-go whose entries these are, as Context's ExecutableIdentity does:
+	// ExecutableIdentity for a run reading and writing the system cache, so an cohere-go reads only what it wrote
+	// itself, or a stamp a test gives in its place. StandardLibraryKeys refuses an empty one.
+	ExecutableIdentity string
 
 	// Build is the target, cgo, the toolchain, its experiments and the go flags narrowed for the standard library,
 	// "GOOS=linux" and the rest, in a fixed order.
@@ -58,7 +58,7 @@ type StandardLibraryContext struct {
 //
 // A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
 // imports, sorted by import path, as Keys' are. The own digest is a sha256 over, in this order and each part
-// length-prefixed: the context (its format version, engine identity, fact analyzers, build and Goroot, hashed once
+// length-prefixed: the context (its format version, executable identity, fact analyzers, build and Goroot, hashed once
 // for every package); the package's ID, PkgPath and Name; each of its GoFiles, CompiledGoFiles, OtherFiles,
 // EmbedFiles and IgnoredFiles as its path below Goroot, written `$GOROOT/` and then slash-separated, and the sha256 of
 // its bytes; and, for a package with cgo files alone, the loader, then the C toolchain when the loader is
@@ -68,8 +68,8 @@ func StandardLibraryKeys(
 	shared StandardLibraryContext,
 	known FileDigests,
 ) (map[*packages.Package]Key, error) {
-	if shared.EngineIdentity == "" {
-		return nil, fmt.Errorf("keying the standard library: no engine identity was given")
+	if shared.ExecutableIdentity == "" {
+		return nil, fmt.Errorf("keying the standard library: no executable identity was given")
 	}
 	if !filepath.IsAbs(shared.Goroot) {
 		return nil, fmt.Errorf("keying the standard library: GOROOT %q is not absolute", shared.Goroot)
@@ -113,13 +113,13 @@ func StandardLibraryKeys(
 }
 
 // standardLibraryContextDigest is the run's StandardLibraryContext hashed once, in the key's order: a marker that sets
-// these keys apart from Keys', the format version, the engine identity, the fact analyzers, the build and Goroot.
+// these keys apart from Keys', the format version, the executable identity, the fact analyzers, the build and Goroot.
 // The loader and the C toolchain are not in it, since neither belongs in every package's key.
 func standardLibraryContextDigest(shared StandardLibraryContext) Key {
 	parts := newPartHash()
 	parts.text("standard library")
 	parts.text(shared.FormatVersion)
-	parts.text(shared.EngineIdentity)
+	parts.text(shared.ExecutableIdentity)
 	parts.texts(shared.Facts)
 	parts.texts(shared.Build)
 	parts.text(shared.Goroot)

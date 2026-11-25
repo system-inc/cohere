@@ -1,7 +1,7 @@
 // Package timing collects, under `--timing`, what a Go run's CPU went to: each analyzer action's, each dispatched
 // listener's and each phase of the load's, by the kernel's thread clock, for the timing record (#3apgjer).
 //
-// A Collector travels by argument, never as package state: the engine makes one for a run that asked, and hands it to
+// A Collector travels by argument, never as package state: cohere-go makes one for a run that asked, and hands it to
 // the load, to check.Run and through it to each pass, so two runs in one process, as two parallel tests are, never
 // bill each other. A nil *Collector is a run that did not ask, and every method on it does nothing, so a caller
 // measures without asking first.
@@ -89,7 +89,7 @@ func (collector *Collector) Analyzer(name string, cpu time.Duration) {
 }
 
 // Shared adds cpu to the analyzer named name's row without counting a package, for work the analyzer's result does
-// for it after its action has finished: the engine's own intermediate representation, which builds its package on the
+// for it after its action has finished: cohere's own intermediate representation, which builds its package on the
 // first read, inside the action of the dispatcher whose walk reads it first.
 func (collector *Collector) Shared(name string, cpu time.Duration) {
 	collector.add(func() { collector.analyzers.add(name, cpu, 0) })
@@ -151,7 +151,7 @@ func (collector *Collector) add(change func()) {
 }
 
 // Kinds says, for an analyzer name, which rule it is the analyzer of, or else what kind of shared row it is. The
-// engine answers it from its registry, which is the one place that knows which analyzer is which rule's.
+// checker answers it from its registry, which is the one place that knows which analyzer is which rule's.
 type Kinds func(analyzer string) (rule string, shared contract.SharedKind)
 
 // Record is the timing record of what was collected. kinds names each analyzer's rule or shared kind: an analyzer

@@ -6,7 +6,7 @@
         { "$ref": "#/$defs/finding" },
         { "$ref": "#/$defs/changedFile" },
         { "$ref": "#/$defs/crash" },
-        { "$ref": "#/$defs/engineBuild" },
+        { "$ref": "#/$defs/programBuild" },
         { "$ref": "#/$defs/ignorePatterns" },
         { "$ref": "#/$defs/languages" },
         { "$ref": "#/$defs/formats" },
@@ -27,7 +27,7 @@
                 "read": { "type": "integer", "description": "The packs read whole." },
                 "missing": {
                     "type": "integer",
-                    "description": "The packs there were none of, as on a build's first run or a new engine's. No refusal."
+                    "description": "The packs there were none of, as on a build's first run or a new executable's. No refusal."
                 },
                 "recordsServed": {
                     "type": "integer",
@@ -93,14 +93,14 @@
                 }
             }
         },
-        "engineBuild": {
-            "description": "An engine a development cohere built from source before it could check, its sources or the toolchain having changed. Its time is not in the summary's seconds, which are the check's alone. A released cohere builds nothing.",
+        "programBuild": {
+            "description": "A program a development cohere built from source before it could check, its sources or the toolchain having changed. Its time is not in the summary's seconds, which are the check's alone. A released cohere builds nothing.",
             "type": "object",
             "additionalProperties": false,
-            "required": ["kind", "engine", "key", "seconds"],
+            "required": ["kind", "program", "key", "seconds"],
             "properties": {
-                "kind": { "const": "engineBuild" },
-                "engine": { "type": "string", "description": "The binary built, such as cohere-swift." },
+                "kind": { "const": "programBuild" },
+                "program": { "type": "string", "description": "The binary built, such as cohere-swift." },
                 "key": {
                     "type": "string",
                     "description": "The cache key it was built under, the hash its binary is named by."
@@ -133,7 +133,7 @@
                 },
                 "default": {
                     "type": "boolean",
-                    "description": "One of cohere's defaults, written by no settings file: testdata, which the Go engine and the format walk never enter, and Vendor, which the format walk and the Swift engine never enter. Each holds only there, so a file a tsconfig includes under either is still type-checked and linted, and neither is ever a finding. Absent for an entry a settings file or set wrote."
+                    "description": "One of cohere's defaults, written by no settings file: testdata, which cohere-go and the format walk never enter, and Vendor, which the format walk and cohere-swift never enter. Each holds only there, so a file a tsconfig includes under either is still type-checked and linted, and neither is ever a finding. Absent for an entry a settings file or set wrote."
                 },
                 "matched": {
                     "type": "integer",
@@ -228,7 +228,7 @@
             }
         },
         "timing": {
-            "description": "What a Go run's CPU went to, under --timing: the Go engine's timing record, written through once before the summary. Every CPU figure is microseconds of the kernel's thread clock read on a thread held for the work, so none is wall time, and each has the measuring's own cost taken out. What the rows leave of processCpuMicroseconds is what no row measures, never spread over them. A run that is not Go, or not under --timing, writes none.",
+            "description": "What a Go run's CPU went to, under --timing: cohere-go's timing record, written through once before the summary. Every CPU figure is microseconds of the kernel's thread clock read on a thread held for the work, so none is wall time, and each has the measuring's own cost taken out. What the rows leave of processCpuMicroseconds is what no row measures, never spread over them. A run that is not Go, or not under --timing, writes none.",
             "type": "object",
             "additionalProperties": false,
             "required": [
@@ -253,7 +253,7 @@
                 },
                 "processCpuMicroseconds": {
                     "type": "integer",
-                    "description": "The engine process's user and system CPU from its start to the record."
+                    "description": "The child process's user and system CPU from its start to the record."
                 },
                 "load": {
                     "description": "The load's phases, each summed across the goroutines that ran it, so each runs past the load's wall.",
@@ -331,7 +331,7 @@
                             },
                             "kind": {
                                 "enum": ["intermediateRepresentation", "dispatcher", "analyzer"],
-                                "description": "An intermediate representation build, staticcheck's or the engine's own; a dispatcher's walk less its calls into the listeners, which are billed to their rules; or another analyzer several rules read."
+                                "description": "An intermediate representation build, staticcheck's or cohere's own; a dispatcher's walk less its calls into the listeners, which are billed to their rules; or another analyzer several rules read."
                             },
                             "cpuMicroseconds": { "type": "integer" },
                             "packages": { "type": "integer", "minimum": 0 }
@@ -350,7 +350,7 @@
             }
         },
         "timeline": {
-            "description": "When each phase and each build of a Go run began and ended, under --timeline: the Go engine's timeline record, written through once before the summary. Every stamp's wall is from the moment the engine package initialized and its CPU the process's user and system CPU from the process's start, so the cores busy between two stamps are their CPU's difference over their wall's, and the first stamp's ratio is no figure. No two stamps share their build, round and label, and begins and ends need not pair: a run with no extra build has no handover.end, and a build that fails or finds type errors has no end. It changes nothing of the run. A run that is not Go, or not under --timeline, writes none.",
+            "description": "When each phase and each build of a Go run began and ended, under --timeline: cohere-go's timeline record, written through once before the summary. Every stamp's wall is from the moment the go_language package initialized and its CPU the process's user and system CPU from the process's start, so the cores busy between two stamps are their CPU's difference over their wall's, and the first stamp's ratio is no figure. No two stamps share their build, round and label, and begins and ends need not pair: a run with no extra build has no handover.end, and a build that fails or finds type errors has no end. It changes nothing of the run. A run that is not Go, or not under --timeline, writes none.",
             "type": "object",
             "additionalProperties": false,
             "required": ["kind", "stamps"],
@@ -388,7 +388,7 @@
                             "wallMicroseconds": {
                                 "type": "integer",
                                 "minimum": 0,
-                                "description": "Wall time from the moment the engine package initialized."
+                                "description": "Wall time from the moment the go_language package initialized."
                             },
                             "userMicroseconds": {
                                 "type": "integer",
@@ -415,7 +415,7 @@
                 "size": {
                     "type": "integer",
                     "minimum": 11,
-                    "description": "The instructions that compute something, the smallest member's, in the engine's own IR."
+                    "description": "The instructions that compute something, the smallest member's, in cohere's own IR."
                 },
                 "digest": { "type": "string", "description": "The canonical hash the members share, in hex." },
                 "members": {
@@ -651,17 +651,17 @@
                 "headersUnshared": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "Why a Go run's listings did not share each Go file's header through the engine's copy of go/build: a binary linked by a Go release whose go/build is not the copy's, which reads the same listing at more CPU. Absent when they shared them, from a replay, which started no engine, and for every other run."
+                    "description": "Why a Go run's listings did not share each Go file's header through the child's copy of go/build: a binary linked by a Go release whose go/build is not the copy's, which reads the same listing at more CPU. Absent when they shared them, from a replay, which started no child, and for every other run."
                 },
                 "memoryRaisedToBytes": {
                     "type": "array",
                     "items": { "type": "integer", "minimum": 1 },
                     "minItems": 1,
-                    "description": "Each limit a Go run raised its heap to after its load, in bytes and in the order raised. Absent when it raised none, from a replay, which started no engine, and for every other run."
+                    "description": "Each limit a Go run raised its heap to after its load, in bytes and in the order raised. Absent when it raised none, from a replay, which started no child, and for every other run."
                 },
                 "packageCache": {
                     "type": "object",
-                    "description": "What the Go engine's per-package findings cache did in the lint phase, by package. Present only for a Go run that linted, and absent from a replay, which started no engine.",
+                    "description": "What cohere-go's per-package findings cache did in the lint phase, by package. Present only for a Go run that linted, and absent from a replay, which started no child.",
                     "additionalProperties": false,
                     "required": [
                         "on",
@@ -684,7 +684,7 @@
                         },
                         "standardLibraryFromSystemCache": {
                             "type": "integer",
-                            "description": "Go standard-library packages restored from the system cache, the engine's tables in the user's cache directory, every build's summed, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
+                            "description": "Go standard-library packages restored from the system cache, the child's tables in the user's cache directory, every build's summed, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
                         },
                         "systemCacheWritten": {
                             "type": "integer",
@@ -928,7 +928,7 @@
                             },
                             "dependence": {
                                 "type": "object",
-                                "description": "Another build's alone, under the Go engine's --build-dependence: which of the host's package-level declarations the build can change, as units and nodes, dependent and in all, for the workspace and the dependencies, the packages with a dependent unit and their nodes, the units only the build compiles, and the milliseconds the host's graph and this build's judgment took, and its facts census beside the host's: the facts compared, equal and different by kind, and the callers a differing fact reaches. Observed only, so it changes no finding. Absent otherwise."
+                                "description": "Another build's alone, under cohere-go's --build-dependence: which of the host's package-level declarations the build can change, as units and nodes, dependent and in all, for the workspace and the dependencies, the packages with a dependent unit and their nodes, the units only the build compiles, and the milliseconds the host's graph and this build's judgment took, and its facts census beside the host's: the facts compared, equal and different by kind, and the callers a differing fact reaches. Observed only, so it changes no finding. Absent otherwise."
                             }
                         }
                     }
@@ -1017,7 +1017,7 @@
                                 "additionalProperties": false,
                                 "required": ["path", "cause"],
                                 "properties": {
-                                    "path": { "type": "string", "description": "The file, as the engine names it." },
+                                    "path": { "type": "string", "description": "The file, as the child names it." },
                                     "rule": {
                                         "type": "string",
                                         "description": "The rule that crashed. Absent when the whole file was lost."
@@ -1040,7 +1040,7 @@
                         "sourceFiles": {
                             "type": "integer",
                             "minimum": 1,
-                            "description": "How many files of its language the project held before anything kept one out of a check: a TypeScript program's own files, or the files an engine's project counts in its package. Present only when nothingToCheck is set and the project had such files. It is what a run that checked nothing fails on; excluded is its explanation, and files no reason counted are named there as unrecorded."
+                            "description": "How many files of its language the project held before anything kept one out of a check: a TypeScript program's own files, or the files a child's project counts in its package. Present only when nothingToCheck is set and the project had such files. It is what a run that checked nothing fails on; excluded is its explanation, and files no reason counted are named there as unrecorded."
                         },
                         "excluded": {
                             "type": "array",
@@ -1099,7 +1099,7 @@
                                     "file": { "type": "string", "description": "The file, absolute." }
                                 }
                             },
-                            "description": "Each file an engine's load reached in its project that its census never counted, as at a root or a go.work use reached through a symbolic link. No count of the run accounts for it, so the run fails. Absent when none."
+                            "description": "Each file a child's load reached in its project that its census never counted, as at a root or a go.work use reached through a symbolic link. No count of the run accounts for it, so the run fails. Absent when none."
                         },
                         "nestedUnread": {
                             "type": "string",
@@ -1136,19 +1136,19 @@
                                 "properties": {
                                     "file": {
                                         "type": "string",
-                                        "description": "The file, as the engine names it."
+                                        "description": "The file, as the child names it."
                                     },
                                     "reason": {
                                         "type": "string",
-                                        "description": "Why the engine left it out, in the engine's words, such as \"no target of this package compiles it\" or \"excluded by build constraints on darwin/arm64\"."
+                                        "description": "Why the child left it out, in the child's words, such as \"no target of this package compiles it\" or \"excluded by build constraints on darwin/arm64\"."
                                     },
                                     "language": {
                                         "type": "string",
-                                        "description": "The language of the engine that left it out, \"Swift\" or \"Go\", which the footer counts it in: \"3 Swift files not checked\"."
+                                        "description": "The language whose run left it out, \"Swift\" or \"Go\", which the footer counts it in: \"3 Swift files not checked\"."
                                     }
                                 }
                             },
-                            "description": "Files an engine's run listed as not checked for a reason other than the ones nobody expects checked. In a Swift run those are git ignoring them, Vendor/ or being a package manifest, so this today means no target of the package compiles them and they are no standalone script the run checks alone (a file of declarations only, or a script whose imports name two platforms), less those under a Swift project below it that runs on its own. In a Go run the expected reasons are git ignoring them and another build having checked the file (\"checked by the windows/arm64 build\"), so this means only a file no build the run checked compiles. Under --host-build-only it means a file only another platform builds, or one that imports \"C\" while cgo is off, since the Go engine then checks the host's build alone. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
+                            "description": "Files a child's run listed as not checked for a reason other than the ones nobody expects checked. In a Swift run those are git ignoring them, Vendor/ or being a package manifest, so this today means no target of the package compiles them and they are no standalone script the run checks alone (a file of declarations only, or a script whose imports name two platforms), less those under a Swift project below it that runs on its own. In a Go run the expected reasons are git ignoring them and another build having checked the file (\"checked by the windows/arm64 build\"), so this means only a file no build the run checked compiles. Under --host-build-only it means a file only another platform builds, or one that imports \"C\" while cgo is off, since cohere-go then checks the host's build alone. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
                         },
                         "notWritten": {
                             "type": "array",
@@ -1159,7 +1159,7 @@
                                 "properties": {
                                     "file": {
                                         "type": "string",
-                                        "description": "The file, as the engine reached it under the root."
+                                        "description": "The file, as the child reached it under the root."
                                     },
                                     "realPath": {
                                         "type": "string",
@@ -1167,7 +1167,7 @@
                                     }
                                 }
                             },
-                            "description": "Files a fix phase, TypeScript's or an engine's, would have written and did not, since each is reached through a symbolic link to a real path outside the root. A fix never writes another project's files: each was checked, its findings stand, and its fixes were withheld. The run is incomplete. Absent when there are none."
+                            "description": "Files a fix phase, TypeScript's or a child's, would have written and did not, since each is reached through a symbolic link to a real path outside the root. A fix never writes another project's files: each was checked, its findings stand, and its fixes were withheld. The run is incomplete. Absent when there are none."
                         },
                         "changedDuringRun": {
                             "type": "array",
@@ -1208,9 +1208,9 @@
                                 "properties": {
                                     "package": {
                                         "type": "string",
-                                        "description": "The dependency's package, as the Go engine names it, such as \"net\"."
+                                        "description": "The dependency's package, as cohere-go names it, such as \"net\"."
                                     },
-                                    "file": { "type": "string", "description": "The file, as the Go engine names it." },
+                                    "file": { "type": "string", "description": "The file, as cohere-go names it." },
                                     "errors": { "type": "integer", "description": "The type errors withheld in it." }
                                 }
                             },

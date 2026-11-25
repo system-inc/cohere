@@ -95,7 +95,7 @@ func TestImportRequireModuleAliasReportsAtTheBinding(test *testing.T) {
 
 // The rule reports and never rewrites. See the doc comment for why: every fix the original offers
 // renames a binding without following its references, and the corrupted output still parses, so the
-// edit engine's parse guard cannot catch it.
+// fix pass's parse guard cannot catch it.
 func TestImportRequireModuleAliasProposesNoFix(test *testing.T) {
 	test.Parallel()
 

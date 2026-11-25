@@ -62,7 +62,7 @@ var messageRadixMissingRadix = rule.Message{
 	Id: "missingRadix",
 	Description: "This calls `parseInt` without a radix. The base is then inferred from the text, " +
 		"so a string that happens to start with `0x` parses as hexadecimal and a leading zero has " +
-		"meant octal in some engines. Pass 10 explicitly when you mean decimal.",
+		"meant octal in some runtimes. Pass 10 explicitly when you mean decimal.",
 }
 
 var messageRadixInvalidRadix = rule.Message{

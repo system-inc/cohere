@@ -1,4 +1,4 @@
-// Package settings reads which of the Go engine's rules run, and how strictly, from the `go` block of
+// Package settings reads which of cohere-go's rules run, and how strictly, from the `go` block of
 // `CohereSettings.json`:
 //
 //	{ "go": { "rules": { "cohere-go/performance-require-parallel-test": "error" } } }
@@ -15,7 +15,7 @@
 //	} }
 //
 // Which options loosen a rule is the rule's to say, so this layer holds a departure to naming a known rule with a
-// reason that isn't blank, and the engine refuses a loosening option without one, and one that loosens nothing.
+// reason that isn't blank, and cohere-go refuses a loosening option without one, and one that loosens nothing.
 //
 // And reasons, why the block turns each of its offs off, in a sentence, as the TypeScript block's `reasons` says it:
 //
@@ -33,7 +33,7 @@
 // When the root has no config, every house rule runs at error. That is not the permissive default the
 // TypeScript loader refuses, because every rule runs, and the note says so on every run, so a missing
 // config never reads as a configured clean tree. A config that exists and cannot be read is an error, never
-// a fallback to the defaults, and so is a rule name the engine does not know: a misspelled rule would
+// a fallback to the defaults, and so is a rule name cohere-go does not know: a misspelled rule would
 // configure nothing while the file looked configured.
 package settings
 
@@ -68,7 +68,7 @@ const (
 )
 
 // SeveritySpellings are the severities parseSeverity accepts, exactly as written, for the settings schema
-// (internal/settings_schema) to read rather than copy, so the schema never allows a spelling the engine
+// (internal/settings_schema) to read rather than copy, so the schema never allows a spelling cohere-go
 // refuses. TestTheSeveritySpellingsAreTheLoaders holds the list to parseSeverity.
 var SeveritySpellings = []string{"error", "warn", "warning", "off"}
 
@@ -81,7 +81,7 @@ type RuleSetting struct {
 	Options json.RawMessage
 }
 
-// Settings is what every rule the engine knows runs at.
+// Settings is what every rule cohere-go knows runs at.
 type Settings struct {
 	// Rules holds every known rule: what the config says, or error with no options for a rule it does not
 	// mention.
@@ -103,11 +103,11 @@ type Settings struct {
 	Note string
 }
 
-// settingsFileName is the file the engine reads beside go.work or go.mod when no path is named.
+// settingsFileName is the file cohere-go reads beside go.work or go.mod when no path is named.
 const settingsFileName = "CohereSettings.json"
 
-// Path is the settings file Load reads for the engine rooted at root: explicitPath when the front door named one
-// with `--lint-config`, or else the CohereSettings.json beside go.work or go.mod, there or not. The engine's
+// Path is the settings file Load reads for cohere-go rooted at root: explicitPath when the front door named one
+// with `--lint-config`, or else the CohereSettings.json beside go.work or go.mod, there or not. cohere-go's
 // inputs record names it, so a replay sees the file appear, change or go.
 func Path(root string, explicitPath string) string {
 	if explicitPath != "" {
@@ -116,8 +116,8 @@ func Path(root string, explicitPath string) string {
 	return filepath.Join(root, settingsFileName)
 }
 
-// Load reads the settings for the engine rooted at root, from the file Path names. knownRules is every rule name
-// the engine runs, and a key outside it is refused. modulePaths are the modules the root governs
+// Load reads the settings for cohere-go rooted at root, from the file Path names. knownRules is every rule name
+// cohere-go runs, and a key outside it is refused. modulePaths are the modules the root governs
 // (project.ModulePaths): when one is ours, every off the block makes must say why.
 func Load(root string, explicitPath string, knownRules []string, modulePaths []string) (Settings, error) {
 	path := Path(root, explicitPath)
@@ -138,7 +138,7 @@ func Load(root string, explicitPath string, knownRules []string, modulePaths []s
 
 // ReadTargets is the go block's targets in the file Path names, as Load reads them (parseTargets), and none when the
 // file or its go block gives none. It is for a reader that holds no rule list, such as the check package's object
-// differential, which cannot import the engine that knows every rule's name, so it reads the builds the engine checks
+// differential, which cannot import cohere-go that knows every rule's name, so it reads the builds cohere-go checks
 // without judging the rest of the block, which Load refuses on its own.
 func ReadTargets(root string, explicitPath string) ([]string, error) {
 	path := Path(root, explicitPath)
@@ -184,7 +184,7 @@ func defaults(knownRules []string, note string) Settings {
 
 // goBlock is the go block of a settings file's contents, read from path, as raw values by key, with whether the file
 // has one: the one decoding Load (through parse) and ReadTargets share, so the targets a reader with no rule list
-// finds are the engine's. A top level or a go block that is not an object is refused.
+// finds are cohere-go's. A top level or a go block that is not an object is refused.
 func goBlock(contents []byte, path string) (map[string]json.RawMessage, bool, error) {
 	var document map[string]json.RawMessage
 	if decodeError := json.Unmarshal(contents, &document); decodeError != nil {
@@ -210,7 +210,7 @@ func goBlock(contents []byte, path string) (map[string]json.RawMessage, bool, er
 }
 
 // parse reads a settings file's go block. Every other top-level key, `format` among them, belongs to the
-// TypeScript engine in a repository that holds both, so it is left alone here.
+// TypeScript linter in a repository that holds both, so it is left alone here.
 //
 // Each level decodes into a map of raw values first, the way the TypeScript loader checks its keys, because
 // `encoding/json` drops a key a struct does not name without a word, and a dropped key is a setting that
@@ -236,7 +236,7 @@ func parse(contents []byte, path string, knownRules []string, modulePaths []stri
 	}
 	if len(unknownKeys) > 0 {
 		sort.Strings(unknownKeys)
-		return Settings{}, fmt.Errorf("reading %s: the go block declares %s, which the Go engine does not read, so "+
+		return Settings{}, fmt.Errorf("reading %s: the go block declares %s, which cohere-go does not read, so "+
 			"the key would configure nothing. The go block takes \"rules\", \"departures\", \"reasons\" and "+
 			"\"targets\"", path,
 			strings.Join(unknownKeys, ", "))
@@ -264,7 +264,7 @@ func parse(contents []byte, path string, knownRules []string, modulePaths []stri
 	settings := defaults(knownRules, "")
 	for _, name := range names {
 		if !known[name] {
-			return Settings{}, fmt.Errorf("reading %s: the go block names %q, which is not a rule the Go engine "+
+			return Settings{}, fmt.Errorf("reading %s: the go block names %q, which is not a rule cohere-go "+
 				"knows, so the entry would configure nothing", path, name)
 		}
 		setting, settingError := parseRuleSetting(rules[name])
@@ -302,7 +302,7 @@ func parse(contents []byte, path string, knownRules []string, modulePaths []stri
 }
 
 // parseOffReasons reads the go block's reasons, each a rule the block turns off and why, in a sentence. An entry that
-// explains nothing is refused, so the list cannot rot: one for a rule the engine does not know, one whose reason is
+// explains nothing is refused, so the list cannot rot: one for a rule cohere-go does not know, one whose reason is
 // blank or not a string, one for a rule the block does not turn off in its own rules, and one beside a departure for
 // the same rule, which already says why. settings holds the block's rules and departures, read already.
 func parseOffReasons(value json.RawMessage, known map[string]bool, settings Settings) (map[string]string, error) {
@@ -319,7 +319,7 @@ func parseOffReasons(value json.RawMessage, known map[string]bool, settings Sett
 	offReasons := make(map[string]string, len(entries))
 	for _, name := range names {
 		if !known[name] {
-			return nil, fmt.Errorf("the go block's reasons name %q, which is not a rule the Go engine knows, so the "+
+			return nil, fmt.Errorf("the go block's reasons name %q, which is not a rule cohere-go knows, so the "+
 				"reason would explain nothing", name)
 		}
 		var reason string
@@ -376,9 +376,9 @@ func refuseUnreasonedOffs(settings Settings, written []string, modulePaths []str
 }
 
 // parseDepartures reads the go block's departures, each a known rule and the reason the project loosens it. A
-// departure for a rule the engine does not know would exempt nothing while the file looked reasoned, and a blank
+// departure for a rule cohere-go does not know would exempt nothing while the file looked reasoned, and a blank
 // reason is a departure that says nothing, so both are refused. Whether the rule's options loosen anything is the
-// engine's to check, since only the rule knows.
+// checker's to check, since only the rule knows.
 func parseDepartures(value json.RawMessage, known map[string]bool) (map[string]string, error) {
 	departures, isObject := decodeObject(value)
 	if !isObject {
@@ -393,7 +393,7 @@ func parseDepartures(value json.RawMessage, known map[string]bool) (map[string]s
 	reasons := make(map[string]string, len(departures))
 	for _, name := range names {
 		if !known[name] {
-			return nil, fmt.Errorf("the go block's departures name %q, which is not a rule the Go engine knows, so "+
+			return nil, fmt.Errorf("the go block's departures name %q, which is not a rule cohere-go knows, so "+
 				"the departure would exempt nothing", name)
 		}
 		var reason string
@@ -500,7 +500,7 @@ var targetPattern = regexp.MustCompile(TargetPattern)
 // parseTargets reads the go block's targets (#ntamp9e, Kirk's ruling, Nov 10): the platforms, `GOOS/GOARCH`, the
 // project is checked under beside the ones its files name. A target only ever adds to them, so an entry that reads
 // as taking one away, `!windows/arm64` or `-windows/arm64`, is refused, and so is one not spelled as a pair, a
-// duplicate, and an entry that is not a string. Whether the toolchain targets the pair is the engine's to check,
+// duplicate, and an entry that is not a string. Whether the toolchain targets the pair is cohere-go's to check,
 // against go tool dist list, when it selects the builds.
 func parseTargets(value json.RawMessage) ([]string, error) {
 	var entries []json.RawMessage

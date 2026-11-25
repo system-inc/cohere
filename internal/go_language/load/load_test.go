@@ -94,7 +94,7 @@ func loadedFixtures(test *testing.T) string {
 	test.Helper()
 
 	fixtures.once.Do(func() {
-		fixtures.root, fixtures.failure = os.MkdirTemp("", "cohere-go-engine-load-")
+		fixtures.root, fixtures.failure = os.MkdirTemp("", "cohere-go-language-load-")
 		if fixtures.failure != nil {
 			return
 		}

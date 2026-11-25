@@ -34,7 +34,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1032",
 	"SA1032",
 	"Flags errors.Is given a global error of another package first and the error it judges second: "+
-		"staticcheck's SA1032, ported onto the engine's own intermediate representation.",
+		"staticcheck's SA1032, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

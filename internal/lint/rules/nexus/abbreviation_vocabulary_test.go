@@ -41,7 +41,7 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 		want []string
 	}{
 		// The switch (13), the early group (7), exactAbbreviations (10), the thirteen Go words @system_cohere
-		// added for every engine on #ec8mvbg, the twenty-three go/ast, go/types and go/ir taught (#r0fa8pa), and
+		// added for every language on #ec8mvbg, the twenty-three go/ast, go/types and go/ir taught (#r0fa8pa), and
 		// `vars` (#1ykwdb9). Whole-word matches cannot overlap, so this one is compared as a set.
 		{"whole", wholeWords, sortedCopy([]string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "acc", "char", "fn", "str",
@@ -71,7 +71,7 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 			"prop", "props", "param", "params", "ms", "ref", "config", "idx", "arg", "args", "char", "fn", "str",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
 		}},
-		// wordSegmentAbbreviations (10), in order, then the thirteen Go words @system_cohere added for every engine
+		// wordSegmentAbbreviations (10), in order, then the thirteen Go words @system_cohere added for every language
 		// on #ec8mvbg and the syntax tree's twenty-three (#r0fa8pa), each after the last so no earlier entry's order
 		// moves.
 		{"segment", abbreviationsOf(vocabulary.Segments), []string{

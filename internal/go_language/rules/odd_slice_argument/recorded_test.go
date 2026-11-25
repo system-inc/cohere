@@ -52,7 +52,7 @@ func TestEveryMarkAJudgmentSettlesIsToldOnce(test *testing.T) {
 	options := check.DispatchOptions()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	hand := &hearingHand{heard: map[types.Object][]string{}}
 	resolver.HoldAnswers(hand)
@@ -93,7 +93,7 @@ func TestAPackageWithNoOddSliceJudgesNothing(test *testing.T) {
 	options := check.DispatchOptions()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	hand := &hearingHand{heard: map[types.Object][]string{}}
 	resolver.HoldAnswers(hand)

@@ -14,7 +14,7 @@
 // the oracle: the parity tests beside this file run both over the same packages, on each target the judgment
 // differs by. The two agree everywhere, so there is no differences fixture.
 //
-// It is not on the engine's syntax dispatcher, and stays a plain analyzer: what it judges is the package's assembly,
+// It is not on cohere-go's syntax dispatcher, and stays a plain analyzer: what it judges is the package's assembly,
 // which it reads from the pass's OtherFiles, and rule.Context carries no OtherFiles. Nor does it walk the package's
 // syntax, so there is no walk for the dispatcher's to replace.
 package frame_pointer

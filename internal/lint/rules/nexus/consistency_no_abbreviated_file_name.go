@@ -41,13 +41,13 @@ var registeredRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
 // family `abbreviated-file-name`). A file's name is read on every path and every import, so it is held to the words
 // an identifier is.
 //
-// The words are internal/file_name_words', the judgment the Go engine's cohere-go/consistency-no-abbreviated-file-name
+// The words are internal/file_name_words', the judgment cohere-go's cohere-go/consistency-no-abbreviated-file-name
 // reads too: the name is cut into words as nexus/consistency-no-utils-file-name cuts it (typeScriptFileNameWords),
 // with the same files left alone, and its words are read as the one camelCase identifier they spell, so a word is
 // judged in a file name exactly where it would be in an identifier holding the same words. The message names the word
 // and how to spell it out, never a rewritten file name, since the name's own convention is its author's.
 //
-// A file named for a rule this engine registers holds the rule's name, upstream's for a port, which is not the file's
+// A file named for a rule this linter registers holds the rule's name, upstream's for a port, which is not the file's
 // author's to spell out, so a run of words spelling one is set aside and the words beside it judged:
 // MaxClassesPerFileRule.ts is judged on `Rule` alone. The names are the registry's (registeredRuleNames), never a list
 // kept here.

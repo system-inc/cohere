@@ -28,7 +28,7 @@ var bodiesFiles = map[string]string{
 	"lined.go": "package bodies\n\n//line other.go:40\nfunc Lined() int {\n\treturn Plain()\n}\n",
 }
 
-// unusedRecorder is U1000's body recorder, as the engine hands it to a host's run (Options.BodyRecorder).
+// unusedRecorder is U1000's body recorder, as cohere-go hands it to a host's run (Options.BodyRecorder).
 var unusedRecorder = BodyRecorder{Analyzer: unused_code.Analyzer,
 	RecordedOf: func(analyzerResult any) (any, bool) { return unused_code.RecordedOf(analyzerResult) }}
 

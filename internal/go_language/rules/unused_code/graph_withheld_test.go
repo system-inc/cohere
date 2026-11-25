@@ -252,7 +252,7 @@ func Address(value pointer) unsafe.Pointer { return address(value) }
 }
 
 // TestWithheldBodyChangesTheVerdictAndItsRecordRestoresIt holds each fixture to the claim unit 2 of #xeafx79 rests
-// on, at the rule's own level, with no engine: a body withheld changes the findings exactly as its case says, so the
+// on, at the rule's own level, with no pipeline: a body withheld changes the findings exactly as its case says, so the
 // rule cannot simply go without it, and the body's own record spliced in its place gives the whole package's nodes,
 // edges and verdict, so the record is enough. A flagged body is the recorder's to keep present: its record says so,
 // and no graph takes it.

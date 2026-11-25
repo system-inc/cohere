@@ -21,15 +21,15 @@ const bodyReachListed = 20
 
 // takesBodyReach is whether the run makes the census's host side as its extra builds start (bodyReachHost): one that
 // judges each build's dependence and asked for the census or the body differential.
-func (engine *pipeline) takesBodyReach() bool {
-	return (engine.bodyReachCensus != "" || engine.bodyDifferential) && engine.dependence != nil
+func (pipeline *pipeline) takesBodyReach() bool {
+	return (pipeline.bodyReachCensus != "" || pipeline.bodyDifferential) && pipeline.dependence != nil
 }
 
 // factReachSettle is the analyzer a build settles its standing bodies by for the facts' reach, standing_facts'
 // (check.Options.FactReachSettle), when handsSides says it hands its passes the host's sides, which it does under the
 // body reach census or the body differential alone, whose census and second leg read its results (buildFactReach,
 // buildBodyDifferential.compareStanding), and nil otherwise, so nothing is settled.
-func (engine *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
+func (pipeline *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
 	if !handsSides {
 		return nil
 	}
@@ -42,8 +42,8 @@ func (engine *pipeline) factReachSettle(handsSides bool) *analysis.Analyzer {
 // differential. An extra build with no census, judged by nothing or stopped by its type errors before its rules, is
 // written as such, and under the differential is a failure: nothing of it was compared. A file that cannot be written
 // is noted and changes nothing else.
-func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
-	if engine.bodyReachHost == nil {
+func (pipeline *pipeline) writeBodyReachCensus(runs []buildRun) {
+	if pipeline.bodyReachHost == nil {
 		return
 	}
 	var written strings.Builder
@@ -52,10 +52,17 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		"findings apart where the package holds a dependent unit, and fails a callee's fact's until the build can "+
 		"show one differs (#5vbs1np).\n")
 	// The host's sides for the facts' reach, under the census, ahead of every build that reads them.
-	if engine.factReachSides != nil {
-		fmt.Fprintf(&written, "fact reach: packages given a side %d; none, uncaptured %d, answered from the store %d, "+
-			"unrecorded %d, order unknown %d\n", len(engine.factReachSides.packages), engine.factReachSides.uncaptured,
-			engine.factReachSides.storeAnswered, engine.factReachSides.unrecorded, engine.factReachSides.orderUnknown)
+	if pipeline.factReachSides != nil {
+		fmt.Fprintf(
+			&written,
+			"fact reach: packages given a side %d; none, uncaptured %d, answered from the store %d, "+
+				"unrecorded %d, order unknown %d\n",
+			len(pipeline.factReachSides.packages),
+			pipeline.factReachSides.uncaptured,
+			pipeline.factReachSides.storeAnswered,
+			pipeline.factReachSides.unrecorded,
+			pipeline.factReachSides.orderUnknown,
+		)
 	}
 	for index, run := range runs {
 		if run.bodyReach == nil {
@@ -63,10 +70,10 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 				continue
 			}
 			fmt.Fprintf(&written, "build %s\n  not judged: the build has no census\n", run.build)
-			if engine.bodyDifferential {
+			if pipeline.bodyDifferential {
 				failure := "the build was not judged, so none of its bodies was compared"
 				fmt.Fprintf(&written, "  body differential: compared 0, failures 1\n    %s\n", failure)
-				engine.note("the body differential of the build %s: %s", run.build, failure)
+				pipeline.note("the body differential of the build %s: %s", run.build, failure)
 			}
 			continue
 		}
@@ -74,7 +81,7 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		// when it listed the packages that need their declarations alone. A run handed no result settled nothing.
 		var takenOut map[string]map[fact_reach.Place]bool
 		if run.result != nil {
-			takenOut = takenOutByFacts(engine.factReachSides, run.result.FactReachSettled)
+			takenOut = takenOutByFacts(pipeline.factReachSides, run.result.FactReachSettled)
 		}
 		writeBuildBodyReach(&written, "build "+run.build.String(), run.bodyReach, takenOut)
 		if run.factReach != nil {
@@ -105,7 +112,7 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 		}
 		for _, failure := range run.bodyDifferential.failures {
 			fmt.Fprintf(&written, "    %s\n", failure)
-			engine.note("the body differential of the build %s: %s", run.build, failure)
+			pipeline.note("the body differential of the build %s: %s", run.build, failure)
 		}
 		for _, owed := range findingStages {
 			classed := run.bodyDifferential.classed[owed.stage]
@@ -115,11 +122,11 @@ func (engine *pipeline) writeBodyReachCensus(runs []buildRun) {
 			}
 		}
 	}
-	if engine.bodyReachCensus == "" {
+	if pipeline.bodyReachCensus == "" {
 		return
 	}
-	if writeError := os.WriteFile(engine.bodyReachCensus, []byte(written.String()), 0o644); writeError != nil {
-		engine.note("the body reach census: %v", writeError)
+	if writeError := os.WriteFile(pipeline.bodyReachCensus, []byte(written.String()), 0o644); writeError != nil {
+		pipeline.note("the body reach census: %v", writeError)
 	}
 }
 

@@ -863,7 +863,7 @@ func relLiteralWithNoreferrer(existing string) string {
 	return "\"" + strings.Join(parts, " ") + "\""
 }
 
-// zeroWidthRangeAt builds an insertion point, which our fix engine spells as an empty range.
+// zeroWidthRangeAt builds an insertion point, which our fix pass spells as an empty range.
 //
 // ESLint has `insertTextAfter`; we have one `Fix` shape holding a range and a text, so an insertion
 // is a replacement of nothing. Named rather than written inline three times so the intent survives.

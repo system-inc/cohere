@@ -36,9 +36,9 @@ func settleFactFixture(test *testing.T, fixture string, packagePath string) *fac
 	test.Helper()
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", fixture)), exitFindings,
-		func(engine *pipeline) {
-			engine.bodyReachCensus = censusFile
-			engine.bodyDifferential = true
+		func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = censusFile
+			pipeline.bodyDifferential = true
 		}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyReach == nil || on.buildRuns[1].result == nil {
 		test.Fatalf("want the host's build and windows's census, got %d runs", len(on.buildRuns))

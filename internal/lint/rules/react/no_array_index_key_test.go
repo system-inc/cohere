@@ -20,7 +20,7 @@ const noArrayIndexKeyFile = "/repository/source/Keys.tsx"
 // built with `[].concat(...)` rather than as a plain literal, which a brace-matching extractor
 // walks straight past and silently reports as empty; it was read by stubbing the tester and
 // capturing the object it was handed, so both `concat` and the template literals inside it are
-// handled by the JavaScript engine rather than by a parser written here.
+// handled by the JavaScript runtime rather than by a parser written here.
 //
 // Upstream carries 30 valid and 41 invalid cases, each invalid one naming exactly one messageId,
 // which is 41 findings from 41 inputs.

@@ -425,7 +425,7 @@ func TestConsistencyNoShoutingMasksARunOfLineCommentsAsOneText(test *testing.T) 
 	}
 }
 
-// A comment is masked without its delimiters (#xfa3q6w), as the Go engine reads a `//` line and ESLint a
+// A comment is masked without its delimiters (#xfa3q6w), as cohere-go reads a `//` line and ESLint a
 // comment's value. The command patterns anchor at a line's start, so read with its slashes a `//` command
 // line, or a one-line block comment holding one, was prose and its capitals shouted, while the same line
 // behind a block comment's gutter was masked. The reporting rows pin that a shout is still found, at the

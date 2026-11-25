@@ -57,7 +57,7 @@ func sizesRun(test *testing.T, root string, storeDirectory string, environment [
 	test.Helper()
 	rules := []rule.Rule{houseRule(sizeProbe)}
 	caching := cachingAt(storeDirectory, rules)
-	// Each build's keys hold its target, as the engine's do, so they never meet another's.
+	// Each build's keys hold its target, as cohere-go's do, so they never meet another's.
 	caching.Context.Build = append(caching.Context.Build, environment...)
 	session := NewCacheSession(caching, rules)
 	// The host records every package's reads, for the build to restore from; the build records none.

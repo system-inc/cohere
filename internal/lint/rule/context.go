@@ -112,7 +112,7 @@ func (ruleContext Context) ReportNode(node *ast.Node, message Message) {
 	})
 }
 
-// ReportNodeWithFixes reports a node and proposes repairs the edit engine may apply unattended.
+// ReportNodeWithFixes reports a node and proposes repairs the fix pass may apply unattended.
 //
 // Anchored on the node's own text, for the reason spelled out on ReportNode. This one matters twice
 // over: a finding reported at the wrong line while carrying a fix means the fix is applied at a
@@ -170,7 +170,7 @@ func (ruleContext Context) ReportRangeWithSuggestions(
 	})
 }
 
-// ReportRangeWithFixes reports a span that is not one node and proposes repairs the engine applies
+// ReportRangeWithFixes reports a span that is not one node and proposes repairs the fix pass applies
 // unattended.
 //
 // The last corner of the same asymmetry ReportRangeWithSuggestions describes. The node helpers came

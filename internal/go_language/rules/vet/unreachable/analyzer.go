@@ -16,7 +16,7 @@
 // it reported as dead. The port also reads every file's package-level declarations, still syntax alone, and takes
 // none of those calls for the builtin's (testdata/src/differences).
 //
-// It sits on the engine's syntax dispatcher, hearing each function declaration and literal on the walk the dispatcher
+// It sits on cohere-go's syntax dispatcher, hearing each function declaration and literal on the walk the dispatcher
 // makes once for every syntax rule, with the cursor of each, the one the original's walk handed it.
 //
 // The registry runs the port in the original's place, and the original stays the oracle: the parity tests beside

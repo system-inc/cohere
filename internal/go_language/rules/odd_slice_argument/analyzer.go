@@ -1,5 +1,5 @@
 // Package odd_slice_argument is staticcheck's SA5012, a slice of odd length passed to a function that panics unless
-// its slice has an even length, as strings.NewReplacer and logging APIs taking pairs do, ported onto the engine's own
+// its slice has an even length, as strings.NewReplacer and logging APIs taking pairs do, ported onto cohere-go's own
 // intermediate representation as a listener that judges one function at a time and asks every mark it reads of the
 // run's fact resolver (#w7zmvat, #8d9r2rh).
 //
@@ -64,7 +64,7 @@ import (
 var MarksAnalyzer = &analysis.Analyzer{
 	Name: "odd_slice_argument_marks",
 	Doc: "marks the slice parameters a function needs of even length when a reader asks, staticcheck's SA5012 marks " +
-		"on the engine's own representation",
+		"on cohere-go's own representation",
 	Run:        runMarks,
 	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
 	ResultType: reflect.TypeFor[*Result](),
@@ -95,7 +95,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA5012",
 	"SA5012",
 	"Flags a slice of odd length passed to a function that needs an even one: staticcheck's SA5012, ported onto "+
-		"the engine's own intermediate representation.",
+		"cohere's own intermediate representation.",
 	&Listener,
 )
 

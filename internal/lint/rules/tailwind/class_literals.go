@@ -540,7 +540,7 @@ func holeEdges(before string, after string, firstHole bool, lastHole bool, templ
 //
 // The range starts at the literal's token, not at its Loc. Loc includes the whitespace before the
 // literal, so for one on its own line or after a comma the quote strip cut the opening quote, the
-// fixed file stopped parsing, and the edit engine refused that file's whole fix batch, every other
+// fixed file stopped parsing, and the edit Tailwind refused that file's whole fix batch, every other
 // rule's fixes included (#vf1hd6j, measured at 174 files in ahra).
 func classLiteralFrom(literal *ast.Node, origin ClassLiteralOrigin) ClassLiteral {
 	contentRange := rule.TokenRange(ast.GetSourceFileOfNode(literal), literal)

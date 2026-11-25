@@ -1,4 +1,4 @@
-// Package child_process is what the Go engine's rules about a child's piped output read: which local variable holds a
+// Package child_process is what cohere-go's rules about a child's piped output read: which local variable holds a
 // pipe from exec.Cmd's StdoutPipe or StderrPipe, which command it belongs to, whether the function writes either again,
 // and which calls wait for the child. correctness_require_drained_child_output asks whether the pipe is read before
 // the wait, and concurrency_require_joined_pipe_reader whether a goroutine reading it is joined before the wait, and

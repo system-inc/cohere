@@ -235,7 +235,7 @@ func TestAnIdentityTransformDoesNotTouchTheFile(test *testing.T) {
 
 // The transform must be idempotent: running it on its own output must produce the same bytes.
 //
-// This is the property the engine relies on and it is worth an explicit guard rather than an
+// This is the property the fix pass relies on and it is worth an explicit guard rather than an
 // assumption. A formatter that alternates between two valid outputs would make every run rewrite
 // every file, so a tree would never reach a steady state and every commit would carry churn nobody
 // authored. Measuring against a reference implementation proves agreement with that implementation;
@@ -344,7 +344,7 @@ func TestSummaryCountsReformattedFiles(test *testing.T) {
 //
 // Asked for by @system_cohere_format: its goja formatter doubles a standalone tilde in markdown,
 // turning approximately-25K into strikethrough, so markdown is scoped out until that is fixed. The
-// engine does not care which files a transform handles, but the coverage line must not report a
+// fix pass does not care which files a transform handles, but the coverage line must not report a
 // skipped file the same way it reports a file that was already correctly formatted. Those mean
 // opposite things: one says the formatter never looked, the other says it looked and approved.
 func TestATransformCanSkipAFileAndTheSkipIsRecorded(test *testing.T) {

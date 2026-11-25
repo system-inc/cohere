@@ -258,7 +258,7 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 //
 // For a month the rule shipped with only the first path while its option decoder parsed
 // `ignoreTernaryTests` and `ignoreIfStatements` and the set enabled it with both on, so a config could
-// not tell. With the rule on in both engines, ESLint found 64 sites in ahra that cohere never reported
+// not tell. With the rule on in both languages, ESLint found 64 sites in ahra that cohere never reported
 // (55 ternaries, 9 if-assignments) (#10kqgs6). The options now gate real checks, and the corpus test
 // counts every path so a missing one fails by name.
 //

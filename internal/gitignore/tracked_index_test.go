@@ -14,7 +14,7 @@ import (
 )
 
 // writeIndex writes a version 2 index of paths, each a regular file at stage 0, into gitDirectory, with SHA-1 object
-// names and the checksum git writes. The fixtures in testdata/index and the Swift engine's samples are git's own bytes;
+// names and the checksum git writes. The fixtures in testdata/index and cohere-swift's samples are git's own bytes;
 // this writes the small indexes the matcher's tests need around a tree.
 func writeIndex(test *testing.T, gitDirectory string, paths ...string) {
 	test.Helper()
@@ -48,7 +48,7 @@ func placeIndex(test *testing.T, gitDirectory string, contents []byte) {
 	}
 }
 
-// swiftSamples is the Swift engine's git index samples, which hold what the shared fixtures in testdata/index lack: a
+// swiftSamples is cohere-swift's git index samples, which hold what the shared fixtures in testdata/index lack: a
 // SHA-256 repository at each version, a sparse index and a split index, each written by git 2.54. How git made them
 // is in swift/Tests/CohereSwiftTests/GitIndexTests.swift. They are read where they live, never copied, so the two
 // readers meet the same bytes.
@@ -64,13 +64,13 @@ var swiftSampleTracked = []string{
 	"Sources/Beta.swift",
 }
 
-// readSwiftSample is one of the Swift engine's samples. One that is not there fails the test rather than skipping
+// readSwiftSample is one of cohere-swift's samples. One that is not there fails the test rather than skipping
 // it, since a skip would read as a reader that agrees with them.
 func readSwiftSample(test *testing.T, name string) []byte {
 	test.Helper()
 	contents, readError := os.ReadFile(filepath.Join(swiftSamples, name))
 	if readError != nil {
-		test.Fatalf("reading the Swift engine's index sample %s: %v", name, readError)
+		test.Fatalf("reading cohere-swift's index sample %s: %v", name, readError)
 	}
 	return contents
 }
@@ -78,7 +78,7 @@ func readSwiftSample(test *testing.T, name string) []byte {
 // git's own index of one small repository, at each version, yields exactly the paths git lists for it: every stage of
 // a conflict as one path, a skip-worktree and an intent-to-add entry, a path with a space, and version 4's paths
 // rebuilt from the long prefix each shares with the one before. The fixtures and how git wrote them are in
-// testdata/index, which the Swift engine reads too.
+// testdata/index, which cohere-swift reads too.
 func TestTheIndexReaderYieldsEveryTrackedPathAtEachVersion(test *testing.T) {
 	test.Parallel()
 	for _, version := range []int{2, 3, 4} {

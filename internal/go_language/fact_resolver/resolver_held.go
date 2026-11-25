@@ -24,7 +24,7 @@ type Held interface {
 // would compute is offered to held.Answer first, and each answer it computes told to held.Computed. An answer the
 // memo, the store or the types alone of a function without a body give is never offered, since it is computed from
 // no body either way. A run under a hand writes no store: a held answer is memoized but never recorded, so a store's
-// whole answers would lack it. Only a test calls it: an engine run has no hand on its answers, and a test holds that
+// whole answers would lack it. Only a test calls it: a cohere-go run has no hand on its answers, and a test holds that
 // no file but a test's calls HoldAnswers.
 func (resolver *Resolver) HoldAnswers(held Held) {
 	resolver.held = held

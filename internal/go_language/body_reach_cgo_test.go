@@ -35,9 +35,9 @@ func TestACgoPackagesImportsCarryTheTranslationsAndTheReachTakesItUnrecorded(tes
 	const gate = "example.test/gate"
 	translated := []string{"runtime/cgo", "syscall", "unsafe"}
 	root := copyFixture(test, filepath.Join("testdata", "body-reach-cgo"))
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyDifferential = true
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyDifferential = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))

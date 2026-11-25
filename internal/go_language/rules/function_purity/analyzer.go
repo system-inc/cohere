@@ -1,4 +1,4 @@
-// Package function_purity judges which functions are pure, staticcheck's purity facts ported onto the engine's own
+// Package function_purity judges which functions are pure, staticcheck's purity facts ported onto cohere-go's own
 // intermediate representation, so the readers asking which calls have no side effects read them without buildir
 // (#w7zmvat).
 //
@@ -29,7 +29,7 @@ import (
 // the resolver holds each of them, before a reader asks.
 var Analyzer = &analysis.Analyzer{
 	Name:       "function_purity",
-	Doc:        "judges which functions are pure when a reader asks, staticcheck's purity on the engine's own representation",
+	Doc:        "judges which functions are pure when a reader asks, staticcheck's purity on cohere-go's own representation",
 	Run:        run,
 	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
 	ResultType: reflect.TypeFor[*Result](),

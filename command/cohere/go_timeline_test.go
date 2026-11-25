@@ -1,7 +1,7 @@
 //go:build unix
 
-// Beside go_engine_test.go, whose helpers for a Go run's command line it reads, so the file builds on Unix as that one
-// does.
+// Beside go_language_test.go, whose helpers for a Go run's command line it reads, so the file builds on Unix as that
+// one does.
 
 package main
 
@@ -44,7 +44,7 @@ func renderGoTimeline(test *testing.T, mode outputMode, timelineRequested bool, 
 	activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	run := newEngineRun(stream, engineModeCheck, goLanguage("module"), "", time.Now())
+	run := newContractRun(stream, contractModeCheck, goLanguage("module"), "", time.Now())
 	run.timelineRequested = timelineRequested
 	for _, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
@@ -57,33 +57,33 @@ func renderGoTimeline(test *testing.T, mode outputMode, timelineRequested bool, 
 	return out.String(), finishError
 }
 
-// TestTimelineReachesTheGoEngineAlone: `--timeline` is taken, not refused, and forwarded to the Go engine, which
+// TestTimelineReachesTheGoChildAlone: `--timeline` is taken, not refused, and forwarded to cohere-go, which
 // answers it with its timeline record (#3v2zp7g). Swift's run refuses it by name, discovery hands it to no project's
 // run but a Go one's, and a run at no Go project refuses it, as `--host-build-only` is refused, saying what it asks of
 // a Go run.
-func TestTimelineReachesTheGoEngineAlone(test *testing.T) {
+func TestTimelineReachesTheGoChildAlone(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	given := map[string]bool{"no-fix": true, "timeline": true}
-	arguments, mode, argumentsError := engineArguments(goLanguage("module"), goFlags, goTestLocation(root), given,
+	arguments, mode, argumentsError := contractArguments(goLanguage("module"), goFlags, goTestLocation(root), given,
 		typedTrue, nil)
 	if argumentsError != nil {
 		test.Fatalf("--timeline was refused for Go: %v", argumentsError)
 	}
 	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--timeline"}
-	if !slices.Equal(arguments, expected) || mode != engineModeCheck {
+	if !slices.Equal(arguments, expected) || mode != contractModeCheck {
 		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
-			engineModeCheck)
+			contractModeCheck)
 	}
 
-	_, _, swiftError := engineArguments(swiftLanguage, swiftFlags, goTestLocation(root), given, typedTrue, nil)
+	_, _, swiftError := contractArguments(swiftLanguage, swiftFlags, goTestLocation(root), given, typedTrue, nil)
 	if swiftError == nil || !strings.Contains(swiftError.Error(), "--timeline is not implemented for Swift") {
 		test.Errorf("--timeline was not refused by name for Swift: %v", swiftError)
 	}
 
 	if kept := withoutGoOnlySwitches([]string{"--no-fix", "--timeline", "--host-build-only", "--json"}); !slices.Equal(
 		kept, []string{"--no-fix", "--json"}) {
-		test.Errorf("another engine's child is handed %q, want every flag but the Go-only ones", kept)
+		test.Errorf("another language's child is handed %q, want every flag but the Go-only ones", kept)
 	}
 
 	refusal := refuseGoOnlySwitches(map[string]bool{"timeline": true}, typedTrue)
@@ -134,11 +134,11 @@ func TestTimelineIsRefusedAtARootWithNoGoProject(test *testing.T) {
 }
 
 // TestARealGoRunUnderTheTimelinePrintsIt: the built binary over a small Go module under `--timeline`, end to end, the
-// engine making its recorder as it reads the command line and the front door taking the record because the run asked
+// child making its recorder as it reads the command line and the front door taking the record because the run asked
 // (#3v2zp7g). Under `--json` the timeline line comes before the summary, its host's stamps in their order from the
-// engine's start through the host's load to the run's end; without it the table is on the terminal, ending at the
-// run's end. No other test reaches the two lines that make this work in a real run: the engine's recorder made in
-// runOverlapping, and the front door's run told it asked (runGoEngine).
+// child's start through the host's load to the run's end; without it the table is on the terminal, ending at the
+// run's end. No other test reaches the two lines that make this work in a real run: the child's recorder made in
+// runOverlapping, and the front door's run told it asked (runGoProject).
 func TestARealGoRunUnderTheTimelinePrintsIt(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -165,11 +165,11 @@ func TestARealGoRunUnderTheTimelinePrintsIt(test *testing.T) {
 	}
 	var labels []string
 	for _, stamp := range record.Stamps {
-		if slices.Contains([]string{"engine.main.begin", "host.load.end", "run.end"}, stamp.Label) {
+		if slices.Contains([]string{"main.begin", "host.load.end", "run.end"}, stamp.Label) {
 			labels = append(labels, stamp.Label)
 		}
 	}
-	if want := []string{"engine.main.begin", "host.load.end", "run.end"}; !slices.Equal(labels, want) {
+	if want := []string{"main.begin", "host.load.end", "run.end"}; !slices.Equal(labels, want) {
 		test.Errorf("the timeline stamped %q of the host's steps, want %q in that order:\n%s", labels, want,
 			lines[timeline])
 	}
@@ -221,7 +221,7 @@ func TestANarrowedRunOfNoGoProjectRefusesAGoOnlySwitch(test *testing.T) {
 	}
 }
 
-// TestAGoRunPrintsItsTimeline: a Go run under `--timeline` prints the engine's timeline record as a table (#3v2zp7g),
+// TestAGoRunPrintsItsTimeline: a Go run under `--timeline` prints the child's timeline record as a table (#3v2zp7g),
 // in the verbose view and the default one alike, since the switch asked for it by name: the unit first, then each
 // stamp in the order taken with its wall and the cores busy since the stamp before, a build's indented under its name
 // and a step taken again with its round, `-` on the first row, whose wall and CPU start at different moments, and `-`
@@ -238,7 +238,7 @@ func TestAGoRunPrintsItsTimeline(test *testing.T) {
 			test.Fatalf("%v\n%s", renderError, output)
 		}
 		requireLines(test, output,
-			"\ntimeline: when each step began or ended, as wall time since the engine started, and the cores busy "+
+			"\ntimeline: when each step began or ended, as wall time since the child started, and the cores busy "+
 				"since the step before, the process's CPU over the wall between them\n",
 			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "step", "wall", "cores"),
 			fmt.Sprintf("  %-*s %9s %7s\n", timelineLabelWidth, "engine.main.begin", "3.0ms", "-"),
@@ -274,7 +274,7 @@ func TestAGoRunPrintsItsTimeline(test *testing.T) {
 	forbidLines(test, output, "cores\n", "3.50")
 }
 
-// TestAGoTimelineRecordIsWrittenThroughUnderJson: under `--json` the record is one `timeline` line, the engine's fields
+// TestAGoTimelineRecordIsWrittenThroughUnderJson: under `--json` the record is one `timeline` line, the child's fields
 // as it wrote them, before the summary, and no table.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoTimelineRecordIsWrittenThroughUnderJson(test *testing.T) {
@@ -294,9 +294,9 @@ func TestAGoTimelineRecordIsWrittenThroughUnderJson(test *testing.T) {
 	if timeline < 0 || summary < timeline {
 		test.Fatalf("no timeline line before the summary:\n%s", output)
 	}
-	// Byte for byte: the fixture is written in the field order the engine encodes, which is the order written through.
-	if engineLine := lines[goTimelineIndex(test, lines)]; written[timeline] != engineLine {
-		test.Errorf("the timeline line is\n%s\nwant the engine's\n%s", written[timeline], engineLine)
+	// Byte for byte: the fixture is written in the field order the child encodes, which is the order written through.
+	if contractLine := lines[goTimelineIndex(test, lines)]; written[timeline] != contractLine {
+		test.Errorf("the timeline line is\n%s\nwant the child's\n%s", written[timeline], contractLine)
 	}
 	forbidLines(test, output, "timeline: when each step")
 }

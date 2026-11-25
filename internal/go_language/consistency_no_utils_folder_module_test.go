@@ -1,9 +1,9 @@
 package go_language
 
-// The engine side of cohere-go/consistency-no-utils-folder's module root (#mxe7xjy). The rule judges a package's path
+// cohere-go side of cohere-go/consistency-no-utils-folder's module root (#mxe7xjy). The rule judges a package's path
 // below its module root, which it reads from pass.Module, and the pass has a module only because load.Packages asks
-// go list for it. analysistest's own loader asks for the module whatever the engine does, so only a run through the
-// engine's load can show the module reaches the rule.
+// go list for it. analysistest's own loader asks for the module whatever cohere-go does, so only a run through the
+// cohere-go's load can show the module reaches the rule.
 
 import (
 	"fmt"

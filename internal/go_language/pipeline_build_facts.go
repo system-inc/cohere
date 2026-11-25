@@ -74,8 +74,8 @@ func factKeyAt(fact check.ExportedFact, object types.Object, fileSet *token.File
 
 // heldByStandardLibrary reports whether the standard library's graph holds the package of identifier, loaded or by a
 // record, whose answers a build's census finds through its units (byDeclaringUnit.answerOf).
-func (engine *pipeline) heldByStandardLibrary(identifier string) bool {
-	standardLibrary := engine.dependence.standardLibrary
+func (pipeline *pipeline) heldByStandardLibrary(identifier string) bool {
+	standardLibrary := pipeline.dependence.standardLibrary
 	if standardLibrary == nil || standardLibrary.graph == nil {
 		return false
 	}
@@ -86,9 +86,9 @@ func (engine *pipeline) heldByStandardLibrary(identifier string) bool {
 // namedByRecords reports whether the host restored the package of identifier and the standard library's graph holds
 // it by a record the findings store keeps (#6a3kjvz) rather than loaded: its objects have no counterparts there, so
 // its facts are keyed by their declaring units on both sides (byDeclaringUnit).
-func (engine *pipeline) namedByRecords(identifier string) bool {
-	standardLibrary := engine.dependence.standardLibrary
-	if !engine.dependence.restored[identifier] || standardLibrary == nil || standardLibrary.graph == nil ||
+func (pipeline *pipeline) namedByRecords(identifier string) bool {
+	standardLibrary := pipeline.dependence.standardLibrary
+	if !pipeline.dependence.restored[identifier] || standardLibrary == nil || standardLibrary.graph == nil ||
 		standardLibrary.loaded[identifier] {
 		return false
 	}
@@ -127,33 +127,33 @@ func factKeyByName(fact check.ExportedFact, encoder *objectpath.Encoder) (factKe
 // change, so the name finds the declaring unit in the host's own graph, and each build's census meets it there. The
 // table's answers of each restored package, restoredAnswers, are kept as they are, for compareFacts to read by
 // objectpath.
-func (engine *pipeline) indexHostFacts(
+func (pipeline *pipeline) indexHostFacts(
 	facts []check.ExportedFact,
 	restoredAnswers map[*packages.Package]*fact_resolver.Answers,
 ) {
-	if engine.dependence == nil {
+	if pipeline.dependence == nil {
 		return
 	}
-	engine.dependence.restoredAnswers = map[string]*fact_resolver.Answers{}
+	pipeline.dependence.restoredAnswers = map[string]*fact_resolver.Answers{}
 	for restoredPackage, answers := range restoredAnswers {
-		engine.dependence.restoredAnswers[restoredPackage.ID] = answers
+		pipeline.dependence.restoredAnswers[restoredPackage.ID] = answers
 	}
-	standardLibrary := engine.dependence.standardLibrary
+	standardLibrary := pipeline.dependence.standardLibrary
 	var counterparts *build_dependence.Counterparts
 	if standardLibrary != nil && standardLibrary.graph != nil {
 		counterparts = build_dependence.NewCounterparts(standardLibrary.graph, nil)
 	}
 	indexed := make(map[factKey]check.ExportedFact, len(facts))
 	var encoder objectpath.Encoder
-	engine.dependence.factsUnnamed = 0
+	pipeline.dependence.factsUnnamed = 0
 	for _, fact := range facts {
 		key, isKeyed := factKeyOf(fact)
-		if engine.namedByRecords(fact.Package.ID) && (fact.Object != nil || fact.ObjectPath != "") {
+		if pipeline.namedByRecords(fact.Package.ID) && (fact.Object != nil || fact.ObjectPath != "") {
 			key, isKeyed = factKeyByName(fact, &encoder)
 			if !isKeyed {
-				engine.dependence.factsUnnamed++
+				pipeline.dependence.factsUnnamed++
 			}
-		} else if engine.dependence.restored[fact.Package.ID] && (fact.Object != nil || fact.ObjectPath != "") {
+		} else if pipeline.dependence.restored[fact.Package.ID] && (fact.Object != nil || fact.ObjectPath != "") {
 			isKeyed = false
 			var counterpart types.Object
 			isFound := false
@@ -176,7 +176,7 @@ func (engine *pipeline) indexHostFacts(
 			indexed[key] = fact
 		}
 	}
-	engine.dependence.facts = indexed
+	pipeline.dependence.facts = indexed
 }
 
 // compareFacts is the build's facts census (#0ghk7vj): each fact the host or the build exported about an object in a
@@ -193,17 +193,17 @@ func (engine *pipeline) indexHostFacts(
 // both compile, of a package both have by one ID, is no comparison's either, the other build having no such object,
 // and is counted on the side that holds it (contract.DependenceFacts.CompiledInOne, #w5dbvdm). Nil when the host's
 // facts were never indexed.
-func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.ExportedFact) *contract.DependenceFacts {
-	if engine.dependence.facts == nil {
+func (pipeline *pipeline) compareFacts(judged *buildJudgment, facts []check.ExportedFact) *contract.DependenceFacts {
+	if pipeline.dependence.facts == nil {
 		return nil
 	}
 	started := time.Now()
 	var encoder objectpath.Encoder
-	parts := contract.UnkeyedFacts{Unnamed: engine.dependence.factsUnnamed}
+	parts := contract.UnkeyedFacts{Unnamed: pipeline.dependence.factsUnnamed}
 	declaring := &byDeclaringUnit{standardLibrary: judged.standardLibrary}
-	hostFacts := make(map[factKey]check.ExportedFact, len(engine.dependence.facts))
+	hostFacts := make(map[factKey]check.ExportedFact, len(pipeline.dependence.facts))
 	hostByName := map[factKey]check.ExportedFact{}
-	for key, hosted := range engine.dependence.facts {
+	for key, hosted := range pipeline.dependence.facts {
 		if key.local != "" {
 			hostByName[key] = hosted
 			continue
@@ -230,7 +230,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 			continue
 		}
 		key, isKeyed := factKeyOf(fact)
-		if engine.namedByRecords(fact.Package.ID) && fact.Object != nil {
+		if pipeline.namedByRecords(fact.Package.ID) && fact.Object != nil {
 			if !isKeyed {
 				parts.Unplaced++
 				continue
@@ -260,7 +260,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 		// A fact about an object no objectpath names, a function's local closure say, in a package the host restored
 		// from the system cache's table, is one no entry can hold, so the host has no side of it to compare with: it is
 		// left out, where a host that checked the package from source would have compared it.
-		if engine.dependence.restored[fact.Package.ID] && fact.Object != nil {
+		if pipeline.dependence.restored[fact.Package.ID] && fact.Object != nil {
 			if _, pathError := encoder.For(fact.Object); pathError != nil {
 				continue
 			}
@@ -273,7 +273,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 	parts.Unplaced += paired.Unplaced
 	parts.PathOnly += paired.PathOnly
 	parts.Collisions += paired.Collisions
-	calls := engine.callIndex()
+	calls := pipeline.callIndex()
 	kinds := map[[2]string]*contract.FactKindCounts{}
 	examples := map[[2]string][]string{}
 	differing := map[int]bool{}
@@ -347,7 +347,7 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 			continue
 		}
 		if _, hostHas := hostFacts[key]; !hostHas && comparable(key) {
-			hosted, hostHas, isPlaced := engine.restoredAnswer(builtFact, &encoder, declaring)
+			hosted, hostHas, isPlaced := pipeline.restoredAnswer(builtFact, &encoder, declaring)
 			if !isPlaced {
 				parts.Answers++
 				continue
@@ -379,18 +379,18 @@ func (engine *pipeline) compareFacts(judged *buildJudgment, facts []check.Export
 // graph holds, the answer is found through the unit declaring the function, never by the build's own objectpath,
 // which can name another method where the build's files change a method set (byDeclaringUnit.answerOf, #h660y7d),
 // and the third result is false where the function cannot be placed there, whose host side is unknown.
-func (engine *pipeline) restoredAnswer(
+func (pipeline *pipeline) restoredAnswer(
 	builtFact check.ExportedFact,
 	encoder *objectpath.Encoder,
 	declaring *byDeclaringUnit,
 ) (check.ExportedFact, bool, bool) {
-	answers := engine.dependence.restoredAnswers[builtFact.Package.ID]
+	answers := pipeline.dependence.restoredAnswers[builtFact.Package.ID]
 	if !builtFact.Answer || builtFact.Object == nil || answers == nil {
 		return check.ExportedFact{}, false, true
 	}
 	var encoded []byte
 	isHeld := false
-	if engine.heldByStandardLibrary(builtFact.Package.ID) {
+	if pipeline.heldByStandardLibrary(builtFact.Package.ID) {
 		var isPlaced bool
 		encoded, isHeld, isPlaced = declaring.answerOf(answers, builtFact)
 		if !isPlaced {

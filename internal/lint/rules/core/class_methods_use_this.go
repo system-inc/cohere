@@ -77,7 +77,7 @@ func classMethodsUseThisMissingThis(name string) rule.Message {
 // available.
 //
 // What replaces it is a single `KindSourceFile` listener that walks the file itself. The listener
-// fires before its children, so the walk below is the rule's own recursion rather than the engine's,
+// fires before its children, so the walk below is the rule's own recursion rather than the linter's,
 // and enter/exit become the two sides of one recursive call. That is the shipped pattern for a rule
 // that must gather before it can judge.
 //

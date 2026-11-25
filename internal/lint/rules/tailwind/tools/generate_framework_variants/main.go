@@ -7,7 +7,7 @@
 //
 // The table it writes is what lets `LoadDesignSystem` build a registry that knows `hover`. Without
 // it a run-scoped design system registers only the repository's own `@custom-variant` names:
-// measured on this repository, one registration against the engine's 88. And the consequence is
+// measured on this repository, one registration against Tailwind's 88. And the consequence is
 // not degraded ranking but refusal to parse: `ParseVariant` returns nil for an unregistered root
 // and `ParseCandidate` then yields zero candidates for the whole class. Every rule reading it would
 // decline on every class carrying a variant, and a differential would score that as agreement
@@ -23,7 +23,7 @@
 //
 // The shipped `VariantOrder` in property_order_table.go is the shape being argued against and is a
 // different thing again: it is keyed on composed prefixes like `group-hover:`, which have no
-// position of their own. This table is keyed on registration roots, which is what the engine
+// position of their own. This table is keyed on registration roots, which is what Tailwind
 // actually registers.
 //
 // # The invariance measurement this table rests on, and the one it used to claim
@@ -60,7 +60,7 @@
 // order numbers carry one in a default build. The generated file records which orders carry one and
 // in which direction; `LoadDesignSystem` registers `CompareBreakpoints` against them, reading the
 // *live* theme. That distinction is load-bearing and measured: redefining `--breakpoint-sm` to
-// `200rem` moves `sm` from dense index 0 to index 4 on the engine, so a comparison closed over a
+// `200rem` moves `sm` from dense index 0 to index 4 on Tailwind, so a comparison closed over a
 // hardcoded scale would be wrong on exactly the repository that customized its breakpoints.
 //
 // The directions are probed rather than read off `variants.ts`, so a release that flipped one
@@ -215,7 +215,7 @@ func registrationDifference(left, right []registryEntry) string {
 	return ""
 }
 
-// registryEntry is one registered variant root, as the engine holds it.
+// registryEntry is one registered variant root, as Tailwind holds it.
 type registryEntry struct {
 	Name  string `json:"name"`
 	Order int    `json:"order"`
@@ -407,7 +407,7 @@ func main() {
 	}
 }
 
-// variantKindConstants maps the engine's kind strings onto the Go port's constants.
+// variantKindConstants maps Tailwind's kind strings onto the Go port's constants.
 //
 // Written out rather than derived by casing, because the mapping is a claim about two independent
 // vocabularies and a silent mismatch would render a table naming a constant that happens to exist
@@ -430,7 +430,7 @@ var variantKindConstants = map[string]string{
 func validate(result *enumeration) error {
 	if len(result.Entries) == 0 {
 		return fmt.Errorf(
-			"the engine reported no variant registrations at all, which is a broken enumeration rather " +
+			"Tailwind reported no variant registrations at all, which is a broken enumeration rather " +
 				"than a Tailwind with no variants",
 		)
 	}
@@ -499,7 +499,7 @@ func render(result *enumeration) ([]byte, error) {
 	entries := make([]registryEntry, len(result.Entries))
 	copy(entries, result.Entries)
 	// Sorted by order, then by name within a shared order, so the file reads as the registration
-	// sequence the engine performed and a diff after an upgrade shows the insertion point rather
+	// sequence Tailwind performed and a diff after an upgrade shows the insertion point rather
 	// than a reshuffle. Ties broken by name because a Map's iteration order is insertion order and
 	// two runs of the same build agree, but relying on that would make the file churn if it ever
 	// stopped being true.
@@ -538,7 +538,7 @@ func render(result *enumeration) ([]byte, error) {
 //
 //	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root <tailwindcss package>
 //
-// Source: Tailwind %s, read from the engine's own variant registry.
+// Source: Tailwind %s, read from Tailwind's own variant registry.
 // %d registrations over %d distinct order numbers, %d of which are shared by more than one root,
 // and %d of which carry a comparison function.
 //
@@ -574,12 +574,12 @@ package tailwind
 	)
 
 	builder.WriteString(
-		`// FrameworkVariantRegistration is one variant the framework registers, with the order number the
-// engine assigned it.
+		`// FrameworkVariantRegistration is one variant the framework registers, with the order number
+// Tailwind assigned it.
 //
 // Order is carried rather than re-derived, and that is the whole reason this type exists alongside
 // FrameworkVariant. Replaying these through Register in sequence would give every root its own
-// number, and the engine shares numbers: six roots hold one order in a default build. A shared
+// number, and Tailwind shares numbers: six roots hold one order in a default build. A shared
 // order is where a comparison function gets to speak, and comparison is how the five breakpoints
 // order by their resolved widths instead of alphabetically.
 type FrameworkVariantRegistration struct {
@@ -597,11 +597,11 @@ type FrameworkVariantRegistration struct {
 //
 // The function itself cannot be generated: upstream's is a closure over the design system's theme,
 // and reading a hardcoded breakpoint scale here would be the per-repository bug this port exists to
-// remove. Measured on the engine, redefining ` + "`--breakpoint-sm` to `200rem` moves `sm`" + ` from dense
+// remove. Measured on Tailwind, redefining ` + "`--breakpoint-sm` to `200rem` moves `sm`" + ` from dense
 // index 0 to index 4. So what is generated is the order number and the direction, and
 // LoadDesignSystem attaches CompareBreakpoints over the live theme.
 //
-// Ascending is probed against the engine rather than read from variants.ts, so a release that
+// Ascending is probed against Tailwind rather than read from variants.ts, so a release that
 // flipped one produces a diff here instead of silently reversing every class in the group.
 type FrameworkVariantComparisonGroup struct {
 	// Order is the shared registration number the comparison is keyed on.
@@ -622,7 +622,7 @@ type FrameworkVariantComparisonGroup struct {
 		`// FrameworkVariantRegistrations is every variant the installed Tailwind registers, in registration
 // order.
 //
-// In order rather than sorted by name, so a reader sees the sequence the engine performed and an
+// In order rather than sorted by name, so a reader sees the sequence Tailwind performed and an
 // upgrade's diff shows where a new variant was inserted. Registrations() sorts by name when a
 // caller needs that.
 var FrameworkVariantRegistrations = []FrameworkVariantRegistration{
@@ -664,7 +664,7 @@ var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 	return formatted, nil
 }
 
-// enumerate runs the Node script that asks the real engine.
+// enumerate runs the Node script that asks the real Tailwind.
 //
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.

@@ -48,7 +48,7 @@ func TestMain(suite *testing.M) {
 		os.Exit(runTimingMarginChild(os.Args[1:], os.Stdout, os.Stderr))
 	}
 	// Every run in this process, and every child it starts, reads a system cache of this test binary's own rather
-	// than the person's (#syscache). The engine's test helpers give each run a system cache of its own beside that
+	// than the person's (#syscache). cohere-go's test helpers give each run a system cache of its own beside that
 	// (isolatedSource), and a test that names one on the run (standardLibrarySource's systemCacheRoot), or sets the
 	// variable itself, reads that one.
 	removeSystemCache, isolateError := system_cache_testing.Isolate()
@@ -57,12 +57,12 @@ func TestMain(suite *testing.M) {
 	}
 	testsSystemCache = os.Getenv(system_cache_testing.Variable)
 	// And no go command of this process or its children reads the person's go env file (`go env -w`), whose
-	// `GOFLAGS=-mod=mod` or `GOAMD64` would change what the engine's go commands answer and redden tests that never
+	// `GOFLAGS=-mod=mod` or `GOAMD64` would change what cohere-go's go commands answer and redden tests that never
 	// asked for it (#sfjj2rh, the reader's S6). A test about the file sets one of its own.
 	if setError := os.Setenv("GOENV", "off"); setError != nil {
 		os.Exit(refuse(os.Stderr, setError))
 	}
-	// And no git child of this process or its runs, the engine's own `git ls-files` at a go.work's root among them,
+	// And no git child of this process or its runs, cohere-go's own `git ls-files` at a go.work's root among them,
 	// reads the machine's git configuration (#2htryg8): a person's global config signs, hooks and ignores as the
 	// person set it, and a test's git reads the repository's own alone. Set before testsEnvironment is taken, so
 	// the template and every guard that compares the environment with it hold these too.
@@ -121,15 +121,15 @@ func coldSystemCacheFor(test *testing.T) {
 // sharingSystemCache has a pipeline read from and write to the system cache at root, which every run of a test given
 // the same root shares, as a person's runs share theirs.
 func sharingSystemCache(root string) func(*pipeline) {
-	return func(engine *pipeline) {
-		sharing := engine.request.standardLibrary
+	return func(pipeline *pipeline) {
+		sharing := pipeline.request.standardLibrary
 		sharing.systemCacheRoot = root
-		engine.request.standardLibrary = sharing
-		engine.systemCache = openSystemCache(engine.request, engine.shardStamps)
+		pipeline.request.standardLibrary = sharing
+		pipeline.systemCache = openSystemCache(pipeline.request, pipeline.shardStamps)
 	}
 }
 
-// runIsolated is the engine run over arguments as Main runs it, with registered as the rules and no standard input, and
+// runIsolated is cohere-go run over arguments as Main runs it, with registered as the rules and no standard input, and
 // a plain run's standard library read from and written to a system cache of the run's own (isolatedSource).
 func runIsolated(
 	test *testing.T,
@@ -137,23 +137,23 @@ func runIsolated(
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *engineMemory,
+	memory *memoryAccount,
 ) int {
 	test.Helper()
 	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,
 		isolatedSource(test, standardLibrarySource{}))
 }
 
-// isolatePipeline gives engine a system cache of its own (isolatedSource), unless its request names one: the pipeline
+// isolatePipeline gives pipeline a system cache of its own (isolatedSource), unless its request names one: the pipeline
 // found its own as it was made, from the request it was made with.
 //
-// Mutates: engine gains the system cache, in its request and its own
-func isolatePipeline(test *testing.T, engine *pipeline) {
+// Mutates: pipeline gains the system cache, in its request and its own
+func isolatePipeline(test *testing.T, pipeline *pipeline) {
 	test.Helper()
-	isolated := isolatedSource(test, engine.request.standardLibrary)
-	if isolated.systemCacheRoot != engine.request.standardLibrary.systemCacheRoot {
-		engine.request.standardLibrary = isolated
-		engine.systemCache = openSystemCache(engine.request, engine.shardStamps)
+	isolated := isolatedSource(test, pipeline.request.standardLibrary)
+	if isolated.systemCacheRoot != pipeline.request.standardLibrary.systemCacheRoot {
+		pipeline.request.standardLibrary = isolated
+		pipeline.systemCache = openSystemCache(pipeline.request, pipeline.shardStamps)
 	}
 }
 
@@ -181,7 +181,7 @@ func systemCacheListing(test *testing.T, root string) map[string]string {
 }
 
 // A plain run, its standard library the zero source, reads and writes the system cache `$COHERE_SYSTEM_CACHE` names:
-// a cold run under `--no-cache` writes there every standard-library package it computes, keyed by the engine's own
+// a cold run under `--no-cache` writes there every standard-library package it computes, keyed by cohere-go's own
 // identity, and every later run restores each one, cached and under `--no-cache` alike, the records those of a run
 // without the system cache.
 //
@@ -190,8 +190,8 @@ func TestARunRestoresTheStandardLibraryFromTheSystemCacheItNames(test *testing.T
 	systemCache := test.TempDir()
 	test.Setenv("COHERE_SYSTEM_CACHE", systemCache)
 	root := copyFixture(test, standardLibraryFixture)
-	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
-	cold := runCachedEngine(test, root, "--no-cache")
+	plain := runCached(test, root, "--no-cache", "--no-system-cache")
+	cold := runCached(test, root, "--no-cache")
 	if cold.counts.FromSystemCache != 0 || cold.counts.SystemCacheWritten == 0 {
 		test.Fatalf("want the cold run to write the standard library to the system cache it names, got %+v",
 			cold.counts)
@@ -201,7 +201,7 @@ func TestARunRestoresTheStandardLibraryFromTheSystemCacheItNames(test *testing.T
 	}
 	// Under `--no-cache` first, which makes no store, so the cached run after it is cold for the project.
 	for _, extra := range [][]string{{"--no-cache"}, {}} {
-		read := runCachedEngine(test, root, extra...)
+		read := runCached(test, root, extra...)
 		if read.counts.FromSystemCache != cold.counts.SystemCacheWritten || read.counts.SystemCacheNotKept != "" {
 			test.Errorf("%v: want all %d standard-library packages from the system cache it names, got %+v", extra,
 				cold.counts.SystemCacheWritten, read.counts)
@@ -218,9 +218,9 @@ func TestARunRestoresTheStandardLibraryFromTheSystemCacheItNames(test *testing.T
 func TestNoCacheStillReadsTheSystemCache(test *testing.T) {
 	test.Parallel()
 
-	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, written := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryFixture)
-	read := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	read := runWith(test, root, reading, rules.All(), "--no-cache")
 	if read.counts.On || read.counts.FromSystemCache != written {
 		test.Errorf("want the store off and all %d standard-library packages from the system cache, got %+v",
 			written, read.counts)
@@ -237,7 +237,7 @@ func TestNoCacheStillReadsTheSystemCache(test *testing.T) {
 func TestNoSystemCacheLeavesTheSystemCacheAsItWas(test *testing.T) {
 	test.Parallel()
 
-	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, written := filledSystemCache(test, rules.All(), testsStamp, nil)
 	aged := time.Now().Add(-2 * time.Hour)
 	for path := range systemCacheListing(test, reading.systemCacheRoot) {
 		if timesError := os.Chtimes(path, aged, aged); timesError != nil {
@@ -250,7 +250,7 @@ func TestNoSystemCacheLeavesTheSystemCacheAsItWas(test *testing.T) {
 	}
 	before := systemCacheListing(test, reading.systemCacheRoot)
 	root := copyFixture(test, standardLibraryFixture)
-	off := runEngineWith(test, root, reading, rules.All(), "--no-cache", "--no-system-cache")
+	off := runWith(test, root, reading, rules.All(), "--no-cache", "--no-system-cache")
 	if off.counts.FromSystemCache != 0 || off.counts.SystemCacheWritten != 0 || off.counts.SystemCacheNotKept != "" {
 		test.Errorf("want nothing from or to the system cache under --no-system-cache, got %+v", off.counts)
 	}
@@ -258,7 +258,7 @@ func TestNoSystemCacheLeavesTheSystemCacheAsItWas(test *testing.T) {
 	if len(after) != len(before) || !equalEntries(before, after) {
 		test.Errorf("want the system cache as it was under --no-system-cache, before %v, after %v", before, after)
 	}
-	on := runEngineWith(test, root, reading, rules.All(), "--no-cache")
+	on := runWith(test, root, reading, rules.All(), "--no-cache")
 	if on.counts.FromSystemCache != written || on.withoutCounts != off.withoutCounts {
 		test.Errorf("want all %d packages from the system cache without the switch, and the same records, got %+v\n"+
 			"%s\nunder the switch\n%s", written, on.counts, on.withoutCounts, off.withoutCounts)
@@ -276,8 +276,8 @@ func TestAnUnusableSystemCacheRootIsNotKept(test *testing.T) {
 		test.Fatal(writeError)
 	}
 	root := copyFixture(test, standardLibraryFixture)
-	plain := runEngineWith(test, root, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
-	unusable, standardError := runEngineNoting(test, root, standardLibrarySource{systemCacheRoot: file}, rules.All(),
+	plain := runWith(test, root, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
+	unusable, standardError := runNoting(test, root, standardLibrarySource{systemCacheRoot: file}, rules.All(),
 		nil, "--no-cache")
 	if reason := unusable.counts.SystemCacheNotKept; reason == "" || strings.ContainsAny(reason, "\r\n") {
 		test.Errorf("want one line saying why the system cache was not kept, got %q", reason)
@@ -306,12 +306,12 @@ func TestAColdRunWritesTheSystemCacheAWarmRunRestoresIt(test *testing.T) {
 
 	root := copyFixture(test, standardLibraryFixture)
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
-	cold := runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
+	plain := runCached(test, root, "--no-cache", "--no-system-cache")
+	cold := runWith(test, root, systemCache, rules.All(), "--no-cache")
 	if cold.counts.FromSystemCache != 0 || cold.counts.SystemCacheWritten == 0 {
 		test.Fatalf("want the cold run to restore nothing and write the standard library, got %+v", cold.counts)
 	}
-	warm := runEngineWith(test, root, systemCache, rules.All(), "--no-cache")
+	warm := runWith(test, root, systemCache, rules.All(), "--no-cache")
 	if warm.counts.FromSystemCache != cold.counts.SystemCacheWritten || warm.counts.SystemCacheWritten != 0 {
 		test.Errorf("want every one of the %d packages written cold restored warm, and none written, got %+v",
 			cold.counts.SystemCacheWritten, warm.counts)
@@ -331,14 +331,14 @@ func TestAWarmRunWritesNothingToTheSystemCache(test *testing.T) {
 
 	root := copyFixture(test, standardLibraryFixture)
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	runEngineWith(test, root, systemCache, rules.All())
+	runWith(test, root, systemCache, rules.All())
 	before := systemCacheListing(test, systemCache.systemCacheRoot)
 	if len(before) == 0 {
 		test.Fatal("the cold run wrote nothing to the system cache, so the warm run tells nothing")
 	}
 	// The modification times are the file system's, which a write in the same instant could leave equal.
 	time.Sleep(10 * time.Millisecond)
-	runEngineWith(test, root, systemCache, rules.All())
+	runWith(test, root, systemCache, rules.All())
 	after := systemCacheListing(test, systemCache.systemCacheRoot)
 	if len(after) != len(before) || !equalEntries(before, after) {
 		test.Errorf("want the system cache as the cold run left it, before %v, after %v", before, after)
@@ -367,11 +367,11 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 		}
 		return restored, written
 	}
-	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
+	cold := lintRecordOf(test, runWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if len(cold.Builds) < 2 || cold.Builds[0].SystemCacheWritten == 0 || cold.Builds[0].SystemCacheRestored != 0 {
 		test.Fatalf("want the cold host to write to the system cache and restore nothing, got %+v", cold.Builds)
 	}
-	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
+	warm := lintRecordOf(test, runWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if warm.Builds[0].SystemCacheRestored != cold.Builds[0].SystemCacheWritten ||
 		warm.Builds[0].SystemCacheWritten != 0 {
 		test.Errorf("want the warm host to restore the %d entries the cold one wrote and write none, got %+v",
@@ -385,7 +385,7 @@ func TestTheRecordsSayWhatTheSystemCacheDid(test *testing.T) {
 				restored, written, lint.Cache)
 		}
 	}
-	off := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache",
+	off := lintRecordOf(test, runWith(test, root, systemCache, rules.All(), "--no-cache",
 		"--no-system-cache").stream)
 	if restored, written := summed(off); !off.Cache.SystemCacheOff || off.Cache.FromSystemCache != 0 ||
 		restored+written != 0 {
@@ -410,8 +410,8 @@ func TestAWarmExtraBuildRestoresTheStandardLibraryItWroteFromTheSystemCache(test
 		test.Fatal(writeError)
 	}
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	cold := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
-	warm := lintRecordOf(test, runEngineWith(test, root, systemCache, rules.All(), "--no-cache").stream)
+	cold := lintRecordOf(test, runWith(test, root, systemCache, rules.All(), "--no-cache").stream)
+	warm := lintRecordOf(test, runWith(test, root, systemCache, rules.All(), "--no-cache").stream)
 	if len(warm.Builds) < 2 || len(warm.Builds) != len(cold.Builds) {
 		test.Fatalf("want the warm run to run the cold run's builds and one beside the host's, got %+v", warm.Builds)
 	}
@@ -436,7 +436,7 @@ func TestAWarmExtraBuildRestoresTheStandardLibraryItWroteFromTheSystemCache(test
 func TestAWarmRunMarksTheSystemCacheItReadsUsed(test *testing.T) {
 	test.Parallel()
 
-	reading, written := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	reading, written := filledSystemCache(test, rules.All(), testsStamp, nil)
 	store := systemStoreDirectory(reading.systemCacheRoot)
 	aged := time.Now().Add(-2 * time.Hour)
 	for path := range systemCacheListing(test, store) {
@@ -444,7 +444,7 @@ func TestAWarmRunMarksTheSystemCacheItReadsUsed(test *testing.T) {
 			test.Fatal(timesError)
 		}
 	}
-	warm := runEngineWith(test, copyFixture(test, standardLibraryFixture), reading, rules.All(), "--no-cache")
+	warm := runWith(test, copyFixture(test, standardLibraryFixture), reading, rules.All(), "--no-cache")
 	if warm.counts.FromSystemCache != written {
 		test.Fatalf("want all %d packages restored from the system cache, got %+v", written, warm.counts)
 	}
@@ -484,8 +484,8 @@ func TestAFailedSystemCacheWriteIsWhyItWasNotKept(test *testing.T) {
 		_ = os.Chmod(store, 0o755)
 	})
 	project := copyFixture(test, standardLibraryFixture)
-	plain := runEngineWith(test, project, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
-	unwritable, standardError := runEngineNoting(test, project, standardLibrarySource{systemCacheRoot: root},
+	plain := runWith(test, project, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
+	unwritable, standardError := runNoting(test, project, standardLibrarySource{systemCacheRoot: root},
 		rules.All(), nil, "--no-cache")
 	if reason := unwritable.counts.SystemCacheNotKept; reason == "" || unwritable.counts.SystemCacheWritten != 0 ||
 		unwritable.counts.Problems != 0 {
@@ -501,7 +501,7 @@ func TestAFailedSystemCacheWriteIsWhyItWasNotKept(test *testing.T) {
 	}
 }
 
-// One project's standard-library entries serve another's (#znqfjw2): the system cache is keyed by the engine, the
+// One project's standard-library entries serve another's (#znqfjw2): the system cache is keyed by cohere-go, the
 // standard library's build and its facts, never by the project, so a second module on the same machine restores from
 // the store the first one filled every package both reach, computes only those the first never reached, and reads as
 // it does with no system cache at all. The second module reaches `text/tabwriter`, which the first fixture never
@@ -509,7 +509,7 @@ func TestAFailedSystemCacheWriteIsWhyItWasNotKept(test *testing.T) {
 func TestOneProjectsStandardLibraryEntriesServeAnothers(test *testing.T) {
 	test.Parallel()
 	shared := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	first := runEngineWith(test, copyFixture(test, standardLibraryFixture), shared, rules.All(), "--no-cache")
+	first := runWith(test, copyFixture(test, standardLibraryFixture), shared, rules.All(), "--no-cache")
 	if first.counts.SystemCacheWritten == 0 {
 		test.Fatalf("want the first project to fill the system cache, got %+v", first.counts)
 	}
@@ -528,8 +528,8 @@ func TestOneProjectsStandardLibraryEntriesServeAnothers(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	alone := runEngineWith(test, second, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
-	served := runEngineWith(test, second, shared, rules.All(), "--no-cache")
+	alone := runWith(test, second, standardLibrarySource{}, rules.All(), "--no-cache", "--no-system-cache")
+	served := runWith(test, second, shared, rules.All(), "--no-cache")
 	if served.counts.FromSystemCache == 0 || served.counts.SystemCacheWritten == 0 {
 		test.Errorf("want the second project to restore what the first wrote and write what only it reaches, "+
 			"got %+v", served.counts)

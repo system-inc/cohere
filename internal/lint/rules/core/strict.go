@@ -307,7 +307,7 @@ func strictRemoveDirective(ruleContext rule.Context, directive *ast.Node) rule.F
 // Upstream reads the directive prologue, which is the run of expression statements whose expression
 // is a string literal, starting at the first statement. The scan stops at the first statement that
 // is not one, so a directive after any real code is not a directive at all -- it is a string
-// expression, and the engine ignores it.
+// expression, and the linter ignores it.
 //
 // Only `use strict` counts. Another directive such as `use asm` occupies a prologue slot and is not
 // this rule's business, and upstream's value comparison skips it the same way.

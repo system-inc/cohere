@@ -1,6 +1,6 @@
 package tailwind
 
-// recordedParser answers from what the real engine said, which is what makes this a test of the
+// recordedParser answers from what the real Tailwind said, which is what makes this a test of the
 // gate's bucketing rather than a test of a Go parser that does not exist.
 //
 // Parsing a class correctly needs the theme, so the gate deliberately takes the parse as input. The

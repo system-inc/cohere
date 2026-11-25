@@ -54,7 +54,7 @@ var messageUnusedLabel = rule.Message{
 //
 // oxc declares this fix unconditionally and rewrites the labeled statement to its body every time.
 // ESLint gates the same repair behind three refusals, and each one corresponds to a rewrite that
-// parses and means something different. The engine's guard checks that the rewritten file parses,
+// parses and means something different. The fix pass's guard checks that the rewritten file parses,
 // which makes it blind to exactly these: a fix producing source that parses and misbehaves is the
 // one failure it structurally cannot refuse. So the refusals are ported and the divergence is
 // deliberate.

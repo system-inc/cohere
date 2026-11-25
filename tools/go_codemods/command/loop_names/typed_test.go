@@ -254,9 +254,9 @@ func settled(test *testing.T, source string) (map[int]string, rename.Plan, fixtu
 	return accepted, plan, checked
 }
 
-// TestSettleTakesTheNextNameTheEngineAccepts confirms that a letter whose first name is taken in its scope takes
+// TestSettleTakesTheNextNameTheRenamingAccepts confirms that a letter whose first name is taken in its scope takes
 // its next one, and that a letter whose every name is taken keeps its letter.
-func TestSettleTakesTheNextNameTheEngineAccepts(test *testing.T) {
+func TestSettleTakesTheNextNameTheRenamingAccepts(test *testing.T) {
 	test.Parallel()
 	accepted, _, _ := settled(test, "type testBlock struct{}\n"+
 		"func taken(b *testBlock) { block := 1; _ = block; _ = b }\n"+

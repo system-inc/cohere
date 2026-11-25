@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// Inputs is what a rule's findings may be a function of, declared for every rule so that the engine judges a rule per
+// Inputs is what a rule's findings may be a function of, declared for every rule so that cohere-go judges a rule per
 // declaration across builds (#ewgh523) only where its findings really are per declaration, and a test holds each rule
 // to what it declares (#h350vqr). A unit is one top-level declaration: a function with its body, a type, or a var or
 // const spec. Nothing serializes the values, so they are spelled as the house spells string literal types.

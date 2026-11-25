@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// Every engine run of a pair carries its side's own `COHERE_SYSTEM_CACHE` (#syscache), whatever the pair's own
+// Every Go child run of a pair carries its side's own `COHERE_SYSTEM_CACHE` (#syscache), whatever the pair's own
 // environment named, so a pair controls what each side's system cache holds rather than inherit the person's.
-func TestAnEngineRunCarriesItsSidesSystemCache(test *testing.T) {
+func TestAGoChildRunCarriesItsSidesSystemCache(test *testing.T) {
 	test.Parallel()
 	output := test.TempDir()
 	base := sideSystemCache(output, sideBase)
-	environment := engineEnvironment([]string{"COHERE_SYSTEM_CACHE=/the/person/s/own", "GOFLAGS=-tags=x",
+	environment := goChildEnvironment([]string{"COHERE_SYSTEM_CACHE=/the/person/s/own", "GOFLAGS=-tags=x",
 		"HOME=/home"}, "/corpus", base)
 	if !slices.Contains(environment, "COHERE_SYSTEM_CACHE="+base) ||
 		slices.Contains(environment, "COHERE_SYSTEM_CACHE=/the/person/s/own") {

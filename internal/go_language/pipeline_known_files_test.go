@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 )
 
-// plainRun runs the engine over root as a plain run does, writing and with the findings cache on, and returns the
+// plainRun runs cohere-go over root as a plain run does, writing and with the findings cache on, and returns the
 // pipeline it ran, so a test reads what the fix phase held.
 func plainRun(test *testing.T, root string) *pipeline {
 	test.Helper()
@@ -36,13 +36,17 @@ func plainRun(test *testing.T, root string) *pipeline {
 	}
 	// What the description started beside its reads ends before the test and its directory do.
 	test.Cleanup(described.awaitStarted)
-	engine := newPipeline(request, described, ruleSettings, registered, &bytes.Buffer{}, io.Discard, nil)
-	isolatePipeline(test, engine)
-	engine.run()
-	if engine.session == nil || engine.fix == nil {
-		test.Fatalf("the run had no findings cache (%t) or no fix phase (%t)", engine.session == nil, engine.fix == nil)
+	pipeline := newPipeline(request, described, ruleSettings, registered, &bytes.Buffer{}, io.Discard, nil)
+	isolatePipeline(test, pipeline)
+	pipeline.run()
+	if pipeline.session == nil || pipeline.fix == nil {
+		test.Fatalf(
+			"the run had no findings cache (%t) or no fix phase (%t)",
+			pipeline.session == nil,
+			pipeline.fix == nil,
+		)
 	}
-	return engine
+	return pipeline
 }
 
 // goFileBytes is every Go file under root by absolute path, as it is on disk.

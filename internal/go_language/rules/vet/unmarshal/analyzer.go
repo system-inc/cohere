@@ -1,7 +1,7 @@
 // Package unmarshal is vet's unmarshal pass, a value passed to json, xml or asn1's Unmarshal, or to the Decode method
 // of json, gob or xml's Decoder, that is neither a pointer nor an interface. Each decodes into what its argument
 // points to, so a value that points nowhere is filled by nothing and the call only reports an error at run time. An
-// interface, `any` among them, or a type parameter may hold a pointer, so neither is judged. It sits on the engine's
+// interface, `any` among them, or a type parameter may hold a pointer, so neither is judged. It sits on cohere-go's
 // syntax dispatcher, hearing each call on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/unmarshal/unmarshal.go, whose

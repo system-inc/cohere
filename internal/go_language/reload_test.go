@@ -47,18 +47,18 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 	// One system cache for every run, as a person's, so each run after the first restores the standard library the
 	// first wrote, and the counts below are of the module's packages alone.
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	cold := runEngineAnsweringInPart(test, root, systemCache, rules.All(), inPart)
+	cold := runAnsweringInPart(test, root, systemCache, rules.All(), inPart)
 	if cold.counts.Reloads != 0 || cold.counts.Written == 0 {
 		test.Fatalf("want a cold run that wrote its entries and reloaded nothing, got %+v", cold.counts)
 	}
 
 	appendToTop(test, root, dropCalls)
-	edited := runEngineWith(test, root, systemCache, rules.All())
+	edited := runWith(test, root, systemCache, rules.All())
 	if strings.Count(edited.stream, `"rule":"cohere-go/SA4017"`) != 2 {
 		test.Fatalf("want SA4017's two findings, on the dropped calls to bottom.Double and side.Triple, got\n%s",
 			edited.stream)
 	}
-	uncached := runCachedEngine(test, root, "--no-cache")
+	uncached := runCached(test, root, "--no-cache")
 	if edited.withoutCounts != uncached.withoutCounts {
 		test.Fatalf("after the reload\n%s\nunder --no-cache\n%s", edited.withoutCounts, uncached.withoutCounts)
 	}
@@ -68,7 +68,7 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 	}
 
 	appendToTop(test, root, "\n// Edited again, so top misses and asks again.\n")
-	stored := runEngineWith(test, root, systemCache, rules.All())
+	stored := runWith(test, root, systemCache, rules.All())
 	if stored.counts.Reloads != 0 || stored.counts.Missed != edited.counts.Missed-edited.counts.Reloads {
 		test.Fatalf("want the stored answers read with no reload and only top missed, edited %+v, again %+v",
 			edited.counts, stored.counts)
@@ -86,13 +86,13 @@ func TestAWarmEditOverWholeEntriesReloadsNothing(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "reload-answer"))
-	cold := runCachedEngine(test, root)
+	cold := runCached(test, root)
 	if cold.counts.Reloads != 0 || cold.counts.Written == 0 {
 		test.Fatalf("want a cold run that wrote its entries and reloaded nothing, got %+v", cold.counts)
 	}
 
 	appendToTop(test, root, dropCalls)
-	edited := runCachedEngine(test, root)
+	edited := runCached(test, root)
 	if edited.counts.Reloads != 0 || edited.counts.ReloadRounds != 0 {
 		test.Fatalf("want bottom and side answered from their whole entries, nothing reloaded, got %+v",
 			edited.counts)
@@ -101,7 +101,7 @@ func TestAWarmEditOverWholeEntriesReloadsNothing(test *testing.T) {
 		test.Fatalf("want SA4017's two findings, on the dropped calls to bottom.Double and side.Triple, got\n%s",
 			edited.stream)
 	}
-	uncached := runCachedEngine(test, root, "--no-cache")
+	uncached := runCached(test, root, "--no-cache")
 	if edited.withoutCounts != uncached.withoutCounts {
 		test.Fatalf("from the whole entries\n%s\nunder --no-cache\n%s", edited.withoutCounts, uncached.withoutCounts)
 	}
@@ -115,7 +115,7 @@ func TestAReplayedAnswerIsCountedWithTheCacheAndWithout(test *testing.T) {
 
 	root := copyFixture(test, filepath.Join("testdata", "replay-answer"))
 	for _, extra := range [][]string{nil, {"--no-cache"}} {
-		ran := runCachedEngine(test, root, extra...)
+		ran := runCached(test, root, extra...)
 		if ran.counts.Replays == 0 || ran.counts.Reloads != 0 {
 			test.Fatalf("want the nilness of Inner answered by a replay and nothing reloaded, with %v, got %+v", extra,
 				ran.counts)
@@ -133,17 +133,17 @@ func TestAStandardLibraryEntryWithAnswersInPartIsReloaded(test *testing.T) {
 
 	root := copyFixture(test, filepath.Join("testdata", "reload-answer"))
 	systemCache := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	cold := runEngineAnsweringInPart(test, root, systemCache, rules.All(), map[string]bool{"os": true})
+	cold := runAnsweringInPart(test, root, systemCache, rules.All(), map[string]bool{"os": true})
 	if cold.counts.SystemCacheWritten == 0 || cold.counts.Reloads != 0 {
 		test.Fatalf("want a cold run that wrote the standard library to the system cache and reloaded nothing, got %+v",
 			cold.counts)
 	}
 	appendToTop(test, root, dropCalls)
-	edited := runEngineWith(test, root, systemCache, rules.All())
+	edited := runWith(test, root, systemCache, rules.All())
 	if edited.counts.FromSystemCache == 0 || edited.counts.Reloads == 0 || edited.counts.ReloadRounds == 0 {
 		test.Errorf("want os restored from the system cache, its missing answer reloading it, got %+v", edited.counts)
 	}
-	plain := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
+	plain := runCached(test, root, "--no-cache", "--no-system-cache")
 	if edited.withoutCounts != plain.withoutCounts {
 		test.Errorf("after the reload\n%s\nwithout either cache\n%s", edited.withoutCounts, plain.withoutCounts)
 	}

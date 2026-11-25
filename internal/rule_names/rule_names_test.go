@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-// The names are every engine's: a TypeScript port's upstream name, a house rule of each engine, and as many as
+// The names are every language's: a TypeScript port's upstream name, a house rule of each language, and as many as
 // documentation/data/rules.json counts. That they are the names the registries render now, in rules.json's order,
 // is internal/documentation_data's freshness check, which holds this package's generated file as it holds the
 // website's data.
-func TestRuleNamesAreEveryEnginesRules(test *testing.T) {
+func TestRuleNamesAreEveryLanguagesRules(test *testing.T) {
 	test.Parallel()
 	names := RuleNames()
 	for _, name := range []string{

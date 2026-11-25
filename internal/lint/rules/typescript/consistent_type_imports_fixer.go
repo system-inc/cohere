@@ -18,7 +18,7 @@ import (
 // # Why one edit
 //
 // Upstream's fixer yields several primitive edits per report: an insertion before the declaration,
-// ` type` after the `import` keyword, a removal per moved specifier. Our engine flattens a report's
+// ` type` after the `import` keyword, a removal per moved specifier. Our fix pass flattens a report's
 // fixes into independent proposals and refuses two insertions at one point as a mutual overlap,
 // measured at zero applied and 1024 rejections for upstream's ordinary split. So this file computes
 // the same primitive edits upstream does, applies them to a copy of the declaration's own text, and

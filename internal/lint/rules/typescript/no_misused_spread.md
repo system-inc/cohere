@@ -32,7 +32,7 @@ So cohere is silent where the gate reports, on the four string sites ahra had:
 | `modules/pensieve/PensieveDailyQuotes.ts:201`                          | ignored characters filtered out             |
 
 ESLint draws the same line through Nexus's `NexusTypeScriptEsLintPlugin`, whose wrapper of this rule
-drops `noStringSpread` (Nexus 4e3395d), so the engines agree on all four (#cn8sthd). The fixture is
+drops `noStringSpread` (Nexus 4e3395d), so the linters agree on all four (#cn8sthd). The fixture is
 `TestNoMisusedSpreadLeavesStringSpreadAlone`: upstream invalid 0 through 13 verbatim, the four ahra
 sites, the constructor shape, and a control proving the object cascade still reports in the same
 harness. The `allow` option is kept for parity of the option surface; nothing in ahra sets it.

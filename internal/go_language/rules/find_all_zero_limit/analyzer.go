@@ -47,6 +47,6 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1010",
 	"SA1010",
 	"Flags a FindAll method of *regexp.Regexp called with n == 0, which always returns no results: staticcheck's "+
-		"SA1010, ported onto the engine's own intermediate representation.",
+		"SA1010, ported onto cohere's own intermediate representation.",
 	&Listener,
 )

@@ -7,13 +7,13 @@ import (
 )
 
 // VerdictVariable names the file descriptor the dispatcher listens on for this run's exit code, when it
-// returns to the caller before the engine has finished. See sendVerdict.
+// returns to the caller before the child has finished. See sendVerdict.
 const VerdictVariable = "COHERE_VERDICT_FD"
 
 // verdictFile is where this run's exit code goes the moment the report is out, nil when nobody listens.
 //
 // Taken at startup, marked close-on-exec and removed from the environment, so a process this one starts,
-// the Swift engine or anything else, neither holds the descriptor nor finds the variable pointing at a
+// cohere-swift or anything else, neither holds the descriptor nor finds the variable pointing at a
 // number that means something else in it.
 var verdictFile = takeVerdictFile()
 

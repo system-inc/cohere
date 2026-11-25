@@ -40,7 +40,7 @@ package tailwind
 // upstream's does.
 //
 // It returns a node list rather than a Reading so that the reading is computed by the same
-// `PropertySort` the engine's is, from declarations rather than from a claim about declarations.
+// `PropertySort` Tailwind's is, from declarations rather than from a claim about declarations.
 type FrameworkEmitter func(resolved ResolvedUtilityValue) []*Node
 
 // declareProperty is the emitter shared by every root in this file.

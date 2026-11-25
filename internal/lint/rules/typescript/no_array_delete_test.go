@@ -255,7 +255,7 @@ func TestNoArrayDeleteFires(test *testing.T) {
 // against the output tsgolint records for it.
 //
 // This is the assertion the harness does not supply and the one that can catch what no message id
-// can. ExpectFixedSource applies fixes, and the repair here is a suggestion, which the engine
+// can. ExpectFixedSource applies fixes, and the repair here is a suggestion, which the linter
 // never applies unattended. So the applier below is hand-rolled. It is worth the twenty lines
 // because a finding carrying a repair that deletes the wrong range satisfies its message id
 // perfectly, and every id fixture above stays green over it.
@@ -400,7 +400,7 @@ func TestNoArrayDeleteSuggestions(test *testing.T) {
 				test.Errorf("suggestion id is %q, want %q", suggestions[0].Message.Id, "useSplice")
 			}
 			// Three fixes per suggestion, one per edited token. Pinned because the adapter carries
-			// a fix slice of any length into one diagnostic, and the edit engine judges each
+			// a fix slice of any length into one diagnostic, and the fix pass judges each
 			// proposal independently, so a repair that lost one of the three would still apply the
 			// other two and leave source that parses.
 			if len(suggestions[0].Fixes) != 3 {
@@ -613,7 +613,7 @@ func TestNoArrayDeleteSpans(test *testing.T) {
 				test.Errorf("the suggestion reads %q", finding.Suggestions[0].Message.Description)
 			}
 			// A suggestion rather than a fix, asserted because the distinction is permission. The
-			// engine applies a fix unattended, and splice reindexes the array where delete does not,
+			// fix pass applies a fix unattended, and splice reindexes the array where delete does not,
 			// so this repair changing arms from suggestion to fix would silently rewrite behavior.
 			if len(finding.Fixes) != 0 {
 				test.Errorf(

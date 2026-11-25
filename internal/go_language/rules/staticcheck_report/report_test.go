@@ -86,7 +86,7 @@ var gates = []gate{
 var gateVersions = []string{"go1.1", "go1.18", "go1.20", "go1.21", "go1.22", "go1.23", "go1.999"}
 
 // comparingAnalyzer runs both reporters side by side over a package, its result a comparison. It requires what
-// staticcheck's Report reads, the tokenfile and generated passes, and the engine's own intermediate representation,
+// staticcheck's Report reads, the tokenfile and generated passes, and cohere's own intermediate representation,
 // whose functions and instructions the ported checks report at.
 var comparingAnalyzer = &analysis.Analyzer{
 	Name: "comparereporters",
@@ -99,7 +99,7 @@ var comparingAnalyzer = &analysis.Analyzer{
 }
 
 // The kit's Report and staticcheck's report.Report report side by side at every node of three fixtures, every node of
-// the syntax, every function, parameter and instruction of the engine's own intermediate representation and every
+// the syntax, every function, parameter and instruction of cohere's own intermediate representation and every
 // object the package defines, under every option and every version gate, and each pair of calls must report the same
 // diagnostics, its position, end, message, related information and suggested fixes, or panic alike. The kit's File,
 // LanguageVersion, StandardLibraryVersion, DisplayPosition and HasRange must answer as staticcheck's do at each node

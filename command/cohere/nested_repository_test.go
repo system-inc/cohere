@@ -123,13 +123,13 @@ func TestARunWritesOnlyItsOwnRepository(test *testing.T) {
 func TestTheProjectReadsItsLibrariesDrift(test *testing.T) {
 	test.Parallel()
 	root := nestedTree(test)
-	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
-		return format_files.Enumerate(walkRoot, engine.Handles)
+	formatter := prettierLike()
+	formatter.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, formatter.Handles)
 	}
 	before := treeSnapshot(test, root)
 
-	check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+	check, checkNestedRepositoriesError := checkNestedRepositories(formatter, root, false)
 	if checkNestedRepositoriesError != nil {
 		test.Fatal(checkNestedRepositoriesError)
 	}
@@ -161,13 +161,13 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 	root := nestedTree(test)
 	library := filepath.Join(root, "library")
 	inner := filepath.Join(library, "inner")
-	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
-		return format_files.Enumerate(walkRoot, engine.Handles)
+	formatter := prettierLike()
+	formatter.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, formatter.Handles)
 	}
 	check := func(label string, wantChecked int, wantDrift ...string) {
 		test.Helper()
-		result, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+		result, checkNestedRepositoriesError := checkNestedRepositories(formatter, root, false)
 		if checkNestedRepositoriesError != nil {
 			test.Fatal(checkNestedRepositoriesError)
 		}
@@ -250,7 +250,7 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 	// file no longer formats with, it says nothing and the drift is reported.
 	thing := filepath.Join(library, "source", "Thing.ts")
 	contents := readForTest(test, thing)
-	options, optionsFingerprintError := engine.OptionsFingerprint(thing)
+	options, optionsFingerprintError := formatter.OptionsFingerprint(thing)
 	if optionsFingerprintError != nil {
 		test.Fatal(optionsFingerprintError)
 	}
@@ -277,7 +277,7 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 	// `--format-all` reads every nested file: an entry vouching for Thing.ts's misformatted bytes, under
 	// this formatter's key and options, says nothing to it.
 	vouch(key, options)
-	all, checkNestedRepositoriesError := checkNestedRepositories(engine, root, true)
+	all, checkNestedRepositoriesError := checkNestedRepositories(formatter, root, true)
 	if checkNestedRepositoriesError != nil {
 		test.Fatal(checkNestedRepositoriesError)
 	}
@@ -300,9 +300,9 @@ func TestASignedEntryStillReadsAnEditedFile(test *testing.T) {
 	if createDirectoryError := os.MkdirAll(cache_directory.Of(library), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
-		return format_files.Enumerate(walkRoot, engine.Handles)
+	formatter := prettierLike()
+	formatter.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, formatter.Handles)
 	}
 	// Older than the second a fresh write is left unsigned for.
 	tidy := filepath.Join(library, "source", "Tidy.ts")
@@ -312,7 +312,7 @@ func TestASignedEntryStillReadsAnEditedFile(test *testing.T) {
 	}
 	drifted := func() []string {
 		test.Helper()
-		check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+		check, checkNestedRepositoriesError := checkNestedRepositories(formatter, root, false)
 		if checkNestedRepositoriesError != nil {
 			test.Fatal(checkNestedRepositoriesError)
 		}
@@ -487,9 +487,9 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 	writeTree(test, root, map[string]string{"library/.gitignore": "ignored/\n.cache/\n"})
 	library := filepath.Join(root, "library")
 	inner := filepath.Join(library, "inner")
-	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
-		return format_files.Enumerate(walkRoot, engine.Handles)
+	formatter := prettierLike()
+	formatter.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, formatter.Handles)
 	}
 
 	prepareNestedCacheDirectories(root)
@@ -504,7 +504,7 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 
 	checked := func(label string) int {
 		test.Helper()
-		result, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+		result, checkNestedRepositoriesError := checkNestedRepositories(formatter, root, false)
 		if checkNestedRepositoriesError != nil {
 			test.Fatal(checkNestedRepositoriesError)
 		}
@@ -547,12 +547,12 @@ func TestASubmoduleTheRootsIgnorePatternsNameIsNotRead(test *testing.T) {
 	test.Parallel()
 	root := nestedTree(test)
 	writeTree(test, root, map[string]string{"CohereSettings.json": `{"ignorePatterns":["library/**"]}`})
-	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
-		return format_files.Enumerate(walkRoot, engine.Handles)
+	formatter := prettierLike()
+	formatter.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, formatter.Handles)
 	}
 
-	check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+	check, checkNestedRepositoriesError := checkNestedRepositories(formatter, root, false)
 	if checkNestedRepositoriesError != nil {
 		test.Fatal(checkNestedRepositoriesError)
 	}

@@ -41,7 +41,7 @@ type preferEnumInitializersFinding struct {
 // asserting the message id of a rule whose entire repair surface is three suggestions would leave
 // every one of them unchecked.
 //
-// Back to front so an earlier edit cannot move a later one's offsets, matching what the fix engine
+// Back to front so an earlier edit cannot move a later one's offsets, matching what the fix pass
 // does. Each suggestion here carries exactly one fix, so the ordering is not load-bearing today; it
 // is written correctly anyway rather than relying on that staying true.
 func applyPreferEnumInitializersSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {

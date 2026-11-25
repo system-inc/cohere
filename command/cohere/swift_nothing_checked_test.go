@@ -1,6 +1,6 @@
 //go:build darwin
 
-// The real Swift engine runs only on macOS, where it ships.
+// The real cohere-swift runs only on macOS, where it ships.
 
 package main
 
@@ -16,39 +16,39 @@ import (
 	"github.com/system-inc/cohere/internal/release/dispatch"
 )
 
-// realSwiftEngine is the engine built from this checkout's swift/, resolved once for the test binary as a development
+// realSwiftBinary is the child built from this checkout's swift/, resolved once for the test binary as a development
 // run resolves it: reused while its sources are unchanged, built when they moved.
-var realSwiftEngine struct {
+var realSwiftBinary struct {
 	once         sync.Once
 	path         string
 	resolveError error
 }
 
-// builtSwiftEngine is the path of the engine a development cohere would run, built from this checkout's sources.
-func builtSwiftEngine(test *testing.T) string {
+// builtSwiftBinary is the path of the child a development cohere would run, built from this checkout's sources.
+func builtSwiftBinary(test *testing.T) string {
 	test.Helper()
-	realSwiftEngine.once.Do(func() {
+	realSwiftBinary.once.Do(func() {
 		moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
 		if findModuleDirectoryError != nil {
-			realSwiftEngine.resolveError = findModuleDirectoryError
+			realSwiftBinary.resolveError = findModuleDirectoryError
 			return
 		}
 		versionOutput, swiftVersionOutputError := dispatch.SwiftVersionOutput()
 		if swiftVersionOutputError != nil {
-			realSwiftEngine.resolveError = swiftVersionOutputError
+			realSwiftBinary.resolveError = swiftVersionOutputError
 			return
 		}
-		realSwiftEngine.path, _, realSwiftEngine.resolveError = dispatch.ResolveSwiftEngine(
+		realSwiftBinary.path, _, realSwiftBinary.resolveError = dispatch.ResolveSwiftBinary(
 			dispatch.DefaultPaths(moduleDirectory),
 			"",
-			engineContractVersion,
+			contractVersion,
 			versionOutput,
 		)
 	})
-	if realSwiftEngine.resolveError != nil {
-		test.Fatalf("cannot resolve the Swift engine: %v", realSwiftEngine.resolveError)
+	if realSwiftBinary.resolveError != nil {
+		test.Fatalf("cannot resolve cohere-swift: %v", realSwiftBinary.resolveError)
 	}
-	return realSwiftEngine.path
+	return realSwiftBinary.path
 }
 
 // toolsWithoutGit is a directory holding the tools a Swift run starts and nothing else, git least of all, so a run
@@ -132,26 +132,27 @@ type swiftJsonSummary struct {
 	} `json:"gaps"`
 }
 
-// A Swift package whose every source file git ignores fails through the front door, with the real engine built from
-// this checkout and no git on PATH: exit 1, `--json`'s verdict "fail", and the footer and `gaps.excluded` naming the
-// `.gitignore` line that ignored the file, which only the engine's excluded record carries. The same package with the
+// A Swift package whose every source file git ignores fails through the front door, with the real cohere-swift built
+// from this checkout and no git on PATH: exit 1, `--json`'s verdict "fail", and the footer and `gaps.excluded` naming
+// the
+// `.gitignore` line that ignored the file, which only the child's excluded record carries. The same package with the
 // file force-added, which git tracks and so never ignores, passes with the file checked, as does a package with
 // nothing ignored (#08cv2mp).
 //
-// It builds the engine when this checkout's Swift sources changed since the last build, which takes minutes, so -short
+// It builds the child when this checkout's Swift sources changed since the last build, which takes minutes, so -short
 // leaves it out.
 func TestARealSwiftRunThatExcludedEveryFileFails(test *testing.T) {
 	test.Parallel()
 	if testing.Short() {
-		test.Skip("runs the real Swift engine, built from this checkout when its sources changed")
+		test.Skip("runs the real cohere-swift, built from this checkout when its sources changed")
 	}
 	binary := buildCohere(test)
 	environment := []string{
-		dispatch.SwiftEngineOverrideVariable + "=" + builtSwiftEngine(test),
+		dispatch.SwiftBinaryOverrideVariable + "=" + builtSwiftBinary(test),
 		"PATH=" + toolsWithoutGit(test),
 	}
 	// run is a `--no-fix` run at root: its standard output, and with `--json` nothing else, since the line saying
-	// which engine ran goes to standard error, and its exit code.
+	// which language ran goes to standard error, and its exit code.
 	run := func(test *testing.T, root string, arguments ...string) (string, int) {
 		test.Helper()
 		command := exec.Command(binary, append([]string{"--no-fix"}, arguments...)...)

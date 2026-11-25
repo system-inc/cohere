@@ -115,7 +115,7 @@ func asksForVerbose(arguments []string) bool {
 	return false
 }
 
-// waitIsRequested reports whether the environment asks the dispatcher to wait for the engine to finish
+// waitIsRequested reports whether the environment asks the dispatcher to wait for cohere to finish
 // everything, its cache write included, rather than return when the verdict is out. CI always waits: a job
 // that ends while its cache is still being written can lose the write to the runner tearing down.
 func waitIsRequested() bool {
@@ -132,7 +132,7 @@ func waitIsRequested() bool {
 // the status would be one more layer able to lose a non-zero exit, and losing a non-zero exit is how a
 // gate goes quietly green.
 //
-// Otherwise it returns early. The engine's report is the caller's answer, and after printing it the engine
+// Otherwise it returns early. cohere's report is the caller's answer, and after printing it cohere
 // still records the run, writes its cache table and gives back a heap of several gigabytes, about 85ms on
 // ahra that nobody needs to wait for (#zqsdzbq). So the binary runs as a child holding one more descriptor,
 // and the moment it writes its exit code there, this process exits with that code while the child finishes

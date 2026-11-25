@@ -442,7 +442,7 @@ var applyCases = []applyCase{
 		changedWanted: wantedOutcome{kept: []string{"printf@4"}},
 	},
 	{
-		name:     "the two engine rules are never withheld",
+		name:     "the two pipeline rules are never withheld",
 		findings: []string{"consistency-no-unused-ignore@3", "printf@3"},
 		source: []string{
 			"package fixture",
@@ -659,7 +659,7 @@ func TestApplyKeepsTheFirstIndexOfAFileEvenWithNoDirective(test *testing.T) {
 	}
 }
 
-// TestBuildConcurrently builds and applies from many goroutines at once, as the engine does per package.
+// TestBuildConcurrently builds and applies from many goroutines at once, as cohere-go does per package.
 func TestBuildConcurrently(test *testing.T) {
 	test.Parallel()
 	source := []byte("package fixture\n//cohere:ignore printf the format is built at run time\nvar first = risky()\n")

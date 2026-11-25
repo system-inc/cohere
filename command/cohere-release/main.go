@@ -48,7 +48,7 @@ func run() error {
 	swiftScratch := flag.String(
 		"swift-scratch",
 		"",
-		"where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output",
+		"where SwiftPM builds cohere-swift; the user cache directory when empty, never inside --output",
 	)
 	flag.Parse()
 

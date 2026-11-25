@@ -23,7 +23,7 @@ func (evaluator *UtilityEvaluator) Has(root string) bool {
 // Reading returns the `{order, count}` reading of a functional candidate against its `@utility`
 // definition, and whether the candidate compiles at all.
 //
-// A false return is a candidate the engine rejects, which is a null reading rather than an empty
+// A false return is a candidate Tailwind rejects, which is a null reading rather than an empty
 // one. The distinction decides sort position: an empty order sorts last, and a control in Phase 0
 // that read a rejection as `[]#0` reported 365,174 spurious mismatches while the model was fine.
 func (evaluator *UtilityEvaluator) Reading(candidate *ParsedCandidate) (Reading, bool) {

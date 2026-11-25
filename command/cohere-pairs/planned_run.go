@@ -10,7 +10,7 @@ const (
 	modeNoCache = "no-cache"
 )
 
-// plannedRun is one run of the engine the schedule holds.
+// plannedRun is one run of the Go child the schedule holds.
 type plannedRun struct {
 	corpus string
 	round  int

@@ -167,24 +167,24 @@ func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
 	}
 }
 
-// TestTheGoExampleLoadsInTheGoEngine: the TypeScript loader only leaves the go block alone, so the block the
+// TestTheGoExampleLoadsInCohereGo: the TypeScript loader only leaves the go block alone, so the block the
 // reference documents is held to the loader that reads it, knowing the rule the example names.
-func TestTheGoExampleLoadsInTheGoEngine(test *testing.T) {
+func TestTheGoExampleLoadsInCohereGo(test *testing.T) {
 	test.Parallel()
 	path := writeSettings(test, keyFixtures["go"])
 	knownRules := []string{"cohere-go/performance-require-parallel-test"}
 	if _, loadError := settings.Load(filepath.Dir(path), path, knownRules, nil); loadError != nil {
-		test.Errorf("the reference's go example is refused by the Go engine: %v", loadError)
+		test.Errorf("the reference's go example is refused by cohere-go: %v", loadError)
 	}
 }
 
-// goBlockRule is the one rule the go blocks below name, and the one the Go engine is told it knows.
+// goBlockRule is the one rule the go blocks below name, and the one cohere-go is told it knows.
 const goBlockRule = "cohere-go/performance-require-parallel-test"
 
-// goBlocks are go blocks of every shape the Go engine accepts and every shape it refuses. Each is judged by
-// both the engine and the published schema, and neither verdict is written here, so the list needs no
-// upkeep beyond a new shape. A rule name the engine does not know is left out on purpose: the schema leaves
-// names open, since the Go engine's registry is not the one this package lists, and the engine refuses them.
+// goBlocks are go blocks of every shape cohere-go accepts and every shape it refuses. Each is judged by
+// both the language and the published schema, and neither verdict is written here, so the list needs no
+// upkeep beyond a new shape. A rule name the language does not know is left out on purpose: the schema leaves
+// names open, since cohere-go's registry is not the one this package lists, and the language refuses them.
 var goBlocks = []string{
 	`{"rules": {}}`,
 	`{"rules": {"` + goBlockRule + `": "error"}}`,
@@ -235,22 +235,22 @@ var goBlocks = []string{
 	`{"rules": {}, "departures": {"` + goBlockRule + `": ["why"]}}`,
 }
 
-// TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts: every go block above is read by
+// TestTheGoSchemaAcceptsExactlyWhatCohereGoAccepts: every go block above is read by
 // internal/go_language/settings and validated against the go block of the published schema, and the two
-// verdicts must agree in both directions, so an editor never passes a block the engine refuses (`{}` once
+// verdicts must agree in both directions, so an editor never passes a block the language refuses (`{}` once
 // did, before the schema required rules) or flags one it reads.
-func TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts(test *testing.T) {
+func TestTheGoSchemaAcceptsExactlyWhatCohereGoAccepts(test *testing.T) {
 	test.Parallel()
 	goSchema := compiledGoSchema(test)
 	for _, block := range goBlocks {
 		path := writeSettings(test, map[string]string{"CohereSettings.json": `{"go": ` + block + `}`})
-		_, engineError := settings.Load(filepath.Dir(path), path, []string{goBlockRule}, nil)
+		_, loadError := settings.Load(filepath.Dir(path), path, []string{goBlockRule}, nil)
 		schemaError := goSchema.Validate([]json.RawMessage{json.RawMessage(block)})
 		switch {
-		case engineError != nil && schemaError == nil:
-			test.Errorf("the schema accepts the go block %s, and the engine refuses it: %v", block, engineError)
-		case engineError == nil && schemaError != nil:
-			test.Errorf("the schema refuses the go block %s, and the engine reads it: %v", block, schemaError)
+		case loadError != nil && schemaError == nil:
+			test.Errorf("the schema accepts the go block %s, and the language refuses it: %v", block, loadError)
+		case loadError == nil && schemaError != nil:
+			test.Errorf("the schema refuses the go block %s, and the language reads it: %v", block, schemaError)
 		}
 	}
 }

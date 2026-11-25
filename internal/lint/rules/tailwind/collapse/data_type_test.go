@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// The fixture is what the shipped Tailwind 4.3.3 engine answered for every shape in the corpus,
+// The fixture is what the shipped Tailwind 4.3.3 answered for every shape in the corpus,
 // captured by internal/lint/rules/tailwind/tools/generate_data_type and checked in next to this test.
 //
-// Measured rather than transcribed, because reading the source and asking the engine are different
+// Measured rather than transcribed, because reading the source and asking Tailwind are different
 // claims and they disagree in ways a careful reader would not predict. Two examples that this suite
 // would have gotten wrong if the expectations had been hand-written from infer-data-type.ts:
 // `serif` answers family-name rather than generic-name, and `1 2 3` answers line-width rather than
@@ -30,7 +30,7 @@ type dataTypeCorpus struct {
 	Cases                     []dataTypeCase `json:"cases"`
 }
 
-// dataTypeCase is one value and everything the engine said about it.
+// dataTypeCase is one value and everything Tailwind said about it.
 type dataTypeCase struct {
 	Value string `json:"value"`
 	// All is the answer with the full type list in declaration order: what a caller passing
@@ -46,7 +46,7 @@ type dataTypeCase struct {
 	// IsLength and IsPositiveInteger are the two exported helpers, asked directly.
 	IsLength          bool `json:"isLength"`
 	IsPositiveInteger bool `json:"isPositiveInteger"`
-	// SegmentComma and SegmentSpace are the engine's own splitter, recorded so that segment can be
+	// SegmentComma and SegmentSpace are Tailwind's own splitter, recorded so that segment can be
 	// tested directly rather than only through the answers it feeds.
 	SegmentComma []string `json:"segmentComma"`
 	SegmentSpace []string `json:"segmentSpace"`
@@ -70,7 +70,7 @@ func loadDataTypeCorpus(test *testing.T) dataTypeCorpus {
 	}
 	if !corpus.SegmentResolved {
 		test.Fatal(
-			"fixture was generated without resolving the engine's segment; its segment columns are not measurements",
+			"fixture was generated without resolving Tailwind's segment; its segment columns are not measurements",
 		)
 	}
 	if !corpus.IsLengthResolved || !corpus.IsPositiveIntegerResolved {
@@ -79,33 +79,38 @@ func loadDataTypeCorpus(test *testing.T) dataTypeCorpus {
 		)
 	}
 	if len(corpus.Types) != 17 {
-		test.Fatalf("fixture carries %d types; the engine declares 17", len(corpus.Types))
+		test.Fatalf("fixture carries %d types; Tailwind declares 17", len(corpus.Types))
 	}
 	return corpus
 }
 
-// TestInferDataTypeMatchesEngine is the whole point of this package's test suite: every answer, for
-// every shape, compared against what the shipped engine said.
-func TestInferDataTypeMatchesEngine(test *testing.T) {
+// TestInferDataTypeMatchesTailwind is the whole point of this package's test suite: every answer, for
+// every shape, compared against what the shipped Tailwind said.
+func TestInferDataTypeMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadDataTypeCorpus(test)
 
 	comparisons := 0
 	for _, testCase := range corpus.Cases {
 		if got := InferDataType(testCase.Value, corpus.Types); got != testCase.All {
-			test.Errorf("InferDataType(%q, allTypes) = %q, engine says %q", testCase.Value, got, testCase.All)
+			test.Errorf("InferDataType(%q, allTypes) = %q, Tailwind says %q", testCase.Value, got, testCase.All)
 		}
 		comparisons++
 
 		if got := InferDataType(testCase.Value, corpus.ReversedTypes); got != testCase.Reversed {
-			test.Errorf("InferDataType(%q, reversedTypes) = %q, engine says %q", testCase.Value, got, testCase.Reversed)
+			test.Errorf(
+				"InferDataType(%q, reversedTypes) = %q, Tailwind says %q",
+				testCase.Value,
+				got,
+				testCase.Reversed,
+			)
 		}
 		comparisons++
 
 		for _, dataType := range corpus.Types {
 			want := testCase.PerType[dataType]
 			if got := InferDataType(testCase.Value, []DataType{dataType}); got != want {
-				test.Errorf("InferDataType(%q, [%q]) = %q, engine says %q", testCase.Value, dataType, got, want)
+				test.Errorf("InferDataType(%q, [%q]) = %q, Tailwind says %q", testCase.Value, dataType, got, want)
 			}
 			comparisons++
 		}
@@ -115,18 +120,18 @@ func TestInferDataTypeMatchesEngine(test *testing.T) {
 		comparisons, len(corpus.Cases), corpus.TailwindVersion, corpus.Chunk)
 }
 
-// TestExportedPredicatesMatchEngine covers IsLength and IsPositiveInteger directly, since callers
+// TestExportedPredicatesMatchTailwind covers IsLength and IsPositiveInteger directly, since callers
 // reach for them without going through a type list.
-func TestExportedPredicatesMatchEngine(test *testing.T) {
+func TestExportedPredicatesMatchTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadDataTypeCorpus(test)
 
 	for _, testCase := range corpus.Cases {
 		if got := IsLength(testCase.Value); got != testCase.IsLength {
-			test.Errorf("IsLength(%q) = %v, engine says %v", testCase.Value, got, testCase.IsLength)
+			test.Errorf("IsLength(%q) = %v, Tailwind says %v", testCase.Value, got, testCase.IsLength)
 		}
 		if got := IsPositiveInteger(testCase.Value); got != testCase.IsPositiveInteger {
-			test.Errorf("IsPositiveInteger(%q) = %v, engine says %v", testCase.Value, got, testCase.IsPositiveInteger)
+			test.Errorf("IsPositiveInteger(%q) = %v, Tailwind says %v", testCase.Value, got, testCase.IsPositiveInteger)
 		}
 	}
 }
@@ -211,19 +216,19 @@ func TestUnknownTypeMatchesNothing(test *testing.T) {
 	}
 }
 
-// TestAllDataTypesIsTheEnginesOrder guards the convenience list against drift, since first-match-wins
+// TestAllDataTypesIsTailwindsOrder guards the convenience list against drift, since first-match-wins
 // makes its order behavior rather than presentation.
-func TestAllDataTypesIsTheEnginesOrder(test *testing.T) {
+func TestAllDataTypesIsTailwindsOrder(test *testing.T) {
 	test.Parallel()
 	corpus := loadDataTypeCorpus(test)
 	all := AllDataTypes()
 
 	if len(all) != len(corpus.Types) {
-		test.Fatalf("AllDataTypes has %d entries, engine declares %d", len(all), len(corpus.Types))
+		test.Fatalf("AllDataTypes has %d entries, Tailwind declares %d", len(all), len(corpus.Types))
 	}
 	for index, dataType := range corpus.Types {
 		if all[index] != dataType {
-			test.Errorf("AllDataTypes()[%d] = %q, engine declares %q", index, all[index], dataType)
+			test.Errorf("AllDataTypes()[%d] = %q, Tailwind declares %q", index, all[index], dataType)
 		}
 	}
 
@@ -234,7 +239,7 @@ func TestAllDataTypesIsTheEnginesOrder(test *testing.T) {
 	}
 }
 
-// TestSegmentMatchesEngine compares the splitter directly against the engine's own.
+// TestSegmentMatchesTailwind compares the splitter directly against Tailwind's own.
 //
 // This test exists because of a measured gap rather than for completeness. Breaking bracket nesting
 // in segment (making `[` stop pushing a closer, so `[a,b]` splits into two parts) changes the
@@ -247,7 +252,7 @@ func TestAllDataTypesIsTheEnginesOrder(test *testing.T) {
 // about to have other callers in this port (the candidate parser and the value parser both need
 // it), and a splitter verified only by the one consumer that cannot see its mistakes is verified
 // for that consumer alone.
-func TestSegmentMatchesEngine(test *testing.T) {
+func TestSegmentMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadDataTypeCorpus(test)
 
@@ -262,13 +267,13 @@ func TestSegmentMatchesEngine(test *testing.T) {
 		} {
 			got := segment(testCase.Value, separator.character)
 			if len(got) != len(separator.want) {
-				test.Errorf("segment(%q, %q) = %q (%d parts), engine says %q (%d parts)",
+				test.Errorf("segment(%q, %q) = %q (%d parts), Tailwind says %q (%d parts)",
 					testCase.Value, string(separator.character), got, len(got), separator.want, len(separator.want))
 				continue
 			}
 			for index := range got {
 				if got[index] != separator.want[index] {
-					test.Errorf("segment(%q, %q)[%d] = %q, engine says %q",
+					test.Errorf("segment(%q, %q)[%d] = %q, Tailwind says %q",
 						testCase.Value, string(separator.character), index, got[index], separator.want[index])
 				}
 			}

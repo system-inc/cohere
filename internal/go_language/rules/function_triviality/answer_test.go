@@ -90,7 +90,7 @@ func askRoots(test *testing.T, patterns ...string) askedRun {
 	options := check.DispatchOptions()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	heard := &heardAnswers{encoded: map[string][]byte{}}
 	resolver.HoldAnswers(heard)
@@ -227,7 +227,7 @@ func TestAnAnswerNamesTheDeclarationEnclosingALiteralInsideALiteral(test *testin
 	}
 }
 
-// A declaration under a //line directive is named as the engine keys a unit: by the file the directive names, as
+// A declaration under a //line directive is named as cohere-go keys a unit: by the file the directive names, as
 // token.Position renders it, beside the file that holds the directive, and by the offset of the declaration's first
 // byte in the file as parsed, which no directive moves. The want is built from the fixture's own bytes, by no file
 // set.

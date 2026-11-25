@@ -445,7 +445,7 @@ var flagValue = types.NewInterfaceType([]*types.Func{
 
 // unreferencedFlagSettersOf is each Set method of reached whose receiver is a flag.Value that the reach never refers
 // to: no call, method value or method expression of it. Only flag's own call through the interface reaches it, which
-// the engine makes from configureRules (options.go), once in the process, before any pass, with what the
+// cohere-go makes from configureRules (options.go), once in the process, before any pass, with what the
 // settings give.
 func unreferencedFlagSettersOf(reached []*packages.Package) map[*types.Func]bool {
 	callers, fromInitialization, otherwise := functionReferencesOf(reached)

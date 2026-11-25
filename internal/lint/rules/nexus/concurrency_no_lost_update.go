@@ -61,7 +61,7 @@ func concurrencyNoLostUpdateStoreMessage(read string) rule.Message {
 //
 // # Where it came from
 //
-// Kirk's ruling of 2026-10-01, replacing `require-atomic-updates`, which is off in both engines.
+// Kirk's ruling of 2026-10-01, replacing `require-atomic-updates`, which is off in both languages.
 // Upstream reports any write after an await to something read before it, and on ahra none of its 39
 // findings was a read-modify-write: they were timestamps, flags, cached tokens and restores in
 // `finally`. This rule asks the narrower question that names an actual lost update.

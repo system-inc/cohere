@@ -11,7 +11,7 @@ import (
 // held lowercased, since it matches a function's name in any case.
 type stringSet map[string]bool
 
-// String is the set's names, sorted and joined by commas, the flag's value as the engine's keys read it.
+// String is the set's names, sorted and joined by commas, the flag's value as cohere-go's keys read it.
 func (set stringSet) String() string {
 	return strings.Join(slices.Sorted(maps.Keys(set)), ",")
 }

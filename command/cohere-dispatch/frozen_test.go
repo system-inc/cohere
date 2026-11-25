@@ -37,7 +37,7 @@ func writeFrozenModule(test *testing.T) string {
 	if createDirectoryError := os.MkdirAll(binaries, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	stub := "#!/bin/sh\necho 'the stub engine on stdout'\necho 'the stub engine on stderr' >&2\n"
+	stub := "#!/bin/sh\necho 'the stub cohere on stdout'\necho 'the stub cohere on stderr' >&2\n"
 	if writeError := executable_testing.WriteFile(
 		filepath.Join(binaries, stagedBinaryName),
 		[]byte(stub),
@@ -51,10 +51,10 @@ func writeFrozenModule(test *testing.T) string {
 // The --frozen announcement is written to a buffer, and the binary it announces writes to the terminal itself,
 // so it reaches the caller only if the dispatcher delivers it before handing the terminal over: before the
 // exec when it waits, which drops the buffer whole, and before the child starts when it returns early, or it
-// lands after everything the engine said. Both modes are run with stdout and stderr on one pipe, so the order
+// lands after everything cohere said. Both modes are run with stdout and stderr on one pipe, so the order
 // the caller reads is the order it was written in. COHERE_BINARY is emptied, since a binary named that way is
 // run with nothing buffered ahead of it, and so tests neither flush.
-func TestTheFrozenAnnouncementArrivesWholeBeforeTheEngineSpeaks(test *testing.T) {
+func TestTheFrozenAnnouncementArrivesWholeBeforeCohereSpeaks(test *testing.T) {
 	test.Parallel()
 	dispatcher := buildBinary(test, "cohere-dispatch", ".")
 	expected := regexp.MustCompile(
@@ -62,8 +62,8 @@ func TestTheFrozenAnnouncementArrivesWholeBeforeTheEngineSpeaks(test *testing.T)
 			`  running: ` + regexp.QuoteMeta(stagedBinaryName) + `\n` +
 			`  hash:    ` + stagedHash + `\n` +
 			`  built:   \d{4}-\d\d-\d\d \d\d:\d\d:\d\d\n` +
-			`the stub engine on stdout\n` +
-			`the stub engine on stderr\n$`)
+			`the stub cohere on stdout\n` +
+			`the stub cohere on stderr\n$`)
 	for _, mode := range []struct {
 		name string
 		wait string

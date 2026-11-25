@@ -46,7 +46,7 @@ type runSummary struct {
 
 // checkedLess says why this project's run did less than a developer's run of it, or "" when it did all of
 // it. A benchmark of such a run times work that was never done: on cohere's root, a copy without git timed
-// 0.18s cold for a Go engine that never ran and a Swift engine that read no input (#7z52pqf). And a missing
+// 0.18s cold for cohere-go that never ran and cohere-swift that read no input (#7z52pqf). And a missing
 // generated file holds every fix and runs no rule: ahra's copy lacked the route types Next's dev server
 // writes into a checkout, so its cold runs type-checked with 161 errors and never linted.
 //

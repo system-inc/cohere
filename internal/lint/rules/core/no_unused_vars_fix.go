@@ -12,7 +12,7 @@ import (
 
 // The removal of an unused import, typescript-eslint 8.71.0's getImportFixer (src/rules/no-unused-vars.ts),
 // ported against its rows (#e1zk9s0). Under `enableAutofixRemoval: {imports: true}` it is a fix the edit
-// engine applies; otherwise, the default, upstream offers the same edit as a suggestion, and so does this.
+// fix pass applies; otherwise, the default, upstream offers the same edit as a suggestion, and so does this.
 // Upstream computes no removal for any other kind of binding, and neither does this.
 //
 // # Report order is part of the answer
@@ -20,7 +20,7 @@ import (
 // ESLint calls a fix function when the finding is reported, so upstream's question "is every binding of
 // this declaration unused" (areAllSpecifiersUnused) sees only the bindings reported so far. In
 // `import { A, B, C } from 'm'` with all three unused, A's and B's removals take the specifier and C's,
-// the last, takes the declaration. The edit engine then applies the earliest-starting of overlapping
+// the last, takes the declaration. The fix pass then applies the earliest-starting of overlapping
 // fixes, the declaration's, which is ESLint's own rule for one pass. So the bindings reported so far are
 // passed in, in report order, rather than the set the whole file will report.
 //

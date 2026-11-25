@@ -230,7 +230,7 @@ func TestNoUnusedLabelsFixRemovesTheLabel(test *testing.T) {
 // an invention. oxc declares `fix` unconditionally and rewrites the labeled statement to its body in
 // every case, including these. ESLint gates the same repair behind `isFixable`, and each of its
 // three refusals corresponds to a rewrite that parses and means something different. Since the
-// engine's guard checks only that the rewritten file parses, none of these would be refused
+// linter's guard checks only that the rewritten file parses, none of these would be refused
 // downstream; a wrong fix here is applied unattended.
 //
 // Each refusal was checked against a real parser rather than reasoned about:

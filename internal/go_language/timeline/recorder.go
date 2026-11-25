@@ -1,8 +1,8 @@
 // Package timeline records, under `--timeline`, when each phase of a Go run and each build began and ended, on one
-// clock from the moment the engine package initialized, with the process's user and system CPU at each, for the
+// clock from the moment cohere-go package initialized, with the process's user and system CPU at each, for the
 // timeline record.
 //
-// A Recorder travels by argument, never as package state: the engine makes one for a run that asked, and hands the
+// A Recorder travels by argument, never as package state: cohere-go makes one for a run that asked, and hands the
 // load and the check a hook of it (Hook), so two runs in one process, as two parallel tests are, never stamp each
 // other's. A nil *Recorder is a run that did not ask, and every method on it does nothing and reads no clock, so a
 // stamp site stamps without asking first, and a run without the switch pays nothing for it.
@@ -21,7 +21,7 @@ const cpuUnavailable = "the process's CPU clock could not be read"
 
 // Recorder holds a run's stamps in the order they arrived. It is safe to use from many goroutines at once.
 type Recorder struct {
-	// start is the moment every stamp's wall is measured from, the engine package's initialization.
+	// start is the moment every stamp's wall is measured from, cohere-go package's initialization.
 	start time.Time
 	clock Clock
 

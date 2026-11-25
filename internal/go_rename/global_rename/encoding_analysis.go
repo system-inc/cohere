@@ -116,7 +116,7 @@ type siteKey struct {
 // that returned it, and the type arguments of every instantiation. That runs to a fixpoint, so a wrapper of a
 // wrapper of json.Unmarshal is an encoder too. What it cannot follow is listed as opaque.
 type encodingAnalysis struct {
-	engine *engine
+	renaming *renaming
 
 	fields map[Key]encoder
 	types  map[Key]encoder
@@ -200,7 +200,7 @@ func (analysis *encodingAnalysis) sinkCount() int {
 
 // index records, for one package variant, the calls, instantiations, assignments, returns and parameters.
 func (analysis *encodingAnalysis) index(goPackage *packages.Package) {
-	engine := analysis.engine
+	renaming := analysis.renaming
 	info := goPackage.TypesInfo
 	recordParameters := func(fields *ast.FieldList, method string) {
 		if fields == nil {
@@ -218,7 +218,7 @@ func (analysis *encodingAnalysis) index(goPackage *packages.Package) {
 			}
 			for _, name := range field.Names {
 				if variable, isVariable := info.Defs[name].(*types.Var); isVariable {
-					key := engine.keyer.key(variable)
+					key := renaming.keyer.key(variable)
 					analysis.parameterKeys[key] = true
 					if method != "" {
 						analysis.methodParameters[key] = methodParameter{name: method, index: index, arity: arity}
@@ -239,9 +239,9 @@ func (analysis *encodingAnalysis) index(goPackage *packages.Package) {
 		case *types.Func:
 			signature := typed.Signature()
 			for index := range signature.TypeParams().Len() {
-				analysis.typeParametersOf[engine.keyer.key(typed)] = append(
-					analysis.typeParametersOf[engine.keyer.key(typed)],
-					engine.keyer.key(signature.TypeParams().At(index).Obj()),
+				analysis.typeParametersOf[renaming.keyer.key(typed)] = append(
+					analysis.typeParametersOf[renaming.keyer.key(typed)],
+					renaming.keyer.key(signature.TypeParams().At(index).Obj()),
 				)
 			}
 			if receiverParameters := signature.RecvTypeParams(); receiverParameters.Len() > 0 {
@@ -249,18 +249,18 @@ func (analysis *encodingAnalysis) index(goPackage *packages.Package) {
 				if named, isNamed := types.Unalias(receiverType).(*types.Named); isNamed {
 					declared := named.Origin().TypeParams()
 					for index := range min(receiverParameters.Len(), declared.Len()) {
-						analysis.receiverTypeAliases[engine.keyer.key(
+						analysis.receiverTypeAliases[renaming.keyer.key(
 							receiverParameters.At(index).Obj(),
-						)] = engine.keyer.key(declared.At(index).Obj())
+						)] = renaming.keyer.key(declared.At(index).Obj())
 					}
 				}
 			}
 		case *types.TypeName:
 			if named, isNamed := typed.Type().(*types.Named); isNamed && !typed.IsAlias() {
 				for index := range named.TypeParams().Len() {
-					analysis.typeParametersOf[engine.keyer.key(typed)] = append(
-						analysis.typeParametersOf[engine.keyer.key(typed)],
-						engine.keyer.key(named.TypeParams().At(index).Obj()),
+					analysis.typeParametersOf[renaming.keyer.key(typed)] = append(
+						analysis.typeParametersOf[renaming.keyer.key(typed)],
+						renaming.keyer.key(named.TypeParams().At(index).Obj()),
 					)
 				}
 			}
@@ -308,7 +308,7 @@ func (analysis *encodingAnalysis) index(goPackage *packages.Package) {
 					if !isFunction {
 						return true
 					}
-					key := engine.keyer.key(declared)
+					key := renaming.keyer.key(declared)
 					if analysis.returns[key] == nil {
 						analysis.returns[key] = map[int][]valueSite{}
 					}
@@ -423,7 +423,7 @@ func (analysis *encodingAnalysis) variableKey(goPackage *packages.Package, ident
 	if !isVariable || variable.IsField() {
 		return Key{}, false
 	}
-	return analysis.engine.keyer.key(variable), true
+	return analysis.renaming.keyer.key(variable), true
 }
 
 // indexAssignment records what each left side may now hold: a variable its value, a map or slice element the
@@ -469,7 +469,7 @@ func (analysis *encodingAnalysis) indexAssignment(
 			}
 		case *ast.SelectorExpr:
 			if field, isField := analysis.referencedObject(goPackage, typed).(*types.Var); isField && field.IsField() {
-				key := analysis.engine.keyer.key(field)
+				key := analysis.renaming.keyer.key(field)
 				analysis.fieldAssignments[key] = append(
 					analysis.fieldAssignments[key],
 					valueSite{goPackage: goPackage, expression: value, result: result, where: where},
@@ -497,7 +497,7 @@ func (analysis *encodingAnalysis) indexCompositeFields(goPackage *packages.Packa
 				continue
 			}
 			if field, isField := goPackage.TypesInfo.Uses[identifier].(*types.Var); isField {
-				key := analysis.engine.keyer.key(field)
+				key := analysis.renaming.keyer.key(field)
 				analysis.fieldAssignments[key] = append(
 					analysis.fieldAssignments[key],
 					valueSite{goPackage: goPackage, expression: keyValue.Value, where: keyValue.Pos()},
@@ -506,7 +506,7 @@ func (analysis *encodingAnalysis) indexCompositeFields(goPackage *packages.Packa
 			continue
 		}
 		if index < structType.NumFields() {
-			key := analysis.engine.keyer.key(structType.Field(index))
+			key := analysis.renaming.keyer.key(structType.Field(index))
 			analysis.fieldAssignments[key] = append(
 				analysis.fieldAssignments[key],
 				valueSite{goPackage: goPackage, expression: element, where: element.Pos()},
@@ -545,7 +545,7 @@ func (analysis *encodingAnalysis) visitCall(site callSite) {
 			interfaceMethod = declared.Name()
 		}
 		for index := range signature.Params().Len() {
-			parameterKeys = append(parameterKeys, analysis.engine.keyer.key(signature.Params().At(index)))
+			parameterKeys = append(parameterKeys, analysis.renaming.keyer.key(signature.Params().At(index)))
 		}
 	case *types.Var:
 		// A call through a variable or a func-typed field calls whatever was stored in it.
@@ -554,7 +554,7 @@ func (analysis *encodingAnalysis) visitCall(site callSite) {
 			return
 		}
 		signature = called
-		key := analysis.engine.keyer.key(typed)
+		key := analysis.renaming.keyer.key(typed)
 		stored := analysis.assignments[key]
 		if typed.IsField() {
 			stored = analysis.fieldAssignments[key]
@@ -607,7 +607,7 @@ func (analysis *encodingAnalysis) typeNameReads(
 	function *types.Func,
 	signature *types.Signature,
 ) map[int]encoder {
-	if function.Pkg() == nil || analysis.engine.workspacePaths[function.Pkg().Path()] {
+	if function.Pkg() == nil || analysis.renaming.workspacePaths[function.Pkg().Path()] {
 		return nil
 	}
 	switch path := function.Pkg().Path(); {
@@ -629,7 +629,7 @@ func (analysis *encodingAnalysis) typeNameReads(
 // reads one through reflect or hands reflect's values on to code that might: reflect.ValueOf(value).IsNil() or a
 // walk of reflect.TypeOf(value)'s json tags reads none, and a rename cannot change what it sees.
 func (analysis *encodingAnalysis) encoderOf(function *types.Func, caller *packages.Package) encoder {
-	if function.Pkg() != nil && analysis.engine.workspacePaths[function.Pkg().Path()] {
+	if function.Pkg() != nil && analysis.renaming.workspacePaths[function.Pkg().Path()] {
 		return 0
 	}
 	family := encoderOf(function)
@@ -765,7 +765,7 @@ func (analysis *encodingAnalysis) literalParameterKeys(goPackage *packages.Packa
 	}
 	keys := make([]Key, signature.Params().Len())
 	for index := range signature.Params().Len() {
-		keys[index] = analysis.engine.keyer.key(signature.Params().At(index))
+		keys[index] = analysis.renaming.keyer.key(signature.Params().At(index))
 	}
 	return keys
 }
@@ -787,7 +787,7 @@ func (analysis *encodingAnalysis) storedFunctionParameterKeys(value valueSite) [
 	signature := function.Origin().Signature()
 	keys := make([]Key, signature.Params().Len())
 	for index := range signature.Params().Len() {
-		keys[index] = analysis.engine.keyer.key(signature.Params().At(index))
+		keys[index] = analysis.renaming.keyer.key(signature.Params().At(index))
 	}
 	return [][]Key{keys}
 }
@@ -843,7 +843,7 @@ func (analysis *encodingAnalysis) visitInstance(site instanceSite) {
 			return
 		}
 	}
-	parameters := analysis.typeParametersOf[analysis.engine.keyer.key(origin(object))]
+	parameters := analysis.typeParametersOf[analysis.renaming.keyer.key(origin(object))]
 	for index := range min(len(parameters), arguments.Len()) {
 		if set := analysis.typeParameters[parameters[index]]; set != 0 {
 			analysis.markType(arguments.At(index), set)
@@ -954,7 +954,7 @@ func (analysis *encodingAnalysis) reachResult(
 			analysis.markOpaque(goPackage, unwrapped, "an identifier that is no variable")
 			return
 		}
-		key := analysis.engine.keyer.key(variable)
+		key := analysis.renaming.keyer.key(variable)
 		if analysis.parameterKeys[key] {
 			analysis.parameters[key] |= set
 		}
@@ -980,13 +980,13 @@ func (analysis *encodingAnalysis) reachResult(
 				return
 			}
 		case *types.Func:
-			key := analysis.engine.keyer.key(callee.Origin())
+			key := analysis.renaming.keyer.key(callee.Origin())
 			if returns, found := analysis.returns[key]; found {
 				analysis.reachValues(valueKey{key: key, result: result}, returns[result], set)
 				return
 			}
 		case *types.Var:
-			if literal := analysis.functionLiterals[analysis.engine.keyer.key(callee)]; literal != nil {
+			if literal := analysis.functionLiterals[analysis.renaming.keyer.key(callee)]; literal != nil {
 				analysis.reachValues(
 					valueKey{literal: literal, result: result},
 					analysis.literalReturns[literal][result],
@@ -1002,7 +1002,7 @@ func (analysis *encodingAnalysis) reachResult(
 		return
 	case *ast.SelectorExpr:
 		if field, isField := analysis.referencedObject(goPackage, typed).(*types.Var); isField {
-			key := analysis.engine.keyer.key(field)
+			key := analysis.renaming.keyer.key(field)
 			if field.IsField() {
 				analysis.reachValues(valueKey{key: key}, analysis.fieldAssignments[key], set)
 			} else {
@@ -1049,7 +1049,7 @@ func (analysis *encodingAnalysis) markOpaque(goPackage *packages.Package, expres
 	position := goPackage.Fset.Position(expression.Pos())
 	analysis.opaque[fmt.Sprintf(
 		"%s: %s (%s)",
-		analysis.engine.relativePosition(positionString(position)),
+		analysis.renaming.relativePosition(positionString(position)),
 		types.ExprString(expression),
 		why,
 	)] = true
@@ -1089,7 +1089,7 @@ func (analysis *encodingAnalysis) markType(goType types.Type, set encoder) {
 		analysis.markType(types.Unalias(typed), set)
 	case *types.Named:
 		// A held type's name is not its own; %T of a named type spells its name and nothing it holds.
-		analysis.types[analysis.engine.keyer.key(typed.Origin().Obj())] |= set &^ encoderHeldTypeName
+		analysis.types[analysis.renaming.keyer.key(typed.Origin().Obj())] |= set &^ encoderHeldTypeName
 		analysis.markType(typed.Underlying(), set&^encoderFormatType)
 	case *types.Pointer:
 		analysis.markType(typed.Elem(), set)
@@ -1105,7 +1105,7 @@ func (analysis *encodingAnalysis) markType(goType types.Type, set encoder) {
 	case *types.Struct:
 		for index := range typed.NumFields() {
 			field := typed.Field(index)
-			key := analysis.engine.keyer.key(field)
+			key := analysis.renaming.keyer.key(field)
 			analysis.fields[key] |= set
 			analysis.markType(field.Type(), heldLevel(set))
 			if holdsUnseenValues(field.Type()) {
@@ -1118,7 +1118,7 @@ func (analysis *encodingAnalysis) markType(goType types.Type, set encoder) {
 			}
 		}
 	case *types.TypeParam:
-		key := analysis.engine.keyer.key(typed.Obj())
+		key := analysis.renaming.keyer.key(typed.Obj())
 		analysis.typeParameters[key] |= set
 		if declared, isReceiver := analysis.receiverTypeAliases[key]; isReceiver {
 			analysis.typeParameters[declared] |= set
@@ -1146,7 +1146,7 @@ func (analysis *encodingAnalysis) checkFunctionValue(value valueSite) {
 	reaches := analysis.encoderOf(declared, value.goPackage) != 0
 	signature := declared.Signature()
 	for index := range signature.Params().Len() {
-		if analysis.parameters[analysis.engine.keyer.key(signature.Params().At(index))] != 0 {
+		if analysis.parameters[analysis.renaming.keyer.key(signature.Params().At(index))] != 0 {
 			reaches = true
 		}
 	}

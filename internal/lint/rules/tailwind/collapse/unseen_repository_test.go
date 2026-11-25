@@ -95,7 +95,7 @@ func TestTheUnseenRepositorySeparatesClassesFromTypos(test *testing.T) {
 // A repository functional root is declined by the table and answered by the evaluator, deliberately.
 //
 // This is the gap the closing claim names rather than hides. `Table.Lookup` returns false for
-// `synthetic-fn-small` because a measured descriptor row needs the engine to probe 527 value shapes
+// `synthetic-fn-small` because a measured descriptor row needs Tailwind to probe 527 value shapes
 // and nothing in shipped Go can do that. `addRepositoryFunctionalRoots` gives every repository root
 // a present-but-declining row so the decline reads as "this table is not what answers it" rather
 // than as "this root does not exist".

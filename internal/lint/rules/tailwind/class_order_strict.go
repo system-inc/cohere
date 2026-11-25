@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // strictClassOrder is upstream's `strict` order: the `official` order, regrouped so classes sharing a
@@ -18,7 +18,7 @@ import (
 // written. A class that does not parse takes everything before its last colon, split on colons,
 // upstream's fallback for component classes. Upstream builds both levels as JavaScript objects keyed
 // by name, so they enumerate in JavaScript's key order, which jsKeyOrder reproduces.
-func strictClassOrder(officially []string, system *tailwindengine.LoadedDesignSystem) []string {
+func strictClassOrder(officially []string, system *tailwindcollapse.LoadedDesignSystem) []string {
 	root := newStrictVariantLevel()
 	for _, className := range jsKeyOrder(officially) {
 		variants := append([]string{""}, strictVariantsOf(className, system)...)
@@ -54,15 +54,15 @@ func isArbitraryVariant(variant string) bool {
 var beforeLastColon = regexp.MustCompile(`^(.*):`)
 
 // strictVariantsOf is one class's variants, in the order written.
-func strictVariantsOf(className string, system *tailwindengine.LoadedDesignSystem) []string {
+func strictVariantsOf(className string, system *tailwindcollapse.LoadedDesignSystem) []string {
 	if system != nil {
-		if parsed := tailwindengine.ParseCandidate(className, system); len(parsed) > 0 {
+		if parsed := tailwindcollapse.ParseCandidate(className, system); len(parsed) > 0 {
 			// The parser keeps variants in the order the compiler applies them, the reverse of how
 			// they were written; upstream reverses its own list the same way.
 			variants := parsed[0].Variants
 			printed := make([]string, 0, len(variants))
 			for index := len(variants) - 1; index >= 0; index-- {
-				printed = append(printed, tailwindengine.PrintVariant(variants[index]))
+				printed = append(printed, tailwindcollapse.PrintVariant(variants[index]))
 			}
 			return printed
 		}

@@ -631,7 +631,7 @@ func TestAPortRunsInItsOriginalsPlace(test *testing.T) {
 }
 
 // TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
-// after vet's suite, as tools rules under the originals' names, each running our port onto the engine's own
+// after vet's suite, as tools rules under the originals' names, each running our port onto cohere-go's own
 // intermediate representation through its dispatcher.
 func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 	test.Parallel()
@@ -657,7 +657,7 @@ func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 }
 
 // TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener holds every rule with a listener, over two calls to
-// All as the engine, the docs and the tests make them, to the one shared dispatcher of its walk: its analyzer requires
+// All as cohere-go, the docs and the tests make them, to the one shared dispatcher of its walk: its analyzer requires
 // that dispatcher's, which holds its listener, every rule of a walk requires the same one, and both calls hand out
 // the same analyzer, the one the settings set options on.
 func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testing.T) {
@@ -690,18 +690,18 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 		analyzerOf[registered.Name] = registered.Analyzer
 	}
 	if len(dispatcherOf) != 2 {
-		test.Errorf("the registry's dispatched rules hear %d walks, where the engine's own intermediate "+
+		test.Errorf("the registry's dispatched rules hear %d walks, where cohere-go's own intermediate "+
 			"representation's and the syntax's were expected", len(dispatcherOf))
 	}
 }
 
-// listenerWalk names the walk listener hears, for a test that keys dispatchers by it: the engine's own intermediate
+// listenerWalk names the walk listener hears, for a test that keys dispatchers by it: cohere-go's own intermediate
 // representation and the syntax are two walks, each with its own shared dispatcher.
 func listenerWalk(listener *rule.Listener) string {
 	if listener.IsSyntax() {
 		return "syntax"
 	}
-	return "the engine's own intermediate representation"
+	return "cohere's own intermediate representation"
 }
 
 // heldTwice is a test-only rule whose listener is registered on the shared dispatchers of both walks, as a listener
@@ -715,7 +715,7 @@ var heldTwice = func() rule.Rule {
 		},
 	}}
 	analyzer := dispatch.RuleAnalyzer(rule.Namespace+"test-held-twice-own", "test_held_twice_own",
-		"a test-only rule on the engine's own walk", listener)
+		"a test-only rule on cohere-go's own walk", listener)
 	listener.FileEnter = func(*rule.Context, *ast.File) {
 		// Never judges anything: the listener exists to be held by two dispatchers.
 	}
@@ -886,7 +886,7 @@ func TestNoRuleRequiresXToolsSingleAssignmentForm(test *testing.T) {
 	}
 }
 
-// TestNoRuleRequiresStaticchecksIntermediateRepresentation holds the run to the engine's own intermediate
+// TestNoRuleRequiresStaticchecksIntermediateRepresentation holds the run to cohere-go's own intermediate
 // representation alone (#kk4864m): no registered rule, nor anything it requires, needs staticcheck's buildir, which
 // built a second program form beside ours on every package. The check also runs over planted rules, to prove it can
 // fail and that it blames the rule that brings buildir in, not every rule sharing its dispatcher.
@@ -1171,7 +1171,7 @@ func TestNoDefaultOffSaOrSCheckIsRegistered(test *testing.T) {
 
 // TestTheRegisteredAnalyzersValidateTogether runs x/tools' own check over the whole set, which refuses a
 // cycle in the Requires graph and a fact type an analyzer uses without declaring, either of which would
-// fail the engine's run rather than one rule.
+// fail cohere-go's run rather than one rule.
 func TestTheRegisteredAnalyzersValidateTogether(test *testing.T) {
 	test.Parallel()
 	analyzers := []*analysis.Analyzer{}
@@ -1236,8 +1236,8 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // type's variant whose methods only mark it, served finds the types a file serves for the two rules that count them,
 // positions is the line table rules read a node's position from without the FileSet's lock, function_purity judges
 // which functions are pure for the rules asking which calls have side effects, return_nil_ness judges whether each
-// function's results may be nil for the rule asking what a call returns, build_intermediate_representation builds the
-// engine's own intermediate representation for the rules that read it, and the four kits the ports of staticcheck's
+// function's results may be nil for the rule asking what a call returns, build_intermediate_representation builds
+// cohere's own intermediate representation for the rules that read it, and the four kits the ports of staticcheck's
 // checks share (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they call,
 // staticcheck_call, the walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures, and
 // dispatch walks a package once for every rule with a listener and builds each such rule's analyzer, holding no rule

@@ -40,7 +40,7 @@ concrete property in getters style). The rest are reporting controls: abstract g
 property, a getter over a base property (already TS2611, which the field repairs), no base
 counterpart, statics, interface-merged members, a mapped-type base, an intersection with an interface
 side, and three already-invalid inheritances the checker skips. As of 2026-10-04 the site no longer
-differs: both engines read 0 on `StringSchema.ts` (#cn8sthd).
+differs: both linters read 0 on `StringSchema.ts` (#cn8sthd).
 
 ## Why this recommendation
 

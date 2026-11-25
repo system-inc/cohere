@@ -1,7 +1,7 @@
 package rule
 
 // Loosening is an option's flag value that knows, by its own type, whether it sets its rule looser than the house
-// does. A project may loosen a house rule only by stating a departure with a reason in its settings, so the engine
+// does. A project may loosen a house rule only by stating a departure with a reason in its settings, so cohere-go
 // asks each option it sets whether it loosens, rather than keeping a list of which options and values do, which
 // would drift from the rules it describes. An option whose value implements nothing here never loosens.
 type Loosening interface {

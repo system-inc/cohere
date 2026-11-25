@@ -158,7 +158,7 @@ type RepositoryContributions struct {
 // A separate type from VariantRegistration even though the fields coincide, because this is an
 // *input* and that is a *record*. VariantRegistration carries an Order the registry assigned;
 // these carry no order at all, since the registry assigns it by registration sequence and taking
-// one from the caller would let a caller produce a registry the engine could never build.
+// one from the caller would let a caller produce a registry Tailwind could never build.
 type FrameworkVariant struct {
 	// Name is the registered root, as written before the colon: `hover`, `group`, `@max`.
 	Name string
@@ -182,7 +182,7 @@ type LoadOptions struct {
 	//
 	// Nil, which is what every shipped caller passes, means the generated
 	// FrameworkVariantRegistrations: the installed Tailwind's own 88 roots with the order numbers
-	// the engine assigned them, plus the four comparison groups that order breakpoints by their
+	// Tailwind assigned them, plus the four comparison groups that order breakpoints by their
 	// resolved widths. That table was verified repository-invariant before being checked in; see
 	// framework_variant_table.go's header for the measurement.
 	//
@@ -249,15 +249,15 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 	// The framework registers first and the repository's `@custom-variant` names after, which is
 	// upstream's sequencing and the reason a redefinition keeps its original position.
 	//
-	// The default path replays the generated table, carrying the engine's own order numbers rather
+	// The default path replays the generated table, carrying Tailwind's own order numbers rather
 	// than recomputing them. That distinction is load-bearing: 88 registrations hold 82 distinct
 	// orders, and a shared order is the only place a comparison function is consulted. See
 	// RegisterFrameworkVariants.
 	frameworkNames := map[string]bool{}
 	if options.FrameworkVariants == nil {
 		variants.RegisterFrameworkVariants(FrameworkVariantRegistrations)
-		// A `@theme { --breakpoint-tablet: ... }` registers `tablet` as a static variant on the
-		// engine, joining the breakpoint group rather than appending past it. Registered before the
+		// A `@theme { --breakpoint-tablet: ... }` registers `tablet` as a static variant on
+		// Tailwind, joining the breakpoint group rather than appending past it. Registered before the
 		// repository's `@custom-variant` names for the same reason the framework is: it is
 		// breakpoint machinery rather than a stylesheet-declared variant, and it must not consume
 		// an appended position.
@@ -353,8 +353,8 @@ type stylesheetCollector struct {
 	skipped []SkippedDirective
 
 	// visiting is the import stack, so a cycle is an error rather than a stack overflow. Not a
-	// "seen" set: a file imported twice from different places is processed twice, matching the
-	// engine, and that matters because the second pass can overwrite what the first set.
+	// "seen" set: a file imported twice from different places is processed twice, matching
+	// Tailwind, and that matters because the second pass can overwrite what the first set.
 	visiting map[string]bool
 
 	stylesheets        []string
@@ -494,8 +494,8 @@ func (collector *stylesheetCollector) resolveImport(node *Node, path string) (st
 // ingestThemeBlock records every custom property in one `@theme` block.
 //
 // The `@keyframes` skip and the reject-anything-else branch are upstream's, reproduced for the
-// reason themeloader.go states: a stylesheet the engine rejects must not quietly produce a theme
-// here, since any theme built from input the engine refuses is one no repository can be using.
+// reason themeloader.go states: a stylesheet Tailwind rejects must not quietly produce a theme
+// here, since any theme built from input Tailwind refuses is one no repository can be using.
 func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) error {
 	options, prefix := parseThemeOptions(node.Parameters)
 

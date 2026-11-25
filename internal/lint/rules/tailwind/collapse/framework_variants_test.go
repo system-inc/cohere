@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// The generated framework registry, tested against the engine's own measurements.
+// The generated framework registry, tested against Tailwind's own measurements.
 //
 // Two claims are separable here and both are tested. The first is that the checked-in table says
-// what the engine says, which is a differential against `variant_fixtures.json`, the same fixture
+// what Tailwind says, which is a differential against `variant_fixtures.json`, the same fixture
 // `variant_test.go` uses, captured by a different generator, so agreement between them is agreement
-// between two independent readings of the engine rather than a tool checking itself. The second is
+// between two independent readings of Tailwind rather than a tool checking itself. The second is
 // that `LoadDesignSystem` wires the table in so that the behaviour downstream changes, which is
 // what the blocker on #4q5dsn3 measured as broken and is not implied by the first.
 
@@ -74,14 +74,14 @@ func frameworkVariantFixtureRegistry(test *testing.T, name string) ([]frameworkV
 	return nil, nil
 }
 
-// TestFrameworkVariantTableMatchesTheEngine is the differential: every registration the engine
+// TestFrameworkVariantTableMatchesTailwind is the differential: every registration Tailwind
 // reported, reproduced by the checked-in table.
 //
 // Names, order numbers and kinds are all compared. Comparing names alone would pass a table that
 // had every root and had renumbered them, which is the failure that costs the most: the order is a
 // sort key, and a renumbering that preserved relative sequence would even look right until it hit
 // the two shared orders.
-func TestFrameworkVariantTableMatchesTheEngine(test *testing.T) {
+func TestFrameworkVariantTableMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	entries, _ := frameworkVariantFixtureRegistry(test, "framework-default")
 
@@ -90,7 +90,7 @@ func TestFrameworkVariantTableMatchesTheEngine(test *testing.T) {
 	}
 	if len(FrameworkVariantRegistrations) != len(entries) {
 		test.Fatalf(
-			"the table holds %d registrations and the engine reported %d",
+			"the table holds %d registrations and Tailwind reported %d",
 			len(FrameworkVariantRegistrations), len(entries),
 		)
 	}
@@ -107,7 +107,7 @@ func TestFrameworkVariantTableMatchesTheEngine(test *testing.T) {
 		registration, isPresent := generated[entry.Name]
 		if !isPresent {
 			test.Errorf(
-				"the engine registers %q and the table does not, so `%s:` would not parse",
+				"Tailwind registers %q and the table does not, so `%s:` would not parse",
 				entry.Name,
 				entry.Name,
 			)
@@ -115,14 +115,14 @@ func TestFrameworkVariantTableMatchesTheEngine(test *testing.T) {
 		}
 		if registration.Order != entry.Order {
 			test.Errorf(
-				"%q holds order %d in the table and %d on the engine",
+				"%q holds order %d in the table and %d on Tailwind",
 				entry.Name,
 				registration.Order,
 				entry.Order,
 			)
 		}
 		if registration.Kind != entry.Kind {
-			test.Errorf("%q is %q in the table and %q on the engine", entry.Name, registration.Kind, entry.Kind)
+			test.Errorf("%q is %q in the table and %q on Tailwind", entry.Name, registration.Kind, entry.Kind)
 		}
 	}
 
@@ -133,13 +133,13 @@ func TestFrameworkVariantTableMatchesTheEngine(test *testing.T) {
 	)
 }
 
-// TestFrameworkVariantComparisonGroupsMatchTheEngine pins which orders carry a comparison function.
+// TestFrameworkVariantComparisonGroupsMatchTailwind pins which orders carry a comparison function.
 //
 // A missing group is the quietest failure in this component. The registrations would still be
 // complete, every class would still parse, and the six roots sharing order 64 would fall through to
 // `compare`'s root-name branch, where `2xl` precedes `sm` alphabetically. Every responsive class in
 // the tree would sort wrongly and nothing would be missing from the table a reader inspected.
-func TestFrameworkVariantComparisonGroupsMatchTheEngine(test *testing.T) {
+func TestFrameworkVariantComparisonGroupsMatchTailwind(test *testing.T) {
 	test.Parallel()
 	entries, compareFnOrders := frameworkVariantFixtureRegistry(test, "framework-default")
 
@@ -148,7 +148,7 @@ func TestFrameworkVariantComparisonGroupsMatchTheEngine(test *testing.T) {
 	}
 	if len(FrameworkVariantComparisonGroups) != len(compareFnOrders) {
 		test.Fatalf(
-			"the table holds %d comparison groups and the engine reported %d",
+			"the table holds %d comparison groups and Tailwind reported %d",
 			len(FrameworkVariantComparisonGroups), len(compareFnOrders),
 		)
 	}
@@ -159,7 +159,7 @@ func TestFrameworkVariantComparisonGroupsMatchTheEngine(test *testing.T) {
 	}
 	for _, order := range compareFnOrders {
 		if _, isPresent := generated[order]; !isPresent {
-			test.Errorf("the engine registers a comparison at order %d and the table does not", order)
+			test.Errorf("Tailwind registers a comparison at order %d and the table does not", order)
 		}
 	}
 
@@ -177,14 +177,14 @@ func TestFrameworkVariantComparisonGroupsMatchTheEngine(test *testing.T) {
 		}
 		if len(holders) != len(group.Members) {
 			test.Errorf(
-				"order %d is held by %d roots on the engine and the group records %d members",
+				"order %d is held by %d roots on Tailwind and the group records %d members",
 				group.Order, len(holders), len(group.Members),
 			)
 		}
 		for _, member := range group.Members {
 			if !holders[member] {
 				test.Errorf(
-					"order %d records member %q, which does not hold that order on the engine",
+					"order %d records member %q, which does not hold that order on Tailwind",
 					group.Order,
 					member,
 				)
@@ -451,7 +451,7 @@ func TestLoadedDesignSystemRegistersTheFrameworkVariants(test *testing.T) {
 //
 // `ParseVariant` returns nil for an unregistered root and `ParseCandidate` then yields zero
 // candidates for the whole class, so a missing registration is not a ranking difference, it is a
-// class the engine reads and cohere cannot. This asserts the population directly, because a rule
+// class Tailwind reads and cohere cannot. This asserts the population directly, because a rule
 // reading a system that cannot parse would decline on every one of these and a differential would
 // score the silence as agreement.
 func TestLoadedDesignSystemParsesVariantBearingClasses(test *testing.T) {
@@ -489,7 +489,7 @@ func TestLoadedDesignSystemParsesVariantBearingClasses(test *testing.T) {
 //
 // Without them the six roots sharing order 64 fall through to `compare`'s root-name branch, and
 // this is the assertion that catches it: alphabetically `2xl` precedes `sm`, so a registry with the
-// registrations and without the comparisons produces exactly the reverse of what the engine does at
+// registrations and without the comparisons produces exactly the reverse of what Tailwind does at
 // the low end.
 func TestFrameworkBreakpointsOrderByResolvedWidth(test *testing.T) {
 	test.Parallel()
@@ -503,7 +503,7 @@ func TestFrameworkBreakpointsOrderByResolvedWidth(test *testing.T) {
 	}
 
 	indices := frameworkVariantIndices(test, system, []string{"sm", "md", "lg", "xl", "2xl"})
-	// Measured on the engine: sm 0, md 1, lg 2, xl 3, 2xl 4, for a run that parsed exactly these
+	// Measured on Tailwind: sm 0, md 1, lg 2, xl 3, 2xl 4, for a run that parsed exactly these
 	// five. Ascending by resolved width, not by name.
 	for _, ordered := range [][2]string{{"sm", "md"}, {"md", "lg"}, {"lg", "xl"}, {"xl", "2xl"}} {
 		if indices[ordered[0]] >= indices[ordered[1]] {
@@ -521,7 +521,7 @@ func TestFrameworkBreakpointsOrderByResolvedWidth(test *testing.T) {
 
 // TestBreakpointComparisonReadsTheLiveTheme is why the comparison is not generated.
 //
-// A repository that redefines `--breakpoint-sm` reorders its own responsive classes, and the engine
+// A repository that redefines `--breakpoint-sm` reorders its own responsive classes, and Tailwind
 // does exactly that: measured, redefining it to `200rem` moves `sm` from dense index 0 to index 4.
 // A comparison closed over a hardcoded default scale passes every other test in this file and fails
 // only here, on the one case that is the whole reason the port exists.
@@ -541,7 +541,7 @@ func TestBreakpointComparisonReadsTheLiveTheme(test *testing.T) {
 	}
 
 	indices := frameworkVariantIndices(test, system, []string{"sm", "md", "lg", "xl", "2xl"})
-	// The engine's answer for this exact stylesheet: md 0, lg 1, xl 2, 2xl 3, sm 4.
+	// Tailwind's answer for this exact stylesheet: md 0, lg 1, xl 2, 2xl 3, sm 4.
 	expected := map[string]int{"md": 0, "lg": 1, "xl": 2, "2xl": 3, "sm": 4}
 	for root, want := range expected {
 		if indices[root] != want {
@@ -609,7 +609,7 @@ func TestContainerQueriesReadTheContainerNamespace(test *testing.T) {
 // table cannot hold, and this test is how it was found.
 //
 // The first version of this file assumed a `@theme { --breakpoint-tablet: 50rem }` registered
-// nothing and only needed resolving. It failed, and asking the engine said why: a new
+// nothing and only needed resolving. It failed, and asking Tailwind said why: a new
 // `--breakpoint-*` key becomes a static variant registration, at the breakpoint group's own shared
 // order, so `tablet:` parses and sorts by its width. A default build reports 88 registrations and
 // this stylesheet reports 89.
@@ -647,7 +647,7 @@ func TestThemeDefinedBreakpointSortsAmongTheFrameworkOnes(test *testing.T) {
 		)
 	}
 	if tablet.Kind != ParsedVariantKindStatic {
-		test.Errorf("`tablet` registered as %q; the engine registers a theme breakpoint as static", tablet.Kind)
+		test.Errorf("`tablet` registered as %q; Tailwind registers a theme breakpoint as static", tablet.Kind)
 	}
 	if len(ParseCandidate("tablet:flex", system)) == 0 {
 		test.Error("`tablet:flex` did not parse, so the class the theme just defined is unreadable")
@@ -667,10 +667,10 @@ func TestThemeDefinedBreakpointSortsAmongTheFrameworkOnes(test *testing.T) {
 // TestThemeContainerKeysRegisterNothing is the known-dirty control for the test above.
 //
 // Without it, "register a variant for every theme key in a size-ish namespace" passes every
-// assertion here and is wrong: measured on the engine, a stylesheet adding `--container-huge`
+// assertion here and is wrong: measured on Tailwind, a stylesheet adding `--container-huge`
 // reports 88 registrations, not 89. Container queries reach the theme through the already-registered
 // `@` root, so `@huge:` parses without `huge` ever being a registration, and registering one would
-// make the bare class `huge:flex` parse when the engine rejects it.
+// make the bare class `huge:flex` parse when Tailwind rejects it.
 func TestThemeContainerKeysRegisterNothing(test *testing.T) {
 	test.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";
@@ -688,7 +688,7 @@ func TestThemeContainerKeysRegisterNothing(test *testing.T) {
 
 	if system.HasVariant("huge") {
 		test.Error(
-			"`--container-huge` should not register a `huge` variant; the engine reaches it through the `@` root",
+			"`--container-huge` should not register a `huge` variant; Tailwind reaches it through the `@` root",
 		)
 	}
 	if got := len(system.Variants().Registrations()); got != len(FrameworkVariantRegistrations) {
@@ -703,8 +703,8 @@ func TestThemeContainerKeysRegisterNothing(test *testing.T) {
 //
 // `--breakpoint-sm` is a name the framework already registers. Re-registering it would be harmless
 // for position, since Register's update branch keeps the order, but it would count as a repository
-// contribution and it would make the registration count drift by one per redefined breakpoint. The
-// engine reports 88 for this stylesheet.
+// contribution and it would make the registration count drift by one per redefined breakpoint.
+// Tailwind reports 88 for this stylesheet.
 func TestRedefiningAFrameworkBreakpointDoesNotRegisterAgain(test *testing.T) {
 	test.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";

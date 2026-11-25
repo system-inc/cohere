@@ -7,12 +7,12 @@
 # than how fast cohere is. Run it only in a quiet window, where nothing else is competing.
 #
 # It measures a copy of the project pinned to its commits, never the project itself, with one cohere
-# engine for every run. pinned.zsh, which it shares with rivals.sh, says how and why.
+# binary for every run. pinned.zsh, which it shares with rivals.sh, says how and why.
 #
 # The command measured is `cohere --json`: the one a developer runs, so a warm run gets the caches a
 # developer's run would, printing its versioned contract instead of the footer. The footer is for people and
 # free to change, and when it became one line, everything this benchmark read from it read nothing
-# (#zrgrk14), so each run's engine seconds, findings and cache use are read from its --json summary by
+# (#zrgrk14), so each run's binary seconds, findings and cache use are read from its --json summary by
 # internal/bench_results/tools/run_output, which is tested against real output. That command may write, so
 # the copy's files are hashed before the first run and after the last one, and a benchmark that changed a
 # byte of them refuses to report.
@@ -31,7 +31,7 @@
 #           that took nothing from the cache (#547dhjz), or a warm run that is not a whole replay
 #   warm    `cohere` again on the unchanged tree: the replay
 #   edit    one line added to one function body, `cohere`, then the file's original bytes put back
-#   cold    `cohere --no-cache`: every phase from source, nothing read or written; narrowed by --engine Go,
+#   cold    `cohere --no-cache`: every phase from source, nothing read or written; narrowed by --project-kind GoModule,
 #           `cohere --no-fix --no-cache`, a checking run, as #pff7xhr's bar is (cold_arguments.zsh)
 #   idle    cold's command after the machine has sat idle for --idle-seconds: cold as a developer who
 #           pauses between saves mostly meets it, since the slow mode below follows idleness
@@ -62,9 +62,9 @@
 # Rounds stop early once every measured mode has at least 3 quiet runs within --band percent of their
 # median, best to worst. The record says it stopped early, and validating it checks that the runs agree.
 #
-# Two times per run. `verdict` is what a developer waits for: the launcher returns when the engine has
-# its exit code, and the engine writes its cache afterwards. `settled` is when every process the run
-# started has exited, cache write included. The next run starts only after that. The engine runs
+# Two times per run. `verdict` is what a developer waits for: the launcher returns when the cohere binary has
+# its exit code, and the cohere binary writes its cache afterwards. `settled` is when every process the run
+# started has exited, cache write included. The next run starts only after that. The cohere binary runs
 # directly with the verdict descriptor the launcher would have given it, so the early return is still
 # what is timed.
 #
@@ -80,18 +80,18 @@
 # samples the fast mode more often than a developer who saves and checks after half a minute of thought, and
 # its median is the better case. The idle mode measures the other one.
 #
-# A run may check one engine's project alone, with --engine: every run, primes and first runs too, is
-# `cohere --directory <its copy>` with `COHERE_PROJECT_ENGINE` set to that engine, the way the front door runs
+# A run may check one project kind's project alone, with --project-kind: every run, primes and first runs too, is
+# `cohere --directory <its copy>` with `COHERE_PROJECT_KIND` set to that kind, the way the front door runs
 # a project it discovered, so its --json summary is that project's alone. On cohere's own root a whole-root
 # cold run times the Go project beside a Swift run of about 25 seconds on the same cores, and #pff7xhr's bar
-# is the Go engine's own cold seconds (#09g6mad). Go is the only engine it takes until another is needed. The
-# record names the engine, and is named for it, so it never stands for the root or the nightly guard's
-# baseline. A `COHERE_PROJECT_ENGINE` already in the environment refuses to start, since every whole-root run
+# is cohere-go's own cold seconds (#09g6mad). GoModule is the only kind it takes until another is needed. The
+# record names the cohere binary, and is named for it, so it never stands for the root or the nightly guard's
+# baseline. A `COHERE_PROJECT_KIND` already in the environment refuses to start, since every whole-root run
 # would inherit it.
 #
-# Any `GODEBUG` in the environment refuses to start too: it sends the Go engine's in-process lister to
+# Any `GODEBUG` in the environment refuses to start too: it sends cohere-go's in-process lister to
 # `go list`, about 600 ms of every run that checks Go (#9wfsmqv). `GOGC`, `GOMEMLIMIT` and `GOMAXPROCS` move
-# the Go engine's seconds as well, and are printed in the header and kept in the record as the benchmark saw
+# cohere-go's seconds as well, and are printed in the header and kept in the record as the benchmark saw
 # them, empty when unset.
 #
 # usage: quiet_machine.sh [options]
@@ -108,11 +108,11 @@
 #   --idle-seconds S     how long the machine sits idle before an idle run (default 60)
 #   --edit PATH          the file the edit run changes, relative to the project
 #                        (default modules/tasks/TasksSearchQuery.ts)
-#   --cohere PATH        the cohere launcher, or an engine binary, to run (default: `cohere` on PATH)
-#   --engine NAME        check only this engine's project at the copy's root, as COHERE_PROJECT_ENGINE
+#   --cohere PATH        the cohere launcher, or a cohere binary, to run (default: `cohere` on PATH)
+#   --project-kind KIND        check only the project of this kind at the copy's root, as COHERE_PROJECT_KIND
 #                        names it: Go (default: the whole root, every project discovery finds)
 #   --no-fix             the cold and idle runs check without fixing, `cohere --no-fix --no-cache`, as a run narrowed
-#                        to the Go engine always does: the same work every night whatever the tree holds, never
+#                        to cohere-go always does: the same work every night whatever the tree holds, never
 #                        rewriting the copy. The record keeps which (noFix), and the guard never compares the two
 #                        (default: a whole-root run fixes)
 #   --builds WHICH       the Go builds every run checks: every, each build the Go files name, as a plain run checks,
@@ -128,7 +128,7 @@
 #   --work DIR           where the copies live (default $TMPDIR/cohere-quiet-machine)
 #   --record             also write the run to bench/results as a record to commit
 #                        (internal/bench_results, schema 2): the machine, the commits, the modes, every run
-#                        and each mode's numbers, refused when it disagrees with its own runs or the engine
+#                        and each mode's numbers, refused when it disagrees with its own runs or the cohere binary
 #                        is dirty; commit it with what `go run ./internal/documentation_data/tools/generate` rewrites
 #   --record-to DIR      --record, writing the record to DIR instead of bench/results: a record kept apart
 #                        from the committed ones, as the nightly speed guard keeps its own (bench/nightly.zsh)
@@ -156,7 +156,7 @@ commit=
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 record_directory=
-project_engine=
+project_kind=
 no_fix=false
 builds=every
 
@@ -171,7 +171,7 @@ while (( $# > 0 )); do
     --idle-seconds) idle_seconds=$2; shift 2 ;;
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
-    --engine) project_engine=$2; shift 2 ;;
+    --project-kind) project_kind=$2; shift 2 ;;
     --no-fix) no_fix=true; shift ;;
     --builds) builds=$2; shift 2 ;;
     --generate) generate=$2; shift 2 ;;
@@ -185,14 +185,14 @@ while (( $# > 0 )); do
   esac
 done
 (( runs >= 1 )) || fail "--runs must be at least 1"
-[[ -z $project_engine || $project_engine == Go ]] || fail "--engine: no engine $project_engine (Go)"
+[[ -z $project_kind || $project_kind == GoModule ]] || fail "--project-kind: no project kind $project_kind (GoModule)"
 [[ $builds == (host|every) ]] || fail "--builds: no builds $builds (host, every)"
 (( ${+GODEBUG} )) &&
-  fail "GODEBUG is set ($GODEBUG), which sends the Go engine's in-process lister to \`go list\` (#9wfsmqv); unset it and run again"
-(( ${+COHERE_PROJECT_ENGINE} )) &&
-  fail "COHERE_PROJECT_ENGINE is set ($COHERE_PROJECT_ENGINE), which every run would inherit; unset it, and name an engine with --engine"
-# The cold and idle runs' arguments, and the record's noFix, which reads them rather than the engine.
-cold=(${(f)"$(cold_arguments "$project_engine" "$no_fix")"})
+  fail "GODEBUG is set ($GODEBUG), which sends cohere-go's in-process lister to \`go list\` (#9wfsmqv); unset it and run again"
+(( ${+COHERE_PROJECT_KIND} )) &&
+  fail "COHERE_PROJECT_KIND is set ($COHERE_PROJECT_KIND), which every run would inherit; unset it, and name a project kind with --project-kind"
+# The cold and idle runs' arguments, and the record's noFix, which reads them rather than the cohere binary.
+cold=(${(f)"$(cold_arguments "$project_kind" "$no_fix")"})
 # The arguments every run takes for the builds it checks, cold and idle runs among them.
 build_arguments=(${(f)"$(build_arguments "$builds")"})
 modes=(${(s:,:)modes_asked})
@@ -237,7 +237,7 @@ fi
 logs=$copy/.cache/quiet-machine-$(date +%Y%m%d-%H%M%S)
 mkdir -p $logs
 runs_table=$logs/runs.tsv
-pin_engine $logs
+pin_cohere $logs
 first_table=$logs/first.tsv
 run_output_reader=$logs/run_output
 # Built without a version stamp, which nothing reads, so it builds in a cohere-dev worktree too (#268j573).
@@ -250,20 +250,20 @@ print "# modes    ${(j:, :)modes}; at most $runs rounds, stopping once quiet run
 print "# quiet    at least $idle_floor% of all cores idle over 2s before and 1s after a run, settling up to ${settle}s"
 measuring edit && print "# edit     $edit"
 measuring idle && print "# idle     each idle run after ${idle_seconds}s of the machine sitting idle"
-[[ -n $project_engine ]] && print "# engine   $project_engine alone (COHERE_PROJECT_ENGINE), with --directory at each run's copy"
+[[ -n $project_kind ]] && print "# kind     $project_kind alone (COHERE_PROJECT_KIND), with --directory at each run's copy"
 (measuring cold || measuring idle) && print "# cold     cohere ${cold} ${build_arguments}"
 print "# builds   $builds${build_arguments:+, every run given ${build_arguments}}"
 print "# go       GOGC ${GOGC-(unset)}, GOMEMLIMIT ${GOMEMLIMIT-(unset)}, GOMAXPROCS ${GOMAXPROCS-(unset)}"
 print
 
-# run_cohere runs the pinned engine in the copy; see run_timed. Narrowed to one engine, it names the copy
-# the run is in, which a first run sets to its own clone, and the engine for that run alone.
+# run_cohere runs the pinned cohere in the copy; see run_timed. Narrowed to one project kind, it names the copy
+# the run is in, which a first run sets to its own clone, and the cohere binary for that run alone.
 run_cohere() {
   local log=$1; shift
-  if [[ -n $project_engine ]]; then
-    COHERE_PROJECT_ENGINE=$project_engine run_timed $log $engine --json --directory $copy $build_arguments "$@"
+  if [[ -n $project_kind ]]; then
+    COHERE_PROJECT_KIND=$project_kind run_timed $log $cohere_pinned --json --directory $copy $build_arguments "$@"
   else
-    run_timed $log $engine --json $build_arguments "$@"
+    run_timed $log $cohere_pinned --json $build_arguments "$@"
   fi
 }
 
@@ -294,20 +294,20 @@ measure() {
   at_floor $idle_after ||
     top -l 2 -s 1 -n 12 -o cpu -stats command,pid,cpu 2> /dev/null |
     awk '/^COMMAND/ { sample++ } sample == 2' > $logs/$mode-$round.busy-after
-  # One build per round: a run that ran any Swift engine but the pinned one measured another (#ywx8zgd).
-  local other_swift=$(swift_engine_named_otherwise $log)
+  # One build per round: a run that ran any cohere-swift but the pinned one measured another (#ywx8zgd).
+  local other_swift=$(swift_binary_named_otherwise $log)
   [[ -z $other_swift ]] ||
-    fail "the $mode run of round $round ran the Swift engine $other_swift, not the pinned one; see $log"
+    fail "the $mode run of round $round ran cohere-swift $other_swift, not the pinned one; see $log"
   local quiet=loaded
   at_floor $idle_before && at_floor $idle_after && quiet=quiet
-  # The run's engine seconds, findings and cache use, from its --json summary. A log the reader cannot
+  # The run's binary seconds, findings and cache use, from its --json summary. A log the reader cannot
   # read stops the benchmark rather than recording a column it could not fill.
   # And the builds its Go project checked, which the record keeps for the cold and idle runs.
-  local output engine_seconds findings cache checked_builds
+  local output summary_seconds findings cache checked_builds
   output=$($run_output_reader $log) || fail "could not read the run's output, see $log"
-  IFS=$'\t' read -r engine_seconds findings cache checked_builds <<< $output
+  IFS=$'\t' read -r summary_seconds findings cache checked_builds <<< $output
   printf '%s\t%d\t%.3f\t%.3f\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\n' $mode $round $verdict_seconds \
-    $settled_seconds $engine_seconds $findings "$cache" $before $after $idle_before $idle_after $quiet $exit_code $primes \
+    $settled_seconds $summary_seconds $findings "$cache" $before $after $idle_before $idle_after $quiet $exit_code $primes \
     "$checked_builds" | tee -a $table
 }
 
@@ -334,7 +334,7 @@ if measuring edit; then
   original_hash=$(shasum -a 256 < $edit_original)
 fi
 
-printf 'mode\tround\tverdict_s\tsettled_s\tengine_s\tfindings\tcache\tload_before\tload_after\tidle_before\tidle_after\tquiet\texit\tprimes\tbuilds\n'
+printf 'mode\tround\tverdict_s\tsettled_s\tsummary_s\tfindings\tcache\tload_before\tload_after\tidle_before\tidle_after\tquiet\texit\tprimes\tbuilds\n'
 rounds_taken=0
 stopped_early=false
 for round in $(seq 1 $runs); do
@@ -409,7 +409,7 @@ fi
 # What the primes and warm runs should never do. After the first round the cache holds the last round, so a
 # prime that took nothing from it is #547dhjz, a cache the run before left unusable. A warm run is a whole
 # replay or the benchmark measured something else under its name. The first round's first prime may start
-# cold, after a new engine, and is not warned on.
+# cold, after a new binary, and is not warned on.
 if [[ -f $logs/primes.tsv ]]; then
   awk -F'\t' '$1 > 1 && $3 == "none" {
       printf "warning: round %s prime %s took nothing from the cache (#547dhjz); see prime-%s-%s.log\n", $1, $2, $1, $2 }' $logs/primes.tsv
@@ -457,11 +457,11 @@ if [[ $record == true ]]; then
   record_flags=(-modes ${(j:,:)${(C)record_modes}} -band $band)
   [[ $stopped_early == true ]] && record_flags+=(-stopped-early)
   measuring edit && record_flags+=(-edit $edit)
-  [[ -n $project_engine ]] && record_flags+=(-project-engine $project_engine)
+  [[ -n $project_kind ]] && record_flags+=(-project-kind $project_kind)
   (( ${cold[(Ie)--no-fix]} )) && record_flags+=(-no-fix)
   [[ $builds == every ]] && record_flags+=(-every-build)
   record_flags+=(-gogc=${GOGC-} -gomemlimit=${GOMEMLIMIT-} -gomaxprocs=${GOMAXPROCS-})
-  (cd ${0:A:h:h} && go run ./internal/bench_results/tools/record -runs $runs_table -engine $engine \
+  (cd ${0:A:h:h} && go run ./internal/bench_results/tools/record -runs $runs_table -binary $cohere_pinned \
     -project ${project:t} -project-commit $project_commit -idle-floor $idle_floor -settle $settle \
     -rounds $rounds_taken -out ${record_directory:-bench/results} $record_flags) ||
     fail "could not record the run; its logs are in $logs"

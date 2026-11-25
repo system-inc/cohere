@@ -501,8 +501,8 @@ thing as data:
 The distinction between the two report calls is not cosmetic. **A Fix is applied
 unattended; a Suggestion needs a human to choose it.** Upstream draws the same line
 with `fix` versus `suggest`, and it is part of what you are porting: shipping a
-suggestion as a fix means the edit engine rewrites code upstream would only have
-offered to rewrite. Read which one the rule uses before writing either. The engine
+suggestion as a fix means the fix pass rewrites code upstream would only have
+offered to rewrite. Read which one the rule uses before writing either. The fix pass
 that applies them is `internal/edit/`.
 
 **The `output` field in the corpus is the specification.** Assert with
@@ -2516,7 +2516,7 @@ them.
 
 ### NeedsTypeChecker does not save you from a nil checker
 
-`NeedsTypeChecker: true` governs the REGISTRATION path: the engine will not hand your rule a
+`NeedsTypeChecker: true` governs the REGISTRATION path: the linter will not hand your rule a
 file without a checker. It says nothing about the HARNESS path, where a `rule.Context` can be
 built by hand — and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` does exactly that.
 
