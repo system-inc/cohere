@@ -296,6 +296,10 @@ func run() error {
 	}
 	given := map[string]bool{}
 	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
+	choice, languageChoiceError := languageChoiceOf(given, *languagesFlag, *formatsFlag)
+	if languageChoiceError != nil {
+		return languageChoiceError
+	}
 	location, locateError := locateProject(locationRequest{
 		WorkingDirectory:        workingDirectory,
 		Directory:               *directory,
@@ -311,7 +315,11 @@ func run() error {
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
 	atNamedDirectory := namedDirectoryHoldsSeveral(given, flag.Args(), location, locateError)
-	if discoveryApplies(given, flag.Args()) || atNamedDirectory {
+	discovers := discoveryApplies(given, flag.Args()) || atNamedDirectory
+	if chooseError := chooseNamedRunLanguages(discovers, choice, location, locateError); chooseError != nil {
+		return chooseError
+	}
+	if discovers {
 		namedLintConfiguration := ""
 		if given["lint-config"] {
 			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
@@ -327,6 +335,7 @@ func run() error {
 			formats,
 			given,
 			atNamedDirectory,
+			choice,
 		)
 		if checkDiscoveredProjectsError != nil {
 			return checkDiscoveredProjectsError

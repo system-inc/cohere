@@ -49,12 +49,22 @@
             "usage": "format only, proposing no fixes and running no other phase (implies --format); with --no-fix, the commit gate's format check: every file formatting would change here or in a nested repository is a finding, and so is one the formatter could not read, and the exit is 0 only when there are none"
         },
         {
+            "name": "formats",
+            "argument": "string",
+            "usage": "format only these kinds of file, a comma list of json, markdown, yaml, css and graphql, wherever they live; naming this or --languages checks exactly what the two name, and names the rest as left out"
+        },
+        {
             "name": "host-build-only",
             "usage": "in a Go project, check only this machine's build, not every build its files name (another GOOS, cgo, a build tag), and name each file only another build compiles as not checked"
         },
         {
             "name": "json",
             "usage": "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json"
+        },
+        {
+            "name": "languages",
+            "argument": "string",
+            "usage": "check only these languages, a comma list of go, typescript (JavaScript and Adamic included) and swift; naming this or --formats checks exactly what the two name, and names the rest as left out"
         },
         {
             "name": "lint",

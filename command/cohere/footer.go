@@ -402,6 +402,9 @@ type overallFacts struct {
 	// warnings, which never fail the run (see folder_names.go).
 	FolderFindings int
 	FolderWarnings int
+	// LeftOut are the languages here that the two flags did not name, named on the line so a run that checked some
+	// languages never reads as a green over all of them (#s7gt4bj).
+	LeftOut []string
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -448,6 +451,9 @@ func overallFooter(facts overallFacts, style textStyle) string {
 		line += " • ⚠ " +
 			counted(facts.CoverageUnknown, "Swift coverage query failed, so some files may be counted twice",
 				"Swift coverage queries failed, so some files may be counted twice")
+	}
+	if segment := leftOutSegment(facts.LeftOut); segment != "" {
+		line += " • " + segment
 	}
 	for _, segment := range engineBuildSegments(facts.EngineBuilds) {
 		line += " • " + segment

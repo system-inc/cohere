@@ -94,7 +94,8 @@ func namedDirectoryHoldsSeveral(
 // lintConfigFileName is the lint config the command line named, absolute, or empty: every project's run
 // gets it, since a path typed here would resolve against each project's directory there. formats is whether
 // the run formats, which decides whether a root no TypeScript project holds gets its format project. given is
-// the flags the command line set, by name.
+// the flags the command line set, by name. choice is the languages the two flags named, nil for every one, whose
+// projects alone run; the rest are named as left out (#s7gt4bj).
 func checkDiscoveredProjects(
 	location projectLocation,
 	locateError error,
@@ -103,6 +104,7 @@ func checkDiscoveredProjects(
 	formats bool,
 	given map[string]bool,
 	atNamedDirectory bool,
+	choice languageChoice,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
 	if atNamedDirectory {
@@ -169,6 +171,24 @@ func checkDiscoveredProjects(
 			projectMarker, swiftProjectMarker, goWorkspaceMarker, goModuleMarker, root, solutions, found.Ignored,
 			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
+	// After the format project is added, so the choice takes it as it chooses any, and after a tree with no
+	// project is refused, which it is whatever languages were named.
+	found.chooseLanguages(choice, formats)
+	if len(found.Projects) == 0 && len(found.NotFound) == len(choice) {
+		return 0, false, fmt.Errorf("this run names %s, and nothing here is any of them: here is %s, so nothing was "+
+			"checked", sayList(choice), sayList(found.LeftOutLanguages))
+	}
+	if len(found.Projects) == 0 {
+		// A named language is here, and only a format walk would check it, which this run does not make.
+		return 0, false, fmt.Errorf("this run names %s, which a run checks here only by formatting them, and this run "+
+			"does not format, so nothing was checked: run it without --types, --lint or --no-format", sayList(choice))
+	}
+	// On standard error, where a run says what it was refused, so every view says it.
+	if len(found.NotFound) > 0 {
+		fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.Of(fmt.Sprintf(
+			"this run names %s, and nothing here is any of them, so it checked nothing of them",
+			sayList(found.NotFound))))
+	}
 	if refuseError := refuseGoOnlySwitchesWithoutGo(found, given, flagValue); refuseError != nil {
 		return 0, false, refuseError
 	}
@@ -179,7 +199,11 @@ func checkDiscoveredProjects(
 	)
 	// A folder finding is this run's to print and count, after its project's run, which then runs in its own
 	// process as one of several would, so the project's recorded run never holds a folder verdict.
-	if found.isTheLocatedProject(location, locateError) && len(found.Folders) == 0 {
+	//
+	// A run that named languages runs its projects as one of several would, even when one is left: the project's run
+	// is then the plain run of that project, which replays as one, and this run, which names what it left out, never
+	// does, since discovery decides afresh each time what there is to leave out (#s7gt4bj).
+	if found.isTheLocatedProject(location, locateError) && len(found.Folders) == 0 && choice == nil {
 		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings
 		for _, note := range found.notes() {
@@ -194,6 +218,11 @@ func checkDiscoveredProjects(
 	if activeOutput.Mode == outputJson && len(discoveredIgnores) > 0 {
 		writeJsonLine(streams.Output, ignorePatternsJson{Kind: "ignorePatterns", IgnorePatterns: discoveredIgnores})
 	}
+	if activeOutput.Mode == outputJson && choice != nil {
+		for _, record := range choiceJsonsOf(choice, found) {
+			writeJsonLine(streams.Output, record)
+		}
+	}
 	showWarning()
 	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName, atNamedDirectory), streams.Output),
 		true, nil
@@ -201,10 +230,12 @@ func checkDiscoveredProjects(
 
 // childArguments are the arguments every project's run gets: this run's, with a named lint config made
 // absolute, and without the named directory when the run is at one (namedDirectoryHoldsSeveral), since each
-// project's run names its own. Discovery runs only when no path was named, so every argument is a flag, and a
-// flag's value is either joined to it with `=` or the next argument, since no boolean flag takes a separate one.
+// project's run names its own. Never `--languages` or `--formats`: this run chose the projects, and each one's run
+// is that project's plain run, so it replays as one (#s7gt4bj). Discovery runs only when no path was named, so every
+// argument is a flag, and a flag's value is either joined to it with `=` or the next argument, since no boolean flag
+// takes a separate one.
 func childArguments(arguments []string, lintConfigFileName string, atNamedDirectory bool) []string {
-	var dropped []string
+	dropped := []string{languagesFlagName, formatsFlagName}
 	if lintConfigFileName != "" {
 		dropped = append(dropped, "lint-config")
 	}
@@ -221,9 +252,6 @@ func childArguments(arguments []string, lintConfigFileName string, atNamedDirect
 // withoutValuedFlags is arguments less each flag named in dropped and its value, joined to it with `=` or the next
 // argument. Every argument is a flag here (see childArguments).
 func withoutValuedFlags(arguments []string, dropped []string) []string {
-	if len(dropped) == 0 {
-		return arguments
-	}
 	kept := make([]string, 0, len(arguments)+2)
 	for index := 0; index < len(arguments); index++ {
 		name, _, joined := strings.Cut(strings.TrimLeft(arguments[index], "-"), "=")
@@ -492,7 +520,12 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		case engineSwift:
 			yield = found.swiftYield(project)
 		case engineFormat:
-			yield = found.formatYield()
+			yield = found.formatYield(project)
+		}
+		// Every format walk leaves out the files of the languages the two flags did not name, which the yield's
+		// fingerprint then carries into the project run's replay key (#s7gt4bj).
+		if project.Engine == engineTypeScript || project.Engine == engineFormat {
+			yield.LeftOutExtensions = found.Choice.leftOutExtensions()
 		}
 		yieldFile, writeProjectYieldError := writeProjectYield(yield, yieldDirectory)
 		if writeProjectYieldError != nil {
@@ -615,6 +648,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.FolderFindings, facts.FolderWarnings = folderSummary.Findings, folderSummary.WarningFindings
 	facts.EngineBuilds = builtEngines()
+	facts.LeftOut = found.LeftOutLanguages
 	switch {
 	case oneLine:
 		fmt.Fprintln(out, combinedFooter(runs, facts, facts.Total, activeOutput.Style))
@@ -831,6 +865,9 @@ func summaryLine(found discovery, runs []projectRun) string {
 			notRunParts,
 			fmt.Sprintf("%d Swift packages another package's run covers", len(found.SwiftCoverage.Covered)),
 		)
+	}
+	if len(found.LeftOutLanguages) > 0 {
+		notRunParts = append(notRunParts, "left out: "+strings.Join(found.LeftOutLanguages, ", "))
 	}
 	notRun := ""
 	if len(notRunParts) > 0 {

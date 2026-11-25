@@ -137,6 +137,18 @@ changed in cohere outside the sets is written under the same heading.
   holds a type error, a run holds the wrap and the save makes it, ahead of the gate and never against it. An
   ignored file, one no package holds, and a buffer that does not parse come back as typed, the reason on
   stderr. The VS Code extension now formats `.go` on save.
+- `--languages <list>` and `--formats <list>` check exactly what they name (#s7gt4bj, Kirk's design). `--languages`
+  takes the code, checked, linted and formatted: `go`, `typescript` (JavaScript and Adamic's `.a` included) and
+  `swift`. `--formats` takes the files cohere only formats: `json`, `markdown`, `yaml`, `css` and `graphql`. Naming
+  either narrows the run to exactly what the two name: `cohere --languages go` checks a repository's Go and nothing
+  else, `--languages go --formats markdown` adds its Markdown, and `--formats json` formats its JSON alone, wherever
+  it lives, a TypeScript program's included. Every kind of file a run checks is one name's. The footer and the
+  verbose summary name each language and format here that was left out (`⚠ left out: swift, markdown`), so a
+  narrowed run never reads as a whole green, and `--json` writes a `languages` and a `formats` record. A name a
+  flag does not take is refused with the names it does; a named one nothing here is is said in one line; naming
+  only such names is refused, and so is a path or `--stdin-filepath` of a kind not named. A plain run is unchanged,
+  its replay key included; a narrowed run never replays as a whole one, since only its projects' runs replay, each
+  that project's plain run, and the kinds a format walk leaves out are in its key.
 - `--profile <file>` profiles a Go run's engine too (#r33n96f): the front door writes its own CPU profile to the
   file, as before, and the Go engine, which does the run's work, writes its own beside it, `go` before the
   extension (`run.pprof` gives `run.go.pprof`). The engine takes `--profile` itself, so release's training script
