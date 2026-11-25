@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/system-inc/cohere/git_tree"
+	"github.com/system-inc/cohere/internal/git_tree"
 )
 
 // Gitlink is one submodule of a worktree: its path and the commit its tree pins.

@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/high_level_intermediate_representation"
 	utilsreact "github.com/system-inc/cohere/internal/typescript_language/ecmascript/react"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 var messageSetStateInEffect = rule.Message{

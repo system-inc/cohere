@@ -27,7 +27,7 @@
 // not have known it, and it runs here.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // PruneNonReactiveDependencies removes scope dependencies that cannot change between renders.
 //

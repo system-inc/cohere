@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
 )
 
 func TestManualMemoizationPreservesComputedFrozenRead(test *testing.T) {

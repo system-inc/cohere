@@ -6,7 +6,7 @@ package intermediate_representation
 import (
 	"sync"
 
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // liftingScratchPool holds the scratch of functions done lifting, for the next function any goroutine lifts.

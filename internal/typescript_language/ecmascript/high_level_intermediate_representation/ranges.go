@@ -8,8 +8,8 @@
 package high_level_intermediate_representation
 
 import (
-	"github.com/system-inc/cohere/mutation_aliasing"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // InferMutableRanges computes the mutable range of every value in function, returning them as a

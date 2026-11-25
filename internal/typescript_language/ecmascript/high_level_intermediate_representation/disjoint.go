@@ -124,8 +124,8 @@ package high_level_intermediate_representation
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/mutation_aliasing"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // DisjointGap names a union rule this pass cannot apply, for a caller that needs to know.

@@ -35,7 +35,7 @@
 // invalid case puts the call on a path that both tests agree about.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // postDominatorExit is the synthetic block every return flows into.
 //

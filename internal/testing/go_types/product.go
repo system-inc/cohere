@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/go_listing"
+	"github.com/system-inc/cohere/modules/go_listing"
 )
 
 // A Product is the export data of every package a set of tests reads that is outside the module it

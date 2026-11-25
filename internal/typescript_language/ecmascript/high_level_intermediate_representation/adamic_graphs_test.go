@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/testing/needs"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
-	"github.com/system-inc/cohere/static_single_assignment"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // exportGraphs names the directory TestExportGraphsForAdamic writes to. Only a test flag sets it, so

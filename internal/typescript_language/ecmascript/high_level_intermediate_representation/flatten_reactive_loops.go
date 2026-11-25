@@ -38,7 +38,7 @@
 // them, and the dependency collector must see the pruned flag rather than discover the scope alive.
 package high_level_intermediate_representation
 
-import "github.com/system-inc/cohere/static_single_assignment"
+import "github.com/system-inc/cohere/modules/static_single_assignment"
 
 // FlattenReactiveLoops marks every reactive scope that begins inside a loop as pruned.
 //

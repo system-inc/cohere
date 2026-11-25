@@ -13,7 +13,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
 	"github.com/system-inc/cohere/internal/testing/needs"
-	"github.com/system-inc/cohere/unicode_properties"
+	"github.com/system-inc/cohere/modules/unicode_properties"
 )
 
 type inventoryRange struct{ Lo, Hi rune }
@@ -181,14 +181,14 @@ func TestUnicodePropertiesNode(test *testing.T) {
 
 func TestUnicodePropertiesFresh(test *testing.T) {
 	test.Parallel()
-	build_inputs.Record(test, ".", "../../../../unicode_properties/internal/generate")
+	build_inputs.Record(test, ".", "../../../../modules/unicode_properties/internal/generate")
 	command := exec.Command(
 		"go",
 		"run",
-		"../../../../unicode_properties/internal/generate",
+		"../../../../modules/unicode_properties/internal/generate",
 		"-check",
 		"-output",
-		"../../../../unicode_properties/tables_generated.go",
+		"../../../../modules/unicode_properties/tables_generated.go",
 	)
 	output, outputError := command.CombinedOutput()
 	if outputError != nil {
