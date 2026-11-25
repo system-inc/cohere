@@ -42,9 +42,41 @@ func upstreamTree(test *testing.T) string {
 }
 
 // staticcheck's own fixture holds the port to every `//@ diag(...)` note the original expects, and to nothing more.
+// Each note sits in the comment it marks, which the message quotes whole, so the note's pattern always matches its own
+// text there: this holds where the port reports, and TestPortReportsUpstreamMessagesWordForWord holds what it says.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
 	parity.RequireStaticcheckWants(test, Analyzer, upstreamTree(test), upstreamPackage)
+}
+
+// upstreamMessages is every finding the port makes over staticcheck's fixture, by line, with its message written out
+// here rather than read from the fixture, whose notes the messages quote. The second comment's tab after its slashes
+// reads `\t` in the message, as %q writes it.
+var upstreamMessages = []struct {
+	line    int
+	message string
+}{
+	{5, "ineffectual compiler directive due to extraneous space: " +
+		"\"// go:linkname bad1 foo.Bad1 //@ diag(`ineffectual compiler directive`)\""},
+	{9, "ineffectual compiler directive due to extraneous space: " +
+		"\"//\\tgo:foobar sdlkfjlaksdj //@ diag(`ineffectual compiler directive`)\""},
+}
+
+// Over staticcheck's fixture the port says word for word what upstreamMessages holds, so a message that lost a word
+// or its quoting fails here, where the fixture's notes, matched against a message that quotes them, cannot tell.
+func TestPortReportsUpstreamMessagesWordForWord(test *testing.T) {
+	test.Parallel()
+	_, portFindings := parity.Findings(test, sa9009.Analyzer, Analyzer, upstreamTree(test), upstreamPackage)
+	if len(portFindings) != len(upstreamMessages) {
+		test.Fatalf("the port made %d findings over staticcheck's fixture, and %d are written out: %v",
+			len(portFindings), len(upstreamMessages), portFindings)
+	}
+	for index, expected := range upstreamMessages {
+		if portFindings[index].Line != expected.line || portFindings[index].Message != expected.message {
+			test.Errorf("finding %d is %q on line %d, and line %d says %q", index, portFindings[index].Message,
+				portFindings[index].Line, expected.line, expected.message)
+		}
+	}
 }
 
 // Over staticcheck's fixture and parity's, the original and the port find the same findings. parity holds every way a
