@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+
+	"github.com/system-inc/cohere/go_listing"
 )
 
 type loader struct {
@@ -31,7 +33,7 @@ type loader struct {
 }
 
 func (loader *loader) load() (*Loaded, error) {
-	var sourcePackages []*listedPackage
+	var sourcePackages []*go_listing.Package
 	for _, listedPackage := range loader.listed.packages {
 		if loader.fromExports[listedPackage.ImportPath] || listedPackage.ImportPath == "unsafe" {
 			continue
@@ -116,7 +118,7 @@ func (loader *loader) importExported(path string) (*types.Package, error) {
 // GoFiles, under its own path and name), or one of its test variants. overrides, when set, stands in for the
 // packages it names, as a test variant does for the packages go test builds again.
 func (loader *loader) check(
-	listedPackage *listedPackage,
+	listedPackage *go_listing.Package,
 	packagePath, name string,
 	names []string,
 	overrides map[string]*types.Package,
@@ -159,7 +161,7 @@ func (loader *loader) check(
 
 // testVariants type-checks each named package's tests as go test builds them, for every named package at once,
 // as many at once as slots allows, and returns them in the named packages' order.
-func (loader *loader) testVariants(sourcePackages []*listedPackage, slots chan struct{}) []*Package {
+func (loader *loader) testVariants(sourcePackages []*go_listing.Package, slots chan struct{}) []*Package {
 	byRoot := make([][]*Package, len(sourcePackages))
 	var group sync.WaitGroup
 	for index, listedPackage := range sourcePackages {
@@ -185,7 +187,7 @@ func (loader *loader) testVariants(sourcePackages []*listedPackage, slots chan s
 
 // testVariantsOf is go test's packages for one package: "p [p.test]", its files and its in-package tests;
 // each package the external tests reach that imports p, again against "p [p.test]"; and "p_test [p.test]".
-func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
+func (loader *loader) testVariantsOf(listedPackage *go_listing.Package) []*Package {
 	path := listedPackage.ImportPath
 	testName := " [" + path + ".test]"
 	var variants []*Package
@@ -257,7 +259,7 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 // the parser reported, and with what go list reported when withListErrors, as the package's errors.
 //
 // Mutates: read gains the files, their syntax and their errors, as the package being loaded
-func (loader *loader) parse(listedPackage *listedPackage, names []string, withListErrors bool, read *Package) {
+func (loader *loader) parse(listedPackage *go_listing.Package, names []string, withListErrors bool, read *Package) {
 	if withListErrors && listedPackage.Error != nil {
 		read.Errors = append(read.Errors, errors.New(listedPackage.Error.Message))
 	}
@@ -290,7 +292,7 @@ func (loader *loader) parse(listedPackage *listedPackage, names []string, withLi
 
 // resolve is one source package's import of path: an override, a source package as checked, or export data.
 func (loader *loader) resolve(
-	importer *listedPackage,
+	importer *go_listing.Package,
 	path string,
 	overrides map[string]*types.Package,
 ) (*types.Package, error) {
