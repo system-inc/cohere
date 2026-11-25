@@ -45,7 +45,7 @@ var (
 // what the cgo tool writes, and loads only where it runs.
 func requireCCompiler(test *testing.T) {
 	test.Helper()
-	named := go_root.CCompiler()
+	named := go_root.CCompiler(test)
 	compiler := strings.Fields(named)
 	found := len(compiler) > 0
 	if found {
