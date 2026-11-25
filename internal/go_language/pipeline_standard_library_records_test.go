@@ -412,7 +412,7 @@ func TestAWarmBuildDependenceRunWritesNoEntryToTheSystemCache(test *testing.T) {
 // its withheld body alone. The table is filled from a fixture that imports plugin too, so the host restores it.
 func TestTheStandardLibrarysSideGraphSeedsWhatItsLoadWithheld(test *testing.T) {
 	test.Parallel()
-	if enabled := go_root.CgoEnabled(); !enabled || !slices.Contains([]string{"darwin", "linux", "freebsd"},
+	if enabled := go_root.CgoEnabled(test); !enabled || !slices.Contains([]string{"darwin", "linux", "freebsd"},
 		runtime.GOOS) {
 		test.Skipf("plugin has a cgo file only with cgo on under darwin, linux or freebsd, and here GOOS is %s and "+
 			"cgo on %t: run `go run ./command/cohere-dev test ./internal/go_language -run %s` on one with cgo on",

@@ -347,7 +347,7 @@ func TestBuildsForCoheresOwnCensus(test *testing.T) {
 	if portsError != nil {
 		test.Fatal(portsError)
 	}
-	host := hostAt()
+	host := hostAt(test)
 	builds, unbuilt := buildsFor(test, census, host, ports)
 	requireEachCompiledOnce(test, census, builds, unbuilt)
 	for _, each := range builds {
@@ -366,10 +366,11 @@ func TestBuildsForCoheresOwnCensus(test *testing.T) {
 // process: the target go/build.Default reads, as go env does from the environment or the binary's own, cgo as
 // go_root decides it, and `GOFLAGS`, with its `-tags` as the context's tags. `GOFLAGS` is the environment's,
 // which cohere-dev's test sets whole, so go env would read no go env file's in its place.
-func hostAt() Build {
+func hostAt(test *testing.T) Build {
+	test.Helper()
 	goFlags := strings.Fields(os.Getenv("GOFLAGS"))
 	buildContext := build.Default
-	buildContext.CgoEnabled = go_root.CgoEnabled()
+	buildContext.CgoEnabled = go_root.CgoEnabled(test)
 	buildContext.BuildTags = nil
 	for _, flag := range goFlags {
 		if tags, isTags := strings.CutPrefix(strings.TrimLeft(flag, "-"), "tags="); isTags {
