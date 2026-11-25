@@ -135,6 +135,9 @@ func combinedFooter(runs []projectRun, facts overallFacts, total time.Duration, 
 			"Swift coverage query failed, so some files may be counted twice",
 			"Swift coverage queries failed, so some files may be counted twice"))
 	}
+	if segment := leftOutSegment(facts.LeftOut); segment != "" {
+		named = append(named, segment)
+	}
 	line := footer(combined, style, footerOptions{})
 	if failed && !combined.failed() {
 		// The verdict is the line's first mark, so a failure the counts do not hold still turns it.

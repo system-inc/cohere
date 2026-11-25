@@ -8,6 +8,7 @@
         { "$ref": "#/$defs/crash" },
         { "$ref": "#/$defs/engineBuild" },
         { "$ref": "#/$defs/ignorePatterns" },
+        { "$ref": "#/$defs/languages" },
         { "$ref": "#/$defs/duplicate" },
         { "$ref": "#/$defs/duplicateRefused" },
         { "$ref": "#/$defs/duplicateCoverage" },
@@ -149,6 +150,38 @@
                 "kind": { "const": "ignorePatterns" },
                 "ignorePatterns": { "type": "array", "items": { "$ref": "#/$defs/ignoreEntry" } }
             }
+        },
+        "languages": {
+            "description": "What `--languages` chose, in a run that discovered its projects and named languages: written once, before the projects' lines. Each language by the name `--languages` takes.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "named", "checked", "leftOut", "notFound"],
+            "properties": {
+                "kind": { "const": "languages" },
+                "named": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/languageName" },
+                    "description": "The languages the command line named."
+                },
+                "checked": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/languageName" },
+                    "description": "The languages named that are here, which this run checked wherever their files live."
+                },
+                "leftOut": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/languageName" },
+                    "description": "The languages here that the command line did not name: nothing of them was checked."
+                },
+                "notFound": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/languageName" },
+                    "description": "The languages named that no project here is in."
+                }
+            }
+        },
+        "languageName": {
+            "enum": ["go", "typescript", "swift", "adamic", "json", "markdown", "yaml", "css", "graphql"]
         },
         "crash": {
             "description": "A rule that could not finish a file, or a file nothing could check, because cohere crashed. A bug in cohere, not in the code checked, and it fails the run.",

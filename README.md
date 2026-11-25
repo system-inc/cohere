@@ -216,6 +216,7 @@ is an engine check, so it is configurable without being an entry in `cohere --ru
 | `--unused-all`          | list the unused findings already marked `cohere-keep`, not only count them (implies `--unused`)                                                                                |
 | `--unused-deep`         | also group the unused code into islands by what reaches what (implies `--unused`)                                                                                              |
 | `--duplicates`          | report functions that compute the same thing, written more than once (TypeScript and Go), size 11 and up; a report that never fails a build                                    |
+| `--languages LIST`      | check only these languages wherever they live (`go`, `typescript`, `swift`, `adamic`, `json`, `markdown`, `yaml`, `css`, `graphql`), naming the rest left out                  |
 | `--directory PATH`      | the project root (default: the nearest `tsconfig.json` or `Package.swift` above you)                                                                                           |
 | `--tsconfig PATH`       | the tsconfig that defines the program (default: the nearest `tsconfig.json`)                                                                                                   |
 | `--lint-config PATH`    | the settings file, relative to `--directory` if given, else to where you run it (default: `CohereSettings.json` at the project root)                                           |

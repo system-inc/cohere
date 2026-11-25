@@ -57,6 +57,11 @@
             "usage": "print newline-delimited JSON for a program to read, described by schema/CohereOutput.schema.json"
         },
         {
+            "name": "languages",
+            "argument": "string",
+            "usage": "check only these languages, wherever their files live: a comma list of go, typescript (JavaScript included), swift, adamic, json, markdown, yaml, css and graphql, naming the rest as left out (default: every language found)"
+        },
+        {
             "name": "lint",
             "usage": "run the lint rules only, reporting their findings without fixing them and without TypeScript's diagnostics"
         },

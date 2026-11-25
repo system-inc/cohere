@@ -347,7 +347,7 @@ func mentionsReferences(configurationFile string) bool {
 // writeProjectYield writes what one project yields to a file of its own for its run to read, and returns
 // the path, or "" when it yields nothing.
 func writeProjectYield(yield projectYield, directory string) (string, error) {
-	if len(yield.Files) == 0 && len(yield.Directories) == 0 {
+	if len(yield.Files) == 0 && len(yield.Directories) == 0 && len(yield.LeftOutExtensions) == 0 {
 		return "", nil
 	}
 	encoded, encodeError := json.Marshal(yield)
@@ -395,31 +395,48 @@ var activeProjectYield = sync.OnceValues(func() (projectYield, error) {
 // nestedProjectsLayer is the format walk's count of files it left to the projects below it.
 const nestedProjectsLayer = "nearer projects"
 
+// leftOutLanguagesLayer is the format walk's count of files in languages `--languages` did not name (#s7gt4bj).
+const leftOutLanguagesLayer = "languages left out by --languages"
+
+// namedRunLeftOutExtensions are the extensions a run that names its project, rather than one discovery started,
+// leaves out of its format walk under `--languages`, set by main; a project's run one of several reads its own from
+// its yield instead.
+var namedRunLeftOutExtensions []string
+
 // withoutYieldedDirectories is a format walk less the files under the directories this run yields, each the
-// run of the project there formats. A walk the run yields nothing from is returned as it is.
+// run of the project there formats, and less the files in languages `--languages` did not name, each counted under
+// the layer that says why. A walk the run leaves nothing out of is returned as it is.
 func withoutYieldedDirectories(enumeration format_files.Enumeration) format_files.Enumeration {
 	yield, activeProjectYieldError := activeProjectYield()
-	if activeProjectYieldError != nil || len(yield.Directories) == 0 {
+	if activeProjectYieldError != nil {
 		return enumeration
 	}
-	kept := enumeration.Files[:0:0]
-	for _, fileName := range enumeration.Files {
-		if yieldsFile(yield.Directories, fileName) {
-			enumeration.IgnoredByLayer[nestedProjectsLayer]++
-			continue
-		}
-		kept = append(kept, fileName)
+	leftOut := yield.LeftOutExtensions
+	if len(leftOut) == 0 {
+		leftOut = namedRunLeftOutExtensions
 	}
-	enumeration.Files = kept
-	keptAdamic := enumeration.Adamic[:0:0]
-	for _, fileName := range enumeration.Adamic {
-		if yieldsFile(yield.Directories, fileName) {
-			enumeration.IgnoredByLayer[nestedProjectsLayer]++
-			continue
-		}
-		keptAdamic = append(keptAdamic, fileName)
+	if len(yield.Directories) == 0 && len(leftOut) == 0 {
+		return enumeration
 	}
-	enumeration.Adamic = keptAdamic
+	if enumeration.IgnoredByLayer == nil {
+		enumeration.IgnoredByLayer = map[string]int{}
+	}
+	keep := func(fileNames []string) []string {
+		kept := fileNames[:0:0]
+		for _, fileName := range fileNames {
+			switch {
+			case yieldsFile(yield.Directories, fileName):
+				enumeration.IgnoredByLayer[nestedProjectsLayer]++
+			case leavesOutFile(leftOut, fileName):
+				enumeration.IgnoredByLayer[leftOutLanguagesLayer]++
+			default:
+				kept = append(kept, fileName)
+			}
+		}
+		return kept
+	}
+	enumeration.Files = keep(enumeration.Files)
+	enumeration.Adamic = keep(enumeration.Adamic)
 	return enumeration
 }
 
@@ -438,10 +455,11 @@ func yieldsFile(directories []string, fileName string) bool {
 // nothing, so a run that is not one of several keeps the key it had.
 func activeProjectYieldFingerprint() string {
 	yield, activeProjectYieldError := activeProjectYield()
-	if activeProjectYieldError != nil || (len(yield.Files) == 0 && len(yield.Directories) == 0) {
+	if activeProjectYieldError != nil ||
+		(len(yield.Files) == 0 && len(yield.Directories) == 0 && len(yield.LeftOutExtensions) == 0) {
 		return ""
 	}
-	// Ignored: a projectYield is two lists of strings, which always encode.
+	// Ignored: a projectYield is three lists of strings, which always encode.
 	encoded, _ := json.Marshal(yield)
 	digest := sha256.Sum256(encoded)
 	return hex.EncodeToString(digest[:])

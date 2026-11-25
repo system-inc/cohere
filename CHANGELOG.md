@@ -137,6 +137,16 @@ changed in cohere outside the sets is written under the same heading.
   holds a type error, a run holds the wrap and the save makes it, ahead of the gate and never against it. An
   ignored file, one no package holds, and a buffer that does not parse come back as typed, the reason on
   stderr. The VS Code extension now formats `.go` on save.
+- `--languages <list>` checks only the languages named, wherever their files live (#s7gt4bj): a comma list of
+  `go`, `typescript` (JavaScript included), `swift`, `adamic`, `json`, `markdown`, `yaml`, `css` and `graphql`,
+  read without regard to case, so `cohere --languages go` checks a repository without its Swift. Every file a run
+  checks is in exactly one language. A language whose files a TypeScript program's run formats is checked there
+  too: `--languages json` formats the JSON in a program's root, as a format run of that directory. The footer names
+  each language here that was left out (`⚠ left out by --languages: swift, markdown`), so a narrowed run never
+  reads as a whole green, and `--json` writes a `languages` record. An unknown name is refused with the names it
+  takes, a named language nothing here is in is said in one line, and naming only such languages is refused. A plain
+  run is unchanged, and so is its replay key; a run naming languages never replays as a whole one, since only its
+  projects' runs replay, each that project's plain run, and the kinds a format walk leaves out are in its key.
 - `--profile <file>` profiles a Go run's engine too (#r33n96f): the front door writes its own CPU profile to the
   file, as before, and the Go engine, which does the run's work, writes its own beside it, `go` before the
   extension (`run.pprof` gives `run.go.pprof`). The engine takes `--profile` itself, so release's training script
