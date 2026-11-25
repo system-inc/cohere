@@ -108,7 +108,13 @@ func TestCgoIncludeDirectoriesReadsEachOptionInEitherSpelling(test *testing.T) {
 		Directory:   "/module/package",
 		CgoCFlags:   []string{"-O2", "-I", "include", "-I/absolute/./one", "-DNAME=-Inot", "-include", "forced.h"},
 		CgoCppFlags: []string{"-I../shared", "-Iinclude", "-isystem", "/system", "-iquote", "quoted"},
-		CgoCxxFlags: []string{"-I/absolute/one", "-idirafter/after", "-isystem../shared", "-isystem../system", "-iquote"},
+		CgoCxxFlags: []string{
+			"-I/absolute/one",
+			"-idirafter/after",
+			"-isystem../shared",
+			"-isystem../system",
+			"-iquote",
+		},
 	}
 	if got, want := listed.CgoIncludeDirectories(), []string{
 		"/module/package/include",
