@@ -62,7 +62,7 @@ func readMoves(mappingPath string) ([]folderMove, error) {
 
 // newMapping checks the moves agree with each other and indexes them. A move nested in another must name its new
 // folder under the outer move's new folder, so applying the outer move first and then the inner one lands where
-// the line says.
+// the line says. A move whose parent stays may land under another parent, one no move takes away.
 func newMapping(modulePath string, moves []folderMove) (*mapping, error) {
 	result := &mapping{
 		modulePath:            modulePath,
@@ -84,7 +84,16 @@ func newMapping(modulePath string, moves []folderMove) (*mapping, error) {
 	})
 	for _, move := range result.moves {
 		parentOld := path.Dir(move.OldFolder)
-		if expected := result.NewFolder(parentOld); expected != path.Dir(move.NewFolder) {
+		if !result.Moved(parentOld) {
+			if newParent := path.Dir(move.NewFolder); result.Moved(newParent) {
+				return nil, fmt.Errorf(
+					"%s moves to %s, inside %s, which moves",
+					move.OldFolder,
+					move.NewFolder,
+					newParent,
+				)
+			}
+		} else if expected := result.NewFolder(parentOld); expected != path.Dir(move.NewFolder) {
 			return nil, fmt.Errorf(
 				"%s moves to %s, but its parent %s moves to %s",
 				move.OldFolder,

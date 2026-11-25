@@ -201,6 +201,14 @@ func moveFolders(root string, moves []folderMove, dryRun bool, output *bufio.Wri
 
 	for _, move := range mapping.moves {
 		source := path.Join(mapping.NewFolder(path.Dir(move.OldFolder)), path.Base(move.OldFolder))
+		// git mv needs the new folder's parent, which a move to a new shelf is the first to fill.
+		if makeError := os.MkdirAll(
+			filepath.Join(loaded.Root, filepath.FromSlash(path.Dir(move.NewFolder))),
+			0o755,
+		); makeError != nil {
+			fmt.Fprintf(output, "foldernames: %v\n", makeError)
+			return 1
+		}
 		command := exec.Command("git", "-C", loaded.Root, "mv", source, move.NewFolder)
 		if combined, moveError := command.CombinedOutput(); moveError != nil {
 			fmt.Fprintf(output, "foldernames: git mv %s %s: %v: %s\n", source, move.NewFolder, moveError, combined)

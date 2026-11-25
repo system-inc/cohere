@@ -427,3 +427,30 @@ func TestCompiles(test *testing.T) {}
 		test.Errorf("the folder did not move or the clause was not counted:\n%s", output.String())
 	}
 }
+
+// A move whose parent stays may land under another parent, a new shelf git mv needs made first, and every importer
+// follows; a move into a folder that itself moves is refused.
+func TestFolderNamesMoveOntoANewShelf(test *testing.T) {
+	test.Parallel()
+	if _, mappingError := newMapping("fixture", []folderMove{
+		{OldFolder: "goengine", NewFolder: "go_engine", NewPackage: "go_engine"},
+		{OldFolder: "user", NewFolder: "goengine/user", NewPackage: "user"},
+	}); mappingError == nil {
+		test.Error("a move into a folder that moves was accepted")
+	}
+	root := writeRepository(test, fixtureModule)
+	moves := []folderMove{
+		{OldFolder: "goengine/markertype", NewFolder: "shelf/marker_type", NewPackage: "marker_type"},
+	}
+	var output bytes.Buffer
+	if exitCode := run(root, moves, false, &output); exitCode != 0 {
+		test.Fatalf("exit %d:\n%s", exitCode, output.String())
+	}
+	if exists(root, "goengine/markertype") || !exists(root, "shelf/marker_type/marker.go") {
+		test.Errorf("the folder did not land on the new shelf:\n%s", output.String())
+	}
+	got := readFile(test, root, "goengine/load/load.go")
+	if !strings.Contains(got, `import "fixture/shelf/marker_type"`) || !strings.Contains(got, "marker_type.Marker") {
+		test.Errorf("the importer did not follow:\n%s", got)
+	}
+}
