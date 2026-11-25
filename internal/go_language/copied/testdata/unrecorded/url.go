@@ -1,4 +1,4 @@
-// cohere:copied example.com/uncached@v1.0.0 url.go
+// cohere:copied example.com/unrecorded@v1.0.0 url.go
 // cohere:until never: a planted copy, which TestPlantedCopies in upstream_test.go reads.
 
 // Copyright 2023 The Go Authors. All rights reserved.
