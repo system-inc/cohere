@@ -33,7 +33,7 @@ import (
 //     cohere we skip it"). Ignored means not this repository's: ahra ignores every clone under
 //     projects/, and each of those has its own gate.
 //   - node_modules, .build, .cache, .git and Go's testdata, ignored or not. node_modules holds packages'
-//     tsconfig.json files, cohere's own swift/.build/checkouts holds dozens of SwiftPM checkouts with a
+//     tsconfig.json files, cohere's own swift_language/.build/checkouts holds dozens of SwiftPM checkouts with a
 //     Package.swift each, and testdata holds fixtures, tsconfigs among them.
 //   - A directory with a repository of its own, a clone or a submodule. Its projects are its own to
 //     discover, and one inside a program, such as Structure or Base, is checked as part of that program,
@@ -200,7 +200,7 @@ var newIgnoreScope = newGitignoreScope
 
 // discoveryRoot is where discovery starts: the root the single-project walk up chose, unless the caller is
 // standing in a repository that holds no marker at its own level or above inside it. Then it is that
-// repository's root, which is how cohere's own repository, with Swift in swift/ and nothing at its root,
+// repository's root, which is how cohere's own repository, with Swift in swift_language/ and nothing at its root,
 // finds its package. Outside any repository and any project it is the working directory.
 func discoveryRoot(location projectLocation, locateError error, workingDirectory string) string {
 	repository := enclosingRepository(workingDirectory)
@@ -678,7 +678,7 @@ func nearestWorkspace(directory string, workspaces []string) (string, bool) {
 const xcodeProjectSpecification = "project.yml"
 
 // xcodeMarker is the entry that makes a directory a candidate Xcode root, by the child's own rule
-// (swift/Contract.md): its project.yml, or else its one .xcodeproj, or "" when it is no candidate. A
+// (swift_language/Contract.md): its project.yml, or else its one .xcodeproj, or "" when it is no candidate. A
 // Package.swift wins beside either, and two .xcodeproj, or a workspace and no project, the child refuses, so
 // none of those is a candidate. names are the listing's entries that are not directories, as the walk keeps
 // them for its other markers; a .xcodeproj is a bundle, a directory, and is counted whatever its type, as the

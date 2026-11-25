@@ -24,7 +24,7 @@ func TestASwiftBinaryRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
 	}
 
 	module := test.TempDir()
-	packageDirectory := filepath.Join(module, "swift")
+	packageDirectory := filepath.Join(module, "swift_language")
 	writeFile(test, filepath.Join(packageDirectory, "Package.swift"), `// swift-tools-version:6.2
 import PackageDescription
 let modified = Context.gitInformation?.hasUncommittedChanges ?? true

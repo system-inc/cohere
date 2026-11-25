@@ -556,7 +556,7 @@ type swiftLicense struct {
 	File       string
 }
 
-// swiftLicenses are cohere-swift's packages, by their identity in swift/Package.resolved, each
+// swiftLicenses are cohere-swift's packages, by their identity in swift_language/Package.resolved, each
 // license taken at the pinned revision.
 var swiftLicenses = map[string]swiftLicense{
 	"swift-argument-parser": {Expression: "Apache-2.0 WITH Swift-exception", File: "swift-argument-parser.txt"},

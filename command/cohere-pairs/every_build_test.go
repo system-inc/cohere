@@ -22,7 +22,7 @@ func standInGoChild(test *testing.T, root string, answer string) string {
 	directory := test.TempDir()
 	binary := filepath.Join(directory, "cohere")
 	script := "#!/bin/sh\n" +
-		"if [ \"$*\" = \"go-language --contract 3 --root " + root + " --version --host-build-only\" ]; then\n" +
+		"if [ \"$*\" = \"go-language --contract 4 --root " + root + " --version --host-build-only\" ]; then\n" +
 		answer + "\n" +
 		"fi\n" +
 		"printf '%s\\n' \"$@\" > " + filepath.Join(directory, "asked") + "\n"
@@ -78,7 +78,7 @@ func TestARunGivesTheSideItsEveryBuildArguments(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	want := []string{"go-language", "--contract", "3", "--root", corpus, "--no-fix", "--other-builds", "--no-cache"}
+	want := []string{"go-language", "--contract", "4", "--root", corpus, "--no-fix", "--other-builds", "--no-cache"}
 	if got := strings.Fields(string(asked)); !slices.Equal(got, want) {
 		test.Errorf("the Go child was asked %q, want %q", got, want)
 	}

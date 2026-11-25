@@ -24,8 +24,8 @@ func TestParseInvocationRefuses(test *testing.T) {
 		{"no contract", []string{"--root", "/project"}, "no --contract was given"},
 		{"a contract that is no number", []string{"--contract", "three", "--root", "/project"}, "not a version number"},
 		{
-			"a mismatch before an unknown flag", []string{"--contract", "4", "--frobnicate", "--root", "/project"},
-			"the front door speaks contract 4 and cohere-go speaks contract 3",
+			"a mismatch before an unknown flag", []string{"--contract", "5", "--frobnicate", "--root", "/project"},
+			"the front door speaks contract 5 and cohere-go speaks contract 4",
 		},
 		{"an unknown flag", append(slices.Clone(contractArguments), "--frobnicate"), "--frobnicate is not a flag"},
 		// Every build is checked unless `--host-build-only` is named (#qqyq61s), so the switch that asked for them is
@@ -36,9 +36,9 @@ func TestParseInvocationRefuses(test *testing.T) {
 		},
 		{"a flag with one dash", append(slices.Clone(contractArguments), "-fix"), "spelled with two dashes"},
 		{"a switch neither true nor false", append(slices.Clone(contractArguments), "--fix=maybe"), "true or false"},
-		{"a valued flag with no value", []string{"--contract", "3", "--root"}, "--root needs a value"},
-		{"no root", []string{"--contract", "3"}, "no --root was given"},
-		{"a relative root", []string{"--contract", "3", "--root", "project"}, "is not an absolute path"},
+		{"a valued flag with no value", []string{"--contract", "4", "--root"}, "--root needs a value"},
+		{"no root", []string{"--contract", "4"}, "no --root was given"},
+		{"a relative root", []string{"--contract", "4", "--root", "project"}, "is not an absolute path"},
 		{
 			"a relative lint config", append(slices.Clone(contractArguments), "--lint-config", "Settings.json"),
 			"--lint-config Settings.json is not an absolute path",
@@ -140,7 +140,7 @@ func TestParseInvocationReads(test *testing.T) {
 		// The system cache's switch is read as the project store's is (#syscache).
 		{"no-system-cache", append(slices.Clone(contractArguments), "--no-system-cache", "--no-fix"), modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
-		{"values after an equals sign", []string{"--contract=3", "--root=/project", "/project/a"}, modeCheck,
+		{"values after an equals sign", []string{"--contract=4", "--root=/project", "/project/a"}, modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, []string{"/project/a"}},
 		{"a path after -- that looks like a flag", append(slices.Clone(contractArguments), "--", "/project/--fix"),
 			modeCheck, []contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint},

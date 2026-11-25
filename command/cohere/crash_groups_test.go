@@ -35,7 +35,7 @@ type crashLanguage struct {
 	cause, wantMessage string
 }
 
-// swiftCrashSentence is cohere-swift's crash, worded as swift/Sources/CohereSwift/Pipeline/Linter.swift
+// swiftCrashSentence is cohere-swift's crash, worded as swift_language/Sources/CohereSwift/Pipeline/Linter.swift
 // words it: never a panic, and it names what the file was not judged for.
 const swiftCrashSentence = "no index store described it, so the rules that read what its names resolve to " +
 	"could not judge it (cohere-swift/correctness-no-unused-declaration); every other rule ran on it"

@@ -6,8 +6,8 @@ package release
 const SwiftBinaryFileName = "cohere-swift"
 
 // SwiftReleaseStampFileName is the generated file that carries the release's commit into cohere-swift,
-// beside EngineVersion.swift, which reads it under COHERE_RELEASE_STAMP. swift/.gitignore names it.
-const SwiftReleaseStampFileName = "EngineReleaseStamp.generated.swift"
+// beside ProgramVersion.swift, which reads it under COHERE_RELEASE_STAMP. swift_language/.gitignore names it.
+const SwiftReleaseStampFileName = "ReleaseStamp.generated.swift"
 
 // ShipsSwiftBinary reports whether a platform's package carries cohere-swift.
 //

@@ -6,7 +6,7 @@ import (
 )
 
 // checkedBuild is one build a Go run checked when it checked more than one, as the lint record's `builds` says it
-// (swift/Contract.md, internal/go_language/contract.BuildRecord), the host's first: its target as go env would make it,
+// (swift_language/Contract.md, internal/go_language/contract.BuildRecord), the host's first: its target as go env would make it,
 // with ` cgo` when cgo is on and its tags after ` tags `; the files of ours it compiles and the packages it analyzed,
 // every package of the workspace in each; and the findings that stand which it kept and the host's did not, and those
 // it kept that the merge left out. Then what the build restored from the host's run rather than checked, each count

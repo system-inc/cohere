@@ -231,7 +231,7 @@ run() {
   where="$base/$runTree"
   rm -f run.jsonl run.err
   if (cd "$where" && "${clean[@]}" PWD="$where" COHERE_SYSTEM_CACHE="$base/system" COHERE_GO_CHILD=1 \
-    /usr/bin/time -l "$base/cohere" go-language --contract 3 --root "$where" --no-fix "$@" > "$base/run.jsonl" \
+    /usr/bin/time -l "$base/cohere" go-language --contract 4 --root "$where" --no-fix "$@" > "$base/run.jsonl" \
     2> "$base/run.err"); then
     runCode=0
   else

@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/registry"
 )
 
-// swiftVerdictNames are the verdicts swift/HouseRuleVerdicts.json may give, the five Swift's decoding accepts.
+// swiftVerdictNames are the verdicts swift_language/HouseRuleVerdicts.json may give, the five Swift's decoding accepts.
 var swiftVerdictNames = []string{"Ported", "Port", "Compiler", "Formatter", "NotApplicable"}
 
 // houseRuleNamespaces are the namespaces whose rules each take one Swift verdict, the ones Swift's
@@ -26,7 +26,7 @@ func isHouseRule(name string) bool {
 	})
 }
 
-// houseVerdictProblems holds swift/HouseRuleVerdicts.json to the registered house rules, the invariant Swift's
+// houseVerdictProblems holds swift_language/HouseRuleVerdicts.json to the registered house rules, the invariant Swift's
 // HouseRuleVerdictsTests.everyHouseRuleHasExactlyOneVerdictAndNothingElse holds: every house rule has exactly
 // one row, every row names a registered house rule, the rows are sorted, and each verdict is one of the five.
 // It returns each problem as a sentence naming its rule, none when the catalog holds.
@@ -75,13 +75,13 @@ func houseVerdictProblems(registered []string, catalog []byte) ([]string, error)
 	return problems, nil
 }
 
-// TestEveryHouseRuleHasOneSwiftVerdict holds the committed swift/HouseRuleVerdicts.json to the live registry
+// TestEveryHouseRuleHasOneSwiftVerdict holds the committed swift_language/HouseRuleVerdicts.json to the live registry
 // in the Go gate every landing passes (#c1x3xrp). The invariant is Swift's own test's, and the land gate runs
 // none of Swift's tests: lint landed a house rule at ab511a115 with no row, and Swift's suite was red on main
 // for about five hours until Swift added it.
 func TestEveryHouseRuleHasOneSwiftVerdict(test *testing.T) {
 	test.Parallel()
-	catalog, readError := os.ReadFile(filepath.Join(moduleRoot, "swift", "HouseRuleVerdicts.json"))
+	catalog, readError := os.ReadFile(filepath.Join(moduleRoot, "swift_language", "HouseRuleVerdicts.json"))
 	if readError != nil {
 		test.Fatal(readError)
 	}
@@ -100,7 +100,7 @@ func TestEveryHouseRuleHasOneSwiftVerdict(test *testing.T) {
 		test.Fatal(problemsError)
 	}
 	for _, problem := range problems {
-		test.Errorf("swift/HouseRuleVerdicts.json: %s; give it a row, or say why it has none in Swift", problem)
+		test.Errorf("swift_language/HouseRuleVerdicts.json: %s; give it a row, or say why it has none in Swift", problem)
 	}
 }
 

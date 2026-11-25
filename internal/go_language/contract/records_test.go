@@ -15,11 +15,11 @@ import (
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 )
 
-// The contract is read from the files swift/Contract.md is made of, the ones the front door's and the
+// The contract is read from the files swift_language/Contract.md is made of, the ones the front door's and the
 // Swift encoder's tests read, so this side cannot drift from them either.
 var (
-	contractDocument = filepath.Join("..", "..", "..", "swift", "Contract.md")
-	contractFixtures = filepath.Join("..", "..", "..", "swift", "Contract", "*.jsonl")
+	contractDocument = filepath.Join("..", "..", "..", "swift_language", "Contract.md")
+	contractFixtures = filepath.Join("..", "..", "..", "swift_language", "Contract", "*.jsonl")
 )
 
 // kindsNotWritten are the contract's record kinds cohere-go does not write, each with why.
@@ -258,7 +258,7 @@ func populatedRecords() []Record {
 	return []Record{
 		ProvenanceRecord{
 			Contract:           Version,
-			Engine:             "cohere-go",
+			Program:            "cohere-go",
 			Version:            "0.1.0",
 			Commit:             "dev",
 			SourceTreeModified: true,

@@ -16,8 +16,8 @@ import (
 	"github.com/system-inc/cohere/internal/streams"
 )
 
-// contractVersion is the version of swift/Contract.md this front door speaks.
-const contractVersion = 3
+// contractVersion is the version of swift_language/Contract.md this front door speaks.
+const contractVersion = 4
 
 // versionReport is what `cohere --version` prints about cohere itself: its provenance, then the Swift
 // contract it speaks, on every platform and every build, since it is true of each. The release reads
@@ -42,12 +42,12 @@ const (
 	contractModeRulesEnabled contractMode = "RulesEnabled"
 )
 
-// The records, as swift/Contract.md defines them. Fields the contract does not list are ignored by
+// The records, as swift_language/Contract.md defines them. Fields the contract does not list are ignored by
 // leaving them out of these types, which is what the contract asks of the front door.
 
 type contractProvenanceRecord struct {
 	Contract           *int   `json:"contract"`
-	Engine             string `json:"engine"`
+	Program            string `json:"program"`
 	Version            string `json:"version"`
 	Commit             string `json:"commit"`
 	SourceTreeModified bool   `json:"sourceTreeModified"`
@@ -696,7 +696,7 @@ func (run *contractRun) acceptUnusedCoverage(record *contractUnusedCoverageRecor
 	run.unusedCoverage++
 
 	// The dashes here and in the items below are escaped, not changed: the report is in the TypeScript unused
-	// report's shape (internal/unused_exports/report.go, swift/Contract.md), so the two print the same bytes.
+	// report's shape (internal/unused_exports/report.go, swift_language/Contract.md), so the two print the same bytes.
 	if !run.unusedHeadingPrinted {
 		run.unusedHeadingPrinted = true
 		fmt.Fprintf(run.out, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")

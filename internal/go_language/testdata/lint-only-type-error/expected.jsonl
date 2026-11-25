@@ -1,4 +1,4 @@
-{"kind":"provenance","contract":3,"engine":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
+{"kind":"provenance","contract":4,"program":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
 {"kind":"project","root":"/project","package":"example.com/typeerror","elapsedMilliseconds":0,"filesInPackage":1,"filesOurs":1,"filesInScope":1,"scopeDescription":"","targets":[{"name":"example.com/typeerror","kind":"module","files":1,"languageMode":"1.24"}],"excluded":[]}
 {"kind":"phase","name":"fix","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
 {"kind":"phase","name":"types","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}

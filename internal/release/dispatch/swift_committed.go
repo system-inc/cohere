@@ -19,7 +19,7 @@ import (
 
 // cohere-swift a gate runs is built from the same commit as the cohere binary running it.
 //
-// Until this existed it was built from the shared working tree's `swift/`, so any member's uncommitted
+// Until this existed it was built from the shared working tree's `swift_language/`, so any member's uncommitted
 // Swift rule was live in every Swift project's gate, the defect #yd6yprj removed for the cohere binary.
 //
 // The tree it builds is a detached git worktree at the commit, not a `git archive` extraction, for two
@@ -38,7 +38,7 @@ import (
 // swiftPackageInputs are what decide cohere-swift, as `commit:path` objects: the same three the
 // working-tree hash reads, so a commit that changes only tests reuses the binary. They are also the
 // pathspecs a development binary's `sourceTreeModified` is read under (ResolveSwiftBinary).
-var swiftPackageInputs = []string{"swift/Package.swift", "swift/Package.resolved", "swift/Sources"}
+var swiftPackageInputs = []string{"swift_language/Package.swift", "swift_language/Package.resolved", "swift_language/Sources"}
 
 // resolveCommittedSwiftBinary returns cohere-swift for commit, building it when the cache has none.
 func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, contract int) (string, bool, error) {
@@ -85,7 +85,7 @@ func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, c
 	// Nothing stated about the tree: the manifest reads git in a worktree nobody edits, and the proof below
 	// checks what it read.
 	if buildSwiftProductError := buildSwiftProduct(
-		filepath.Join(worktree, "swift"),
+		filepath.Join(worktree, "swift_language"),
 		paths.SwiftCommittedBuildDirectory(),
 		temporary,
 		nil,
@@ -107,7 +107,7 @@ func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, c
 
 // committedSwiftPackageHash names cohere-swift for commit without reading a single file from disk.
 //
-// Git object ids are content addresses, so `commit:swift/Sources` names exactly the sources at that
+// Git object ids are content addresses, so `commit:swift_language/Sources` names exactly the sources at that
 // commit. A cache hit therefore never touches the worktree, and after the first run at a commit it
 // starts no git either: see swiftPackageInputObjects.
 func committedSwiftPackageHash(paths Paths, commit string, toolchain string) (string, error) {
@@ -255,7 +255,7 @@ func requireWorktreeAt(worktree string, commit string) error {
 // proveCommittedSwiftBinary asks the built binary what it is and refuses it unless it reports a clean
 // source tree.
 //
-// cohere-swift's commit field reads "dev" until the release build stamps it (EngineVersion.swift), so it
+// cohere-swift's commit field reads "dev" until the release build stamps it (ProgramVersion.swift), so it
 // cannot be checked here yet. What can be checked is the bit its manifest computed from the tree it was
 // built in, which is exactly the property this build exists to have.
 func proveCommittedSwiftBinary(binaryPath string, commit string, contract int) error {

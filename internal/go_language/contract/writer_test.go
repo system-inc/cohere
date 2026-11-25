@@ -9,7 +9,7 @@ import (
 // provenanceForTest is a provenance record any test stream can open with.
 var provenanceForTest = ProvenanceRecord{
 	Contract:  Version,
-	Engine:    "cohere-go",
+	Program:   "cohere-go",
 	Version:   "0.1.0",
 	Commit:    "dev",
 	Toolchain: "go1.27",

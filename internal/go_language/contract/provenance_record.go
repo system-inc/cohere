@@ -7,7 +7,7 @@ package contract
 // it could not find rather than one it does not have. The front door ignores a field it is not sent.
 type ProvenanceRecord struct {
 	Contract int    `json:"contract"`
-	Engine   string `json:"engine"`
+	Program  string `json:"program"`
 	Version  string `json:"version"`
 	// Commit is 40 hex digits, or `dev`.
 	Commit string `json:"commit"`

@@ -57,10 +57,10 @@ type Inputs struct {
 	LoadSet     func(name string) (*configuration.Configuration, error)
 	SetContents func(name string) ([]byte, error)
 
-	// SwiftVerdicts is swift/HouseRuleVerdicts.json.
+	// SwiftVerdicts is swift_language/HouseRuleVerdicts.json.
 	SwiftVerdicts []byte
 
-	// SwiftRules is swift/Rules.json, cohere-swift's registry as data, which a Swift test holds to
+	// SwiftRules is swift_language/Rules.json, cohere-swift's registry as data, which a Swift test holds to
 	// the registry in both directions.
 	SwiftRules []byte
 

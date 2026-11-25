@@ -740,7 +740,7 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		test.Errorf("cohere ran %d times, want %d, fills included:\n%s", len(ran), want, strings.Join(ran, "\n"))
 	}
 	for _, line := range ran {
-		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-language --contract 3 --root ") {
+		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-language --contract 4 --root ") {
 			test.Errorf("a run was not cohere over the binary's own system store: %s", line)
 		}
 	}

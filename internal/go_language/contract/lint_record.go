@@ -22,7 +22,7 @@ type LintRecord struct {
 	RulesNotConfigured   []string       `json:"rulesNotConfigured"`
 	// ConfigNote is the line saying which defaults ran when no config was read, empty when one was.
 	ConfigNote string `json:"configNote"`
-	// FilesReplayed is additive within contract 3 (swift/Contract.md): of FilesWalked, the files whose every rule's
+	// FilesReplayed is additive within contract 3 (swift_language/Contract.md): of FilesWalked, the files whose every rule's
 	// verdict cohere-go read from a per-file verdict store rather than computed, as cohere-swift's lint verdict
 	// cache does. cohere-go leaves it unset and so unwritten: its cache restores packages (Cache below), and how
 	// many files a restored package stands for is not a count it keeps, so what the field means for a Go run is for

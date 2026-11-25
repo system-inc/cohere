@@ -9,7 +9,7 @@ import (
 )
 
 // The `swift` block is cohere-swift's, which reads it itself
-// (swift/Sources/CohereSwift/Command/RuleConfiguration.swift), from the CohereSettings.json beside the
+// (swift_language/Sources/CohereSwift/Command/RuleConfiguration.swift), from the CohereSettings.json beside the
 // project's root or the one --lint-config names, and refuses what it does not read. That reader takes one
 // file and never follows `extends`, so this loader leaves the block's insides alone and refuses only a block
 // no Swift run would ever read, naming the file: a block that loads and configures nothing is the silent
@@ -79,7 +79,7 @@ func CheckSwiftBlockHasAReader(path string) error {
 }
 
 // holdsSwiftProject reports whether directory is a Swift project's root by the linter's own rule
-// (swift/Contract.md, the invocation): a regular file Package.swift, or a regular file project.yml, or
+// (swift_language/Contract.md, the invocation): a regular file Package.swift, or a regular file project.yml, or
 // exactly one entry ending .xcodeproj, a bundle the linter counts whatever its type. Two .xcodeproj the
 // fix pass refuses, so they are no project.
 func holdsSwiftProject(directory string) (bool, error) {

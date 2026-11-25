@@ -32,11 +32,11 @@ func SourceInputs(root string) (Inputs, error) {
 	}
 	var readError error
 	if inputs.SwiftVerdicts, readError = os.ReadFile(
-		filepath.Join(root, "swift", "HouseRuleVerdicts.json"),
+		filepath.Join(root, "swift_language", "HouseRuleVerdicts.json"),
 	); readError != nil {
 		return inputs, readError
 	}
-	if inputs.SwiftRules, readError = os.ReadFile(filepath.Join(root, "swift", "Rules.json")); readError != nil {
+	if inputs.SwiftRules, readError = os.ReadFile(filepath.Join(root, "swift_language", "Rules.json")); readError != nil {
 		return inputs, readError
 	}
 	if inputs.Changelog, readError = os.ReadFile(filepath.Join(root, "CHANGELOG.md")); readError != nil {

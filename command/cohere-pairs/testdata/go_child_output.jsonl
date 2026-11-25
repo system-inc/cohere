@@ -1,4 +1,4 @@
-{"kind":"provenance","engine":"go","contract":3}
+{"kind":"provenance","program":"go","contract":4}
 {"kind":"project","root":"/corpus","package":"","elapsedMilliseconds":120,"filesInPackage":40,"filesOurs":38,"filesInScope":37,"scopeDescription":"","targets":[],"excluded":[]}
 {"kind":"finding","file":"b.go","line":3,"rule":"go/nilness","message":"impossible condition"}
 {"kind":"finding","file":"a.go","line":9,"rule":"go/receiver-name","message":"receiver name should be consistent"}

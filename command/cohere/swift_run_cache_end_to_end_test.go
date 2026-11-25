@@ -25,7 +25,7 @@ import (
 // the override and a stand-in `swift` first on PATH, so the front door's half of the replay is proved without building
 // the child: which runs replay, what a replay prints, and that every input the front door names, the toolchain and the
 // child among them, moves the replay when it changes. Which files the real cohere-swift names is proved by its own
-// tests (swift/Tests/CohereSwiftTests/RunInputsTests.swift); this stand-in names every file and directory below the
+// tests (swift_language/Tests/CohereSwiftTests/RunInputsTests.swift); this stand-in names every file and directory below the
 // root, as the real cohere-swift's walk does. Each test has its own, so they run in parallel and none sees another's
 // table.
 type swiftReplayFixture struct {
@@ -54,7 +54,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 listed() { find "$root" -name .cache -prune -o -type "$1" -print | sort | sed 's/.*/"&"/' | paste -sd, - ; }
-echo '{"kind":"provenance","contract":3,"engine":"cohere-swift","version":"0.1.0","commit":"dev","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}'
+echo '{"kind":"provenance","contract":4,"program":"cohere-swift","version":"0.1.0","commit":"dev","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}'
 printf '{"kind":"project","root":"%s","package":"App","elapsedMilliseconds":5,"filesInPackage":2,"filesOurs":2,"filesInScope":2,"scopeDescription":"","targets":[{"name":"App","kind":"library","files":2,"languageMode":"6"}],"excluded":[]}\n' "$root"
 echo '{"kind":"fix","filesConsidered":2,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every file in the package","changedFiles":[]}'
 echo '{"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":3,"detail":""}'
@@ -506,7 +506,7 @@ func TestEveryProjectOfARootWithGoAndSwiftReplays(test *testing.T) {
 
 // swiftScriptsRootBinary is the stand-in cohere-swift at a scripts-only root (#wpd36zj): a check over `--root`'s Swift
 // files, one rule finding at each that holds `forced`, whose inputs record names what the real cohere-swift's names
-// there (swift/Tests/CohereSwiftTests/StandaloneScriptTests.swift, aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict):
+// there (swift_language/Tests/CohereSwiftTests/StandaloneScriptTests.swift, aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict):
 // each Swift file and each directory its walk listed, and nothing under node_modules, .cache or .git, which the walk
 // never enters. COHERE_TEST_WALK_DEPENDENCIES names node_modules too, the walk a mutant would make.
 const swiftScriptsRootBinary = `echo started >> "$COHERE_TEST_SWIFT_STARTS"
@@ -520,7 +520,7 @@ if [ -n "$COHERE_TEST_WALK_DEPENDENCIES" ]; then skipped='-name .cache -o -name 
 listed() { find "$root" \( $skipped \) -prune -o -type "$1" $2 -print | sort | sed 's/.*/"&"/' | paste -sd, - ; }
 scripts=$(find "$root" \( -name node_modules -o -name .cache -o -name .git \) -prune -o -type f -name '*.swift' -print | sort)
 count=$(printf '%s\n' "$scripts" | grep -c .)
-echo '{"kind":"provenance","contract":3,"engine":"cohere-swift","version":"0.1.0","commit":"dev","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}'
+echo '{"kind":"provenance","contract":4,"program":"cohere-swift","version":"0.1.0","commit":"dev","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}'
 printf '{"kind":"project","root":"%s","package":"root","elapsedMilliseconds":5,"filesInPackage":%d,"filesOurs":%d,"filesInScope":%d,"scopeDescription":"","targets":[],"excluded":[],"projectKind":"Scripts"}\n' "$root" "$count" "$count" "$count"
 printf '{"kind":"fix","filesConsidered":%d,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every file in the package","changedFiles":[]}\n' "$count"
 echo '{"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":3,"detail":""}'

@@ -140,7 +140,7 @@ func runGoChild(
 	defer func() { _ = standardError.Close() }()
 
 	// Every build the corpus's files name is checked, by whatever this side's Go child is asked for it (#qqyq61s).
-	arguments := append([]string{"go-language", "--contract", "3", "--root", corpusRoot, "--no-fix"},
+	arguments := append([]string{"go-language", "--contract", "4", "--root", corpusRoot, "--no-fix"},
 		binary.everyBuildArguments...)
 	if planned.mode == modeNoCache {
 		arguments = append(arguments, "--no-cache")

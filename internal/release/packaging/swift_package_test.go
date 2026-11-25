@@ -188,7 +188,7 @@ func speaksContract(contract string) string {
 if [ "$2" != ` + contract + ` ]; then ` +
 		`echo "cohere-swift speaks contract ` + contract + `, and the front door asked for $2" >&2; exit 2; fi
 echo '{"kind":"provenance","contract":` + contract +
-		`,"engine":"cohere-swift","version":"0.1.0","commit":"` + stampedCommit + `"}'`
+		`,"program":"cohere-swift","version":"0.1.0","commit":"` + stampedCommit + `"}'`
 }
 
 // TestSwiftContractAcceptsAMatchingPair is the positive half. Without it, a check that refused every pair
@@ -268,24 +268,24 @@ func TestSwiftBinaryBuildReadsTheTreeAsItIsNow(test *testing.T) {
 	}
 
 	module := test.TempDir()
-	writeFile(test, filepath.Join(module, "swift", "Package.swift"), `// swift-tools-version:6.2
+	writeFile(test, filepath.Join(module, "swift_language", "Package.swift"), `// swift-tools-version:6.2
 import PackageDescription
 let modified = Context.gitInformation?.hasUncommittedChanges ?? true
 let package = Package(name: "Stand", products: [.executable(name: "cohere-swift", targets: ["CohereSwift"])],
     targets: [.executableTarget(name: "CohereSwift", swiftSettings: modified ? [.define("TREE_MODIFIED")] : [])])
 `)
-	source := filepath.Join(module, "swift", "Sources", "CohereSwift", "main.swift")
+	source := filepath.Join(module, "swift_language", "Sources", "CohereSwift", "main.swift")
 	program := "#if TREE_MODIFIED\nlet tree = \"modified\"\n#else\nlet tree = \"clean\"\n#endif\n" +
-		"#if COHERE_RELEASE_STAMP\nprint(tree, EngineReleaseStamp.commit)\n#else\nprint(tree, \"dev\")\n#endif\n"
+		"#if COHERE_RELEASE_STAMP\nprint(tree, ReleaseStamp.commit)\n#else\nprint(tree, \"dev\")\n#endif\n"
 	writeFile(test, source, program)
 	writeFile(
 		test,
-		filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", "Placeholder.swift"),
+		filepath.Join(module, "swift_language", "Sources", "CohereSwift", "Command", "Placeholder.swift"),
 		"enum Placeholder {}\n",
 	)
 	writeFile(
 		test,
-		filepath.Join(module, "swift", ".gitignore"),
+		filepath.Join(module, "swift_language", ".gitignore"),
 		"/Sources/CohereSwift/Command/"+SwiftReleaseStampFileName+"\n",
 	)
 	writeFile(test, filepath.Join(module, ".gitignore"), ".scratch/\n")
@@ -322,7 +322,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 		test.Fatalf("a binary built from a clean tree says %q, and should say clean and its commit %s", got, commit)
 	}
 	if _, statError := os.Stat(
-		filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftReleaseStampFileName),
+		filepath.Join(module, "swift_language", "Sources", "CohereSwift", "Command", SwiftReleaseStampFileName),
 	); statError == nil {
 		test.Fatal("the stamp was left in the checkout after the build")
 	}

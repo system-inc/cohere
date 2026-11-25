@@ -13,7 +13,7 @@ import (
 // says which language's rule it is before a reader gets to the rule.
 const Namespace = "cohere-go/"
 
-// Origin is where a rule came from. Its values are serialized, so they are spelled as swift/Rules.json
+// Origin is where a rule came from. Its values are serialized, so they are spelled as swift_language/Rules.json
 // spells its origins, lowercase, rather than in the house's PascalCase for string literal types.
 type Origin string
 
@@ -42,7 +42,7 @@ type Rule struct {
 	// UpstreamName is the name a ported rule had where it came from, `printf` or `SA4006`, so a reader can
 	// find its upstream documentation. A house rule has none, since it has no upstream.
 	UpstreamName string
-	// TypeAware is whether the rule reads type information, for the docs, as swift/Rules.json's typeAware.
+	// TypeAware is whether the rule reads type information, for the docs, as swift_language/Rules.json's typeAware.
 	TypeAware bool
 	// Analyzer is what runs. Its options are flags on Analyzer.Flags, which cohere-go sets from the
 	// options object of the rule's entry in the settings.

@@ -81,7 +81,7 @@ func stampedCohere(test *testing.T, version string) string {
 // and streams a clean run, and returns the file it records into.
 func placeSiblingSwiftBinary(test *testing.T, binary string) string {
 	test.Helper()
-	clean, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract", "Clean.jsonl"))
+	clean, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
@@ -158,7 +158,7 @@ func TestAReleasedCohereRunsTheSwiftBinaryShippedBesideIt(test *testing.T) {
 	if evalSymlinksError != nil {
 		test.Fatal(evalSymlinksError)
 	}
-	if want := "--contract 3 --root "; !strings.HasPrefix(string(recorded), want) ||
+	if want := "--contract 4 --root "; !strings.HasPrefix(string(recorded), want) ||
 		!(strings.Contains(string(recorded), root) || strings.Contains(string(recorded), resolvedRoot)) {
 		test.Fatalf(
 			"the shipped cohere-swift was run with %q, expected the contract and the package root %s",
@@ -190,8 +190,8 @@ func TestAReleasedCohereWithNoSwiftBinaryBesideItNeverBuildsOne(test *testing.T)
 	checkout := test.TempDir()
 	writeTree(test, checkout, map[string]string{
 		"go.mod":                       "module github.com/system-inc/cohere\n",
-		"swift/Package.swift":          "// swift-tools-version:6.0\n",
-		"swift/Sources/Engine/A.swift": "let a = 1\n",
+		"swift_language/Package.swift": "// swift-tools-version:6.0\n",
+		"swift_language/Sources/Language/A.swift": "let a = 1\n",
 	})
 	root := swiftPackage(test, checkout)
 

@@ -99,7 +99,7 @@ func TestEverySwiftPackageIsCredited(test *testing.T) {
 		test.Fatal(readSwiftPinsError)
 	}
 	if len(pins) == 0 {
-		test.Fatalf("swift/Package.resolved pins nothing, so this test checked nothing")
+		test.Fatalf("swift_language/Package.resolved pins nothing, so this test checked nothing")
 	}
 	notices := committed(test, ThirdPartyNoticesFileName)
 	for _, pin := range pins {

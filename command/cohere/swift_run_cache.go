@@ -17,7 +17,7 @@ import (
 // The run cache for a Swift root (#nkk91tv). A Swift run uses the TypeScript run cache whole, as a Go run does (see
 // go_run_cache.go): the table in .cache/cohere, the invocations it admits (runCacheEligible), the key, the clock, the
 // tee, the replay and the record. Its inputs come the way a Go run's do. The child names what its verdict was read
-// from in its inputs record (swift/Contract.md; RunInputs.swift says what it names and why), and the front door adds
+// from in its inputs record (swift_language/Contract.md; RunInputs.swift says what it names and why), and the front door adds
 // what it knows itself: the settings file it hands the child, the child binary it ran, the `swift` its own toolchain
 // question went to, a child built from this checkout's working tree's sources, and the facts in swiftRunCacheFacts.
 //

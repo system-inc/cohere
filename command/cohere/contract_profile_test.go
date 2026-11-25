@@ -52,12 +52,12 @@ func TestOnlyAProfiledRunSendsTheChildAProfile(test *testing.T) {
 		return built
 	}
 	unprofiled := arguments(goFlags, map[string]bool{"no-fix": true}, map[string]string{"no-fix": "true"})
-	if want := []string{"--contract", "3", "--root", "/project", "--no-fix"}; !slices.Equal(unprofiled, want) {
+	if want := []string{"--contract", "4", "--root", "/project", "--no-fix"}; !slices.Equal(unprofiled, want) {
 		test.Errorf("an unprofiled run sends %q, want %q", unprofiled, want)
 	}
 	profiled := arguments(goFlags, map[string]bool{"no-fix": true, "profile": true},
 		map[string]string{"no-fix": "true", "profile": "run.pprof"})
-	withProfile := []string{"--contract", "3", "--root", "/project", "--no-fix", "--profile", "/work/run.go.pprof"}
+	withProfile := []string{"--contract", "4", "--root", "/project", "--no-fix", "--profile", "/work/run.go.pprof"}
 	if !slices.Equal(profiled, withProfile) {
 		test.Errorf("a profiled run sends %q, want %q", profiled, withProfile)
 	}
@@ -74,7 +74,7 @@ func TestTheGoChildRefusesAProfileItCannotCreate(test *testing.T) {
 	binary := buildCohere(test)
 	root := test.TempDir()
 	writeTree(test, root, map[string]string{goModuleMarker: "module example.com/refused\n\ngo 1.27\n"})
-	command := exec.Command(binary, goLanguageVerb, "--contract", "3", "--root", root, "--no-fix", "--profile",
+	command := exec.Command(binary, goLanguageVerb, "--contract", "4", "--root", root, "--no-fix", "--profile",
 		filepath.Join(root, "missing", "run.pprof"))
 	command.Env = append(os.Environ(), goChildVariable+"=1")
 	var standardOutput strings.Builder
@@ -96,7 +96,7 @@ func TestTheGoChildRefusesAProfileItCannotCreate(test *testing.T) {
 func TestAProfiledRunWritesAProfileForEachProcessThatDidTheWork(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract", "Clean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}

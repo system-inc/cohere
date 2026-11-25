@@ -2,7 +2,7 @@ package main
 
 import "encoding/json"
 
-// goChildLine is the part of one record of the Go child's contract 3 stream the pair reads, by the names
+// goChildLine is the part of one record of the Go child's contract 4 stream the pair reads, by the names
 // internal/go_language/contract gives them: the project record's files in scope and the lint record's files walked,
 // cache, builds and width. It is its own shape rather than the contract's types because two Go children of different
 // commits write the streams it reads, and a field another commit changed must not fail the read of the fields here.

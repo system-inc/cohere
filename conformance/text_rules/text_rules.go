@@ -90,7 +90,7 @@ type Family struct {
 
 // LedgerRow is one case a language fails today, or with no Case and no Kind, one family it has no rule for yet.
 type LedgerRow struct {
-	Language Language `json:"engine"`
+	Language Language `json:"language"`
 	Family   string   `json:"family"`
 	Case     string   `json:"case,omitempty"`
 	Kind     Kind     `json:"kind,omitempty"`

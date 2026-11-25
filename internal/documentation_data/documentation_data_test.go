@@ -171,7 +171,7 @@ func TestCheckSeesATierChange(test *testing.T) {
 }
 
 // TestEveryRegisteredRuleHasOneRow: rules.json names every rule each language registers exactly once, under
-// that language's language, and nothing else. The Swift registry is read from swift/Rules.json, which a
+// that language's language, and nothing else. The Swift registry is read from swift_language/Rules.json, which a
 // Swift test holds to cohere-swift's registry.
 func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	test.Parallel()
@@ -183,7 +183,7 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	if decodeError := json.Unmarshal(committed, &rules); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	swiftRegistry, readError := os.ReadFile(filepath.Join(moduleRoot, "swift", "Rules.json"))
+	swiftRegistry, readError := os.ReadFile(filepath.Join(moduleRoot, "swift_language", "Rules.json"))
 	if readError != nil {
 		test.Fatal(readError)
 	}
@@ -244,7 +244,7 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	}
 }
 
-// swiftRegistryEntry is one rule in swift/Rules.json, every field Build reads and every field the file holds,
+// swiftRegistryEntry is one rule in swift_language/Rules.json, every field Build reads and every field the file holds,
 // since Build refuses one it does not know: so an entry decoded here and encoded again is the entry the file
 // wrote.
 type swiftRegistryEntry struct {
@@ -254,7 +254,7 @@ type swiftRegistryEntry struct {
 	TypeAware    bool   `json:"typeAware"`
 }
 
-// TestCheckSeesASwiftRegistryChange: a Swift rule removed from swift/Rules.json makes rules.json stale, and
+// TestCheckSeesASwiftRegistryChange: a Swift rule removed from swift_language/Rules.json makes rules.json stale, and
 // a Swift rule with an unknown origin, a misnamed house rule, or a verdict naming a missing Swift rule
 // refuses the build.
 func TestCheckSeesASwiftRegistryChange(test *testing.T) {
@@ -312,7 +312,7 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 					return append(entries[:index], entries[index+1:]...)
 				}
 			}
-			test.Fatal("the bare-throw rule, which a verdict names, is not in swift/Rules.json")
+			test.Fatal("the bare-throw rule, which a verdict names, is not in swift_language/Rules.json")
 			return nil
 		},
 	} {

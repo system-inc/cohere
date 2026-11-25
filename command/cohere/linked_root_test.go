@@ -76,7 +76,7 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 func TestACensusThatMissedTheLoadIsNeverComplete(test *testing.T) {
 	stream := func(complete bool, exitCode int) string {
 		return "cat <<'RECORDS'\n" + strings.Join([]string{
-			`{"kind":"provenance","contract":3,"engine":"cohere-go","version":"0.1.0","commit":"dev",` +
+			`{"kind":"provenance","contract":4,"program":"cohere-go","version":"0.1.0","commit":"dev",` +
 				`"sourceTreeModified":false,"toolchain":"go1.27.0 darwin/arm64"}`,
 			`{"kind":"project","root":"/project","package":"example.com/project","elapsedMilliseconds":1,` +
 				`"filesInPackage":0,"filesOurs":0,"filesInScope":0,"scopeDescription":"","targets":[],"excluded":[]}`,

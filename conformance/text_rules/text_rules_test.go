@@ -108,7 +108,7 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 		},
 		{
 			"an unknown key in a ledger row",
-			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "case": "w02", `+
+			with(valid, "ledger.json", `[{"language": "typescript", "family": "words", "case": "w02", `+
 				`"kind": "verdict", "task": "t", "reason": "r", "note": "n"}]`),
 			`unknown field "note"`,
 		},
@@ -125,32 +125,32 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 		},
 		{
 			"a verdict row on a control",
-			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "case": "w01", `+
+			with(valid, "ledger.json", `[{"language": "typescript", "family": "words", "case": "w01", `+
 				`"kind": "verdict", "task": "t", "reason": "r"}]`),
 			"verdict row on a control",
 		},
 		{
 			"a ledger row naming a case that does not exist",
-			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "case": "w09", `+
+			with(valid, "ledger.json", `[{"language": "typescript", "family": "words", "case": "w09", `+
 				`"kind": "verdict", "task": "t", "reason": "r"}]`),
 			"names a case that does not exist",
 		},
 		{
 			"a ledger row of an unknown kind",
-			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "case": "w02", `+
+			with(valid, "ledger.json", `[{"language": "typescript", "family": "words", "case": "w02", `+
 				`"kind": "Verdict", "task": "t", "reason": "r"}]`),
 			`kind is "Verdict"`,
 		},
 		{
 			"a ledger row for a language the case has no form in",
-			with(valid, "ledger.json", `[{"engine": "go", "family": "words", "case": "w02", `+
+			with(valid, "ledger.json", `[{"language": "go", "family": "words", "case": "w02", `+
 				`"kind": "verdict", "task": "t", "reason": "r"}]`),
 			"no go form",
 		},
 		{
 			"two rows for one case in one language",
-			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "case": "w02", `+
-				`"kind": "verdict", "task": "t", "reason": "r"}, {"engine": "typescript", "family": "words", `+
+			with(valid, "ledger.json", `[{"language": "typescript", "family": "words", "case": "w02", `+
+				`"kind": "verdict", "task": "t", "reason": "r"}, {"language": "typescript", "family": "words", `+
 				`"case": "w02", "kind": "span", "task": "t", "reason": "r"}]`),
 			"second row",
 		},
@@ -274,34 +274,34 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 		},
 		{
 			"a family-level row where the language names a rule",
-			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "task": "t", "reason": "r"}]`),
+			with(valid, "ledger.json", `[{"language": "typescript", "family": "words", "task": "t", "reason": "r"}]`),
 			"the row is stale",
 		},
 		{
 			"a family-level row where the language has no such idea",
-			with(valid, "ledger.json", `[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}]`),
+			with(valid, "ledger.json", `[{"language": "swift", "family": "words", "task": "t", "reason": "r"}]`),
 			"no such idea",
 		},
 		{
 			"a family-level row with a kind",
-			withMissingSwift(`[{"engine": "swift", "family": "words", "kind": "verdict", "task": "t", "reason": "r"}]`),
+			withMissingSwift(`[{"language": "swift", "family": "words", "kind": "verdict", "task": "t", "reason": "r"}]`),
 			"family-level row with a kind",
 		},
 		{
 			"a case-level row for a missing language",
-			withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
-				`{"engine": "swift", "family": "words", "case": "w01", "kind": "span", "task": "t", "reason": "r"}]`),
+			withMissingSwift(`[{"language": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
+				`{"language": "swift", "family": "words", "case": "w01", "kind": "span", "task": "t", "reason": "r"}]`),
 			"case-level row where swift has no rule",
 		},
 		{
 			"two family-level rows for one language",
-			withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
-				`{"engine": "swift", "family": "words", "task": "u", "reason": "r"}]`),
+			withMissingSwift(`[{"language": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
+				`{"language": "swift", "family": "words", "task": "u", "reason": "r"}]`),
 			"second family-level row",
 		},
 		{
 			"a family-level row naming a family that does not exist",
-			with(valid, "ledger.json", `[{"engine": "swift", "family": "letters", "task": "t", "reason": "r"}]`),
+			with(valid, "ledger.json", `[{"language": "swift", "family": "letters", "task": "t", "reason": "r"}]`),
 			"names a family that does not exist",
 		},
 	}
@@ -336,7 +336,7 @@ func TestAMissingLanguageWithItsRowLoadsAndRunsNothing(test *testing.T) {
 	test.Parallel()
 
 	corpus, loadFromError := LoadFrom(
-		withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}]`),
+		withMissingSwift(`[{"language": "swift", "family": "words", "task": "t", "reason": "r"}]`),
 	)
 	if loadFromError != nil {
 		test.Fatalf("a missing language with its row was refused: %v", loadFromError)
@@ -444,7 +444,7 @@ func TestACaseNamesItsFileByPathAndRoot(test *testing.T) {
 func TestASpanRowOnAControlLoads(test *testing.T) {
 	test.Parallel()
 
-	files := with(validCorpus(), "ledger.json", `[{"engine": "typescript", "family": "words", "case": "w01", `+
+	files := with(validCorpus(), "ledger.json", `[{"language": "typescript", "family": "words", "case": "w01", `+
 		`"kind": "span", "task": "t", "reason": "r"}]`)
 	if _, loadFromError := LoadFrom(files); loadFromError != nil {
 		test.Fatalf("a span row on a control was refused: %v", loadFromError)

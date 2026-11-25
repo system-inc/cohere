@@ -88,7 +88,7 @@ func (recorder *sourceRecorder) rule() rule.Rule {
 	}
 }
 
-// runRecorded runs cohere-go over root with extra after `--contract 3 --root <root>`, failing the test when it
+// runRecorded runs cohere-go over root with extra after `--contract 4 --root <root>`, failing the test when it
 // refuses the run, and returns its stream and its stderr.
 func runRecorded(test *testing.T, root string, registered []rule.Rule, extra ...string) (string, string) {
 	test.Helper()

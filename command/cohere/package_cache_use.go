@@ -8,7 +8,7 @@ import (
 )
 
 // packageCacheUse is what cohere-go's per-package findings cache did in the lint phase, by package, as the lint
-// record's `cache` object says it (swift/Contract.md): hit, restored from an entry with nothing run on it; missed,
+// record's `cache` object says it (swift_language/Contract.md): hit, restored from an entry with nothing run on it; missed,
 // analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; the facts the
 // written entries left out, since nothing outside their package can name their object; the restored facts
 // skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
@@ -51,7 +51,7 @@ type packageCacheUse struct {
 }
 
 // buildPacksUse is what the extra builds did with their packs, as the lint record's `cache.packs` says it
-// (swift/Contract.md): each build reads one file of each store holding every record its last run read or wrote there,
+// (swift_language/Contract.md): each build reads one file of each store holding every record its last run read or wrote there,
 // rather than open each record, and serves a record from it only while the record's shard of the store is as it was.
 // The packs read whole and those missing, which is no refusal, the records served, those whose shard had moved and
 // those no pack held, each read from the store, the shard stamps read, each pack refused by the first word of why, and

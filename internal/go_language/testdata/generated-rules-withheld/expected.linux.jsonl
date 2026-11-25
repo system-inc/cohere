@@ -1,4 +1,4 @@
-{"kind":"provenance","contract":3,"engine":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
+{"kind":"provenance","contract":4,"program":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
 {"kind":"project","root":"/project","package":"example.com/generated","elapsedMilliseconds":0,"filesInPackage":3,"filesOurs":3,"filesInScope":3,"scopeDescription":"","targets":[{"name":"example.com/generated","kind":"module","files":3,"languageMode":"1.24"}],"excluded":[]}
 {"kind":"fix","filesConsidered":3,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[],"notWritten":[]}
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}

@@ -134,9 +134,9 @@ func TestSwiftPackageInputsAreAskedOncePerCommit(test *testing.T) {
 		return strings.TrimSpace(string(output))
 	}
 	run("init", "--quiet")
-	writeFile(test, filepath.Join(module, "swift", "Package.swift"), "// package\n")
-	writeFile(test, filepath.Join(module, "swift", "Package.resolved"), "{}\n")
-	writeFile(test, filepath.Join(module, "swift", "Sources", "A.swift"), "let a = 1\n")
+	writeFile(test, filepath.Join(module, "swift_language", "Package.swift"), "// package\n")
+	writeFile(test, filepath.Join(module, "swift_language", "Package.resolved"), "{}\n")
+	writeFile(test, filepath.Join(module, "swift_language", "Sources", "A.swift"), "let a = 1\n")
 	run("add", ".")
 	run("commit", "--quiet", "-m", "cohere-swift")
 	commit := run("rev-parse", "HEAD")

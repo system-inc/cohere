@@ -52,7 +52,7 @@ func TestGoChildArgumentsForwardWhatTheGoChildReads(test *testing.T) {
 		test.Fatal(argumentsError)
 	}
 	expected := []string{
-		"--contract", "3", "--root", root, "--no-fix", "--lint", "--single-threaded",
+		"--contract", "4", "--root", root, "--no-fix", "--lint", "--single-threaded",
 		"--lint-config", filepath.Join(root, "Settings.json"), filepath.Join(root, "a.go"), "/elsewhere/b.go",
 	}
 	if !slices.Equal(arguments, expected) {
@@ -103,7 +103,7 @@ func TestGoChildArgumentsForwardNoCache(test *testing.T) {
 	if argumentsError != nil {
 		test.Fatalf("--no-cache was refused for Go: %v", argumentsError)
 	}
-	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--no-cache"}
+	expected := []string{"--contract", "4", "--root", root, "--no-fix", "--no-cache"}
 	if !slices.Equal(arguments, expected) || mode != contractModeCheck {
 		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
 			contractModeCheck)
@@ -122,7 +122,7 @@ func TestTimingReachesTheGoChild(test *testing.T) {
 	if argumentsError != nil {
 		test.Fatalf("--timing was refused for Go: %v", argumentsError)
 	}
-	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--timing"}
+	expected := []string{"--contract", "4", "--root", root, "--no-fix", "--timing"}
 	if !slices.Equal(arguments, expected) || mode != contractModeCheck {
 		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
 			contractModeCheck)
@@ -153,7 +153,7 @@ func TestHostBuildOnlyReachesTheGoChildAlone(test *testing.T) {
 	if argumentsError != nil {
 		test.Fatalf("--host-build-only was refused for Go: %v", argumentsError)
 	}
-	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--host-build-only"}
+	expected := []string{"--contract", "4", "--root", root, "--no-fix", "--host-build-only"}
 	if !slices.Equal(arguments, expected) || mode != contractModeCheck {
 		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
 			contractModeCheck)
@@ -184,7 +184,7 @@ func TestNoSystemCacheReachesTheGoChildAndIsAcceptedElsewhere(test *testing.T) {
 	if argumentsError != nil {
 		test.Fatalf("--no-system-cache was refused for Go: %v", argumentsError)
 	}
-	if expected := []string{"--contract", "3", "--root", root, "--no-fix", "--no-system-cache"}; !slices.Equal(
+	if expected := []string{"--contract", "4", "--root", root, "--no-fix", "--no-system-cache"}; !slices.Equal(
 		arguments, expected) {
 		test.Errorf("Go's arguments are %q, want %q", arguments, expected)
 	}
@@ -371,7 +371,7 @@ func runFakeGoChild(test *testing.T, body string) (string, int, error) {
 	var standardError bytes.Buffer
 	stream := bufio.NewWriter(&out)
 	run := newContractRun(stream, contractModeCheck, goLanguage("module"), "", time.Now())
-	exitCode, runError := runContractBinary(path, []string{goLanguageVerb, "--contract", "3"}, run, &standardError)
+	exitCode, runError := runContractBinary(path, []string{goLanguageVerb, "--contract", "4"}, run, &standardError)
 	flushStream(test, stream)
 	return out.String(), exitCode, runError
 }
@@ -379,7 +379,7 @@ func runFakeGoChild(test *testing.T, body string) (string, int, error) {
 // Not parallel: its subtests drive check runs through contractRun, whose record acceptors set the
 // package-level activeSummary.
 func TestAGoChildThatDoesNotFinishChecksNothing(test *testing.T) {
-	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract", "GoClean.jsonl"))
+	fixture, absoluteError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "GoClean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
 	}
@@ -501,7 +501,7 @@ func TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds(test *testing.T) {
 func TestAGoRunThatExcludedEveryFileFails(test *testing.T) {
 	stream := func(filesOurs int, excluded string) string {
 		return strings.Join([]string{
-			`{"kind":"provenance","contract":3,"engine":"cohere-go","version":"0.1.0","commit":"dev",` +
+			`{"kind":"provenance","contract":4,"program":"cohere-go","version":"0.1.0","commit":"dev",` +
 				`"sourceTreeModified":false,"toolchain":"go1.27.0 darwin/arm64"}`,
 			fmt.Sprintf(`{"kind":"project","root":"/project","package":"example.com/project",`+
 				`"elapsedMilliseconds":1,"filesInPackage":1,"filesOurs":%d,"filesInScope":%d,"scopeDescription":"",`+

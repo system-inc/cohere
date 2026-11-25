@@ -38,7 +38,7 @@ var swiftFlags = contractFlags{
 // runSwiftProject checks a Swift package by running cohere-swift on it and rendering its records.
 //
 // A released cohere runs the child its package ships beside it. A development cohere resolves one the
-// way the launcher resolves cohere: from this module's `swift/` sources, rebuilt when they or the
+// way the launcher resolves cohere: from this module's `swift_language/` sources, rebuilt when they or the
 // toolchain change. See resolveSwiftBinary for the order.
 func runSwiftProject(location projectLocation, given map[string]bool, positionals []string) (int, error) {
 	if given["tsconfig"] {

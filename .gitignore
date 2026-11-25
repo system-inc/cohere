@@ -44,7 +44,7 @@
 /dist/
 
 # Local caches: the graph snapshot and the rebuild cache at the root, and cohere-swift's build
-# scratch in swift/.cache, written when cohere-swift checks itself
+# scratch in swift_language/.cache, written when cohere-swift checks itself
 .cache/
 
 # Operating systems and editors
