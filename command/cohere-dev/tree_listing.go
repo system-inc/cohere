@@ -18,7 +18,7 @@ import (
 )
 
 // What makes a land main's is everything it links, not only command/cohere-dev (#ehjasc6). #j3bfnyt changed
-// internal/go_engine/project, which the gate calls to read the modules it gates, and left command/cohere-dev as it
+// internal/go_language/project, which the gate calls to read the modules it gates, and left command/cohere-dev as it
 // was. So every branch from before it compared equal, ran its own land, and gated main's merged tree with code
 // that predated the change: an hour of landings refused on 2026-11-07 for a module main's land accepts.
 //

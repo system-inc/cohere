@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_language/project"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -139,7 +139,7 @@ func goLanguage(container string) engineLanguage {
 		FileNoun:      "Go files",
 		CompilerLabel: "go",
 		VersionLines:  goVersionLines,
-		// The project record's reasons, from the census and the build constraints (internal/go_engine's
+		// The project record's reasons, from the census and the build constraints (internal/go_language's
 		// describeProject): what git ignores, and what lies in a repository of its own below a module, a submodule's
 		// checkout or a vendored clone that no ignore file of ours governs (#hd5bsqh), are files nobody expects
 		// checked. What go never reads (testdata, a directory starting with `.` or `_`, a nested module, below
@@ -159,7 +159,7 @@ func goLanguage(container string) engineLanguage {
 		ExpectedExclusionReasonPrefixes: []string{project.CheckedByBuildPrefix},
 		// A Go run's cache is the run cache's table, which replays a verdict with nothing changed (beginGoRunCache).
 		// The engine loads the packages through the go command, whose build cache is go's
-		// (internal/go_engine/load), so the sentence says which of the two the flag reaches.
+		// (internal/go_language/load), so the sentence says which of the two the flag reaches.
 		CacheOffDetail: "no recorded run was replayed and this one was not recorded, and the go command's " +
 			"build cache, which loading the packages reads and may fill, is go's to keep",
 	}

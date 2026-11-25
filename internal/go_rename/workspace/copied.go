@@ -6,7 +6,7 @@ import (
 )
 
 // declaresCopy reports whether file opens a `cohere:copied` header in the comments before its package
-// clause, the way internal/go_engine/copied reads it. It answers true for a header copied.IsCopied would
+// clause, the way internal/go_language/copied reads it. It answers true for a header copied.IsCopied would
 // refuse as malformed too: a rename leaves anything that claims to be upstream's alone.
 func declaresCopy(file *ast.File) bool {
 	for _, group := range file.Comments {

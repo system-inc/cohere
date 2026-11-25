@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/executable_testing"
-	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_language/project"
 	"github.com/system-inc/cohere/internal/needs"
 )
 

@@ -1170,7 +1170,7 @@ func TestEngineRunRendersAGoStreamInGoWords(test *testing.T) {
 // Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
 // activeSummary, which it reads back
 func TestAGoRunNamesAFileOnlyAnotherPlatformBuilds(test *testing.T) {
-	// The engine's words on a Mac (internal/go_engine/load/excluded.go).
+	// The engine's words on a Mac (internal/go_language/load/excluded.go).
 	const constraintsReason = "excluded by build constraints on darwin/arm64"
 	const cgoReason = `imports "C", and cgo is off for darwin/arm64`
 	stream := contractFixture(test, "GoClean.jsonl")

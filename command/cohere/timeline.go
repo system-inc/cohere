@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 
-	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_language/contract"
 )
 
 // timelineLabelWidth is the narrowest a timeline table's step column is, timing's own, so the two tables a run under

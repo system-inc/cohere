@@ -3,7 +3,7 @@ package main
 import "encoding/json"
 
 // engineLine is the part of one record of the engine's contract 3 stream the pair reads, by the names
-// internal/go_engine/contract gives them: the project record's files in scope and the lint record's files walked,
+// internal/go_language/contract gives them: the project record's files in scope and the lint record's files walked,
 // cache, builds and width. It is its own shape rather than the contract's types because two engines of different
 // commits write the streams it reads, and a field another commit changed must not fail the read of the fields here.
 type engineLine struct {

@@ -332,9 +332,9 @@ isolation_report() {
     print
     print "Run it again from cohere's root, the fixtures, and the tree by its seed:"
     print -r -- '- `COHERE_UNIT_ISOLATION=fixtures go run ./command/cohere-dev test -count=1'\
-' -run TestEveryIsolatedRuleFindsTheSameInTheUnitsAVariantKeeps ./internal/go_engine/check`'
+' -run TestEveryIsolatedRuleFindsTheSameInTheUnitsAVariantKeeps ./internal/go_language/check`'
     print -r -- '- `COHERE_UNIT_ISOLATION=tree COHERE_UNIT_ISOLATION_SEED='$seed' go run ./command/cohere-dev test'\
-' -count=1 -run TestASampleOfCoheresTreeFindsTheSameInTheUnitsAVariantKeeps ./internal/go_engine/check`'
+' -count=1 -run TestASampleOfCoheresTreeFindsTheSameInTheUnitsAVariantKeeps ./internal/go_language/check`'
     print
     grep -E -e '--- FAIL|unit_isolation_test\.go:[0-9]+: ' $log | grep -v -E -e '--- FAIL: .*/fixtures \(' | head -60 |
       sed 's/^ */- /'
@@ -351,12 +351,12 @@ run_isolation() {
   (
     cd $repository &&
       COHERE_UNIT_ISOLATION=fixtures go run ./command/cohere-dev test -count=1 \
-        -run '^TestEveryIsolatedRuleFindsTheSameInTheUnitsAVariantKeeps$' ./internal/go_engine/check
+        -run '^TestEveryIsolatedRuleFindsTheSameInTheUnitsAVariantKeeps$' ./internal/go_language/check
   ) > $log 2>&1 || failed+=(fixtures)
   (
     cd $repository &&
       COHERE_UNIT_ISOLATION=tree COHERE_UNIT_ISOLATION_SEED=$seed go run ./command/cohere-dev test -count=1 \
-        -run '^TestASampleOfCoheresTreeFindsTheSameInTheUnitsAVariantKeeps$' ./internal/go_engine/check
+        -run '^TestASampleOfCoheresTreeFindsTheSameInTheUnitsAVariantKeeps$' ./internal/go_language/check
   ) >> $log 2>&1 || failed+=("the tree")
   if (( ${#failed} == 0 )); then
     print "isolation: passed, every rule's fixtures and the tree under seed $seed, log $log"

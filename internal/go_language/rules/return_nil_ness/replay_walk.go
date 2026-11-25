@@ -1,0 +1,159 @@
+package return_nil_ness
+
+import (
+	"go/types"
+
+	"github.com/system-inc/cohere/internal/go_language/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
+)
+
+// replayWalk is the push's walk of one package, replayed only as far as an answer needs it: its source functions in
+// buildir's order, each judged with the one seen set they all share, resumed where the last replay stopped.
+//
+// A function's answer in the push depends on the order only through the cycles of calls it reaches: which member of a
+// cycle the walk enters first decides which call back answers the defaults. Everything else is the same in any order
+// (see demandWalk). The member entered first is the first one the walk reaches, so the walk is replayed root by root
+// until the function asked of has been judged, and no further: every cycle that function reaches is then entered as
+// the push enters it.
+//
+// A root the push would judge whose verdict the resolver already holds, judged on demand without meeting a cycle, is
+// not judged again: the push would judge it and the functions below it, each to the verdict already held, so the
+// replay marks them seen, as the push would, and moves on. Being seen is what the push's facts on a wrapper's callee
+// read, so it must be what the push's walk leaves.
+type replayWalk struct {
+	resolver  *fact_resolver.Resolver
+	home      *fact_resolver.Package
+	irPackage *intermediate_representation.Package
+	state     *verdicts
+
+	functions []*intermediate_representation.Function
+	next      int
+	seen      map[*intermediate_representation.Function]bool
+	begun     map[*intermediate_representation.Function]bool
+}
+
+// until replays the push's walk root by root until target, a declared function of home, has been judged.
+func (walk *replayWalk) until(target *intermediate_representation.Function) {
+	for walk.next < len(walk.functions) && !walk.judged(target) {
+		root := walk.functions[walk.next]
+		walk.next++
+		walk.returns(root)
+	}
+}
+
+// rest replays the push's walk to its end, every root judged as the push judges it.
+func (walk *replayWalk) rest() {
+	for walk.next < len(walk.functions) {
+		root := walk.functions[walk.next]
+		walk.next++
+		walk.returns(root)
+	}
+}
+
+// judged is whether the replay has judged function to the end, or left it at the defaults of its signature.
+func (walk *replayWalk) judged(function *intermediate_representation.Function) bool {
+	return walk.seen[function] && !walk.begun[function]
+}
+
+// returns is the push's answer for the nilness of function's results at this point of its walk (see pushWalk), the
+// verdict held standing in for a judgment the push would make again.
+func (walk *replayWalk) returns(function *intermediate_representation.Function) []ValueNilness {
+	if function.Signature.Results().Len() == 0 {
+		return nil
+	}
+	if function.Object() == nil {
+		return defaultNilnessForSignature(function.Signature)
+	}
+	declared := declaredFunction(function)
+	if function.Package == walk.irPackage && !anyPointers(function.Signature) {
+		// The push answers such a function the defaults of its signature, whatever its body, and leaves it seen,
+		// which nothing reads of it: judged, imported and markSeen read seen only of a function with a result that
+		// may be nil. So it is answered unbuilt, where imported, through home.Function, and then Build built it. Nor
+		// is it kept: its signature alone answers it, the same in every build (keepAnswer).
+		//
+		// The condition names home's functions, though dropping it changes nothing a run can see: a replay reaches
+		// another package's function only through a call its judgment transfers, and transferReturnValue asks a
+		// callee only about a result that may be nil, so such a function always has one. Asked of one without, the
+		// replay would skip ask, and the read the store keeps for it with it, which is why the condition stays.
+		// A scratch panic in its place never fired over the nilness differential on cohere's root, the standard
+		// library, loom and deeafbf4, and fired as soon as a judgment asked a callee of every result (#efs50c3).
+		return defaultNilnessForSignature(function.Signature)
+	}
+	if function.Package != walk.irPackage && declared.Pkg() == walk.home.Types {
+		// A stand-in for one of home's functions, read below as its fact, which the walk holds only once it has
+		// judged the declared function, so what this read answers hangs on the order (see OrderBound).
+		walk.state.standIns[declared] = true
+	}
+	if results, holds := walk.imported(declared); holds {
+		return results
+	}
+	if function.Package != walk.irPackage {
+		return defaultNilnessForSignature(function.Signature)
+	}
+	walk.resolver.Build(function)
+	if function.Blocks == nil {
+		// The push never judges a function with no blocks and answers it the defaults. A function of assembly may be
+		// one of Go in another build, with another answer, so the defaults are kept as its verdict and handed to the
+		// resolver, as the demand walk keeps them, once.
+		results := defaultNilnessForSignature(function.Signature)
+		if _, held := walk.state.results[declared]; !held {
+			walk.state.results[declared] = results
+			keepAnswer(walk.resolver, walk.home, declared, results)
+		}
+		return results
+	}
+	if walk.seen[function] {
+		// A cycle's begun read, or a function judged before to no more than the defaults, since imported answered one
+		// judged to more: the push answers the defaults, and a begun read is no verdict, so nothing is kept.
+		return defaultNilnessForSignature(function.Signature)
+	}
+	walk.seen[function] = true
+	if !anyPointers(function.Signature) {
+		return defaultNilnessForSignature(function.Signature)
+	}
+	if results, held := walk.state.results[declared]; held {
+		walk.markSeen(declared)
+		return results
+	}
+	walk.begun[function] = true
+	recorder := &calleeRecorder{callees: walk, irPackage: walk.irPackage}
+	returned := (&judgment{callees: recorder}).judge(function)
+	delete(walk.begun, function)
+	walk.state.results[declared] = returned
+	walk.state.callees[declared] = recorder.recorded
+	keepAnswer(walk.resolver, walk.home, declared, returned)
+	walk.resolver.Counts(Kind).Computed.Add(1)
+	return returned
+}
+
+// imported is the fact the push would hold on function here: another package's, as the resolver answers it, or one of
+// home's that the walk has judged to the end and found to say more than the defaults.
+func (walk *replayWalk) imported(function *types.Func) ([]ValueNilness, bool) {
+	if function.Pkg() != walk.home.Types {
+		return ask(walk.resolver, walk.home, function)
+	}
+	declared := walk.home.Function(function)
+	if declared == nil || !walk.judged(declared) {
+		return nil, false
+	}
+	results, held := walk.state.results[function]
+	if !held || !interesting(declared.Signature, results) {
+		return nil, false
+	}
+	return results, true
+}
+
+// markSeen marks seen every function of home that judging function, held already, calls, and each one's in turn, as
+// the push's judgment of function would have.
+func (walk *replayWalk) markSeen(function *types.Func) {
+	for _, callee := range walk.state.callees[function] {
+		walk.resolver.Build(callee)
+		if callee.Blocks == nil || walk.seen[callee] {
+			continue
+		}
+		walk.seen[callee] = true
+		if anyPointers(callee.Signature) {
+			walk.markSeen(declaredFunction(callee))
+		}
+	}
+}

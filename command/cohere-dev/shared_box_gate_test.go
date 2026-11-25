@@ -110,7 +110,7 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			name: "the -race run of the token with a run failing fails the gate",
 			node: "pinned",
 			plant: func(test *testing.T, goroot string, environment []string) []string {
-				return append(environment, "GATE_RACE_FAILS=./internal/go_engine")
+				return append(environment, "GATE_RACE_FAILS=./internal/go_language")
 			},
 			raceFails: true,
 		},
@@ -210,7 +210,7 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			// A plain token and one with a run, which reaches go test whole: its `.*` is never globbed to the file
 			// planted above.
 			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, node, nodeDigest,
-				"./internal/edit,./internal/go_engine@AtOnce|SideBy.*", "./...")
+				"./internal/edit,./internal/go_language@AtOnce|SideBy.*", "./...")
 			gate.Dir, gate.Env = tree, environment
 			output, gateError := gate.CombinedOutput()
 			// Ignored: a gate that refused before any go ran asked nothing, and its log was never written.
@@ -253,7 +253,7 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			// A token with a run is a go test of its own, its run whole, after the plain tokens' and through the same
 			// flags.
 			if !strings.HasPrefix(lines[3], "test test -count=1 -timeout "+sharedBoxTestTimeout+
-				" -json -race -run AtOnce|SideBy.* ./internal/go_engine |") {
+				" -json -race -run AtOnce|SideBy.* ./internal/go_language |") {
 				test.Errorf("the -race run of the token with a run is not its own go test: %s", lines[3])
 			}
 			if !strings.Contains(string(output), boxRaceMarker+"\n") {
@@ -296,8 +296,8 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 	writeFixtureFile(test, filepath.Join(worktree, "internal", "edit", "edit_test.go"),
 		"package edit\n\nimport \"testing\"\n\nfunc TestEdit(test *testing.T) {}\n")
 	// A package at the -race list's entry that names a run, so the -race run asks for it with that run.
-	engine := raceGatedEntry(test, "internal/go_engine")
-	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_engine", "engine_test.go"),
+	engine := raceGatedEntry(test, "internal/go_language")
+	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_language", "main_test.go"),
 		"package go_engine\n\nimport \"testing\"\n\nfunc TestEngine(test *testing.T) {}\n")
 	fixture.git(worktree, "add", ".")
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a module"))
@@ -323,8 +323,8 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 		}
 	}
 	if len(tests) != 3 || tests[1] != "test -race ./internal/edit" ||
-		tests[2] != "test -race -run "+engine.run+" ./internal/go_engine" {
+		tests[2] != "test -race -run "+engine.run+" ./internal/go_language" {
 		test.Fatalf("Kirk's Mac ran go tests %q, want the module's, then its -race run of ./internal/edit, then "+
-			"./internal/go_engine's with -run %s:\n%s", tests, engine.run, recorded)
+			"./internal/go_language's with -run %s:\n%s", tests, engine.run, recorded)
 	}
 }

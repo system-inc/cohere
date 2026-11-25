@@ -7,11 +7,11 @@ import (
 )
 
 // checkPackage is the Go engine's core, the lint phase every binary that runs or tests the engine links.
-const checkPackage = "github.com/system-inc/cohere/internal/go_engine/check"
+const checkPackage = "github.com/system-inc/cohere/internal/go_language/check"
 
 // goEngineRules is the Go engine's registry, which links every package that registers a rule, and the prefix every
 // package under it shares.
-const goEngineRules = "github.com/system-inc/cohere/internal/go_engine/rules"
+const goEngineRules = "github.com/system-inc/cohere/internal/go_language/rules"
 
 // goEngineDispatch is the shared dispatcher every dispatched rule registers its listener on.
 const goEngineDispatch = goEngineRules + "/dispatch"
@@ -33,12 +33,12 @@ const goEngineDispatch = goEngineRules + "/dispatch"
 // reading clean.
 func TestTheEnginesCoreLinksNoRulePackage(test *testing.T) {
 	test.Parallel()
-	machinery := linkedPackages(test, "./internal/go_engine/rules/dispatch")
+	machinery := linkedPackages(test, "./internal/go_language/rules/dispatch")
 	if !slices.Contains(machinery, goEngineDispatch) {
 		test.Fatalf("go list names no %s among what it links, so the listing read nothing", goEngineDispatch)
 	}
 	registered := map[string]bool{}
-	for _, importPath := range linkedPackages(test, "./internal/go_engine/rules") {
+	for _, importPath := range linkedPackages(test, "./internal/go_language/rules") {
 		if strings.HasPrefix(importPath, goEngineRules+"/") && !slices.Contains(machinery, importPath) {
 			registered[importPath] = true
 		}
@@ -46,7 +46,7 @@ func TestTheEnginesCoreLinksNoRulePackage(test *testing.T) {
 	if len(registered) < 100 {
 		test.Fatalf("the registry links %d rule packages under it, too few to be every rule's", len(registered))
 	}
-	linked := linkedPackages(test, "./internal/go_engine/check")
+	linked := linkedPackages(test, "./internal/go_language/check")
 	if !slices.Contains(linked, checkPackage) {
 		test.Fatalf("go list names no %s among what it links, so the listing read nothing", checkPackage)
 	}
@@ -57,6 +57,6 @@ func TestTheEnginesCoreLinksNoRulePackage(test *testing.T) {
 		test.Errorf("check links %s, a rule package the registry links, and its registration rides into every "+
 			"binary that links check: take what check needs of it as an option of check.Options, as "+
 			"FactReachPresence takes standing_presence's reader; find the importer with "+
-			"`go list -deps -f '{{.ImportPath}} {{.Imports}}' ./internal/go_engine/check`", importPath)
+			"`go list -deps -f '{{.ImportPath}} {{.Imports}}' ./internal/go_language/check`", importPath)
 	}
 }

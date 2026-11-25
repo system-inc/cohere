@@ -22,31 +22,31 @@ const plantedInputs = "# The planted inventory.\n" +
 // importing gamma and delta for its ports table, with the inventory's table and a fixture of its own in its testdata,
 // and other.go outside it. Each rule directory has a testdata directory, and shared and deep have none.
 var plantedRules = map[string]string{
-	"internal/go_engine/rules/rule_inputs.txt":                              plantedInputs,
-	"internal/go_engine/rules/testdata/src/unused_fixture/fixture.go":       "package unused_fixture\n",
-	"internal/go_engine/rules/epsilon_rule/analyzer.go":                     "package epsilon_rule\n",
-	"internal/go_engine/rules/epsilon_rule/testdata/src/flagged/flagged.go": "package flagged\n",
-	"internal/go_engine/rules/zeta/analyzer.go":                             "package zeta\n\nconst Name = \"U9999\"\n",
-	"internal/go_engine/rules/zeta/testdata/src/flagged/flagged.go":         "package flagged\n",
+	"internal/go_language/rules/rule_inputs.txt":                              plantedInputs,
+	"internal/go_language/rules/testdata/src/unused_fixture/fixture.go":       "package unused_fixture\n",
+	"internal/go_language/rules/epsilon_rule/analyzer.go":                     "package epsilon_rule\n",
+	"internal/go_language/rules/epsilon_rule/testdata/src/flagged/flagged.go": "package flagged\n",
+	"internal/go_language/rules/zeta/analyzer.go":                             "package zeta\n\nconst Name = \"U9999\"\n",
+	"internal/go_language/rules/zeta/testdata/src/flagged/flagged.go":         "package flagged\n",
 	"go.mod": "module example.com/planted\n\ngo 1.24\n",
-	"internal/go_engine/rules/alpha/analyzer.go": "package alpha\n\n" +
-		"import _ \"example.com/planted/internal/go_engine/rules/shared\"\n",
-	"internal/go_engine/rules/alpha/testdata/src/flagged/flagged.go": "package flagged\n",
-	"internal/go_engine/rules/beta/analyzer.go": "package beta\n\n" +
-		"import _ \"example.com/planted/internal/go_engine/rules/shared\"\n",
-	"internal/go_engine/rules/beta/testdata/src/flagged/flagged.go":  "package flagged\n",
-	"internal/go_engine/rules/gamma/analyzer.go":                     "package gamma\n",
-	"internal/go_engine/rules/gamma/analyzer_test.go":                "package gamma\n",
-	"internal/go_engine/rules/gamma/testdata/src/flagged/flagged.go": "package flagged\n",
-	"internal/go_engine/rules/vet/delta/analyzer.go":                 "package delta\n",
-	"internal/go_engine/rules/vet/delta/testdata/parity/go.mod":      "module example.com/parity\n",
-	"internal/go_engine/rules/vet/delta/testdata/parity/parity.go":   "package parity\n",
-	"internal/go_engine/rules/shared/shared.go": "package shared\n\n" +
-		"import _ \"example.com/planted/internal/go_engine/rules/deep\"\n",
-	"internal/go_engine/rules/deep/deep.go": "package deep\n",
-	"internal/go_engine/rules/registry.go": "package rules\n\nimport (\n" +
-		"\t\"example.com/planted/internal/go_engine/rules/gamma\"\n" +
-		"\t\"example.com/planted/internal/go_engine/rules/vet/delta\"\n)\n\n" +
+	"internal/go_language/rules/alpha/analyzer.go": "package alpha\n\n" +
+		"import _ \"example.com/planted/internal/go_language/rules/shared\"\n",
+	"internal/go_language/rules/alpha/testdata/src/flagged/flagged.go": "package flagged\n",
+	"internal/go_language/rules/beta/analyzer.go": "package beta\n\n" +
+		"import _ \"example.com/planted/internal/go_language/rules/shared\"\n",
+	"internal/go_language/rules/beta/testdata/src/flagged/flagged.go":  "package flagged\n",
+	"internal/go_language/rules/gamma/analyzer.go":                     "package gamma\n",
+	"internal/go_language/rules/gamma/analyzer_test.go":                "package gamma\n",
+	"internal/go_language/rules/gamma/testdata/src/flagged/flagged.go": "package flagged\n",
+	"internal/go_language/rules/vet/delta/analyzer.go":                 "package delta\n",
+	"internal/go_language/rules/vet/delta/testdata/parity/go.mod":      "module example.com/parity\n",
+	"internal/go_language/rules/vet/delta/testdata/parity/parity.go":   "package parity\n",
+	"internal/go_language/rules/shared/shared.go": "package shared\n\n" +
+		"import _ \"example.com/planted/internal/go_language/rules/deep\"\n",
+	"internal/go_language/rules/deep/deep.go": "package deep\n",
+	"internal/go_language/rules/registry.go": "package rules\n\nimport (\n" +
+		"\t\"example.com/planted/internal/go_language/rules/gamma\"\n" +
+		"\t\"example.com/planted/internal/go_language/rules/vet/delta\"\n)\n\n" +
 		"var ports = map[string]port{\n\t\"SA0001\": {analyzer: gamma.Analyzer, listener: &gamma.Listener},\n" +
 		"\t\"delta\": {analyzer: delta.Analyzer},\n}\n",
 	"internal/other/other.go": "package other\n",
@@ -97,7 +97,7 @@ func plantedChange(test *testing.T, edits map[string]string) (string, string) {
 // found by its name, and a rule only its own code spells; a flip to Composes isolates nothing.
 func TestALandIsolatesTheRuleDirectoriesItsDiffTouches(test *testing.T) {
 	test.Parallel()
-	rules := "internal/go_engine/rules/"
+	rules := "internal/go_language/rules/"
 	changed := func(file string) map[string]string {
 		return map[string]string{file: plantedRules[file] + "// changed\n"}
 	}

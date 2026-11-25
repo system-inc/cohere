@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	goenginerule "github.com/system-inc/cohere/internal/go_engine/rule"
+	goenginerule "github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -73,21 +73,21 @@ type SwiftVerdict struct {
 var ruleSourceNotes = map[string]string{
 	"name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
 	"language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), " +
-		"the Go engine's (internal/go_engine/rules), swift/Rules.json for Swift",
+		"the Go engine's (internal/go_language/rules), swift/Rules.json for Swift",
 	"namespace": "the registered name, before its last slash",
 	"origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; " +
 		"for Swift, the origin each rule declares (swift/Rules.json); " +
-		"for Go, the origin each rule declares (internal/go_engine/rules)",
+		"for Go, the origin each rule declares (internal/go_language/rules)",
 	"upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; " +
 		"for Swift, the id a ported rule declares (swift/Rules.json); " +
-		"for Go, the analyzer or check a ported rule names (internal/go_engine/rules)",
+		"for Go, the analyzer or check a ported rule names (internal/go_language/rules)",
 	"category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
 	"typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares, " +
 		"or for Go the TypeAware its registration declares",
 	"options":    "the rule's registration: which decoder it carries and whether it requires options",
 	"messageIds": "the message ids the rule's own tests assert (examples/<rule>.json)",
 	"fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json); for Go, " +
-		"\"fix\" when a run without --no-fix fixes the rule's findings (internal/go_engine's FixingRules)",
+		"\"fix\" when a run without --no-fix fixes the rule's findings (internal/go_language's FixingRules)",
 	"sets":            "each carried rule set as the loader resolves it, at warn or error, top-level rules only",
 	"swift":           "swift/HouseRuleVerdicts.json",
 	"typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",

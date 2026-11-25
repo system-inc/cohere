@@ -221,7 +221,7 @@ type uncheckedEngineFile struct {
 }
 
 // notWrittenFile is one file a fix phase did not write: the file as the engine reached it, and its real path, outside
-// the root. The same fields the Go engine's fix record writes (internal/go_engine/contract.NotWrittenFile), so the
+// the root. The same fields the Go engine's fix record writes (internal/go_language/contract.NotWrittenFile), so the
 // record decodes into it and `--json` writes it as is.
 type notWrittenFile struct {
 	File     string `json:"file"`
@@ -229,7 +229,7 @@ type notWrittenFile struct {
 }
 
 // censusMissedFile is a file an engine's load reached that its census never counted, with its package (#hd5bsqh):
-// the same fields the Go engine's types record writes (internal/go_engine/contract.CensusMissedFile).
+// the same fields the Go engine's types record writes (internal/go_language/contract.CensusMissedFile).
 type censusMissedFile struct {
 	Package string `json:"package"`
 	File    string `json:"file"`
@@ -237,7 +237,7 @@ type censusMissedFile struct {
 
 // withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,
 // the file as the engine names it, and how many errors it held. The same fields the Go engine's types record
-// writes (internal/go_engine/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
+// writes (internal/go_language/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
 type withheldCgoFile struct {
 	Package string `json:"package"`
 	File    string `json:"file"`

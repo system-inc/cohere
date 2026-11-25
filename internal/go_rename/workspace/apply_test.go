@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
+	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 )
 

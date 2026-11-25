@@ -150,7 +150,7 @@ A gate box is a shared box: every org there runs as loom and writes one Go cache
 kept (`shared_box_gate.go`, #adbkt5t). Its Go toolchain must digest to the one pinned there before any of it
 runs. Its account's Go settings are left unread. `go mod verify` passes before any test. Every test runs with
 `-count=1` on a Go cache made empty for the job, and each package may run 30 minutes, since on an empty cache
-`internal/go_engine` alone took 8 on an idle Sun2 and crossed go test's default 10 in the whole run (#er5mbvc). A mirror that doesn't hold the commit after 3 minutes, or a
+`internal/go_language` alone took 8 on an idle Sun2 and crossed go test's default 10 in the whole run (#er5mbvc). A mirror that doesn't hold the commit after 3 minutes, or a
 toolchain or module cache it can't vouch for, refuses the landing, and its verdict's land line says "scratch box,
 shared uid".
 
@@ -188,7 +188,7 @@ Shackler, land waits holding the lock, saying whose claim and since when, and af
 with no `command/cohere` has nothing to measure and lands saying so. Each phase's seconds are on the land line.
 
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
-body. The area is a folder in the tree, by its name or its path (`go_engine`, `release/dispatch`), or a
+body. The area is a folder in the tree, by its name or its path (`go_language`, `release/dispatch`), or a
 top-level file's name lowercased (`contributing`). Land refuses a landing whose commits break that, naming
 each commit, before it waits for the lock: a merge needs no area, but is held to the length. The landing
 commit's subject is `Land #<task>: <what landed>`: the task is the one the commits' subjects name, or

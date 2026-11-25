@@ -63,7 +63,7 @@ const folderReasoning = "A folder's name is read on every path and every import 
 	"way the author meant."
 
 // folderRuleNames are every engine's rule names, from internal/rule_names, as the Go engine's file-name rule reads
-// them, so a folder named for a rule it holds, internal/go_engine/rules/no_param_reassign, is not judged on the
+// them, so a folder named for a rule it holds, internal/go_language/rules/no_param_reassign, is not judged on the
 // rule's words.
 var folderRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
 	return file_name_words.NewRuleNames(rule_names.RuleNames())

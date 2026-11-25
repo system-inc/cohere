@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_language/project"
 	"github.com/system-inc/cohere/internal/needs"
 	"github.com/system-inc/cohere/internal/streams"
 	"golang.org/x/mod/modfile"
@@ -98,7 +98,7 @@ type boxVerdict struct {
 	// timeouts is, for each package whose test binary hit go test's -timeout, everything it printed from its timeout's
 	// panic on: the tests still running and every goroutine's stack. test2json gives that text to whichever test it
 	// was framing, which never ends with a pass or a fail, so printing only the failed tests' output dropped it and a
-	// timeout read as a bare `FAIL` with no test named (internal/go_engine on Sun2, Nov 23, #r28e4nh).
+	// timeout read as a bare `FAIL` with no test named (internal/go_language on Sun2, Nov 23, #r28e4nh).
 	timeouts map[string][]string
 	// steps is each step the box's run said it ended, `<step> <seconds>`, in order, and packageSeconds each package's
 	// test binary's run, from its pass or fail.

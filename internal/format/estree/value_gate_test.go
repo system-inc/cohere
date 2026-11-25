@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_language/load"
 )
 
 // The gate holds format to one promise of the typed property values: an estree value never travels as an

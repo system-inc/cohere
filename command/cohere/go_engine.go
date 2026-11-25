@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/system-inc/cohere/internal/go_engine"
+	"github.com/system-inc/cohere/internal/go_language"
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 )
@@ -35,7 +35,7 @@ func runGoEngineVerb(
 	standardOutput io.Writer,
 	standardError io.Writer,
 ) int {
-	return go_engine.Main(arguments, activeMemoryPolicy.available, standardInput, standardOutput, standardError)
+	return go_language.Main(arguments, activeMemoryPolicy.available, standardInput, standardOutput, standardError)
 }
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded
