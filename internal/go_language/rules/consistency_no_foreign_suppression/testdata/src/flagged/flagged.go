@@ -27,4 +27,5 @@ var trailingBare = 2 //nolint // want "^`//nolint` is golangci-lint's suppressio
 
 // want +1 "^`//nolint` is golangci-lint's suppression, and cohere checks neither its reason nor whether"
 //nolint
+
 var bare = 3
