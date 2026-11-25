@@ -13,9 +13,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // A stopped speculation finishes the files its workers are on and begins no more, so every file it did not

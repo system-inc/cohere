@@ -12,9 +12,9 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	// Aliased: the CohereSettings.json loader is package settings too, and this one reads only its go block.
 	go_settings "github.com/system-inc/cohere/internal/go_language/settings"
-	"github.com/system-inc/cohere/internal/lint/option_schema"
-	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/option_schema"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
 )
 
 // moduleRoot is the directory the generated paths are relative to: go test runs in the package's own
@@ -256,12 +256,12 @@ func TestTheGoSchemaAcceptsExactlyWhatCohereGoAccepts(test *testing.T) {
 	}
 }
 
-// compiledGoSchema compiles the published project schema's go block with internal/lint/option_schema, the
-// repository's in-process validator. That validator is a draft-04 subset held to ajv 6, and the published
-// schema is 2020-12, so one keyword is translated: prefixItems becomes draft-04's tuple, items as a list,
-// which means the same thing. The validator ignores a keyword it does not know, and an untranslated one
-// reads as permissive, so a keyword this misses fails the refusal half of the test above rather than
-// hiding there. The block is wrapped as the one element of a list, since Validate checks an option list.
+// compiledGoSchema compiles the published project schema's go block with internal/typescript_language/option_schema,
+// the repository's in-process validator. That validator is a draft-04 subset held to ajv 6, and the published schema is
+// 2020-12, so one keyword is translated: prefixItems becomes draft-04's tuple, items as a list, which means the same
+// thing. The validator ignores a keyword it does not know, and an untranslated one reads as permissive, so a keyword
+// this misses fails the refusal half of the test above rather than hiding there. The block is wrapped as the one
+// element of a list, since Validate checks an option list.
 func compiledGoSchema(test *testing.T) *option_schema.Schema {
 	test.Helper()
 	var published struct {

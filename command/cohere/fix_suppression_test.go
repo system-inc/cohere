@@ -3,17 +3,17 @@ package main
 import (
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/rules/core"
-	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/core"
 )
 
 /*
  * A disable comment withholds the repair as well as the finding.
  *
  * The lint path filters every diagnostic through `directives.Suppresses` before reporting it
- * (`internal/types/program/walk.go:500`). The fix path did not build that index at all, so a rule's
+ * (`internal/typescript_language/program/walk.go:500`). The fix path did not build that index at all, so a rule's
  * finding was correctly withheld and its fix was applied anyway.
  *
  * That combination is worse than either half alone. Both linters report nothing on the disabled

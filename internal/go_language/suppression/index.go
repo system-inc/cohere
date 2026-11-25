@@ -3,7 +3,7 @@
 //
 // A suppression is a rule scoped off for one line, so it is honest only when it says why, and it stays honest
 // only while it still withholds something: a stale exemption is a rule silently turned off. The TypeScript side
-// (internal/lint/suppression) records a missing reason and counts it. This side is stricter: a directive
+// (internal/typescript_language/suppression) records a missing reason and counts it. This side is stricter: a directive
 // without a reason suppresses nothing and is itself a finding, and so is one that withholds nothing.
 //
 // The index comes from go/scanner rather than a parse. A directive is a fact about a line, and the scanner

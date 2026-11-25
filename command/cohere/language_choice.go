@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // language is one name `--languages` or `--formats` takes (#s7gt4bj): the flag that takes it, the child whose

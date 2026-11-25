@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 type guardOptions struct {

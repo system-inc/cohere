@@ -23,12 +23,12 @@ import (
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
-	"github.com/system-inc/cohere/internal/unused_exports"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/unused_exports"
 )
 
 // cacheOff is `--no-cache`: no cache is read or written for the project. Package-level because the

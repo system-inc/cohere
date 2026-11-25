@@ -38,7 +38,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/types/source_name"
+	"github.com/system-inc/cohere/internal/typescript_language/source_name"
 )
 
 // Formatter is either side of the comparison.

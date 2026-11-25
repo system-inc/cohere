@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
+	esregexp "github.com/system-inc/cohere/internal/typescript_language/ecmascript/regexp"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // Coverage, said as counts a reader can check rather than as a wall.

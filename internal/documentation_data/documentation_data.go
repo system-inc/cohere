@@ -5,7 +5,7 @@
 // and what each registration declares, the rule sets cohere carries as the loader resolves them, the
 // Swift registry and verdict catalog, cohere-go's registry, the settings schemas
 // internal/settings/schema renders, CHANGELOG.md, the flag set as the binary prints it, the cases the rule
-// tests assert, recorded by the capture hook in internal/lint/testing, and the benchmark runs
+// tests assert, recorded by the capture hook in internal/typescript_language/rule_testing, and the benchmark runs
 // bench/quiet_machine.sh recorded in bench/results. A field no source holds yet is left out rather than
 // guessed, and the sourceNotes in rules.json say where each field comes from.
 //
@@ -28,8 +28,8 @@ import (
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/format/native"
 	golanguagerule "github.com/system-inc/cohere/internal/go_language/rule"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // The files Build produces under Directory, relative to the module root. RuleNamesPath is the one it writes

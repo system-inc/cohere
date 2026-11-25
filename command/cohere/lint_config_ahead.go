@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
 )
 
 // lintConfigAhead is the lint config read on its own goroutine while the graph builds (#g3046x5).

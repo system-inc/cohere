@@ -16,11 +16,11 @@ import (
 	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/duplicate_functions"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/canonical_function_hash"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/suppression"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/canonical_function_hash"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/suppression"
 )
 
 // duplicatesRequested is `--duplicates`: a report beside --unused, never a gate (#jfvhbj7, @system_cohere's ruling on
@@ -77,7 +77,10 @@ func writeTypeScriptDuplicates(
 		}
 		projectSettings = loaded
 	}
-	writeDuplicatesReport(streams.Output, typeScriptDuplicates(callerContext, graph, projectFiles, projectSettings, location))
+	writeDuplicatesReport(
+		streams.Output,
+		typeScriptDuplicates(callerContext, graph, projectFiles, projectSettings, location),
+	)
 }
 
 // typeScriptDuplicates is the duplicates report over a TypeScript program: every function of every project file the

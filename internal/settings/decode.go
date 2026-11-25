@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/json_value"
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // Decoder turns a rule's raw JSON options into the rule bound to them, ready to run.

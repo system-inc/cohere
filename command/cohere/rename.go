@@ -10,8 +10,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/rename"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rename"
 )
 
 // renameVerbName is the subcommand that triggers a program-wide rename.

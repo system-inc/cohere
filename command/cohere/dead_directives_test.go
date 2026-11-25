@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/rules/core"
-	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/core"
 )
 
 // Exercise the relint path used after fixes and by stdin. The same directive is dead with its

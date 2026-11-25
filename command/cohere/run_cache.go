@@ -20,17 +20,17 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // The run cache's command half: decide whether this run can be replayed, replay it if so, and
 // otherwise record it on the way out.
 //
-// The package half (internal/types/program/run_cache.go) proves inputs unchanged. This half decides
+// The package half (internal/typescript_language/program/run_cache.go) proves inputs unchanged. This half decides
 // which runs are eligible and which exits are verdicts, and it is deliberately narrow on both.
 //
 // # Which runs

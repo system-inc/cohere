@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // The run cache for a Go root (#c387bta). A Go run uses the TypeScript run cache whole: the table in

@@ -625,7 +625,7 @@ func gate(worktree string, commit string, task string) (int, string) {
 }
 
 // ruleCpuCheck is the repository-local, generated stress corpus and its budget test.
-const ruleCpuCheck = "./internal/lint/registry/rule_budget_test.go"
+const ruleCpuCheck = "./internal/typescript_language/registry/rule_budget_test.go"
 
 // ruleCpuTest is the budget test in ruleCpuCheck that the gate runs by name. A -run pattern that names no test runs
 // none and passes, so TestCohereHasTheRuleCpuCheckTheGateRuns holds the file to this name.

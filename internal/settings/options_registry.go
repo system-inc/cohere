@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/system-inc/cohere/internal/lint/option_schema"
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/option_schema"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // OptionsRegistry maps rule names to their decoders.

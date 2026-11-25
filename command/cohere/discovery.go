@@ -16,7 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // Discovery is how one cohere checks a repository that holds more than one project: TypeScript programs,

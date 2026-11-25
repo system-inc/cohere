@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 type runCacheSession struct {

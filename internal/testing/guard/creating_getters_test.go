@@ -90,7 +90,7 @@ func TestTheCreatingGetterScanSeesAPlantedCall(test *testing.T) {
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
-	path := filepath.Join(root, "internal/lint/rules/typescript/no_shadow.go")
+	path := filepath.Join(root, "internal/typescript_language/rules/typescript/no_shadow.go")
 	original, readError := os.ReadFile(path)
 	if readError != nil {
 		test.Fatal(readError)

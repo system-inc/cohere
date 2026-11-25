@@ -8,11 +8,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/rules/adamic"
-	"github.com/system-inc/cohere/internal/lint/rules/nexus"
-	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/adamic"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/nexus"
 	"github.com/system-inc/cohere/rule_runner"
 )
 

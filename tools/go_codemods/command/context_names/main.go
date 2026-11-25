@@ -276,8 +276,8 @@ func ownContextType(variable *types.Var, ownModule string) (*types.TypeName, boo
 // a parameter cannot take without shadowing the type. Keyed by the package path relative to the module, and
 // applied before the type-derived name.
 var contextOverrides = map[origin_names.TypeName]string{
-	{PackagePath: "internal/format/yaml/compose", Name: "composeContext"}:   "composition",
-	{PackagePath: "internal/lint/ecmascript/regexp", Name: "escapeContext"}: "escaping",
+	{PackagePath: "internal/format/yaml/compose", Name: "composeContext"}:                  "composition",
+	{PackagePath: "internal/typescript_language/ecmascript/regexp", Name: "escapeContext"}: "escaping",
 }
 
 // ownContextName names a ctx of one of our own Context types: the override for its type when there is one,

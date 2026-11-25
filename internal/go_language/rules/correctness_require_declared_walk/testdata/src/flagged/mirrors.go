@@ -9,7 +9,7 @@ import (
 // checkMirrors is a helper in a file of its own: the root reaches two walks, one of them a second hop away.
 func checkMirrors(root string) []string {
 	problems := sourceHeaders(root)
-	_ = goFiles(filepath.Join(root, "internal/lint/rules"), nil)
+	_ = goFiles(filepath.Join(root, "internal/typescript_language/rules"), nil)
 	_ = goFiles(root, func(path string) error { return nil })
 	if _, readError := os.ReadFile(filepath.Join(root, "internal/dry/testdata/mirrors.json")); readError != nil {
 		problems = append(problems, readError.Error())

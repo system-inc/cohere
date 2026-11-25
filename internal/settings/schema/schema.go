@@ -185,7 +185,7 @@ func keyShape(key settings.TopLevelKey) (*schemaNode, error) {
 }
 
 // settingsShape is the namespaces a run reads settings for: better-tailwindcss, under either of the
-// names upstream reads (tailwindSettingsNamespaces in internal/lint/rules/tailwind). Which keys each
+// names upstream reads (tailwindSettingsNamespaces in internal/typescript_language/rules/tailwind). Which keys each
 // carries is checked by the run against the rules that read them (registry.CheckSettings), and a key
 // no rule reads is refused there, so the schema names the namespaces and leaves their keys open.
 func settingsShape() *schemaNode {

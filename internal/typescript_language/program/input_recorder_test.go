@@ -1,0 +1,226 @@
+package program_test
+
+import (
+	"os"
+	"path/filepath"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+)
+
+// A path the compiler asked about with a typed question that answered no is still present if it is on
+// disk in another form, and only a path genuinely not there is recorded absent.
+//
+// Module resolution asks whether `./Graph.css` is a directory, the answer is no, and the file is right
+// there. Recording that no as absence made an untouched ahra tree miss on a four-month-old stylesheet,
+// so the cache could never hit. Built through the real Build so the probe reaches the recorder the way
+// the compiler sends it, not the way a test imagines it does.
+func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	write := func(path, contents string) {
+		test.Helper()
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	write(
+		filepath.Join(root, "tsconfig.json"),
+		`{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
+	write(
+		filepath.Join(root, "source", "index.ts"),
+		"import './style.css';\nimport { a } from './missing';\nexport const b = a;\n",
+	)
+	write(filepath.Join(root, "source", "style.css"), "body {}\n")
+
+	recorder := program.NewInputRecorder()
+	if _, buildError := program.Build(
+		program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder},
+	); buildError != nil {
+		test.Fatalf("build: %v", buildError)
+	}
+	present, absent, probed := recorder.Inputs()
+
+	style := filepath.Join(root, "source", "style.css")
+	if slices.Contains(absent, style) {
+		test.Errorf("%s is on disk and was recorded absent, so every check would report it appearing", style)
+	}
+	for _, path := range absent {
+		if _, statError := os.Stat(path); statError == nil {
+			test.Errorf("%s is on disk and was recorded absent", path)
+		}
+	}
+
+	// The control: the recorder does record absence, or the loop above passes on an empty list.
+	if len(absent) == 0 {
+		test.Fatal(
+			"nothing was recorded absent, though ./missing was looked for and does not exist: the check above proved nothing",
+		)
+	}
+	if !slices.Contains(present, filepath.Join(root, "source", "index.ts")) {
+		test.Error("the source file the program read was not recorded present")
+	}
+
+	// And the whole recording replays as a hit on the untouched tree, which is the property all of
+	// this serves.
+	cache, recordRunCacheError := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatalf("record: %v", recordRunCacheError)
+	}
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("the untouched tree missed: %v", checkError)
+	}
+}
+
+// A directory the build only asked whether it exists is recorded for that alone (#q51f02a). With no
+// package.json at the project's root, module resolution asks it of every directory up to /, and on a busy
+// machine /tmp changes many times a second: checked at full signature, those cost a replay on a tree
+// nothing had touched, which is how TestTheCacheLivesInTheProjectAndNoCacheTouchesNone failed at load 58.
+// So an unrelated directory created beside the project still hits. What the probe was for still misses: a
+// package.json appearing above the project. And a directory the build listed is never recorded for its
+// existence alone, even one holding nothing it read: a file added to an empty directory the include glob
+// walks still misses.
+func TestADirectoryOnlyProbedIsRecordedForItsExistence(test *testing.T) {
+	test.Parallel()
+	parent := test.TempDir()
+	root := filepath.Join(parent, "project")
+	write := func(path string, contents string) {
+		test.Helper()
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	write(
+		filepath.Join(root, "tsconfig.json"),
+		`{"compilerOptions":{"strict":true,"noEmit":true},"include":["**/*.ts"]}`,
+	)
+	write(filepath.Join(root, "index.ts"), "export const a: number = 1;\n")
+	if createDirectoryError := os.Mkdir(filepath.Join(root, "empty"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	record := func() *program.RunCache {
+		test.Helper()
+		recorder := program.NewInputRecorder()
+		if _, buildError := program.Build(program.Options{
+			ConfigFileName:   filepath.Join(root, "tsconfig.json"),
+			CurrentDirectory: root,
+			Inputs:           recorder,
+		}); buildError != nil {
+			test.Fatalf("build: %v", buildError)
+		}
+		present, absent, probed := recorder.Inputs()
+		cache, recordRunCacheError := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
+		if recordRunCacheError != nil {
+			test.Fatalf("record: %v", recordRunCacheError)
+		}
+		return cache
+	}
+
+	// The parent is probed and nothing more. Since #zc57tqg it is left out of the record entirely, since the
+	// project's own directory beneath it says the same thing; either way it must never be watched at full
+	// signature, or the unrelated directory below would cost the replay.
+	cache := record()
+	rootRecorded := false
+	for _, input := range cache.Inputs {
+		if input.Path == parent && !input.ExistenceOnly {
+			test.Fatal("the project's parent, which the build only probed, was recorded at full signature")
+		}
+		if input.Path == root {
+			rootRecorded = true
+			if input.ExistenceOnly {
+				test.Error("the project's own directory, which the build lists, was recorded for its existence alone")
+			}
+		}
+	}
+	if !rootRecorded {
+		test.Fatal("the project's own directory was not recorded, so nothing below is about what a listing catches")
+	}
+
+	if createDirectoryError := os.Mkdir(filepath.Join(parent, "unrelated"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("a directory created beside the project cost the replay: %v", checkError)
+	}
+
+	write(filepath.Join(parent, "package.json"), "{}\n")
+	if checkError := cache.Check("k"); checkError == nil {
+		test.Error("a package.json created above the project, which module resolution reads, still replayed")
+	}
+	if removeError := os.Remove(filepath.Join(parent, "package.json")); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("with the package.json removed again the tree did not hit: %v", checkError)
+	}
+
+	write(filepath.Join(root, "empty", "added.ts"), "export const added = 2;\n")
+	if checkError := cache.Check("k"); checkError == nil {
+		test.Error("a file added to a directory the include glob lists, holding nothing the build read, still replayed")
+	}
+}
+
+// Removing a package's directory misses, though since #zc57tqg the probe of that directory is no longer
+// recorded: the package.json the build read beneath it is, and it cannot stay present without the directory.
+// That is the argument for leaving the probe out, so it is planted here rather than assumed: record, remove
+// the package, and the check must fail; and the control, the same record over the untouched tree, must hit.
+func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	write := func(path string, contents string) {
+		test.Helper()
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	write(
+		filepath.Join(root, "tsconfig.json"),
+		`{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
+	write(
+		filepath.Join(root, "source", "index.ts"),
+		"import { value } from 'pkg';\nexport const doubled: number = value * 2;\n",
+	)
+	write(filepath.Join(root, "node_modules", "pkg", "package.json"), `{"name":"pkg","types":"index.d.ts"}`)
+	write(filepath.Join(root, "node_modules", "pkg", "index.d.ts"), "export declare const value: number;\n")
+
+	recorder := program.NewInputRecorder()
+	if _, buildError := program.Build(
+		program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder},
+	); buildError != nil {
+		test.Fatalf("build: %v", buildError)
+	}
+	present, absent, probed := recorder.Inputs()
+	packagePath := filepath.Join(root, "node_modules", "pkg")
+	if !slices.Contains(present, filepath.Join(packagePath, "package.json")) {
+		test.Fatal("the package's package.json was not recorded, so nothing below is about what it covers")
+	}
+	if slices.Contains(probed, packagePath) {
+		test.Errorf("%s has a recorded path beneath it and was still recorded as a probe", packagePath)
+	}
+	cache, recordRunCacheError := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatalf("record: %v", recordRunCacheError)
+	}
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("the untouched tree missed: %v", checkError)
+	}
+	if renameError := os.Rename(packagePath, packagePath+"-moved"); renameError != nil {
+		test.Fatal(renameError)
+	}
+	if checkError := cache.Check("k"); checkError == nil {
+		test.Error("the package's directory was moved away and the record still replayed")
+	}
+}

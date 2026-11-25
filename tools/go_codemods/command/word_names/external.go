@@ -19,21 +19,21 @@ const (
 // outside spelling: the doc's opening name takes the new name, every other occurrence of the old one stays, and a
 // doc that names the spelling nowhere gains the note, a person's sentence read in the file.
 var externalNames = map[string]externalName{
-	"internal/lint/rules/core/no_var.go:messageUnexpectedVar": {
+	"internal/typescript_language/rules/core/no_var.go:messageUnexpectedVar": {
 		reason: javaScriptVariable, spelling: "var",
 		note: "messageUnexpectedVariable is upstream's unexpectedVar message: a `var` declaration.",
 	},
 	// one-var's and block-scoped-var's own names for a list the var keyword opens, which a rule's spelling alone
 	// would rename without citing the keyword.
-	"internal/lint/rules/core/one_var.go:oneVarKindVar": {
+	"internal/typescript_language/rules/core/one_var.go:oneVarKindVar": {
 		reason: javaScriptVariable, spelling: "var",
 		note: "oneVariableKindVariable is a declaration list the `var` keyword opens.",
 	},
-	"internal/lint/rules/core/block_scoped_var.go:blockScopedVarIsVarDeclaration": {
+	"internal/typescript_language/rules/core/block_scoped_var.go:blockScopedVarIsVarDeclaration": {
 		reason:   javaScriptVariable,
 		spelling: "var",
 	},
-	"internal/lint/rules/core/no_unmodified_loop_condition_test.go:" +
+	"internal/typescript_language/rules/core/no_unmodified_loop_condition_test.go:" +
 		"TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite": {
 		reason: javaScriptVariable, spelling: "var",
 	},
@@ -41,15 +41,16 @@ var externalNames = map[string]externalName{
 		reason: cssVariable, spelling: "var",
 		note: "isVariableFunctionNode is upstream's isVarFunctionNode: whether a node calls CSS's var().",
 	},
-	"internal/lint/rules/tailwind/collapse/variant_printer.go:isLoneVar": {
+	"internal/typescript_language/rules/tailwind/collapse/variant_printer.go:isLoneVar": {
 		reason:   cssVariable,
 		spelling: "var",
 	},
-	"internal/lint/rules/tailwind/collapse/data_type_test.go:TestVarShortCircuitBeatsEveryCheck": {
+	"internal/typescript_language/rules/tailwind/collapse/data_type_test.go:TestVarShortCircuitBeatsEveryCheck": {
 		reason:   cssVariable,
 		spelling: "var",
 	},
-	"internal/lint/rules/tailwind/collapse/data_type_test.go:TestImageVarSkipIsUnreachableThroughInferDataType": {
+	"internal/typescript_language/rules/tailwind/collapse/data_type_test.go:" +
+		"TestImageVarSkipIsUnreachableThroughInferDataType": {
 		reason:   cssVariable,
 		spelling: "var",
 	},
@@ -59,31 +60,32 @@ var externalNames = map[string]externalName{
 		note: "isPostcssSimpleVariableNode is upstream's isPostcssSimpleVarNode: a `$$` function a word follows " +
 			"with no space between, postcss-simple-vars' interpolation.",
 	},
-	"internal/lint/rules/structure/react_component_require_properties_parameter.go:messageUsePropertiesNotProps": {
+	"internal/typescript_language/rules/structure/react_component_require_properties_parameter.go:" +
+		"messageUsePropertiesNotProps": {
 		reason: "the binding `props` the rule asks a component to rename to `properties`", spelling: "props",
 		note: "It asks for `properties` where a component's parameter is named `props`.",
 	},
-	"internal/lint/rules/react/no_unsafe.go:messageUnsafeComponentWillReceiveProps": {
+	"internal/typescript_language/rules/react/no_unsafe.go:messageUnsafeComponentWillReceiveProps": {
 		reason: "React's UNSAFE_componentWillReceiveProps lifecycle method", spelling: "componentWillReceiveProps",
 		note: "messageUnsafeComponentWillReceiveProperties reports React's `componentWillReceiveProps`.",
 	},
-	"internal/lint/rules/react/no_unused_state.go:noUnusedStateIsDerivedStateFromProps": {
+	"internal/typescript_language/rules/react/no_unused_state.go:noUnusedStateIsDerivedStateFromProps": {
 		reason: "React's getDerivedStateFromProps lifecycle method", spelling: "getDerivedStateFromProps",
 		note: "React names the hook getDerivedStateFromProps.",
 	},
-	"internal/lint/rules/react/forward_ref_uses_ref.go:canRemoveForwardRef": {
+	"internal/typescript_language/rules/react/forward_ref_uses_ref.go:canRemoveForwardRef": {
 		reason:   "React's forwardRef",
 		spelling: "forwardRef",
 	},
-	"internal/lint/rules/react/default_props_match_prop_types.go:propTypeEntry": {
+	"internal/typescript_language/rules/react/default_props_match_prop_types.go:propTypeEntry": {
 		reason: reactPropTypes, spelling: "propTypes",
 		note: "Upstream reads it from a component's propTypes.",
 	},
-	"internal/lint/rules/react/default_props_match_prop_types.go:propTypeIsRequired": {
+	"internal/typescript_language/rules/react/default_props_match_prop_types.go:propTypeIsRequired": {
 		reason:   reactPropTypes,
 		spelling: "propTypes",
 	},
-	"internal/lint/rules/react/boolean_prop_naming.go:propTypesKeyName": {
+	"internal/typescript_language/rules/react/boolean_prop_naming.go:propTypesKeyName": {
 		reason:   reactPropTypes,
 		spelling: "propTypes",
 	},
@@ -133,33 +135,33 @@ type externalName struct {
 
 // vocabularyWords are the files whose literals list the vocabulary's words, as words.
 var vocabularyWords = map[string]string{
-	"internal/lint/rules/nexus/abbreviation_vocabulary_test.go":               "a word of the vocabulary the test lists",
-	"internal/lint/rules/nexus/consistency_no_abbreviated_identifier_test.go": "a word of the vocabulary the test lists",
+	"internal/typescript_language/rules/nexus/abbreviation_vocabulary_test.go":               "a word of the vocabulary the test lists",
+	"internal/typescript_language/rules/nexus/consistency_no_abbreviated_identifier_test.go": "a word of the vocabulary the test lists",
 }
 
 // reviewedLiterals are string literals read in their files and judged unable to name the declaration a
 // candidate renames, by the name the literal spells, then the file relative to the root, the reason.
 var reviewedLiterals = map[string]map[string]string{
 	"Props": {
-		"internal/lint/rules/structure/react_component_require_properties_type_suffix.go": "a TypeScript type name's suffix the rule checks",
+		"internal/typescript_language/rules/structure/react_component_require_properties_type_suffix.go": "a TypeScript type name's suffix the rule checks",
 	},
 	"Dir": {
 		"internal/goengine/rules/correctness_require_declared_walk/analyzer.go": "the name of filepath.Dir, which the analyzer matches in calls",
 	},
 	"Ref": {
-		"internal/lint/ecmascript/react/compiled.go":    javaScriptNameText,
-		"internal/lint/rules/react/error_boundaries.go": javaScriptNameText,
-		"internal/lint/rules/react/refs.go":             javaScriptNameText,
+		"internal/typescript_language/ecmascript/react/compiled.go":    javaScriptNameText,
+		"internal/typescript_language/rules/react/error_boundaries.go": javaScriptNameText,
+		"internal/typescript_language/rules/react/refs.go":             javaScriptNameText,
 	},
 	"charCodeAt": {
-		"internal/lint/rules/nexus/correctness_no_discarded_pure_result.go": javaScriptStringMethod,
+		"internal/typescript_language/rules/nexus/correctness_no_discarded_pure_result.go": javaScriptStringMethod,
 	},
 	"charAt": {
-		"internal/lint/rules/nexus/correctness_no_discarded_pure_result.go": javaScriptStringMethod,
+		"internal/typescript_language/rules/nexus/correctness_no_discarded_pure_result.go": javaScriptStringMethod,
 	},
 	"decodeURIComponent": {
-		"internal/lint/rules/typescript/builtin_globals.go":                          javaScriptGlobal,
-		"internal/lint/ecmascript/high_level_intermediate_representation/effects.go": javaScriptGlobal,
+		"internal/typescript_language/rules/typescript/builtin_globals.go":                          javaScriptGlobal,
+		"internal/typescript_language/ecmascript/high_level_intermediate_representation/effects.go": javaScriptGlobal,
 	},
 	"cur": vocabularyWords,
 	"pos": mergeReviews(
@@ -168,11 +170,11 @@ var reviewedLiterals = map[string]map[string]string{
 	),
 	"prev": mergeReviews(
 		vocabularyWords,
-		map[string]string{"internal/lint/rules/react/no_invalid_html_attribute.go": "an HTML rel value"},
+		map[string]string{"internal/typescript_language/rules/react/no_invalid_html_attribute.go": "an HTML rel value"},
 	),
 	"args": mergeReviews(vocabularyWords, map[string]string{
-		"internal/lint/rules/core/no_unused_vars.go":                         "the value of no-unused-vars' args option",
-		"internal/lint/rules/nexus/consistency_no_abbreviated_identifier.go": "a JavaScript binding's name the TypeScript rule looks for",
+		"internal/typescript_language/rules/core/no_unused_vars.go":                         "the value of no-unused-vars' args option",
+		"internal/typescript_language/rules/nexus/consistency_no_abbreviated_identifier.go": "a JavaScript binding's name the TypeScript rule looks for",
 	}),
 }
 
@@ -197,7 +199,9 @@ var nameOverrides = map[string]string{
 	"internal/format/css/values/tokenize.go:wordEndNum": "endsNumberWord",
 	// The finding of react-component-require-properties-parameter, whose expansion would read "use properties, not
 	// properties"; its doc's note says what it asks.
-	"internal/lint/rules/structure/react_component_require_properties_parameter.go:messageUsePropertiesNotProps": "messageUsePropertiesParameter",
+	"internal/typescript_language/rules/structure/react_component_require_properties_parameter.go:" +
+		"messageUsePropertiesNotProps": "messageUsePropertiesParameter",
 	// Its catalog text, which the rule does not flag, keeps the pair's one name.
-	"internal/lint/rules/structure/react_component_require_properties_parameter.go:messageUsePropertiesNotPropsText": "messageUsePropertiesParameterText",
+	"internal/typescript_language/rules/structure/react_component_require_properties_parameter.go:" +
+		"messageUsePropertiesNotPropsText": "messageUsePropertiesParameterText",
 }

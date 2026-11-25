@@ -132,7 +132,9 @@ func TestTheLicenseTextsAreTheStandardOnes(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	reference, readError := os.ReadFile(filepath.Join(module, "internal", "lint", "checking", "LICENSE"))
+	reference, readError := os.ReadFile(
+		filepath.Join(module, "internal", "typescript_language", "type_checking", "LICENSE"),
+	)
 	if readError != nil {
 		test.Fatal(readError)
 	}

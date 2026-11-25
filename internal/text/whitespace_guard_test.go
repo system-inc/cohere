@@ -37,10 +37,16 @@ var goWhitespaceFunctions = map[string][]string{
 var goWhitespaceUnswept = map[string]int{
 	// lint: a gap that is only trivia, or what TypeScript's JSDoc parser kept, which is the scanner's set
 	// (it also skips U+0085 and U+200B), neither Go's nor JavaScript's (#0pbc8mv).
-	"internal/lint/ecmascript/comments/comments.go":         1,
-	"internal/lint/ecmascript/dot_notation/dot_notation.go": 1,
-	"internal/lint/rules/typescript/no_deprecated.go":       1,
-	"internal/lint/rules/typescript/no_invalid_this.go":     1,
+	"internal/typescript_language/ecmascript/comments/comments.go":         1,
+	"internal/typescript_language/ecmascript/dot_notation/dot_notation.go": 1,
+	"internal/typescript_language/rules/typescript/no_deprecated.go":       1,
+	"internal/typescript_language/rules/typescript/no_invalid_this.go":     1,
+	// The program's verbs and the shim generator, which came under this walk when the program joined the rules on
+	// the internal/typescript_language shelf, and have not been swept: whether each reads JavaScript is still to be
+	// decided, one call at a time.
+	"internal/typescript_language/rename/mention.go":             1,
+	"internal/typescript_language/tools/generate_shims/main.go":  1,
+	"internal/typescript_language/unused_exports/intentional.go": 4,
 }
 
 // goWhitespaceSite is one unmarked reference to a Go whitespace function.
@@ -125,7 +131,12 @@ func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
 	}
 	var found []goWhitespaceSite
 	files := 0
-	for _, directory := range []string{"internal/lint", "internal/settings", "internal/text", "internal/format"} {
+	for _, directory := range []string{
+		"internal/typescript_language",
+		"internal/settings",
+		"internal/text",
+		"internal/format",
+	} {
 		walkError := filepath.WalkDir(filepath.Join(
 			moduleRoot,
 			directory,

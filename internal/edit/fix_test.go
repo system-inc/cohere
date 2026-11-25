@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // proposeOnce returns a fixed set of proposals on the first pass and nothing afterwards, which is

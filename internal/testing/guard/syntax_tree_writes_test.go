@@ -23,9 +23,10 @@ import (
 // and a checker that resolved the class during the swap kept it without its `*[Symbol.iterator]()` for the run:
 // false TS2488 in 2 of 60 cold runs of loom (#72kn826). This holds every rule to computing on a copy (#qb5xxj1).
 //
-// It reads every package under internal/lint from source with its types: the rules, the rule interface, and
-// every shelf a rule calls with a node (checking, ecmascript and the rest). A helper is scanned where it is
-// written, so a write in a helper a rule calls is named at the helper, whoever calls it. What it reports:
+// It reads every package under internal/typescript_language but the host packages (hostPackages) from source with
+// its types: the rules, the rule interface, and every shelf a rule calls with a node (type_checking, ecmascript and
+// the rest). A helper is scanned where it is written, so a write in a helper a rule calls is named at the helper,
+// whoever calls it. What it reports:
 //
 //   - an assignment, op-assignment, `++` or `--`, or a range clause assigning, whose target is reached through a
 //     field of a struct the ast package declares (`node.Members = ...`, `list.Nodes[i] = ...`, `symbol.Flags |=`),
@@ -45,13 +46,13 @@ import (
 // holds and nothing reached through that. A parameter is never fresh, since the caller decides what it holds, and
 // neither is a variable whose address is taken, since what the address is handed to decides.
 //
-// Known limits: a call through a function value or an interface is not followed, and is only seen where the
-// function it reaches is written in internal/lint; a write inside the TypeScript packages a rule calls (the
-// checker's own caches) is the checker's to synchronize and is not looked at; a fresh allocation's field that is
-// handed a slice the tree owns, then written through, reads as the rule's own; and freshness is not followed into
-// a parameter, so a helper writing a slice every caller built is reported until it is handed a copy.
-// TestEveryRuleWalksBesideReadersOfTheSameTreeAtOnce (internal/types/program) runs every rule beside a reader of
-// the tree under -race, which catches a write wherever it is written.
+// Known limits: a call through a function value or an interface is not followed, and is only seen where the function it
+// reaches is written in internal/typescript_language; a write inside the TypeScript packages a rule calls (the
+// checker's own caches) is the checker's to synchronize and is not looked at; a fresh allocation's field that is handed
+// a slice the tree owns, then written through, reads as the rule's own; and freshness is not followed into a parameter,
+// so a helper writing a slice every caller built is reported until it is handed a copy.
+// TestEveryRuleWalksBesideReadersOfTheSameTreeAtOnce (internal/typescript_language/program) runs every rule beside a
+// reader of the tree under -race, which catches a write wherever it is written.
 func TestRulesNeverWriteTheSyntaxTree(test *testing.T) {
 	test.Parallel()
 
@@ -66,8 +67,8 @@ func TestRulesNeverWriteTheSyntaxTree(test *testing.T) {
 		}
 		scan.read(lintPackage.FileSet, lintPackage.TypesInfo, lintPackage.Syntax)
 	}
-	// About 650 files under internal/lint name the tree today. A scan that saw a handful lost the packages, or
-	// stopped resolving the ast package's types, and would pass on nothing.
+	// About 650 files under internal/typescript_language name the tree today. A scan that saw a handful lost the
+	// packages, or stopped resolving the ast package's types, and would pass on nothing.
 	if scan.treeFiles < 300 {
 		test.Fatalf("the scan read %d files, %d of them naming the syntax tree's types, too few to be every rule",
 			scan.files, scan.treeFiles)

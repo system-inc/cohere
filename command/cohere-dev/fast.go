@@ -93,7 +93,7 @@ var landingGateOnly = []landingGateEntry{
 		reason: "it type-checks all of cohere for each of the six release targets",
 	},
 	{
-		pattern:   "./internal/lint/ecmascript/high_level_intermediate_representation",
+		pattern:   "./internal/typescript_language/ecmascript/high_level_intermediate_representation",
 		skippedBy: fastTierVariable,
 		reads:     corpus.Structure,
 		// At load about 10: the package in full took 12.8s and 22.3s of CPU, in the fast tier 1.8s and 3.8s.

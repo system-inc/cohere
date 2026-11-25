@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // A run that reads the table waits while another run holds its lock, and reads the moment the lock is

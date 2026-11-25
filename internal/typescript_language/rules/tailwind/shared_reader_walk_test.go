@@ -1,0 +1,141 @@
+package tailwind
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+)
+
+// sharedReaderRules are the rules that read class surfaces through ClassLiteralSurfaces.ReaderFor, each run
+// unconfigured.
+func sharedReaderRules(test testing.TB) []rule.Entry {
+	return []rule.Entry{
+		rule_testing.EntryOf(test, EnforceCanonicalClasses),
+		rule_testing.EntryOf(test, EnforceConsistentClassOrder),
+		rule_testing.EntryOf(test, EnforceConsistentImportantPosition),
+		rule_testing.EntryOf(test, EnforceConsistentVariableSyntax),
+		rule_testing.EntryOf(test, EnforceConsistentVariantOrder),
+		rule_testing.EntryOf(test, EnforceShorthandClasses),
+		rule_testing.EntryOf(test, NoConcatenatedClasses),
+		rule_testing.EntryOf(test, NoConflictingClasses),
+		rule_testing.EntryOf(test, NoDeprecatedClasses),
+		rule_testing.EntryOf(test, NoDuplicateClasses),
+		rule_testing.EntryOf(test, NoUnknownClasses),
+		rule_testing.EntryOf(test, NoUnnecessaryWhitespace),
+	}
+}
+
+// sharedReaderWalkSource plants a finding for every one of those rules, on all three surfaces and in
+// the value positions the reader enters, so each rule reads nodes another rule already read.
+const sharedReaderWalkSource = `declare function cn(...values: unknown[]): string;
+declare const size: string;
+declare const open: boolean;
+export const className = open ? 'items-center flex' : 'flex-shrink-0';
+export const merged = cn('px-4 py-2 px-4', ` + "`px-${size}`" + `, open && 'ps-4 pe-4');
+export const elements = [
+	<div className="px-4 py-4" />,
+	<div className="flex block" />,
+	<div className="flx items-center" />,
+	<div className="text-[var(--brand)]" />,
+	<div className="hover:sm:flex" />,
+	<div className="!text-red-500" />,
+	<div className="flex  items-center" />,
+	<div className={` + "`flex  ${size}  gap-2 gap-2`" + `} />,
+];
+`
+
+// TestSharedReaderFindsWhatEachRuleFindsAlone runs the twelve rules through the real walk, where they
+// share one file cache and so one reader, and requires exactly the findings each rule makes when it
+// runs alone with a cache of its own. A reading that one rule spoiled for the next, or a memo that
+// answered one surface with another's, shows up here as a finding gained or lost.
+//
+// Every rule must report at least once, so the comparison cannot pass by everyone declining: the
+// design-system rules decline without a stylesheet, so the fixture links the installed package in as
+// a repository has it.
+func TestSharedReaderFindsWhatEachRuleFindsAlone(test *testing.T) {
+	test.Parallel()
+	packageRoot := classOrderFixturePackageRoot(test)
+	if packageRoot == "" {
+		test.Skip("no installed tailwindcss on this machine, so there is no design system to ask")
+	}
+
+	directory := test.TempDir()
+	for name, contents := range map[string]string{
+		"Component.tsx":                 sharedReaderWalkSource,
+		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
+		"tsconfig.json":                 `{"compilerOptions": {"jsx": "preserve", "strict": true, "noEmit": true}, "include": ["*.tsx"]}`,
+	} {
+		path := filepath.Join(directory, name)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatalf("creating the directory for %s: %v", name, createDirectoryError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
+		}
+	}
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(directory, "node_modules"),
+		0o755,
+	); createDirectoryError != nil {
+		test.Fatalf("creating node_modules: %v", createDirectoryError)
+	}
+	if symlinkError := os.Symlink(
+		packageRoot,
+		filepath.Join(directory, "node_modules", "tailwindcss"),
+	); symlinkError != nil {
+		test.Fatalf("linking the installed tailwindcss: %v", symlinkError)
+	}
+
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
+	}
+	files := graph.ProjectFiles()
+
+	findings := func(rules []rule.Entry) []string {
+		result, walkError := graph.Walk(context.Background(), files, rules)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
+		}
+		var lines []string
+		for _, diagnostic := range result.Diagnostics {
+			lines = append(lines, fmt.Sprintf("%s %d-%d %s %q %v", diagnostic.RuleName, diagnostic.Range.Pos(),
+				diagnostic.Range.End(), diagnostic.Message.Id, diagnostic.Message.Description, diagnostic.Fixes))
+		}
+		slices.Sort(lines)
+		return lines
+	}
+
+	rules := sharedReaderRules(test)
+	shared := findings(rules)
+	var alone []string
+	for _, subject := range rules {
+		alone = append(alone, findings([]rule.Entry{subject})...)
+	}
+	slices.Sort(alone)
+
+	for _, subject := range rules {
+		reported := slices.ContainsFunc(
+			alone,
+			func(line string) bool { return strings.HasPrefix(line, subject.Name+" ") },
+		)
+		if !reported {
+			test.Errorf("%s reported nothing on the fixture, so the comparison cannot speak for it", subject.Name)
+		}
+	}
+	if !slices.Equal(shared, alone) {
+		test.Fatalf(
+			"the rules sharing a reader found something other than what each finds alone:\n  shared:\n    %s\n  alone:\n    %s",
+			strings.Join(shared, "\n    "),
+			strings.Join(alone, "\n    "),
+		)
+	}
+}

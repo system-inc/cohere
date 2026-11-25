@@ -297,10 +297,10 @@ func TestAFileLocalListenerReadingFileStateJudgesEachFileAlone(test *testing.T) 
 	}
 }
 
-// TestTheDefaultShardSplitsWhatEndsACohereRun pins defaultShardBytes by the packages it was set for (#3ddm7fm), each
-// by its size in source bytes at cohere's root: internal/lint/rules/core's test variant splits, and so does
-// internal/lint/rules/typescript's, which a 4 MiB shard left whole at the end of the cold run; react's test variant and
-// command/cohere stay whole, since splitting them bought no wall.
+// TestTheDefaultShardSplitsWhatEndsACohereRun pins defaultShardBytes by the packages it was set for (#3ddm7fm), each by
+// its size in source bytes at cohere's root: internal/typescript_language/rules/core's test variant splits, and so does
+// internal/typescript_language/rules/typescript's, which a 4 MiB shard left whole at the end of the cold run; react's
+// test variant and command/cohere stay whole, since splitting them bought no wall.
 func TestTheDefaultShardSplitsWhatEndsACohereRun(test *testing.T) {
 	test.Parallel()
 	requireSplitting(test)
@@ -310,9 +310,9 @@ func TestTheDefaultShardSplitsWhatEndsACohereRun(test *testing.T) {
 		bytes int
 		split bool
 	}{
-		{name: "internal/lint/rules/core's test variant", bytes: 14_259_553, split: true},
-		{name: "internal/lint/rules/typescript's test variant", bytes: 5_775_349, split: true},
-		{name: "internal/lint/rules/react's test variant", bytes: 5_182_045, split: false},
+		{name: "internal/typescript_language/rules/core's test variant", bytes: 14_259_553, split: true},
+		{name: "internal/typescript_language/rules/typescript's test variant", bytes: 5_775_349, split: true},
+		{name: "internal/typescript_language/rules/react's test variant", bytes: 5_182_045, split: false},
 		{name: "command/cohere", bytes: 2_098_452, split: false},
 	} {
 		fileSet := token.NewFileSet()

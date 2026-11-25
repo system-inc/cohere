@@ -10,10 +10,10 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/format/format_files"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/nextjs"
 	"github.com/system-inc/cohere/internal/rule_names"
 	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
 )
 
 // A folder's name spells its words out (#zyq63kk). Kirk, Nov 13: "has a folder called docs, i want it to be

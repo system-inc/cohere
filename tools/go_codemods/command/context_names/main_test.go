@@ -407,7 +407,7 @@ func TestContextOverrides(test *testing.T) {
 		},
 		{
 			name:        "escapeContext in the ecmascript regexp package",
-			packagePath: fixtureModule + "/internal/lint/ecmascript/regexp",
+			packagePath: fixtureModule + "/internal/typescript_language/ecmascript/regexp",
 			source:      "package regexp\n\ntype escapeContext struct{}\n\nfunc escape(ctx escapeContext) escapeContext {\n\treturn ctx\n}\n",
 			newName:     "escaping",
 		},

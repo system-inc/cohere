@@ -1,6 +1,6 @@
 // Package static_single_assignment is the graph maintenance and single static assignment form two
 // intermediate representations share: cohere's high-level IR (the React Compiler's, in
-// internal/lint/ecmascript/high_level_intermediate_representation) and Adamic's flow graph.
+// internal/typescript_language/ecmascript/high_level_intermediate_representation) and Adamic's flow graph.
 //
 // It owns the algorithms and none of either IR's meaning. Reverse postorder, predecessors, evaluation
 // order, Braun's construction, redundant phi elimination and the verifier are written here once, over

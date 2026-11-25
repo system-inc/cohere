@@ -91,8 +91,10 @@ func equivalenceCorpus(test *testing.T, vocabulary *Vocabulary) []string {
 		test.Fatal(walkError)
 	}
 
-	identifiers, readError := os.ReadFile(filepath.Join(root, "internal", "lint", "rules", "nexus", "testdata",
-		"identifiers.txt"))
+	identifiers, readError := os.ReadFile(
+		filepath.Join(root, "internal", "typescript_language", "rules", "nexus", "testdata",
+			"identifiers.txt"),
+	)
 	if readError != nil {
 		test.Fatal(readError)
 	}

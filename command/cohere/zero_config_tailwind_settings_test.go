@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind/vendored"
 )
 
 // tailwindProjectConfiguration is a tsconfig for a project with TSX in it.

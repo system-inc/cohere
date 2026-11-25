@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // incrementalFixtureConfiguration is a tsconfig that writes its build info inside the project, so a test can

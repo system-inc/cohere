@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // reportBugsAt is where a user reports a bug in cohere. The README's "Reporting bugs" names the same

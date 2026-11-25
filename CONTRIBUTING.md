@@ -44,7 +44,7 @@ and in phase_, from the graph alone, which is what lets it be fast enough to lea
 `verify` will answer _did it actually do the thing_, which cannot be answered from inside the code
 and needs running it and reading what came out. The oracles belong there: the fixture pairs, the
 mutation sweeps, the known-dirty controls, the differential against the gate this replaces. Today
-they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
+they live here, in `internal/typescript_language/rules/tools/` and beside the rules they hold.
 
 ## Built on
 
@@ -55,10 +55,10 @@ they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
   stateless by design, which is precisely what we are replacing.
 - [web-infra-dev/rslint](https://github.com/web-infra-dev/rslint) — MIT, copyright Bytedance Inc and
   typescript-eslint contributors. Its `internal/utils/cfg` is vendored at
-  `internal/lint/ecmascript/control_flow_graph`: a basic-block control-flow graph with dominators, reachability, and
+  `internal/typescript_language/ecmascript/control_flow_graph`: a basic-block control-flow graph with dominators, reachability, and
   correct `try`/`catch`/`finally` edges, built on the same typescript-go AST we use. Vendored rather
   than depended on, because it is a package rather than a library and we change it when we change a
-  shared decision. The header on `internal/lint/ecmascript/control_flow_graph/builder.go` names the commit and what was
+  shared decision. The header on `internal/typescript_language/ecmascript/control_flow_graph/builder.go` names the commit and what was
   changed.
 
 ## Development

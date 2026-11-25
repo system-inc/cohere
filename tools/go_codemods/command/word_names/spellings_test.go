@@ -15,12 +15,12 @@ import (
 // spellingsFixture is a module holding a ported rule's names, its tests, and names that cite JavaScript, CSS and
 // React, each beside what a guard must keep.
 var spellingsFixture = map[string]string{
-	"go.work":                    "go 1.27\n\nuse .\n",
-	"go.mod":                     "module fixture\n\ngo 1.27\n",
-	"internal/lint/rule/rule.go": "package rule\n\n// Rule is a ported rule, registered under its Name.\ntype Rule struct{ Name string }\n",
-	"internal/lint/rules/core/no_unused_vars.go": `package core
+	"go.work": "go 1.27\n\nuse .\n",
+	"go.mod":  "module fixture\n\ngo 1.27\n",
+	"internal/typescript_language/rule/rule.go": "package rule\n\n// Rule is a ported rule, registered under its Name.\ntype Rule struct{ Name string }\n",
+	"internal/typescript_language/rules/core/no_unused_vars.go": `package core
 
-import "fixture/internal/lint/rule"
+import "fixture/internal/typescript_language/rule"
 
 // NoUnusedVars ports no-unused-vars.
 var NoUnusedVars = rule.Rule{Name: "no-unused-vars"}
@@ -35,7 +35,7 @@ var pkg = rule.Rule{Name: "pkg"}
 
 func pkgName() string { return pkg.Name }
 `,
-	"internal/lint/rules/core/no_unused_vars_test.go": `package core
+	"internal/typescript_language/rules/core/no_unused_vars_test.go": `package core
 
 import "testing"
 
@@ -51,12 +51,12 @@ func TestNoUnusedVarsStaysSilent(test *testing.T) { test.Parallel() }
 
 var gateArguments = []string{"-run=^TestNoUnusedVarsStaysSilent$"}
 `,
-	"internal/lint/rules/core/sort_vars.go": `package core
+	"internal/typescript_language/rules/core/sort_vars.go": `package core
 
 import (
 	"encoding/json"
 
-	"fixture/internal/lint/rule"
+	"fixture/internal/typescript_language/rule"
 )
 
 // The options decode the way NoUnusedVars and SortVars decode theirs, and this sentence runs on long enough that a
@@ -115,7 +115,7 @@ func Use() int {
 	return 0
 }
 `,
-	"internal/lint/rules/core/one_var_checker.go": `package core
+	"internal/typescript_language/rules/core/one_var_checker.go": `package core
 
 // oneVarChecker walks one file.
 type oneVarChecker struct{ count int }
@@ -125,7 +125,7 @@ func (checker *oneVarChecker) visit() int {
 	return checker.count
 }
 `,
-	"internal/lint/rules/core/one_var_checker_test.go": `package core
+	"internal/typescript_language/rules/core/one_var_checker_test.go": `package core
 
 import "testing"
 
@@ -136,14 +136,14 @@ func TestCheckerVisitsOnce(test *testing.T) {
 	}
 }
 `,
-	"internal/lint/rules/core/sort_vars_group.go": `package core
+	"internal/typescript_language/rules/core/sort_vars_group.go": `package core
 
 type sortVarsGroup struct{ names []string }
 
 func (group sortVarsGroup) size() int { return len(group.names) }
 `,
-	"internal/lint/rules/core/sort_variables_group.go": "package core\n\n// The name sort_vars_group.go would move to is taken.\n",
-	"internal/lint/rules/structure/react_component_require_properties_parameter.go": `package structure
+	"internal/typescript_language/rules/core/sort_variables_group.go": "package core\n\n// The name sort_vars_group.go would move to is taken.\n",
+	"internal/typescript_language/rules/structure/react_component_require_properties_parameter.go": `package structure
 
 // messageUsePropertiesNotPropsText is the finding's catalog text.
 var messageUsePropertiesNotPropsText = "use properties"
@@ -151,7 +151,7 @@ var messageUsePropertiesNotPropsText = "use properties"
 // messageUsePropertiesNotProps is the finding.
 func messageUsePropertiesNotProps() string { return messageUsePropertiesNotPropsText }
 `,
-	"internal/lint/globals.go": `package lint
+	"internal/typescript_language/globals.go": `package lint
 
 // globals are JavaScript's globals and string methods, by their JavaScript names.
 var globals = map[string]bool{"decodeURIComponent": true, "charAt": true}
@@ -175,7 +175,8 @@ var spellingsExternals = map[string]externalName{
 		newName:  "decodeUriComponent",
 	},
 	"internal/format/css/tokenize.go:charAt": {reason: javaScriptMethod, spelling: "charAt"},
-	"internal/lint/rules/structure/react_component_require_properties_parameter.go:messageUsePropertiesNotProps": {
+	"internal/typescript_language/rules/structure/react_component_require_properties_parameter.go:" +
+		"messageUsePropertiesNotProps": {
 		reason:   "the binding `props`",
 		spelling: "props",
 		note:     "It asks for `properties` where a parameter is named `props`.",
@@ -331,12 +332,12 @@ func TestOwnedSpellingsAreRenamedWithTheFlag(test *testing.T) {
 	}
 	// A file named for a renamed type moves with it, its test beside it; a move onto a taken name is refused.
 	for name, want := range map[string]bool{
-		"internal/lint/rules/core/one_var_checker.go":           false,
-		"internal/lint/rules/core/one_variable_checker.go":      true,
-		"internal/lint/rules/core/one_var_checker_test.go":      false,
-		"internal/lint/rules/core/one_variable_checker_test.go": true,
-		"internal/lint/rules/core/sort_vars_group.go":           true,
-		"internal/lint/rules/core/no_unused_vars.go":            true,
+		"internal/typescript_language/rules/core/one_var_checker.go":           false,
+		"internal/typescript_language/rules/core/one_variable_checker.go":      true,
+		"internal/typescript_language/rules/core/one_var_checker_test.go":      false,
+		"internal/typescript_language/rules/core/one_variable_checker_test.go": true,
+		"internal/typescript_language/rules/core/sort_vars_group.go":           true,
+		"internal/typescript_language/rules/core/no_unused_vars.go":            true,
 	} {
 		_, statError := os.Stat(filepath.Join(root, name))
 		if exists := statError == nil; exists != want {
@@ -413,16 +414,16 @@ func Use() int {
 	}
 	wantRule := `package core
 
-import "fixture/internal/lint/rule"
+import "fixture/internal/typescript_language/rule"
 
 // NoUnusedVariables ports no-unused-vars.
 var NoUnusedVariables = rule.Rule{Name: "no-unused-vars"}
 `
-	if got := read("internal/lint/rules/core/no_unused_vars.go"); !strings.HasPrefix(got, wantRule) {
+	if got := read("internal/typescript_language/rules/core/no_unused_vars.go"); !strings.HasPrefix(got, wantRule) {
 		test.Errorf("no_unused_vars.go:\n%s\nwant it to open with:\n%s", got, wantRule)
 	}
 	if got := read(
-		"internal/lint/rules/core/no_unused_vars_test.go",
+		"internal/typescript_language/rules/core/no_unused_vars_test.go",
 	); !strings.Contains(got, "func TestNoUnusedVariablesFires(") ||
 		!strings.Contains(got, "func TestNoUnusedVarsStaysSilent(") ||
 		!strings.Contains(got, `"-run=^TestNoUnusedVarsStaysSilent$"`) {
@@ -435,11 +436,13 @@ var NoUnusedVariables = rule.Rule{Name: "no-unused-vars"}
 		"sentence runs on long enough\n" +
 		"// that a respelling pushes it past the limit, so the rest flows on.\n"
 	if got := read(
-		"internal/lint/rules/core/sort_vars.go",
+		"internal/typescript_language/rules/core/sort_vars.go",
 	); !strings.Contains(got, wantCitation) || !strings.Contains(got, wantReflow) {
 		test.Errorf("sort_vars.go:\n%s\nwant it to hold:\n%s\nand:\n%s", got, wantCitation, wantReflow)
 	}
-	if got := read("internal/lint/globals.go"); got != spellingsFixture["internal/lint/globals.go"] {
+	if got := read(
+		"internal/typescript_language/globals.go",
+	); got != spellingsFixture["internal/typescript_language/globals.go"] {
 		test.Errorf("a string literal changed:\n%s", got)
 	}
 }

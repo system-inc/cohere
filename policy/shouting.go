@@ -5,10 +5,10 @@ import (
 	_ "embed"
 )
 
-// Shouting.json is the uppercase vocabulary the shouting rules judge with: nexus's consistency-no-shouting in Go,
-// and cohere-swift's of the same name in Swift. The Go rule reads and checks it
-// (internal/lint/rules/nexus/shouting_vocabulary.go), refusing an unknown key and panicking at init on a file it
-// refuses, since which words are acronyms is that rule's to interpret. cohere-swift compiles in the same bytes
+// Shouting.json is the uppercase vocabulary the shouting rules judge with: nexus's consistency-no-shouting in Go, and
+// cohere-swift's of the same name in Swift. The Go rule reads and checks it
+// (internal/typescript_language/rules/nexus/shouting_vocabulary.go), refusing an unknown key and panicking at init on a
+// file it refuses, since which words are acronyms is that rule's to interpret. cohere-swift compiles in the same bytes
 // (SwiftFiles), so a released cohere-swift carries the words with nothing handed to it at run time.
 //
 //go:embed Shouting.json

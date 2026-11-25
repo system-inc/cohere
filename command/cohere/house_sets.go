@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/house_sets"
-	"github.com/system-inc/cohere/internal/lint/rules/tailwind"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/house_sets"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind"
 )
 
 // Zero config is the house stack (Kirk, 2026-10-04, #bfxz13m): a project with no CohereSettings.json,

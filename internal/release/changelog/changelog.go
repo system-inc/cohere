@@ -27,7 +27,7 @@ const SetDirectory = "internal/settings/sets"
 
 // earlierSetDirectory is where the sets lived through 0.1.x, which those releases' tags still hold: a commit
 // with no set at SetDirectory is read here.
-const earlierSetDirectory = "internal/lint/configuration/sets"
+const earlierSetDirectory = "internal/settings/sets"
 
 const (
 	// Patch is a release whose sets changed nothing that can fail a project that passed.

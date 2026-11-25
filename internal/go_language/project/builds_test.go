@@ -510,7 +510,7 @@ func TestBuildsForSetsATagThatAloneCompilesNoProgram(test *testing.T) {
 // module's internal package is no exception either.
 func TestBuildsForNamesAnInternalImportNoBuildOfTheModuleMayMake(test *testing.T) {
 	test.Parallel()
-	oracle := "//go:build lintoracle\n\npackage main\n\nimport (\n\t\"fmt\"\n\t\"example.com/cohere/internal/lint/rule\"\n)\n"
+	oracle := "//go:build lintoracle\n\npackage main\n\nimport (\n\t\"fmt\"\n\t\"example.com/cohere/internal/typescript_language/rule\"\n)\n"
 	census := censusOf(test, map[string]string{
 		"rules/beside/build_test.go": "package assertions\n",
 		"rules/beside/oracle.go":     oracle,
@@ -521,8 +521,8 @@ func TestBuildsForNamesAnInternalImportNoBuildOfTheModuleMayMake(test *testing.T
 	})
 	census.Modules = []Module{{Directory: ".", Path: "example.com/adamic"}}
 	_, unbuilt := buildsFor(test, census, testHost, testPorts)
-	forbidden := "it imports example.com/cohere/internal/lint/rule, which only a build under example.com/cohere may " +
-		"import, so no build of this module compiles it"
+	forbidden := "it imports example.com/cohere/internal/typescript_language/rule, " +
+		"which only a build under example.com/cohere may import, so no build of this module compiles it"
 	want := map[string]string{
 		"rules/alone/oracle.go":  forbidden,
 		"rules/beside/oracle.go": forbidden,
@@ -550,7 +550,7 @@ func TestInternalParentIsTheFinalInternalElementsParent(test *testing.T) {
 		parent     string
 		isInternal bool
 	}{
-		{"example.com/cohere/internal/lint/rule", "example.com/cohere", true},
+		{"example.com/cohere/internal/typescript_language/rule", "example.com/cohere", true},
 		{"example.com/a/internal/b/internal/c", "example.com/a/internal/b", true},
 		{"internal/abi", "", true},
 		{"example.com/internalized/rule", "", false},

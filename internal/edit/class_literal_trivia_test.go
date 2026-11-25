@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rules/nexus"
-	"github.com/system-inc/cohere/internal/lint/rules/tailwind"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/nexus"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind"
 )
 
 // One rule's bad range costs every rule's fixes in that file, and a class literal after trivia was

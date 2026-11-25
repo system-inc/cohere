@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
-// lintTypes is the export data of every package outside cohere that ./internal/lint/... imports: the
+// lintTypes is the export data of every package outside cohere that ./internal/typescript_language/... imports: the
 // standard library, the TypeScript checker and its shims, the modules they need. The guards read cohere's own
 // packages from source, overlay and all, and those from this product, which is built where building is
 // allowed and never here: a guard that compiled ran `go list -compiled`, which a runner of prebuilt tests
@@ -20,7 +21,7 @@ var lintTypes = go_types.Product{
 	Name:      "lint",
 	Test:      "TestProduct_LintTypes (internal/testing/guard)",
 	Directory: "../../..",
-	Patterns:  []string{"./internal/lint/..."},
+	Patterns:  []string{"./internal/typescript_language/..."},
 }
 
 // Not parallel: it builds the product every other test here reads, so it finishes before they resume. A
@@ -41,12 +42,13 @@ var lintLoads = struct {
 	byOverlay map[string]*lintLoad
 }{byOverlay: map[string]*lintLoad{}}
 
-// lintPackages is ./internal/lint/... loaded with its syntax and types, read with overlay in place of the
-// files it names: cohere's own packages from source, and every other from lintTypes. The creating-getter
-// and TypeReach guards and their probes all read it, and each loaded it for itself: six loads of the whole
-// lint tree from source, about 21s of CPU in a package run, where three distinct inputs ever occur (the
-// working tree, and one plant for each guard's probe) (#nxgt2ca). So each distinct overlay is loaded once
-// per test binary and shared. The guards only read what they are handed.
+// lintPackages is ./internal/typescript_language/... less its host packages, loaded with its syntax and types, read
+// with overlay in place of the files it names: cohere's own packages from source, and every other from lintTypes.
+// The creating-getter and
+// TypeReach guards and their probes all read it, and each loaded it for itself: six loads of the whole lint tree from
+// source, about 21s of CPU in a package run, where three distinct inputs ever occur (the working tree, and one plant
+// for each guard's probe) (#nxgt2ca). So each distinct overlay is loaded once per test binary and shared. The guards
+// only read what they are handed.
 //
 // The packages it returns are the named roots, each with its syntax and type information, so the scans see
 // the same calls they saw when every dependency was type-checked from source too: a dependency's types are
@@ -105,7 +107,7 @@ func loadLintPackages(overlay map[string][]byte) ([]*go_types.Package, string) {
 	}
 	loaded, loadError := go_types.Load(
 		go_types.Configuration{Directory: root, Overlay: overlay, Exports: exports},
-		"./internal/lint/...",
+		"./internal/typescript_language/...",
 	)
 	if loadError != nil {
 		return nil, fmt.Sprintf("loading the rule packages: %v", loadError)
@@ -117,5 +119,31 @@ func loadLintPackages(overlay map[string][]byte) ([]*go_types.Package, string) {
 			return nil, fmt.Sprintf("loading %s: %v", sourcePackage.ImportPath, sourcePackage.Errors[0])
 		}
 	}
-	return loaded.Roots, ""
+	var rulesSide []*go_types.Package
+	for _, rootPackage := range loaded.Roots {
+		if !isHostPackage(rootPackage.ImportPath) {
+			rulesSide = append(rulesSide, rootPackage)
+		}
+	}
+	return rulesSide, ""
+}
+
+// hostPackages are the shelf's packages that host the rules rather than run beside them or under them: the
+// program, which builds the tree and calls the rules after, the rename and unused-export verbs built on it, and the
+// shim generator. No rule imports one, so the guards here, which hold the rules and every shelf a rule calls, pass
+// them by, as they did when the rules' half of the shelf was internal/lint.
+var hostPackages = []string{"program", "rename", "unused_exports", "tools/generate_shims"}
+
+// isHostPackage reports whether importPath, a package or a test variant of one (`p [p.test]`, `p_test [p.test]`), is
+// one of hostPackages or under one.
+func isHostPackage(importPath string) bool {
+	packagePath, _, _ := strings.Cut(importPath, " ")
+	packagePath = strings.TrimSuffix(packagePath, "_test")
+	for _, host := range hostPackages {
+		hostPath := "github.com/system-inc/cohere/internal/typescript_language/" + host
+		if packagePath == hostPath || strings.HasPrefix(packagePath, hostPath+"/") {
+			return true
+		}
+	}
+	return false
 }

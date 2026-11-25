@@ -136,7 +136,7 @@ func TestShapeReadersHandBackNoSyntax(test *testing.T) {
 
 	var rulePackage *go_types.Package
 	for _, lintPackage := range lintPackages(test, guardOverlay(test)) {
-		if strings.HasSuffix(lintPackage.ImportPath, "/internal/lint/rule") {
+		if strings.HasSuffix(lintPackage.ImportPath, "/internal/typescript_language/rule") {
 			rulePackage = lintPackage
 		}
 	}
@@ -307,7 +307,7 @@ func isOwnSourceFile(expression ast.Expr, info *types.Info) bool {
 	}
 	named, ok := receiver.(*types.Named)
 	return ok && named.Obj().Name() == "Context" && named.Obj().Pkg() != nil &&
-		strings.HasSuffix(named.Obj().Pkg().Path(), "/internal/lint/rule")
+		strings.HasSuffix(named.Obj().Pkg().Path(), "/internal/typescript_language/rule")
 }
 
 // scanTypeReach reads the rule packages with overlay in place of the files it names.
@@ -329,7 +329,7 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 	for _, loadedPackage := range loaded {
 		for _, file := range loadedPackage.Syntax {
 			path := loadedPackage.FileSet.Position(file.Pos()).Filename
-			if strings.Contains(path, "/internal/lint/rules/") && !strings.HasSuffix(path, "_test.go") {
+			if strings.Contains(path, "/internal/typescript_language/rules/") && !strings.HasSuffix(path, "_test.go") {
 				ruleFiles = append(ruleFiles, ruleFile{path, file, loadedPackage.TypesInfo})
 			}
 			for _, declaration := range file.Decls {

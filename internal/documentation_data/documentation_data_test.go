@@ -15,10 +15,10 @@ import (
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/documentation_data/capture"
 	golanguagerules "github.com/system-inc/cohere/internal/go_language/rules"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/rule_names"
 	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // moduleRoot is the directory the generated paths are relative to: go test runs in the package's own

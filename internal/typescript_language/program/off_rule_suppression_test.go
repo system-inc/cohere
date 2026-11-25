@@ -1,0 +1,187 @@
+package program_test
+
+import (
+	"context"
+	"path/filepath"
+	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
+)
+
+// A directive naming a rule the config turns off is dead, whether or not cohere ports the rule.
+//
+// It silences nothing, because nothing that is off can report. The "not ported yet" excuse is for a
+// rule the config wants on that this binary lacks: had it been ported, the directive might have
+// withheld something. ESLint flagged 13 `no-await-in-loop` directives as unused in ahra, and it was
+// right; cohere excused them as unported (#ezhwsbc). Walked through a real config, one file per
+// shape, so each count below is one directive's verdict.
+func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
+	test.Parallel()
+	quiet := rule.Rule[rule.NoOptions]{
+		Name: "test-quiet",
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
+		},
+	}
+	registeredOff := rule.Rule[rule.NoOptions]{
+		Name: "test-registered-off",
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
+		},
+	}
+	// Registered with its plugin, as every typescript-eslint, nexus and structure rule is. A walk that
+	// keyed the rules it ran by full name and looked directives up bare filed this one's dead
+	// directives as unported (#6dc4f7k).
+	prefixed := rule.Rule[rule.NoOptions]{
+		Name: "plugin/test-prefixed",
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
+		},
+	}
+	settingsText := `{"rules": {
+		"plugin/test-prefixed": "error",
+		"test-quiet": "error",
+		"test-registered-off": "off",
+		"no-await-in-loop": "off",
+		"plugin/unported-on": "error"
+	}, "reasons": {
+		"test-registered-off": "off for this test",
+		"no-await-in-loop": "off for this test"
+	}}`
+
+	for _, shape := range []struct {
+		name            string
+		directive       string
+		wantDead        int
+		wantForUnported int
+	}{
+		{"an off rule cohere does not register", "no-await-in-loop", 1, 0},
+		{"an off rule cohere registers", "test-registered-off", 1, 0},
+		{"a registered rule that ran and matched nothing", "test-quiet", 1, 0},
+		{"a prefixed registered rule that ran and matched nothing", "plugin/test-prefixed", 1, 0},
+		{"the same rule named bare in the directive", "test-prefixed", 1, 0},
+		{"an unported rule the config turns on", "plugin/unported-on", 0, 1},
+		{"a rule nobody configured or ported", "plugin/never-mentioned", 0, 1},
+		{"an off rule beside an unported one the config turns on", "no-await-in-loop, plugin/unported-on", 0, 1},
+	} {
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			directory := writeProject(test, map[string]string{
+				"tsconfig.json":       minimalConfiguration,
+				"CohereSettings.json": settingsText,
+				"main.ts": "// eslint-disable-next-line " +
+					shape.directive +
+					" -- the reason\nconst a = 1;\n",
+			})
+			graph, buildError := program.Build(
+				program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+			)
+			if buildError != nil {
+				test.Fatalf("building: %v", buildError)
+			}
+			var loadError error
+			graph.LintConfiguration, loadError = settings.Load(filepath.Join(directory, "CohereSettings.json"))
+			if loadError != nil {
+				test.Fatalf("loading the config: %v", loadError)
+			}
+
+			result, walkError := graph.Walk(
+				context.Background(),
+				graph.ProjectFiles(),
+				rule_testing.EntriesOf(test, quiet, registeredOff, prefixed),
+			)
+			if walkError != nil {
+				test.Fatalf("walking: %v", walkError)
+			}
+			coverage := result.Coverage
+			if coverage.UnusedSuppressions != 1 {
+				test.Fatalf("%d unused directives, want the one in the file", coverage.UnusedSuppressions)
+			}
+			dead := coverage.UnusedSuppressions - coverage.UnusedSuppressionsForUnrunRules
+			if dead != shape.wantDead || coverage.UnusedSuppressionsForUnrunRules != shape.wantForUnported {
+				test.Errorf("counted %d dead and %d for unported rules, want %d and %d",
+					dead, coverage.UnusedSuppressionsForUnrunRules, shape.wantDead, shape.wantForUnported)
+			}
+			// Each dead directive is named, and only those: one for an unported rule is not dead.
+			if len(coverage.DeadSuppressions) != shape.wantDead {
+				test.Errorf(
+					"named %d dead directives, want %d: %+v",
+					len(coverage.DeadSuppressions),
+					shape.wantDead,
+					coverage.DeadSuppressions,
+				)
+			}
+		})
+	}
+}
+
+// The coverage count of dead directives comes with where each one is, so it can be removed from a
+// whole-program run. A file with one dead and one live directive names exactly the dead one, at its own
+// line, with the rules it names; the live one withheld a finding and is not listed.
+func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
+	test.Parallel()
+	reporting := rule.Rule[rule.NoOptions]{
+		Name: "test-reporting",
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				ruleContext.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
+			}}
+		},
+	}
+	quiet := rule.Rule[rule.NoOptions]{
+		Name: "test-quiet",
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing, so its directive is the one under test.
+			}}
+		},
+	}
+	directory := writeProject(test, map[string]string{
+		"tsconfig.json":       minimalConfiguration,
+		"CohereSettings.json": `{"rules": {"test-reporting": "error", "test-quiet": "error"}}`,
+		"main.ts": "// eslint-disable-next-line test-reporting -- live, it withholds the finding below\n" +
+			"const a = 1;\n" +
+			"// eslint-disable-next-line test-quiet -- dead, the rule ran and found nothing\n" +
+			"const b = 2;\n",
+	})
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
+	}
+	var loadError error
+	graph.LintConfiguration, loadError = settings.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
+	}
+	result, walkError := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, reporting, quiet),
+	)
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
+	}
+
+	// The live directive did withhold something, or this file cannot tell the two apart.
+	if result.Coverage.Suppressed != 1 {
+		test.Fatalf("%d findings withheld, want the one under the live directive", result.Coverage.Suppressed)
+	}
+	sites := result.Coverage.DeadSuppressions
+	if len(sites) != 1 {
+		test.Fatalf("named %d dead directives, want exactly the dead one: %+v", len(sites), sites)
+	}
+	if filepath.Base(sites[0].File) != "main.ts" || sites[0].Line != 2 ||
+		len(sites[0].Rules) != 1 || sites[0].Rules[0] != "test-quiet" {
+		test.Errorf("named %+v, want main.ts at zero-based line 2 naming test-quiet", sites[0])
+	}
+}

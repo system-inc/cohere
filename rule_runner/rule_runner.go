@@ -28,10 +28,10 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/system-inc/cohere/internal/lint/linter"
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/rules/adamic"
-	"github.com/system-inc/cohere/internal/lint/rules/nexus"
+	"github.com/system-inc/cohere/internal/typescript_language/linter"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/adamic"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/nexus"
 )
 
 // allowed is every rule another program may run, by its registered name, each bound with no options, since none

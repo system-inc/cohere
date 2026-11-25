@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/command_line/sentence"
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // collectTypeDiagnostics gathers the compiler's own findings for our files.

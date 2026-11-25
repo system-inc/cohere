@@ -6,7 +6,7 @@
 //	go run ./internal/format/native/tools/format_house <file>...
 //
 // For a generator that cannot call the helper itself because it is not Go, such as
-// internal/lint/tools/option_schemas/extract.mjs, which runs this on what it wrote. A Go generator calls
+// internal/typescript_language/tools/option_schemas/extract.mjs, which runs this on what it wrote. A Go generator calls
 // native.FormatHouse on its bytes before writing them, and never runs this (#4wjhppw).
 package main
 

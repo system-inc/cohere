@@ -39,7 +39,7 @@ struct HouseRuleVerdictsTests {
 
     /* Every house rule cohere-go registers, by the `Name:` its rule value declares. */
     static func registeredHouseRules() throws -> Set<String> {
-        let rules = packageRoot.deletingLastPathComponent().appendingPathComponent("internal/lint/rules")
+        let rules = packageRoot.deletingLastPathComponent().appendingPathComponent("internal/typescript_language/rules")
         let pattern = try Regex(#"Name:\s+"((?:nexus|structure|base)/[a-z0-9-]+)""#)
         var names = Set<String>()
         guard let walker = FileManager.default.enumerator(at: rules, includingPropertiesForKeys: nil) else {
@@ -62,7 +62,7 @@ struct HouseRuleVerdictsTests {
         let duplicates = Dictionary(grouping: names, by: \.self).filter { $0.value.count > 1 }.keys.sorted()
         #expect(duplicates.isEmpty, "named twice: \(duplicates)")
         let registered = try Self.registeredHouseRules()
-        #expect(!registered.isEmpty, "no house rule was found under internal/lint/rules")
+        #expect(!registered.isEmpty, "no house rule was found under internal/typescript_language/rules")
         #expect(registered.subtracting(names).sorted() == [], "registered but given no verdict")
         #expect(Set(names).subtracting(registered).sorted() == [], "given a verdict but not registered")
         #expect(names == names.sorted(), "rows are sorted by typeScriptRule")

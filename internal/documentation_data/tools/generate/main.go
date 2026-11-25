@@ -13,7 +13,7 @@
 // -check always recaptures, because a check computes from source: one that read the committed examples
 // back compared them with themselves and could never find one stale (#d7vx76v). It belongs where minutes
 // are fine, the release's module check and CI, never the per-edit test run, whose cache a fresh capture
-// directory would bust for all of internal/lint/... The examples come back from the committed files only
+// directory would bust for all of internal/typescript_language/... The examples come back from the committed files only
 // in the modes that say so: a write without -capture, and -check-rendering, which covers every file
 // rendered from them and says on every run that the examples themselves were not recaptured.
 package main
@@ -35,7 +35,7 @@ import (
 )
 
 // capturedPackages are the tests that assert rule cases through the harness.
-const capturedPackages = "./internal/lint/..."
+const capturedPackages = "./internal/typescript_language/..."
 
 // verbs are the subcommands with a flag set of their own.
 var verbs = []string{"rename"}

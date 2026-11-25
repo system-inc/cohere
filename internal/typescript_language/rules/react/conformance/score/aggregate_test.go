@@ -1,0 +1,125 @@
+package react_conformance_score
+
+import (
+	"testing"
+
+	"github.com/system-inc/cohere/internal/typescript_language/rules/react/conformance"
+)
+
+// ruleImplementation runs whichever wired rule owns a fixture, and declines the rest.
+//
+// This is the `react_conformance.Implementation` the harness was written against and never had. A
+// fixture whose attributed rule has no wired entry returns UnsupportedError rather than an empty
+// Result, which is the whole distinction `score.go` draws: an empty Result claims "I looked and
+// found nothing", and on a corpus where every fixture expects at least one error that claim is a
+// wrong answer rather than an absent one.
+type ruleImplementation struct{ test *testing.T }
+
+func (implementation ruleImplementation) Analyze(
+	fixture react_conformance.Fixture,
+) (react_conformance.Result, error) {
+	rules, complete := fixture.Rules()
+	if !complete {
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
+			Reason: "not every diagnostic could be attributed to an upstream rule",
+		}
+	}
+
+	// Only a fixture whose diagnostics belong to exactly one wired rule can be scored against that
+	// rule. A mixed fixture would be judged against one rule while expecting another's findings,
+	// which manufactures a failure neither rule earned.
+	if len(rules) != 1 {
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
+			Reason: "fixture spans more than one upstream rule, so no single rule can be scored against it",
+		}
+	}
+	subject, wired := Rules[rules[0]]
+	if !wired {
+		return react_conformance.Result{}, &react_conformance.UnsupportedError{
+			Reason: "no rule run wired for upstream rule " + rules[0],
+		}
+	}
+	return Analyze(subject, fixture, implementation.test.TempDir())
+}
+
+// TestAggregateWithTheRulesWired is the whole-corpus score with real rules running.
+//
+// The sibling package's `TestAggregatedScoreAgainstReactsOwnFixtures` reports the same partition
+// with `NothingImplemented`, so every addressable fixture lands in `not scored: no rule run run`.
+// This is that report with the rule run supplied, and the difference between the two is the entire
+// contribution of this file.
+//
+// The assertions are two-sided on purpose. A pass floor alone is satisfied by a harness that cannot
+// see, and a failure count alone is satisfied by one that is broken; requiring both to be non-zero,
+// plus the partition check, is what makes the number a measurement.
+func TestAggregateWithTheRulesWired(test *testing.T) {
+	test.Parallel()
+	if testing.Short() {
+		test.Skip("builds a TypeScript program per fixture")
+	}
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
+	}
+
+	report, aggregateError := react_conformance.Aggregate(fixtures, ruleImplementation{test: test})
+	if aggregateError != nil {
+		test.Fatalf("aggregating: %v", aggregateError)
+	}
+
+	test.Logf("\n%s", report.Summary())
+	for _, ruleName := range report.RuleNames() {
+		if _, shipped := react_conformance.ShippedRules[ruleName]; !shipped {
+			continue
+		}
+		test.Logf("  shipped rule %-22s %v", ruleName, report.ByRule()[ruleName])
+	}
+
+	if report.Counts[react_conformance.VerdictPassed] == 0 {
+		test.Error("nothing passed, so the rule run is not reaching any rule")
+	}
+	if report.Counts[react_conformance.VerdictFailed] == 0 {
+		test.Error("nothing failed; a harness that cannot produce a failure is not measuring anything")
+	}
+
+	// The pinned numbers. Exact rather than floors, because the whole point of the wiring is that
+	// this number can now be wrong, and a floor cannot tell an improvement from a regression.
+	//
+	// Measured 2026-08-24 against facebook/react@bd6ea412c673.
+	for _, want := range []struct {
+		Verdict react_conformance.Verdict
+		Count   int
+	}{
+		{react_conformance.VerdictPassed, 37},
+		{react_conformance.VerdictFailed, 25},
+		{react_conformance.VerdictStatedDivergence, 18},
+		{react_conformance.VerdictUnresolvableTypes, 8},
+		// The only one of the five that moved when the clean population was vendored, and the four
+		// that did not are the reassurance: adding 70 fixtures nothing addresses must change the
+		// exclusion count and leave every scored verdict alone.
+		{react_conformance.VerdictFlowSyntax, react_conformance.ExpectedFlowFixtureCount},
+	} {
+		if got := report.Counts[want.Verdict]; got != want.Count {
+			test.Errorf("%s = %d, want %d", want.Verdict, got, want.Count)
+		}
+	}
+
+	// Nothing addressable may remain unscored. This is the assertion that would have failed before
+	// this file existed, when all 178 sat in `not scored`, and it is the one that stops the rule run
+	// quietly ceasing to run.
+	for _, upstream := range UpstreamNames() {
+		for _, verdict := range report.Fixtures {
+			if len(verdict.Rules) != 1 || verdict.Rules[0] != upstream {
+				continue
+			}
+			if verdict.Verdict == react_conformance.VerdictNotScored {
+				test.Errorf(
+					"%s is owned by wired rule %s and was not scored: %s",
+					verdict.Name,
+					upstream,
+					verdict.Reason,
+				)
+			}
+		}
+	}
+}

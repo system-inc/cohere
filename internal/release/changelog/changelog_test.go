@@ -297,8 +297,9 @@ func TestSetsAtACommitMatchTheTree(test *testing.T) {
 
 // A release tagged before the sets moved holds them where they were, and they are read from there by the same
 // names, so the first release after the move diffs against its predecessor's sets and not against none.
+//
+// Not parallel: it sets the environment, which keeps the machine's own git configuration out of SetsAt's git too.
 func TestSetsAtACommitFromBeforeTheMove(test *testing.T) {
-	// Not parallel: the environment keeps the machine's own git configuration out of SetsAt's git as well.
 	test.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	test.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	module := test.TempDir()

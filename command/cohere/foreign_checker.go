@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // reportForeignCheckers says, under the COHERE_TEST_FOREIGN_CHECKERS instrument, how many files a walk put on

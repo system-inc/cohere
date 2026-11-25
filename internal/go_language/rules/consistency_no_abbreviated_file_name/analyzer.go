@@ -56,8 +56,8 @@ var messages = map[string]policy.MessageHandle{
 
 // registeredRuleNames are every language's rule names, from internal/rule_names, which the website's data generator
 // writes beside rules.json, read once. A Go file is named for a rule as often for a TypeScript one,
-// internal/lint/rules/core/max_lines.go for max-lines, as for one of cohere-go's, and cohere-go's registry holds
-// only its own, so the names are the generated list of every registry's rather than knownRuleNames.
+// internal/typescript_language/rules/core/max_lines.go for max-lines, as for one of cohere-go's, and cohere-go's
+// registry holds only its own, so the names are the generated list of every registry's rather than knownRuleNames.
 var registeredRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
 	return file_name_words.NewRuleNames(rule_names.RuleNames())
 })

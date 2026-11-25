@@ -19,7 +19,7 @@ From cohere, run:
 
 ```sh
 go generate ./unicode_properties
-go test ./internal/lint/ecmascript/regexp -run '^TestUnicodePropertiesFresh$'
+go test ./internal/typescript_language/ecmascript/regexp -run '^TestUnicodePropertiesFresh$'
 ```
 
 Generation is offline. `internal/ucd/17.0.0.zip` holds unmodified files extracted
@@ -56,7 +56,7 @@ Node: v24.19.0, Unicode 17.0.
 Before changing the compiler, a temporary `TestUnicodePropertyInventory` read
 `go run ./unicode_properties/internal/generate -inventory` output, asked Node to
 accept each candidate, and compared accepted patterns with esregexp. The command
-was `go test ./internal/lint/ecmascript/regexp -run '^TestUnicodePropertyInventory$' -v`.
+was `go test ./internal/typescript_language/ecmascript/regexp -run '^TestUnicodePropertyInventory$' -v`.
 It made 4,327,167 membership comparisons; early rejection or mismatch stops the
 remaining comparisons for that spelling. A spelling was rejected if its basic
 `\p` pattern did not compile; otherwise any disagreement among the 12 profiles
@@ -80,9 +80,9 @@ an alias cannot silently reduce differential coverage.
 With class.go, escape.go and rewrite.go restored from the baseline commit and the
 new regexp/properties.go helper temporarily removed, these commands were run:
 
-- `go test ./internal/lint/ecmascript/regexp -run '^TestUnicodePropertiesNode$' -v`:
+- `go test ./internal/typescript_language/ecmascript/regexp -run '^TestUnicodePropertiesNode$' -v`:
   exit 1, 97 passing and 1,618 failing property subtests.
-- `go test ./internal/lint/ecmascript/regexp -run '^TestUnicodePropertySyntaxNode$' -v`:
+- `go test ./internal/typescript_language/ecmascript/regexp -run '^TestUnicodePropertySyntaxNode$' -v`:
   exit 1, 14 passing and 10 failing syntax fixtures.
 
 Representative old failures: Script=Greek, Script_Extensions=Latin and
@@ -92,16 +92,16 @@ at U+24DC under iu. All compiler files were then restored to the new implementat
 ### Compile-checked family mutants
 
 Each mutant was applied separately to tables_generated.go, compiled with
-`go test ./internal/lint/ecmascript/regexp -run '^$'` (exit 0, zero tests), and then
+`go test ./internal/typescript_language/ecmascript/regexp -run '^$'` (exit 0, zero tests), and then
 run only against its Node differential subtest. Each extended the first interval's
 upper endpoint by one, retaining a valid compiled set.
 
-| Canonical table | Targeted command suffix after `go test ./internal/lint/ecmascript/regexp` | Node caught                     |
-| --------------- | ------------------------------------------------------------------------- | ------------------------------- |
-| sc=Greek        | `-run '^TestUnicodePropertiesNode$/^Script=Greek$' -v`                    | extra U+0374, 1 failing subtest |
-| scx=Latin       | `-run '^TestUnicodePropertiesNode$/^Script_Extensions=Latin$' -v`         | extra U+005B, 1 failing subtest |
-| gc=L            | `-run '^TestUnicodePropertiesNode$/^General_Category=Letter$' -v`         | extra U+005B, 1 failing subtest |
-| Emoji           | `-run '^TestUnicodePropertiesNode$/^Emoji$' -v`                           | extra U+0024, 1 failing subtest |
+| Canonical table | Targeted command suffix after `go test ./internal/typescript_language/ecmascript/regexp` | Node caught                     |
+| --------------- | ---------------------------------------------------------------------------------------- | ------------------------------- |
+| sc=Greek        | `-run '^TestUnicodePropertiesNode$/^Script=Greek$' -v`                                   | extra U+0374, 1 failing subtest |
+| scx=Latin       | `-run '^TestUnicodePropertiesNode$/^Script_Extensions=Latin$' -v`                        | extra U+005B, 1 failing subtest |
+| gc=L            | `-run '^TestUnicodePropertiesNode$/^General_Category=Letter$' -v`                        | extra U+005B, 1 failing subtest |
+| Emoji           | `-run '^TestUnicodePropertiesNode$/^Emoji$' -v`                                          | extra U+0024, 1 failing subtest |
 
 Freshness and other local checks were excluded from these targeted mutant runs;
 only Node supplied the expected membership. The tables were restored after every run.
@@ -109,10 +109,10 @@ only Node supplied the expected membership. The tables were restored after every
 ### Additional plants
 
 - Generator Version 17.0.0 -> 17.0.1, leaving tables unchanged:
-  `go test ./internal/lint/ecmascript/regexp -run '^TestUnicodePropertiesFresh$' -v`
+  `go test ./internal/typescript_language/ecmascript/regexp -run '^TestUnicodePropertiesFresh$' -v`
   exited 1, one failing freshness test.
 - propertyAtom returned classRune instead of classSet: compilation with `-run '^$'`
-  passed; `go test ./internal/lint/ecmascript/regexp -run '^TestUnicodePropertySyntaxNode$' -v`
+  passed; `go test ./internal/typescript_language/ecmascript/regexp -run '^TestUnicodePropertySyntaxNode$' -v`
   exited 1 with eight failing and 16 passing fixtures, catching range-endpoint
   treatment as well as lost set membership.
 - Removed the Script=Greek alias: the full Node test exited 1 at the independently
@@ -146,12 +146,12 @@ writing ranges, preserving set-atom identity until range syntax has been checked
 ## Final package checks
 
 - `go generate ./unicode_properties`: exit 0, regenerated one table file.
-- `go test ./internal/lint/ecmascript/regexp -v`: exit 0, 13 top-level tests;
+- `go test ./internal/typescript_language/ecmascript/regexp -v`: exit 0, 13 top-level tests;
   1,715 passing property subtests, 24 passing syntax fixtures, and one passing
   freshness test. Membership counts: 64,403,724 property comparisons + 216 syntax comparisons.
-- `go vet ./internal/lint/ecmascript/regexp ./unicode_properties ./unicode_properties/internal/ucd ./unicode_properties/internal/generate`:
+- `go vet ./internal/typescript_language/ecmascript/regexp ./unicode_properties ./unicode_properties/internal/ucd ./unicode_properties/internal/generate`:
   exit 0, four packages, zero diagnostics.
-- `gofmt -l internal/lint/ecmascript/regexp/*.go unicode_properties/*.go unicode_properties/internal/ucd/*.go unicode_properties/internal/generate/*.go`:
+- `gofmt -l internal/typescript_language/ecmascript/regexp/*.go unicode_properties/*.go unicode_properties/internal/ucd/*.go unicode_properties/internal/generate/*.go`:
   exit 0, 14 files, zero listed files.
 - `git diff --check`: exit 0, zero whitespace diagnostics.
 
@@ -169,8 +169,8 @@ as their first statement. Both subtest loops have a directly preceding
 Both t.Run sites in regexp_test.go already called t.Parallel() first.
 
 After the fix, the same gate command passed (one test, zero violations).
-`go test ./internal/lint/ecmascript/regexp -v` passed all 13 top-level tests,
+`go test ./internal/typescript_language/ecmascript/regexp -v` passed all 13 top-level tests,
 including 1,715 property subtests and 24 syntax fixtures, with 64,403,940
-membership comparisons. `go vet ./internal/lint/ecmascript/regexp` passed
-(one package, zero diagnostics), and `gofmt -l internal/lint/ecmascript/regexp/properties_test.go`
+membership comparisons. `go vet ./internal/typescript_language/ecmascript/regexp` passed
+(one package, zero diagnostics), and `gofmt -l internal/typescript_language/ecmascript/regexp/properties_test.go`
 listed zero files. No tests or runtime behavior were added in this follow-up.

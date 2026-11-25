@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/settings/schema"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
 )
 
 func main() {

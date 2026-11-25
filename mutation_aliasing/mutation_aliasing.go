@@ -1,6 +1,6 @@
 // Package mutation_aliasing is React's mutation and aliasing model, shared by two intermediate
 // representations: cohere's high-level IR (the React Compiler's, in
-// internal/lint/ecmascript/high_level_intermediate_representation) and Adamic's flow graph.
+// internal/typescript_language/ecmascript/high_level_intermediate_representation) and Adamic's flow graph.
 //
 // It holds two things, both named after React's own passes, InferMutationAliasingEffects and
 // InferMutationAliasingRanges:

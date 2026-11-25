@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/settings"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // `--print-config` answers what runs on a file, rule by registered rule, in ESLint's shape, so a parity

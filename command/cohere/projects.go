@@ -20,7 +20,7 @@ import (
 	"github.com/system-inc/cohere/internal/command_line/sentence"
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/settings"
-	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/typescript_language/program"
 )
 
 // projectKindVariable names the child a child run checks its --directory with. A directory holding both

@@ -10,17 +10,17 @@ var nameOverrides = map[string]string{
 	// opens the word Is, and the initialism ends a letter earlier.
 	"internal/format/css/format_test.go:TestFormatSCSSIsNotFormat":                                "TestFormatScssIsNotFormat",
 	"internal/format/css/format_test.go:TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline": "TestPrintToDocScssIsFormatScssWithoutTheTrailingHardline",
-	"internal/types/program/timing_test.go:TestTheWorkersCPUIsAccountedFor":                       "TestTheWorkersCpuIsAccountedFor",
+	"internal/typescript_language/program/timing_test.go:TestTheWorkersCPUIsAccountedFor":         "TestTheWorkersCpuIsAccountedFor",
 	"internal/release/packaging/swift_package_test.go:TestMinimumMacOSIsReadFromTheBinary":        "TestMinimumMacOsIsReadFromTheBinary",
 	// Here an article runs into the initialism after it: a CRLF file. A JSDoc edit drops its article, since AJs
 	// would read as a plural again.
-	"command/cohere/line_endings_test.go:TestACRLFFilesWouldChangeFindingSaysWhy":           "TestACrlfFilesWouldChangeFindingSaysWhy",
-	"internal/types/program/signatures_test.go:TestAJSDocEditOnAnExportChangesTheSignature": "TestJsDocEditOnAnExportChangesTheSignature",
+	"command/cohere/line_endings_test.go:TestACRLFFilesWouldChangeFindingSaysWhy":                         "TestACrlfFilesWouldChangeFindingSaysWhy",
+	"internal/typescript_language/program/signatures_test.go:TestAJSDocEditOnAnExportChangesTheSignature": "TestJsDocEditOnAnExportChangesTheSignature",
 	// ECMAScript's <LS> and <PS>, U+2028 and U+2029, read as what they are rather than as two letters each.
-	"internal/lint/ecmascript/regexp/regexp_test.go:LS": "lineSeparator",
-	"internal/lint/ecmascript/regexp/regexp_test.go:PS": "paragraphSeparator",
+	"internal/typescript_language/ecmascript/regexp/regexp_test.go:LS": "lineSeparator",
+	"internal/typescript_language/ecmascript/regexp/regexp_test.go:PS": "paragraphSeparator",
 	// UV reports whether the u or the v flag puts the pattern in a Unicode mode.
-	"internal/lint/ecmascript/regexsyntax/charclass.go:UV": "UnicodeMode",
+	"internal/typescript_language/ecmascript/regexsyntax/charclass.go:UV": "UnicodeMode",
 }
 
 // shoutingWord and goEnvironmentArgument are the reasons that recur.
@@ -41,12 +41,12 @@ var reviewedLiterals = map[string]map[string]string{
 		"internal/format/markdown/languages_generated.go": "Linguist's name for the language, in the generated language table",
 	},
 	"URL": {
-		"internal/text_rules/shouting/shouting.go":                        shoutingWord,
-		"internal/lint/rules/next/no_unwanted_polyfillio.go":              "a JavaScript global polyfill.io can serve",
-		"internal/lint/rules/nexus/constant_casing_shapes.go":             "a JavaScript global class",
-		"internal/lint/rules/typescript/no_base_to_string.go":             "a TypeScript library type the rule ignores by default",
-		"internal/lint/rules/typescript/no_base_to_string_test.go":        "a TypeScript library type the rule's test expects ignored",
-		"internal/lint/rules/typescript/restrict_template_expressions.go": "a TypeScript library type the rule allows by default",
+		"internal/text_rules/shouting/shouting.go":                                       shoutingWord,
+		"internal/typescript_language/rules/next/no_unwanted_polyfillio.go":              "a JavaScript global polyfill.io can serve",
+		"internal/typescript_language/rules/nexus/constant_casing_shapes.go":             "a JavaScript global class",
+		"internal/typescript_language/rules/typescript/no_base_to_string.go":             "a TypeScript library type the rule ignores by default",
+		"internal/typescript_language/rules/typescript/no_base_to_string_test.go":        "a TypeScript library type the rule's test expects ignored",
+		"internal/typescript_language/rules/typescript/restrict_template_expressions.go": "a TypeScript library type the rule allows by default",
 	},
 	"YAML": {
 		"internal/text_rules/shouting/shouting.go":                  shoutingWord,

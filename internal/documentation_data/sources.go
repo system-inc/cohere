@@ -7,10 +7,10 @@ import (
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/go_language"
 	"github.com/system-inc/cohere/internal/go_language/rules"
-	"github.com/system-inc/cohere/internal/lint/registry"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/settings/schema"
+	"github.com/system-inc/cohere/internal/typescript_language/registry"
+	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
 // SourceInputs gathers every input but the binary's help from the module at root: the live registry
