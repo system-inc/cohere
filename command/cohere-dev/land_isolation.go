@@ -52,6 +52,31 @@ const (
 	unitIsolationFile    = unitIsolationPackage + "/unit_isolation_test.go"
 )
 
+// holdsFixture reports whether the testdata directory at path holds a fixture as the isolation test reads one
+// (isolationFixtures in unitIsolationFile): a `GOPATH` tree under src, or a module, a directory with its own go.mod,
+// anywhere below it outside src. A directory it can't read is an error, never no fixture, since reading it as none
+// would leave a rule's fixtures out of the isolation without a word.
+func holdsFixture(path string) (bool, error) {
+	if source, statError := os.Stat(filepath.Join(path, "src")); statError == nil && source.IsDir() {
+		return true, nil
+	}
+	found := false
+	walkError := filepath.WalkDir(path, func(walked string, entry fs.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
+		}
+		if !entry.IsDir() && entry.Name() == "go.mod" {
+			found = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if walkError != nil {
+		return false, fmt.Errorf("reading %s for a fixture: %w", path, walkError)
+	}
+	return found, nil
+}
+
 // isolatedRuleDirectories are the rule directories under rulesDirectory whose fixtures a landing changing changed,
 // paths relative to the worktree's root with slashes, must isolate, sorted: each rule directory holding a changed
 // file, a fixture's among them, and each rule directory that imports, at any depth under rulesDirectory, a package
@@ -81,8 +106,13 @@ func isolatedRuleDirectories(worktree string, changed []string) ([]string, error
 						return relativeError
 					}
 					// The registry imports every rule, so a rules directory counted as a rule would have any rule's
-					// change isolate every fixture.
-					if owner := filepath.ToSlash(relative); owner != rulesDirectory {
+					// change isolate every fixture. And a helper's testdata that holds data for its own tests is no
+					// fixture the isolation test reads, which refuses a directory named to it that holds none.
+					fixture, fixtureError := holdsFixture(walked)
+					if fixtureError != nil {
+						return fixtureError
+					}
+					if owner := filepath.ToSlash(relative); owner != rulesDirectory && fixture {
 						ruleDirectories[owner] = true
 					}
 					return filepath.SkipDir
