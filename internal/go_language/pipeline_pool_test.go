@@ -142,22 +142,21 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 }
 
 // The width the memory decides is measured as the first build's load ends (#rmzehfg): over the fixture's three builds
-// beside the host's under the memory cap, whose windows build checks a quarter of its graph from source, the first
-// build runs to its load's end alone, its holding is read, the lint record names the host's live heap, the holding and
-// the peak factor the width was decided by, 2.5 under `--no-cache` and 3.5 with a findings store (#hv090f4), and the
-// stream is the one a run one build at a time writes, but for the width. Under `--no-cache` the first build passes the
-// share gate alone, the windows build's share being over its line, and with a store it runs alone from the start, as no
-// gate holds the rest (#ghb3rcn).
+// beside the host's under an 8 GiB memory limit, whose windows build checks a quarter of its graph from source, the
+// first build runs to its load's end alone, its holding is read, the lint record names the host's live heap, the
+// holding and the peak factor the width was decided by, 2.5 under `--no-cache` and 3.5 with a findings store
+// (#hv090f4), and the stream is the one a run one build at a time writes, but for the width. Under `--no-cache` the
+// first build passes the share gate alone, the windows build's share being over its line, and with a store it runs
+// alone from the start, as no gate holds the rest (#ghb3rcn).
 func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	test.Parallel()
 
-	underCap := func() *memoryAccount {
-		return &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
-			Source: contract.MemorySourceCap}}
+	underLimit := func() *contract.Memory {
+		return halfOfAvailable(eightGibibytes)
 	}
 	measured := threeExtraBuilds(test)
 	measuredPipeline, raw := runOverConfigured(test, measured, exitFindings, func(pipeline *pipeline) {
-		pipeline.memory = underCap()
+		pipeline.memory = underLimit()
 	}, "--no-cache")
 	if measuredPipeline.buildsWidthBuildBytes == 0 ||
 		measuredPipeline.buildsWidthLiveBytes == 0 ||
@@ -180,14 +179,14 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	}
 	stored := threeExtraBuilds(test)
 	_, storedStream := runOverConfigured(test, stored, exitFindings, func(pipeline *pipeline) {
-		pipeline.memory = underCap()
+		pipeline.memory = underLimit()
 	})
 	if !strings.Contains(storedStream, `"buildsWidthPeakFactor":3.5`) {
 		test.Errorf("a run with a findings store names no peak factor of 3.5:\n%s", storedStream)
 	}
 	one := threeExtraBuilds(test)
 	_, oneStream := runOverConfigured(test, one, exitFindings, func(pipeline *pipeline) {
-		pipeline.memory = underCap()
+		pipeline.memory = underLimit()
 		pipeline.buildsWidthForced = 1
 	}, "--no-cache")
 	if normalize(raw, measured) != normalize(oneStream, one) {

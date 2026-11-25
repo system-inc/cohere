@@ -44,10 +44,10 @@ func writeSharedPackages(test *testing.T, root string) {
 	writeFixtureFiles(test, root, files)
 }
 
-// underCapRun runs cohere-go over root checking every build under the 8 GiB cap, so the memory, not a fixed rule,
-// decides the width, with configure, when not nil, given the pipeline first, and extra as its switches. It returns
-// the pipeline, its stream as written and its stderr.
-func underCapRun(
+// underLimitRun runs cohere-go over root checking every build under an 8 GiB limit, half the memory available, so the
+// memory, not a fixed rule, decides the width, with configure, when not nil, given the pipeline first, and extra as its
+// switches. It returns the pipeline, its stream as written and its stderr.
+func underLimitRun(
 	test *testing.T,
 	root string,
 	wantExit int,
@@ -56,19 +56,18 @@ func underCapRun(
 ) (*pipeline, string, string) {
 	test.Helper()
 	return runOverNoted(test, root, wantExit, func(pipeline *pipeline) {
-		pipeline.memory = &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
-			Source: contract.MemorySourceCap}}
+		pipeline.memory = halfOfAvailable(eightGibibytes)
 		if configure != nil {
 			configure(pipeline)
 		}
 	}, extra...)
 }
 
-// shareGateRun is underCapRun without a findings store, under `--no-cache`, the only run whose width the share gate
+// shareGateRun is underLimitRun without a findings store, under `--no-cache`, the only run whose width the share gate
 // decides (#ghb3rcn).
 func shareGateRun(test *testing.T, root string, wantExit int, configure func(*pipeline)) (*pipeline, string, string) {
 	test.Helper()
-	return underCapRun(test, root, wantExit, configure, "--no-cache")
+	return underLimitRun(test, root, wantExit, configure, "--no-cache")
 }
 
 // startPositions is each extra build of pipeline's described builds by name, at its position in the order the builds
@@ -313,7 +312,7 @@ func TestABuildEndedBeforeTheShareGateStillLetsTheSharesBeJudged(test *testing.T
 func TestARunOverAnEmptyStoreTakesNoShareGate(test *testing.T) {
 	test.Parallel()
 	var stepped atomic.Int64
-	pipeline, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
+	pipeline, raw, _ := underLimitRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
 		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	})
 	if !pipeline.withFindingsStore() {
@@ -350,7 +349,7 @@ func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.
 	// run is one run over root's store, its lint record, and how many steps its builds took at the share gate.
 	run := func() (contract.LintRecord, int64) {
 		var stepped atomic.Int64
-		pipeline, raw, _ := underCapRun(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline, raw, _ := underLimitRun(test, root, exitFindings, func(pipeline *pipeline) {
 			pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 		})
 		if !pipeline.withFindingsStore() {
@@ -391,9 +390,9 @@ func TestARunWithAStoreTakesTheShareGateOnceTheHostMostlyRestored(test *testing.
 func TestAnAllHitWarmRunTakesTheShareGatesWidth(test *testing.T) {
 	test.Parallel()
 	root := lowShareBuilds(test)
-	underCapRun(test, root, exitFindings, nil)
+	underLimitRun(test, root, exitFindings, nil)
 	var stepped atomic.Int64
-	pipeline, raw, _ := underCapRun(test, root, exitFindings, func(pipeline *pipeline) {
+	pipeline, raw, _ := underLimitRun(test, root, exitFindings, func(pipeline *pipeline) {
 		pipeline.buildsWidthAtGateForced = 3
 		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	})
@@ -421,13 +420,12 @@ func TestAnAllHitWarmRunTakesTheShareGatesWidth(test *testing.T) {
 func TestAWarmDependenceRunTakesTheMeasuredRule(test *testing.T) {
 	test.Parallel()
 	root := lowShareBuilds(test)
-	underCapRun(test, root, exitFindings, nil, "--build-dependence")
+	underLimitRun(test, root, exitFindings, nil, "--build-dependence")
 	var stepped atomic.Int64
-	pipeline, raw, _ := underCapRun(test, root, exitFindings, func(pipeline *pipeline) {
-		// A pebibyte under the cap: three builds held at the store's peak factor fill it only past 100 TB each. The
-		// limit is the record's alone, since a test's memory sets no limit on the runtime (newLoadMemory).
-		pipeline.memory = &memoryAccount{record: contract.Memory{LimitBytes: 1 << 50, CapBytes: 1 << 50,
-			Source: contract.MemorySourceCap}}
+	pipeline, raw, _ := underLimitRun(test, root, exitFindings, func(pipeline *pipeline) {
+		// A pebibyte of limit: three builds held at the store's peak factor fill it only past 100 TB each. The limit is
+		// the record's alone, since a test's memory sets no limit on the runtime.
+		pipeline.memory = halfOfAvailable(1 << 50)
 		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	}, "--build-dependence")
 	lint := lintRecordOf(test, raw)
@@ -453,8 +451,7 @@ func TestAWarmDependenceRunTakesTheMeasuredRule(test *testing.T) {
 func TestOnlyAHostThatMostlyHitItsStoreLiftsTheGuard(test *testing.T) {
 	test.Parallel()
 	guardedPipeline := &pipeline{
-		memory: &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
-			Source: contract.MemorySourceCap}},
+		memory:            halfOfAvailable(eightGibibytes),
 		buildsWidthForced: 3,
 	}
 	if width, fixed := guardedPipeline.fixedBuildsWidth(3, nil, false); width != 1 || !fixed {
@@ -659,7 +656,7 @@ func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
 func TestADependenceRunTakesNoShareGate(test *testing.T) {
 	test.Parallel()
 	var stepped atomic.Int64
-	pipeline, raw, _ := underCapRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
+	pipeline, raw, _ := underLimitRun(test, lowShareBuilds(test), exitFindings, func(pipeline *pipeline) {
 		pipeline.shareGateSteps = func(project.Build, int, shareGateStep) { stepped.Add(1) }
 	}, "--no-cache", "--build-dependence")
 	if pipeline.withFindingsStore() || !pipeline.censusKeepsHostRestoreOff {
