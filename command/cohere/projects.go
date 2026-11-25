@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/system-inc/cohere/internal/cache_directory"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
@@ -509,8 +510,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	if note := timingSkipsSwiftNote(found, labels, arguments); note != "" {
 		fmt.Fprintf(streams.Errors, "cohere: %s\n", note)
 	}
-	var group sync.WaitGroup
-	running := make(chan struct{}, projectRunsAtOnce())
+	var launches []projectLaunch
 	for index, project := range found.Projects {
 		label := projectLabel(project)
 		// A Swift project and a TypeScript project in one directory share a label, and what one yields is
@@ -557,13 +557,20 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		if oneLine {
 			summaryPath = filepath.Join(yieldDirectory, fmt.Sprintf("summary-%d.json", index))
 		}
+		launches = append(launches, projectLaunch{index, project, projectArguments, yieldFile, openPath, summaryPath})
+	}
+	makeProjectCacheDirectories(found.Root, launches)
+	var group sync.WaitGroup
+	running := make(chan struct{}, projectRunsAtOnce())
+	for _, launch := range launches {
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			running <- struct{}{}
 			defer func() { <-running }()
-			runs[index] = runProject(executable, found.Root, project, labels[index], projectArguments, yieldFile,
-				openPath, summaryPath, children, activeOutput.Mode == outputJson)
+			runs[launch.index] = runProject(executable, found.Root, launch.project, labels[launch.index],
+				launch.arguments, launch.yieldFile, launch.openPath, launch.summaryPath, children,
+				activeOutput.Mode == outputJson)
 		}()
 	}
 	group.Wait()
@@ -664,6 +671,37 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		return 128 + received
 	}
 	return worst
+}
+
+// projectLaunch is one project's run as runProjects prepared it, before any project's run starts: the project, by its
+// index among the runs, the arguments its run gets, and the files it is handed.
+type projectLaunch struct {
+	index       int
+	project     discoveredProject
+	arguments   []string
+	yieldFile   string
+	openPath    string
+	summaryPath string
+}
+
+// makeProjectCacheDirectories makes the cache directory of every project whose run keeps a run cache, before any
+// project's run starts (#d46ks7h). Each run makes its own as it starts, and a project's directory can be one another
+// project's run reads: a Swift package below a Go module is a directory the Go census lists, so the Swift run's
+// `.cache` appearing there mid-run made the Go run refuse to record, as it should, and a fresh tree's first two runs
+// were both cold. Made here, every such directory is settled before any run reads it. Only where the project's own run
+// would make it: a run the cache is off for, or whose arguments no run cache admits, makes none, and neither does
+// this. A directory that can't be made is the project's run's to say, which tries again.
+func makeProjectCacheDirectories(root string, launches []projectLaunch) {
+	if cacheOff {
+		return
+	}
+	for _, launch := range launches {
+		if !runCacheAdmits(runCacheArguments(launch.arguments, true)) {
+			continue
+		}
+		// Ignored: the project's run makes it again as it starts, and says so when it can't.
+		_ = cache_directory.Make(cache_directory.Of(filepath.Join(root, filepath.FromSlash(launch.project.Directory))))
+	}
 }
 
 // failRunProjects says why the projects could not be run at all: as a failure line, and under `--json` as a
