@@ -214,6 +214,88 @@ func TestALayRefusesADiskUnderItsFloor(test *testing.T) {
 	}
 }
 
+// The pin file is found in the tree being landed by its name, wherever it lives, never at the path the land's own code
+// names, so a landing queued before the file moved still lays its corpora; a cohere tree, by its go.mod, with no pin
+// file refuses the landing naming it, rather than laying no corpus and letting its corpus tests skip on a green gate
+// (#3kpxrdt); two pin files refuse; and a tree that isn't cohere's lays none, as a test's fixture does.
+func TestTheGateFindsItsPinsByNameAndRefusesACohereTreeWithout(test *testing.T) {
+	test.Parallel()
+	pinned := "package corpus\n\nconst AhraPin = \"0123456789012345678901234567890123456789\"\n"
+	tree := func(files map[string]string) (string, string) {
+		test.Helper()
+		directory := test.TempDir()
+		for name, contents := range files {
+			writeFixtureFile(test, filepath.Join(directory, filepath.FromSlash(name)), contents)
+		}
+		for _, arguments := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=test", "-c",
+			"user.email=test@example.com", "commit", "-q", "-m", "a tree"}} {
+			git := exec.Command("git", arguments...)
+			git.Dir, git.Env = directory, append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+			if output, gitError := git.CombinedOutput(); gitError != nil {
+				test.Fatalf("git %v: %v\n%s", arguments, gitError, output)
+			}
+		}
+		commit, gitError := gitOutput(directory, "rev-parse", "HEAD")
+		if gitError != nil {
+			test.Fatal(gitError)
+		}
+		return directory, commit
+	}
+	cohereModuleLine := "module " + cohereModule + "\n\ngo 1.27\n"
+	for _, row := range []struct {
+		name    string
+		files   map[string]string
+		found   string
+		refusal string
+	}{
+		{"where the land's code looks", map[string]string{"go.mod": cohereModuleLine,
+			corpus.PinnedFile: pinned}, corpus.PinnedFile, ""},
+		{"moved somewhere the land's code never looked", map[string]string{"go.mod": cohereModuleLine,
+			"internal/somewhere/else/" + coherePinnedName: pinned}, "internal/somewhere/else/" + coherePinnedName, ""},
+		{"a cohere tree with none", map[string]string{"go.mod": cohereModuleLine},
+			"", "is a cohere tree with no " + coherePinnedName + " anywhere"},
+		{"two of them", map[string]string{"go.mod": cohereModuleLine, corpus.PinnedFile: pinned,
+			"old/" + coherePinnedName: pinned}, "", "holds 2 files named " + coherePinnedName},
+		{"a tree that isn't cohere's", map[string]string{"go.mod": "module example.com/fixture\n"}, "", ""},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			directory, commit := tree(row.files)
+			found, isFound, findError := pinnedFileIn(directory, commit)
+			said := ""
+			if findError != nil {
+				said = findError.Error()
+			}
+			if found != row.found || isFound != (row.found != "") || (row.refusal == "") != (findError == nil) ||
+				!strings.Contains(said, row.refusal) {
+				test.Errorf("found %q (%t), %q; want %q and a refusal saying %q", found, isFound, said, row.found,
+					row.refusal)
+			}
+		})
+	}
+}
+
+// A gate that skips far more tests than main's last landing says so, loudly: more than twice as many and at least
+// skipJumpFloor more. 196 against 10 is the jump #3kpxrdt's two landings printed and passed over.
+func TestAGateSaysWhenItsSkipsJump(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct {
+		now, before int
+		jumps       bool
+	}{
+		{196, 10, true},
+		{25, 0, true},
+		{10, 10, false},
+		{25, 10, false},
+		{19, 0, false},
+		{196, -1, false},
+	} {
+		if said := skipJump(row.now, row.before); (said != "") != row.jumps {
+			test.Errorf("%d against %d reads %q, want a jump: %t", row.now, row.before, said, row.jumps)
+		}
+	}
+}
+
 // The gate's Mac script unsets every corpus's variable, so the list it unsets is every corpus's.
 func TestTheGatesMacScriptUnsetsEveryCorpusVariable(test *testing.T) {
 	test.Parallel()

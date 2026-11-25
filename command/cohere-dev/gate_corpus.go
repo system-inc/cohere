@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -105,24 +106,42 @@ func (gate gateCorpus) place() string {
 	return gate.corpus.Name + "/" + gate.pins.Checkout + "-" + corpusRecipeDigest(gate.corpus.Name)
 }
 
-// gateCorpora is every corpus the landing of commit lays, and a line for each it can't, naming why: the commit names
-// no pins, which only a tree from before them does, or the lander's corpora file names no checkout to lay it from.
-// Those run nowhere, named on the land line, as every corpus did before #5r0vrte.
+// coherePinnedName is the pin file's own name, which the gate finds in the tree being landed wherever it lives.
+var coherePinnedName = path.Base(corpus.PinnedFile)
+
+// cohereModule is cohere's own module path, whose trees always carry the pin file.
+const cohereModule = "github.com/system-inc/cohere"
+
+// gateCorpora is every corpus the landing of commit lays, and a line for each it can't, naming why: the lander's
+// corpora file names no checkout to lay it from, which runs nowhere, named on the land line.
+//
+// The pin file is found in the tree being landed by its name, wherever that tree keeps it (pinnedFileIn), never at the
+// path the land's own code names: land runs main's code as it was when the landing was asked for, so a landing queued
+// before the file moved read the old path, found nothing, laid no corpus, and 196 tests skipped on a green gate twice
+// (168fc2d5c and 1312d2e60, #3kpxrdt). A cohere tree with no pin file refuses the landing; only a tree that isn't
+// cohere's, a test's fixture, lays none.
 func gateCorpora(worktree string, commit string) ([]gateCorpus, []string, error) {
-	source, showError := gitOutput(worktree, "show", commit+":"+corpus.PinnedFile)
+	pinned, found, findError := pinnedFileIn(worktree, commit)
+	if findError != nil {
+		return nil, nil, findError
+	}
+	if !found {
+		return nil, []string{fmt.Sprintf("no corpus is laid, since %s is no cohere tree and holds no %s",
+			shortCommit(commit), coherePinnedName)}, nil
+	}
+	source, showError := gitOutput(worktree, "show", commit+":"+pinned)
 	if showError != nil {
-		return nil, []string{fmt.Sprintf("no corpus is laid, since %s has no %s, so the tests that read one run "+
-			"nowhere", shortCommit(commit), corpus.PinnedFile)}, nil
+		return nil, nil, fmt.Errorf("reading %s at %s: %w", pinned, shortCommit(commit), showError)
 	}
 	pins, pinsError := corpus.PinsIn([]byte(source))
 	if pinsError != nil {
 		return nil, nil, pinsError
 	}
-	path, pathError := corpus.ConfigPath()
-	if pathError != nil {
-		return nil, nil, pathError
+	configurationPath, configurationPathError := corpus.ConfigPath()
+	if configurationPathError != nil {
+		return nil, nil, configurationPathError
 	}
-	configuration, configurationError := corpus.ReadConfiguration(path)
+	configuration, configurationError := corpus.ReadConfiguration(configurationPath)
 	if configurationError != nil {
 		return nil, nil, configurationError
 	}
@@ -135,12 +154,44 @@ func gateCorpora(worktree string, commit string) ([]gateCorpus, []string, error)
 		}
 		if checkout == "" {
 			unlaid = append(unlaid, fmt.Sprintf("%s isn't laid, since %s names no checkout of it to lay from, so "+
-				"its tests run nowhere", each.Name, path))
+				"its tests run nowhere", each.Name, configurationPath))
 			continue
 		}
 		laid = append(laid, gateCorpus{corpus: each, pins: pins[each.Name], checkout: checkout})
 	}
 	return laid, unlaid, nil
+}
+
+// pinnedFileIn finds the pin file in commit's tree by its name, and reports whether there is one. A tree with two
+// refuses, since which pins it lays would be a guess, and a cohere tree, by its go.mod's module, with none refuses,
+// naming the name it looked for, since its corpus tests would skip and the gate read green over them.
+func pinnedFileIn(worktree string, commit string) (string, bool, error) {
+	listing, listError := gitOutput(worktree, "ls-tree", "-r", "--name-only", commit)
+	if listError != nil {
+		return "", false, fmt.Errorf("listing %s's tree for its %s: %w", shortCommit(commit), coherePinnedName,
+			listError)
+	}
+	found := []string{}
+	for file := range strings.SplitSeq(listing, "\n") {
+		if path.Base(file) == coherePinnedName {
+			found = append(found, file)
+		}
+	}
+	switch {
+	case len(found) > 1:
+		return "", false, fmt.Errorf("%s holds %d files named %s (%s), so which pins it lays is a guess",
+			shortCommit(commit), len(found), coherePinnedName, strings.Join(found, ", "))
+	case len(found) == 1:
+		return found[0], true, nil
+	}
+	// Ignored: a tree with no go.mod is no cohere tree, which lays no corpus.
+	module, _ := gitOutput(worktree, "show", commit+":go.mod")
+	firstLine, _, _ := strings.Cut(module, "\n")
+	if strings.TrimSpace(strings.TrimPrefix(firstLine, "module ")) == cohereModule {
+		return "", false, fmt.Errorf("%s is a cohere tree with no %s anywhere, so its corpus tests would skip on a "+
+			"green gate: put the corpus pins back before it lands (#3kpxrdt)", shortCommit(commit), coherePinnedName)
+	}
+	return "", false, nil
 }
 
 // corporaArgument is the gate's Mac script's corpora argument: each corpus's variable and place, `VARIABLE=place`,
