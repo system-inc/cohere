@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_language/project"
 	"github.com/system-inc/cohere/internal/streams"
 )
 

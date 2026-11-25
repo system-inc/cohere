@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
+	"github.com/system-inc/cohere/internal/go_language/rules/marker"
 )
 
 // Package is one type-checked package, with the files the engine may read and edit. Files left out (generated,

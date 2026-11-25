@@ -1,0 +1,697 @@
+package go_language
+
+import (
+	"errors"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"go/types"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_language/build_dependence"
+	"github.com/system-inc/cohere/internal/go_language/check"
+	"github.com/system-inc/cohere/internal/go_language/contract"
+	"github.com/system-inc/cohere/internal/go_language/fact_resolver"
+	"github.com/system-inc/cohere/internal/go_language/load"
+)
+
+// hostDependence is the host's graph of its package-level declarations under `--build-dependence` (#qkq4gx5), built
+// once from its load for every extra build to be judged on, and what each judgment compares a build's load with: the
+// host's files of every package as written, those of them the cgo tool translated (cgoFiles), and its path, by package
+// ID, the load it was built from, and how long it took. restored are the packages the host read from export data, the
+// system cache's standard-library table's or the store's, by package ID, which the graph does not hold, and
+// standardLibrary is the graph of the standard library's among them, nil when it restored none (#ss4t5g6).
+type hostDependence struct {
+	graph *build_dependence.Graph
+	from  *load.Loaded
+	// facts are the host's facts by object and kind (indexHostFacts), indexed once its lint has run, before any extra
+	// build starts, nil until then, and factsUnnamed those of a package named by records it could not name.
+	facts           map[factKey]check.ExportedFact
+	factsUnnamed    int
+	files           map[string][]string
+	cgoFiles        map[string][]string
+	paths           map[string]string
+	elapsed         time.Duration
+	restored        map[string]bool
+	standardLibrary *standardLibraryDependence
+	// restoredAnswers are the answers the host's store holds of each package it restored, by package ID, indexed with
+	// its facts (indexHostFacts), which the facts census reads by objectpath.
+	restoredAnswers map[string]*fact_resolver.Answers
+	// decoded are the types of the packages the host checked from source whose graph it took from the findings store's
+	// records rather than their syntax, which hold no live object, so the body reach census asks of their objects by
+	// name (bodyReacher.bits).
+	decoded map[*types.Package]bool
+	// exportData are the IDs of the packages the host read from export data rather than checking from source, the
+	// system cache's or the store's, whose untyped float constants the body reach census reads as another build's
+	// check from source may not (bodyReacher.loadModeReaches).
+	exportData map[string]bool
+	// calls is the units of graph and of the standard library's graph and the calls between them, which every build's
+	// facts census counts by its own verdicts (#f9br7sg), built once a run by the first census to ask (callIndex,
+	// under callsOnce), since the builds' censuses run at once.
+	calls     *build_dependence.CallIndex
+	callsOnce sync.Once
+	// lineDirectives is whether each file a build's difference scanned holds a line directive, by path as written, a
+	// bool (holdsLineDirective): every build compares the same files, and the builds run at once.
+	lineDirectives sync.Map
+}
+
+// callIndex is the run's call index (hostDependence.calls), built the first time a build's census asks for it,
+// once every build waits for the standard library's graph to end (dependenceOf), so it holds that graph whole, or none
+// of it when its side load failed, as each build's judgment does.
+func (engine *pipeline) callIndex() *build_dependence.CallIndex {
+	engine.dependence.callsOnce.Do(func() {
+		var standardLibrary *build_dependence.Graph
+		if engine.dependence.standardLibrary != nil {
+			standardLibrary = engine.dependence.standardLibrary.graph
+		}
+		engine.dependence.calls = build_dependence.NewCallIndex(engine.dependence.graph, standardLibrary)
+	})
+	return engine.dependence.calls
+}
+
+// holdsLineDirective is build_dependence.HoldsLineDirective of file as the run holds it (held), the bytes the load
+// parsed and the host's graph was built from, which every reader that would open a file again reads instead: a file
+// rewritten on disk once the run read it is scanned as the graph knows it, never as the disk has it now. A file the
+// run holds nothing for, a dependency's, the standard library's or one in scope it could not read, is read from disk,
+// where the load read it, and one that cannot be read there holds a directive, failing wide (sourceReader). It is
+// scanned once a run (hostDependence.lineDirectives) whichever build asks first, or by each of two builds that ask at
+// once, alike.
+//
+// The editor's save (#qtna8m4) is the one run whose held bytes of a file, the buffer, are not the disk's, and it never
+// reaches here: it takes `--fix` alone, refusing `--lint` (invocation.go:125), so it asks for no lint phase, which
+// alone builds the host's graph (buildDependenceGraph) and runs the extra builds this judges (runLint), and runStdin
+// (pipeline_stdin.go:53-70) calls neither.
+func (engine *pipeline) holdsLineDirective(file string) bool {
+	return holdsLineDirectiveOnce(&engine.dependence.lineDirectives, file, engine.sourceReader(nil, nil))
+}
+
+// holdsLineDirectiveOnce is build_dependence.HoldsLineDirective of file as read reads it, scanned once into scanned, a
+// bool by path as written, whichever caller asks first, or by each of two that ask at once, alike.
+func holdsLineDirectiveOnce(scanned *sync.Map, file string, read func(file string) ([]byte, error)) bool {
+	if answered, isScanned := scanned.Load(file); isScanned {
+		if holds, isBool := answered.(bool); isBool {
+			return holds
+		}
+	}
+	holds := build_dependence.HoldsLineDirective(file, read)
+	scanned.Store(file, holds)
+	return holds
+}
+
+// standardLibraryDependence is the standard library's own graph (#ss4t5g6): the host restores the standard library
+// from the system cache's table, with no syntax, so its graph holds none of it, and each build's standard library is
+// judged on a graph of its own, loaded from source beside the host's lint, whose judgment answers for the objects the
+// host's units read of it (build_dependence.Counterparts). done is closed once the side load and the graph have ended;
+// graph is then nil when the load failed, which problem says, files are each side-loaded package's files as written, by
+// package ID, which each build's are compared with, and fileSet is the side load's, where its objects' positions are,
+// by which the facts census keys the host's facts of a restored package (indexHostFacts). Its packages are counted
+// among the dependencies.
+//
+// fromRecords counts the packages its graph took from the records the findings store keeps of them (#6a3kjvz), which
+// the side load skipped, and sideLoaded those it loaded, by ID in loaded, whose records the host's session writes once
+// it has ended (awaitStandardLibrary), writeFailed counting the writes that failed and firstWriteFailure the first's
+// reason.
+type standardLibraryDependence struct {
+	done         chan struct{}
+	graph        *build_dependence.Graph
+	files        map[string][]string
+	fileSet      *token.FileSet
+	packages     int
+	problem      error
+	loadElapsed  time.Duration
+	graphElapsed time.Duration
+	fromRecords  int
+	sideLoaded   int
+	loaded       map[string]bool
+
+	writeFailed       int
+	firstWriteFailure error
+}
+
+// buildDependenceGraph builds the host's graph from loaded, every package it checked from source, on the run's pool,
+// while their syntax and type information are whole: the rules let go of each package's as they finish with it, so
+// this runs between the load's end and the first rules' start, the rename's pass's or the lint phase's, which a run
+// judging dependence never overlaps with its load (lintOverlaps). A package with a file in scope is the workspace's,
+// its test variants included, and every other a dependency. It builds nothing unless the run judges dependence and the
+// lint phase has extra builds to judge, over a load that will be linted: one that failed or found a type error is left
+// alone, and so is the load the graph was built from already, which a rename that wrote nothing hands on. The engine
+// keeps the graph, which every extra build reads. A package whose record the findings store holds, decoded as the
+// session read it, is added from its record (#6a3kjvz), whether the host restored it or checks it, and one the host
+// checks with none from its syntax, its record then written beside its entry
+// (check.CacheSession.DependenceRecordsFrom). A package the host restored from export data with no record has no type
+// information and is absent from the graph; the standard library's among them are loaded from source onto a graph of
+// their own, beside the host's lint (standardLibraryGraph), once a run, since a rename never changes them. A record
+// that does not decode is the session's to say, and its package checked from source, so it has none here
+// (CacheSession.readDependenceRecords).
+func (engine *pipeline) buildDependenceGraph(loaded *load.Loaded, loadError error) {
+	if !engine.request.judgesDependence() || !engine.keepsForBuilds() || !engine.request.requests(contract.PhaseLint) ||
+		loadError != nil || loaded == nil || len(loaded.Diagnostics) > 0 ||
+		engine.dependence != nil && engine.dependence.from == loaded {
+		return
+	}
+	started := time.Now()
+	var every []*packages.Package
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) { every = append(every, each) })
+	host := &hostDependence{
+		graph:      build_dependence.NewGraph(),
+		from:       loaded,
+		files:      make(map[string][]string, len(every)),
+		cgoFiles:   map[string][]string{},
+		paths:      make(map[string]string, len(every)),
+		restored:   map[string]bool{},
+		decoded:    map[*types.Package]bool{},
+		exportData: map[string]bool{},
+	}
+	var restoredStandardLibrary []string
+	recordedStandardLibrary := map[string]*build_dependence.Record{}
+	records := make([]*build_dependence.Record, len(every))
+	for index, each := range every {
+		host.files[each.ID] = each.GoFiles
+		// Read from the listing, so a package the host restored, or added from its record, has them too.
+		if cgoFiles := build_dependence.CgoFiles(each); len(cgoFiles) > 0 {
+			host.cgoFiles[each.ID] = cgoFiles
+		}
+		host.paths[each.ID] = each.PkgPath
+		if engine.session != nil {
+			records[index], _ = engine.session.DependenceRecord(each)
+		}
+		if records[index] != nil && each.Types != nil {
+			host.decoded[each.Types] = true
+		}
+		if each.TypesInfo == nil {
+			host.exportData[each.ID] = true
+		}
+		if each.TypesInfo != nil || records[index] != nil {
+			continue
+		}
+		host.restored[each.ID] = true
+		// The standard library is the only package in no module that a module's load reaches, and none of it is a
+		// test variant here, since only the workspace's packages have tests built.
+		if each.Module == nil && each.ForTest == "" {
+			if engine.session != nil {
+				if record, isRecorded := engine.session.StandardLibraryRecord(each); isRecorded {
+					recordedStandardLibrary[each.PkgPath] = record
+					continue
+				}
+			}
+			restoredStandardLibrary = append(restoredStandardLibrary, each.PkgPath)
+		}
+	}
+	engine.workPool().ForEach(len(every), 0, func(index int) {
+		if records[index] != nil {
+			host.graph.AddDecoded(records[index])
+			return
+		}
+		if every[index].TypesInfo != nil {
+			host.graph.AddPackage(every[index], engine.described.hasFileInScope(every[index]),
+				loaded.Withheld[every[index]].Declarations)
+		}
+	})
+	if engine.session != nil {
+		graph := host.graph
+		engine.session.DependenceRecordsFrom(func(saved *packages.Package) ([]byte, bool) {
+			return graph.EncodedRecord(saved.ID)
+		})
+	}
+	host.elapsed = time.Since(started)
+	switch {
+	case engine.dependence != nil && engine.dependence.standardLibrary != nil:
+		host.standardLibrary = engine.dependence.standardLibrary
+	case len(restoredStandardLibrary) > 0 || len(recordedStandardLibrary) > 0:
+		host.standardLibrary = engine.standardLibraryGraph(restoredStandardLibrary, recordedStandardLibrary,
+			host.files)
+	}
+	engine.dependence = host
+}
+
+// standardLibraryGraph starts the standard library's graph (standardLibraryDependence) on a goroutine of its own and
+// returns at once: paths, the standard-library packages the host restored with no record in the findings store, are
+// loaded from source by the engine's own loader (loadPackages), as the host's load would have checked them, under the
+// host's environment, on the run's pool, without tests, and every package the load reaches is added to the graph, so
+// the graph holds whatever they import too and needs no answers of its own. Its work takes the pool's slots beside the
+// host's lint, and the builds wait for it (awaitStandardLibrary). recorded are the records the store holds of the rest,
+// by path, each added as it is, its files those hostFiles name of it, the host's listing's, with no load at all when
+// paths is empty (#6a3kjvz).
+func (engine *pipeline) standardLibraryGraph(
+	paths []string,
+	recorded map[string]*build_dependence.Record,
+	hostFiles map[string][]string,
+) *standardLibraryDependence {
+	side := &standardLibraryDependence{done: make(chan struct{}), graph: build_dependence.NewGraph(),
+		files: map[string][]string{}, fromRecords: len(recorded), loaded: map[string]bool{}}
+	// The standard library's side load has no test variants, so each package's ID is its path.
+	for path, record := range recorded {
+		side.graph.AddDecoded(record)
+		side.files[path] = hostFiles[path]
+	}
+	side.packages = len(recorded)
+	workspace := engine.described.workspace
+	go func() {
+		defer close(side.done)
+		if len(paths) == 0 {
+			return
+		}
+		started := time.Now()
+		loaded, loadError := engine.loadPackages(loadRequest{
+			environment: workspace.Environment(),
+			caching:     &load.Caching{GoEnvironment: engine.described.goEnvironment, WithoutTests: true},
+			patterns:    paths,
+		})
+		side.loadElapsed = time.Since(started)
+		switch {
+		case loadError != nil:
+			side.problem, side.graph = loadError, nil
+			return
+		case len(loaded.Diagnostics) > 0:
+			side.problem = fmt.Errorf("%d errors, the first %s", len(loaded.Diagnostics), loaded.Diagnostics[0].Message)
+			side.graph = nil
+			return
+		}
+		graphStarted := time.Now()
+		var every []*packages.Package
+		packages.Visit(loaded.Roots, nil, func(each *packages.Package) {
+			if _, isRecorded := recorded[each.ID]; !isRecorded {
+				every = append(every, each)
+			}
+		})
+		for _, each := range every {
+			side.files[each.ID] = each.GoFiles
+			side.loaded[each.ID] = true
+		}
+		side.packages += len(every)
+		side.sideLoaded = len(every)
+		if len(every) > 0 {
+			side.fileSet = every[0].Fset
+		}
+		engine.workPool().ForEach(len(every), 0, func(index int) {
+			side.graph.AddPackage(every[index], false, loaded.Withheld[every[index]].Declarations)
+		})
+		side.graphElapsed = time.Since(graphStarted)
+	}()
+	return side
+}
+
+// awaitStandardLibrary waits for the standard library's graph, if the host has one, and says on stderr when its side
+// load failed, so every object of the standard library a unit reads fails wide. otherBuilds calls it once, on the
+// pipeline's goroutine, before any extra build starts, so the builds' width is measured with the side load over.
+func (engine *pipeline) awaitStandardLibrary() {
+	if engine.dependence == nil || engine.dependence.standardLibrary == nil {
+		return
+	}
+	side := engine.dependence.standardLibrary
+	<-side.done
+	if side.problem != nil {
+		engine.note("the standard library's side load for --build-dependence failed, so every object of it a unit "+
+			"reads is called dependent: %v", side.problem)
+		return
+	}
+	// What the side load built from live packages is written into the findings store, for a later run to read in its
+	// place (#6a3kjvz), and never a record the graph took from the store. The session's counts were handed on with the
+	// host's result before the side load ended, so its failed writes are kept here and counted in the lint record.
+	if engine.session != nil && side.sideLoaded > 0 {
+		side.writeFailed, side.firstWriteFailure = engine.session.WriteStandardLibraryRecords(
+			func(path string) ([]byte, bool) {
+				if !side.loaded[path] {
+					return nil, false
+				}
+				return side.graph.EncodedRecord(path)
+			})
+		if side.firstWriteFailure != nil {
+			engine.note("the findings cache: %v", side.firstWriteFailure)
+		}
+	}
+}
+
+// sealDependenceGraphs seals the host's graph and the standard library's (build_dependence.Graph.Seal), so every
+// build is judged on graphs that hold only what a judgment reads. otherBuilds calls it after awaitStandardLibrary,
+// once it knows there are builds to judge and before any is measured or started, with no record of either graph left
+// to write: the host's session wrote the host's records beside their entries in its save (check.Run's), which ended
+// with the host's lint, reloads included, before otherBuilds began; the standard library's were written inside
+// awaitStandardLibrary, once its side load had ended; and no extra build's session writes any, since only the host's
+// session keeps records (KeepDependenceRecords). Seal resolves under the graph's lock, as the first build's Against
+// would have, so sealing adds no contention.
+// The standard library's graph is nil when its side load failed, and then there is nothing of it to seal.
+func (engine *pipeline) sealDependenceGraphs() {
+	if engine.dependence == nil {
+		return
+	}
+	engine.dependence.graph.Seal()
+	if engine.dependence.standardLibrary != nil && engine.dependence.standardLibrary.graph != nil {
+		engine.dependence.standardLibrary.graph.Seal()
+	}
+}
+
+// dependenceOf is one extra build's judgment on the host's graph, from its first load, nil when the host built none.
+// Each package's files are compared as written (GoFiles), as compiledFiles reads them, since a cgo output's name
+// changes from run to run, and the graph names each unit by the file a reader sees. What stands for the cgo outputs
+// left out is a mark on each of the host's units that hangs on the C side, one in a cgo tool's output or in any file of
+// a package checked as written that has a cgo file, set as the graph collected it and kept in its record. Every marked
+// unit is build-dependent wherever the build's package differs at all (build_dependence's seedFiles): a file only the
+// host compiles, a file only the build compiles, or a cgo tool that translated the package on either side
+// (build_dependence.KeepsCgo). The build's outputs are then its own cgo tool's, under its own tags and flags, a `!cgo`
+// file's, or none, and a body or a value the host's load withheld from a package it checked as written is checked there
+// for the first time, whatever the files' names say. Every unit whose body or initial value the host's load withheld,
+// as the graph was told (load.PackageWithheld.Declarations), is build-dependent in every build, whatever differs, since
+// the host never checked it (build_dependence's seedWithheld). A file only the build compiles is parsed for its syntax
+// alone. A package only one side's load reaches is that side's alone, except a root the build's load leaves out because
+// its in-package test variant is checked in its place (load.Caching's AnalyzedRootsOnly): the variant holds every file
+// of it, so its files are compared with the variant's but its test files, and its units are never called dependent for
+// a package the build checks by another name. A build loaded again for a question keeps this judgment, since its files
+// do not change between rounds. Beside the record it returns the judgment and the files both builds compile of each
+// package both have by one ID, which the facts census compares through (compareFacts).
+//
+// When the host restored packages from export data, which its graph does not hold, the standard library's graph is
+// judged first against the build's files of its packages, and that judgment answers for every object the host's units
+// read of a restored package (build_dependence.Counterparts), failing wide for one it cannot answer. The record's
+// dependencies count the standard library's units beside the host's, so its totals are those of a run whose host
+// checked every package from source. A run asked for the must-check census keeps the build's set in the judgment too,
+// from both graphs' differences and judgments, with what was answered wide (pipeline_must_check_census.go).
+func (engine *pipeline) dependenceOf(loaded *load.Loaded) (*contract.BuildDependence, *buildJudgment) {
+	if engine.dependence == nil {
+		return nil, nil
+	}
+	// The builds start once the standard library's graph has ended (awaitStandardLibrary); a build that did not, as a
+	// test's might, waits for it here.
+	if engine.dependence.standardLibrary != nil {
+		<-engine.dependence.standardLibrary.done
+	}
+	started := time.Now()
+	built := map[string]*packages.Package{}
+	packages.Visit(loaded.Roots, nil, func(each *packages.Package) { built[each.ID] = each })
+	fileSet := token.NewFileSet()
+	// Every build-only file is parsed from the bytes the run holds of it, those the build's load parsed, or the disk's
+	// for one it holds nothing for (sourceReader).
+	read := engine.sourceReader(nil, nil)
+	judged := &buildJudgment{shared: map[sharedFile]bool{}, sharedPackages: map[string]bool{},
+		withoutSyntax: map[string]bool{}, filesDiffer: map[string]bool{}}
+	difference := engine.listingDifference(hostListing{files: engine.dependence.files,
+		cgoFiles: engine.dependence.cgoFiles, paths: engine.dependence.paths}, built, fileSet, read,
+		engine.holdsLineDirective, judged)
+	standardLibrary := engine.dependence.standardLibrary
+	var standardLibraryJudged *build_dependence.Dependence
+	var standardLibraryDiffering build_dependence.Difference
+	if standardLibrary != nil && standardLibrary.graph != nil {
+		standardLibraryDiffering = standardLibraryDifference(standardLibrary, engine.dependence.cgoFiles, built,
+			fileSet, read, engine.holdsLineDirective)
+		standardLibraryJudged = standardLibrary.graph.Against(standardLibraryDiffering)
+	}
+	var standardLibraryGraph *build_dependence.Graph
+	if standardLibraryJudged != nil {
+		standardLibraryGraph = standardLibrary.graph
+	}
+	counterparts := build_dependence.NewCounterparts(standardLibraryGraph, standardLibraryJudged)
+	judged.standardLibrary, judged.counterparts = standardLibraryJudged, counterparts
+	// A host that restored nothing holds every package it reached, so nothing is asked, and a graph that asks nothing
+	// judges as block 1 always has.
+	if len(engine.dependence.restored) > 0 {
+		difference.DependentObject = counterparts.DependentObject
+		// A package the host restored hands the graph its record (#6a3kjvz), which names an object of a package the
+		// graph does not hold by its path and local name rather than holding it.
+		difference.DependentName = counterparts.DependentName
+	}
+	judged.dependence = engine.dependence.graph.Against(difference)
+	counts := judged.dependence.Counts()
+	record := &contract.BuildDependence{
+		GraphMilliseconds:    int(engine.dependence.elapsed.Milliseconds()),
+		JudgmentMilliseconds: int(time.Since(started).Milliseconds()),
+	}
+	if len(engine.dependence.restored) > 0 {
+		answered := counterparts.Counts()
+		record.Restored = &contract.RestoredDependence{
+			Packages:           len(engine.dependence.restored),
+			Answered:           answered.Answered,
+			WithoutCounterpart: answered.WithoutCounterpart,
+			WithoutPackage:     answered.WithoutPackage,
+		}
+		if standardLibrary != nil {
+			record.Restored.StandardLibraryFromRecords = standardLibrary.fromRecords
+			record.Restored.StandardLibrarySideLoaded = standardLibrary.sideLoaded
+			record.Restored.StandardLibraryPackages = standardLibrary.packages
+			record.Restored.LoadMilliseconds = int(standardLibrary.loadElapsed.Milliseconds())
+			record.Restored.GraphMilliseconds = int(standardLibrary.graphElapsed.Milliseconds())
+		}
+		if standardLibraryJudged != nil {
+			standardLibraryCounts := standardLibraryJudged.Counts()
+			record.Restored.StandardLibraryUnits = standardLibraryCounts.Dependencies.Units
+			record.Restored.StandardLibraryDependentUnits = standardLibraryCounts.Dependencies.DependentUnits
+			counts.Workspace.Add(standardLibraryCounts.Workspace)
+			counts.Dependencies.Add(standardLibraryCounts.Dependencies)
+		}
+	}
+	record.Workspace = dependenceCounts(counts.Workspace)
+	record.Dependencies = dependenceCounts(counts.Dependencies)
+	if engine.mustCheckCensus != "" {
+		// A package the host restored with no record that the standard library's graph does not hold either is in no
+		// graph, so whatever of it a unit reads is answered wide, and it is in the set as NoGraph.
+		var notHeld []string
+		for identifier := range engine.dependence.restored {
+			isHeld := false
+			// A judgment of the standard library's graph means the graph was built, so standardLibrary is not nil.
+			if standardLibraryJudged != nil {
+				_, isHeld = standardLibrary.files[identifier]
+			}
+			if !isHeld {
+				notHeld = append(notHeld, identifier)
+			}
+		}
+		judged.mustCheck = &mustCheckSet{
+			lines: mustCheckLines([]build_dependence.Difference{difference, standardLibraryDiffering},
+				[]*build_dependence.Dependence{judged.dependence, standardLibraryJudged}, notHeld),
+			wide:   mustCheckWide(notHeld, counterparts.Counts().WithoutCounterpart),
+			at:     mustCheckAtLoad,
+			judged: time.Since(started),
+		}
+	}
+	return record, judged
+}
+
+// hostListing is what a build's listing is compared with (listingDifference), read from the host's load: each
+// package's files as written, those of them its cgo tool translated (build_dependence.CgoFiles), and its path, each by
+// package ID, every package the host reached included, those it restored among them.
+type hostListing struct {
+	files    map[string][]string
+	cgoFiles map[string][]string
+	paths    map[string]string
+}
+
+// listingDifference is how the build's listing, built, its packages by ID, differs from the host's, host: each package
+// both have whose files differ or that a cgo tool translated on either side (filesDiffer), each only the build has,
+// with all its files, and each only the host has. It reads nothing but the two listings, the bytes of the build's own
+// files, read and parsed into fileSet, and the scan for a line directive, so it is known as soon as the build has
+// listed. It records into judged the files both builds compile of each package both have by one ID, the packages both
+// have by one ID that the build checked from source, those it did not (withoutSyntax), and those whose files differ,
+// which the facts census and the body differential read.
+//
+// Mutates: judged gains the shared files, the shared packages, those without syntax and the packages whose files differ
+func (engine *pipeline) listingDifference(
+	host hostListing,
+	built map[string]*packages.Package,
+	fileSet *token.FileSet,
+	read func(file string) ([]byte, error),
+	holdsLineDirective func(file string) bool,
+	judged *buildJudgment,
+) build_dependence.Difference {
+	difference := build_dependence.Difference{
+		Packages:          map[string]build_dependence.PackageDifference{},
+		HostOnlyPackages:  map[string]bool{},
+		BuildOnlyPackages: map[string]bool{},
+	}
+	for identifier, hostFiles := range host.files {
+		counterpart, isShared := built[identifier]
+		asVariant := false
+		if !isShared {
+			counterpart, isShared = built[identifier+" ["+host.paths[identifier]+".test]"]
+			asVariant = isShared
+		}
+		if !isShared {
+			difference.HostOnlyPackages[identifier] = true
+			continue
+		}
+		// A package the build restored has its facts' objects from export data, whose positions are no offsets in
+		// its files, so the census leaves it out, and counts what it leaves (withoutSyntax); one the host restored is
+		// keyed through its counterpart in the standard library's graph (indexHostFacts).
+		if !asVariant {
+			if counterpart.TypesInfo != nil {
+				judged.sharedPackages[identifier] = true
+			} else {
+				judged.withoutSyntax[identifier] = true
+			}
+		}
+		builtFiles := counterpart.GoFiles
+		if asVariant {
+			// The variant holds the package's files and its own in-package test files, which are the variant's, never
+			// the package's it stands in for, and a test file is told by its name, as go/build tells it. Every other
+			// file of the variant the host does not compile is a build-only file of the package, parsed and scanned as
+			// any other is, so a method or a line directive in it is judged though the build checks no plain package.
+			builtFiles = slices.DeleteFunc(slices.Clone(counterpart.GoFiles), func(file string) bool {
+				return strings.HasSuffix(file, "_test.go")
+			})
+		}
+		// The host's cgo files are read by the host's own ID, which a variant stands in for.
+		differing := filesDiffer(hostFiles, host.cgoFiles[identifier], counterpart, builtFiles, fileSet, read,
+			holdsLineDirective)
+		if !asVariant {
+			for _, file := range hostFiles {
+				if slices.Contains(counterpart.GoFiles, file) {
+					judged.shared[sharedFile{packageIdentifier: identifier, file: file}] = true
+				}
+			}
+		}
+		// A build-only file that cannot be read or parsed is left out of BuildOnlyFiles (appendParsed) but still marks
+		// the package, which may differ by that file alone, and so may a package whose only difference is cgo.
+		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.EveryUnitDependent ||
+			differing.KeepsCgo {
+			difference.Packages[identifier] = differing
+			judged.filesDiffer[identifier] = true
+		}
+	}
+	for identifier, each := range built {
+		if _, isHosted := host.files[identifier]; isHosted {
+			continue
+		}
+		difference.BuildOnlyPackages[identifier] = true
+		buildOnly := build_dependence.PackageDifference{Workspace: engine.described.hasFileInScope(each)}
+		for _, file := range each.GoFiles {
+			// Ignored: a package only the build has has no unit of the host's to seed, and a file of it that cannot
+			// be read or parsed only goes uncounted.
+			buildOnly.BuildOnlyFiles, _ = appendParsed(buildOnly.BuildOnlyFiles, fileSet, file, read)
+		}
+		difference.Packages[identifier] = buildOnly
+	}
+	return difference
+}
+
+// standardLibraryDifference is what the build changes of the standard library's graph, as dependenceOf compares the
+// host's packages: each side-loaded package's files with the build's package of that ID, and one the build does not
+// have is the host's alone. A package only the build has is no business of this graph's: the host's difference counts
+// it, since the host's files name every package the host reached, the standard library's among them. hostCgoFiles are
+// the host's cgo files, by package ID (hostDependence.cgoFiles): the host's load says which of a package's files its
+// cgo tool translated, where the side load, which translates nothing, checks every one as written. Each file the two
+// do not share is read by read and scanned for a line directive by holdsLineDirective, as filesDiffer says.
+func standardLibraryDifference(
+	standardLibrary *standardLibraryDependence,
+	hostCgoFiles map[string][]string,
+	built map[string]*packages.Package,
+	fileSet *token.FileSet,
+	read func(file string) ([]byte, error),
+	holdsLineDirective func(file string) bool,
+) build_dependence.Difference {
+	difference := build_dependence.Difference{
+		Packages:          map[string]build_dependence.PackageDifference{},
+		HostOnlyPackages:  map[string]bool{},
+		BuildOnlyPackages: map[string]bool{},
+	}
+	for identifier, hostFiles := range standardLibrary.files {
+		counterpart, isShared := built[identifier]
+		if !isShared {
+			difference.HostOnlyPackages[identifier] = true
+			continue
+		}
+		differing := filesDiffer(hostFiles, hostCgoFiles[identifier], counterpart, counterpart.GoFiles, fileSet, read,
+			holdsLineDirective)
+		// Kept when the mark or cgo is its one difference, as dependenceOf keeps the host's packages.
+		if len(differing.HostOnlyFiles) > 0 || len(differing.BuildOnlyFiles) > 0 || differing.EveryUnitDependent ||
+			differing.KeepsCgo {
+			difference.Packages[identifier] = differing
+		}
+	}
+	return difference
+}
+
+// filesDiffer is how one package's files differ, as written: hostFiles the host compiles and builtFiles the build
+// does, of built, the build's load of the package, each host-only file named and each shared one too, by which a unit
+// a //line directive names apart is seeded, and each build-only file parsed for its syntax alone from the bytes read
+// gives (appendParsed). A build-only file that cannot be read or parsed marks the package
+// (PackageDifference.EveryUnitDependent), since what it declares is unknown. The host-only files, then the build-only
+// ones, are scanned by holdsLineDirective, by path as written, until one holds a directive, which could name a shared
+// file, so it marks the package too; once it is marked no file is scanned, since the mark is all a scan can add, though
+// each build-only file is still parsed. It says too whether a cgo tool translated the package on either side
+// (build_dependence.KeepsCgo), hostCgoFiles being those of hostFiles the host's cgo tool translated, which no file's
+// name tells, and built's compiled files saying whether the build's did.
+func filesDiffer(
+	hostFiles []string,
+	hostCgoFiles []string,
+	built *packages.Package,
+	builtFiles []string,
+	fileSet *token.FileSet,
+	read func(file string) ([]byte, error),
+	holdsLineDirective func(file string) bool,
+) build_dependence.PackageDifference {
+	differing := build_dependence.PackageDifference{KeepsCgo: build_dependence.KeepsCgo(hostCgoFiles, built)}
+	for _, file := range hostFiles {
+		if slices.Contains(builtFiles, file) {
+			differing.SharedFiles = append(differing.SharedFiles, file)
+		} else {
+			differing.HostOnlyFiles = append(differing.HostOnlyFiles, file)
+			differing.EveryUnitDependent = differing.EveryUnitDependent || holdsLineDirective(file)
+		}
+	}
+	for _, file := range builtFiles {
+		if !slices.Contains(hostFiles, file) {
+			var parsed bool
+			differing.BuildOnlyFiles, parsed = appendParsed(differing.BuildOnlyFiles, fileSet, file, read)
+			differing.EveryUnitDependent = differing.EveryUnitDependent || !parsed || holdsLineDirective(file)
+		}
+	}
+	return differing
+}
+
+// appendParsed is files with file's syntax after them, parsed alone from the bytes read gives, and whether it was. The
+// engine's read is the run's held bytes (sourceReader), those the build's load parsed, never the disk's again, which a
+// file rewritten once the run read it would make differ, hiding a method or a name the build was checked with. A
+// build-only file that cannot be read or does not parse fails the build's own load, whose type errors the record
+// already holds, so its units are left uncounted, and it is reported unparsed, for its package to be marked
+// (filesDiffer).
+func appendParsed(
+	files []*ast.File,
+	fileSet *token.FileSet,
+	file string,
+	read func(file string) ([]byte, error),
+) ([]*ast.File, bool) {
+	source, readError := read(file)
+	if readError != nil {
+		return files, false
+	}
+	parsed, parseError := parser.ParseFile(fileSet, file, source, parser.SkipObjectResolution)
+	if parseError != nil || parsed == nil {
+		return files, false
+	}
+	return append(files, parsed), true
+}
+
+// dependenceCounts is one scope's counts as the record writes them.
+func dependenceCounts(counts build_dependence.ScopeCounts) contract.DependenceCounts {
+	return contract.DependenceCounts{
+		Units:                 counts.Units,
+		DependentUnits:        counts.DependentUnits,
+		Nodes:                 counts.Nodes,
+		DependentNodes:        counts.DependentNodes,
+		Packages:              counts.Packages,
+		DependentPackages:     counts.DependentPackages,
+		DependentPackageNodes: counts.DependentPackageNodes,
+		BuildOnlyUnits:        counts.BuildOnlyUnits,
+		BuildOnlyNodes:        counts.BuildOnlyNodes,
+	}
+}
+
+// decodeWholeRecord is the whole record encoded holds (build_dependence.DecodeRecord), or why it holds none: bytes that
+// do not decode, or a declarations-only record, which no whole record's key holds and a whole graph refuses with a
+// panic (#anfjtr3). A run under `--build-dependence` reads one, from a collision of the two keys or a damaged store, as
+// a record that does not decode, and writes its package's whole record over it, as decodeDeclarationsRecord refuses a
+// whole record on a plain run.
+func decodeWholeRecord(encoded []byte) (*build_dependence.Record, error) {
+	record, decodeError := build_dependence.DecodeRecord(encoded)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	if record.DeclarationsOnly() {
+		return nil, errors.New("decoding a whole record: it is a declarations-only graph's record")
+	}
+	return record, nil
+}

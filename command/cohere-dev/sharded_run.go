@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// The gate runs internal/go_engine's tests as several 2-thread processes rather than one (#78xwy8k). Its test process
+// The gate runs internal/go_language's tests as several 2-thread processes rather than one (#78xwy8k). Its test process
 // starts about 6,450 children, and on darwin each fork write-protects the whole heap, so the faults grow with the heap
 // and with the threads faulting together: one process on 8 threads took 426s wall and 2,143s of system time, and four
 // processes of 2 threads ran the same 431 top-level tests in 127s wall and about 440s of system time (#2htryg8). In
@@ -24,7 +24,7 @@ import (
 // boxShardedPackage is the one package the gate runs in shards, by its import path. The script shards it only when
 // this path is among its arguments, which a split half's and a Mac's whole gate are; the land-gate job's patterns,
 // `./...`, never name it, so that road runs it unsharded.
-const boxShardedPackage = "github.com/system-inc/cohere/internal/go_engine"
+const boxShardedPackage = "github.com/system-inc/cohere/internal/go_language"
 
 // boxShardListingMarker opens the line a box's run prints when it shards a package: the package's import path, then
 // every top-level test its listing held, in the listing's order, each separated by a space.

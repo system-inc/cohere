@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
 )
 
 // wrapCases each hold a source with long lines and the exact output the tool must produce under options.

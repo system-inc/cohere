@@ -19,7 +19,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
-	"github.com/system-inc/cohere/internal/go_engine/settings"
+	"github.com/system-inc/cohere/internal/go_language/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/our_tiers"
 )
@@ -276,7 +276,7 @@ func ignoreEntryShape() *schemaNode {
 	}}
 }
 
-// goShape is the Go engine's block, as internal/go_engine/settings reads it: rules, each a severity or
+// goShape is the Go engine's block, as internal/go_language/settings reads it: rules, each a severity or
 // [severity] or [severity, options object], departures, each rule's reason for loosening it past the house,
 // reasons, why each off is off, and targets, the platforms checked beside the ones the files name.
 // Its severities are that loader's own list, exact, so the schema never allows what the engine refuses. Rule

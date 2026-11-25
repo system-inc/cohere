@@ -27,7 +27,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/format/native"
-	goenginerule "github.com/system-inc/cohere/internal/go_engine/rule"
+	goenginerule "github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )

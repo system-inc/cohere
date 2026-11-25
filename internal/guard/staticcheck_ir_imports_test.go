@@ -41,7 +41,7 @@ func TestNoCodeImportsStaticchecksIntermediateRepresentation(test *testing.T) {
 	}
 	for _, importer := range importers {
 		test.Errorf("%s imports %s, staticcheck's intermediate representation: read the engine's own, "+
-			"internal/go_engine/intermediate_representation, through dispatch.IntermediateRepresentation or "+
+			"internal/go_language/intermediate_representation, through dispatch.IntermediateRepresentation or "+
 			"build_intermediate_representation", importer.file, importer.importPath)
 	}
 }

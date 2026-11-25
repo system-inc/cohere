@@ -19,13 +19,13 @@ import (
 )
 
 // The landing gate split across two house Macs (#bc8nf0r). One gate on Sun2 took 41m48s: its plain tests 26m45s, nearly
-// all of it internal/go_engine's test binary (1,522.7s), then the -race tokens 10m29s and the -race runs 3m20s, and
-// internal/go_engine alone on an idle 12-core Mac takes 875s at a load of 11. The gate is CPU-bound, so it runs as two
-// halves at once, one per box, both on the commit being landed, each in its own gap, on the Square's terms:
+// all of it internal/go_language's test binary (1,522.7s), then the -race tokens 10m29s and the -race runs 3m20s, and
+// internal/go_language alone on an idle 12-core Mac takes 875s at a load of 11. The gate is CPU-bound, so it runs as
+// two halves at once, one per box, both on the commit being landed, each in its own gap, on the Square's terms:
 //
 //   - The gate's packages are listed here, `go list` of the module's patterns at the commit in the gate's environment,
 //     and each half is handed its packages as import paths in place of the patterns, with its share of the race tokens.
-//     The split is the Square's starting one, internal/go_engine alone on one half and everything else on the other.
+//     The split is the Square's starting one, internal/go_language alone on one half and everything else on the other.
 //     A package's Elapsed is its test binary's wall, not its CPU, and the box is CPU-bound: go_engine fills every core
 //     while most binaries use one or two, so balancing summed Elapsed would load go_engine's half with more. The
 //     halves' times are still kept (gateTimesFile), for a balancer built from the halves' own walls.
@@ -59,7 +59,7 @@ const gateTimesFile = "gate-times.json"
 // gateSplitStartingDirectory is the package the Square's starting split runs alone on one half, with every other
 // package and every race token on the other, until a split gate has written gateTimesFile: its test binary is most of
 // the gate's plain run.
-const gateSplitStartingDirectory = "internal/go_engine"
+const gateSplitStartingDirectory = "internal/go_language"
 
 // gateSplitUnweighed is the seconds a package or race token with no time in gateTimesFile weighs.
 const gateSplitUnweighed = 1.0

@@ -72,7 +72,7 @@ require (
 	github.com/dop251/goja v0.0.0-20260822123354-58e940e0d230
 
 	// A type parameter's terms, read as staticcheck reads them: SA4023's port asks it what the original
-	// asks (internal/go_engine/rules/typed_nil_interface_comparison).
+	// asks (internal/go_language/rules/typed_nil_interface_comparison).
 	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678
 
 	// cohere-dev reads go.work and each module's go.mod with the parser go itself uses, to gate every
@@ -80,7 +80,7 @@ require (
 	golang.org/x/mod v0.41.0
 	golang.org/x/sys v0.48.0
 
-	// The Go engine's analysis framework: every Go rule is a go/analysis analyzer (internal/go_engine/rule),
+	// The Go engine's analysis framework: every Go rule is a go/analysis analyzer (internal/go_language/rule),
 	// so vet's own suite, analysistest and facts across packages work unchanged, and the engine loads with
 	// go/packages and runs the rules with go/analysis/checker. Tests use it too: the registry's
 	// option-decoding guard loads the rules tree with type information, because whether a decode is strict
@@ -89,7 +89,7 @@ require (
 
 	// staticcheck as released. The binary links only its helper packages (type utilities, edits, the
 	// generated-file facts); every check it registers is cohere's own port, and the original checks run
-	// only in the tests, as the live oracles each port is held to (internal/go_engine/check/parity). Move
+	// only in the tests, as the live oracles each port is held to (internal/go_language/check/parity). Move
 	// to the first release that carries upstream's fa9ae6d1a5, one object path encoder per package, which
 	// makes the original U1000 cheaper in its parity tests, once x/tools is at v0.51, which it requires.
 	honnef.co/go/tools v0.8.1

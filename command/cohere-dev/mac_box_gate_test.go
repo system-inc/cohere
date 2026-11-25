@@ -375,14 +375,14 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	test.Parallel()
 	fixture := newMacBoxFixture(test, false)
 	// A package at the -race list's entry that names a run, so the races the script is handed carry it.
-	engine := raceGatedEntry(test, "internal/go_engine")
+	engine := raceGatedEntry(test, "internal/go_language")
 	worktree := fixture.worktree("a")
-	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_engine", "engine_test.go"),
+	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_language", "main_test.go"),
 		"package go_engine\n\nimport \"testing\"\n\nfunc TestEngine(test *testing.T) {}\n")
 	fixture.git(worktree, "add", ".")
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("an engine"))
 	fixture.reply("Sun2.run", macBoxPassing+boxRaceMarker+"\n"+
-		`{"Action":"pass","Package":"example.com/fixture/internal/go_engine"}`+"\n")
+		`{"Action":"pass","Package":"example.com/fixture/internal/go_language"}`+"\n")
 	landed, output, calls, _ := fixture.landing()
 	if !landed {
 		test.Fatalf("the landing did not land:\n%s", output)
@@ -400,8 +400,8 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	// The whole gate hands its box every package it lists, by import path, so the box shards go_engine's tests.
 	if fixture.git(fixture.repository, "rev-parse", commit+"^{tree}") !=
 		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" ||
-		races != "./internal/go_engine@"+engine.run || corpora != "-" ||
-		packages != "example.com/fixture/alpha example.com/fixture/internal/go_engine" {
+		races != "./internal/go_language@"+engine.run || corpora != "-" ||
+		packages != "example.com/fixture/alpha example.com/fixture/internal/go_language" {
 		test.Errorf("the script was handed commit %s, pin %q, races %q, corpora %q and packages %q", commit, pin,
 			races, corpora, packages)
 	}

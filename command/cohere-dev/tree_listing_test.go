@@ -14,7 +14,7 @@ import (
 
 // A change on main to a package land links, with command/cohere-dev left as it was, hands a landing from a branch
 // that lacks it to main's land, and names the package; a branch that holds it runs its own (#ehjasc6). Before,
-// only command/cohere-dev was compared, so after #j3bfnyt changed internal/go_engine/project every older branch
+// only command/cohere-dev was compared, so after #j3bfnyt changed internal/go_language/project every older branch
 // ran its own land and gated main's tree with code that refused it.
 //
 // The fixture is a module whose command/cohere-dev imports internal/gate, which imports internal/deeper, and

@@ -12,7 +12,7 @@ import (
 )
 
 // loadElsewhere loads the fixture with go/packages itself and gives FromLoaded its roots and analyzed variants as
-// the Go engine's load chooses them (internal/go_engine/load's analyzedOfGraph), here by ForTest, where Load
+// the Go engine's load chooses them (internal/go_language/load's analyzedOfGraph), here by ForTest, where Load
 // chooses by ID.
 func (fixture fixture) loadElsewhere(test *testing.T) *workspace.Workspace {
 	test.Helper()

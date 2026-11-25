@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_language/contract"
 )
 
 // An extra build loaded again reaches `--json` with each load's count checked from source, and a build under

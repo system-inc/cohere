@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
-	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_language/rules/marker"
 )
 
 // exampleOutput is how go/doc recognizes an Example's output block, `// Output:` or `// Unordered output:` in any case,

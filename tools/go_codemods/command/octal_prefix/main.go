@@ -24,7 +24,7 @@ import (
 	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_octal_prefix"
+	"github.com/system-inc/cohere/internal/go_language/rules/consistency_require_octal_prefix"
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"

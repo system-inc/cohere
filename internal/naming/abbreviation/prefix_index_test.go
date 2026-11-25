@@ -35,7 +35,7 @@ func TestFindAgreesWithThePrefixWalk(test *testing.T) {
 	if rootError != nil {
 		test.Fatal(rootError)
 	}
-	fixtureWords := wordsUnder(test, filepath.Join(root, "internal", "go_engine", "rules",
+	fixtureWords := wordsUnder(test, filepath.Join(root, "internal", "go_language", "rules",
 		"consistency_no_abbreviated_identifier", "testdata"), func(string) bool { return true })
 	// Fixtures that failed to read would agree with anything.
 	if len(fixtureWords) < 500 {
