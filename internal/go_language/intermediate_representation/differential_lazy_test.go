@@ -4,9 +4,9 @@ package intermediate_representation_test
 // shuffled order, one at a time and from many goroutines at once, against go/ir's eager build, naive and lifted.
 // Every function must come out as it does built eagerly, whatever was built first.
 //
-// COHERE_GO_IR_DIFFERENTIAL names the corpus as for the other differentials; COHERE_GO_IR_LAZY_SEEDS, a comma
-// list, the seeds (1,2,3 when unset); COHERE_GO_IR_LAZY_WORKERS, a comma list, the goroutine counts (1,8 when
-// unset). Run the concurrent half under -race to hold the builder's shared state to its guards.
+// The corpus is the other differentials'; COHERE_GO_IR_LAZY_SEEDS, a comma list, names the seeds (1,2,3 when unset);
+// COHERE_GO_IR_LAZY_WORKERS, a comma list, the goroutine counts (1,8 when unset). Run the concurrent half under -race
+// to hold the builder's shared state to its guards.
 
 import (
 	"fmt"
@@ -54,8 +54,7 @@ func differentialLazyNumbers(test *testing.T, variable string, fallback []uint64
 // runs on two threads.
 func TestLazyDifferential(test *testing.T) {
 	test.Parallel()
-	corpus := os.Getenv(differentialCorpusVariable)
-	units := differentialCorpusUnits(test, corpus)
+	units := differentialCorpusUnits(test)
 	seeds := differentialLazyNumbers(test, differentialLazySeedsVariable, []uint64{1, 2, 3})
 	for _, workerCount := range differentialLazyNumbers(test, differentialLazyWorkersVariable, []uint64{1, 8}) {
 		workers := int(workerCount)
@@ -67,7 +66,7 @@ func TestLazyDifferential(test *testing.T) {
 				naive = differentialMerge(naive, differentialCompareLazyUnit(test, unit, true, seed, workers))
 				lifted = differentialMerge(lifted, differentialCompareLazyUnit(test, unit, false, seed, workers))
 			}
-			name := fmt.Sprintf("lazy %s, seed %d, %d goroutines", differentialCorpusName(corpus), seed, workers)
+			name := fmt.Sprintf("lazy, seed %d, %d goroutines", seed, workers)
 			differentialReport(test, name+", naive", naive, time.Since(started))
 			differentialReport(test, name+", lifted", lifted, time.Since(started))
 		}
