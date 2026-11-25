@@ -276,7 +276,7 @@ type returnAwaitFinding struct {
 //
 // Cases whose repair upstream ships as a fix assert the rewritten file in TestReturnAwaitFixes
 // below. Cases whose repair is a suggestion are asserted separately, because the harness applies
-// fixes and not suggestions, and collapsing the two would have the edit engine rewriting which
+// fixes and not suggestions, and collapsing the two would have the fix pass rewriting which
 // frame catches a rejection.
 func TestReturnAwaitFires(test *testing.T) {
 	test.Parallel()
@@ -1165,7 +1165,7 @@ func TestReturnAwaitFixes(test *testing.T) {
 // Where the position affects error handling, upstream ships the same edit as a suggestion rather
 // than a fix, because adding or removing the await changes which frame catches a rejection. That
 // distinction is the whole safety property of this rule: shipping these as fixes would have the
-// edit engine silently rewriting control flow.
+// fix pass silently rewriting control flow.
 //
 // ExpectFixedSource cannot see a suggestion, so these rows assert that the finding carries a
 // suggestion and no fix, plus the suggestion text. A row that arrived as a fix would pass every
@@ -1312,7 +1312,7 @@ func TestReturnAwaitOffersSuggestionsRatherThanFixes(test *testing.T) {
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
 					test.Fatalf("finding %q carries a fix; upstream offers only a suggestion here, and a "+
-						"fix would let the engine rewrite control flow unattended", diagnostic.Message.Id)
+						"fix would let the linter rewrite control flow unattended", diagnostic.Message.Id)
 				}
 				for _, suggestion := range diagnostic.Suggestions {
 					got = append(got, suggestion.Message.Description)

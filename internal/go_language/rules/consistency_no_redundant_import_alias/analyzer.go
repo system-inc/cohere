@@ -1,4 +1,4 @@
-// Package consistency_no_redundant_import_alias is the Go engine's rule that an import is not renamed to the name it
+// Package consistency_no_redundant_import_alias is cohere-go's rule that an import is not renamed to the name it
 // already has.
 //
 // It is the Go form of ESLint core's no-useless-rename. Go has no destructuring, so the rename Go writes is the
@@ -36,7 +36,7 @@ var Analyzer = &analysis.Analyzer{
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It reads type information for the name in the imported
+// Rule is this rule's entry in cohere-go's registry. It reads type information for the name in the imported
 // package's own package clause.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 

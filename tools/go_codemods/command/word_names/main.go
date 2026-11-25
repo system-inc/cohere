@@ -1,11 +1,11 @@
 // Command wordnames expands the abbreviated words in the names of cohere's Go locals: `cfg` becomes
 // `configuration`, `srcPath` `sourcePath`, `cmd` `command`. The words, and where in a name each is judged,
 // come from policy/Abbreviations.json, read the way nexus/consistency-no-abbreviated-identifier reads it, so a
-// renamed local is one that rule no longer flags. Every rename goes through the rename engine, which refuses
+// renamed local is one that rule no longer flags. Every rename goes through global_rename, which refuses
 // any that would change what an identifier resolves to; after writing, the tree is reloaded and every
 // identifier's resolution compared. A local it cannot settle by itself is listed as a wave, and an
 // abbreviated name that is not a local is counted, never proposed. With -global it renames those names instead,
-// and the locals holding an advice-only word, through the global rename engine (global.go); with
+// and the locals holding an advice-only word, through global_rename (global.go); with
 // -rename-owned-spellings as well, the names spelling an upstream rule or an outside name (external.go).
 package main
 
@@ -60,7 +60,7 @@ func runCommandLine() int {
 	global := flag.Bool(
 		"global",
 		false,
-		"rename the flagged names that reach past one function, and the advice-word locals, through the global engine",
+		"rename the flagged names that reach past one function, and the advice-word locals, through global_rename",
 	)
 	tagEncodedFields := flag.Bool(
 		"tag-encoded-fields",
@@ -636,7 +636,7 @@ type localName struct {
 	outcome  string
 	// rule says what chose newName.
 	rule string
-	// alternatives are the qualified names to try, in order, when the engine refuses newName for a conflict.
+	// alternatives are the qualified names to try, in order, when global_rename refuses newName for a conflict.
 	alternatives []choice
 }
 
@@ -771,7 +771,7 @@ func houseInitialisms(name string) string {
 // lowerCamel lowers a name's first camel word whole, initialism or not: `ParsedCommandLine` is
 // `parsedCommandLine`, `URLPattern` `urlPattern`.
 // folderWords is a folder's name as the lowerCamel words of a Go name: a folder separates its words with
-// underscores (go_engine), and a Go name never does, so go_engine gives goEngine.
+// underscores (go_language), and a Go name never does, so go_language gives goLanguage.
 func folderWords(folder string) string {
 	words := strings.Split(folder, "_")
 	for index := 1; index < len(words); index++ {
@@ -936,7 +936,7 @@ func definitionsOf(info *types.Info, file *ast.File) (map[*types.Var]ast.Expr, m
 
 // planPackage finds every local in the editable files whose name the vocabulary flags, decides the name for
 // those it can, and counts the flagged names that are not locals. A proposed local carries the qualified
-// names to try if the engine refuses its name for a conflict.
+// names to try if global_rename refuses its name for a conflict.
 func planPackage(renamePackage rename.Package, vocabulary *vocabulary) ([]localName, []nonLocalName) {
 	var locals []localName
 	var nonLocals []nonLocalName
@@ -1043,7 +1043,7 @@ func planPackage(renamePackage rename.Package, vocabulary *vocabulary) ([]localN
 	return locals, nonLocals
 }
 
-// checkQualified runs the engine over every proposed local, and gives each one it refuses for a conflict its
+// checkQualified runs global_rename over every proposed local, and gives each one it refuses for a conflict its
 // next qualified name, round after round, until a round gives none a new name. It returns the last round's
 // plan, and for each accepted local the rule that chose its name.
 func checkQualified(renamePackage rename.Package, locals []localName) (rename.Plan, map[types.Object]string) {
@@ -1225,7 +1225,7 @@ func run(root string, vocabularyPath string, skips []string, dryRun bool) int {
 			fmt.Fprintf(streams.Output, "    %s: %d\n", strings.TrimPrefix(outcome, wavePrefix), outcomes[outcome])
 		}
 	}
-	fmt.Fprintf(streams.Output, "accepted by the engine: %d\n", len(acceptedByKey))
+	fmt.Fprintf(streams.Output, "accepted by global_rename: %d\n", len(acceptedByKey))
 	acceptedByRule := map[string]int{}
 	for _, accepted := range acceptedByKey {
 		acceptedByRule[accepted.rule]++
@@ -1233,7 +1233,7 @@ func run(root string, vocabularyPath string, skips []string, dryRun bool) int {
 	for _, rule := range sortedKeys(acceptedByRule) {
 		fmt.Fprintf(streams.Output, "  named by %s: %d\n", rule, acceptedByRule[rule])
 	}
-	fmt.Fprintf(streams.Output, "rejected by the engine: %d\n", len(allRejections))
+	fmt.Fprintf(streams.Output, "rejected by global_rename: %d\n", len(allRejections))
 	rejectedByReason := map[string]int{}
 	for _, rejection := range allRejections {
 		rejectedByReason[reasonClass(rejection.Reason)]++
@@ -1406,7 +1406,7 @@ func lineInContext(position token.Position, fileEdits []rename.Edit) (string, st
 	return strings.TrimSpace(line), strings.TrimSpace(rewritten)
 }
 
-// conflictKind finds the kind of object a conflict would resolve to in the engine's reason.
+// conflictKind finds the kind of object a conflict would resolve to in global_rename's reason.
 var conflictKind = regexp.MustCompile(`would resolve to (\S+) `)
 
 // reasonClass groups rejection reasons for counting, a conflict by the kind of object it would hit.

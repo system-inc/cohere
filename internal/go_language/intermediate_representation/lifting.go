@@ -33,7 +33,7 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
-// liftingOptions are how a test asks a Program's functions to be built. The zero value lifts, as the engine does.
+// liftingOptions are how a test asks a Program's functions to be built. The zero value lifts, as cohere-go does.
 type liftingOptions struct {
 	// unlifted builds every function as go/ir's NaiveForm does, for the differential against it.
 	unlifted bool

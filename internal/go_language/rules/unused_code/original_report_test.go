@@ -15,7 +15,7 @@ import (
 //
 // staticcheck's runner also merges the result across a package's variants, so a function only its tests call is not
 // reported from the build without them. This reports one variant at a time, as the port does, so that merge is the
-// engine's to make if it loads test variants.
+// checker's to make if it loads test variants.
 var originalReport = &analysis.Analyzer{
 	Name:     "unusedreport",
 	Doc:      "reports the unused code staticcheck's U1000 finds",

@@ -80,7 +80,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	}
 	typeScript := 0
 	for _, project := range found.Projects {
-		if project.Engine == engineTypeScript {
+		if project.Kind == projectKindTypeScriptProgram {
 			typeScript++
 		}
 	}
@@ -92,7 +92,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		// tsconfig that points at one discovery's walk did not find. Reading a tsconfig is milliseconds, and
 		// a byte search keeps ahra's run from paying even that.
 		for _, project := range found.Projects {
-			if project.Engine == engineTypeScript && !mentionsReferences(found.configurationPath(project)) {
+			if project.Kind == projectKindTypeScriptProgram && !mentionsReferences(found.configurationPath(project)) {
 				return decided, nil
 			}
 		}
@@ -101,7 +101,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	reads := readProjectConfigs(*found, found.Projects)
 	known := map[string]bool{}
 	for _, project := range found.Projects {
-		if project.Engine == engineTypeScript {
+		if project.Kind == projectKindTypeScriptProgram {
 			known[found.configurationPath(project)] = true
 		}
 	}
@@ -111,7 +111,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		var added []discoveredProject
 		for _, project := range queue {
 			read, isRead := reads[found.configurationPath(project)]
-			if project.Engine != engineTypeScript || !isRead || read.readError != nil {
+			if project.Kind != projectKindTypeScriptProgram || !isRead || read.readError != nil {
 				continue
 			}
 			for _, reference := range read.configuration.References {
@@ -139,7 +139,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	for _, project := range found.Projects {
 		if read, isRead := reads[found.configurationPath(
 			project,
-		)]; project.Engine == engineTypeScript && isRead && read.readError == nil &&
+		)]; project.Kind == projectKindTypeScriptProgram && isRead && read.readError == nil &&
 			len(read.configuration.FileNames) == 0 && len(read.configuration.References) > 0 {
 			decided.Solutions = append(decided.Solutions, projectLabel(project))
 			continue
@@ -152,7 +152,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	includers := map[string][]int{}
 	for index, project := range found.Projects {
 		read, isRead := reads[found.configurationPath(project)]
-		if project.Engine != engineTypeScript || !isRead || read.readError != nil {
+		if project.Kind != projectKindTypeScriptProgram || !isRead || read.readError != nil {
 			continue
 		}
 		for _, fileName := range read.configuration.FileNames {
@@ -165,7 +165,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	for index, project := range found.Projects {
 		if read, isRead := reads[found.configurationPath(
 			project,
-		)]; project.Engine == engineTypeScript && isRead && read.readError != nil {
+		)]; project.Kind == projectKindTypeScriptProgram && isRead && read.readError != nil {
 			unloaded = append(unloaded, index)
 		}
 	}
@@ -213,7 +213,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	// What each running project yields, files and format directories, and which share a directory.
 	cacheDirectories := map[string]bool{}
 	for index, project := range found.Projects {
-		if project.Engine != engineTypeScript {
+		if project.Kind != projectKindTypeScriptProgram {
 			continue
 		}
 		yield := projectYield{Files: runningYields[index]}
@@ -224,7 +224,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		} else {
 			cacheDirectories[directory] = true
 			for _, other := range found.Projects {
-				if other.Engine == engineTypeScript && isBelow(other.Directory, project.Directory) {
+				if other.Kind == projectKindTypeScriptProgram && isBelow(other.Directory, project.Directory) {
 					yield.Directories = append(
 						yield.Directories,
 						filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
@@ -255,7 +255,7 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 	var group sync.WaitGroup
 	reading := make(chan struct{}, discoveryParallelism)
 	for _, project := range projects {
-		if project.Engine != engineTypeScript {
+		if project.Kind != projectKindTypeScriptProgram {
 			continue
 		}
 		configurationFile := found.configurationPath(project)

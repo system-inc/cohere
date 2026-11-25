@@ -18,7 +18,7 @@
 // parity tests beside this file run both over the same packages and compare findings and fixes, and the differences
 // fixture pins each fix withheld.
 //
-// It sits on the engine's syntax dispatcher, entering each file and hearing each call within it on the walk the
+// It sits on cohere-go's syntax dispatcher, entering each file and hearing each call within it on the walk the
 // dispatcher makes once for every syntax rule.
 package string_int_conv
 

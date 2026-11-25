@@ -2,7 +2,7 @@
 // updates, run in a way that may outlive the iteration: by a goroutine, a deferred call or an errgroup.Group's Go in
 // the loop's last statement, or after t.Parallel in a subtest the loop's body starts. Before Go 1.22 every iteration
 // shares one variable, so such a literal may see a later iteration's value. From Go 1.22 each iteration declares its
-// own, so only a file whose Go version is older than go1.22 is judged. It sits on the engine's syntax dispatcher,
+// own, so only a file whose Go version is older than go1.22 is judged. It sits on cohere-go's syntax dispatcher,
 // hearing each loop on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/loopclosure/loopclosure.go, with

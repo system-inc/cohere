@@ -1,4 +1,4 @@
-// Package consistency_require_error_clause is the Go engine's rule that an error's text is a lowercase clause that
+// Package consistency_require_error_clause is cohere-go's rule that an error's text is a lowercase clause that
 // reads right after a caller wraps it.
 //
 // An error travels up through callers that each wrap it with what they were doing, so the line a reader finally sees
@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_error_clause", "
 	"A text that is not a string literal is not judged, and neither is whether the clause is a gerund, which cannot "+
 	"be told without a dictionary.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var capitalizedOpeningMessage = policy.MessageOf(Name, "capitalizedOpening")

@@ -13,7 +13,7 @@
 // worth a real answer.
 //
 // Measured on the ahra corpus of 2,682 distinct className literals plus 14 planted violations, the
-// gate takes 2,695 engine questions down to 735, losing no finding the ungated engine reports and
+// gate takes 2,695 Tailwind questions down to 735, losing no finding the ungated Tailwind reports and
 // inventing none. Planted violations rather than the tree alone, because the tree is very nearly
 // canonical and an approach that catches nothing is fast and correct on it.
 //
@@ -24,10 +24,10 @@
 // question implied.
 //
 // Shipping the 469 surviving literals to a Node sidecar and reading the answers back costs 0.4 to
-// 1.3ms of transport. The engine costs 3,300 to 4,100ms cold and roughly 500ms warm. The control
+// 1.3ms of transport. Tailwind costs 3,300 to 4,100ms cold and roughly 500ms warm. The control
 // that makes those numbers mean something is the same batch run in-process in Node, with no
 // boundary at all: 3,834ms cold, 506 to 595ms warm. Statistically identical. So the crossing
-// contributes about a millisecond to a ~3,800ms operation, and the engine costs what it costs
+// contributes about a millisecond to a ~3,800ms operation, and Tailwind costs what it costs
 // whether Go is asking or Node is asking itself.
 //
 // The lever is warmup, not the boundary. A cold run averages 3,909ms and a warm batch on an
@@ -51,7 +51,7 @@
 //
 // # The direction of error is not symmetric
 //
-// An over-approximation costs an engine call. An under-approximation loses a finding, silently, on
+// An over-approximation costs Tailwind call. An under-approximation loses a finding, silently, on
 // a tree that looks clean because the rule stopped looking. Three separate attempts at a cheaper
 // gate each lost real findings during the oxlint migration and each measured faster:
 //
@@ -59,7 +59,7 @@
 //     `l`, buckets it away from `border-r`, and stops reporting `border-x`.
 //   - Giving every static utility its own bucket separates `overflow-x-hidden` from
 //     `overflow-y-hidden` and stops reporting `overflow-hidden`.
-//   - Requiring two classes to declare the same CSS property family cuts engine calls by an order
+//   - Requiring two classes to declare the same CSS property family cuts Tailwind calls by an order
 //     of magnitude and stops reporting `w-8 h-8` into `size-8`, because a shorthand can absorb
 //     properties that share no name: `width` and `height` become `size`, `column-gap` and
 //     `row-gap` become `gap`.
@@ -136,7 +136,7 @@ type Variant struct {
 // this package ports resolves it by silently taking the first reading without recording why. That
 // made it worth checking rather than inheriting: over all 4,375 candidate pairs in the corpus, of
 // which 75 collapse, keying on the first reading loses none, and the order is stable across calls.
-// So the choice is safe, but it was verified against the engine, not assumed from the source it
+// So the choice is safe, but it was verified against Tailwind, not assumed from the source it
 // was ported from. See DeclaredValues for the static case.
 type Candidate struct {
 	Kind      CandidateKind
@@ -222,7 +222,7 @@ func (gate *Gate) computeGroupKey(className string) string {
 	}
 
 	// The first reading, deliberately. Tailwind returns readings in a stable order and the first is
-	// the one that preserves every collapse the engine finds, measured over all 4,375 candidate
+	// the one that preserves every collapse Tailwind finds, measured over all 4,375 candidate
 	// pairs in the real corpus, of which 75 collapse, with zero lost to this choice.
 	candidate := candidates[0]
 
@@ -247,7 +247,7 @@ func (gate *Gate) computeGroupKey(className string) string {
 //
 // A class that declares nothing gets a key carrying its own name rather than the empty string.
 // Without that, every class the compiler could not read would collide under one key and send each
-// other to the engine forever.
+// other to Tailwind forever.
 func (gate *Gate) declaredValuesKey(className string) string {
 	values := gate.parser.DeclaredValues(className)
 	if len(values) == 0 {
@@ -306,7 +306,7 @@ func valueKey(candidateValue Value) string {
 // CouldRewriteAlone reports whether a class might have a shorter spelling with no second class
 // involved.
 //
-// Two shapes do, and both are visible without asking the engine. An arbitrary value can have a
+// Two shapes do, and both are visible without asking Tailwind. An arbitrary value can have a
 // theme name: `z-[1]` is `z-1`, `w-[100%]` is `w-full`. A static can be renamed outright, which
 // Tailwind keeps in a table: `order-none` is `order-0`, `break-words` is `wrap-break-word`.
 //
@@ -327,7 +327,7 @@ func (gate *Gate) CouldRewriteAlone(className string) bool {
 
 // RecordSingleRewrites tells the gate which classes an authority confirmed rewrite on their own.
 //
-// The gate can see that `z-[1]` is worth asking about; only the engine can say that it is actually
+// The gate can see that `z-[1]` is worth asking about; only Tailwind can say that it is actually
 // `z-1`. Feeding the verdict back means a class is asked about once per process rather than once per
 // literal that contains it.
 func (gate *Gate) RecordSingleRewrites(classNames []string) {
@@ -356,10 +356,10 @@ func (gate *Gate) SingleClassesWorthChecking(classNames []string, alreadyChecked
 
 // CannotCollapse reports that no two of these classes share a bucket and none rewrites alone.
 //
-// When this is true the caller may skip the engine entirely. When it is false the caller must ask:
+// When this is true the caller may skip Tailwind entirely. When it is false the caller must ask:
 // the gate claims only that a collapse is possible, never that one exists.
 //
-// The asymmetry is the whole design. A false here costs one engine call. A true here that should
+// The asymmetry is the whole design. A false here costs one Tailwind call. A true here that should
 // have been false loses a finding on a tree that then looks clean, which is the failure this package
 // exists to prevent, so every doubtful case resolves to false.
 func (gate *Gate) CannotCollapse(classNames []string) bool {
@@ -380,15 +380,15 @@ func (gate *Gate) CannotCollapse(classNames []string) bool {
 	return true
 }
 
-// NeedsEngine is the gate's whole verdict for one literal: must this set of classes be asked about?
+// NeedsTailwind is the gate's whole verdict for one literal: must this set of classes be asked about?
 //
 // It runs the two tests in the order that matters. The bucket test is free and the singles test is
-// not, because on the first class it touches, the engine builds signature tables for the entire
+// not, because on the first class it touches, Tailwind builds signature tables for the entire
 // utility registry and costs about 1.8 seconds. Running the free test first means a file holding no
 // two classes in a shared bucket and no rewritable single never pays that at all.
 //
 // alreadyChecked carries singles the caller has resolved in this process; pass nil on a first call.
-func (gate *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) bool {
+func (gate *Gate) NeedsTailwind(classNames []string, alreadyChecked map[string]bool) bool {
 	checked := alreadyChecked
 	if checked == nil {
 		checked = map[string]bool{}
@@ -408,7 +408,7 @@ func (gate *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]boo
 // distinctPreservingOrder removes repeats without sorting.
 //
 // A repeated class is a different rule's finding, and passing it twice would confuse any
-// leave-one-out attribution the caller does with the engine's answer. Order is preserved so that a
+// leave-one-out attribution the caller does with Tailwind's answer. Order is preserved so that a
 // reported set reads in the order the author wrote it.
 func distinctPreservingOrder(classNames []string) []string {
 	seen := make(map[string]bool, len(classNames))

@@ -45,7 +45,7 @@ var messageDivRegex = rule.Message{
 // Upstream replaces the range `[start+1, start+2)` with `[=]`, which turns `/=foo/` into
 // `/[=]foo/`. A one-member character class matches exactly the character it names, so the pattern
 // accepts the same input before and after and there is no second valid answer to pick between.
-// That is what makes it a fix the engine may apply unattended rather than a suggestion needing an
+// That is what makes it a fix the fix pass may apply unattended rather than a suggestion needing an
 // author, and it is the same reasoning `no-regex-spaces` records for its own repair.
 //
 // The span of the finding is the whole literal including its flags, which upstream's corpus states

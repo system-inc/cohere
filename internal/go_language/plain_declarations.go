@@ -47,7 +47,7 @@ func (declarations *plainDeclarations) add(loaded *packages.Package) {
 	once, isOnce := stored.(*sync.Once)
 	if !isOnce {
 		// Invariant: add alone stores into added, and only a *sync.Once.
-		panic("go_engine: the plain declarations' adds hold something other than a *sync.Once")
+		panic("go_language: the plain declarations' adds hold something other than a *sync.Once")
 	}
 	once.Do(func() {
 		// A package added from its record needs no walk of its syntax.

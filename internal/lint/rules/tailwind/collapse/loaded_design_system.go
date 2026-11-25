@@ -15,7 +15,7 @@ type LoadedDesignSystem struct {
 	// EntryPoint is the stylesheet the load started from, absolute.
 	EntryPoint string
 
-	// TailwindVersion is the engine version the generated tables were produced against.
+	// TailwindVersion is the Tailwind version the generated tables were produced against.
 	//
 	// Carried so a mismatch between the tables and an upgraded `tailwindcss` is a loud failure
 	// rather than a subtly wrong sort. Nothing verifies it yet; #4q5dsn3 is where the sort starts
@@ -128,9 +128,9 @@ func (system *LoadedDesignSystem) HasUtility(root string, kind UtilityKind) bool
 
 // RepositoryStaticUtilityNames is every static utility the repository itself declares.
 //
-// Exposed for the upstream check, which compares the installed engine's registry against the
+// Exposed for the upstream check, which compares the installed Tailwind's registry against the
 // checked-in framework tables and must subtract the repository's own blocks first. Reading them from
-// `utilityRoots` rather than from the engine is what makes that subtraction exact: this is the set
+// `utilityRoots` rather than from Tailwind is what makes that subtraction exact: this is the set
 // `collectStylesheets` recorded while parsing the repository's `@utility` blocks, so it cannot
 // accidentally include a framework name.
 func (system *LoadedDesignSystem) RepositoryStaticUtilityNames() []string {

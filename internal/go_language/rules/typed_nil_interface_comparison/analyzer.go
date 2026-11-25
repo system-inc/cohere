@@ -1,7 +1,7 @@
 // Package typed_nil_interface_comparison is staticcheck's SA4023, an interface value compared with untyped nil where
 // the comparison can never come out true or always does: the value was made from a concrete value, or it is a result
-// of a function that never returns a nil interface but may return one holding a typed nil. It is ported onto the
-// engine's own intermediate representation and reports through the kit every port of staticcheck shares.
+// of a function that never returns a nil interface but may return one holding a typed nil. It is ported onto
+// cohere's own intermediate representation and reports through the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4023/sa4023.go, whose logic it keeps and
 // whose messages and related places it reports word for word, through staticcheck_report.Report and Related at the
@@ -9,10 +9,10 @@
 // asks report.HasRange, report.Ordinal and code.IsInTest, each the port of the one the original calls, proven against
 // it beside it. It reads what each function returns from return_nil_ness, the port of staticcheck's nilness facts,
 // which cross from every dependency, through the context, its listener requiring return_nil_ness, asks Flatten of the
-// engine's intermediate representation where the original asks irutil's, and asks golang.org/x/exp/typeparams and
+// checker's intermediate representation where the original asks irutil's, and asks golang.org/x/exp/typeparams and
 // honnef.co/go/tools/go/types/typeutil what the original asks them, public packages and not framework. Where the
 // original asks irutil.IsTrivial of the function a value came from, the port asks function_triviality, which answers
-// with the engine's IsTrivial through the fact resolver, so the answer is recorded with the bodies it read and the
+// with cohere-go's IsTrivial through the fact resolver, so the answer is recorded with the bodies it read and the
 // rule itself reads the body of no function but the one it judges.
 //
 // The original walks every source function of a package in one run but keeps nothing from one comparison to the next,
@@ -22,7 +22,7 @@
 // instantiations, so `any(value)` of a type parameter is flagged only when every type the parameter allows is
 // concrete (parity's genericAny and genericConcrete), and a generic function returning it is judged the same for
 // every instantiation (parity's generic). The original's second message, for a value made into the interface that
-// has no syntax to point a related place at, is kept, but no fixture reaches it: the engine's intermediate
+// has no syntax to point a related place at, is kept, but no fixture reaches it: cohere-go's intermediate
 // representation, like staticcheck's, gives every value it builds from source code a source, zero values, comma-ok
 // forms and range variables included (parity's zeroValues and madeFromOtherValues). The registry runs the port in the
 // original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
@@ -47,7 +47,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own with the nilness facts and the triviality of the package. It
 // requires return_nil_ness and function_triviality, whose results it reads.
 var Listener = rule.Listener{
@@ -80,7 +80,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4023",
 	"SA4023",
 	"Flags a comparison of an interface value with untyped nil that can never be true or is always true: "+
-		"staticcheck's SA4023, ported onto the engine's own intermediate representation.",
+		"staticcheck's SA4023, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 
@@ -192,7 +192,7 @@ func checkComparison(
 // trivialities, whose answer the fact resolver records with the bodies it read, so the rule reads no function's body
 // itself, and calls IsTrivial nowhere.
 //
-// A function another package declares is never read, and is not trivial. In the program the engine hands a rule,
+// A function another package declares is never read, and is not trivial. In the program cohere-go hands a rule,
 // another package's function is made from its types alone and has no syntax, which IsTrivial answers not trivial, and
 // function_triviality refuses at the same boundary where other packages do have their syntax, so the rule and the
 // kind agree in every program. A method of a type from a package this one never imports has no function in that

@@ -1,4 +1,4 @@
-// Package consistency_no_parameter_reassignment is the Go engine's rule that a parameter keeps the value its caller
+// Package consistency_no_parameter_reassignment is cohere-go's rule that a parameter keeps the value its caller
 // passed.
 //
 // A reader who sees a parameter used near the end of a function takes it for what the caller passed. An assignment
@@ -45,7 +45,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_parameter_reassignmen
 	"parameter[index], *parameter) is the caller's data and not judged here, a := in an inner scope is a new "+
 	"variable, and named results are left alone entirely, since assigning them is what Go names them for.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var parameterReassignedMessage = policy.MessageOf(Name, "parameterReassigned")

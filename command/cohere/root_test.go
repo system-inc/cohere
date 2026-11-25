@@ -160,7 +160,7 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(test *testing.T) {
 }
 
 // TestLocateProjectFindsSwiftPackages holds the second marker: the nearest directory holding either
-// marker is the root, and the marker decides the engine.
+// marker is the root, and the marker decides the child.
 //
 // The tree mirrors ahra's: a TypeScript root with a Swift package under `projects/`, a Swift package
 // vendored inside that one, and a TypeScript project inside a Swift package. Each case is one sentence
@@ -192,32 +192,32 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 		name       string
 		standingIn string
 		wantRoot   string
-		wantEngine projectEngine
+		wantKind   projectKind
 	}{
 		{
 			"a Swift package under a TypeScript root is the Swift package's",
 			filepath.Join(macos, "Sources", "App"),
 			macos,
-			engineSwift,
+			projectKindSwiftPackage,
 		},
-		{"the TypeScript root is still TypeScript's", root, root, engineTypeScript},
+		{"the TypeScript root is still TypeScript's", root, root, projectKindTypeScriptProgram},
 		{
 			"a vendored package is its own root",
 			filepath.Join(macos, "Vendor", "Term", "Sources"),
 			filepath.Join(macos, "Vendor", "Term"),
-			engineSwift,
+			projectKindSwiftPackage,
 		},
 		{
 			"a TypeScript project inside a Swift package is TypeScript's",
 			filepath.Join(macos, "web"),
 			filepath.Join(macos, "web"),
-			engineTypeScript,
+			projectKindTypeScriptProgram,
 		},
 		{
 			"a directory holding both markers is TypeScript's",
 			filepath.Join(root, "projects", "both"),
 			filepath.Join(root, "projects", "both"),
-			engineTypeScript,
+			projectKindTypeScriptProgram,
 		},
 	}
 	for _, testCase := range cases {
@@ -227,17 +227,17 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 			if locateProjectError != nil {
 				test.Fatal(locateProjectError)
 			}
-			if location.Root != testCase.wantRoot || location.Engine != testCase.wantEngine {
+			if location.Root != testCase.wantRoot || location.Kind != testCase.wantKind {
 				test.Errorf(
-					"root %s engine %s, want root %s engine %s",
+					"root %s kind %s, want root %s kind %s",
 					location.Root,
-					location.Engine,
+					location.Kind,
 					testCase.wantRoot,
-					testCase.wantEngine,
+					testCase.wantKind,
 				)
 			}
 			// A Swift root carries no tsconfig path, so nothing downstream can build a graph from one.
-			if location.Engine == engineSwift && location.ConfigFileName != "" {
+			if location.Kind == projectKindSwiftPackage && location.ConfigFileName != "" {
 				test.Errorf("a Swift root carried a tsconfig path: %s", location.ConfigFileName)
 			}
 			if location.LintConfigFileName != filepath.Join(testCase.wantRoot, "CohereSettings.json") {
@@ -254,8 +254,8 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 		if locateProjectError != nil {
 			test.Fatal(locateProjectError)
 		}
-		if location.Root != macos || location.Engine != engineSwift {
-			test.Errorf("stopped at a directory named like a marker: root %s engine %s", location.Root, location.Engine)
+		if location.Root != macos || location.Kind != projectKindSwiftPackage {
+			test.Errorf("stopped at a directory named like a marker: root %s kind %s", location.Root, location.Kind)
 		}
 	})
 
@@ -270,8 +270,8 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 		if locateProjectError != nil {
 			test.Fatal(locateProjectError)
 		}
-		if location.Root != macos || location.Engine != engineSwift {
-			test.Errorf("--directory at a Swift package: root %s engine %s", location.Root, location.Engine)
+		if location.Root != macos || location.Kind != projectKindSwiftPackage {
+			test.Errorf("--directory at a Swift package: root %s kind %s", location.Root, location.Kind)
 		}
 	})
 
@@ -286,11 +286,11 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 		if locateProjectError != nil {
 			test.Fatal(locateProjectError)
 		}
-		if location.Root != root || location.Engine != engineTypeScript {
+		if location.Root != root || location.Kind != projectKindTypeScriptProgram {
 			test.Errorf(
-				"an explicit tsconfig inside a Swift package: root %s engine %s",
+				"an explicit tsconfig inside a Swift package: root %s kind %s",
 				location.Root,
-				location.Engine,
+				location.Kind,
 			)
 		}
 	})
@@ -303,7 +303,7 @@ func TestLocateProjectFailsLoudlyOutsideAnyProject(test *testing.T) {
 	// test.TempDir is under the system temp directory, which has no tsconfig.json at or above it.
 	outside := test.TempDir()
 	for directory := outside; ; directory = filepath.Dir(directory) {
-		if _, found := engineAt(directory); found {
+		if _, found := kindAt(directory); found {
 			test.Skipf("%s holds a project marker, so there is no outside to test from", directory)
 		}
 		if filepath.Dir(directory) == directory {
@@ -324,10 +324,10 @@ func TestLocateProjectFailsLoudlyOutsideAnyProject(test *testing.T) {
 	}
 }
 
-// TestEngineAtRanksTheFourMarkers holds the order engineAt reads the markers in: TypeScript, then Swift, then
+// TestKindAtRanksTheFourMarkers holds the order kindAt reads the markers in: TypeScript, then Swift, then
 // Go, and a directory holding a go.work and a go.mod is one Go project, the workspace, even when a go.work
 // above it would use its module.
-func TestEngineAtRanksTheFourMarkers(test *testing.T) {
+func TestKindAtRanksTheFourMarkers(test *testing.T) {
 	test.Parallel()
 	root := newRepository(test, map[string]string{
 		"go.work":                      "go 1.24\n\nuse ./workspace-and-module\n",
@@ -343,18 +343,18 @@ func TestEngineAtRanksTheFourMarkers(test *testing.T) {
 		"module/go.mod":                "module example.com/module\n",
 	})
 	cases := []struct {
-		directory  string
-		wantEngine projectEngine
+		directory string
+		wantKind  projectKind
 	}{
-		{"all", engineTypeScript},
-		{"swift", engineSwift},
-		{"workspace-and-module", engineGo},
-		{"module", engineGo},
+		{"all", projectKindTypeScriptProgram},
+		{"swift", projectKindSwiftPackage},
+		{"workspace-and-module", projectKindGoModule},
+		{"module", projectKindGoModule},
 	}
 	for _, testCase := range cases {
-		engine, found := engineAt(filepath.Join(root, testCase.directory))
-		if !found || engine != testCase.wantEngine {
-			test.Errorf("%s: engine %q (found %v), want %s", testCase.directory, engine, found, testCase.wantEngine)
+		kind, found := kindAt(filepath.Join(root, testCase.directory))
+		if !found || kind != testCase.wantKind {
+			test.Errorf("%s: kind %q (found %v), want %s", testCase.directory, kind, found, testCase.wantKind)
 		}
 	}
 
@@ -367,9 +367,9 @@ func TestEngineAtRanksTheFourMarkers(test *testing.T) {
 	if locateProjectError != nil {
 		test.Fatal(locateProjectError)
 	}
-	if location.Root != workspaceAndModule || location.Engine != engineGo || location.ConfigFileName != "" {
-		test.Errorf("root %s engine %s tsconfig %q, want the workspace %s, Go, and no tsconfig",
-			location.Root, location.Engine, location.ConfigFileName, workspaceAndModule)
+	if location.Root != workspaceAndModule || location.Kind != projectKindGoModule || location.ConfigFileName != "" {
+		test.Errorf("root %s kind %s tsconfig %q, want the workspace %s, Go, and no tsconfig",
+			location.Root, location.Kind, location.ConfigFileName, workspaceAndModule)
 	}
 }
 
@@ -424,9 +424,9 @@ func TestLocateProjectWalksAGoModuleUpToItsWorkspace(test *testing.T) {
 			if locateProjectError != nil {
 				test.Fatal(locateProjectError)
 			}
-			if location.Root != testCase.wantRoot || location.Engine != engineGo {
-				test.Errorf("root %s engine %s, want root %s engine Go",
-					location.Root, location.Engine, testCase.wantRoot)
+			if location.Root != testCase.wantRoot || location.Kind != projectKindGoModule {
+				test.Errorf("root %s kind %s, want root %s kind GoModule",
+					location.Root, location.Kind, testCase.wantRoot)
 			}
 		})
 	}
@@ -441,8 +441,8 @@ func TestLocateProjectWalksAGoModuleUpToItsWorkspace(test *testing.T) {
 		if locateProjectError != nil {
 			test.Fatal(locateProjectError)
 		}
-		if location.Root != used || location.Engine != engineGo {
-			test.Errorf("root %s engine %s, want root %s engine Go", location.Root, location.Engine, used)
+		if location.Root != used || location.Kind != projectKindGoModule {
+			test.Errorf("root %s kind %s, want root %s kind GoModule", location.Root, location.Kind, used)
 		}
 	})
 }

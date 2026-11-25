@@ -1,4 +1,4 @@
-// Package testing_require_parallel is the Go engine's rule that a test runs in parallel unless it says why.
+// Package testing_require_parallel is cohere-go's rule that a test runs in parallel unless it says why.
 //
 // Parallel is the house default: cohere spreads its work over every core, and its tests are held to the same. A
 // serial test runs alone while its siblings wait, and the shared state that makes it serial is what the next reader
@@ -39,7 +39,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "testing_require_parallel", "Flags a 
 	"directly above it says why. A subtest whose function is not a literal or a function declared in the same "+
 	"package is not judged, because its body cannot be seen.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var notParallelMessage = policy.MessageOf(Name, "notParallel")
@@ -67,7 +67,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 	if state.indexes == nil {
 		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 		if !isIndexes {
-			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// Invariant: marker's result is always its Indexes, so another is a mistake in cohere-go, and the
 			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}

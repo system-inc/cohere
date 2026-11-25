@@ -71,14 +71,14 @@ const (
 	// VerdictFlowSyntax means the fixture needs a Flow parser.
 	VerdictFlowSyntax Verdict = "excluded: flow syntax"
 
-	// VerdictNotScored means a rule cohere ships owns this fixture but no rule engine was run.
+	// VerdictNotScored means a rule cohere ships owns this fixture but no rule run was run.
 	//
 	// This is the honest name for the state the harness is in today, and it is deliberately not
 	// folded into any decline. A decline says something about the fixture; this says something
 	// about the run. Collapsing it into `unreachable` would claim these fixtures cannot be scored,
 	// when in fact they are precisely the ones that can, and the addressable set going unmeasured
 	// is the single thing a reader most needs to see.
-	VerdictNotScored Verdict = "not scored: no rule engine run"
+	VerdictNotScored Verdict = "not scored: no rule run run"
 )
 
 // AllVerdicts is every category, in report order.

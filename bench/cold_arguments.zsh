@@ -1,11 +1,11 @@
-# cold_arguments prints, one to a line, the arguments quiet_machine.sh's cold and idle runs give cohere, for the engine
-# a run is narrowed to with --engine, or for the whole root when it is given none, and checking without fixing when its
+# cold_arguments prints, one to a line, the arguments quiet_machine.sh's cold and idle runs give cohere, for the cohere binary
+# a run is narrowed to with --project-kind, or for the whole root when it is given none, and checking without fixing when its
 # second argument is `true` (quiet_machine.sh's --no-fix).
 #
 # Every cold run reads nothing from and writes nothing to the project's caches (`--no-cache`). It still reads and
 # writes the Go standard library's entries in the system cache (`$COHERE_SYSTEM_CACHE`, or else the user cache
-# directory), which `--no-cache` leaves on, so only an engine's first cold run on a machine computes the standard
-# library, and every later one of that engine restores it. One narrowed to the Go engine also checks without fixing
+# directory), which `--no-cache` leaves on, so only a cohere's first cold run on a machine computes the standard
+# library, and every later one of that binary restores it. One narrowed to cohere-go also checks without fixing
 # (`--no-fix`): it is #pff7xhr's bar, which is a checking run's seconds, and a fixing run spends about 0.3s formatting
 # before its load (#jp0cqkk). A whole-root run fixes as it always has, so its records still compare with the baselines
 # taken that way. The arguments live here, apart from the benchmark, so a test runs them alone
@@ -22,7 +22,7 @@ build_arguments() {
 }
 
 # Both read their argument as ${1:-}: quiet_machine.sh runs under `set -u`, where reading an unset argument is an
-# error, and a whole-root run names no engine: a bare $1 failed after `--no-cache` was printed, so the cold runs
+# error, and a whole-root run names no cohere: a bare $1 failed after `--no-cache` was printed, so the cold runs
 # stayed cold only by the order of the two lines.
 cold_arguments() {
   print -r -- --no-cache

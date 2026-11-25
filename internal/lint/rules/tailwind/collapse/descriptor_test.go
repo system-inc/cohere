@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// The descriptor lookup, measured against readings the shipped engine produced.
+// The descriptor lookup, measured against readings the shipped Tailwind produced.
 //
 // The question this suite answers is not "does the code run" but "does the table plus the lookup
-// reproduce the engine", which is the claim the whole port rests on. So the fixture carries the
-// engine's parse alongside its reading: the candidate parser is a separate task (#bg0t9tb), and
-// feeding this suite the engine's own parse means a failure here is a failure of the descriptor
+// reproduce Tailwind", which is the claim the whole port rests on. So the fixture carries
+// Tailwind's parse alongside its reading: the candidate parser is a separate task (#bg0t9tb), and
+// feeding this suite Tailwind's own parse means a failure here is a failure of the descriptor
 // model rather than of two ports summed together.
 //
 // Counts print on success. A suite that ran twelve cases and a suite that ran eleven thousand are
@@ -68,12 +68,12 @@ func loadDescriptorFixtures(test *testing.T, name string) *descriptorFixtures {
 
 // parsed turns a fixture's recorded parse back into the type Lookup consumes.
 //
-// The fixture stores the engine's own field names rather than this package's, so the mapping is
+// The fixture stores Tailwind's own field names rather than this package's, so the mapping is
 // explicit here. That is deliberate: a fixture written in the port's vocabulary would agree with the
 // port by construction, and this one has to be able to disagree.
 //
 // It is also what keeps this suite measuring the descriptor model rather than the sum of two ports.
-// The candidate parser is a separate task, and feeding this suite the engine's parse means a failure
+// The candidate parser is a separate task, and feeding this suite Tailwind's parse means a failure
 // here is a failure of the table and the lookup.
 func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 	candidate := &ParsedCandidate{Root: one.Root, Property: one.Property, Raw: one.ClassName}
@@ -99,7 +99,7 @@ func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 		// on this corpus until the fixture recorded it.
 		candidate.Value = &ParsedValue{Kind: ParsedValueKindNamed, Value: one.Value, Fraction: one.Fraction}
 	case "arbitrary":
-		// The engine reports the annotation and the remaining text separately, and so does the
+		// Tailwind reports the annotation and the remaining text separately, and so does the
 		// parser, so they are carried across unjoined.
 		candidate.Value = &ParsedValue{Kind: ParsedValueKindArbitrary, Value: one.Value, DataType: one.DataType}
 	}
@@ -113,7 +113,7 @@ func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 	return candidate
 }
 
-func TestDescriptorLookupMatchesEngine(test *testing.T) {
+func TestDescriptorLookupMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	fixtures := loadDescriptorFixtures(test, "descriptor_fixtures.json")
 	table := testTable(test)
@@ -144,15 +144,15 @@ func TestDescriptorLookupMatchesEngine(test *testing.T) {
 			if descriptor, found := table.Descriptors[one.Root]; found && descriptor.PerDeclaration {
 				perDeclarationDeclined++
 			}
-			// Declining is the right answer for a class the engine also refuses. Declining a class
-			// the engine reads is a real gap, and it is reported rather than folded into the
+			// Declining is the right answer for a class Tailwind also refuses. Declining a class
+			// Tailwind reads is a real gap, and it is reported rather than folded into the
 			// agreement count, because a lookup that answered nothing would otherwise pass.
 			if one.Reading != nil {
 				descriptor, found := table.Descriptors[one.Root]
 				if !found || !descriptor.PerDeclaration {
 					mismatched++
 					if mismatched <= 20 {
-						test.Errorf("%s: lookup declined but engine read %v#%d",
+						test.Errorf("%s: lookup declined but Tailwind read %v#%d",
 							one.ClassName, one.Reading.Order, one.Reading.Count)
 					}
 				}
@@ -165,7 +165,7 @@ func TestDescriptorLookupMatchesEngine(test *testing.T) {
 			//
 			// The descriptor model answers "what does this root read for a value of this type", not
 			// "does this root accept this value". The corpus probes every root with every shape, so
-			// most of these are combinations no author would write and the engine declines:
+			// most of these are combinations no author would write and Tailwind declines:
 			// `-bg-conic-bold` parses and compiles to nothing. Scoring them would be measuring
 			// whether the table can predict a utility's own accept-list, which it never claimed to
 			// and which the `@utility` evaluator owns.
@@ -180,7 +180,7 @@ func TestDescriptorLookupMatchesEngine(test *testing.T) {
 		if !got.Equal(want) {
 			mismatched++
 			if mismatched <= 20 {
-				test.Errorf("%s (root %q, %s %q, modifier %s %q): read %v#%d, engine said %v#%d",
+				test.Errorf("%s (root %q, %s %q, modifier %s %q): read %v#%d, Tailwind said %v#%d",
 					one.ClassName, one.Root, one.ValueKind, one.Value, one.ModifierKind, one.ModifierValue,
 					got.Order, got.Count, want.Order, want.Count)
 			}
@@ -190,7 +190,7 @@ func TestDescriptorLookupMatchesEngine(test *testing.T) {
 	}
 
 	if mismatched > 0 {
-		test.Errorf("%d of %d cases disagreed with the engine", mismatched, len(fixtures.Cases))
+		test.Errorf("%d of %d cases disagreed with Tailwind", mismatched, len(fixtures.Cases))
 	}
 	scored := agreed + mismatched
 	test.Logf(
@@ -200,7 +200,7 @@ func TestDescriptorLookupMatchesEngine(test *testing.T) {
 		fixtures.Counts.Roots,
 		fixtures.Counts.ClassesConsidered,
 	)
-	test.Logf("  %d cases had no engine reading and were reported rather than scored", withoutReading)
+	test.Logf("  %d cases had no Tailwind reading and were reported rather than scored", withoutReading)
 	test.Logf(
 		"  %d lookups declined, of which %d on the %d per-declaration roots",
 		declined,
@@ -232,7 +232,7 @@ func countPerDeclaration(table *Table) int {
 	return count
 }
 
-// TestDescriptorLookupCoversEveryRoot asserts the table answers for every root the engine has,
+// TestDescriptorLookupCoversEveryRoot asserts the table answers for every root Tailwind has,
 // rather than for the ones the corpus happened to reach.
 func TestDescriptorLookupCoversEveryRoot(test *testing.T) {
 	test.Parallel()
@@ -406,7 +406,7 @@ func TestModifierIsThreeStates(test *testing.T) {
 		{Kind: ParsedModifierKindNamed, Value: "50"},
 		{Kind: ParsedModifierKindArbitrary, Value: "0.5"},
 		{Kind: ParsedModifierKindArbitrary, Value: "var(--a)"},
-		// An arbitrary modifier spelling a theme key is still an alpha: the engine does not consult
+		// An arbitrary modifier spelling a theme key is still an alpha: Tailwind does not consult
 		// the theme for a bracketed modifier.
 		{Kind: ParsedModifierKindArbitrary, Value: "none"},
 	} {

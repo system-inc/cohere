@@ -247,7 +247,7 @@ func TestNoUnnecessaryWhitespaceFixMatchesUpstream(test *testing.T) {
 // Every edit this rule proposes deletes whitespace and nothing else, and never the first character
 // of a separator between two classes, because those bytes are what `no-duplicate-classes` and
 // `enforce-consistent-class-order` edit in the same pass (class_tokens.go). A rewrite of the whole
-// literal produces the same text and claims every byte, and the engine then refuses one of the two.
+// literal produces the same text and claims every byte, and Tailwind then refuses one of the two.
 func TestWhitespaceFixClaimsNoClassByte(test *testing.T) {
 	test.Parallel()
 	source := `const element = <div className="  flex   items-center  gap-2 " />;`

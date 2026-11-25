@@ -87,7 +87,7 @@ type halfRun struct {
 }
 
 // requireHalvesFindAsTheWhole runs the rule over each package patterns name in directory twice, loaded apart: over the
-// whole package, as the engine runs it, and over a seeded half of its functions with nothing else built, and requires
+// whole package, as cohere-go runs it, and over a seeded half of its functions with nothing else built, and requires
 // the half's findings to be the whole run's in those functions. It requires that the half built nothing unrelated,
 // which is every function but the ones judged and the ones a static call leads to from them, since a question's
 // judgment reaches only along such calls, and that some function somewhere was left so. It returns each package's

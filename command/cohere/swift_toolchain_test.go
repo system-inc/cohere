@@ -1,6 +1,6 @@
 //go:build unix
 
-// Every run here goes through stand-in shell scripts for swift, xcrun and the engine, so the file builds on
+// Every run here goes through stand-in shell scripts for swift, xcrun and the child, so the file builds on
 // Unix, as projects_test.go does (#tejf9bc).
 
 package main
@@ -86,7 +86,7 @@ func readLogFile(test *testing.T, log string) string {
 }
 
 // A repository of several Swift packages asks `swift --version` once, in the run that starts the others, and
-// every engine in the tree, coverage queries and project runs alike, is handed that answer and the `swift`
+// every language in the tree, coverage queries and project runs alike, is handed that answer and the `swift`
 // xcrun named, rather than asking again (#nkk91tv). A value the caller's shell carries is never one of them:
 // only a process whose own parent published it may trust it, so a stale toolchain cannot reach a cache key.
 func TestAProcessTreeAsksTheSwiftToolchainOnce(test *testing.T) {
@@ -118,18 +118,18 @@ func TestAProcessTreeAsksTheSwiftToolchainOnce(test *testing.T) {
 	lines := strings.Split(strings.TrimSpace(readLogFile(test, seen)), "\n")
 	want := fakeSwiftVersion + " Target: arm64-apple-macosx |" + filepath.Join(toolchain, "swift")
 	if len(lines) < 4 {
-		test.Fatalf("the engine ran %d times, want the 4 coverage queries and the 2 checks:\n%s", len(lines), output)
+		test.Fatalf("the child ran %d times, want the 4 coverage queries and the 2 checks:\n%s", len(lines), output)
 	}
 	for _, line := range lines {
 		if strings.TrimSpace(line) != strings.TrimSpace(want) {
-			test.Errorf("an engine was handed %q, want the tree's one answer %q", line, want)
+			test.Errorf("a child was handed %q, want the tree's one answer %q", line, want)
 		}
 	}
 }
 
-// A run trusts an engine and a toolchain it inherits only from its own parent: given them by the process that
-// started it, it runs that engine and asks nothing; given the same values by anyone else, it drops them and
-// resolves its own, here through a `swift` that does not answer, so the engine it was handed never runs.
+// A run trusts a child and a toolchain it inherits only from its own parent: given them by the process that
+// started it, it runs that cohere-swift and asks nothing; given the same values by anyone else, it drops them and
+// resolves its own, here through a `swift` that does not answer, so the child it was handed never runs.
 func TestARunTrustsAnInheritedSwiftEngineOnlyFromItsParent(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -157,13 +157,19 @@ func TestARunTrustsAnInheritedSwiftEngineOnlyFromItsParent(test *testing.T) {
 			ran := readLogFile(test, log) != ""
 			if trust.trusted {
 				if exitCode != 0 || !ran || readLogFile(test, asked) != "" {
-					test.Errorf("a run did not take the engine and toolchain its parent resolved "+
-						"(exit %d, engine ran %t, asked %q):\n%s", exitCode, ran, readLogFile(test, asked), output)
+					test.Errorf(
+						"a run did not take the child and toolchain its parent resolved "+
+							"(exit %d, cohere-swift ran %t, asked %q):\n%s",
+						exitCode,
+						ran,
+						readLogFile(test, asked),
+						output,
+					)
 				}
 				return
 			}
 			if exitCode == 0 || ran {
-				test.Errorf("a run took an engine its parent did not resolve (exit %d, engine ran %t):\n%s",
+				test.Errorf("a run took a child its parent did not resolve (exit %d, cohere-swift ran %t):\n%s",
 					exitCode, ran, output)
 			}
 		})

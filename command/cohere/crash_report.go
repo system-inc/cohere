@@ -32,7 +32,7 @@ func printCrash(out *bufio.Writer, crash runCrash) {
 	}
 }
 
-// printCrashGroups names a run's crashes in the human view, for every engine. `--verbose` names each crash
+// printCrashGroups names a run's crashes in the human view, for every language. `--verbose` names each crash
 // on its own line in its coverage notes, and printing these as well would say every crash twice; `--json`
 // lists them in the summary's gaps.
 func printCrashGroups(out *bufio.Writer, crashes []runCrash) {

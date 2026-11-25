@@ -1,6 +1,6 @@
 //go:build unix
 
-// Every project here is checked through a stand-in Swift engine, a /bin/sh script, so the file builds on
+// Every project here is checked through a stand-in cohere-swift, a /bin/sh script, so the file builds on
 // Unix, as swift_engine_test.go does (#tejf9bc).
 
 package main
@@ -19,7 +19,7 @@ import (
 // mixedRepository writes a repository holding a TypeScript program at its root and a Swift package below
 // it, the shape a run from the root checks both of (#f9nftxz).
 //
-// Its files are in the house format, since a run formats them and the Swift engine refuses --no-format
+// Its files are in the house format, since a run formats them and cohere-swift refuses --no-format
 // (#nqb3mjv), so these runs check formatting too.
 func mixedRepository(test *testing.T, swiftDirectory string) string {
 	test.Helper()
@@ -37,7 +37,7 @@ func mixedRepository(test *testing.T, swiftDirectory string) string {
 }
 
 // outsideAnyRepository removes a fixture's `.git`, so a test can hold discovery to what it does inside one: the
-// Swift no project claims is a scripts-only root's either way, since the engine walks by the tree's own ignore files
+// Swift no project claims is a scripts-only root's either way, since the child walks by the tree's own ignore files
 // outside a repository (#13nbb1s).
 func outsideAnyRepository(test *testing.T, root string) string {
 	test.Helper()
@@ -48,7 +48,7 @@ func outsideAnyRepository(test *testing.T, root string) string {
 }
 
 // A mixed repository is checked whole from its root: each project in its own section under its own
-// engine, one line per project, and one summary. The run is green only when both are, a Swift finding
+// child, one line per project, and one summary. The run is green only when both are, a Swift finding
 // turns it red, and its exit code is the one the failing project's own run gives.
 func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(test *testing.T) {
 	test.Parallel()
@@ -57,7 +57,7 @@ func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(test *testing.T) {
 	findings := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Findings.jsonl")+"\nexit 1")
 
 	root := mixedRepository(test, "apple/Toy")
-	output, exitCode := runWithEngine(test, binary, clean, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, clean, root, "--no-fix")
 	if exitCode != 0 {
 		test.Fatalf("a clean mixed repository exited %d:\n%s", exitCode, output)
 	}
@@ -73,8 +73,8 @@ func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(test *testing.T) {
 		}
 	}
 
-	output, exitCode = runWithEngine(test, binary, findings, root, "--no-fix")
-	_, alone := runWithEngine(
+	output, exitCode = runWithSwiftBinary(test, binary, findings, root, "--no-fix")
+	_, alone := runWithSwiftBinary(
 		test,
 		binary,
 		findings,
@@ -99,7 +99,7 @@ func TestAMixedRepositoryIsCheckedWholeAndTheWorstExitWins(test *testing.T) {
 	}
 }
 
-// Both markers in one directory are two projects, each checked by its own engine; and projects nested two
+// Both markers in one directory are two projects, each checked by its own child; and projects nested two
 // levels down are found from the root.
 func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(test *testing.T) {
 	test.Parallel()
@@ -107,11 +107,15 @@ func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(test *test
 	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
 
 	together := mixedRepository(test, ".")
-	output, exitCode := runWithEngine(test, binary, clean, together, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, clean, together, "--no-fix")
 	if exitCode != 0 ||
 		!strings.Contains(output, "== . (TypeScript) ==") ||
 		!strings.Contains(output, "== . (Swift) ==") {
-		test.Fatalf("a directory holding both markers was not checked by both engines (exit %d):\n%s", exitCode, output)
+		test.Fatalf(
+			"a directory holding both markers was not checked by both languages (exit %d):\n%s",
+			exitCode,
+			output,
+		)
 	}
 
 	deep := newRepository(test, nil)
@@ -125,7 +129,7 @@ func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(test *test
 		filepath.Join(deep, "apple", "Toy"),
 		map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"},
 	)
-	output, exitCode = runWithEngine(test, binary, clean, deep, "--no-fix")
+	output, exitCode = runWithSwiftBinary(test, binary, clean, deep, "--no-fix")
 	if exitCode != 0 ||
 		!strings.Contains(output, "== apple/Toy (Swift) ==") ||
 		!strings.Contains(output, "== web/app (TypeScript) ==") {
@@ -133,28 +137,28 @@ func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(test *test
 	}
 }
 
-// A project whose run fails without a verdict, here an engine that dies before reporting, fails the run
+// A project whose run fails without a verdict, here a child that dies before reporting, fails the run
 // from the root; and a root holding no project at all fails loudly rather than passing over nothing.
 func TestACrashedProjectOrNoProjectFailsTheRun(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	crashed := fakeSwiftEngine(test, "exit 2")
 	root := mixedRepository(test, "apple/Toy")
-	output, exitCode := runWithEngine(test, binary, crashed, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, crashed, root, "--no-fix")
 	if exitCode == 0 || !strings.Contains(output, "apple/Toy (Swift): failed") {
-		test.Fatalf("a Swift engine that died passed the run (exit %d):\n%s", exitCode, output)
+		test.Fatalf("cohere-swift that died passed the run (exit %d):\n%s", exitCode, output)
 	}
 
 	empty := newRepository(test, map[string]string{"README.md": "nothing to check\n"})
-	output, exitCode = runWithEngine(test, binary, crashed, empty)
+	output, exitCode = runWithSwiftBinary(test, binary, crashed, empty)
 	if exitCode == 0 || !strings.Contains(output, "no project here to check") {
 		test.Fatalf("a repository with no project passed (exit %d):\n%s", exitCode, output)
 	}
 }
 
-// Under --format-only a Swift package runs in the engine's own format-only mode (#nqb3mjv, c024df4b): the
-// engine gets --format-only, its types and lint skipped as not requested are no gap, and its format finding
-// fails the run, beside a TypeScript program and in the package alone. Before, the engine had no such mode,
+// Under --format-only a Swift package runs in the child's own format-only mode (#nqb3mjv, c024df4b): the
+// child gets --format-only, its types and lint skipped as not requested are no gap, and its format finding
+// fails the run, beside a TypeScript program and in the package alone. Before, the child had no such mode,
 // so the package was skipped with its gap named, and the flag against it alone was refused.
 func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 	test.Parallel()
@@ -166,7 +170,7 @@ func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 	)
 	root := mixedRepository(test, "apple/Toy")
 
-	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix", "--format-only")
+	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix", "--format-only")
 	if exitCode == 0 ||
 		!strings.Contains(output, "apple/Toy (Swift): failed, exit") ||
 		!strings.Contains(output, "  . (TypeScript): green") ||
@@ -181,7 +185,7 @@ func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 		test.Errorf("the run counted types or lint skipped as not requested as a gap:\n%s", output)
 	}
 
-	output, alone := runWithEngine(
+	output, alone := runWithSwiftBinary(
 		test,
 		binary,
 		engine,
@@ -207,11 +211,11 @@ func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
 		if !strings.Contains(" "+line+" ", " --no-fix ") || !strings.Contains(" "+line+" ", " --format-only ") {
-			test.Errorf("the engine was run without --no-fix --format-only: %q", line)
+			test.Errorf("the child was run without --no-fix --format-only: %q", line)
 		}
 	}
 	if count := len(strings.Split(strings.TrimSpace(string(logged)), "\n")); count != 2 {
-		test.Errorf("the engine ran %d times, want twice:\n%s", count, logged)
+		test.Errorf("the child ran %d times, want twice:\n%s", count, logged)
 	}
 }
 
@@ -230,7 +234,7 @@ func coveringRepository(test *testing.T) string {
 	return root
 }
 
-// coveringSwiftEngine is a stand-in engine for coveringRepository. It logs every command line to the file
+// coveringSwiftEngine is a stand-in cohere-swift for coveringRepository. It logs every command line to the file
 // it returns, answers `--covered-packages` with coverage, and otherwise runs check: both shell, with the
 // `--root` it was given in $root. A check run reports Lib's findings from Lib's own run and from the root's,
 // which checks Lib too, so a test can count how often they appear.
@@ -252,10 +256,10 @@ func coveringSwiftEngine(test *testing.T, coverage string) (string, string) {
 	return engine, log
 }
 
-// coverageAnswerThrough is the shell that answers `--covered-packages` the way the engine does for coveringRepository:
+// coverageAnswerThrough is the shell that answers `--covered-packages` the way the child does for coveringRepository:
 // each package checks itself, the root checks Lib as well and vendors Third, and Sim is in neither list.
 // Paths are printed through alias, a symbolic link to the repository, so the front door must resolve links
-// on both sides to match them, as it must for the engine's `/tmp` against its own `/private/tmp`.
+// on both sides to match them, as it must for the child's `/tmp` against its own `/private/tmp`.
 func coverageAnswerThrough(repository string, alias string, provenance string) string {
 	return "real=$(cd \"$root\" && pwd -P); base=$(cd '" +
 		repository +
@@ -290,7 +294,7 @@ func TestASwiftPackageAnotherRunCoversIsNotCheckedTwice(test *testing.T) {
 		coverageAnswerThrough(root, alias, filepath.Join(contractDirectory(test), "Clean.jsonl")),
 	)
 
-	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
 	if exitCode == 0 {
 		test.Errorf("the root's findings, Lib's among them, did not fail the run:\n%s", output)
 	}
@@ -319,12 +323,12 @@ func TestASwiftPackageAnotherRunCoversIsNotCheckedTwice(test *testing.T) {
 		test.Fatal(readError)
 	}
 	if count := strings.Count(string(logged), "--covered-packages"); count != 4 {
-		test.Errorf("the engine was asked its coverage %d times, want once per package, 4:\n%s", count, logged)
+		test.Errorf("the child was asked its coverage %d times, want once per package, 4:\n%s", count, logged)
 	}
 }
 
 // A coverage query that fails derives nothing: every package runs, the dependency's findings counted twice,
-// which is visible, rather than a package hidden, which is not, and the failure is named with the engine's
+// which is visible, rather than a package hidden, which is not, and the failure is named with the child's
 // reason.
 func TestAFailedCoverageQueryRunsEveryPackageAndSaysSo(test *testing.T) {
 	test.Parallel()
@@ -332,14 +336,14 @@ func TestAFailedCoverageQueryRunsEveryPackageAndSaysSo(test *testing.T) {
 	root := coveringRepository(test)
 	engine, _ := coveringSwiftEngine(test, "echo 'cohere-swift: the manifest would not load' >&2; exit 2")
 
-	output, _ := runWithEngine(test, binary, engine, root, "--no-fix")
+	output, _ := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
 	for _, want := range []string{
 		"== . (Swift) ==",
 		"== Libraries/Lib (Swift) ==",
 		"== Tools/Sim (Swift) ==",
 		"== Vendor/Third (Swift) ==",
 		"projects: 4 checked (4 Swift)",
-		".: the Swift coverage query failed, so every package it might check runs as its own project too: the engine exited 2: cohere-swift: the manifest would not load",
+		".: the Swift coverage query failed, so every package it might check runs as its own project too: the child exited 2: cohere-swift: the manifest would not load",
 		// Said on the verdict line too, which every view prints, since notes are --verbose's alone.
 		"⚠ 4 Swift coverage queries failed, so some files may be counted twice",
 	} {
@@ -355,7 +359,7 @@ func TestAFailedCoverageQueryRunsEveryPackageAndSaysSo(test *testing.T) {
 	}
 }
 
-// One Swift package has nothing to share, so the engine is never asked its coverage, and the run is the one
+// One Swift package has nothing to share, so the child is never asked its coverage, and the run is the one
 // it was before.
 func TestOneSwiftPackageAsksNoCoverage(test *testing.T) {
 	test.Parallel()
@@ -363,7 +367,7 @@ func TestOneSwiftPackageAsksNoCoverage(test *testing.T) {
 	engine, log := coveringSwiftEngine(test, "echo 'asked' >&2; exit 2")
 	root := mixedRepository(test, "apple/Toy")
 
-	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
 	if exitCode != 0 || !strings.Contains(output, "projects: 2 checked (1 TypeScript, 1 Swift), every one green") {
 		test.Errorf("a repository with one Swift package did not run as it did (exit %d):\n%s", exitCode, output)
 	}
@@ -372,7 +376,7 @@ func TestOneSwiftPackageAsksNoCoverage(test *testing.T) {
 		test.Fatal(readError)
 	}
 	if strings.Contains(string(logged), "--covered-packages") || !strings.Contains(string(logged), "--root") {
-		test.Errorf("want one check run and no coverage query, the engine was run with:\n%s", logged)
+		test.Errorf("want one check run and no coverage query, the child was run with:\n%s", logged)
 	}
 }
 
@@ -398,7 +402,7 @@ func TestSwiftNoPackageHoldsIsAScriptsOnlyRootsInOrOutOfARepository(test *testin
 				"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
 					"\\\"checked\\\":[\\\"$root\\\"],\\\"vendored\\\":[]}\"\nexit 0")
 
-			output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+			output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
 			if exitCode != 0 {
 				test.Errorf("a clean repository with an app's Swift exited %d, want 0:\n%s", exitCode, output)
 			}
@@ -429,7 +433,7 @@ func TestSwiftACoveredPackageHoldsIsNoGap(test *testing.T) {
 		"\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
 		"exit 0")
 
-	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
 	if exitCode != 0 || !strings.Contains(output, "B not run: checked as part of A") {
 		test.Fatalf("A's run did not cover B, so this does not test a covered package (exit %d):\n%s", exitCode, output)
 	}
@@ -465,7 +469,7 @@ func TestSwiftIgnoredOrInADependencyGivesNoScriptsOnlyRoot(test *testing.T) {
 				if discoverProjectsError != nil {
 					test.Fatal(discoverProjectsError)
 				}
-				return slices.Contains(found.Projects, discoveredProject{Directory: ".", Engine: engineSwift})
+				return slices.Contains(found.Projects, discoveredProject{Directory: ".", Kind: projectKindSwiftPackage})
 			}
 			if scriptsRoot() {
 				test.Errorf("Swift nobody expects checked gave the root a scripts-only Swift run")
@@ -502,8 +506,8 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"CapturePhone/App/App.swift": "let app = 1\n",
 			},
 			projects: []discoveredProject{
-				{Directory: ".", Engine: engineSwift},
-				{Directory: "CapturePhone", Engine: engineSwift},
+				{Directory: ".", Kind: projectKindSwiftPackage},
+				{Directory: "CapturePhone", Kind: projectKindSwiftPackage},
 			},
 		},
 		{
@@ -515,7 +519,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Docs/README.md":        "not Swift\n",
 				"Alone/project.yml":     "name: Alone\n",
 			},
-			projects: []discoveredProject{{Directory: ".", Engine: engineSwift}},
+			projects: []discoveredProject{{Directory: ".", Kind: projectKindSwiftPackage}},
 		},
 		{
 			name: "two .xcodeproj, or a workspace alone, is no candidate",
@@ -526,7 +530,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Work/App.xcworkspace/contents.xcworkspace": "<Workspace/>\n",
 				"Work/Work.swift":                           "let work = 1\n",
 			},
-			projects: []discoveredProject{{Directory: ".", Engine: engineSwift}},
+			projects: []discoveredProject{{Directory: ".", Kind: projectKindSwiftPackage}},
 		},
 		{
 			name: "Package.swift beside project.yml is the package alone",
@@ -536,10 +540,10 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Lib/Single.xcodeproj/file": "// one\n",
 				"Lib/Sources/Lib/Lib.swift": "let lib = 1\n",
 			},
-			projects: []discoveredProject{{Directory: "Lib", Engine: engineSwift}},
+			projects: []discoveredProject{{Directory: "Lib", Kind: projectKindSwiftPackage}},
 		},
 		{
-			// The engine reads a Package.swift first wherever it is, so one the root's ignorePatterns refuse
+			// The child reads a Package.swift first wherever it is, so one the root's ignorePatterns refuse
 			// leaves no Xcode project to run beside it, and its directory's Swift is claimed by nothing.
 			name: "Package.swift refused beside project.yml leaves no Xcode project",
 			files: map[string]string{
@@ -548,7 +552,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Lib/Sources/Lib/Lib.swift": "let lib = 1\n",
 			},
 			ignorePatterns: []string{"Lib/Package.swift"},
-			projects:       []discoveredProject{{Directory: ".", Engine: engineSwift}},
+			projects:       []discoveredProject{{Directory: ".", Kind: projectKindSwiftPackage}},
 			refused:        []string{"Lib/Package.swift"},
 		},
 		{
@@ -557,7 +561,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"App/project.yml":       "name: App\n",
 				"App/Sources/App.swift": "let app = 1\n",
 			},
-			projects: []discoveredProject{{Directory: "App", Engine: engineSwift}},
+			projects: []discoveredProject{{Directory: "App", Kind: projectKindSwiftPackage}},
 		},
 		{
 			name: "nested markers each claim their nearest files",
@@ -570,9 +574,9 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Outer/Kit/Sources/Kit/Kit.swift":             "let kit = 1\n",
 			},
 			projects: []discoveredProject{
-				{Directory: "Outer", Engine: engineSwift},
-				{Directory: "Outer/Inner", Engine: engineSwift},
-				{Directory: "Outer/Kit", Engine: engineSwift},
+				{Directory: "Outer", Kind: projectKindSwiftPackage},
+				{Directory: "Outer/Inner", Kind: projectKindSwiftPackage},
+				{Directory: "Outer/Kit", Kind: projectKindSwiftPackage},
 			},
 		},
 		{
@@ -582,7 +586,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Refused/App.swift":   "let app = 1\n",
 			},
 			ignorePatterns: []string{"Refused/project.yml"},
-			projects:       []discoveredProject{{Directory: ".", Engine: engineSwift}},
+			projects:       []discoveredProject{{Directory: ".", Kind: projectKindSwiftPackage}},
 			refused:        []string{"Refused/project.yml"},
 		},
 	} {
@@ -606,7 +610,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 }
 
 // The Swift no project claims is a Swift project of its own at the root, a scripts-only root, inside a repository
-// or not (#wpd36zj, #13nbb1s): the engine checks each standalone script there alone, as `swift <file>` runs it, and
+// or not (#wpd36zj, #13nbb1s): the child checks each standalone script there alone, as `swift <file>` runs it, and
 // names every other file. A package's own files stay its own.
 func TestUnclaimedSwiftIsAScriptsOnlyRootInOrOutOfARepository(test *testing.T) {
 	test.Parallel()
@@ -625,7 +629,10 @@ func TestUnclaimedSwiftIsAScriptsOnlyRootInOrOutOfARepository(test *testing.T) {
 			if discoverProjectsError != nil {
 				test.Fatal(discoverProjectsError)
 			}
-			want := []discoveredProject{{Directory: ".", Engine: engineSwift}, {Directory: "Kit", Engine: engineSwift}}
+			want := []discoveredProject{
+				{Directory: ".", Kind: projectKindSwiftPackage},
+				{Directory: "Kit", Kind: projectKindSwiftPackage},
+			}
 			if !reflect.DeepEqual(found.Projects, want) {
 				test.Errorf("found the projects %+v, want %+v", found.Projects, want)
 			}
@@ -634,7 +641,7 @@ func TestUnclaimedSwiftIsAScriptsOnlyRootInOrOutOfARepository(test *testing.T) {
 }
 
 // ahra's shape: a TypeScript program at the root, a package below it, and a script under no Swift project. The
-// script's Swift run is the engine's at the repository's root, through the --directory and engine a discovered
+// script's Swift run is the child's at the repository's root, through the --directory and kind a discovered
 // project's run is given, labelled beside the TypeScript project there (#wpd36zj).
 func TestAScriptsOnlyRootRunsTheSwiftEngineAtTheRepositoryRoot(test *testing.T) {
 	test.Parallel()
@@ -644,7 +651,7 @@ func TestAScriptsOnlyRootRunsTheSwiftEngineAtTheRepositoryRoot(test *testing.T) 
 	engine, log := coveringSwiftEngine(test, "echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
 		"\\\"checked\\\":[\\\"$root\\\"],\\\"vendored\\\":[]}\"\nexit 0")
 
-	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
 	if exitCode != 0 {
 		test.Errorf("a clean repository with a script exited %d, want 0:\n%s", exitCode, output)
 	}
@@ -668,7 +675,7 @@ func TestAScriptsOnlyRootRunsTheSwiftEngineAtTheRepositoryRoot(test *testing.T) 
 		}
 	}
 	if !checkedAtRoot {
-		test.Errorf("no check run's --root is the repository's root %s; the engine was run with:\n%s", root, logged)
+		test.Errorf("no check run's --root is the repository's root %s; the child was run with:\n%s", root, logged)
 	}
 }
 
@@ -693,7 +700,7 @@ func xcodeRepository(test *testing.T) string {
 	return root
 }
 
-// xcodeSwiftEngine is a stand-in engine for xcodeRepository, with the root's check stream given. It answers
+// xcodeSwiftEngine is a stand-in cohere-swift for xcodeRepository, with the root's check stream given. It answers
 // `--covered-packages` with each root checking itself and the root checking Libraries/Lib as well, and logs
 // each check run's root, resolved, and the yield its run was handed, to the file it returns.
 func xcodeSwiftEngine(test *testing.T, rootStream string) (string, string) {
@@ -730,7 +737,7 @@ func xcodeSwiftEngine(test *testing.T, rootStream string) (string, string) {
 // In ahraos-presence's shape, CapturePhone runs as its own Swift project and the root's run yields it and
 // Tools/Sim, the Swift projects running below it, and not Libraries/Lib, which it checks itself, nor web/,
 // which only the TypeScript project in the same directory yields. So the root's notes stop naming their files
-// as checked by nothing, though the engine spells them through a symbolic link; what remains for a reason
+// as checked by nothing, though the child spells them through a symbolic link; what remains for a reason
 // nobody expects is the root run's gap, on its footer and under --json; and the run is green (#ybspptb).
 func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *testing.T) {
 	test.Parallel()
@@ -746,7 +753,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		{alias + "/Tools/Sim/Package.swift", "a package manifest"},
 		{alias + "/Tools/Sim/Sources/Toy/Toy.swift", "no target of this package compiles it"},
 		{alias + "/Stray/Leftover.swift", declarationsOnlyReason},
-		{alias + "/Stray/odd.swift", "a reason no engine has given yet"},
+		{alias + "/Stray/odd.swift", "a reason no child has given yet"},
 		{alias + "/Package.swift", "a package manifest"},
 		{alias + "/Vendor/Kit/Kit.swift", "vendored under Vendor/"},
 		{alias + "/Scratch.swift", "ignored by git"},
@@ -757,7 +764,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 	}
 	engine, log := xcodeSwiftEngine(test, rootStream)
 
-	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+	output, exitCode := runWithSwiftBinary(test, binary, engine, root, "--no-fix")
 	if exitCode != 0 {
 		test.Errorf("a clean repository with a gap exited %d, want 0:\n%s", exitCode, output)
 	}
@@ -766,7 +773,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		"== Tools/Sim (Swift) ==",
 		"Libraries/Lib not run: checked as part of .",
 		"  not checked: " + alias + "/Stray/Leftover.swift (" + declarationsOnlyReason + ")\n",
-		"  not checked: " + alias + "/Stray/odd.swift (a reason no engine has given yet)\n",
+		"  not checked: " + alias + "/Stray/odd.swift (a reason no child has given yet)\n",
 		"  not checked: " + alias + "/Package.swift (a package manifest)\n",
 		"  not checked: " + alias + "/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
 		"  not checked: " + alias + "/Scratch.swift (ignored by git)\n",
@@ -847,7 +854,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		test.Errorf("the Swift runs yielded %v, want %v:\n%s", yields, want, logged)
 	}
 
-	output, exitCode = runWithEngine(test, binary, engine, root, "--no-fix", "--json")
+	output, exitCode = runWithSwiftBinary(test, binary, engine, root, "--no-fix", "--json")
 	if exitCode != 0 {
 		test.Errorf("under --json the run exited %d, want 0:\n%s", exitCode, output)
 	}
@@ -869,7 +876,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 	}
 	wantGaps := []map[string]string{
 		{"file": alias + "/Stray/Leftover.swift", "reason": declarationsOnlyReason, "language": "Swift"},
-		{"file": alias + "/Stray/odd.swift", "reason": "a reason no engine has given yet", "language": "Swift"},
+		{"file": alias + "/Stray/odd.swift", "reason": "a reason no child has given yet", "language": "Swift"},
 	}
 	if !reflect.DeepEqual(gaps[". (Swift)"], wantGaps) || len(gaps["."]) != 0 || len(gaps["CapturePhone"]) != 0 ||
 		len(gaps["Tools/Sim"]) != 0 {
@@ -892,8 +899,8 @@ func contractDirectory(test *testing.T) string {
 }
 
 // TestTheCoveredPackagesQueryKeepsANoCacheRunsPromise: describing a package writes SwiftPM's cache, which the
-// engine keeps in the package unless told the run writes nothing, so a `--no-cache` run passes the flag to the
-// query, and a run with its cache on leaves the engine its own. A `--no-cache` run of two Swift packages once
+// child keeps in the package unless told the run writes nothing, so a `--no-cache` run passes the flag to the
+// query, and a run with its cache on leaves the child its own. A `--no-cache` run of two Swift packages once
 // left `.cache/cohere/swift` in each, since the query alone never heard the flag.
 func TestTheCoveredPackagesQueryKeepsANoCacheRunsPromise(test *testing.T) {
 	test.Parallel()
@@ -908,17 +915,17 @@ func TestTheCoveredPackagesQueryKeepsANoCacheRunsPromise(test *testing.T) {
 			}
 			passed, readError := os.ReadFile(arguments)
 			if readError != nil {
-				test.Fatalf("the stand-in engine never ran: %v", readError)
+				test.Fatalf("the stand-in cohere-swift never ran: %v", readError)
 			}
 			if got := strings.Contains(string(passed), "--no-cache"); got != noCache {
-				test.Errorf("the engine was given --no-cache %t, expected %t: %s", got, noCache, passed)
+				test.Errorf("the child was given --no-cache %t, expected %t: %s", got, noCache, passed)
 			}
 		})
 	}
 }
 
 // TestASwiftProjectRunsUntimedAtARootThatTimesTheRest: `--timing` at a discovered root reaches every project's run but
-// a Swift one's, whose engine refuses it, and the run says which Swift projects ran without it, so one command line at
+// a Swift one's, whose child refuses it, and the run says which Swift projects ran without it, so one command line at
 // cohere's own root times its Go and is never refused over Swift (#3apgjer). A run not typed `--timing`, or typed
 // `--timing=false`, says nothing, and nor does a root with no Swift project.
 func TestASwiftProjectRunsUntimedAtARootThatTimesTheRest(test *testing.T) {
@@ -928,12 +935,12 @@ func TestASwiftProjectRunsUntimedAtARootThatTimesTheRest(test *testing.T) {
 		test.Errorf("a Swift project's run is handed %q, want every flag but --timing", kept)
 	}
 	found := discovery{Projects: []discoveredProject{
-		{Directory: ".", Engine: engineGo},
-		{Directory: ".", Engine: engineSwift},
-		{Directory: "tools", Engine: engineSwift},
+		{Directory: ".", Kind: projectKindGoModule},
+		{Directory: ".", Kind: projectKindSwiftPackage},
+		{Directory: "tools", Kind: projectKindSwiftPackage},
 	}}
 	labels := []string{".", ". (Swift)", "tools"}
-	want := "--timing measures the TypeScript and Go projects only, since the Swift engine does not implement it " +
+	want := "--timing measures the TypeScript and Go projects only, since cohere-swift does not implement it " +
 		"yet, so . (Swift), tools ran without it"
 	if note := timingSkipsSwiftNote(found, labels, given); note != want {
 		test.Errorf("the note is %q, want %q", note, want)
@@ -943,7 +950,7 @@ func TestASwiftProjectRunsUntimedAtARootThatTimesTheRest(test *testing.T) {
 			test.Errorf("%q says %q, want nothing, since it did not ask for timing", quiet, note)
 		}
 	}
-	noSwift := discovery{Projects: []discoveredProject{{Directory: ".", Engine: engineGo}}}
+	noSwift := discovery{Projects: []discoveredProject{{Directory: ".", Kind: projectKindGoModule}}}
 	if note := timingSkipsSwiftNote(noSwift, []string{"."}, given); note != "" {
 		test.Errorf("a root with no Swift project says %q, want nothing", note)
 	}

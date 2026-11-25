@@ -45,26 +45,26 @@ func fromSourceRecordFile(directory string, build project.Build) string {
 
 // writeFromSourceRecord writes each extra build's from-source packages of runs into the record's directory, one ID a
 // line, when the run was asked to record them. A file that cannot be written is noted and changes nothing else.
-func (engine *pipeline) writeFromSourceRecord(runs []buildRun) {
-	if engine.bodyReachFromSourceRecord == "" {
+func (pipeline *pipeline) writeFromSourceRecord(runs []buildRun) {
+	if pipeline.bodyReachFromSourceRecord == "" {
 		return
 	}
 	for _, run := range runs[1:] {
 		contents := strings.Join(run.fromSourceIdentifiers, "\n") + "\n"
-		file := fromSourceRecordFile(engine.bodyReachFromSourceRecord, run.build)
+		file := fromSourceRecordFile(pipeline.bodyReachFromSourceRecord, run.build)
 		if writeError := os.WriteFile(file, []byte(contents), 0o644); writeError != nil {
-			engine.note("the body reach census's from-source record: %v", writeError)
+			pipeline.note("the body reach census's from-source record: %v", writeError)
 		}
 	}
 }
 
 // recordedFromSource are build's from-source packages as a plain run recorded them, by ID, nil when the census was
 // given no record or holds none of build, which the census then counts over the whole alone.
-func (engine *pipeline) recordedFromSource(build project.Build) map[string]bool {
-	if engine.bodyReachFromSource == "" {
+func (pipeline *pipeline) recordedFromSource(build project.Build) map[string]bool {
+	if pipeline.bodyReachFromSource == "" {
 		return nil
 	}
-	contents, readError := os.ReadFile(fromSourceRecordFile(engine.bodyReachFromSource, build))
+	contents, readError := os.ReadFile(fromSourceRecordFile(pipeline.bodyReachFromSource, build))
 	if readError != nil {
 		return nil
 	}

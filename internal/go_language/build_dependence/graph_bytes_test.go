@@ -11,7 +11,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// graphBytesFixture is the engine's build-facts-chain fixture, one module that imports os, so its load reaches a real
+// graphBytesFixture is cohere-go's build-facts-chain fixture, one module that imports os, so its load reaches a real
 // closure of the standard library, some fifty packages, where every fixture of this package's own reaches none.
 var graphBytesFixture = filepath.Join("..", "testdata", "build-facts-chain")
 
@@ -35,9 +35,9 @@ func liveHeapBytes() uint64 {
 }
 
 // The graphs' own live bytes stay compact (#gf9qrzf): graphBytesFixture loaded with syntax and types, tests on, its
-// standard library on a graph of its own and the rest on the host's, as the engine builds them, every record encoded,
+// standard library on a graph of its own and the rest on the host's, as cohere-go builds them, every record encoded,
 // both graphs sealed and judged and a call index built over them, then the load's syntax and type maps let go as the
-// engine's rules let them go. Every package's types are held for the whole test, so what the graphs hold of them is
+// pipeline's rules let them go. Every package's types are held for the whole test, so what the graphs hold of them is
 // no part of their own bytes: the live heap with the graphs, less the live heap once they and every judgment of them
 // are let go.
 //

@@ -116,7 +116,7 @@ func requiredGoVersion(directory string) (string, error) {
 
 // downloadModules runs `go mod download -json` in directory with arguments, and returns every module it reports, each
 // with the error it met, if any. Without arguments, in a workspace or a module, it takes the whole build list, every
-// module any build of the tree can read and more, so a pass proves the engine's loads and the release's builds read
+// module any build of the tree can read and more, so a pass proves the Go child's loads and the release's builds read
 // nothing from the network; it is the cheapest command that does, since it reads the graph and compiles nothing. It
 // fails when go does, with the reported modules still returned, so a caller names each.
 func downloadModules(

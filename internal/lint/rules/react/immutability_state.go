@@ -121,7 +121,7 @@ func (state *immutabilityState) setKind(id static_single_assignment.IdentifierId
 	}
 }
 
-// freeze marks a value frozen for a reason, which is the whole engine of this rule.
+// freeze marks a value frozen for a reason, which is the whole mechanism of this rule.
 //
 // A value that is already Frozen, Global or Primitive is left alone, matching upstream's `freeze`:
 // re-freezing an already-frozen value must not count as movement or the fixpoint never settles.

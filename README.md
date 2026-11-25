@@ -2,7 +2,7 @@
 
 cohere type-checks, lints, fixes and formats a TypeScript codebase in one process. The TypeScript
 compiler builds the program once, and that one type graph is what TypeScript's own diagnostics and
-every lint rule read, the rules in one walk of each file. The fix engine and the formatter run in the
+every lint rule read, the rules in one walk of each file. The fix pass and the formatter run in the
 same process. Fixes re-read each file from disk and re-lint it until they stop landing, so they never
 apply to a stale copy. They land only in files the lint walk checked: a file the formatter reaches that the
 program does not hold, such as a bundle beside a tsconfig that does not include it, is formatted and never
@@ -24,14 +24,14 @@ the platform rather than doing nothing.
 
 ## Swift, on macOS only
 
-A directory with a `Package.swift` at its root is checked as a Swift package, by `cohere-swift`, an
-engine the two macOS packages ship beside `cohere`. It runs on macOS 15 and later, and types the
-package with the Swift toolchain already on your machine. On Linux and Windows there is no Swift
-engine, and `cohere` refuses a Swift package by name and exits 1 rather than checking nothing.
+A directory with a `Package.swift` at its root is checked as a Swift package, by `cohere-swift`, a
+program the two macOS packages ship beside `cohere`. It runs on macOS 15 and later, and types the
+package with the Swift toolchain already on your machine. On Linux and Windows there is no
+cohere-swift, and `cohere` refuses a Swift package by name and exits 1 rather than checking nothing.
 
 ## Go
 
-A directory with a `go.work` or a `go.mod` is checked as Go, by the Go engine, which is `cohere` itself
+A directory with a `go.work` or a `go.mod` is checked as Go, by cohere-go, which is `cohere` itself
 run as a child of itself, so it ships on every platform `cohere` does. It loads every package once, with
 its types, through the `go` on your `PATH`, formats with gofmt, and runs vet's analyzers and the house
 rules over what it loaded. A `go.work` is one project over every module it uses, so a module a workspace
@@ -44,14 +44,14 @@ rules are set under a `go` key in `CohereSettings.json`, and a finding is suppre
 Run it anywhere in a repository. It starts from the project you're in, the nearest `tsconfig.json`,
 `Package.swift`, `go.work` or `go.mod` at or above you, or from the repository's root when there's none,
 and checks that project and every project below it: each TypeScript program, each Swift package and each
-Go workspace or module, each with its own engine and its own settings, all at once. A repository holding more than one gets one report, its findings
+Go workspace or module, each with its own checker and its own settings, all at once. A repository holding more than one gets one report, its findings
 with their paths, ending on one footer line for all of them (see [Output](#output)), and the exit code is
 the worst of theirs, so it's green only when every project is. A run that finds no project fails, and so does one whose every project was
 skipped, such as a Swift package alone under `--format-only`: it checked nothing.
 
 A TypeScript project at the root formats every JSON, Markdown, YAML and CSS file the repository holds, as
 well as its TypeScript. A root that's a Go workspace or a Swift package has nothing that would, since gofmt
-and the Swift engine format their own languages, so when such a root holds those files outside every
+and cohere-swift format their own languages, so when such a root holds those files outside every
 TypeScript project's directory, the run adds one more project there: `Format`, the format phase alone, with
 the house format, leaving each TypeScript project's directory to that project. It needs no file of its own.
 `--types` and `--lint` don't run it, and `--no-format` leaves it out.
@@ -195,7 +195,7 @@ file overrides:
 
 Use `"warn"` to report dead directives without failing the run, as ESLint does by default, or
 `"off"` to disable both their findings and their fixes. The coverage count remains visible when reporting is off. `unused-disable`
-is an engine check, so it is configurable without being an entry in `cohere --rules`.
+is a linter check, so it is configurable without being an entry in `cohere --rules`.
 
 ## Flags
 
@@ -235,7 +235,7 @@ is an engine check, so it is configurable without being an entry in `cohere --ru
 | `--timing`              | report what building the graph cost and the CPU each rule cost, most expensive rule first, for TypeScript and Go                                                               |
 | `--timeline`            | in a Go project, report when each phase and each build began and ended on the run's clock, with the cores busy between                                                         |
 | `--single-threaded`     | use one type checker instead of several                                                                                                                                        |
-| `--profile FILE`        | write a Go CPU profile of the run to FILE, and in a Go project the engine's beside it (`run.pprof` gives `run.go.pprof`)                                                       |
+| `--profile FILE`        | write a Go CPU profile of the run to FILE, and in a Go project cohere-go's beside it (`run.pprof` gives `run.go.pprof`)                                                        |
 | `--cache-dump`          | print what this project's cache holds, and exit                                                                                                                                |
 | `--version`             | print the version, what this binary was built from, and the Swift contract it speaks, and exit                                                                                 |
 
@@ -333,7 +333,7 @@ the intermediate representation builds and the load's phases as rows of their ow
 `--timing` is never replayed from the cache or recorded in it.
 
 `--timeline`, in a Go project, prints when each phase of the run and each build began and ended, on one clock from
-the engine's start, with the cores the process kept busy between each step and the one before. Unlike `--timing` it
+the Go child's start, with the cores the process kept busy between each step and the one before. Unlike `--timing` it
 changes nothing about the run, so the map is of the run you make; beside `--timing` it says it is a timed run's shape.
 It is never replayed from the cache or recorded in it either.
 

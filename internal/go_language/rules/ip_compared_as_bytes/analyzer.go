@@ -40,7 +40,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1021",
 	"SA1021",
 	"Flags two net.IP values compared with bytes.Equal, which tells the four and sixteen byte forms of one IPv4 "+
-		"address apart: staticcheck's SA1021, ported onto the engine's own intermediate representation.",
+		"address apart: staticcheck's SA1021, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

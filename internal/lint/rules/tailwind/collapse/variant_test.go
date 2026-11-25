@@ -11,19 +11,19 @@ import (
 	"testing"
 )
 
-// The fixture is what the shipped Tailwind 4.3.3 engine answered about variant ordering, captured
+// The fixture is what the shipped Tailwind 4.3.3 answered about variant ordering, captured
 // by internal/lint/rules/tailwind/tools/generate_variant and checked in next to this test.
 //
 // Measured rather than transcribed, because the two are different claims and `getVariantOrder` is
 // where they part. Reading `variants.ts` shows every variant holding an `order` number and invites
 // a static table of variant to position; cohere has shipped exactly that table, 145 entries. Asking
-// the engine says the number a consumer sees is a dense rank assigned per run over only the
-// variants that run parsed, with ties collapsed. A transcribed table agrees with the engine on any
+// Tailwind says the number a consumer sees is a dense rank assigned per run over only the
+// variants that run parsed, with ties collapsed. A transcribed table agrees with Tailwind on any
 // corpus whose variant set matches the one it was generated from, which is why a table generated
 // from this repository passed on this repository for as long as it did.
 //
 // The corpus has three halves and needs all three. The repository half is the exit criterion: 2,400
-// real class lists from two repositories, sorted by the engine, each compared class by class. The
+// real class lists from two repositories, sorted by Tailwind, each compared class by class. The
 // synthetic half reaches the pairs a real corpus never writes, and one of those pairs is what
 // answers this component's open question. The `@custom-variant` half separates a custom variant
 // that appends a new position from one that overwrites a framework name in place, which look the
@@ -87,7 +87,7 @@ type variantOrderClassListFixture struct {
 	ClassOrder variantOrderClassOrderFixture `json:"classOrder"`
 }
 
-// variantOrderShapeFixture is the engine's own description of a parsed variant.
+// variantOrderShapeFixture is Tailwind's own description of a parsed variant.
 //
 // Read into the port's ParsedVariant by variantOrderVariantFromFixture rather than compared field by field,
 // because what is under test here is the ordering of variants and not the parsing of them. The
@@ -153,7 +153,7 @@ func loadVariantOrderCorpus(test *testing.T) variantOrderCorpus {
 	return corpus
 }
 
-// variantOrderRegistryFrom rebuilds the engine's registry from a fixture.
+// variantOrderRegistryFrom rebuilds Tailwind's registry from a fixture.
 //
 // The order numbers are taken from the fixture rather than reproduced by replaying registrations,
 // because replaying them would mean porting the 1,000 lines of `variants.ts` that build CSS in
@@ -207,13 +207,13 @@ func variantOrderRegistryFrom(
 	return registry
 }
 
-// TestVariantOrderMatchesTheEngine is the differential: every variant order and every class order
-// the engine reported, reproduced by the port.
+// TestVariantOrderMatchesTailwind is the differential: every variant order and every class order
+// Tailwind reported, reproduced by the port.
 //
 // The counts are printed on success. A suite that compared twelve answers and one that compared
 // twenty thousand look the same as a green line, and this component's whole claim is about a
 // population rather than about a handful of cases.
-func TestVariantOrderMatchesTheEngine(test *testing.T) {
+func TestVariantOrderMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadVariantOrderCorpus(test)
 
@@ -316,7 +316,7 @@ var variantOrderDefaultContainerScale = map[string]string{
 
 // variantOrderBreakpointResolverFor answers what a breakpoint variant resolves to, from the fixture's own data.
 //
-// The engine resolves these through the theme's `--breakpoint` and `--container` namespaces, which
+// Tailwind resolves these through the theme's `--breakpoint` and `--container` namespaces, which
 // is a sibling component. Rather than depend on it, the resolver reads the value straight off the
 // variant when it is arbitrary and falls back to the default scale by name, which is what both
 // repositories in the corpus use. A name this cannot resolve reports false, which is upstream's own
@@ -352,7 +352,7 @@ func variantOrderBreakpointResolverFor(
 	}
 }
 
-// checkVariantOrderIndices compares the port's dense indices against the engine's, for one case.
+// checkVariantOrderIndices compares the port's dense indices against Tailwind's, for one case.
 func checkVariantOrderIndices(
 	test *testing.T,
 	name string,
@@ -371,7 +371,7 @@ func checkVariantOrderIndices(
 
 	order := registry.BuildVariantOrder(variants)
 	if order.Length() != fixture.Size {
-		test.Errorf("%s: the port ordered %d variants and the engine ordered %d", name, order.Length(), fixture.Size)
+		test.Errorf("%s: the port ordered %d variants and Tailwind ordered %d", name, order.Length(), fixture.Size)
 	}
 
 	compared := 0
@@ -382,7 +382,7 @@ func checkVariantOrderIndices(
 		got, hasIndex := order.IndexOf(*variantOrderVariantFromFixture(position.Variant))
 		if !hasIndex {
 			test.Errorf(
-				"%s: the port assigned no index to %q, which the engine placed at %d",
+				"%s: the port assigned no index to %q, which Tailwind placed at %d",
 				name,
 				position.Raw,
 				*position.Index,
@@ -390,14 +390,14 @@ func checkVariantOrderIndices(
 			continue
 		}
 		if got != *position.Index {
-			test.Errorf("%s: %q is at %d in the port and %d in the engine", name, position.Raw, got, *position.Index)
+			test.Errorf("%s: %q is at %d in the port and %d in Tailwind", name, position.Raw, got, *position.Index)
 		}
 		compared++
 	}
 	return compared
 }
 
-// checkVariantOrderClassOrder compares the port's bitmasks and resulting order against the engine's.
+// checkVariantOrderClassOrder compares the port's bitmasks and resulting order against Tailwind's.
 //
 // Both are compared because they answer different questions. The mask is the mechanism, and two
 // ports can agree on every rank in a corpus while building the mask differently. The rank is the
@@ -411,7 +411,7 @@ func checkVariantOrderClassOrder(
 ) (int, int) {
 	test.Helper()
 
-	// Every variant the engine saw for this class list, which is the population its dense indices
+	// Every variant Tailwind saw for this class list, which is the population its dense indices
 	// were assigned over. Taking it from the fixture rather than re-parsing keeps this a test of
 	// ordering rather than of the sibling parser.
 	var population []ParsedVariant
@@ -454,14 +454,14 @@ func checkVariantOrderClassOrder(
 			)
 		}
 		if got.Cmp(want) != 0 {
-			test.Errorf("%s: %q has mask %s in the port and %s in the engine", name, maskFixture.ClassName, got, want)
+			test.Errorf("%s: %q has mask %s in the port and %s in Tailwind", name, maskFixture.ClassName, got, want)
 		}
 		masksByClass[maskFixture.ClassName] = got
 		comparedMasks++
 	}
 
-	// The engine's own sorted list, reproduced by sorting on the masks alone. Classes whose masks
-	// tie keep their relative order from the engine's list, which is what isolates this comparison
+	// Tailwind's own sorted list, reproduced by sorting on the masks alone. Classes whose masks
+	// tie keep their relative order from Tailwind's list, which is what isolates this comparison
 	// to the variant dimension: the property dimensions that break those ties belong to sibling
 	// components and are not under test here.
 	sorted := make([]string, 0, len(fixture.Sorted))
@@ -474,7 +474,7 @@ func checkVariantOrderClassOrder(
 		return CompareVariantBitmasks(masksByClass[sorted[left]], masksByClass[sorted[right]]) < 0
 	})
 
-	// The engine's own list, restricted to the classes that have masks, is what the port's sorted
+	// Tailwind's own list, restricted to the classes that have masks, is what the port's sorted
 	// list is compared against position by position.
 	expected := make([]string, 0, len(fixture.Sorted))
 	for _, className := range fixture.Sorted {
@@ -486,7 +486,7 @@ func checkVariantOrderClassOrder(
 	for index := range sorted {
 		if index < len(expected) && expected[index] != sorted[index] {
 			test.Errorf(
-				"%s: position %d is %q in the port and %q in the engine",
+				"%s: position %d is %q in the port and %q in Tailwind",
 				name,
 				index,
 				sorted[index],
@@ -506,12 +506,12 @@ func checkVariantOrderClassOrder(
 // whatever they start with." That rule was arrived at by fixture failure, and its comment names the
 // evidence honestly as four real class lists.
 //
-// The engine implements no such rule. `compile.ts` sets one bit per variant in a mask and
+// Tailwind implements no such rule. `compile.ts` sets one bit per variant in a mask and
 // compares the masks numerically, so a class's position is decided by its highest-ranked variant
 // and only ties on that are broken lower down. A stacked variant whose members all rank low
 // therefore sorts before a single variant that ranks high.
 //
-// Measured on the engine: `group-hover:disabled:` carries bits 0 and 2, mask 5. `dark:` carries bit
+// Measured on Tailwind: `group-hover:disabled:` carries bits 0 and 2, mask 5. `dark:` carries bit
 // 3, mask 8. The stacked class sorts first, and the depth-first rule puts it second.
 func TestVariantBitmaskIsNotDepthFirst(test *testing.T) {
 	test.Parallel()
@@ -536,7 +536,7 @@ func TestVariantBitmaskIsNotDepthFirst(test *testing.T) {
 	single := "dark:flex"
 	if probe.ClassOrder.Sorted[0] != stacked || probe.ClassOrder.Sorted[1] != single {
 		test.Fatalf(
-			"the engine no longer sorts the stacked variant first: got %v. If Tailwind changed this, "+
+			"Tailwind no longer sorts the stacked variant first: got %v. If Tailwind changed this, "+
 				"the divergence this test records has closed and the finding needs rewriting rather "+
 				"than the assertion flipping",
 			probe.ClassOrder.Sorted,
@@ -568,7 +568,7 @@ func TestVariantBitmaskIsNotDepthFirst(test *testing.T) {
 	}
 }
 
-// TestDepthFirstDisagreesWithTheEngineOnTheCorpus quantifies the divergence.
+// TestDepthFirstDisagreesWithTailwindOnTheCorpus quantifies the divergence.
 //
 // The open question this component was dispatched to answer is whether the segment comparison that
 // enforce_consistent_class_order.go used to carry and upstream's bitmask are the same rule. They are
@@ -586,19 +586,19 @@ func TestVariantBitmaskIsNotDepthFirst(test *testing.T) {
 // #4q5dsn3 swapped the rule onto the live design system, so the depth-first comparison this counts
 // against no longer ships anywhere: `compareVariants`, `variantSegments` and the rest of that path
 // were deleted with it. What this test compares is a depth-first rule reimplemented here, in the loop
-// below, against the engine's masks from the fixture.
+// below, against Tailwind's masks from the fixture.
 //
 // It is kept in that form rather than repointed at the new code, because the two answer different
 // questions and both are worth keeping. This one is the standing statement that depth-first is wrong
 // and by how much: 15 pairs of 4,265, the number #nr3wtj1 filed. Repointing it at the live sort would
 // turn it into a second copy of
-// `internal/rules/tailwind`'s TestClassOrderLiveMatchesTheEngineOverTheCorpus, which measures the
+// `internal/rules/tailwind`'s TestClassOrderLiveMatchesTailwindOverTheCorpus, which measures the
 // shipped path over the same corpus and reports 0 of 28,133, and this file would lose the record of
 // what the divergence was.
 //
 // So a nonzero count here is correct and expected forever. A zero would mean the corpus lost its
 // stacked-variant cases, which is what the assertion at the bottom exists to catch.
-func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(test *testing.T) {
+func TestDepthFirstDisagreesWithTailwindOnTheCorpus(test *testing.T) {
 	test.Parallel()
 	corpus := loadVariantOrderCorpus(test)
 
@@ -650,7 +650,7 @@ func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(test *testing.T) {
 					if !leftHasMask || !rightHasMask {
 						continue
 					}
-					// Only pairs the mask actually separates are counted. A pair the engine ties on
+					// Only pairs the mask actually separates are counted. A pair Tailwind ties on
 					// is decided by properties, which is a different component's dimension, and
 					// counting it here would dilute the measurement with pairs neither rule claims.
 					if CompareVariantBitmasks(leftMask, rightMask) == 0 {
@@ -665,13 +665,13 @@ func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(test *testing.T) {
 						continue
 					}
 					depthFirstPutsLeftFirst := leftDepth < rightDepth
-					// The engine put leftClass first, by construction of `ordered`.
+					// Tailwind put leftClass first, by construction of `ordered`.
 					if !depthFirstPutsLeftFirst {
 						disagreeingPairs++
 						listDisagrees = true
 						if len(examples) < 8 {
 							examples = append(examples, fmt.Sprintf(
-								"%s: engine puts %q (mask %s, %d variants) before %q (mask %s, %d variants); depth-first reverses them",
+								"%s: Tailwind puts %q (mask %s, %d variants) before %q (mask %s, %d variants); depth-first reverses them",
 								classOrder.name, leftClass, leftMask, leftDepth, rightClass, rightMask, rightDepth,
 							))
 						}
@@ -689,7 +689,7 @@ func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(test *testing.T) {
 	}
 
 	test.Logf(
-		"depth-first vs the engine's bitmask: %d disagreeing pairs of %d separable pairs (%.4f%%), across %d class lists",
+		"depth-first vs Tailwind's bitmask: %d disagreeing pairs of %d separable pairs (%.4f%%), across %d class lists",
 		disagreeingPairs, comparedPairs, 100*float64(disagreeingPairs)/float64(comparedPairs), disagreeingLists,
 	)
 	for _, example := range examples {
@@ -698,7 +698,7 @@ func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(test *testing.T) {
 
 	if disagreeingPairs == 0 {
 		test.Error(
-			"depth-first agreed with the engine on every pair in the corpus, which contradicts the " +
+			"depth-first agreed with Tailwind on every pair in the corpus, which contradicts the " +
 				"synthetic probe in TestVariantBitmaskIsNotDepthFirst. Either the corpus lost its " +
 				"stacked-variant cases or the mask comparison stopped being a mask comparison",
 		)
@@ -881,7 +881,7 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(test *testing.T) {
 // TestVariantOrderIsRunScoped is the known-dirty control for the shipped table.
 //
 // A static variant-to-position table is the shape cohere ships today and the shape this component
-// argues against. The argument is only sound if the engine's index genuinely moves, so this asserts
+// argues against. The argument is only sound if Tailwind's index genuinely moves, so this asserts
 // it does: the same variant must receive different indices in two runs whose populations differ.
 //
 // Without this, every other assertion here would still pass against a port that memoized one
@@ -918,7 +918,7 @@ func TestVariantOrderIsRunScoped(test *testing.T) {
 		)
 	}
 
-	// And the port reproduces the movement rather than only the engine exhibiting it.
+	// And the port reproduces the movement rather than only Tailwind exhibiting it.
 	var framework *variantOrderRegistryFixture
 	for _, aCase := range corpus.Cases {
 		if aCase.Name == "framework-default" && aCase.Registry != nil {
@@ -960,9 +960,9 @@ func TestVariantOrderIsRunScoped(test *testing.T) {
 // reorders classes that have nothing to do with the tie.
 //
 // Reaching an actual tie takes more than a shared registration order, and this test asserted the
-// wrong thing before it was measured against the engine. `Variants.group` gives its members one
+// wrong thing before it was measured against Tailwind. `Variants.group` gives its members one
 // order number, but `compare` continues past the order to the root name, so two differently-named
-// roots in one group still separate. Measured on the engine, `sm` through `2xl` share order 64 and
+// roots in one group still separate. Measured on Tailwind, `sm` through `2xl` share order 64 and
 // receive five distinct indices. A tie needs two variants that compare equal all the way down,
 // which is what a group whose comparison function returns zero produces.
 func TestTiedVariantsShareAnIndex(test *testing.T) {
@@ -1014,7 +1014,7 @@ func TestTiedVariantsShareAnIndex(test *testing.T) {
 
 // TestReRegisteringAVariantKeepsItsOrder pins `Variants.set`'s update branch directly.
 //
-// The fixture cannot reach this. It supplies order numbers the engine already computed, so every
+// The fixture cannot reach this. It supplies order numbers Tailwind already computed, so every
 // differential assertion above passes whether Register preserves an order or reassigns one. Only a
 // unit test exercises the branch, and the branch is what makes `@custom-variant dark (...)` change
 // the selector `dark:` emits without moving where `dark:` sorts.
@@ -1070,7 +1070,7 @@ func TestReRegisteringAVariantKeepsItsOrder(test *testing.T) {
 // TestSharedRegistrationOrderStillSeparatesByRoot is the known-dirty control for the tie above.
 //
 // Without it, a port that collapsed every shared-order group into one index would pass
-// TestTiedVariantsShareAnIndex and be wrong about all five breakpoints. The engine gives `sm`
+// TestTiedVariantsShareAnIndex and be wrong about all five breakpoints. Tailwind gives `sm`
 // through `2xl` five distinct indices despite one shared order, because `compare` continues to the
 // root name when no comparison function is registered.
 func TestSharedRegistrationOrderStillSeparatesByRoot(test *testing.T) {
@@ -1141,7 +1141,7 @@ func TestCompareBreakpointsBucketsByUnit(test *testing.T) {
 			order := CompareBreakpoints(testCase.left, testCase.right, testCase.ascending)
 			if order == 0 {
 				test.Fatalf(
-					"%q and %q tied, which the engine does not do for distinct values",
+					"%q and %q tied, which Tailwind does not do for distinct values",
 					testCase.left,
 					testCase.right,
 				)

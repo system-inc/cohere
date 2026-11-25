@@ -39,12 +39,12 @@ func TestAChangeToTheHeldBytesStartsTheFingerprintsOver(test *testing.T) {
 	test.Parallel()
 	file := filepath.Join(test.TempDir(), "held.go")
 	described := &describedProject{contents: map[string][]byte{file: []byte("package held\n")}}
-	engine := newPipeline(invocation{}, described, settings.Settings{}, nil, io.Discard, io.Discard, nil)
+	pipeline := newPipeline(invocation{}, described, settings.Settings{}, nil, io.Discard, io.Discard, nil)
 
 	// A save's fix holds its output in memory.
-	before := engine.fingerprints
-	engine.hold(format.ChangedFile{File: file, Output: []byte("package held\n\n// Held is held.\nconst Held = 1\n")})
-	if engine.fingerprints == nil || engine.fingerprints == before {
+	before := pipeline.fingerprints
+	pipeline.hold(format.ChangedFile{File: file, Output: []byte("package held\n\n// Held is held.\nconst Held = 1\n")})
+	if pipeline.fingerprints == nil || pipeline.fingerprints == before {
 		test.Errorf("holding a fix's output kept the fingerprints %p, want new ones", before)
 	}
 
@@ -53,19 +53,19 @@ func TestAChangeToTheHeldBytesStartsTheFingerprintsOver(test *testing.T) {
 	if writeError := os.WriteFile(file, written, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	before = engine.fingerprints
-	engine.reread(file)
+	before = pipeline.fingerprints
+	pipeline.reread(file)
 	// A process that refuses writes, the editor's save's (format.RefuseWrites), reads nothing again and holds the bytes
 	// it had, so its fingerprints stand. The refusal is the process's, and no test of this package sets it, so this
 	// reads the reread; it is read here rather than assumed, so the test holds in a process that refuses.
 	refused := format.WritesRefused()
-	if reread := bytes.Equal(engine.described.contents[file], written); reread == refused {
+	if reread := bytes.Equal(pipeline.described.contents[file], written); reread == refused {
 		test.Fatalf("with writes refused %t, the run holds %q after the reread", refused,
-			engine.described.contents[file])
+			pipeline.described.contents[file])
 	}
-	if changed := engine.fingerprints != nil && engine.fingerprints != before; changed == refused {
+	if changed := pipeline.fingerprints != nil && pipeline.fingerprints != before; changed == refused {
 		test.Errorf("with writes refused %t, the reread left the fingerprints %p as %p", refused, before,
-			engine.fingerprints)
+			pipeline.fingerprints)
 	}
 }
 
@@ -151,20 +151,20 @@ func hostLoad(test *testing.T, root string, run string) (*pipeline, *load.Loaded
 	}
 	// What the description started beside its reads ends before the test and its directory do.
 	test.Cleanup(described.awaitStarted)
-	engine := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
-	isolatePipeline(test, engine)
+	pipeline := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
+	isolatePipeline(test, pipeline)
 	// The load alone is asked, so no lint starts beside it.
-	engine.overlaps = false
-	engine.session = engine.cacheSession(engine.described.workspace.Environment(),
-		engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
-	if engine.session == nil || !engine.session.HasStore() {
+	pipeline.overlaps = false
+	pipeline.session = pipeline.cacheSession(pipeline.described.workspace.Environment(),
+		pipeline.described.goEnvironment, cache.FileDigests{}, pipeline.standardError)
+	if pipeline.session == nil || !pipeline.session.HasStore() {
 		test.Fatalf("%s has no findings cache with a store, so its load keeps no listing", run)
 	}
 	// The first load waits for what the description started, as the pipeline's does (startChildrenFirst).
 	described.awaitForked()
-	loaded, loadError := engine.loadWorkspacePackages()
+	loaded, loadError := pipeline.loadWorkspacePackages()
 	if loadError != nil {
 		test.Fatalf("%s: %v", run, loadError)
 	}
-	return engine, loaded
+	return pipeline, loaded
 }

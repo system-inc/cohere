@@ -43,9 +43,9 @@
 // A generator that emits a file which compiles has proved nothing about the file's contents: the
 // printing is where an index can be written next to the wrong key and still parse. So the suite in
 // `internal/tailwind` builds the same table in memory from the same two JSON inputs and asserts
-// against the engine's readings, and the generated Go was checked against that in-memory table over
+// against Tailwind's readings, and the generated Go was checked against that in-memory table over
 // the whole fixture corpus, 10,977 cases, all agreeing. Rerun that comparison after changing the
-// printing here; agreement with the engine is the contract, and compiling is not evidence of it.
+// printing here; agreement with Tailwind is the contract, and compiling is not evidence of it.
 //
 // Node is required to produce the input and never to use the result.
 package main
@@ -103,7 +103,7 @@ type extractedContext struct {
 	KeysByNamespace     map[string][]string `json:"keysByNamespace"`
 	PropertyOrder       []string            `json:"propertyOrder"`
 	PerDeclarationRoots []string            `json:"perDeclarationRoots"`
-	// UnlistedStatics are static utilities the engine compiles and getClassList() does not
+	// UnlistedStatics are static utilities Tailwind compiles and getClassList() does not
 	// advertise. See context.mjs: one class on this design system, and the table would otherwise
 	// decline a real class.
 	UnlistedStatics map[string]*reading `json:"unlistedStatics"`
@@ -178,7 +178,7 @@ func main() {
 		os.Exit(3)
 	}
 
-	// The two inputs must describe the same engine. They are produced by separate invocations, so
+	// The two inputs must describe the same Tailwind. They are produced by separate invocations, so
 	// nothing but this check stops a stale readings file being paired with a fresh context and
 	// generating a table that is internally inconsistent in a way no test would name.
 	if tableContext.TailwindVersion != table.TailwindVersion {
@@ -378,7 +378,7 @@ var generatedReadings = []Reading{
 	fmt.Fprintf(&body, "\t},\n")
 
 	// Longest-first, and written in the order context.mjs sorted rather than re-sorted here. The
-	// order is the engine's namespace precedence and re-deriving it in a second place is how the two
+	// order is Tailwind's namespace precedence and re-deriving it in a second place is how the two
 	// drift.
 	fmt.Fprintf(&body, "\tNamespaces: []string{\n")
 	for _, namespace := range tableContext.Namespaces {
@@ -438,7 +438,7 @@ func writeDescriptor(
 		for index, typeName := range entry.TypeList {
 			typeParts[index] = fmt.Sprintf("%q", typeName)
 		}
-		// The order is the engine's, recovered by topological sort from observation. It is written
+		// The order is Tailwind's, recovered by topological sort from observation. It is written
 		// out verbatim and must not be sorted: InferDataType returns the first match.
 		fmt.Fprintf(out, "\t\t\tTypeList: []DataType{%s},\n", strings.Join(typeParts, ", "))
 	}

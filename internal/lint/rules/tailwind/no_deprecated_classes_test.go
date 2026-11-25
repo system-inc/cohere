@@ -250,7 +250,7 @@ func TestNoDeprecatedClassesFixMatchesUpstream(test *testing.T) {
 		},
 		{
 			// Two findings, each renaming its own class. One rewrite of the whole literal attached to
-			// both proposed the same edit twice, and the engine refused the second.
+			// both proposed the same edit twice, and Tailwind refused the second.
 			name:     "two deprecated classes, two disjoint renames",
 			source:   `const element = <div className="flex-shrink-0 flex flex-grow" />;`,
 			wantText: "shrink-0 flex grow",

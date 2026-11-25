@@ -128,7 +128,7 @@ func compareOwners(test *testing.T, directory string, patterns []string) ownersC
 	options := check.DispatchOptions()
 	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
 	if !isResolver {
-		test.Fatalf("the engine's options hold a %T, not a fact resolver", options.Resolver)
+		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
 	}
 	roots := loadFixtures(test, directory, patterns)
 	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{odd_slice_argument.MarksAnalyzer}, roots, options)

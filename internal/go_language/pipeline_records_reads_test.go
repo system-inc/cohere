@@ -57,13 +57,13 @@ func TestTheHostRecordsReadsOnlyWithAnExtraBuild(test *testing.T) {
 		}
 		// What the description started beside its reads ends before the test and its directory do.
 		test.Cleanup(described.awaitStarted)
-		engine := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
-		isolatePipeline(test, engine)
+		pipeline := newPipeline(request, described, ruleSettings, registered, io.Discard, io.Discard, nil)
+		isolatePipeline(test, pipeline)
 		// The load alone is asked, so no lint starts beside it.
-		engine.overlaps = false
+		pipeline.overlaps = false
 		// The first load waits for what the description started, as the pipeline's does (startChildrenFirst).
 		described.awaitForked()
-		loaded, loadError := engine.loadWorkspacePackages()
+		loaded, loadError := pipeline.loadWorkspacePackages()
 		if loadError != nil {
 			test.Fatal(loadError)
 		}

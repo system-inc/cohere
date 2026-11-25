@@ -1,4 +1,4 @@
-// Package consistency_no_useless_concatenation is the Go engine's rule that two string literals are not joined with +
+// Package consistency_no_useless_concatenation is cohere-go's rule that two string literals are not joined with +
 // on one line.
 //
 // It is the Go form of ESLint core's no-useless-concat, and follows the core port's reading of it: the operands are
@@ -47,7 +47,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_useless_concatenation
 	"follow. A join across lines, which is how a long string is wrapped, is left alone, and so is a raw literal "+
 	"joined to an interpreted one whose texts cannot be pasted into one.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads no type information: a + with a string literal
+// Rule is this rule's entry in cohere-go's registry. It reads no type information: a + with a string literal
 // beside it is string concatenation in any package that compiles, so the literals' syntax is the whole judgment.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 

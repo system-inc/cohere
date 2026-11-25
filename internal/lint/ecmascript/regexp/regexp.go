@@ -3,7 +3,7 @@
 //
 // A rule ported from ESLint is handed patterns its users wrote as JavaScript
 // regexps, in rule options and in `new RegExp` calls in the source under lint.
-// Neither Go engine answers about those the way JavaScript does:
+// Neither cohere-go answers about those the way JavaScript does:
 //
 //   - The standard library's regexp is RE2, which has no lookahead, no
 //     lookbehind and no backreferences. A pattern using any of them does not
@@ -23,7 +23,7 @@
 // This package takes the second one and closes every one of those gaps by
 // rewriting the pattern before handing it over. Unicode property escapes use
 // cohere-generated Unicode 17.0.0 tables, including exact ECMAScript aliases. It also bounds how long a
-// match may run: a backtracking engine on a pattern a user wrote is a way to
+// match may run: a backtracking matcher on a pattern a user wrote is a way to
 // hang the linter. A match that overruns has no answer, so the caller says
 // which answer stands in for it, and is told the pattern overran so the run
 // can name the gap rather than read the stand-in as the pattern's.

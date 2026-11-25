@@ -93,7 +93,7 @@ var NoDuplicateClasses = rule.Rule[NoDuplicateClassesOptions]{
 //
 // The fix is computed once for the whole literal rather than as one deletion per duplicate. Two
 // deletions inside the same string would each be computed against the original offsets, and
-// applying the first invalidates the second. That is the class of bug the edit engine exists to
+// applying the first invalidates the second. That is the class of bug the edit Tailwind exists to
 // prevent, and not one a rule should be handing it in the first place.
 func reportDuplicates(ruleContext rule.Context, literal ClassLiteral) {
 	classes := SplitClasses(literal.Text)
@@ -138,7 +138,7 @@ func reportDuplicates(ruleContext rule.Context, literal ClassLiteral) {
 
 		// Each class's diagnostic carries the deletions for its own repeats and nothing else. The
 		// whole-literal rewrite this replaced was attached to every duplicated class's diagnostic,
-		// so a literal with two duplicated classes proposed the same edit twice and the engine
+		// so a literal with two duplicated classes proposed the same edit twice and Tailwind
 		// refused the second as an overlap.
 		// A literal whose source is not its decoded value is reported without a fix, for the reason
 		// no-unnecessary-whitespace gives: decoded text written over an escape can stop the file

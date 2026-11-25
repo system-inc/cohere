@@ -135,7 +135,7 @@ func DecodeEqeqeqOptions(list []byte) (EqeqeqOptions, error) {
 //
 // Those get a real Fix, applied unattended. Everything else gets a Suggestion, which a human
 // chooses. Twenty of upstream's cases carry a fix and twenty-eight carry a suggestion, and no case
-// carries both. Shipping the suggestion arm as a fix would let the edit engine change program
+// carries both. Shipping the suggestion arm as a fix would let the fix pass change program
 // behaviour on `a == b`, which is the single worst thing a linter can do.
 //
 // # `null` is its own axis

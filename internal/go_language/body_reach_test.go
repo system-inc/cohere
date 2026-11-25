@@ -78,13 +78,13 @@ func TestTheBodyReachCensusJudgesEachOfTheHostsBodies(test *testing.T) {
 	fromSource := test.TempDir()
 	// A plain run records the packages each build checks from source, which the census then counts apart.
 	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
-		func(engine *pipeline) { engine.bodyReachFromSourceRecord = fromSource }, "--no-cache", "--no-fix")
+		func(pipeline *pipeline) { pipeline.bodyReachFromSourceRecord = fromSource }, "--no-cache", "--no-fix")
 	root := copyFixture(test, filepath.Join("testdata", "body-reach"))
 	on, onStream := runOverConfigured(test, root, exitFindings,
-		func(engine *pipeline) {
-			engine.bodyReachCensus = censusFile
-			engine.bodyDifferential = true
-			engine.bodyReachFromSource = fromSource
+		func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = censusFile
+			pipeline.bodyDifferential = true
+			pipeline.bodyReachFromSource = fromSource
 		}, "--no-cache", "--no-fix", "--build-dependence")
 	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
 		"--no-fix", "--build-dependence")
@@ -301,10 +301,10 @@ func TestTheBodyDifferentialFailsWhereTheReachWronglyLeavesABody(test *testing.T
 	run := func(census func(*buildBodyReach) *buildBodyReach) *buildBodyDifferential {
 		test.Helper()
 		on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach")), exitFindings,
-			func(engine *pipeline) {
-				engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-				engine.bodyDifferential = true
-				engine.bodyDifferentialCensus = census
+			func(pipeline *pipeline) {
+				pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+				pipeline.bodyDifferential = true
+				pipeline.bodyDifferentialCensus = census
 			}, "--no-cache", "--no-fix", "--build-dependence")
 		if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
 			test.Fatal("want windows's body differential")
@@ -388,9 +388,9 @@ func Held(holder Holder) Holder {
 `), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyDifferential = true
-		engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyDifferential = true
+		pipeline.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
 			altered := *census
 			altered.bodies = slices.Clone(census.bodies)
 			for index, body := range altered.bodies {
@@ -449,9 +449,9 @@ func TestABuildWithNoJudgmentFailsTheBodyDifferential(test *testing.T) {
 
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	var notes strings.Builder
-	engine := &pipeline{bodyReachHost: &bodyReachHost{}, bodyDifferential: true, bodyReachCensus: censusFile,
+	pipeline := &pipeline{bodyReachHost: &bodyReachHost{}, bodyDifferential: true, bodyReachCensus: censusFile,
 		standardError: &notes}
-	engine.writeBodyReachCensus([]buildRun{{build: project.Build{OperatingSystem: "darwin"}},
+	pipeline.writeBodyReachCensus([]buildRun{{build: project.Build{OperatingSystem: "darwin"}},
 		{build: project.Build{OperatingSystem: "windows"}}})
 	written, readError := os.ReadFile(censusFile)
 	if readError != nil {
@@ -483,8 +483,8 @@ func TestABuildUnderOtherSizesReachesEveryBody(test *testing.T) {
 		test.Fatal(writeError)
 	}
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = censusFile
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = censusFile
 	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	censuses := map[string]*buildBodyReach{}
@@ -535,8 +535,8 @@ func TestAValueMovedToAnEmptyInterfaceReachesItsBodyThroughTheTypesBelowIt(test 
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "body-reach-moved"))
-	on, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyDifferential = true
+	on, stream := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyDifferential = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
@@ -637,9 +637,9 @@ func Show(entries moved.PrintedEntries) {
 `), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyDifferential = true
-		engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyDifferential = true
+		pipeline.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
 			altered := *census
 			altered.bodies = slices.Clone(census.bodies)
 			for index, body := range altered.bodies {
@@ -813,8 +813,8 @@ func Plain() string {
 		0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	warm, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+	warm, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 	}, "--no-fix", "--build-dependence")
 
 	hosted, isHosted := warm.bodyReachHost.packages["example.com/reach"]
@@ -868,9 +868,9 @@ func TestABodyReachingAStructThroughAPointerNoExpressionNamesIsReached(test *tes
 		[]byte(`{"go": {"rules": {}, "targets": ["`+target+`"]}}`), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	on, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyDifferential = true
+	on, stream := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyDifferential = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	var census *buildBodyReach

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// A signal to the process building the Swift engine ends the build tool and every compiler it started,
+// A signal to the process building cohere-swift ends the build tool and every compiler it started,
 // and the build reports that it was stopped. Before, the signal ended this process alone, and `swift build`
 // went on compiling with nobody to read its result (#nqb3mjv).
 func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {

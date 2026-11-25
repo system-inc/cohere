@@ -154,7 +154,7 @@ type heldAnswerKey struct {
 }
 
 // isolationRun is one run of the isolated rules over some packages: each package's findings, as compared and as the
-// engine writes them (checked), the rules that crashed on it, and the places of its functions ctrlflow found never
+// cohere-go writes them (checked), the rules that crashed on it, and the places of its functions ctrlflow found never
 // return.
 type isolationRun struct {
 	findings map[*packages.Package][]isolationFinding

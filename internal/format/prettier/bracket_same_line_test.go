@@ -7,12 +7,12 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
-// TestBracketSameLineReachesTheEngine proves the option is passed, not merely carried.
+// TestBracketSameLineReachesTheFormatter proves the option is passed, not merely carried.
 //
 // A field resolved and never handed to Prettier would pass every resolution test in format_options.
 // This formats the same JSX both ways and requires different bytes, the specific difference being
 // where `>` goes.
-func TestBracketSameLineReachesTheEngine(test *testing.T) {
+func TestBracketSameLineReachesTheFormatter(test *testing.T) {
 	test.Parallel()
 
 	source := "const element = <Component firstAttribute=\"a long value here\" secondAttribute=\"another long value\" third=\"x\">child</Component>;\n"
@@ -21,11 +21,11 @@ func TestBracketSameLineReachesTheEngine(test *testing.T) {
 		options := format_options.Default()
 		options.PrintWidth = 60
 		options.BracketSameLine = sameLine
-		engine, newPrettierError := New(options)
+		formatter, newPrettierError := New(options)
 		if newPrettierError != nil {
 			test.Fatal(newPrettierError)
 		}
-		formatted, formatError := engine.Format("probe.tsx", source)
+		formatted, formatError := formatter.Format("probe.tsx", source)
 		if formatError != nil {
 			test.Fatal(formatError)
 		}

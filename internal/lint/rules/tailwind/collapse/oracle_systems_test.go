@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// oracleCopies are the copies of an engine oracle a test compares against (#f598zk0): the public theme's,
+// oracleCopies are the copies of Tailwind oracle a test compares against (#f598zk0): the public theme's,
 // generated on testdata/public_theme and run on every machine and on CI, and ahra's, the live one the
 // test was written against, opt-in through its corpus. A fixture named name.json has its public copy at
 // name_public.json.

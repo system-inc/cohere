@@ -20,7 +20,7 @@ type Result struct {
 	TwinEdits    []rename.Edit
 	// EncodedFields lists every proposed field the encoding guard found reachable.
 	EncodedFields []EncodedField
-	// The model checks: any entry means the engine's model of Go disagreed with go/types somewhere, and every
+	// The model checks: any entry means the renaming's model of Go disagreed with go/types somewhere, and every
 	// rename the disagreement touched was refused.
 	Unresolved                  []string
 	SelectionModelMismatches    []string

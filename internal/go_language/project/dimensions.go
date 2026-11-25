@@ -74,7 +74,7 @@ type source struct {
 	importsC bool
 }
 
-// readSource is file as source, its bytes taken through read: the engine's reader of what it read once for the run
+// readSource is file as source, its bytes taken through read: cohere-go's reader of what it read once for the run
 // (BuildsFor), or the disk's.
 func readSource(file string, read func(file string) ([]byte, error)) (source, error) {
 	contents, readError := read(file)

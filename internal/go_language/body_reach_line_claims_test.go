@@ -433,7 +433,7 @@ func writeLineClaimFiles(test *testing.T, files map[string]string) string {
 	return root
 }
 
-// runLineClaims runs the engine over a copy of the body-reach-line-claims fixture with files written over it
+// runLineClaims runs cohere-go over a copy of the body-reach-line-claims fixture with files written over it
 // (writeLineClaimFiles), under the census and the body differential, handed differentialCensus's census where it is
 // set (pipeline.bodyDifferentialCensus), and returns windows's census and its differential's failures, the copy's root
 // taken out of each.
@@ -444,10 +444,10 @@ func runLineClaims(
 ) (*buildBodyReach, []string) {
 	test.Helper()
 	root := writeLineClaimFiles(test, files)
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyDifferential = true
-		engine.bodyDifferentialCensus = differentialCensus
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyDifferential = true
+		pipeline.bodyDifferentialCensus = differentialCensus
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
@@ -463,7 +463,7 @@ func runLineClaims(
 	return census, failures
 }
 
-// standingLineClaims runs the engine twice more, each over a copy of the body-reach-line-claims fixture with files
+// standingLineClaims runs cohere-go twice more, each over a copy of the body-reach-line-claims fixture with files
 // written over it, under the census with the standing bodies' switch off, then on, and returns windows's own findings
 // of each run (rawFindings): the second check, which sees a body left standing whose findings are not the host's. And
 // it returns the first run's again in target's file, target.go or target_test.go, each written `rule
@@ -473,9 +473,9 @@ func standingLineClaims(test *testing.T, files map[string]string) (off []string,
 	var found [2][]string
 	for index, switched := range []bool{false, true} {
 		root := writeLineClaimFiles(test, files)
-		standing, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-			engine.standingBodies = switched
+		standing, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			pipeline.standingBodies = switched
 		}, "--no-cache", "--no-fix", "--build-dependence")
 		if len(standing.buildRuns) != 2 || standing.buildRuns[1].build.OperatingSystem != "windows" {
 			test.Fatalf("want the host's build and windows's, got %d runs", len(standing.buildRuns))

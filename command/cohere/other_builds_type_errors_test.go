@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// otherBuildTypeError is the compiler finding record the Go engine writes in the lint phase for a type error only
+// otherBuildTypeError is the compiler finding record cohere-go writes in the lint phase for a type error only
 // another build found: a `_linux.go` file that fails to type-check on linux and is never compiled on the Mac.
 const otherBuildTypeError = `{"kind":"finding","source":"compiler","file":"/project/broken_linux.go","line":3,` +
 	`"column":9,"severity":"error","rule":"","messageId":"UndeclaredName","message":"undefined: missing",` +
@@ -39,7 +39,7 @@ func goStreamWithOtherBuildTypeError(test *testing.T, typeErrors string) []strin
 // A type error only another build finds is a finding of the run (#rw6tg3a): the lint record counts it in typeErrors
 // beside its findings, the front door accepts the record as the stream it came with, and the run reports the type
 // error, counted as one, fails on it, and names the builds it checked. Before, the record counted the rule findings
-// alone, and the front door refused every such run as an engine that broke its contract. A record that leaves the
+// alone, and the front door refused every such run as a child that broke its contract. A record that leaves the
 // type error out of its counts is still refused, so a finding record no count holds never passes unnoticed.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestATypeErrorOnlyAnotherBuildFindsIsAFindingOfTheRun(test *testing.T) {
@@ -47,7 +47,7 @@ func TestATypeErrorOnlyAnotherBuildFindsIsAFindingOfTheRun(test *testing.T) {
 	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
 
 	activeOutput, activeSummary = outputSettings{Mode: outputJson}, runSummary{}
-	output, exitCode, renderError := renderRecordsStartedAt(test, goLanguage("module"), engineModeCheck,
+	output, exitCode, renderError := renderRecordsStartedAt(test, goLanguage("module"), contractModeCheck,
 		goStreamWithOtherBuildTypeError(test, "1"), 1, nil, time.Now())
 	if renderError != nil {
 		test.Fatalf("the front door refused the run: %v\n%s", renderError, output)
@@ -72,7 +72,7 @@ func TestATypeErrorOnlyAnotherBuildFindsIsAFindingOfTheRun(test *testing.T) {
 	}
 
 	activeOutput, activeSummary = outputSettings{Mode: outputJson}, runSummary{}
-	output, _, renderError = renderRecordsStartedAt(test, goLanguage("module"), engineModeCheck,
+	output, _, renderError = renderRecordsStartedAt(test, goLanguage("module"), contractModeCheck,
 		goStreamWithOtherBuildTypeError(test, ""), 1, nil, time.Now())
 	if renderError == nil || !strings.Contains(renderError.Error(), "finding records came with it") {
 		test.Errorf("a lint record that counts no type error beside its finding record was accepted: %v\n%s",

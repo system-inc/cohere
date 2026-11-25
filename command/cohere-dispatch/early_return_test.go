@@ -19,11 +19,11 @@ import (
 
 // A run that returns early gives its caller exactly what a run that waits gives: every byte of stdout and
 // stderr and the exit code, on a clean tree, a tree with findings, one with a type error, and a run whose
-// fixes rewrite a file. Only what the caller does not wait for moves: the engine's cache write, which this
+// fixes rewrite a file. Only what the caller does not wait for moves: cohere's cache write, which this
 // also waits for and reads back (#zqsdzbq, early return).
 func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 	test.Parallel()
-	dispatcher, engine := buildDispatcherAndEngine(test)
+	dispatcher, cohere := buildDispatcherAndCohere(test)
 	scenarios := []struct {
 		name      string
 		files     map[string]string
@@ -60,7 +60,7 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 			}
 			run := func(wait bool) outcome {
 				root := writeEarlyReturnProject(test, scenario.files)
-				command := earlyReturnCommand(dispatcher, engine, root, scenario.arguments...)
+				command := earlyReturnCommand(dispatcher, cohere, root, scenario.arguments...)
 				if wait {
 					command.Env = append(command.Env, "COHERE_WAIT=1")
 				}
@@ -103,7 +103,7 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 				)
 			}
 
-			// The engine finishes alone after an early return, and what it finishes is the cache table: a run that
+			// cohere finishes alone after an early return, and what it finishes is the cache table: a run that
 			// rewrote files records no run of its own, and still writes the sections it produced.
 			deadline := time.Now().Add(30 * time.Second)
 			for {
@@ -115,21 +115,21 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 					break
 				}
 				if time.Now().After(deadline) {
-					test.Fatal("the engine that returned early never wrote its cache table")
+					test.Fatal("cohere that returned early never wrote its cache table")
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
 			if _, statError := os.Stat(
 				filepath.Join(early.root, ".cache", "cohere", "notes-after-return.txt"),
 			); statError == nil {
-				test.Error("the engine left a note after returning, so something it did in the background failed")
+				test.Error("cohere left a note after returning, so something it did in the background failed")
 			}
 		})
 	}
 }
 
-// buildDispatcherAndEngine builds this dispatcher and the engine it runs, from the working tree.
-func buildDispatcherAndEngine(test *testing.T) (dispatcher string, engine string) {
+// buildDispatcherAndCohere builds this dispatcher and cohere it runs, from the working tree.
+func buildDispatcherAndCohere(test *testing.T) (dispatcher string, cohere string) {
 	return buildBinary(test, "cohere-dispatch", "."), buildBinary(test, "cohere", "../cohere")
 }
 
@@ -178,10 +178,10 @@ func writeEarlyReturnProject(test *testing.T, extra map[string]string) string {
 
 // earlyReturnCommand runs the dispatcher on root the way a terminal would, returning early unless the
 // caller adds COHERE_WAIT.
-func earlyReturnCommand(dispatcher string, engine string, root string, arguments ...string) *exec.Cmd {
+func earlyReturnCommand(dispatcher string, cohere string, root string, arguments ...string) *exec.Cmd {
 	command := exec.Command(dispatcher, arguments...)
 	command.Dir = root
-	command.Env = append(os.Environ(), "COHERE_BINARY="+engine, "CI=", "COHERE_WAIT=")
+	command.Env = append(os.Environ(), "COHERE_BINARY="+cohere, "CI=", "COHERE_WAIT=")
 	return command
 }
 
@@ -190,18 +190,18 @@ func earlyReturnCommand(dispatcher string, engine string, root string, arguments
 // could be read half-written, or empty, with a failure to close it swallowed.
 func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(test *testing.T) {
 	test.Parallel()
-	dispatcher, engine := buildDispatcherAndEngine(test)
+	dispatcher, cohere := buildDispatcherAndCohere(test)
 	for round := range 5 {
 		root := writeEarlyReturnProject(test, map[string]string{"Clean.ts": "export const clean = 1;\n"})
 		profilePath := filepath.Join(root, "cpu.pprof")
 		// Output to a file rather than a buffer, as a terminal takes it: a buffer is fed through a pipe the
-		// engine holds open, so the test would wait for the engine to exit and see a whole profile whenever
+		// child holds open, so the test would wait for cohere to exit and see a whole profile whenever
 		// it was written.
 		output, createError := os.Create(filepath.Join(test.TempDir(), "output"))
 		if createError != nil {
 			test.Fatal(createError)
 		}
-		command := earlyReturnCommand(dispatcher, engine, root, "--no-fix", "--profile", profilePath)
+		command := earlyReturnCommand(dispatcher, cohere, root, "--no-fix", "--profile", profilePath)
 		command.Stdout, command.Stderr = output, output
 		runError := command.Run()
 		closeError := output.Close()
@@ -270,18 +270,18 @@ func writeRepositoryProject(test *testing.T) string {
 // ancestor directories, and the shared temporary directory above a test's moves under other processes.
 func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
 	test.Parallel()
-	dispatcher, engine := buildDispatcherAndEngine(test)
+	dispatcher, cohere := buildDispatcherAndCohere(test)
 	root := writeRepositoryProject(test)
 	if output, outputError := earlyReturnCommand(
 		dispatcher,
-		engine,
+		cohere,
 		root,
 		"--no-fix",
 	).CombinedOutput(); outputError != nil {
 		test.Fatalf("the first run failed: %v\n%s", outputError, output)
 	}
 
-	// The first run's engine may still be finishing; taking the lock waits for it.
+	// The first run's child may still be finishing; taking the lock waits for it.
 	lock, openError := os.OpenFile(filepath.Join(root, ".cache", "cohere", "table.lock"), os.O_RDWR, 0)
 	if openError != nil {
 		test.Fatalf("the first run left no table lock: %v", openError)
@@ -292,7 +292,7 @@ func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
 		test.Fatal(flockError)
 	}
 
-	second := earlyReturnCommand(dispatcher, engine, root, "--no-fix")
+	second := earlyReturnCommand(dispatcher, cohere, root, "--no-fix")
 	var output bytes.Buffer
 	second.Stdout, second.Stderr = &output, &output
 	if startError := second.Start(); startError != nil {

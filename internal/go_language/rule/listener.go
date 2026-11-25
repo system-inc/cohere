@@ -9,9 +9,9 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Listener is what one rule hears of a package from the engine's dispatchers, which walk each package once for every
+// Listener is what one rule hears of a package from cohere-go's dispatchers, which walk each package once for every
 // rule rather than once per rule. A rule declares the callbacks it needs and the kinds each is called for, and is
-// called for nothing else. A listener hears one walk, never both: the engine's own intermediate representation's
+// called for nothing else. A listener hears one walk, never both: cohere's own intermediate representation's
 // (IntermediateRepresentation) or the syntax's, and its PackageExit follows that walk. A check keeps no state between
 // packages, never recovers, since the dispatcher recovers per check per package, and never names its rule, since
 // Context.Report stamps the name it was registered under.
@@ -20,7 +20,7 @@ type Listener struct {
 	// fails this rule there and no other on its dispatcher, as it did when the rule walked by itself.
 	Requires []*analysis.Analyzer
 
-	// IntermediateRepresentation is what the listener hears of the walk over the engine's own intermediate
+	// IntermediateRepresentation is what the listener hears of the walk over cohere-go's own intermediate
 	// representation, and nil for a listener of the syntax walk.
 	IntermediateRepresentation *IntermediateRepresentationListener
 
@@ -62,7 +62,7 @@ func (listener *Listener) IsSyntax() bool {
 	return len(listener.Nodes) > 0 || listener.Node != nil || listener.FileEnter != nil || listener.FileExit != nil
 }
 
-// IsIntermediateRepresentation is whether the listener hears the walk over the engine's own intermediate
+// IsIntermediateRepresentation is whether the listener hears the walk over cohere-go's own intermediate
 // representation, declaring IntermediateRepresentation.
 func (listener *Listener) IsIntermediateRepresentation() bool {
 	return listener.IntermediateRepresentation != nil
@@ -70,14 +70,14 @@ func (listener *Listener) IsIntermediateRepresentation() bool {
 
 // Validate refuses a listener that would listen for what it does not declare, or declare what nothing calls: one
 // with no callback at all, one that declares two walks, one with PackageExit alone, which no walk gathers for, one
-// that declares the engine's own intermediate representation's walk with none of its callbacks, kinds listed with no
+// that declares cohere's own intermediate representation's walk with none of its callbacks, kinds listed with no
 // callback to call for them, a kind callback with no kinds, a kind that is a bare nil and so names no type, a kind
 // listed twice, a listener marked FileLocal that declares PackageExit, or a listener marked SyntaxOnly that hears no
 // syntax walk, is not FileLocal, or requires what a syntax-only context does not answer.
 func (listener *Listener) Validate() error {
 	declared := []string{}
 	if listener.IsIntermediateRepresentation() {
-		declared = append(declared, "the engine's own intermediate representation's walk")
+		declared = append(declared, "cohere's own intermediate representation's walk")
 	}
 	if listener.IsSyntax() {
 		declared = append(declared, "the syntax walk")

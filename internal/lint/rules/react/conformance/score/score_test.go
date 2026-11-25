@@ -3,7 +3,7 @@
 // # Why this is a separate package
 //
 // `internal/react_conformance` owns the corpus, the expectation parser, and the categories. It
-// deliberately depends on nothing in cohere's rule engine, so that the instrument cannot be bent by
+// deliberately depends on nothing in cohere's rule run, so that the instrument cannot be bent by
 // the thing it measures, and so that its 0.3s suite stays cheap enough never to be gated.
 //
 // Running a real rule costs a TypeScript program build, which is roughly a second per fixture.

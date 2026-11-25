@@ -118,7 +118,7 @@ func newPlantedStanding(
 }
 
 // options is the checker's options that hand every pass the planted standing bodies, whatever its package, with a
-// dispatcher told from any other analyzer as the engine tells one, and each dispatcher a follower of
+// dispatcher told from any other analyzer as cohere-go tells one, and each dispatcher a follower of
 // checker.Options.StandingAfter where a test sets it.
 func (standing *plantedStanding) options() *checker.Options {
 	return &checker.Options{

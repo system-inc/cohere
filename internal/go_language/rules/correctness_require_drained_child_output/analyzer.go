@@ -1,4 +1,4 @@
-// Package correctness_require_drained_child_output is the Go engine's rule that a child's piped output is read
+// Package correctness_require_drained_child_output is cohere-go's rule that a child's piped output is read
 // before the code waits for the child to exit.
 //
 // exec.Cmd's StdoutPipe and StderrPipe hand back the read end of a pipe the child writes into. The pipe holds about
@@ -44,7 +44,7 @@ var Analyzer = &analysis.Analyzer{
 	Run:      run,
 }
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 
 var pipeUnreadAtWaitMessage = policy.MessageOf(Name, "pipeUnreadAtWait")

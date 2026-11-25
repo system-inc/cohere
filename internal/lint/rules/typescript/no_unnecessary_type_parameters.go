@@ -94,7 +94,7 @@ import (
 //
 // Upstream offers `replaceUsagesWithConstraint` as a suggestion rather than a fix, and that is the
 // right line: rewriting every use of the parameter to its constraint and deleting the parameter
-// changes what the signature means to every caller. A human chooses it; the engine does not apply
+// changes what the signature means to every caller. A human chooses it; the fix pass does not apply
 // it unattended.
 var NoUnnecessaryTypeParameters = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-type-parameters",

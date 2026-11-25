@@ -117,7 +117,7 @@ func TestThePackageCacheLineSaysTheReloads(test *testing.T) {
 }
 
 // The account and the summary `--json` writes name what kept the findings cache from being read or written, which
-// the engine says one by one on stderr alone otherwise, and every write that failed, of which stderr says only the
+// the child says one by one on stderr alone otherwise, and every write that failed, of which stderr says only the
 // first (#27r8r24), and carry nothing of either when there was none, so a run without a problem encodes as it always
 // has.
 func TestThePackageCacheNamesItsProblems(test *testing.T) {

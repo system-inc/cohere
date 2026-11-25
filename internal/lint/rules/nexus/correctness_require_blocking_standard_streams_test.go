@@ -231,11 +231,11 @@ func correctnessRequireBlockingStandardStreamsPhiSocialUpload(
 	return testCase
 }
 
-// correctnessRequireBlockingStandardStreamsLintEngineParity models Structure's spawned
+// correctnessRequireBlockingStandardStreamsLinterParity models Structure's spawned
 // `command-line/StructureLintEngineParity.ts` before and after Structure commit fed59eb3: no `#!`,
 // top-level code with a usage exit, a computed `await import(...)`, and a report printed line by line
 // before the final exit.
-func correctnessRequireBlockingStandardStreamsLintEngineParity(
+func correctnessRequireBlockingStandardStreamsLinterParity(
 	fixed bool,
 ) correctnessRequireBlockingStandardStreamsCase {
 	testCase := correctnessRequireBlockingStandardStreamsCase{lines: []string{
@@ -336,7 +336,7 @@ func TestCorrectnessRequireBlockingStandardStreamsRealSites(test *testing.T) {
 		{"a main().catch script", correctnessRequireBlockingStandardStreamsPhiSocialUpload, "process.exit(1)", nil},
 		{
 			"StructureLintEngineParity",
-			correctnessRequireBlockingStandardStreamsLintEngineParity,
+			correctnessRequireBlockingStandardStreamsLinterParity,
 			"process.exit(1)",
 			nil,
 		},

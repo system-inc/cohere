@@ -26,7 +26,7 @@ type DefaultCaseOptions struct {
 //
 // Anchored at both ends and case-insensitive, so `// no default` and `// NO DEFAULT` excuse the
 // switch while `// no default case here` does not. Compiled with upstream's own source and flags and
-// read as JavaScript reads it, the same engine a user's `commentPattern` goes through, since both
+// read as JavaScript reads it, the same regular expression package a user's `commentPattern` goes through, since both
 // fill the one variable the listener tests (#7mztrdd).
 var defaultCaseDefaultCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 

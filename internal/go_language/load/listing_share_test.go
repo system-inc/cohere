@@ -134,13 +134,13 @@ func TestSharedHooksImportEveryDirectoryAsGoBuildsOwn(test *testing.T) {
 }
 
 // Every extra build's listing is the one it makes with nothing shared, its kept answer and that answer's fingerprint
-// included, as the engine lists them (#5jpss95): the host's through the run's reads alone, then each extra build's
+// included, as cohere-go lists them (#5jpss95): the host's through the run's reads alone, then each extra build's
 // through the reads, the builds' fingerprints and the builds' walks (#tb538na), a first time, keeping its answer, and
 // in the next run, under fingerprints and walks of its own as each run has, a second, reading it kept: under the
 // first run's, each would be answered from what that run remembers (#32594zm), and nothing would be read kept. A
 // fingerprint read once for every build is each build's own, since a directory's
 // fingerprint is of its entries and headers, which no build changes, and so is a walk, which reads only entries. It
-// holds on a module of targeted files, on the engine's cgo fixture, on a module whose builds' kept listings name other
+// holds on a module of targeted files, on cohere-go's cgo fixture, on a module whose builds' kept listings name other
 // directories, and on a go.work root of two modules, whose kept listings name two roots and two go.mod files, each
 // root's walk and each module file its own (#qqyq61s).
 func TestEveryBuildsListingIsItsOwnWithTheRunsTablesShared(test *testing.T) {
@@ -422,7 +422,7 @@ func TestAListingFingerprintIsKeyedByTheDirectoriesItNames(test *testing.T) {
 // A run's fingerprints are never carried into the next (#qqyq61s): a build keeps its listing under one run's
 // fingerprints, an import is added to a file's header, and the next run's build, under fingerprints of its own, reads
 // the edit and asks go list again. It guards that NewFingerprints carries nothing from one to the next; that one is
-// made for each run, in newPipeline, the engine's TestEachRunsPipelineHoldsFingerprintsOfItsOwn pins.
+// made for each run, in newPipeline, cohere-go's TestEachRunsPipelineHoldsFingerprintsOfItsOwn pins.
 func TestAListingFingerprintIsReadAgainEachRun(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()

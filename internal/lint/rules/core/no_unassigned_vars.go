@@ -103,7 +103,7 @@ var NoUnassignedVariables = rule.Rule[rule.NoOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
-				// The engine hands every rule a nil checker when the program could not be built,
+				// The linter hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one. Reporting on a nil checker would be
 				// the worst available behavior here, since it would mean reporting every readable
 				// declaration in the file as never-assigned.

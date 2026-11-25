@@ -13,7 +13,7 @@ import (
 // in it, at the set's own options, whatever the project's chain says: Adamic will not read a disable
 // comment or a departure, so readiness cannot either. So a rule the chain enables is counted as it runs, its
 // findings counted before suppression, and a rule the chain leaves off or never names runs measure-only:
-// its findings are counted and never reported, never fail the run, and never carry a fix to the edit engine.
+// its findings are counted and never reported, never fail the run, and never carry a fix to the fix pass.
 //
 // A rule the chain enables with options of its own is counted at the chain's options, not the set's. Today
 // only ban-ts-comment can differ, and only in a chain that sets it; running it twice to measure the set's

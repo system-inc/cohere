@@ -13,7 +13,7 @@
 // original's place, and the original stays the oracle: the parity tests beside this file run both over the same
 // packages. The two agree everywhere, so there is no differences fixture.
 //
-// The port sits on the engine's syntax dispatcher. The original walks twice, marking every branch a constant rules
+// The port sits on cohere-go's syntax dispatcher. The original walks twice, marking every branch a constant rules
 // out and then judging every shift outside them; the port hears all four kinds on the dispatcher's one preorder walk,
 // marking as it goes, and judges the shifts it gathered once the walk is done, against the marks of the whole package,
 // in the order the original's second walk reads them.

@@ -75,4 +75,4 @@ node test-vscode/run.js /tmp/vsix/cohere-1.0.0.vsix ~/Projects/ahra "$(command -
 It saves a misformatted file in the project and requires the bytes on disk to equal what
 `cohere --fix --format` writes for the same text. Then it saves a file where no cohere can be found
 and requires it saved as typed, and in a Go module saves a misformatted Go file, which must come back as gofmt
-prints it, and a TypeScript file, which the Go engine declines there, and requires it saved as typed.
+prints it, and a TypeScript file, which cohere-go declines there, and requires it saved as typed.

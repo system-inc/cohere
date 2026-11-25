@@ -2,7 +2,7 @@
 // `value.(Target)`, or a case of a type switch on value, where value's static type is an interface holding a method
 // of the same name as one of Target's with a different signature, so no type can implement both. Where either
 // interface holds a free type parameter, in a method or in its type set, the pass says nothing, since it cannot know
-// the signatures it would compare. It sits on the engine's syntax dispatcher, hearing each type assertion and type
+// the signatures it would compare. It sits on cohere-go's syntax dispatcher, hearing each type assertion and type
 // switch on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/ifaceassert/ifaceassert.go, whose

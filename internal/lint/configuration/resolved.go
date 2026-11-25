@@ -254,7 +254,7 @@ func (resolved Resolved) MatchedOverrideIndices() []int {
 	return indices
 }
 
-// UnusedDisable is an engine diagnostic configured in rules, not an AST rule in the registry.
+// UnusedDisable is a linter diagnostic configured in rules, not an AST rule in the registry.
 const UnusedDisable = "unused-disable"
 
 // AbbreviatedFolderName is the folder check discovery makes, configured in rules as UnusedDisable is and no AST rule
@@ -263,9 +263,9 @@ const UnusedDisable = "unused-disable"
 // top-level one, since a folder is no file an override's patterns could match, and unconfigured it is off.
 const AbbreviatedFolderName = "consistency-no-abbreviated-folder-name"
 
-// IsEngineCheck reports whether a rules key configures one of the engine's own checks, UnusedDisable or
+// IsLinterCheck reports whether a rules key configures one of the linter's own checks, UnusedDisable or
 // AbbreviatedFolderName, rather than a rule in the registry.
-func IsEngineCheck(name string) bool {
+func IsLinterCheck(name string) bool {
 	return name == UnusedDisable || name == AbbreviatedFolderName
 }
 

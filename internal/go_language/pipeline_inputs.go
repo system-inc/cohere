@@ -31,7 +31,7 @@ import (
 //
 // In a run of every build the record is every build's (#e4b08k7): each build's load is named, and the directories of
 // the files each build compiled are read for staticcheck.conf, so a replay misses when anything any build read moves.
-func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord {
+func (pipeline *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord {
 	files := map[string]bool{}
 	absent := map[string]bool{}
 	directories := map[string]bool{}
@@ -39,7 +39,7 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 	// host's never does, the standard library's and a module's that only its platform builds among them, and its
 	// verdict is the run's as much as the host's is, so a replay keyed on the host's load alone would serve a stale
 	// verdict after an edit to one of them.
-	for _, inputs := range append([]load.Inputs{loaded.Inputs()}, engine.buildInputs()...) {
+	for _, inputs := range append([]load.Inputs{loaded.Inputs()}, pipeline.buildInputs()...) {
 		for _, file := range inputs.Files {
 			files[file] = true
 		}
@@ -59,11 +59,11 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 		absent[cleaned] = true
 	}
 
-	root := engine.described.workspace.Root
+	root := pipeline.described.workspace.Root
 	fileOrAbsent(filepath.Join(root, "go.work"))
 	fileOrAbsent(filepath.Join(root, "go.mod"))
-	fileOrAbsent(settings.Path(engine.request.root, engine.request.lintConfiguration))
-	for _, unreadable := range engine.described.unreadable {
+	fileOrAbsent(settings.Path(pipeline.request.root, pipeline.request.lintConfiguration))
+	for _, unreadable := range pipeline.described.unreadable {
 		files[filepath.Clean(unreadable.File)] = true
 	}
 
@@ -127,7 +127,7 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 	}
 	// Another build analyzes a package of ours the host's never loads when every file of it is one only that build
 	// compiles, so the directory of each file it compiled is one the rules read staticcheck.conf from too.
-	for _, run := range engine.buildRuns {
+	for _, run := range pipeline.buildRuns {
 		for file := range run.compiled {
 			analyzedDirectories[filepath.Dir(filepath.Clean(file))] = true
 		}
@@ -151,13 +151,13 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 
 // buildInputs is what every build beside the host's loaded, in the order the merge was handed them, and nil for a run
 // of one build, each waited for here, since each build's load collected its inputs beside it (load.Loaded.Inputs).
-// The host's run is first in engine.buildRuns and carries the host's load's inputs, which the record names already.
-func (engine *pipeline) buildInputs() []load.Inputs {
-	if len(engine.buildRuns) < 2 {
+// The host's run is first in pipeline.buildRuns and carries the host's load's inputs, which the record names already.
+func (pipeline *pipeline) buildInputs() []load.Inputs {
+	if len(pipeline.buildRuns) < 2 {
 		return nil
 	}
-	inputs := make([]load.Inputs, 0, len(engine.buildRuns)-1)
-	for _, run := range engine.buildRuns[1:] {
+	inputs := make([]load.Inputs, 0, len(pipeline.buildRuns)-1)
+	for _, run := range pipeline.buildRuns[1:] {
 		inputs = append(inputs, run.inputs())
 	}
 	return inputs

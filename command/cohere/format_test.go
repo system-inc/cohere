@@ -14,12 +14,12 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// fakeEngine stands in for the real formatter so the seam can be tested before the engine exists.
+// fakeFormatter stands in for the real formatter so the seam can be tested before the child exists.
 //
 // It is not a mock of convenience: every outcome the adapter must distinguish is reachable through
 // it, which is what makes these fixtures a test of the mapping rather than a test of goja. The real
-// engine drops in behind the same interface and these keep meaning what they mean.
-type fakeEngine struct {
+// formatter drops in behind the same interface and these keep meaning what they mean.
+type fakeFormatter struct {
 	handled        []string
 	format         func(fileName string, text string) (string, error)
 	enumerate      func(root string) (format_files.Enumeration, error)
@@ -31,8 +31,8 @@ type fakeEngine struct {
 	askedForMutex sync.Mutex
 }
 
-func (engine *fakeEngine) Handles(fileName string) bool {
-	for _, extension := range engine.handled {
+func (formatter *fakeFormatter) Handles(fileName string) bool {
+	for _, extension := range formatter.handled {
 		if strings.HasSuffix(fileName, extension) {
 			return true
 		}
@@ -40,41 +40,41 @@ func (engine *fakeEngine) Handles(fileName string) bool {
 	return false
 }
 
-// Enumerate lets the fake stand in for the real engine on the enumeration path too, so the wiring
+// Enumerate lets the fake stand in for the real formatter on the enumeration path too, so the wiring
 // and the coverage line can be tested without a goja runtime or a real tree.
 //
 // It returns whatever the fixture set, including the account of what the walk removed, because the
 // numbers in that account are the thing under test rather than the walk itself.
-func (engine *fakeEngine) Enumerate(root string) (format_files.Enumeration, error) {
-	engine.enumeratedRoot = root
-	if engine.enumerate != nil {
-		return engine.enumerate(root)
+func (formatter *fakeFormatter) Enumerate(root string) (format_files.Enumeration, error) {
+	formatter.enumeratedRoot = root
+	if formatter.enumerate != nil {
+		return formatter.enumerate(root)
 	}
 	return format_files.Enumeration{Root: root}, nil
 }
 
 // OptionsFingerprint is one fixed configuration, unless the fixture says otherwise.
-func (engine *fakeEngine) OptionsFingerprint(fileName string) (string, error) {
-	if engine.options != nil {
-		return engine.options(fileName)
+func (formatter *fakeFormatter) OptionsFingerprint(fileName string) (string, error) {
+	if formatter.options != nil {
+		return formatter.options(fileName)
 	}
 	return "fake options", nil
 }
 
-func (engine *fakeEngine) Format(fileName string, text string) (string, error) {
-	engine.askedForMutex.Lock()
-	engine.askedFor = append(engine.askedFor, fileName)
-	engine.askedForMutex.Unlock()
-	if engine.format != nil {
-		return engine.format(fileName, text)
+func (formatter *fakeFormatter) Format(fileName string, text string) (string, error) {
+	formatter.askedForMutex.Lock()
+	formatter.askedFor = append(formatter.askedFor, fileName)
+	formatter.askedForMutex.Unlock()
+	if formatter.format != nil {
+		return formatter.format(fileName, text)
 	}
 	return text, nil
 }
 
-// prettierLike is the engine as @system_cohere_format describes it: the extensions it handles today,
+// prettierLike is the child as @system_cohere_format describes it: the extensions it handles today,
 // and a stand-in transform that collapses runs of spaces so a formatted result is observable.
-func prettierLike() *fakeEngine {
-	return &fakeEngine{
+func prettierLike() *fakeFormatter {
+	return &fakeFormatter{
 		handled: []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".md", ".css", ".json"},
 		format: func(_ string, text string) (string, error) {
 			collapsed := text
@@ -152,12 +152,12 @@ func TestHandledFileTypesAreNotSkipped(test *testing.T) {
 	}
 }
 
-// A file that does not parse is a skip rather than a failure. The engine already refuses to fix a
+// A file that does not parse is a skip rather than a failure. The child already refuses to fix a
 // file in that state and says so, and the types phase reports it in a form a reader can act on, so
 // a second complaint from the formatter adds noise rather than information.
 func TestAnUnparseableFileIsSkippedNotFailed(test *testing.T) {
 	test.Parallel()
-	_, formatTransformError := formatTransform(parseFailingEngine())("broken.ts", "function alpha( {\n", nil)
+	_, formatTransformError := formatTransform(parseFailingFormatter())("broken.ts", "function alpha( {\n", nil)
 
 	if !errors.Is(formatTransformError, edit.ErrSkipped) {
 		test.Fatalf("an unparseable file should skip, not fail: %v", formatTransformError)
@@ -170,7 +170,7 @@ func TestAnUnparseableFileIsSkippedNotFailed(test *testing.T) {
 // A well-formed file formats and comes back as text, and the transform is idempotent on its own
 // output.
 //
-// Idempotence is the property the engine's convergence loop assumes and cannot enforce. A formatter
+// Idempotence is the property the child's convergence loop assumes and cannot enforce. A formatter
 // that alternated between two valid outputs would make every run rewrite every file, so a tree
 // would never reach a steady state and every commit would carry churn nobody authored.
 func TestFormattingIsIdempotent(test *testing.T) {
@@ -194,7 +194,7 @@ func TestFormattingIsIdempotent(test *testing.T) {
 }
 
 // Formatting must not change what the code means, which at this layer means the result still
-// parses. The engine checks this too, and checking it here as well is deliberate: the engine's
+// parses. The child checks this too, and checking it here as well is deliberate: the child's
 // guard proves the pipeline is safe, this one proves the transform itself is not the thing
 // generating garbage.
 func TestFormattedOutputStillParses(test *testing.T) {
@@ -232,10 +232,10 @@ func TestExtensionOfNamesTheType(test *testing.T) {
 	}
 }
 
-// parseFailingEngine reports a parse failure the way a real formatter does, as an ordinary error
+// parseFailingFormatter reports a parse failure the way a real formatter does, as an ordinary error
 // with a message rather than a distinct type.
-func parseFailingEngine() *fakeEngine {
-	return &fakeEngine{
+func parseFailingFormatter() *fakeFormatter {
+	return &fakeFormatter{
 		handled: []string{".ts", ".tsx", ".js", ".md"},
 		format: func(fileName string, _ string) (string, error) {
 			return "", fmt.Errorf("prettier: %s does not parse", fileName)
@@ -250,14 +250,14 @@ func parseFailingEngine() *fakeEngine {
 // file type nobody formats, which is the coverage-line failure wearing a different costume.
 func TestAFormatFailureIsNotDowngradedToASkip(test *testing.T) {
 	test.Parallel()
-	engine := &fakeEngine{
+	formatter := &fakeFormatter{
 		handled: []string{".ts"},
 		format: func(_ string, _ string) (string, error) {
 			return "", errors.New("the formatter ran out of memory")
 		},
 	}
 
-	_, formatTransformError := formatTransform(engine)("sample.ts", "const a = 1;\n", nil)
+	_, formatTransformError := formatTransform(formatter)("sample.ts", "const a = 1;\n", nil)
 
 	if formatTransformError == nil {
 		test.Fatalf("a failing formatter reported success")
@@ -270,32 +270,32 @@ func TestAFormatFailureIsNotDowngradedToASkip(test *testing.T) {
 	}
 }
 
-// The engine must not be asked to format a file it does not handle. Asking would mean running the
+// The child must not be asked to format a file it does not handle. Asking would mean running the
 // formatter to learn it should not have run, which on a 3,416-file tree is the difference between a
 // scoped pass and a full one.
-func TestAnUnhandledFileIsNeverHandedToTheEngine(test *testing.T) {
+func TestAnUnhandledFileIsNeverHandedToTheFormatter(test *testing.T) {
 	test.Parallel()
-	engine := prettierLike()
-	transform := formatTransform(engine)
+	formatter := prettierLike()
+	transform := formatTransform(formatter)
 
 	if _, transformError := transform("Makefile", "all:\n", nil); !errors.Is(transformError, edit.ErrSkipped) {
 		test.Fatalf("expected a skip, got %v", transformError)
 	}
-	if len(engine.askedFor) != 0 {
-		test.Fatalf("the engine was asked to format a file it does not handle: %v", engine.askedFor)
+	if len(formatter.askedFor) != 0 {
+		test.Fatalf("the child was asked to format a file it does not handle: %v", formatter.askedFor)
 	}
 
 	if _, transformError := transform("a.ts", "const a = 1;\n", nil); transformError != nil {
 		test.Fatalf("unexpected error: %v", transformError)
 	}
-	if len(engine.askedFor) != 1 || engine.askedFor[0] != "a.ts" {
-		test.Fatalf("the engine was not asked about the file it does handle: %v", engine.askedFor)
+	if len(formatter.askedFor) != 1 || formatter.askedFor[0] != "a.ts" {
+		test.Fatalf("the child was not asked about the file it does handle: %v", formatter.askedFor)
 	}
 }
 
 // A run that did not ask to format is a skip with a reason, never a crash and never a silent pass.
 //
-// A nil engine reaching this code means formatting was not requested, and that must show up in the
+// A nil formatter reaching this code means formatting was not requested, and that must show up in the
 // coverage line rather than as a tree that reports itself perfectly formatted. The reason says so,
 // not that no formatter is configured: a plain --no-fix run on ahra, which has a format block, printed
 // `11 not formatted (11 no formatter is configured)`.
@@ -336,7 +336,7 @@ func TestUnparseableDetectionDiscriminates(test *testing.T) {
 	}
 }
 
-// The real error strings the goja engine produces must be recognized as parse failures.
+// The real error strings goja produces must be recognized as parse failures.
 //
 // These four are measured rather than invented: @system_cohere_format ran four malformations
 // through the fork and reported what came back. They are Prettier's own errors surfacing through
@@ -344,8 +344,8 @@ func TestUnparseableDetectionDiscriminates(test *testing.T) {
 // the stable part and is what the matcher keys on.
 //
 // Pinned here because a matcher tested only against strings I wrote myself is a matcher tested
-// against my imagination. The one that matters is the one the engine actually emits.
-func TestTheEnginesRealParseErrorsAreRecognized(test *testing.T) {
+// against my imagination. The one that matters is the one the child actually emits.
+func TestTheFormattersRealParseErrorsAreRecognized(test *testing.T) {
 	test.Parallel()
 	for _, message := range []string{
 		"SyntaxError: Property assignment expected. (1:12)",
@@ -363,11 +363,11 @@ func TestTheEnginesRealParseErrorsAreRecognized(test *testing.T) {
 }
 
 // The native printers' parse failures must be recognized too, for the reason the goja ones above
-// are pinned: the matcher has to know the errors the engine actually emits, and switching engines
+// are pinned: the matcher has to know the errors the child actually emits, and switching formatters
 // changes who emits them. Measured by formatting malformed source, never written by hand.
-func TestTheNativeEnginesParseErrorsAreRecognized(test *testing.T) {
+func TestTheNativeFormattersParseErrorsAreRecognized(test *testing.T) {
 	test.Parallel()
-	engine, configuredFormatterError := configuredFormatter(true)
+	formatter, configuredFormatterError := configuredFormatter(true)
 	if configuredFormatterError != nil {
 		test.Fatal(configuredFormatterError)
 	}
@@ -381,9 +381,9 @@ func TestTheNativeEnginesParseErrorsAreRecognized(test *testing.T) {
 		"package.json": "{ \"a\": 1, // comments are not allowed in json-stringify\n}\n",
 		"a.graphql":    "query { a(b: ) }\n",
 	} {
-		_, formatError := engine.Format(fileName, malformed)
+		_, formatError := formatter.Format(fileName, malformed)
 		if formatError == nil {
-			test.Errorf("%s: the native engine formatted malformed source without complaint", fileName)
+			test.Errorf("%s: the native formatter formatted malformed source without complaint", fileName)
 			continue
 		}
 		if !isUnparseable(formatError) {
@@ -395,11 +395,11 @@ func TestTheNativeEnginesParseErrorsAreRecognized(test *testing.T) {
 // With formatting off there is no formatter, and saying so is the coverage line's job, not an error.
 func TestFormattingOffConfiguresNoFormatter(test *testing.T) {
 	test.Parallel()
-	engine, configuredFormatterError := configuredFormatter(false)
-	if configuredFormatterError != nil || engine != nil {
+	formatter, configuredFormatterError := configuredFormatter(false)
+	if configuredFormatterError != nil || formatter != nil {
 		test.Fatalf(
 			"formatting off configured %v, %v; want no formatter and no error",
-			engine,
+			formatter,
 			configuredFormatterError,
 		)
 	}
@@ -448,15 +448,15 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(test *testing.T
 	// ahra's options, named rather than resolved: resolving from this test's directory finds no
 	// config and prints at Prettier's default width, where this input settles in one pass.
 	printer := native.Formatter{Options: format_options.Default()}
-	engine := &fakeEngine{handled: []string{".ts"}, format: printer.Format}
+	formatter := &fakeFormatter{handled: []string{".ts"}, format: printer.Format}
 
 	// The premise: one pass really does not settle this input. Without it the case below would pass
 	// on a printer that happened to be idempotent here and prove nothing about the loop.
-	once, formatError := engine.Format("Report.ts", nonIdempotentUnifiChain)
+	once, formatError := formatter.Format("Report.ts", nonIdempotentUnifiChain)
 	if formatError != nil {
 		test.Fatal(formatError)
 	}
-	twice, formatError := engine.Format("Report.ts", once)
+	twice, formatError := formatter.Format("Report.ts", once)
 	if formatError != nil {
 		test.Fatal(formatError)
 	}
@@ -464,7 +464,7 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(test *testing.T
 		test.Fatal("one pass settled the Unifi chain, so this fixture no longer reproduces a non-idempotent input")
 	}
 
-	formatted, formatTransformError := formatTransform(engine)("Report.ts", nonIdempotentUnifiChain, nil)
+	formatted, formatTransformError := formatTransform(formatter)("Report.ts", nonIdempotentUnifiChain, nil)
 	if formatTransformError != nil {
 		test.Fatal(formatTransformError)
 	}
@@ -475,7 +475,7 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(test *testing.T
 			twice,
 		)
 	}
-	again, againError := formatTransform(engine)("Report.ts", formatted, nil)
+	again, againError := formatTransform(formatter)("Report.ts", formatted, nil)
 	if againError != nil {
 		test.Fatal(againError)
 	}
@@ -489,7 +489,7 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(test *testing.T
 // second pass comes back settled, and an already formatted one costs a single pass.
 func TestTheFormatFixpointIsBoundedAndStopsWhenStable(test *testing.T) {
 	test.Parallel()
-	growing := &fakeEngine{
+	growing := &fakeFormatter{
 		handled: []string{".ts"},
 		format:  func(_ string, text string) (string, error) { return text + "x", nil },
 	}
@@ -505,7 +505,7 @@ func TestTheFormatFixpointIsBoundedAndStopsWhenStable(test *testing.T) {
 		test.Fatalf("formatted %d times, want the bound of %d", len(growing.askedFor), formatPassLimit)
 	}
 
-	settling := &fakeEngine{
+	settling := &fakeFormatter{
 		handled: []string{".ts"},
 		format: func(_ string, text string) (string, error) {
 			switch text {

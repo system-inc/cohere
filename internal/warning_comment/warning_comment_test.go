@@ -5,7 +5,7 @@ import (
 )
 
 // Each word comes back naming the comment that holds it and its offsets in that comment's own text, delimiters
-// included, so an engine places it by adding the comment's start. The group is read as one text, so the pair
+// included, so a linter places it by adding the comment's start. The group is read as one text, so the pair
 // wrapped across the second and third comments masks the word inside it, and a word in the third, outside the
 // pair, is still reported there.
 func TestWordsInPlacesEachWordInItsOwnComment(test *testing.T) {
@@ -36,7 +36,7 @@ func TestWordsInPlacesEachWordInItsOwnComment(test *testing.T) {
 	}
 }
 
-// A group with none of the words, and an empty group, return nothing, so an engine with no comments to hand over
+// A group with none of the words, and an empty group, return nothing, so a linter with no comments to hand over
 // reports nothing rather than panicking on an empty join.
 func TestWordsInFindsNothingInAGroupWithoutTheWords(test *testing.T) {
 	test.Parallel()
@@ -90,7 +90,7 @@ func TestWordsInFindsEachWordWhereverItStands(test *testing.T) {
 }
 
 // A group with none of the words is turned away before its bodies are joined, so it allocates nothing, and nearly
-// every group an engine hands over is that. The group has capitals in a row, the words in lowercase, and a word cut
+// every group a linter hands over is that. The group has capitals in a row, the words in lowercase, and a word cut
 // in two across a pair of comments, which the joined text holds only with a newline inside it, so it is no word
 // either way.
 //

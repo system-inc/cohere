@@ -29,7 +29,7 @@ import (
 	"github.com/system-inc/cohere/internal/write_root"
 )
 
-// renamingRules are the rules whose findings ask for a rename the engine applies after the load: each attaches one
+// renamingRules are the rules whose findings ask for a rename cohere-go applies after the load: each attaches one
 // suggestion to a finding whose judgment names exactly one new spelling (see rule.RenameFixes), in this order, which
 // is the order a name both of them ask to rename takes their renames in.
 var renamingRules = []string{consistency_no_abbreviated_identifier.Name, consistency_no_uppercase_initialism.Name}
@@ -84,10 +84,10 @@ func renameOf(found check.Finding) (nameRename, bool) {
 }
 
 // renamingRulesOn are the naming rules the registry holds and the settings leave on, by name.
-func (engine *pipeline) renamingRulesOn() map[string]rule.Rule {
+func (pipeline *pipeline) renamingRulesOn() map[string]rule.Rule {
 	on := map[string]rule.Rule{}
-	for _, registered := range engine.registered {
-		_, enabled := engine.severityOf(registered.Name)
+	for _, registered := range pipeline.registered {
+		_, enabled := pipeline.severityOf(registered.Name)
 		if enabled && slices.Contains(renamingRules, registered.Name) {
 			on[registered.Name] = registered
 		}
@@ -101,17 +101,17 @@ func (engine *pipeline) renamingRulesOn() map[string]rule.Rule {
 // rename rewrites is still printed by gofmt, since a longer name moves gofmt's alignment and leaving it would trade
 // one finding for another, but the long-line wrap, which is formatting, does not run (wrapsLongLines). The editor's
 // save, which asks for `--fix` alone, names the renames rather than making them (nameRenamesLeft), so it lints too.
-func (engine *pipeline) renamesNames() bool {
-	saves := engine.request.stdinPath != ""
-	if engine.fix == nil || !(engine.request.requests(contract.PhaseLint) || saves) {
+func (pipeline *pipeline) renamesNames() bool {
+	saves := pipeline.request.stdinPath != ""
+	if pipeline.fix == nil || !(pipeline.request.requests(contract.PhaseLint) || saves) {
 		return false
 	}
 	for _, mode := range []string{"no-fix", "format-only"} {
-		if engine.request.switches[mode] {
+		if pipeline.request.switches[mode] {
 			return false
 		}
 	}
-	return len(engine.renamingRulesOn()) > 0
+	return len(pipeline.renamingRulesOn()) > 0
 }
 
 // runRename is the part of the fix phase that needs types: the renames the naming rules ask for. The lint phase's rules
@@ -123,26 +123,26 @@ func (engine *pipeline) renamesNames() bool {
 // findings and the cache's keys are of the bytes it replaced. That load is its own, rather than the last round's
 // proof, since the proof keeps no dependency's syntax and the lint's rules learn facts from every dependency's
 // syntax; it reads the bytes the proof proved, which are on disk now. Its error is that load's, or loadError.
-func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.Loaded, *lintPass, error) {
-	if !engine.renamesNames() || loadError != nil || len(loaded.Diagnostics) > 0 {
+func (pipeline *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.Loaded, *lintPass, error) {
+	if !pipeline.renamesNames() || loadError != nil || len(loaded.Diagnostics) > 0 {
 		return loaded, nil, loadError
 	}
 	started := time.Now()
 	var first lintPass
-	if engine.speculation != nil {
+	if pipeline.speculation != nil {
 		// The pass beside the load is the lint over this load. Its own time ran beside the types; what the run waits
 		// for it here is the lint phase's, as runLint counts it.
-		first = engine.speculativePass()
+		first = pipeline.speculativePass()
 		first.elapsed = time.Since(started)
 	} else {
-		first = engine.lint(loaded)
+		first = pipeline.lint(loaded)
 	}
 	if first.checkError != nil {
 		return loaded, &first, loadError
 	}
-	asked := engine.askedRenames(first.outcome().kept)
-	if engine.request.stdinPath != "" {
-		engine.nameRenamesLeft(asked)
+	asked := pipeline.askedRenames(first.outcome().kept)
+	if pipeline.request.stdinPath != "" {
+		pipeline.nameRenamesLeft(asked)
 		return loaded, &first, loadError
 	}
 	if len(asked) == 0 {
@@ -150,26 +150,26 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 	}
 	if loaded.CgoTranslated {
 		for _, refused := range asked {
-			engine.refuseRename(refused, engine.spelledAt(refused), refusedCgo,
+			pipeline.refuseRename(refused, pipeline.spelledAt(refused), refusedCgo,
 				"the cgo tool reads its files from disk, so the rewrite cannot be loaded before it is written")
 		}
 		return loaded, &first, loadError
 	}
-	written := engine.rename(asked)
+	written := pipeline.rename(asked)
 	if written == nil {
 		// Nothing was written, so the first load and its lint pass are still of the tree on disk. What this cost was
 		// the fix phase's, but the lint pass, which the lint phase reports.
-		engine.fix.elapsed += time.Since(started) - first.elapsed
+		pipeline.fix.elapsed += time.Since(started) - first.elapsed
 		return loaded, &first, loadError
 	}
-	engine.renamed = true
+	pipeline.renamed = true
 	// The first load and its lint pass served only the rename, and the load of what it wrote is the types phase's. The
 	// last round's proof is unread from here, so it goes as the written tree loads.
-	engine.fix.elapsed += loaded.Elapsed + time.Since(started)
+	pipeline.fix.elapsed += loaded.Elapsed + time.Since(started)
 	// A load of the host's, counted for the round of the lint pass over it under `--timeline`, though it stamps
 	// nothing.
-	engine.hostLoads.Add(1)
-	reloaded, reloadError := engine.loadPackages(loadRequest{environment: engine.described.workspace.Environment()})
+	pipeline.hostLoads.Add(1)
+	reloaded, reloadError := pipeline.loadPackages(loadRequest{environment: pipeline.described.workspace.Environment()})
 	return reloaded, nil, reloadError
 }
 
@@ -178,18 +178,18 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 // others' references broken. Named from the first lint pass's findings rather than planned, since a plan loads the
 // tree again under every platform, which a save cannot wait for to name what it will not apply. A run over the tree
 // makes them.
-func (engine *pipeline) nameRenamesLeft(asked []nameRename) {
+func (pipeline *pipeline) nameRenamesLeft(asked []nameRename) {
 	for _, each := range asked {
-		if each.file != engine.request.stdinPath {
+		if each.file != pipeline.request.stdinPath {
 			continue
 		}
-		engine.note("%s:%d:%d: left for a run over the %s: `%s` asks `%s` to be `%s`", each.file, each.line,
-			each.column, engine.described.container(), each.rule, engine.spelledAt(each), each.newName)
+		pipeline.note("%s:%d:%d: left for a run over the %s: `%s` asks `%s` to be `%s`", each.file, each.line,
+			each.column, pipeline.described.container(), each.rule, pipeline.spelledAt(each), each.newName)
 	}
 }
 
 // askedRenames are the renames the kept findings ask for, in the order of renamingRules and then of the findings.
-func (engine *pipeline) askedRenames(kept []check.Finding) []nameRename {
+func (pipeline *pipeline) askedRenames(kept []check.Finding) []nameRename {
 	var asked []nameRename
 	for _, found := range kept {
 		if renamed, renames := renameOf(found); renames {
@@ -226,16 +226,16 @@ type renameRound struct {
 // written together, once, as one set (see writeRenamed), and the last round's proof is the load of what is on disk.
 // The plan reads only the roots' syntax and type maps, so the load to plan over keeps no dependency's
 // (load.PackagesWithRootSyntax).
-func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
-	current, loadError := engine.loadPackages(loadRequest{
-		environment: engine.described.workspace.Environment(), rootSyntaxOnly: true,
+func (pipeline *pipeline) rename(firstAsked []nameRename) *load.Loaded {
+	current, loadError := pipeline.loadPackages(loadRequest{
+		environment: pipeline.described.workspace.Environment(), rootSyntaxOnly: true,
 	})
 	if loadError == nil && len(current.Diagnostics) > 0 {
 		loadError = fmt.Errorf("it found %d errors the first load did not", len(current.Diagnostics))
 	}
 	if loadError != nil {
 		for _, refused := range firstAsked {
-			engine.refuseRename(refused, engine.spelledAt(refused), refusedUnproven,
+			pipeline.refuseRename(refused, pipeline.spelledAt(refused), refusedUnproven,
 				"the load to plan it over failed: "+oneLine(loadError))
 		}
 		return nil
@@ -251,7 +251,7 @@ func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
 	renamedTo := map[[2]string]bool{}
 	declined := map[string]string{}
 	for round := 1; round <= renameRounds && len(asked) > 0; round++ {
-		result := engine.renameOnce(current, overlay, asked)
+		result := pipeline.renameOnce(current, overlay, asked)
 		if result.proof == nil {
 			break
 		}
@@ -280,16 +280,16 @@ func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
 		}
 		maps.Copy(declined, result.declined)
 		if round < renameRounds {
-			asked = engine.askedOver(current, overlay)
+			asked = pipeline.askedOver(current, overlay)
 		}
 	}
-	if proven == nil || !engine.writeRenamed(overlay, fixedBy, wrapped, applied) {
+	if proven == nil || !pipeline.writeRenamed(overlay, fixedBy, wrapped, applied) {
 		return nil
 	}
 	for _, file := range slices.Sorted(maps.Keys(declined)) {
 		// Not a gap, as the wrap after the load says of its own: the file holds gofmt's output of the rename, and the
 		// lint phase reports every long line in it.
-		engine.note("%s: its long lines were not wrapped, so they stay findings: %s", file, declined[file])
+		pipeline.note("%s: its long lines were not wrapped, so they stay findings: %s", file, declined[file])
 	}
 	return proven
 }
@@ -302,27 +302,27 @@ func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
 // refused as unwritable and its finding stands, and it returns false. A set it could not put back is a gap, named. A
 // set holding a file outside the root, which renameOnce's writable keeps out of every plan, is refused as such and the
 // file withheld, should one reach here.
-func (engine *pipeline) writeRenamed(
+func (pipeline *pipeline) writeRenamed(
 	overlay map[string][]byte, fixedBy map[string]map[string]int, wrapped map[string]int, applied []askedProposal,
 ) bool {
-	partlyWritten, writeError := format.WriteAllAtomically(engine.writeRoot, overlay)
+	partlyWritten, writeError := format.WriteAllAtomically(pipeline.writeRoot, overlay)
 	for _, file := range slices.Sorted(maps.Keys(overlay)) {
-		engine.reread(file)
+		pipeline.reread(file)
 	}
 	if writeError != nil {
 		reason := refusedUnwritable
 		var outside *write_root.OutsideRootError
 		if errors.As(writeError, &outside) {
 			reason = refusedOutsideRoot
-			engine.withhold(outside.File, outside.RealPath)
+			pipeline.withhold(outside.File, outside.RealPath)
 		}
 		for _, renamed := range applied {
-			engine.refuseRename(renamed.rename, renamed.oldName, reason, "the files it rewrites could not "+
+			pipeline.refuseRename(renamed.rename, renamed.oldName, reason, "the files it rewrites could not "+
 				"all be written, so none was: "+oneLine(writeError))
 		}
 		if len(partlyWritten) > 0 {
-			engine.incomplete = true
-			engine.note("%s hold a rename and could not be put back after the rest of its files failed to write, so "+
+			pipeline.incomplete = true
+			pipeline.note("%s hold a rename and could not be put back after the rest of its files failed to write, so "+
 				"the tree on disk is half renamed", strings.Join(partlyWritten, ", "))
 		}
 		return false
@@ -336,23 +336,23 @@ func (engine *pipeline) writeRenamed(
 			counts[consistency_no_long_line.Name] += wrapped[file]
 		}
 		for _, count := range counts {
-			engine.fix.record.FixesApplied += count
+			pipeline.fix.record.FixesApplied += count
 		}
-		index := slices.IndexFunc(engine.fix.record.ChangedFiles, func(changed contract.ChangedFile) bool {
+		index := slices.IndexFunc(pipeline.fix.record.ChangedFiles, func(changed contract.ChangedFile) bool {
 			return changed.File == file
 		})
 		if index < 0 {
-			engine.fix.record.FilesRewritten++
-			engine.fix.record.ChangedFiles = append(engine.fix.record.ChangedFiles,
+			pipeline.fix.record.FilesRewritten++
+			pipeline.fix.record.ChangedFiles = append(pipeline.fix.record.ChangedFiles,
 				contract.ChangedFile{File: file, FixedBy: counts, Formatted: false})
 			continue
 		}
 		for name, count := range counts {
-			engine.fix.record.ChangedFiles[index].FixedBy[name] += count
+			pipeline.fix.record.ChangedFiles[index].FixedBy[name] += count
 		}
 	}
 	// In the order of the files' names, as gofmt's and the wrap's entries are.
-	slices.SortStableFunc(engine.fix.record.ChangedFiles, func(left, right contract.ChangedFile) int {
+	slices.SortStableFunc(pipeline.fix.record.ChangedFiles, func(left, right contract.ChangedFile) int {
 		return cmp.Compare(left.File, right.File)
 	})
 	return true
@@ -364,34 +364,34 @@ func (engine *pipeline) writeRenamed(
 // under its expected name (global_rename.Compare). A proof that fails names the renames it caught, which are dropped
 // and the rest planned and proven again, at most renameRounds times. Every rename asked for is accounted once: in
 // the proven rewrite, or refused with its reason. Its proof is nil when nothing was proven.
-func (engine *pipeline) renameOnce(current *load.Loaded, overlay map[string][]byte, asked []nameRename) renameRound {
+func (pipeline *pipeline) renameOnce(current *load.Loaded, overlay map[string][]byte, asked []nameRename) renameRound {
 	// A file in scope, or one the build constraints leave out here inside the scope's paths, which a rename proven
 	// under the platform that builds it may write, and only when its real path is inside the root: a plan never
 	// reaches a file through a link to somewhere else, and refuseRejected names the file it would have edited.
 	writable := func(filename string) bool {
-		if !engine.described.inScopeSet[filename] && !engine.described.constrainedInScope[filename] {
+		if !pipeline.described.inScopeSet[filename] && !pipeline.described.constrainedInScope[filename] {
 			return false
 		}
-		_, inside, resolveError := engine.writeRoot.Inside(filename)
+		_, inside, resolveError := pipeline.writeRoot.Inside(filename)
 		return resolveError == nil && inside
 	}
-	space := workspace.FromLoaded(engine.described.workspace.Root, current.Roots, current.Packages, writable)
-	proposals, askedBy := engine.proposals(current, asked)
+	space := workspace.FromLoaded(pipeline.described.workspace.Root, current.Roots, current.Packages, writable)
+	proposals, askedBy := pipeline.proposals(current, asked)
 	// Types can't prove a name nothing spells but a string: an encoder reading a field by its name, a template or
 	// reflect calling a member by it, a literal spelling it. So an untagged encoded field is declined rather than given
 	// a tag that keeps the old key (TagEncodedFields), and the string-literal guard reviews no literal away.
 	// A rename that reaches a package holding a file only another platform builds is read and proven under that
-	// platform, through the engine's own load of it (platformLoad), and refused, naming the platform, when that load
+	// platform, through cohere-go's own load of it (platformLoad), and refused, naming the platform, when that load
 	// fails or the package does not type-check there. Only a platform a planned rename reaches is loaded.
 	options := global_rename.Options{
 		RenameImplementations: true,
 		TagEncodedFields:      false,
 		ReviewedLiterals:      nil,
 		PinnedLibraries:       map[string]string{},
-		LoadPlatform:          engine.platformLoad(space, overlay),
+		LoadPlatform:          pipeline.platformLoad(space, overlay),
 		RequireSoundPlatforms: true,
 	}
-	for _, on := range engine.renamingRulesOn() {
+	for _, on := range pipeline.renamingRulesOn() {
 		if !rule.RenamesExports(on.Analyzer) {
 			continue
 		}
@@ -411,7 +411,7 @@ func (engine *pipeline) renameOnce(current *load.Loaded, overlay map[string][]by
 		if len(last.Accepted) == 0 {
 			break
 		}
-		proved := engine.prove(space, overlay, last, options)
+		proved := pipeline.prove(space, overlay, last, options)
 		failures := proved.failures
 		if len(failures) == 0 {
 			proven = renameRound{
@@ -437,11 +437,11 @@ func (engine *pipeline) renameOnce(current *load.Loaded, overlay map[string][]by
 		break
 	}
 	if last != nil {
-		engine.refuseRejected(last, askedBy)
+		pipeline.refuseRejected(last, askedBy)
 	}
 	for _, asked := range askedBy {
 		if reason, failed := unproven[[2]string{asked.oldName, asked.rename.newName}]; failed {
-			engine.refuseRename(asked.rename, asked.oldName, refusedUnproven, reason)
+			pipeline.refuseRename(asked.rename, asked.oldName, refusedUnproven, reason)
 		}
 	}
 	return proven
@@ -457,7 +457,7 @@ type askedProposal struct {
 // declares the name in current, by file and byte offset. A rename whose finding stands on no declaration, or that
 // renames an exported name of an importable package for a rule without renameExports, is refused here; two renames of
 // one declaration keep the first, and the second is asked again by the next round if it still stands.
-func (engine *pipeline) proposals(
+func (pipeline *pipeline) proposals(
 	current *load.Loaded, asked []nameRename,
 ) ([]global_rename.Proposal, []askedProposal) {
 	type declared struct {
@@ -477,20 +477,20 @@ func (engine *pipeline) proposals(
 			}
 		}
 	}
-	rules := engine.renamingRulesOn()
+	rules := pipeline.renamingRulesOn()
 	var proposals []global_rename.Proposal
 	var askedBy []askedProposal
 	proposed := map[types.Object]bool{}
 	for _, each := range asked {
 		// Keyed by the name its finding stands on, as the bytes this round reads spell it, which needs no declaration:
 		// a rename refused in an earlier round whose finding still stands is not asked for, or counted, again.
-		spelled := engine.spelledAt(each)
-		if engine.refusedRenames[[3]string{each.file, spelled, each.newName}] {
+		spelled := pipeline.spelledAt(each)
+		if pipeline.refusedRenames[[3]string{each.file, spelled, each.newName}] {
 			continue
 		}
 		found, held := declarations[rename.EditKey{Filename: each.file, Offset: each.offset}]
 		if !held {
-			engine.refuseRename(each, spelled, refusedNotDeclared, "no identifier declares a name at its position")
+			pipeline.refuseRename(each, spelled, refusedNotDeclared, "no identifier declares a name at its position")
 			continue
 		}
 		if proposed[found.object] {
@@ -498,7 +498,7 @@ func (engine *pipeline) proposals(
 		}
 		if exportedFromImportable(found.owner, found.object, each.file) &&
 			!rule.RenamesExports(rules[each.rule].Analyzer) {
-			engine.refuseRename(each, found.object.Name(), refusedExported, fmt.Sprintf("%s is importable, so code "+
+			pipeline.refuseRename(each, found.object.Name(), refusedExported, fmt.Sprintf("%s is importable, so code "+
 				"outside the workspace may name it; set renameExports on %s when the workspace is the whole world",
 				found.owner.PkgPath, each.rule))
 			continue
@@ -513,8 +513,8 @@ func (engine *pipeline) proposals(
 
 // spelledAt is the name a rename's finding stands on, as the bytes the run holds for its file spell it: the file as
 // read, or as the last proven round rewrote it (see askedOver). Empty when the run holds no such bytes.
-func (engine *pipeline) spelledAt(asked nameRename) string {
-	contents, held := engine.described.contents[asked.file]
+func (pipeline *pipeline) spelledAt(asked nameRename) string {
+	contents, held := pipeline.described.contents[asked.file]
 	if !held || asked.offset < 0 || asked.end > len(contents) || asked.offset > asked.end {
 		return ""
 	}
@@ -557,7 +557,7 @@ type rewriteProof struct {
 
 // prove rewrites result's files over overlay, wraps each as the fix phase does, and loads the workspace from source
 // reading them (see rewriteProof).
-func (engine *pipeline) prove(
+func (pipeline *pipeline) prove(
 	space *workspace.Workspace, overlay map[string][]byte, result *global_rename.Result, options global_rename.Options,
 ) rewriteProof {
 	everyRename := func(reason string) map[[2]string]string {
@@ -576,8 +576,8 @@ func (engine *pipeline) prove(
 	// gofmt does. A longer name can push a line past the limit, so in a run that wraps each file is wrapped through the
 	// fix phase's own step and hook, with the long-file guard and every comment rule; a declined wrap keeps gofmt's
 	// output, its long lines stay findings, and its reason is noted once the set is written.
-	wraps := engine.wrapsLongLines()
-	wrap := engine.longLineWrap()
+	wraps := pipeline.wrapsLongLines()
+	wrap := pipeline.longLineWrap()
 	next := maps.Clone(overlay)
 	wrapped := map[string]int{}
 	declined := map[string]string{}
@@ -594,8 +594,8 @@ func (engine *pipeline) prove(
 	}
 	// The proof keeps no dependency's syntax either: what reads it is the next round's plan and the naming rules
 	// (askedOver), which learn no facts, and the lint phase loads the written tree whole for itself (runRename).
-	proof, proofError := engine.loadPackages(loadRequest{
-		environment: engine.described.workspace.Environment(), overlay: next, withOverlay: true, rootSyntaxOnly: true,
+	proof, proofError := pipeline.loadPackages(loadRequest{
+		environment: pipeline.described.workspace.Environment(), overlay: next, withOverlay: true, rootSyntaxOnly: true,
 	})
 	if proofError != nil {
 		return rewriteProof{failures: everyRename("the load of the rewrite failed: " + oneLine(proofError))}
@@ -606,10 +606,10 @@ func (engine *pipeline) prove(
 			diagnostic.Message)
 		keepFirst(failures, renamesIn(result, diagnostic.File, reason, everyRename))
 	}
-	proved := workspace.FromLoaded(engine.described.workspace.Root, proof.Roots, proof.Packages, nil)
+	proved := workspace.FromLoaded(pipeline.described.workspace.Root, proof.Roots, proof.Packages, nil)
 	keepFirst(failures, mismatchedRenames(result, global_rename.Compare(expectation, proved).Mismatches,
 		"the rewrite reads back otherwise: ", everyRename))
-	// The rewrite is proven under every platform the plan read files under too, through the engine's own load for that
+	// The rewrite is proven under every platform the plan read files under too, through cohere-go's own load for that
 	// platform (platformLoad), with no package that type-checked there before failing after and no mismatch. A
 	// failure there names the renames that reached that platform's files, or every rename when none did.
 	// held are the files a load that proved the rewrite type-checked: the host's, every one of which it checked with
@@ -643,14 +643,14 @@ func (engine *pipeline) prove(
 		if held[filepath.Clean(file)] {
 			continue
 		}
-		relative := strings.TrimPrefix(file, engine.described.workspace.Root+string(filepath.Separator))
+		relative := strings.TrimPrefix(file, pipeline.described.workspace.Root+string(filepath.Separator))
 		keepFirst(failures, renamesIn(result, file, "no load type-checked "+relative+", the host's or any "+
 			"platform's, so its rewrite is unproven", everyRename))
 	}
 	return rewriteProof{proof: proof, overlay: next, wrapped: wrapped, declined: declined, failures: failures}
 }
 
-// platformLoad is the tree as a platform builds it, for the plan and the platform's proof: the engine's own load from
+// platformLoad is the tree as a platform builds it, for the plan and the platform's proof: cohere-go's own load from
 // source, with `GOOS` and `GOARCH` set and cgo off, its root packages sorted into what type-checks there and what
 // does not (workspace.PlatformLoadOf), with space's judgment of which files may be written. It reads base, the
 // round's rewrite so far, in place of the disk, as the host's load of the round does, and each call's overlay over
@@ -659,16 +659,16 @@ func (engine *pipeline) prove(
 // load live beside the proof's, about 1.5 GB each on cohere at deeafbf4, and ran the collector without letting up
 // (#djk8cfd). A round that plans again after a failed proof loads each platform again. Neither the plan nor the proof
 // reads a dependency's syntax there, so the load keeps none (load.PackagesWithRootSyntax).
-func (engine *pipeline) platformLoad(
+func (pipeline *pipeline) platformLoad(
 	space *workspace.Workspace, base map[string][]byte,
 ) func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
 	return func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
 		merged := map[string][]byte{}
 		maps.Copy(merged, base)
 		maps.Copy(merged, overlay)
-		environment := append(slices.Clone(engine.described.workspace.Environment()),
+		environment := append(slices.Clone(pipeline.described.workspace.Environment()),
 			"GOOS="+platform.OperatingSystem, "GOARCH="+platform.Architecture, "CGO_ENABLED=0")
-		loaded, loadError := engine.loadPackages(loadRequest{
+		loaded, loadError := pipeline.loadPackages(loadRequest{
 			environment: environment, overlay: merged, withOverlay: true, rootSyntaxOnly: true,
 		})
 		if loadError != nil {
@@ -785,7 +785,7 @@ func acceptedAsked(result *global_rename.Result, askedBy []askedProposal) []aske
 // refuseRejected refuses each rename asked for that the plan rejected, matched by where its declaration stands, with
 // the plan's reason, under the reason the fix record counts it by. A file the plan may not edit because its real path
 // is outside the root is refused as such, and withheld, so writeFix names it.
-func (engine *pipeline) refuseRejected(result *global_rename.Result, askedBy []askedProposal) {
+func (pipeline *pipeline) refuseRejected(result *global_rename.Result, askedBy []askedProposal) {
 	for _, rejection := range result.Rejections {
 		for _, asked := range askedBy {
 			if rejection.Position.Filename != asked.rename.file || rejection.Position.Offset != asked.rename.offset {
@@ -795,43 +795,43 @@ func (engine *pipeline) refuseRejected(result *global_rename.Result, askedBy []a
 			switch rejection.Class {
 			case "file":
 				reason = refusedUnwritable
-				if realPath, outside := engine.outsideRoot(rejection.File); outside {
+				if realPath, outside := pipeline.outsideRoot(rejection.File); outside {
 					reason = refusedOutsideRoot
-					engine.withhold(rejection.File, realPath)
+					pipeline.withhold(rejection.File, realPath)
 				}
 			case "platform":
 				reason = refusedPlatform
 			}
-			engine.refuseRename(asked.rename, asked.oldName, reason, rejection.Reason)
+			pipeline.refuseRename(asked.rename, asked.oldName, reason, rejection.Reason)
 		}
 	}
 }
 
 // outsideRoot is file's real path, and whether it is outside the root: false for no file, and for one that cannot be
 // resolved, which is refused as unwritable and never named as reached through a link.
-func (engine *pipeline) outsideRoot(file string) (string, bool) {
+func (pipeline *pipeline) outsideRoot(file string) (string, bool) {
 	if file == "" {
 		return "", false
 	}
-	realPath, inside, resolveError := engine.writeRoot.Inside(file)
+	realPath, inside, resolveError := pipeline.writeRoot.Inside(file)
 	return realPath, resolveError == nil && !inside
 }
 
 // refuseRename counts one rename as refused in the fix record, under reason, and says on stderr which and why. oldName
 // is the name it would have renamed, as its finding's span spells it (spelledAt), and keys the refusal, so a later
 // round does not count it again; empty only when the run holds no bytes for its file.
-func (engine *pipeline) refuseRename(refused nameRename, oldName string, reason string, detail string) {
-	if engine.refusedRenames == nil {
-		engine.refusedRenames = map[[3]string]bool{}
+func (pipeline *pipeline) refuseRename(refused nameRename, oldName string, reason string, detail string) {
+	if pipeline.refusedRenames == nil {
+		pipeline.refusedRenames = map[[3]string]bool{}
 	}
-	engine.refusedRenames[[3]string{refused.file, oldName, refused.newName}] = true
-	engine.fix.record.FixesRefused++
-	engine.fix.record.RefusalsByReason[reason]++
+	pipeline.refusedRenames[[3]string{refused.file, oldName, refused.newName}] = true
+	pipeline.fix.record.FixesRefused++
+	pipeline.fix.record.RefusalsByReason[reason]++
 	what := "the name"
 	if oldName != "" {
 		what = oldName
 	}
-	engine.note("%s:%d:%d: %s was not renamed to %s, %s: %s", refused.file, refused.line, refused.column, what,
+	pipeline.note("%s:%d:%d: %s was not renamed to %s, %s: %s", refused.file, refused.line, refused.column, what,
 		refused.newName, reason, detail)
 }
 
@@ -839,8 +839,8 @@ func (engine *pipeline) refuseRename(refused nameRename, oldName string, reason 
 // overlay: the two rules alone, without the findings cache, whose keys are of the bytes on disk, and the
 // //cohere:ignore comments read from the rewrite. Neither rule learns facts, so no package below the analyzed ones is
 // analyzed, and the load keeps the syntax the next plan and the lint phase read.
-func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byte) []nameRename {
-	on := engine.renamingRulesOn()
+func (pipeline *pipeline) askedOver(current *load.Loaded, overlay map[string][]byte) []nameRename {
+	on := pipeline.renamingRulesOn()
 	naming := make([]rule.Rule, 0, len(on))
 	names := make([]string, 0, len(on))
 	run := make([]*analysis.Analyzer, 0, len(on))
@@ -855,7 +855,7 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 		// current's roots, would read a root with no types. A listener registered on the dispatcher for a rule this run
 		// leaves out teaches nothing here, since the run never runs what it requires.
 		if learner := check.FactLearner(on[name].Analyzer, run); learner != nil {
-			engine.note("%s learns facts through %s, so its renames are not asked for again after a round", name,
+			pipeline.note("%s learns facts through %s, so its renames are not asked for again after a round", name,
 				learner.Name)
 			return nil
 		}
@@ -864,17 +864,17 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	}
 	// current parsed the rewrite from overlay, which is not on disk yet, so a rule reads it from there.
 	result, checkError := check.Run(current.Packages, naming, check.Options{
-		SingleThreaded: engine.request.switches["single-threaded"],
-		ReadFile:       engine.sourceReader(overlay, current.Rewritten),
-		Timing:         engine.timing,
+		SingleThreaded: pipeline.request.switches["single-threaded"],
+		ReadFile:       pipeline.sourceReader(overlay, current.Rewritten),
+		Timing:         pipeline.timing,
 	})
 	if checkError != nil {
-		engine.note("the naming rules could not run over the renamed tree, so no further round renames: %v",
+		pipeline.note("the naming rules could not run over the renamed tree, so no further round renames: %v",
 			checkError)
 		return nil
 	}
 	for file, contents := range overlay {
-		engine.described.contents[file] = contents
+		pipeline.described.contents[file] = contents
 	}
 	// A guard, not what keeps the fingerprints right today (#t7h2sm4): no load between here and writeRenamed reads
 	// the run's fingerprints, since each is a loadPackages without the host's caching, and a proven round, which
@@ -882,7 +882,7 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	// written or not. The editor's save, whose rereads change nothing, names its renames rather than making them, so
 	// it never comes here. The call keeps a load added here later from reading the fingerprints of the bytes before
 	// the rename.
-	engine.heldChanged()
-	suppressed := engine.suppress(names, engine.inScope(result.Findings), engine.described.readable())
-	return engine.askedRenames(suppressed.kept)
+	pipeline.heldChanged()
+	suppressed := pipeline.suppress(names, pipeline.inScope(result.Findings), pipeline.described.readable())
+	return pipeline.askedRenames(suppressed.kept)
 }

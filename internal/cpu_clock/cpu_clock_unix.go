@@ -1,7 +1,7 @@
 //go:build darwin || linux
 
 // Package cpu_clock reads the kernel's CPU clocks: a thread's, the process's and its children's, so the TypeScript
-// walk's --timing and the Go engine's read one clock the same way.
+// walk's --timing and cohere-go's read one clock the same way.
 package cpu_clock
 
 import (

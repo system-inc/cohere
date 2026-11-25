@@ -13,7 +13,7 @@ import (
 func readSetRun(test *testing.T, body string) (warm cachedRun, warmFindings int, uncachedFindings int, root string) {
 	test.Helper()
 	root = copyFixture(test, filepath.Join("testdata", "read-set"))
-	cold := runCachedEngine(test, root)
+	cold := runCached(test, root)
 	if found := strings.Count(cold.stream, `"rule":"cohere-go/SA4017"`); found != 1 {
 		test.Fatalf("want SA4017's one finding on the dropped call to the pure bottom.Double cold, got %d", found)
 	}
@@ -29,8 +29,8 @@ func readSetRun(test *testing.T, body string) (warm cachedRun, warmFindings int,
 	if writeError := os.WriteFile(file, []byte(edited), 0o644); writeError != nil {
 		test.Fatalf("editing %s: %v", file, writeError)
 	}
-	warm = runCachedEngine(test, root)
-	uncached := runCachedEngine(test, root, "--no-cache")
+	warm = runCached(test, root)
+	uncached := runCached(test, root, "--no-cache")
 	return warm, strings.Count(warm.stream, `"rule":"cohere-go/SA4017"`),
 		strings.Count(uncached.stream, `"rule":"cohere-go/SA4017"`), root
 }
@@ -65,7 +65,7 @@ func TestAnImporterWhoseReadsHoldIsRestoredByItsSecondKey(test *testing.T) {
 	if warm.counts.Hit != 1 || warm.counts.Missed != 1 {
 		test.Fatalf("want bottom missed and top restored by its second key, got %+v", warm.counts)
 	}
-	again := runCachedEngine(test, root)
+	again := runCached(test, root)
 	if again.counts.Hit != 2 || again.counts.Missed != 0 || again.counts.Waves != 0 ||
 		again.withoutCounts != warm.withoutCounts {
 		test.Fatalf("want both restored, top by its alias, with no wave and the warm run's stream, got %+v",

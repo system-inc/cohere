@@ -1,10 +1,10 @@
 package go_language
 
-// The engine side of cohere-go/consistency-require-separated-folder-words's mirrors. The rule knows no mirror: a
+// cohere-go side of cohere-go/consistency-require-separated-folder-words's mirrors. The rule knows no mirror: a
 // folder that keeps another project's name is excused by a //cohere:file-ignore in the file the finding is at, since
-// the finding sits at that file's start, where no line directive reaches. Only the engine's suppression reads it,
-// and one that withholds nothing is the engine's own consistency-no-unused-ignore finding. analysistest runs the
-// analyzer alone, so only a run through the engine can show either.
+// the finding sits at that file's start, where no line directive reaches. Only cohere-go's suppression reads it,
+// and one that withholds nothing is cohere-go's own consistency-no-unused-ignore finding. analysistest runs the
+// analyzer alone, so only a run through cohere-go can show either.
 
 import (
 	"bytes"
@@ -40,8 +40,8 @@ func separatedFolderWordsDirective(test *testing.T) string {
 	return directive + " " + consistency_require_separated_folder_words.Name + " typescript-go's package name\n"
 }
 
-// separatedFolderWordsRun runs the engine's lint phase over the module in directory with the rule alone registered,
-// as the engine runs a project with no settings file, every house rule and the suppression rules at error, and returns
+// separatedFolderWordsRun runs cohere-go's lint phase over the module in directory with the rule alone registered,
+// as cohere-go runs a project with no settings file, every house rule and the suppression rules at error, and returns
 // the stream's finding records and its lint record.
 func separatedFolderWordsRun(test *testing.T, directory string) ([]contract.FindingRecord, contract.LintRecord) {
 	test.Helper()
@@ -51,7 +51,7 @@ func separatedFolderWordsRun(test *testing.T, directory string) ([]contract.Find
 	var standardError bytes.Buffer
 	exitCode := runIsolated(test, arguments, &standardOutput, &standardError, registered, nil)
 	if exitCode != 0 && exitCode != 1 {
-		test.Fatalf("the engine exited %d, so the run measured nothing; stderr:\n%s", exitCode, standardError.String())
+		test.Fatalf("cohere-go exited %d, so the run measured nothing; stderr:\n%s", exitCode, standardError.String())
 	}
 	var findings []contract.FindingRecord
 	var lint contract.LintRecord
@@ -88,9 +88,9 @@ func separatedFolderWordsRun(test *testing.T, directory string) ([]contract.Find
 // carrying the directive, whose finding is withheld and counted; treebuilder, which runs words together and carries
 // none, so its finding shows the rule ran; and inner, a word, whose directive withholds nothing and is reported unused
 // at the directive's own line.
-func TestSeparatedFolderWordsMirrorIsExcusedByTheEngineSuppression(test *testing.T) {
+func TestSeparatedFolderWordsMirrorIsExcusedByThePipelinesSuppression(test *testing.T) {
 	test.Parallel()
-	// Resolved, so the file names the engine reports are the ones written here.
+	// Resolved, so the file names cohere-go reports are the ones written here.
 	directory, resolveError := filepath.EvalSymlinks(test.TempDir())
 	if resolveError != nil {
 		test.Fatalf("resolving the temporary directory: %v", resolveError)
@@ -123,7 +123,7 @@ func TestSeparatedFolderWordsMirrorIsExcusedByTheEngineSuppression(test *testing
 		{consistency_require_separated_folder_words.Name, tree, 1},
 	}
 	if !slices.Equal(reported, want) {
-		test.Errorf("the engine reported %v, want %v: the module root clean, the mirror withheld, the run-together "+
+		test.Errorf("cohere-go reported %v, want %v: the module root clean, the mirror withheld, the run-together "+
 			"folder reported at its file's start, and the directive on a word reported unused", reported, want)
 	}
 	if withheld := lint.WithheldBySuppression[consistency_require_separated_folder_words.Name]; withheld != 1 {

@@ -7,8 +7,8 @@
 //
 // `theme.go` is the store. It answers lookups and knows nothing about CSS. This file is the only
 // thing that fills it, and it exists because a Theme that cannot be built from a repository proves
-// nothing: the exit criterion for this component is a resolved namespace map diffed against the
-// engine's own, on two repositories, and there is no way to reach that without walking the real
+// nothing: the exit criterion for this component is a resolved namespace map diffed against
+// Tailwind's own, on two repositories, and there is no way to reach that without walking the real
 // `@import` graph.
 //
 // It is deliberately narrower than upstream's `index.ts`, which is 867 lines because it also builds
@@ -55,7 +55,7 @@ type StylesheetResolver func(specifier, base string) (path string, resolveError 
 // tailwindcss package.
 //
 // `tailwindcss` and `tailwindcss/theme` name files inside that package; everything else is relative
-// to the importing file. A specifier with no `.css` extension gets one, matching the engine, which
+// to the importing file. A specifier with no `.css` extension gets one, matching Tailwind, which
 // appends no extension itself and relies on the host's resolver to do it.
 func NodeStylesheetResolver(tailwindPackageRoot string) StylesheetResolver {
 	return func(specifier, base string) (string, error) {
@@ -116,7 +116,7 @@ type themeLoader struct {
 
 	// visiting is the set of files currently on the import stack, so a cycle is an error rather
 	// than a stack overflow. It is not a "seen" set: a file imported twice from different places is
-	// processed twice, which matches the engine, and matters because the second pass can overwrite
+	// processed twice, which matches Tailwind, and matters because the second pass can overwrite
 	// values the first one set.
 	visiting map[string]bool
 }
@@ -232,8 +232,8 @@ func (loader *themeLoader) followImport(node *Node, path string) error {
 // that are not theme entries.
 //
 // Upstream throws when the block holds anything other than a custom property or `@keyframes`. That
-// is reproduced: a stylesheet the engine rejects must not quietly produce a theme here, since any
-// theme built from input the engine refuses is one no repository can actually be using.
+// is reproduced: a stylesheet Tailwind rejects must not quietly produce a theme here, since any
+// theme built from input Tailwind refuses is one no repository can actually be using.
 func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 	options, prefix := parseThemeOptions(node.Parameters)
 

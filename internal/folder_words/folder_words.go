@@ -1,12 +1,12 @@
-// Package folder_words is whether a folder's name runs words together, in one place, for every engine that judges
+// Package folder_words is whether a folder's name runs words together, in one place, for every language that judges
 // folder names (#narw7aq, the text rules family `separated-folder-words`).
 //
-// The Go engine's cohere-go/consistency-require-separated-folder-words and the TypeScript rule
+// cohere-go's cohere-go/consistency-require-separated-folder-words and the TypeScript rule
 // nexus/consistency-require-separated-folder-words both read it, so the words, the pieces a split may use and how a
-// tie is broken are decided once. Each engine hands it a name and its language's Spelling, and decides only its own
+// tie is broken are decided once. Each language hands it a name and its language's Spelling, and decides only its own
 // language's facts first: which folders are its own to judge, and where a finding sits. It lives in its own package,
-// importing nothing heavier than policy, because the nexus rules package links the TypeScript checker and the Go
-// engine must not.
+// importing nothing heavier than policy, because the nexus rules package links the TypeScript checker and
+// cohere-go must not.
 //
 // A name is judged one part at a time, a part being a run between two of the spelling's separators, or between a
 // lowercase letter and a capital where the spelling's case separates: a part that is a word passes, and a part that
@@ -47,7 +47,7 @@ type Spelling struct {
 const minimumPieceLength = 3
 
 // twoLetterWords are the two-letter pieces a split may use despite minimumPieceLength: the ones folder names in Go
-// projects run together with a word (go_engine, ts_path, next_js, io_test), each a name a reader knows on sight.
+// projects run together with a word (go_language, ts_path, next_js, io_test), each a name a reader knows on sight.
 // The set is closed, so a two-letter piece is a reviewed decision here rather than whatever the lists hold. A
 // member counts as a piece whether or not the lists hold it, since js and others are names, not dictionary words.
 // Go has no constant set, so this is a variable nothing writes.
@@ -162,7 +162,7 @@ func splitParts(name string, spelling Spelling) ([]string, []string) {
 // is service and Types, or the last capital of a run of them that a lowercase letter follows, so an acronym is kept
 // whole before the word after it and URLSession is URL and Session. Swift's
 // cohere-swift/consistency-require-separated-folder-words cuts its parts at the same two boundaries (#2fnqe2h), so a
-// capitalized name reads the same in both engines, and the corpus holds them to it (fw16 to fw20). It is exported for
+// capitalized name reads the same in both languages, and the corpus holds them to it (fw16 to fw20). It is exported for
 // internal/file_name_words, which cuts a file name's words at the same two boundaries, so a folder and a file named
 // alike are read alike.
 func IsCaseBoundary(name string, index int) bool {

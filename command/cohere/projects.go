@@ -22,14 +22,14 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// projectEngineVariable names the engine a child run checks its --directory with. A directory holding both
+// projectKindVariable names the child a child run checks its --directory with. A directory holding both
 // a tsconfig.json and a Package.swift is two projects, and --directory alone reads it as TypeScript's, so
-// the run that checks its Swift says which engine it is.
-const projectEngineVariable = "COHERE_PROJECT_ENGINE"
+// the run that checks its Swift says which language it is.
+const projectKindVariable = "COHERE_PROJECT_KIND"
 
 // runDepthVariable marks a run another cohere run started to check one of its projects (#excff9x).
 //
-// A project's run is this same binary, given `--directory` and its engine (projectEngineVariable), and a child whose
+// A project's run is this same binary, given `--directory` and the child (projectKindVariable), and a child whose
 // guard against discovering failed would find the same projects and start a run for each, without end: on Nov 10 a
 // review mutant that removed one such guard forked about 7,700 copies and filled the machine's process table. So the
 // parent marks every child, and a run that finds the mark refuses to start runs of its own, which ends any recursion
@@ -67,10 +67,10 @@ func discoveryApplies(given map[string]bool, arguments []string) bool {
 }
 
 // namedDirectoryHoldsSeveral reports whether a run names a directory with `--directory`, and nothing else that
-// narrows it, and that directory is more than one engine's project, as adamic's root holds a tsconfig.json and a
+// narrows it, and that directory is more than one language's project, as adamic's root holds a tsconfig.json and a
 // go.work (#pswhv5q). `--directory` is a `cd`, so such a run discovers from that directory and checks every project
 // discovery finds there, nested ones included, as `cd` there and `cohere` would, where it once read the directory as
-// TypeScript's alone and checked nothing else, in silence. A child run, which names its engine, is one project as
+// TypeScript's alone and checked nothing else, in silence. A child run, which names the child, is one project as
 // ever: it never discovers, so a project's run never starts runs of its own.
 func namedDirectoryHoldsSeveral(
 	given map[string]bool,
@@ -78,13 +78,13 @@ func namedDirectoryHoldsSeveral(
 	location projectLocation,
 	locateError error,
 ) bool {
-	if !given["directory"] || len(arguments) > 0 || locateError != nil || os.Getenv(projectEngineVariable) != "" {
+	if !given["directory"] || len(arguments) > 0 || locateError != nil || os.Getenv(projectKindVariable) != "" {
 		return false
 	}
 	if slices.ContainsFunc(narrowingFlags, func(name string) bool { return given[name] }) {
 		return false
 	}
-	return len(enginesAt(location.Root)) > 1
+	return len(kindsAt(location.Root)) > 1
 }
 
 // checkDiscoveredProjects discovers the projects under the root and, when there is more than the one the
@@ -115,7 +115,7 @@ func checkDiscoveredProjects(
 		return 0, false, rootIgnoreEntriesError
 	}
 	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
-	// file that every run makes. A file the command line named is the Swift engine's to read wherever it
+	// file that every run makes. A file the command line named is cohere-swift's to read wherever it
 	// sits, and the projects' runs are handed it (see configuration.CheckSwiftBlockHasAReader).
 	if settings := filepath.Join(
 		root,
@@ -270,12 +270,12 @@ func withoutValuedFlags(arguments []string, dropped []string) []string {
 // paths: not one of discovery's children, which its parent already judged, nor a run that only answers, explains
 // one file or formats one from standard input (#zyq63kk).
 func lintsLocatedProject(given map[string]bool, locateError error) bool {
-	return locateError == nil && os.Getenv(projectEngineVariable) == "" && runLints(given) && !answersOnly(given) &&
+	return locateError == nil && os.Getenv(projectKindVariable) == "" && runLints(given) && !answersOnly(given) &&
 		!given["explain"] && !given["stdin-filepath"]
 }
 
 // lintsWholeLocatedProject reports whether such a run lints its project whole: one given `--directory` into one
-// engine's project, `--tsconfig`, or `--profile`, with no path argument or only the project's root as its path, which
+// child's project, `--tsconfig`, or `--profile`, with no path argument or only the project's root as its path, which
 // is the bare run (#xd2q11d). A path below the root narrows the run to those files, partial by its nature, so its
 // folders are not judged, and the run says so (noteFolderCheckSkipped).
 func lintsWholeLocatedProject(
@@ -323,8 +323,10 @@ func checkNarrowedProjectFolders(
 	if severity == configuration.SeverityOff {
 		return 0, false, nil
 	}
-	located := discoveredProject{Directory: ".", Engine: location.Engine}
-	if base := filepath.Base(location.ConfigFileName); location.Engine == engineTypeScript && base != projectMarker {
+	located := discoveredProject{Directory: ".", Kind: location.Kind}
+	if base := filepath.Base(
+		location.ConfigFileName,
+	); location.Kind == projectKindTypeScriptProgram && base != projectMarker {
 		located.ConfigFile = base
 	}
 	// Only the located project and the folders: what else the walk found is not this run's to check or name.
@@ -338,22 +340,22 @@ func checkNarrowedProjectFolders(
 		return 0, false, refuseError
 	}
 	// The project's run is named by the directory and tsconfig runProject gives it, so this run's own go. A profiled
-	// run's project profiles itself to a file of its own, named `project` (engineProfilePath), since this process
+	// run's project profiles itself to a file of its own, named `project` (contractProfilePath), since this process
 	// profiles itself to the file the caller named, and two processes writing one file leave neither profile whole
 	// (#r33n96f).
 	arguments := childArguments(withoutValuedFlags(flags, []string{"directory", "tsconfig", "profile"}),
 		lintConfigFileName, false)
 	if given["profile"] && flagValue("profile") != "" {
 		arguments = append(arguments, "--profile",
-			engineProfilePath(location.WorkingDirectory, flagValue("profile"), "project"))
+			contractProfilePath(location.WorkingDirectory, flagValue("profile"), "project"))
 	}
 	return runProjects(found, arguments, streams.Output), true, nil
 }
 
 // goOnlySwitches are the switches only a Go run takes (goFlags), each with what it asks of a Go run, which its refusal
-// says: every other engine's child is run without them, so one command line at a root holding several projects narrows
-// the Go one's check to the host's build, or maps the Go one's run, where Swift's run would refuse the switch and
-// TypeScript's has no other build to leave out and no engine's phases to map (#3v2zp7g).
+// says: every other language's child is run without them, so one command line at a root holding several projects
+// narrows the Go one's check to the host's build, or maps the Go one's run, where Swift's run would refuse the switch
+// and TypeScript's has no other build to leave out and no child's phases to map (#3v2zp7g).
 var goOnlySwitches = map[string]string{
 	"host-build-only": "narrows which builds of a Go project's files are checked",
 	"timeline":        "maps when each phase and each build of a Go run began and ended",
@@ -363,7 +365,7 @@ var goOnlySwitches = map[string]string{
 // ignoring it, since a flag accepted and ignored reads as a run that did what was asked. Discovery hands them to a Go
 // project's run alone (withoutGoOnlySwitches) and refuses them at a root with no Go project
 // (refuseGoOnlySwitchesWithoutGo), so here only a TypeScript run discovery leaves alone, such as one naming
-// --directory, meets this; Swift's refuses them as its engine's arguments are built (engineArguments). Sorted, so a
+// --directory, meets this; Swift's refuses them as the child's arguments are built (contractArguments). Sorted, so a
 // command line naming two of them is refused for the same one every time.
 func refuseGoOnlySwitches(given map[string]bool, value func(string) string) error {
 	for _, name := range slices.Sorted(maps.Keys(goOnlySwitches)) {
@@ -381,7 +383,7 @@ func refuseGoOnlySwitches(given map[string]bool, value func(string) string) erro
 // A root holding a Go project takes them, and its other projects run without them.
 func refuseGoOnlySwitchesWithoutGo(found discovery, given map[string]bool, value func(string) string) error {
 	for _, project := range found.Projects {
-		if project.Engine == engineGo {
+		if project.Kind == projectKindGoModule {
 			return nil
 		}
 	}
@@ -394,9 +396,9 @@ func withoutGoOnlySwitches(arguments []string) []string {
 }
 
 // swiftUntimedSwitches are the switches a Swift project's run at a discovered root is run without: `--timing`, which
-// the Swift engine does not implement and refuses, so one command line at a root holding Swift beside TypeScript or
+// cohere-swift does not implement and refuses, so one command line at a root holding Swift beside TypeScript or
 // Go times those and says the Swift project ran untimed (timingSkipsSwiftNote), rather than refusing every project's
-// run over one engine's gap (#3apgjer).
+// run over one language's gap (#3apgjer).
 var swiftUntimedSwitches = []string{"timing"}
 
 // timingSkipsSwiftNote is what a run at a discovered root says when it was typed `--timing` and holds a Swift project,
@@ -407,14 +409,14 @@ func timingSkipsSwiftNote(found discovery, labels []string, arguments []string) 
 	}
 	var untimed []string
 	for index, project := range found.Projects {
-		if project.Engine == engineSwift {
+		if project.Kind == projectKindSwiftPackage {
 			untimed = append(untimed, labels[index])
 		}
 	}
 	if len(untimed) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("--timing measures the TypeScript and Go projects only, since the Swift engine does not "+
+	return fmt.Sprintf("--timing measures the TypeScript and Go projects only, since cohere-swift does not "+
 		"implement it yet, so %s ran without it", strings.Join(untimed, ", "))
 }
 
@@ -516,15 +518,15 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		// A Swift project and a TypeScript project in one directory share a label, and what one yields is
 		// nothing to the other, so a Swift project's yield is its own.
 		yield := found.Ownership.Yields[label]
-		switch project.Engine {
-		case engineSwift:
+		switch project.Kind {
+		case projectKindSwiftPackage:
 			yield = found.swiftYield(project)
-		case engineFormat:
+		case projectKindFolder:
 			yield = found.formatYield(project)
 		}
 		// Every format walk leaves out the files of the languages the two flags did not name, which the yield's
 		// fingerprint then carries into the project run's replay key (#s7gt4bj).
-		if project.Engine == engineTypeScript || project.Engine == engineFormat {
+		if project.Kind == projectKindTypeScriptProgram || project.Kind == projectKindFolder {
 			yield.LeftOutExtensions = found.Choice.leftOutExtensions()
 		}
 		yieldFile, writeProjectYieldError := writeProjectYield(yield, yieldDirectory)
@@ -538,15 +540,15 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			continue
 		}
 		projectArguments := arguments
-		if project.Engine != engineGo {
+		if project.Kind != projectKindGoModule {
 			projectArguments = withoutGoOnlySwitches(arguments)
 		}
-		if project.Engine == engineSwift {
+		if project.Kind == projectKindSwiftPackage {
 			projectArguments = withoutSwitches(projectArguments, swiftUntimedSwitches)
 		}
 		// TypeScript runs alone: the cache it turns off is cohere's table in the directory, which a Swift run
 		// never reads or writes, so a Swift run in the same directory keeps its own cache.
-		if found.Ownership.SharedDirectory[label] && project.Engine == engineTypeScript {
+		if found.Ownership.SharedDirectory[label] && project.Kind == projectKindTypeScriptProgram {
 			projectArguments = append(slices.Clone(projectArguments), "--no-cache")
 		}
 		openPath := ""
@@ -592,11 +594,11 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		if len(checked.output) > 0 && checked.output[len(checked.output)-1] != '\n' {
 			fmt.Fprintln(out)
 		}
-		// Under `--json` stdout is records only, so what a child wrote to stderr, an engine's note or a
+		// Under `--json` stdout is records only, so what a child wrote to stderr, a child's note or a
 		// file it could not format, goes to stderr, where a single project's run puts it too.
 		streams.Errors.Write(checked.standardError)
 		if checked.runError != nil {
-			unfinished := fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.runError)
+			unfinished := fmt.Errorf("the %s run did not finish: %w", checked.project.Kind.label(), checked.runError)
 			failureLine(out, unfinished)
 			// Under `--json` the project's record says it too, since a run that never finished printed none.
 			if activeOutput.Mode == outputJson {
@@ -632,7 +634,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			account,
 			"  %s (%s): %s in %s\n",
 			checked.label,
-			checked.project.Engine,
+			checked.project.Kind.label(),
 			verdict,
 			round(checked.elapsed),
 		)
@@ -647,7 +649,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts.UnusedIgnores = unusedIgnoreCount(discoveredIgnores)
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.FolderFindings, facts.FolderWarnings = folderSummary.Findings, folderSummary.WarningFindings
-	facts.EngineBuilds = builtEngines()
+	facts.ProgramBuilds = builtPrograms()
 	facts.LeftOut = found.LeftOutLanguages
 	switch {
 	case oneLine:
@@ -656,7 +658,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
 	default:
 		// A build this run made before its projects ran, as a coverage query does, is a record of its own.
-		fmt.Fprint(out, engineBuildLines(facts.EngineBuilds))
+		fmt.Fprint(out, programBuildLines(facts.ProgramBuilds))
 	}
 	// A run stopped by a signal ends the way the signal would have ended it, after every child has, so the
 	// caller that sent it reads it as stopped and not as a verdict.
@@ -683,12 +685,12 @@ func failureLine(out *bufio.Writer, runError error) {
 	fmt.Fprintf(failures, "cohere: %s\n", sentence.FromError(runError))
 }
 
-// overallFactsOf is what the overall verdict says of the projects' runs: how many of each engine, the ones
+// overallFactsOf is what the overall verdict says of the projects' runs: how many of each language, the ones
 // that failed with their exits, and the ones whose run did not finish, which checked nothing.
 func overallFactsOf(runs []projectRun, total time.Duration) overallFacts {
-	facts := overallFacts{Total: total, ProjectsByEngine: map[string]int{}}
+	facts := overallFacts{Total: total, ProjectsByKind: map[string]int{}}
 	for _, checked := range runs {
-		facts.ProjectsByEngine[string(checked.project.Engine)]++
+		facts.ProjectsByKind[checked.project.Kind.label()]++
 		switch {
 		case checked.runError != nil:
 			facts.Unfinished++
@@ -739,7 +741,7 @@ func runProject(
 	// The verdict descriptor is this run's: a child's verdict reaches this process as its exit code, and
 	// only the merged one may answer the caller.
 	child.Env = append(withoutVariable(withoutVariable(os.Environ(), VerdictVariable), projectYieldVariable),
-		projectEngineVariable+"="+string(project.Engine), projectLabelVariable+"="+label, runDepthVariable+"=1")
+		projectKindVariable+"="+string(project.Kind), projectLabelVariable+"="+label, runDepthVariable+"=1")
 	if yieldFile != "" {
 		child.Env = append(child.Env, projectYieldVariable+"="+yieldFile)
 	}
@@ -807,7 +809,7 @@ func projectLabel(project discoveredProject) string {
 }
 
 // runLabels names each project of the run uniquely, in the run's order: its label, and for a project whose
-// directory an earlier one of the run shares, its engine beside it, as `. (Format)` beside the Go workspace at `.`
+// directory an earlier one of the run shares, the child beside it, as `. (Folder)` beside the Go workspace at `.`
 // (#vyjvz9k). The first keeps the label alone, so a directory holding one project names it as it always did, and a
 // summary, a failure line and a run-cache record each name one project.
 func runLabels(projects []discoveredProject) []string {
@@ -816,7 +818,7 @@ func runLabels(projects []discoveredProject) []string {
 	for index, project := range projects {
 		label := projectLabel(project)
 		if taken[label] {
-			label = fmt.Sprintf("%s (%s)", label, project.Engine)
+			label = fmt.Sprintf("%s (%s)", label, project.Kind.label())
 		}
 		taken[label] = true
 		labels[index] = label
@@ -826,26 +828,31 @@ func runLabels(projects []discoveredProject) []string {
 
 // sectionHeading opens a project's section.
 func sectionHeading(project discoveredProject) string {
-	return fmt.Sprintf("== %s (%s) ==", projectLabel(project), project.Engine)
+	return fmt.Sprintf("== %s (%s) ==", projectLabel(project), project.Kind.label())
 }
 
-// summaryLine closes the report: how many projects were checked, of which engines, how many failed, what
+// summaryLine closes the report: how many projects were checked, of which kinds, how many failed, what
 // was found and not run or not checked, and what the walk did not enter.
 func summaryLine(found discovery, runs []projectRun) string {
-	counts := map[projectEngine]int{}
+	counts := map[projectKind]int{}
 	failed := 0
 	checkedCount := 0
 	for _, checked := range runs {
 		checkedCount++
-		counts[checked.project.Engine]++
+		counts[checked.project.Kind]++
 		if checked.exitCode != 0 {
 			failed++
 		}
 	}
-	engines := []string{}
-	for _, engine := range []projectEngine{engineTypeScript, engineSwift, engineGo, engineFormat} {
-		if counts[engine] > 0 {
-			engines = append(engines, fmt.Sprintf("%d %s", counts[engine], engine))
+	kinds := []string{}
+	for _, kind := range []projectKind{
+		projectKindTypeScriptProgram,
+		projectKindSwiftPackage,
+		projectKindGoModule,
+		projectKindFolder,
+	} {
+		if counts[kind] > 0 {
+			kinds = append(kinds, fmt.Sprintf("%d %s", counts[kind], kind.label()))
 		}
 	}
 	verdict := "every one green"
@@ -877,7 +884,7 @@ func summaryLine(found discovery, runs []projectRun) string {
 		"projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
 			"%d dependency, build, cache or fixture directories, %d nested repositories",
 		checkedCount,
-		strings.Join(engines, ", "),
+		strings.Join(kinds, ", "),
 		verdict,
 		notRun,
 		found.Ignored,

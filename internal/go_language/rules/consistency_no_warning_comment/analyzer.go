@@ -1,4 +1,4 @@
-// Package consistency_no_warning_comment is the Go engine's rule that a comment holds no task left for later.
+// Package consistency_no_warning_comment is cohere-go's rule that a comment holds no task left for later.
 //
 // A `TODO`, `FIXME` or `XXX` in a comment is a deferred task kept where nobody is reminded of it. It rots there: the
 // code around it reads as finished to every reader not looking at that line, and the task is done only if someone
@@ -15,7 +15,7 @@
 // line straight after prose is a paragraph continuation, as in CommonMark, and is read.
 //
 // The judgment past Go's own grammar, the words, the whole-word test and the masks, is internal/warning_comment's,
-// which the TypeScript rule nexus/consistency-no-warning-comment reads too, so the two engines report the same
+// which the TypeScript rule nexus/consistency-no-warning-comment reads too, so the two rules report the same
 // words. This package hands it each comment group with the directives set aside, and places each word it returns.
 package consistency_no_warning_comment
 
@@ -47,7 +47,7 @@ var Analyzer = &analysis.Analyzer{
 	Run:      run,
 }
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
 var warningCommentMessage = policy.MessageOf(Name, "warningComment")

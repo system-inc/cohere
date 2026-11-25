@@ -35,7 +35,7 @@ type fixture struct {
 var fixtureBase string
 
 var sharedFixture = sync.OnceValues(func() (fixture, error) {
-	base, baseError := os.MkdirTemp("", "cohere-go-engine-project-")
+	base, baseError := os.MkdirTemp("", "cohere-go-language-project-")
 	if baseError != nil {
 		return fixture{}, baseError
 	}

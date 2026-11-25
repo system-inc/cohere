@@ -17,7 +17,7 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// The Swift engine a gate runs is built from the same commit as the cohere binary running it.
+// cohere-swift a gate runs is built from the same commit as the cohere binary running it.
 //
 // Until this existed it was built from the shared working tree's `swift/`, so any member's uncommitted
 // Swift rule was live in every Swift project's gate, the defect #yd6yprj removed for the cohere binary.
@@ -25,8 +25,8 @@ import (
 // The tree it builds is a detached git worktree at the commit, not a `git archive` extraction, for two
 // reasons that were measured rather than assumed (2026-10-02):
 //
-//   - The engine's manifest reads `Context.gitInformation?.hasUncommittedChanges ?? true`. An extraction
-//     has no git context, so every committed engine would report itself modified. A worktree at the
+//   - cohere-swift's manifest reads `Context.gitInformation?.hasUncommittedChanges ?? true`. An extraction
+//     has no git context, so every committed binary would report itself modified. A worktree at the
 //     commit reports false, and that reading also rules out SwiftPM having found the enclosing checkout,
 //     which was dirty at the time.
 //   - Moving one worktree between commits rewrites only the files that differ, so SwiftPM's build stays
@@ -35,12 +35,12 @@ import (
 // The worktree belongs to this cache and nobody edits it. If it is ever found dirty the build is refused
 // rather than forced, because forcing would discard something without knowing what it was.
 
-// swiftEngineInputs are what decide the engine, as `commit:path` objects: the same three the
+// swiftEngineInputs are what decide cohere-swift, as `commit:path` objects: the same three the
 // working-tree hash reads, so a commit that changes only tests reuses the binary. They are also the
-// pathspecs a development engine's `sourceTreeModified` is read under (ResolveSwiftEngine).
+// pathspecs a development binary's `sourceTreeModified` is read under (ResolveSwiftEngine).
 var swiftEngineInputs = []string{"swift/Package.swift", "swift/Package.resolved", "swift/Sources"}
 
-// resolveCommittedSwiftEngine returns the engine for commit, building it when the cache has none.
+// resolveCommittedSwiftEngine returns cohere-swift for commit, building it when the cache has none.
 func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, contract int) (string, bool, error) {
 	hash, committedSwiftEngineHashError := committedSwiftEngineHash(paths, commit, toolchain)
 	if committedSwiftEngineHashError != nil {
@@ -60,7 +60,7 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	}
 	defer unlock()
 
-	// Asked again under the lock: a run waiting here behind another that built this same engine finds
+	// Asked again under the lock: a run waiting here behind another that built this same binary finds
 	// it, and does not move the worktree or build again.
 	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
@@ -100,12 +100,12 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 		return "", false, proveCommittedSwiftEngineError
 	}
 	if renameError := os.Rename(temporary, binaryPath); renameError != nil {
-		return "", false, fmt.Errorf("moving the built Swift engine into the cache: %w", renameError)
+		return "", false, fmt.Errorf("moving the built cohere-swift into the cache: %w", renameError)
 	}
 	return binaryPath, true, nil
 }
 
-// committedSwiftEngineHash names the engine for commit without reading a single file from disk.
+// committedSwiftEngineHash names cohere-swift for commit without reading a single file from disk.
 //
 // Git object ids are content addresses, so `commit:swift/Sources` names exactly the sources at that
 // commit. A cache hit therefore never touches the worktree, and after the first run at a commit it
@@ -126,7 +126,7 @@ func committedSwiftEngineHash(paths Paths, commit string, toolchain string) (str
 	return hex.EncodeToString(digest.Sum(nil))[:hashLength], nil
 }
 
-// swiftEngineInputObjects are the object ids of the engine's inputs at commit, one per
+// swiftEngineInputObjects are the object ids of cohere-swift's inputs at commit, one per
 // swiftEngineInputs entry.
 //
 // A commit's tree never changes, so the answer is asked of git once and kept, named for the commit and
@@ -156,7 +156,7 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 		// rev-parse with several arguments stops at the first it cannot resolve, so the message names
 		// what was asked rather than guessing which one was missing.
 		return nil, fmt.Errorf(
-			"reading the Swift engine's inputs at %s (%s): %w",
+			"reading cohere-swift's inputs at %s (%s): %w",
 			release.ShortCommit(commit),
 			strings.Join(swiftEngineInputs, ", "),
 			gitOutputError,
@@ -165,7 +165,7 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 	objects := strings.Fields(output)
 	if len(objects) != len(swiftEngineInputs) {
 		return nil, fmt.Errorf(
-			"asked git for %d Swift engine inputs at %s and got %d answers",
+			"asked git for %d cohere-swift inputs at %s and got %d answers",
 			len(swiftEngineInputs),
 			release.ShortCommit(commit),
 			len(objects),
@@ -199,7 +199,7 @@ func checkOutWorktree(moduleDirectory string, worktree string, commit string) er
 			worktree,
 			commit,
 		); gitOutputError != nil {
-			return fmt.Errorf("creating the Swift engine's worktree at %s: %w", worktree, gitOutputError)
+			return fmt.Errorf("creating cohere-swift's worktree at %s: %w", worktree, gitOutputError)
 		}
 		return requireWorktreeAt(worktree, commit)
 	}
@@ -210,7 +210,7 @@ func checkOutWorktree(moduleDirectory string, worktree string, commit string) er
 		return requireCleanWorktreeError
 	}
 	if _, gitOutputError := gitOutput(worktree, "checkout", "--quiet", "--detach", commit); gitOutputError != nil {
-		return fmt.Errorf("moving the Swift engine's worktree to %s: %w", release.ShortCommit(commit), gitOutputError)
+		return fmt.Errorf("moving cohere-swift's worktree to %s: %w", release.ShortCommit(commit), gitOutputError)
 	}
 	return requireWorktreeAt(worktree, commit)
 }
@@ -220,14 +220,14 @@ func requireCleanWorktree(worktree string) error {
 	status, gitOutputError := gitOutput(worktree, "status", "--porcelain")
 	if gitOutputError != nil {
 		return fmt.Errorf(
-			"%s is not a usable git worktree, so the Swift engine was not built (remove it by name and it will be recreated): %w",
+			"%s is not a usable git worktree, so cohere-swift was not built (remove it by name and it will be recreated): %w",
 			worktree,
 			gitOutputError,
 		)
 	}
 	if strings.TrimSpace(status) != "" {
 		return fmt.Errorf(
-			"the Swift engine's worktree %s has changes nobody should have made there, so it was not moved or built:\n%s",
+			"cohere-swift's worktree %s has changes nobody should have made there, so it was not moved or built:\n%s",
 			worktree,
 			strings.TrimRight(status, "\n"),
 		)
@@ -240,11 +240,11 @@ func requireCleanWorktree(worktree string) error {
 func requireWorktreeAt(worktree string, commit string) error {
 	head, gitOutputError := gitOutput(worktree, "rev-parse", "HEAD")
 	if gitOutputError != nil {
-		return fmt.Errorf("reading the Swift engine's worktree: %w", gitOutputError)
+		return fmt.Errorf("reading cohere-swift's worktree: %w", gitOutputError)
 	}
 	if strings.TrimSpace(head) != commit {
 		return fmt.Errorf(
-			"the Swift engine's worktree is at %s after checking out %s",
+			"cohere-swift's worktree is at %s after checking out %s",
 			release.ShortCommit(strings.TrimSpace(head)),
 			release.ShortCommit(commit),
 		)
@@ -252,10 +252,10 @@ func requireWorktreeAt(worktree string, commit string) error {
 	return requireCleanWorktree(worktree)
 }
 
-// proveCommittedSwiftEngine asks the built engine what it is and refuses it unless it reports a clean
+// proveCommittedSwiftEngine asks the built binary what it is and refuses it unless it reports a clean
 // source tree.
 //
-// The engine's commit field reads "dev" until the release build stamps it (EngineVersion.swift), so it
+// cohere-swift's commit field reads "dev" until the release build stamps it (EngineVersion.swift), so it
 // cannot be checked here yet. What can be checked is the bit its manifest computed from the tree it was
 // built in, which is exactly the property this build exists to have.
 func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) error {
@@ -264,7 +264,7 @@ func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) e
 	command.Stderr = &standardError
 	output, outputError := command.Output()
 	if outputError != nil {
-		return fmt.Errorf("the Swift engine built from %s failed its own --version (%w), so it was not cached: %s",
+		return fmt.Errorf("cohere-swift built from %s failed its own --version (%w), so it was not cached: %s",
 			release.ShortCommit(commit), outputError, strings.TrimSpace(standardError.String()))
 	}
 
@@ -279,20 +279,20 @@ func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) e
 		}
 		if record.SourceTreeModified == nil {
 			return fmt.Errorf(
-				"the Swift engine built from %s reported provenance without sourceTreeModified, so it was not cached",
+				"cohere-swift built from %s reported provenance without sourceTreeModified, so it was not cached",
 				release.ShortCommit(commit),
 			)
 		}
 		if *record.SourceTreeModified {
 			return fmt.Errorf(
-				"the Swift engine built from %s reports a modified source tree, which a build from a clean worktree at that commit cannot have, so it was not cached",
+				"cohere-swift built from %s reports a modified source tree, which a build from a clean worktree at that commit cannot have, so it was not cached",
 				release.ShortCommit(commit),
 			)
 		}
 		return nil
 	}
 	return fmt.Errorf(
-		"the Swift engine built from %s printed no provenance record for --version, so it was not cached:\n%s",
+		"cohere-swift built from %s printed no provenance record for --version, so it was not cached:\n%s",
 		release.ShortCommit(commit),
 		output,
 	)

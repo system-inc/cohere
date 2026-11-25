@@ -53,8 +53,8 @@ var fixtureMoves = []folderMove{
 	{OldFolder: "goengine/markertype", NewFolder: "go_engine/marker_type", NewPackage: "marker_type"},
 }
 
-// fixtureEngine is the moved package and what lives in it.
-var fixtureEngine = map[string]string{
+// fixtureModule is the moved package and what lives in it.
+var fixtureModule = map[string]string{
 	"go.work": "go 1.27\n\nuse .\n",
 	"go.mod":  "module fixture\n\ngo 1.27\n",
 	"goengine/engine.go": `// Package goengine runs the engine.
@@ -121,7 +121,7 @@ import "strings"
 // Upper reads goengine as a word, not a package.
 func Upper(goengine string) string { return strings.ToUpper(goengine) }
 `
-	root := writeRepository(test, withFiles(fixtureEngine, map[string]string{
+	root := writeRepository(test, withFiles(fixtureModule, map[string]string{
 		"user/user.go": `package user
 
 import (
@@ -310,7 +310,7 @@ var go_engine = 2
 // Use reads the engine.
 func Use() int { return goengine.Run() + go_engine }
 `
-	root := writeRepository(test, withFiles(fixtureEngine, map[string]string{"user/user.go": user}))
+	root := writeRepository(test, withFiles(fixtureModule, map[string]string{"user/user.go": user}))
 	var output bytes.Buffer
 	if exitCode := run(root, fixtureMoves, false, &output); exitCode != 1 {
 		test.Fatalf("exit %d, want 1:\n%s", exitCode, output.String())
@@ -331,13 +331,13 @@ func Use() int { return goengine.Run() + go_engine }
 // A dry run proves the moves in memory and changes nothing.
 func TestFolderNamesDryRunWritesNothing(test *testing.T) {
 	test.Parallel()
-	root := writeRepository(test, fixtureEngine)
+	root := writeRepository(test, fixtureModule)
 	var output bytes.Buffer
 	if exitCode := run(root, fixtureMoves, true, &output); exitCode != 0 {
 		test.Fatalf("exit %d:\n%s", exitCode, output.String())
 	}
 	if !strings.Contains(output.String(), "dry run: proven in memory") || exists(root, "go_engine") ||
-		readFile(test, root, "goengine/engine.go") != fixtureEngine["goengine/engine.go"] {
+		readFile(test, root, "goengine/engine.go") != fixtureModule["goengine/engine.go"] {
 		test.Errorf("the dry run changed the tree or proved nothing:\n%s", output.String())
 	}
 }

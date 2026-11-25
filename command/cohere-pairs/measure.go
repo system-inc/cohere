@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// runDeadline is how long one run of the engine may take before it is stopped and recorded as stopped. The slowest
+// runDeadline is how long one run of the Go child may take before it is stopped and recorded as stopped. The slowest
 // corpus runs in well under a minute on the machines a pair is measured on, so a run past this is stuck, not slow.
 const runDeadline = 15 * time.Minute
 
@@ -69,7 +69,7 @@ func measure(checked preflight, base builtBinary, branch builtBinary, rounds int
 			trashed += emptied
 		}
 		rawDirectory := filepath.Join(checked.output, rawDirectoryName)
-		record := runEngine(binaries[planned.side], corpusRoot, planned, rawDirectory, checked.goEnvironment,
+		record := runGoChild(binaries[planned.side], corpusRoot, planned, rawDirectory, checked.goEnvironment,
 			systemCache)
 		record.CorpusCommit = commits[planned.corpus]
 		changed, restoreError := restoreChangedFiles(corpusRoot, layers[planned.corpus])
@@ -96,12 +96,12 @@ func measure(checked preflight, base builtBinary, branch builtBinary, rounds int
 	return records, nil
 }
 
-// runEngine runs one side's engine over a corpus and returns its record, the corpus's commit and the files it changed
-// left for the caller. The engine is run as the front door runs it, marked as its child, from the corpus, in
-// engineEnvironment, with systemCache the side's own; in a process group of its own, which the deadline stops whole;
+// runGoChild runs one side's Go child over a corpus and returns its record, the corpus's commit and the files it
+// changed left for the caller. The Go child is run as the front door runs it, marked as its child, from the corpus, in
+// goChildEnvironment, with systemCache the side's own; in a process group of its own, which the deadline stops whole;
 // its stdout and stderr go to the raw directory, and it is timed from here: the wall by the clock, user, sys and the
 // peak resident set from its rusage.
-func runEngine(
+func runGoChild(
 	binary builtBinary,
 	corpusRoot string,
 	planned plannedRun,
@@ -139,15 +139,15 @@ func runEngine(
 	// Ignored: as above.
 	defer func() { _ = standardError.Close() }()
 
-	// Every build the corpus's files name is checked, by whatever this side's engine is asked for it (#qqyq61s).
-	arguments := append([]string{"go-engine", "--contract", "3", "--root", corpusRoot, "--no-fix"},
+	// Every build the corpus's files name is checked, by whatever this side's Go child is asked for it (#qqyq61s).
+	arguments := append([]string{"go-language", "--contract", "3", "--root", corpusRoot, "--no-fix"},
 		binary.everyBuildArguments...)
 	if planned.mode == modeNoCache {
 		arguments = append(arguments, "--no-cache")
 	}
 	command := exec.Command(binary.path, arguments...)
 	command.Dir = corpusRoot
-	command.Env = engineEnvironment(goEnvironment, corpusRoot, systemCache)
+	command.Env = goChildEnvironment(goEnvironment, corpusRoot, systemCache)
 	command.Stdout, command.Stderr = output, standardError
 	command.SysProcAttr = ownProcessGroup()
 
@@ -176,7 +176,7 @@ func runEngine(
 	if readOutputError != nil {
 		record.OutputError = readOutputError.Error()
 	}
-	record.engineOutput = read
+	record.goChildOutput = read
 	if information, statError := os.Stat(errorPath); statError == nil {
 		record.StandardErrorBytes = information.Size()
 	}
@@ -184,14 +184,14 @@ func runEngine(
 }
 
 // readRunOutput reads a finished run's stdout from path.
-func readRunOutput(path string) (engineOutput, error) {
+func readRunOutput(path string) (goChildOutput, error) {
 	file, openError := os.Open(path)
 	if openError != nil {
-		return engineOutput{}, openError
+		return goChildOutput{}, openError
 	}
 	// Ignored: the file was only read.
 	defer func() { _ = file.Close() }()
-	return readEngineOutput(file)
+	return readGoChildOutput(file)
 }
 
 // moveCachesAside renames every .cache directory under corpusRoot into trash, each to a directory of its own numbered
@@ -226,14 +226,14 @@ func moveCachesAside(corpusRoot string, trash string, already int) (int, error) 
 	return len(found), nil
 }
 
-// engineEnvironment is the environment an engine run gets: goEnvironment, which holds the go list it starts off the
+// goChildEnvironment is the environment a Go child run gets: goEnvironment, which holds the go list it starts off the
 // network (offlineGoEnvironment), less `GOFLAGS`, which a developer's run does not have; marked as the front door's
 // child; `PWD` the corpus's, as a shell's would be in it, where the inherited one names where this command was
-// started; and `COHERE_SYSTEM_CACHE` the side's own system cache (#syscache), so a pair controls what the engine's
+// started; and `COHERE_SYSTEM_CACHE` the side's own system cache (#syscache), so a pair controls what the Go child's
 // system cache holds rather than inherit the person's, and neither side reads the other's tables.
-func engineEnvironment(goEnvironment []string, corpusRoot string, systemCache string) []string {
+func goChildEnvironment(goEnvironment []string, corpusRoot string, systemCache string) []string {
 	return append(environmentWithout(goEnvironment, "GOFLAGS", "PWD", "COHERE_SYSTEM_CACHE"),
-		"COHERE_GO_ENGINE_CHILD=1", "PWD="+corpusRoot, "COHERE_SYSTEM_CACHE="+systemCache)
+		"COHERE_GO_CHILD=1", "PWD="+corpusRoot, "COHERE_SYSTEM_CACHE="+systemCache)
 }
 
 // sideSystemCache is side's system cache under output, which every run of the side reads and writes: warm for the

@@ -14,10 +14,10 @@ import (
 
 // The duplicates report (#jfvhbj7): functions whose canonical IR is one graph, grouped, at size 11 and up. A report,
 // never a gate (@system_cohere's ruling on #6rj7jw7): it follows the phases rather than being one, so no phase line or
-// engine contract changes, it is never a finding, and the run's exit code is the run's whichever groups it lists.
+// contract changes, it is never a finding, and the run's exit code is the run's whichever groups it lists.
 //
-// TypeScript builds the report in this process (duplicates_typescript.go), and the Go engine sends it as one
-// duplicates record (engine_run.go). Both print here, so a duplicate reads the same whichever engine found it.
+// TypeScript builds the report in this process (duplicates_typescript.go), and cohere-go sends it as one
+// duplicates record (contract_run.go). Both print here, so a duplicate reads the same whichever child found it.
 
 // refusalPhrases are the refusal reasons in the report's words.
 var refusalPhrases = map[duplicate_functions.RefusalReason]string{

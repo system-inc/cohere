@@ -70,7 +70,7 @@ func loadedCgoFixtures(test *testing.T) string {
 	test.Helper()
 
 	cgoFixtures.once.Do(func() {
-		cgoFixtures.root, cgoFixtures.failure = os.MkdirTemp("", "cohere-go-engine-load-cgo-")
+		cgoFixtures.root, cgoFixtures.failure = os.MkdirTemp("", "cohere-go-language-load-cgo-")
 		if cgoFixtures.failure != nil {
 			return
 		}

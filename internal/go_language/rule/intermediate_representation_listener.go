@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
 )
 
-// IntermediateRepresentationListener is what a Listener hears of the walk over the engine's own intermediate
+// IntermediateRepresentationListener is what a Listener hears of the walk over cohere-go's own intermediate
 // representation (internal/go_language/intermediate_representation), built by the rules'
 // build_intermediate_representation pass: a callback for each function, for each instruction of the kinds listed, and
 // for each function's exit. The Listener's PackageExit follows this walk.
@@ -33,7 +33,7 @@ type IntermediateRepresentationListener struct {
 func (listener *IntermediateRepresentationListener) validate() error {
 	if listener.Function == nil && len(listener.Instructions) == 0 && listener.Instruction == nil &&
 		listener.FunctionExit == nil {
-		return errors.New("declares the engine's own intermediate representation's walk with none of its callbacks, " +
+		return errors.New("declares cohere's own intermediate representation's walk with none of its callbacks, " +
 			"so nothing of the walk would ever call it")
 	}
 	return validateKinds(

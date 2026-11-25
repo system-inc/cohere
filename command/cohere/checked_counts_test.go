@@ -8,7 +8,7 @@ import (
 // A Swift project whose every file lacked a compiler record, so the type check examined none and lint never ran,
 // reads no checked count in its footer: before, the front door preset checked to the files in scope, and the line
 // read `1 type error (2 checked) • ⚠ 2 files nothing checked` (#1hva1ya). Checked is what a phase examined.
-// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary.
+// Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary.
 func TestAFooterCountsOnlyTheFilesAPhaseExamined(test *testing.T) {
 	records := contractFixture(test, "TypesBail.jsonl")
 	for index, record := range records {
@@ -19,7 +19,7 @@ func TestAFooterCountsOnlyTheFilesAPhaseExamined(test *testing.T) {
 		}
 	}
 	activeSummary = runSummary{}
-	output, _, renderRecordsError := renderRecords(test, engineModeCheck, records, 1)
+	output, _, renderRecordsError := renderRecords(test, contractModeCheck, records, 1)
 	if renderRecordsError != nil {
 		test.Fatalf("%v\n%s", renderRecordsError, output)
 	}
@@ -36,7 +36,7 @@ func TestAFooterCountsOnlyTheFilesAPhaseExamined(test *testing.T) {
 	// The same stream with the records present: the compiler examined both files, so both are checked.
 	activeSummary = runSummary{}
 	present := contractFixture(test, "TypesBail.jsonl")
-	if _, _, renderRecordsError := renderRecords(test, engineModeCheck, present, 1); renderRecordsError != nil {
+	if _, _, renderRecordsError := renderRecords(test, contractModeCheck, present, 1); renderRecordsError != nil {
 		test.Fatal(renderRecordsError)
 	}
 	if activeSummary.FilesChecked != 2 {

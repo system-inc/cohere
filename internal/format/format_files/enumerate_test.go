@@ -30,7 +30,7 @@ func writeTree(test *testing.T, files map[string]string) string {
 }
 
 // TestEnumerateOffersEveryLanguage is the positive control the ruling asked for: a project with a
-// file in each language the engine speaks, proving each one is offered rather than only TypeScript.
+// file in each language the formatter speaks, proving each one is offered rather than only TypeScript.
 //
 // This is the whole point of the change. The pipeline's universe was the type graph, so a .css in a
 // TypeScript project was not declined, it was absent, and absence and agreement print the same.
@@ -68,7 +68,7 @@ func TestEnumerateOffersEveryLanguage(test *testing.T) {
 
 // TestEnumerateNamesWhatItDeclined is the negative control, and it is the one that matters.
 //
-// A file the engine cannot format must come back as a named zero rather than as an absence. A clean
+// A file the formatter cannot format must come back as a named zero rather than as an absence. A clean
 // enumeration and a vacuous one look identical from the outside, so the report has to say what it
 // refused and why, or the coverage line inherits the same blindness it was built to destroy.
 func TestEnumerateNamesWhatItDeclined(test *testing.T) {
@@ -733,7 +733,7 @@ func TestTheHouseListReadsAsIgnoreFileLines(test *testing.T) {
 	}
 }
 
-// An Adamic `.a` file is held back from Files whatever the engine handles, after every ignore layer has had
+// An Adamic `.a` file is held back from Files whatever the formatter handles, after every ignore layer has had
 // its say (#6mhafvb). The walk cannot tell Adamic source from a static library, so it never offers one; the run
 // offers a held `.a` once the program claims it. Every handles predicate is told yes, so a `.a` in Files would be
 // the walk ignoring the hold, and the subtraction still balances with the held files counted.
@@ -866,7 +866,7 @@ func TestTheWalkNeverEntersWhatDiscoveryNeverEnters(test *testing.T) {
 	}
 }
 
-// A directory named Vendor, at any depth, is someone else's code to the Swift engine, so the Format walk never enters
+// A directory named Vendor, at any depth, is someone else's code to cohere-swift, so the Format walk never enters
 // it either (#fe4vr5s): at ahraos-macos the Format project read SwiftTerm's README.md and Contents.json under
 // Vendor/SwiftTerm while the Swift run there excluded all 156 of its Swift files as vendored. The control is a
 // directory named like it, which is entered.

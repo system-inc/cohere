@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1000",
 	"SA1000",
 	"Flags a regular expression given as a constant that does not compile: staticcheck's SA1000, ported onto "+
-		"the engine's own intermediate representation.",
+		"cohere's own intermediate representation.",
 	&Listener,
 )
 

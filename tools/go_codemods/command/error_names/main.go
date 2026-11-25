@@ -1,14 +1,14 @@
 // Command errornames names every error for what produced it. A local `err` (or an error named `e`) written
 // once takes a name from its call: a table of standard library calls first (matched through types, never by
 // spelling), else the function's name in full words plus Error, a function value's name, or for a call of a
-// call's result the function that made it. That naming is internal/naming/go_origin_names, which the Go
-// engine's naming rule asks too, so its suggestion and this rename agree. A local written more than once is
+// call's result the function that made it. That naming is internal/naming/go_origin_names, which
+// cohere-go's naming rule asks too, so its suggestion and this rename agree. A local written more than once is
 // split into one variable per web of reaching definitions (splitter.go), each named the same way. A named
 // result takes its function's name and a walk callback's error parameter is pathError, each split too when the
 // body reuses it. A name that abbreviates error (`readErr`, `errOne`) is spelled out. A second phase renames
-// sentinels, error-making functions and fields the same way through the cross-package engine (globals.go).
+// sentinels, error-making functions and fields the same way through global_rename (globals.go).
 //
-// Whole renames go through the rename engine, which refuses any that would change what an identifier
+// Whole renames go through global_rename, which refuses any that would change what an identifier
 // resolves to. Every package is then rehearsed in memory (verify.go): rewritten, type-checked, every
 // identifier compared, and every changed line held to the house width, dropping a declaration's decisions
 // until it passes. After writing, the tree is reloaded and every identifier's resolution compared again.
@@ -882,20 +882,20 @@ type declarationRecord struct {
 	newName  string
 	category string
 	call     string
-	// rejection is the engine's reason class, when it refused the proposal.
+	// rejection is global_rename's reason class, when it refused the proposal.
 	rejection string
 	reason    string
 	// split is the plan of a variable split into several.
 	split *splitPlan
 }
 
-// declaredAt finds the position an engine conflict reason names as the other declaration.
+// declaredAt finds the position a global_rename conflict reason names as the other declaration.
 var declaredAt = regexp.MustCompile(`declared at (\S+) instead of`)
 
 // lineNumber finds a line number in a category, which the counts leave out.
 var lineNumber = regexp.MustCompile(`line \d+`)
 
-// insteadOf finds the old name of the object an engine conflict reason says the occurrence belongs to.
+// insteadOf finds the old name of the object a global_rename conflict reason says the occurrence belongs to.
 var insteadOf = regexp.MustCompile(`instead of "([^"]*)"$`)
 
 func run(root string, skips []string, dryRun bool, fixup bool) int {
@@ -1073,8 +1073,8 @@ func run(root string, skips []string, dryRun bool, fixup bool) int {
 		)
 	}
 	fmt.Fprintf(streams.Output, "eligible (proposed): %d\n", eligibleCount)
-	fmt.Fprintf(streams.Output, "accepted by the engine: %d\n", acceptedCount)
-	fmt.Fprintf(streams.Output, "rejected by the engine: %d\n", eligibleCount-acceptedCount)
+	fmt.Fprintf(streams.Output, "accepted by global_rename: %d\n", acceptedCount)
+	fmt.Fprintf(streams.Output, "rejected by global_rename: %d\n", eligibleCount-acceptedCount)
 	printCounts(rejectedByReason, 0)
 	fmt.Fprintf(streams.Output, "not eligible: %d\n", candidateCount-eligibleCount)
 	printCounts(notEligibleByCategory, 0)
@@ -1263,7 +1263,7 @@ func splitNames(plan *splitPlan) string {
 	return strings.Join(names, "+")
 }
 
-// packageDecision is what a package's candidates come to after the rename engine and the package check.
+// packageDecision is what a package's candidates come to after global_rename and the package check.
 type packageDecision struct {
 	plan      rename.Plan
 	edits     []rename.Edit
@@ -1278,9 +1278,9 @@ type packageDecision struct {
 	checkError error
 }
 
-// decidePackage sends the candidates' renames through the rename engine, adds the splits' edits, and runs
+// decidePackage sends the candidates' renames through global_rename, adds the splits' edits, and runs
 // checkPackage over the result. Each line it finds wrong drops the decisions of the top-level declaration
-// holding it (the splits first, since a split's names are the ones the engine never saw, then the renames),
+// holding it (the splits first, since a split's names are the ones global_rename never saw, then the renames),
 // and the package is decided again, until the check passes.
 func decidePackage(goPackage *packages.Package, renamePackage rename.Package, candidates []candidate) packageDecision {
 	decision := packageDecision{dropped: map[*types.Var]string{}, oldNames: map[string]bool{}}

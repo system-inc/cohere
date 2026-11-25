@@ -824,12 +824,12 @@ func checkReasons(layer configurationLayer) error {
 // Such a key loaded, resolved to nothing, and the run read green with its ruling applied nowhere: an `error`
 // enforcing nothing, an `off` recording a decision about no rule. Only `--verbose` said so, and only of
 // top-level keys. It is the silent drop checkTopLevelKeys refuses, one level down, and refused rather than
-// warned of for the reason given there. The Go engine refuses an unknown key in its `go` block at load, and
-// the Swift engine one in its `swift` block; this is the TypeScript loader's.
+// warned of for the reason given there. cohere-go refuses an unknown key in its `go` block at load, and
+// cohere-swift one in its `swift` block; this is the TypeScript loader's.
 //
 // Asked through reach, which asks KeyReachesRule, the resolver's own test, so a key refused here is exactly
-// one the resolver could never apply. `unused-disable` and `consistency-no-abbreviated-folder-name` are the engine's
-// own checks rather than rules (IsEngineCheck), and pass.
+// one the resolver could never apply. `unused-disable` and `consistency-no-abbreviated-folder-name` are the linter's
+// own checks rather than rules (IsLinterCheck), and pass.
 // `reasons` and `departures` need no check of their own: an entry in either must name a key the same file
 // writes under "rules" (checkReasons, and the departures check in loadLayers), and that key is judged here.
 //
@@ -866,7 +866,7 @@ func unknownRuleKeysError(where string, unknown []string) error {
 func keysReachingNoRule(rules map[string]json.RawMessage, reach *ruleReach) []string {
 	var unknown []string
 	for key := range rules {
-		if IsEngineCheck(key) || len(reach.of(key)) > 0 {
+		if IsLinterCheck(key) || len(reach.of(key)) > 0 {
 			continue
 		}
 		unknown = append(unknown, key)
@@ -955,13 +955,13 @@ var ignoredTopLevelKeys = map[string]string{
 	"output": "how a run prints, read by the command (command/cohere/output_settings.go) from the file cohere " +
 		"reads first. It decides nothing a rule does, so the linter leaves it alone on purpose.",
 
-	"go": "the Go engine's rules, read by internal/go_language/settings. A repository that holds both a tsconfig and " +
-		"a go.mod keeps one CohereSettings.json for both engines, so the TypeScript linter leaves the key alone on " +
-		"purpose: its rules are the Go engine's, not this linter's.",
+	"go": "cohere-go's rules, read by internal/go_language/settings. A repository that holds both a tsconfig and " +
+		"a go.mod keeps one CohereSettings.json for both languages, so the TypeScript linter leaves the key alone on " +
+		"purpose: its rules are cohere-go's, not this linter's.",
 
-	swiftBlockKey: "the Swift engine's rules, read by cohere-swift itself " +
+	swiftBlockKey: "cohere-swift's rules, read by cohere-swift itself " +
 		"(swift/Sources/CohereSwift/Command/RuleConfiguration.swift), which refuses what it does not read. " +
-		"One settings file configures every engine, so this loader leaves the block's insides to that engine, " +
+		"One settings file configures every language, so this loader leaves the block's insides to that language, " +
 		"and refuses only a block no Swift run reads (swift_block.go).",
 }
 

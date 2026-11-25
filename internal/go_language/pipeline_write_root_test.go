@@ -62,7 +62,7 @@ func linkedProject(test *testing.T) (string, string) {
 	return root, shared
 }
 
-// linkedRun is what one engine run over a linkedProject wrote: its fix record, its findings, its summary and stderr.
+// linkedRun is what one cohere-go run over a linkedProject wrote: its fix record, its findings, its summary and stderr.
 type linkedRun struct {
 	exitCode      int
 	fix           contract.FixRecord
@@ -71,7 +71,7 @@ type linkedRun struct {
 	standardError string
 }
 
-// runLinked runs the engine over root with extra after its contract and root, and reads back what it wrote, holding
+// runLinked runs cohere-go over root with extra after its contract and root, and reads back what it wrote, holding
 // the stream to what the front door refuses.
 func runLinked(test *testing.T, root string, extra ...string) linkedRun {
 	test.Helper()

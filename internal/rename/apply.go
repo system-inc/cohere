@@ -20,7 +20,7 @@ import (
 //	                              correctly is not done at all.
 //	overlapping edits             two edits touching the same bytes means the plan is wrong about
 //	                              its own sites, and applying either one is a guess.
-//	a file that stops parsing     the same guard the fix engine uses, applied here for the same
+//	a file that stops parsing     the same guard the fix pass uses, applied here for the same
 //	                              reason: a range computed one token off produces plausible-looking
 //	                              bytes, and parsing before writing turns that into a refusal
 //	                              instead of a corrupted file.

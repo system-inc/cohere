@@ -1,5 +1,5 @@
 // Package nil_map_assignment is staticcheck's SA5000, a write into a map that is certainly nil, which panics, ported
-// onto the engine's own intermediate representation, the first reader to walk it (#g0rwdw1).
+// onto cohere's own intermediate representation, the first reader to walk it (#g0rwdw1).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5000/sa5000.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the update's syntax, where staticcheck's report
@@ -22,7 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own.
 var Listener = rule.Listener{
 	FileLocal: true, IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
@@ -33,7 +33,7 @@ var Listener = rule.Listener{
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA5000",
 	"SA5000",
-	"Flags an assignment into a map that is certainly nil: staticcheck's SA5000, ported onto the engine's own "+
+	"Flags an assignment into a map that is certainly nil: staticcheck's SA5000, ported onto cohere-go's own "+
 		"intermediate representation.",
 	&Listener,
 )

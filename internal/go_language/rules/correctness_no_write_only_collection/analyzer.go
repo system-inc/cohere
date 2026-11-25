@@ -1,4 +1,4 @@
-// Package correctness_no_write_only_collection is the Go engine's rule that a map or slice something fills is also
+// Package correctness_no_write_only_collection is cohere-go's rule that a map or slice something fills is also
 // read.
 //
 // A collection every use of which puts something in or takes something out, and nothing reads, throws away the work
@@ -40,7 +40,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_no_write_only_collection
 	"append. A slice only ever appended to is staticcheck's SA4010, which holds the append half, so this rule leaves "+
 	"it alone.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var writeOnlyCollectionMessage = policy.MessageOf(Name, "writeOnlyCollection")

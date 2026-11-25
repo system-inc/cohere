@@ -219,7 +219,7 @@ func TestFormatMatchesTheFork(test *testing.T) {
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle := golden.Engine(options)
+		oracle := golden.Formatter(options)
 		for _, testCase := range formatCases {
 			expected, formatError := oracle.Format("Probe.css", testCase.source)
 			if formatError != nil {
@@ -283,7 +283,7 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
-	oracle := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
+	oracle := oracle_testing.Open(test, test.Name()).Formatter(format_options.Default())
 	for _, source := range []string{"a { color: red;\n", "a { color: \"unclosed; }\n", "}\n"} {
 		if _, formatError := oracle.Format("Probe.css", source); formatError == nil {
 			test.Fatalf("the oracle accepted %q", source)
@@ -325,7 +325,7 @@ func TestCoreNormalizedInputMatchesTheFork(test *testing.T) {
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle := golden.Engine(options)
+		oracle := golden.Formatter(options)
 		for _, testCase := range cases {
 			expected, oracleError := oracle.Format(testCase.fileName, testCase.source)
 			if oracleError != nil {
@@ -498,7 +498,7 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle := golden.Engine(options)
+		oracle := golden.Formatter(options)
 		compared, refusedByBoth := 0, 0
 		for _, file := range files {
 			source, readError := os.ReadFile(file)
@@ -674,7 +674,7 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle := golden.Engine(options)
+		oracle := golden.Formatter(options)
 		for _, testCase := range scssFormatCases {
 			expected, formatError := oracle.Format("Probe.scss", testCase.source)
 			if formatError != nil {
@@ -717,7 +717,7 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 func TestFormatScssIsNotFormat(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
-	oracle := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
+	oracle := oracle_testing.Open(test, test.Name()).Formatter(format_options.Default())
 	for _, source := range []string{
 		"a{\n// comment\ncolor:red;\n}",
 		"$map:(key1:value1,key2:value2);",
@@ -796,7 +796,7 @@ func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle := golden.Engine(options)
+		oracle := golden.Formatter(options)
 		compared, matched, rewritten, refusedByBoth, skipped := 0, 0, 0, 0, 0
 		for _, file := range files {
 			source, readError := os.ReadFile(file)

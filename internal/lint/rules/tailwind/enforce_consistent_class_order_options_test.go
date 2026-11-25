@@ -56,7 +56,7 @@ func TestClassOrderOptions(test *testing.T) {
 			options: EnforceConsistentClassOrderOptions{Order: "official"},
 			want:    "absolute w-full",
 		},
-		// The engine's order puts px before py too, so asc is told apart by the pair desc reverses.
+		// Tailwind's order puts px before py too, so asc is told apart by the pair desc reverses.
 		{
 			name:    "asc is not locale order",
 			source:  "py-24 px-12",
@@ -70,7 +70,7 @@ func TestClassOrderOptions(test *testing.T) {
 			want:    "py-24 px-12",
 		},
 		{
-			name:    "desc ignores the engine",
+			name:    "desc ignores Tailwind",
 			source:  "absolute w-full",
 			options: EnforceConsistentClassOrderOptions{Order: "desc"},
 			want:    "w-full absolute",

@@ -40,7 +40,7 @@ func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
 		{"an unknown key", `"messages": {`, `"descriptions": {}, "messages": {`},
 		{"an unknown key in a message", `"text": "This`, `"words": "", "text": "This`},
 		{"no rules", `"TypeScript": "base/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing"`, ``},
-		{"a language neither engine is", `"Swift": "cohere`, `"Kotlin": "cohere`},
+		{"a language neither checker is", `"Swift": "cohere`, `"Kotlin": "cohere`},
 		{"a rule with no namespace", `"base/consistency-no-thing"`, `"consistency-no-thing"`},
 		{"a file named for another idea", `"base/consistency-no-thing"`, `"base/consistency-no-other"`},
 		{"an id that is not camelCase", `"thing": {`, `"Thing": {`},
@@ -314,7 +314,7 @@ func TestPhrasesRenderTheSharedTextAndThePickedOption(test *testing.T) {
 	}
 }
 
-// A twin file can hold a message only one engine renders, named by its languages.
+// A twin file can hold a message only one language renders, named by its languages.
 func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(test *testing.T) {
 	test.Parallel()
 	withOneLanguage := strings.Replace(minimalMessages, `"messages": {`, `"messages": {
@@ -361,7 +361,7 @@ func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(test *testing.T) {
 }
 
 // optionsByLanguage is a twin file whose object phrase gives one option's text by language: `variable`
-// for both engines, each in its own words, and `storeEntry` for TypeScript only.
+// for both languages, each in its own words, and `storeEntry` for TypeScript only.
 const optionsByLanguage = `{
   "rules": { "TypeScript": "base/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing" },
   "phrases": {

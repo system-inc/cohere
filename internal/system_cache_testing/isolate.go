@@ -1,5 +1,5 @@
 // Package system_cache_testing keeps a test binary, and every process it starts, out of the person's own system cache
-// (#syscache): the Go engine's standard-library tables, which a run reads from the directory `COHERE_SYSTEM_CACHE`
+// (#syscache): cohere-go's standard-library tables, which a run reads from the directory `COHERE_SYSTEM_CACHE`
 // names, or else from the user's cache directory. A package whose tests run the engine, in process or as a binary,
 // calls Isolate from its TestMain and ExpectIsolated from a test of its own, so a TestMain that lost the call fails
 // rather than reads, trims or writes the person's cache.
@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-// Variable is the environment variable the engine reads the system cache's root from, spelled as the environment
+// Variable is the environment variable cohere-go reads the system cache's root from, spelled as the environment
 // spells it.
 const Variable = "COHERE_SYSTEM_CACHE"
 
@@ -35,7 +35,7 @@ func Isolate() (func(), error) {
 }
 
 // PersonsSystemCache is the system cache a run on this machine reads when `COHERE_SYSTEM_CACHE` is unset, from
-// usersCache, the person's user cache directory: usersCache joined with `cohere`, as the engine's
+// usersCache, the person's user cache directory: usersCache joined with `cohere`, as cohere-go's
 // cache.SystemCacheRoot spells it, which a test of the cache package holds this to. Empty when usersCache is.
 func PersonsSystemCache(usersCache string) string {
 	if usersCache == "" {

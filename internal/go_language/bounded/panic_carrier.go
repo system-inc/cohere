@@ -4,7 +4,7 @@ import "sync/atomic"
 
 // panicCarrier carries a panic in a fan-out's work from the worker goroutine it happened on back to the fan-out's
 // caller (#z8ym3x5). Nothing up a worker's stack recovers, so a panic there ends the process, where the same panic on
-// the caller's goroutine reaches whatever recovers the run, as the engine's run does to report it as its problem. Each
+// the caller's goroutine reaches whatever recovers the run, as cohere-go's run does to report it as its problem. Each
 // index's work runs under run, which recovers a panic and keeps the first value recovered, so the worker goes on to
 // give its slot back and take its next index, and every index runs, since callers rely on that and some write per
 // index; once every worker has returned, raise panics again with that value on the caller's goroutine.

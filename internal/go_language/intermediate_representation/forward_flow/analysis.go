@@ -1,5 +1,5 @@
-// Package forward_flow solves a forward monotone data flow problem over a function's control flow graph in the
-// engine's own intermediate representation, for the fact passes ported from staticcheck that ran one over buildir's
+// Package forward_flow solves a forward monotone data flow problem over a function's control flow graph in
+// cohere's own intermediate representation, for the fact passes ported from staticcheck that ran one over buildir's
 // (#w7zmvat).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/dfa/dense (forward.go and flow.go) and the

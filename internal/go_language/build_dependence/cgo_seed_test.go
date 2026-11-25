@@ -221,7 +221,7 @@ func TestACgoPackagesUnitsAreSeedsWhereTheBuildKeepsCgoOn(test *testing.T) {
 }
 
 // checkedAsWritten is the package at path of files, each a name and its source, parsed and checked here with package
-// "C" faked, as the engine's load checks a package's cgo files where its cgo tool translates nothing: every file is one
+// "C" faked, as cohere-go's load checks a package's cgo files where its cgo tool translates nothing: every file is one
 // of the package's files as written and one it compiles. No loader and no C compiler runs.
 func checkedAsWritten(test *testing.T, path string, files [][2]string) *packages.Package {
 	test.Helper()
@@ -254,7 +254,7 @@ func checkedAsWritten(test *testing.T, path string, files [][2]string) *packages
 }
 
 // withhold empties, in loaded's syntax, the body of each function and the initial values of each package-level var
-// that names holds, as the engine's load does of every declaration that reaches cgo in a package it checks as written
+// that names holds, as cohere-go's load does of every declaration that reaches cgo in a package it checks as written
 // (load.withholdCgoDeclarations), once the package is type-checked and before the graph collects it, and returns each
 // one's position as the load gives it, for AddPackage.
 //
@@ -290,7 +290,7 @@ func withhold(test *testing.T, loaded *packages.Package, names ...string) []stri
 	return positions
 }
 
-// A cgo file checked as written, package "C" faked, as the engine's load checks a dependency's where the project has
+// A cgo file checked as written, package "C" faked, as cohere-go's load checks a dependency's where the project has
 // no cgo of its own, imports "C", so its units carry the mark a translated file's do, and so do those of every other
 // file of its package, whose bodies the load may have emptied (cgo_files.go). Where a build keeps cgo on in the
 // package each is a seed, Slots of the cgo file and Steady of the plain file alike, and so where the package differs
@@ -459,7 +459,7 @@ func TestAFakedCgoPackagesWithheldUnitsAreSeedsWhereThePackageDiffers(test *test
 // A unit the host's load withheld from is a seed in every build, under a difference that says nothing of its package
 // at all, in the live graph and in the graph read back from its records, whose unit flags carry the mark: the host
 // never checked what it held, whatever the load withheld it for, its own cgo file or another faked package's invalid
-// expression (load's holdsInvalid), which the engine's TestWhatTheHostWithheldIsASeedInEveryBuild loads. Here a
+// expression (load's holdsInvalid), which cohere-go's TestWhatTheHostWithheldIsASeedInEveryBuild loads. Here a
 // package checked as written beside a cgo file has Doubled's initializer and Size's body withheld by hand, as the
 // load withholds them (withhold), and its positions handed to the graph; Steady, left whole, is no seed.
 func TestAUnitTheHostWithheldIsASeedInEveryBuild(test *testing.T) {
@@ -586,8 +586,8 @@ func translatedByHand(test *testing.T) *packages.Package {
 // cache, a path no file list holds. So WidthBytes, a plain file's constant that sizes `_Ctype_width_t`, which the
 // build's `!cgo` file declares as an int64 where the host's tool wrote an int32, is 4 on the host and 8 in the build
 // with no file of its own differing, and only the mark on the generated file's units says so. The difference is the
-// engine's for such a build: the cgo file the host's alone, the `!cgo` file the build's alone, and what KeepsCgo says
-// of the two loads. Steady, which names nothing of C, stays independent.
+// cohere-go's for such a build: the cgo file the host's alone, the `!cgo` file the build's alone, and what KeepsCgo
+// says of the two loads. Steady, which names nothing of C, stays independent.
 func TestTheGeneratedFilesUnitsAreSeedsWhereTheBuildDropsTheCgoFiles(test *testing.T) {
 	test.Parallel()
 

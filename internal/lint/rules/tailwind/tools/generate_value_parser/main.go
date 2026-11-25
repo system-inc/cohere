@@ -8,7 +8,7 @@
 //	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
 // The distinction this tool exists to enforce is the same one generate_data_type enforces:
-// reading the source and asking the engine are different claims. For this parser they disagree in
+// reading the source and asking Tailwind are different claims. For this parser they disagree in
 // places a careful reader would not predict, because several behaviors fall out of JavaScript
 // semantics rather than intent. `a)b` parses to a single word `b`, the pending `a` discarded by an
 // optional chain against an empty stack. A trailing `\` produces the literal word `\undefined`.
@@ -73,13 +73,13 @@ func main() {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
 				os.Stderr,
-				"%s is stale: the engine now parses differently. Re-run without -check and read the diff.\n",
+				"%s is stale: Tailwind now parses differently. Re-run without -check and read the diff.\n",
 				*output,
 			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
-		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
+		fmt.Fprintf(os.Stderr, "%s matches Tailwind\n", *output)
 		return
 	}
 

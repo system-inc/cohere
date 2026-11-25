@@ -31,7 +31,7 @@
 // impossible for a design system checked in under `tools/` with no `node_modules` above it. The two
 // are separate inputs now, defaulting to the old behaviour.
 //
-// The table it writes is what lets `enforce-canonical-classes` run in Go without a JavaScript engine
+// The table it writes is what lets `enforce-canonical-classes` run in Go without a JavaScript runtime
 // at lint time. Tailwind's own collapse logic is a signature-equivalence search over the whole
 // utility registry, eight to ten thousand lines that change every minor release. Porting the search
 // was rejected twice for that reason. Porting its answers is a different proposition: 327 functional
@@ -54,7 +54,7 @@
 // trusting that an upgrade would have been caught.
 //
 // Node is required to run it and never to use the result. The enumeration asks the real Tailwind
-// engine, because a hand-maintained table is a guess and the guesses have been wrong: an earlier
+// Tailwind, because a hand-maintained table is a guess and the guesses have been wrong: an earlier
 // attempt enumerated from the classes this codebase happens to use and missed nine families.
 package main
 
@@ -290,7 +290,7 @@ func main() {
 	// empty table that no test would obviously reject.
 	if len(result.Families) == 0 {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintln(os.Stderr, "generate_collapse: the engine reported no collapse families at all.")
+		fmt.Fprintln(os.Stderr, "generate_collapse: Tailwind reported no collapse families at all.")
 		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(
 			os.Stderr,
@@ -364,7 +364,7 @@ func main() {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
 				os.Stderr,
-				"generate_collapse: %s is Tailwind %s and %s is Tailwind %s; refusing to compare engines.\n",
+				"generate_collapse: %s is Tailwind %s and %s is Tailwind %s; refusing to compare Tailwind versions.\n",
 				*entryPoint,
 				result.TailwindVersion,
 				other.entryPoint,
@@ -547,7 +547,7 @@ func main() {
 		*output, result.TailwindVersion, len(result.Families), result.PairsProbed, result.FunctionalRoots)
 }
 
-// enumerate runs the Node script that asks the real engine.
+// enumerate runs the Node script that asks the real Tailwind.
 //
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.
@@ -709,7 +709,7 @@ var CollapseFamilies = []CollapseFamily{
 // TailwindVersion is the version these families were enumerated from.
 //
 // Recorded so a mismatch between this and the installed Tailwind is greppable, and so a reader of a
-// finding can tell which engine's opinion produced it.
+// finding can tell which side's opinion produced it.
 const TailwindVersion = %q
 `, result.TailwindVersion)
 
@@ -743,7 +743,7 @@ func renderOrder(result *enumeration) ([]byte, error) {
 //
 // Porting that comparator needs this list rather than a position per class. A per-class table was
 // built first and measured at 37,643 entries and 2.0 MB; this is the same answer in a few hundred
-// rows, verified exact against the engine over 2,465 real class literals and 296 shuffled ones.
+// rows, verified exact against Tailwind over 2,465 real class literals and 296 shuffled ones.
 
 package tailwind
 
@@ -782,7 +782,7 @@ var PropertyOrder = map[string]int{
 	// resolved value, which a table keyed on a root cannot.
 	fmt.Fprintf(&buffer, `// VariantOrder is the position of each variant prefix in Tailwind's sort order.
 //
-// Asked of the engine rather than guessed. Ranking variants by prefix length put focus: before
+// Asked of Tailwind rather than guessed. Ranking variants by prefix length put focus: before
 // hover: because it is shorter, which is not the order Tailwind emits them in.
 var VariantOrder = map[string]int{
 `)

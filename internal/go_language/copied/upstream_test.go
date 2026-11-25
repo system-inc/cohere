@@ -76,7 +76,7 @@ func TestEveryCopyMatchesUpstreamOutsideItsMarkedChanges(test *testing.T) {
 	if walkError != nil {
 		test.Fatalf("walking %s: %v", root, walkError)
 	}
-	// A walk that found no copy would pass over a tree nobody examined, so the copies the engine carries today
+	// A walk that found no copy would pass over a tree nobody examined, so the copies cohere-go carries today
 	// must be among those found.
 	for _, expected := range []string{
 		"internal/go_language/check/analysistest/analysistest.go",

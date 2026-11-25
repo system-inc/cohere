@@ -68,9 +68,9 @@ func TestACheckLeavesAStaleGoWorkSumAsItWasUnderEveryBuild(test *testing.T) {
 		// Not parallel: it sets the go environment of the process, which every go command of the run in it reads
 		test.Run(each.name, func(test *testing.T) {
 			workspace := writeStaleWorkspace(test, each.extra)
-			engine, stream := runOverRaw(test, workspace, exitClean, "--no-fix")
-			if len(engine.buildRuns) != 2 {
-				test.Errorf("the run checked %d builds, want the host's and windows's", len(engine.buildRuns))
+			pipeline, stream := runOverRaw(test, workspace, exitClean, "--no-fix")
+			if len(pipeline.buildRuns) != 2 {
+				test.Errorf("the run checked %d builds, want the host's and windows's", len(pipeline.buildRuns))
 			}
 			after, readError := os.ReadFile(filepath.Join(workspace, "go.work.sum"))
 			if readError != nil {

@@ -9,7 +9,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// RenameExportsOption is the option a renaming rule carries, `renameExports`, read by the engine's rename fix and
+// RenameExportsOption is the option a renaming rule carries, `renameExports`, read by cohere-go's rename fix and
 // never by the rule's run. Off, which is its default, the fix declines to rename an exported name of a package
 // another module could import, since a consumer outside the workspace can't be renamed with it. On, the settings
 // say the workspace is the whole world. The rule's findings are the same either way.
@@ -39,7 +39,7 @@ func RenamesExports(analyzer *analysis.Analyzer) bool {
 }
 
 // RenameFixes is the fix a renaming rule attaches to a finding whose judgment names exactly one new spelling for the
-// whole identifier: one edit over the declaring identifier whose new text is the whole new name. The engine reads
+// whole identifier: one edit over the declaring identifier whose new text is the whole new name. cohere-go reads
 // that text as the name and renames every reference itself, through the types, so the fix carries no edit of its
 // own at a use. A new name Go reserves, a keyword or a predeclared identifier, or one that is the old name gets no
 // fix, since a rename to it would not compile or would change nothing.

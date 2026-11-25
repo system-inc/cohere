@@ -1,4 +1,4 @@
-// Package testing_require_failure_path is the Go engine's rule that a test can fail on a wrong result.
+// Package testing_require_failure_path is cohere-go's rule that a test can fail on a wrong result.
 //
 // A test whose body computes a result and checks nothing fails only when the code under it crashes, so go test
 // prints ok whatever result that code returns. Its silence reads as a proof it never gave, and the next reader
@@ -38,7 +38,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "testing_require_failure_path", "Flag
 	"only a crash in the code under test fails it. A test that skips unconditionally before doing anything is not "+
 	"judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var cannotFailMessage = policy.MessageOf(Name, "cannotFail")

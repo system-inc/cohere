@@ -64,10 +64,10 @@ func cachingAt(directory string, rules []rule.Rule) *Caching {
 	return &Caching{
 		Store: cache.Open(directory, nil),
 		Context: cache.Context{
-			FormatVersion:  CacheFormatVersion,
-			EngineIdentity: "check tests",
-			Build:          []string{"loader=source"},
-			RuleSet:        names,
+			FormatVersion:      CacheFormatVersion,
+			ExecutableIdentity: "check tests",
+			Build:              []string{"loader=source"},
+			RuleSet:            names,
 		},
 	}
 }

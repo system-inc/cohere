@@ -13,21 +13,21 @@ import (
 //
 // Per-file cost is not a property of the formatter, it is a property of the sample: a corpus of
 // 9.5 KB files will report roughly twice the per-file cost of a corpus of 4.3 KB files while the
-// engine does exactly the same work per byte. Two honest measurements of the same engine can
+// formatter does exactly the same work per byte. Two honest measurements of the same formatter can
 // therefore disagree by 2x with neither being wrong, which is what happened here.
 //
 //	COHERE_COST_LIST=/path/to/list go test ./internal/prettier/ -run TestCost -v
 func TestCost(test *testing.T) {
 	test.Parallel()
 
-	listPath := needs.OptIn(test, "COHERE_COST_LIST", "it times the engine over a list of files")
+	listPath := needs.OptIn(test, "COHERE_COST_LIST", "it times the formatter over a list of files")
 	listBytes, readError := os.ReadFile(listPath)
 	if readError != nil {
 		test.Fatalf("reading the list: %v", readError)
 	}
 
 	constructionStart := time.Now()
-	engine := newTestEngine(test)
+	formatter := newTestFormatter(test)
 	construction := time.Since(constructionStart)
 
 	var totalBytes int
@@ -35,7 +35,7 @@ func TestCost(test *testing.T) {
 	var formatting time.Duration
 	for _, path := range strings.Split(strings.TrimSpace(string(listBytes)), "\n") {
 		path = strings.TrimSpace(path)
-		if path == "" || !engine.Handles(path) {
+		if path == "" || !formatter.Handles(path) {
 			continue
 		}
 		source, readError := os.ReadFile(path)
@@ -43,7 +43,7 @@ func TestCost(test *testing.T) {
 			continue
 		}
 		start := time.Now()
-		if _, formatError := engine.Format(path, string(source)); formatError != nil {
+		if _, formatError := formatter.Format(path, string(source)); formatError != nil {
 			test.Errorf("%s: %v", path, formatError)
 			continue
 		}

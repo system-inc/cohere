@@ -50,13 +50,13 @@ var typeScriptParsableExtensions = []string{".ts", ".tsx", ".mts", ".cts", ".js"
 // by accident. Both assumptions were incidental and both looked like architecture.
 //
 // A file this returns false for is passed through unguarded, and that is the honest trade: the
-// engine cannot check a language it cannot parse, and refusing every such file would mean the
+// fix pass cannot check a language it cannot parse, and refusing every such file would mean the
 // formatter can never touch css or markdown. The formatter's own parser is the guard for those, and
-// a transform that produces unparseable output in its own language fails inside the engine rather
+// a transform that produces unparseable output in its own language fails inside the fix pass rather
 // than here.
 //
 // An Adamic `.a` file is TypeScript (#6mhafvb), so the name is read through source_name.TreatedAs. Only the
-// program's `.a` files reach the engine: the format walk holds every `.a` back until the program claims
+// program's `.a` files reach the fix pass: the format walk holds every `.a` back until the program claims
 // it, so a static library named libfoo.a is never handed to this parser.
 func TypeScriptParsable(fileName string) bool {
 	treatedAs := source_name.TreatedAs(fileName)
@@ -69,7 +69,7 @@ func TypeScriptParsable(fileName string) bool {
 }
 
 // TypeScriptParsableExtensions is a copy of the endings TypeScriptParsable says yes to, for a list that has to
-// name every file the fix engine acts on, as the editor's save list does (editors/vscode/cohere-save.json).
+// name every file the fix pass acts on, as the editor's save list does (editors/vscode/cohere-save.json).
 func TypeScriptParsableExtensions() []string {
 	return slices.Clone(typeScriptParsableExtensions)
 }
@@ -80,7 +80,7 @@ func Parses(fileName string, text string) (bool, string) {
 }
 
 // parsesWithTree is Parses, also returning the tree it built: nil for a file the TypeScript parser does not
-// own, or one that does not parse. The fix engine hands it to the transform, which then parses nothing
+// own, or one that does not parse. The fix pass hands it to the transform, which then parses nothing
 // again (Transform).
 func parsesWithTree(fileName string, text string) (bool, string, *ast.SourceFile) {
 	// A file the TypeScript parser does not own is not something this guard can judge. Reporting it
@@ -184,7 +184,7 @@ func guardScriptKind(fileName string) core.ScriptKind {
 // and renamed over it: a link inside root stays a link, and its target takes the new text. A real path
 // outside root is refused with a *write_root.OutsideRootError before anything is created, and the file
 // holds what it held. A file that cannot be resolved, a missing one included, is an error, never a new
-// file: the engine only rewrites files it has just read.
+// file: the fix pass only rewrites files it has just read.
 func WriteAtomically(root write_root.WriteRoot, fileName string, text string) error {
 	realPath, inside, resolveError := root.Inside(fileName)
 	if resolveError != nil {

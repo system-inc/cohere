@@ -222,7 +222,7 @@ func TestNoConstAssignStaysSilent(test *testing.T) {
 
 // The span, which the message-id fixtures above cannot see.
 //
-// Upstream carries two labels per diagnostic, the declaration and the write, and our engine has one
+// Upstream carries two labels per diagnostic, the declaration and the write, and our linter has one
 // range per finding. The write is the one chosen: it is the line the reader has to change, and the
 // declaration is usually correct code that some other line is abusing. A port pointing at the
 // declaration instead passes every fixture above, because `ExpectFindings` asserts ids and count and

@@ -11,7 +11,7 @@
 //
 // A functional utility's suggestions are a recipe: literal values, theme namespaces whose keys are
 // offered, the fractions, a bare default, and the same for its modifiers. The recipe is a fact about
-// Tailwind and is generated, as FrameworkSuggestions, by probing the engine with a theme of one key
+// Tailwind and is generated, as FrameworkSuggestions, by probing Tailwind with a theme of one key
 // per namespace. The keys are a fact about the repository, so they are read here, from the run's
 // Theme, through the same `keysInNamespaces` upstream calls. A repository's own `@utility` blocks
 // carry recipes of their own, which upstream records while registering them; that tracking is

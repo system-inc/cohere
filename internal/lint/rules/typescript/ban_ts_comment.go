@@ -125,12 +125,12 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 // not apply the rule to that file at all. #6aa3wrx makes readiness resolve the set per file, moves
 // the scope into the set, and removes this gate.
 //
-// # The three patterns, read without a regular expression engine
+// # The three patterns, read without a regular expression matcher
 //
 // Upstream matches each comment against one of three patterns, taken from TypeScript's scanner and
 // parser. Each is a run of one character class, then another, then a fixed `@ts-` directive, then
 // the rest of the line, and no two adjacent classes share a character, so a left-to-right scan takes
-// the same path the backtracking engine does. `\s` is JavaScript's, which is exactly
+// the same path the backtracking matcher does. `\s` is JavaScript's, which is exactly
 // `type_checking.IsStrWhiteSpace`, and `.` stops at a line terminator:
 //
 //	line comment, `//` + value    ^\/\/\/?\s*@ts-(check|nocheck)(.*)$

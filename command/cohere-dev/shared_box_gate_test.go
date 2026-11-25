@@ -296,9 +296,9 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 	writeFixtureFile(test, filepath.Join(worktree, "internal", "edit", "edit_test.go"),
 		"package edit\n\nimport \"testing\"\n\nfunc TestEdit(test *testing.T) {}\n")
 	// A package at the -race list's entry that names a run, so the -race run asks for it with that run.
-	engine := raceGatedEntry(test, "internal/go_language")
+	goLanguage := raceGatedEntry(test, "internal/go_language")
 	writeFixtureFile(test, filepath.Join(worktree, "internal", "go_language", "main_test.go"),
-		"package go_engine\n\nimport \"testing\"\n\nfunc TestEngine(test *testing.T) {}\n")
+		"package go_language\n\nimport \"testing\"\n\nfunc TestChecker(test *testing.T) {}\n")
 	fixture.git(worktree, "add", ".")
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a module"))
 	fixture.git(worktree, "merge", "-q", "--no-edit", "-m", "Merge main", "main")
@@ -323,8 +323,8 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 		}
 	}
 	if len(tests) != 3 || tests[1] != "test -race ./internal/edit" ||
-		tests[2] != "test -race -run "+engine.run+" ./internal/go_language" {
+		tests[2] != "test -race -run "+goLanguage.run+" ./internal/go_language" {
 		test.Fatalf("Kirk's Mac ran go tests %q, want the module's, then its -race run of ./internal/edit, then "+
-			"./internal/go_language's with -run %s:\n%s", tests, engine.run, recorded)
+			"./internal/go_language's with -run %s:\n%s", tests, goLanguage.run, recorded)
 	}
 }

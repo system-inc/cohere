@@ -278,7 +278,7 @@ func TestALaterCalleeIsBuiltWhenItsCallerIsRead(test *testing.T) {
 }
 
 // The expression map is recorded for a package exactly when an analyzer requiring ExpressionReader requires Analyzer
-// there. Under the engine's Dependents, a reader of the map finds values for the fixture's expressions, and a reader
+// there. Under cohere-go's Dependents, a reader of the map finds values for the fixture's expressions, and a reader
 // of the representation alone finds none, alone or beside the map's reader, which shares its one result and so finds
 // them too. Under a driver with no Dependents, every package records it, as buildir's GlobalDebug does.
 func TestTheExpressionMapIsRecordedForItsReaders(test *testing.T) {

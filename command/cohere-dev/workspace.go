@@ -13,7 +13,7 @@ import (
 // directory with a go.mod of its own, so the TypeScript shims and static_single_assignment, each a module
 // so another repository can import it, were never vetted or tested by any gate.
 //
-// The list is go.work's use directives, read by internal/go_language/project, which the Go engine reads too.
+// The list is go.work's use directives, read by internal/go_language/project, which cohere-go reads too.
 // A module inside a submodule is not gated: its tests are its upstream's. Everything gated runs in one go
 // invocation, so it shares the token's -p budget and Go's test cache, and the gate says what it covered.
 //

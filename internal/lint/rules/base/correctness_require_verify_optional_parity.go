@@ -9,13 +9,13 @@ import (
 	"github.com/system-inc/cohere/policy"
 )
 
-// verifyIsOptionalDecorator is the sentinel that tells the validation engine to skip every other
+// verifyIsOptionalDecorator is the sentinel that tells the validator to skip every other
 // rule on a property when the value is null or undefined.
 //
 // Base's decorator name, matched literally. See the package doc for why it keeps that spelling.
 const verifyIsOptionalDecorator = "VerifyIsOptional"
 
-// verifyDecoratorPrefix is what marks a decorator as belonging to the validation engine.
+// verifyDecoratorPrefix is what marks a decorator as belonging to the validator.
 const verifyDecoratorPrefix = "Verify"
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-verify-optional-parity.json`.
@@ -51,7 +51,7 @@ var (
 //
 // # A property with no Verify decorator is not validated
 //
-// The engine does not look at it, so neither does this rule. That is the first guard and it is what
+// The validator does not look at it, so neither does this rule. That is the first guard and it is what
 // keeps the rule from reporting every optional field in the codebase.
 //
 // # The nullability question lives on the shelf
@@ -118,7 +118,7 @@ func checkVerifyOptionalParity(ruleContext rule.Context, node *ast.Node, key *as
 		hasOtherVerifyRule = true
 	}
 
-	// A property the validation engine never looks at is outside this rule's scope.
+	// A property the validator never looks at is outside this rule's scope.
 	if !hasOptionalSentinel && !hasOtherVerifyRule {
 		return
 	}
@@ -175,7 +175,7 @@ func isBaseParameterProperty(node *ast.Node) bool {
 	return ast.HasSyntacticModifier(node, ast.ModifierFlagsParameterPropertyModifier)
 }
 
-// isVerifyDecoratorName says whether a decorator belongs to the validation engine.
+// isVerifyDecoratorName says whether a decorator belongs to the validator.
 //
 // Shared by both Verify parity rules rather than spelled twice in one package: they ask the
 // identical question, and two spellings of it would be free to drift.

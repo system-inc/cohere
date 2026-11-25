@@ -29,7 +29,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // and on screaming snake case.
 //
 // Each .golden file beside a flagged file is that file with every offered rename applied to its declaring
-// identifier, the engine's part, renaming each reference, left out. Every finding offers one, to the name its
+// identifier, cohere-go's part, renaming each reference, left out. Every finding offers one, to the name its
 // message suggests, so where a golden and a want disagree, the fix and the finding name two spellings.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
@@ -43,7 +43,7 @@ func TestAnalyzer(test *testing.T) {
 	)
 }
 
-// renameExports is the engine's to read, so turning it on changes no finding and no rename the rule offers: the
+// renameExports is cohere-go's to read, so turning it on changes no finding and no rename the rule offers: the
 // same fixtures, wants and goldens pass with it set.
 func TestRenameExportsChangesNoFinding(test *testing.T) {
 	test.Parallel()

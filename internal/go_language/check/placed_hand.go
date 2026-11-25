@@ -47,7 +47,7 @@ func newPlacedHand() *placedHand {
 // host did, which the digests check here too; and its place is its own, which DeclarationPlaces holds by placing no
 // place two functions share. Unit B's comparison of the host's and the build's units is what makes the first true;
 // until a build hands a predicate built on it, only a test does, and TestOnlyATestHoldsTheAnswers keeps every hand,
-// this one included, out of an engine run. digests is the sha256 of each file's bytes as the build parsed it, by the
+// this one included, out of a cohere-go run. digests is the sha256 of each file's bytes as the build parsed it, by the
 // name it parsed it under, as digestsOf reads them from the build's keys; an answer whose file the host held no digest
 // of is never taken.
 func (hand *placedHand) hold(

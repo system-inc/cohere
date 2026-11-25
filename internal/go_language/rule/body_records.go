@@ -7,7 +7,7 @@ import (
 )
 
 // BodyRecords keys, in a pass's ResultOf, a host's ask that U1000 record what each function body of the pass's
-// package adds to its graph (#xeafx79), true, which the engine's checker hands every pass when its
+// package adds to its graph (#xeafx79), true, which cohere-go's checker hands every pass when its
 // checker.Options.BodyRecords is this key and its Options.RecordBodies is set: the records an extra build's U1000
 // splices in place of walking a body the build leaves standing, which the host's side of the package hands it. Only a
 // host's run whose extra builds leave bodies standing asks. Every other run, a plain one among them, holds no ask, and

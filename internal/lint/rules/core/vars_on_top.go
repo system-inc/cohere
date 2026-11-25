@@ -10,7 +10,7 @@ var messageVarDeclarationsOnTop = rule.Message{
 	Description: "All 'var' declarations must be at the top of the function scope. " +
 		"A `var` is hoisted to the top of its function whatever line it is written on, so a " +
 		"declaration buried in a loop or a branch reads as scoped to that block and is not. " +
-		"Writing them together at the top makes the text say what the engine already does.",
+		"Writing them together at the top makes the text say what the linter already does.",
 }
 
 // VarDeclarationsOnTop requires every `var` declaration to sit at the top of its containing scope.
@@ -167,7 +167,7 @@ func varDeclarationsOnTopIsOnTop(subject *ast.Node, statements *ast.NodeList, in
 //	`use strict`; var x; f();   REPORTS
 //	`hello`; var x;             REPORTS
 //
-// A template is never a directive to any engine either, so upstream is right and the improvement
+// A template is never a directive to any linter either, so upstream is right and the improvement
 // was not one. Found by a surviving mutant, because no upstream case writes a backtick here.
 func varDeclarationsOnTopLooksLikeDirective(node *ast.Node) bool {
 	if node.Kind != ast.KindExpressionStatement {

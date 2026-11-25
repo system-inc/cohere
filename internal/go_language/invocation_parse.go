@@ -22,13 +22,13 @@ import (
 //
 // `host-build-only` checks the host's build alone (#qqyq61s). Without it the run checks, beside the host's build, every
 // other build the census needs (otherBuilds), and the project record names each file only such a build compiles as
-// checked by it (#72n9mq0); with it each such file keeps its constraint's reason, a gap. The engine reads it through
-// checksEveryBuild. The front door forwards it to this engine alone, and off changes nothing.
+// checked by it (#72n9mq0); with it each such file keeps its constraint's reason, a gap. cohere-go reads it through
+// checksEveryBuild. The front door forwards it to cohere-go alone, and off changes nothing.
 //
-// `build-dependence` has the engine compute, for every extra build the run checks, which of the host's package-level
+// `build-dependence` has cohere-go compute, for every extra build the run checks, which of the host's package-level
 // declarations the build can change (#qkq4gx5), and write the counts on the build's record, observed only: it changes
-// no finding. Under `host-build-only` it does nothing. The engine reads it alone for now, and the census runs the
-// engine directly, so the front door does not forward it.
+// no finding. Under `host-build-only` it does nothing. cohere-go reads it alone for now, and the census runs the
+// cohere-go directly, so the front door does not forward it.
 //
 // `timing` measures what the run's CPU goes to and writes it as the timing record (pipeline.timing, #3apgjer).
 //
@@ -37,15 +37,15 @@ import (
 // changes nothing of the run, unlike `timing`, which turns the cache off and runs the builds one at a time.
 //
 // `duplicates` asks for the duplicates report (#jfvhbj7): the lint pass hashes every function beside the rules, and
-// one duplicates record after the unused phase's says what it grouped. Additive within contract 3, and this engine's
-// alone: the Swift engine refuses it as a flag it does not know.
+// one duplicates record after the unused phase's says what it grouped. Additive within contract 3, and cohere-go's
+// alone: cohere-swift refuses it as a flag it does not know.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
 	"rules", "rules-enabled", "version", "no-cache", "no-system-cache", "host-build-only", "timing", "timeline",
 	"duplicates", "build-dependence",
 }
 
-// notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a
+// notImplementedFlags are the contract's flags cohere-go does not do yet. Each is refused by name, because a
 // flag accepted and ignored reads as a run that did what was asked.
 var notImplementedFlags = []string{"unused", "unused-all", "unused-deep", "explain"}
 
@@ -55,7 +55,7 @@ var notImplementedFlags = []string{"unused", "unused-all", "unused-deep", "expla
 // for which the run prints on standard output what `--fix` would write, and writes nothing (pipeline.runStdin).
 //
 // `profile` is the file the process writes its CPU profile to (Main), which the front door names beside its own when
-// its run is profiled, and release's training script names when it runs the engine directly (#r33n96f). It changes
+// its run is profiled, and release's training script names when it runs cohere-go directly (#r33n96f). It changes
 // nothing of the run.
 var valuedFlags = []string{"contract", "root", "lint-config", "stdin-filepath", "profile"}
 
@@ -83,9 +83,9 @@ const (
 	modeStdin mode = "Stdin"
 )
 
-// parseInvocation reads the command line, and refuses one the engine cannot honor in full.
+// parseInvocation reads the command line, and refuses one cohere-go cannot honor in full.
 //
-// A contract mismatch is the refusal named whenever there is one, even beside a flag this engine does not
+// A contract mismatch is the refusal named whenever there is one, even beside a flag cohere-go does not
 // know: a front door speaking another version may well send flags this one has never heard of, and the
 // version is the reason.
 func parseInvocation(arguments []string) (invocation, error) {
@@ -112,7 +112,7 @@ func parseInvocation(arguments []string) (invocation, error) {
 		}
 		spelled, isLong := strings.CutPrefix(argument, "--")
 		if !isLong {
-			refuseOnce(fmt.Errorf("%s is not a flag the Go engine takes, whose flags are spelled with two dashes",
+			refuseOnce(fmt.Errorf("%s is not a flag cohere-go takes, whose flags are spelled with two dashes",
 				argument))
 			continue
 		}
@@ -158,7 +158,7 @@ func parseInvocation(arguments []string) (invocation, error) {
 			refuseOnce(fmt.Errorf("--%s is not implemented for Go yet, so the run was refused rather than run "+
 				"without it", name))
 		default:
-			refuseOnce(fmt.Errorf("--%s is not a flag the Go engine takes", name))
+			refuseOnce(fmt.Errorf("--%s is not a flag cohere-go takes", name))
 		}
 	}
 
@@ -175,19 +175,19 @@ func parseInvocation(arguments []string) (invocation, error) {
 	return request, nil
 }
 
-// checkContract refuses a command line that does not speak this engine's contract version.
+// checkContract refuses a command line that does not speak cohere-go's contract version.
 func checkContract(value string, given bool) error {
 	if !given {
-		return fmt.Errorf("no --contract was given, so the engine cannot tell whether it speaks the front door's "+
+		return fmt.Errorf("no --contract was given, so cohere-go cannot tell whether it speaks the front door's "+
 			"version (it speaks contract %d)", contract.Version)
 	}
 	spoken, parseError := strconv.Atoi(value)
 	if parseError != nil {
-		return fmt.Errorf("--contract %q is not a version number (this engine speaks contract %d)", value,
+		return fmt.Errorf("--contract %q is not a version number (cohere-go speaks contract %d)", value,
 			contract.Version)
 	}
 	if spoken != contract.Version {
-		return fmt.Errorf("the front door speaks contract %d and this engine speaks contract %d", spoken,
+		return fmt.Errorf("the front door speaks contract %d and cohere-go speaks contract %d", spoken,
 			contract.Version)
 	}
 	return nil

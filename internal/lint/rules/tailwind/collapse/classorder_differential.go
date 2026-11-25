@@ -1,7 +1,7 @@
-// The Tier 2 differential: `{order, count}` per class, over a whole registry, against the engine.
+// The Tier 2 differential: `{order, count}` per class, over a whole registry, against Tailwind.
 //
 // This is the tier above the per-component fixtures rather than a replacement for them. Six
-// components have landed and each carries an engine-verified corpus of its own, which is the right
+// components have landed and each carries Tailwind-verified corpus of its own, which is the right
 // shape for testing a component and cannot see the thing this file exists to see.
 //
 // # What a component fixture cannot reach
@@ -23,8 +23,8 @@
 //
 // Every class lands in exactly one Outcome. The lattice is the whole design, because the failure
 // this harness was built to refuse is a differential that scores mutual silence as agreement. In the
-// ahra corpus 10 of 1,208 distinct classes return null from the engine, and the expanded registry
-// adds 30 more per system where the engine advertises a modifier it then refuses. Those are the
+// ahra corpus 10 of 1,208 distinct classes return null from Tailwind, and the expanded registry
+// adds 30 more per system where Tailwind advertises a modifier it then refuses. Those are the
 // classes most likely to break and the ones a naive differential is blind to, so `BothSilent` is
 // counted, reported, and bounded, never folded into agreement.
 //
@@ -71,7 +71,7 @@ type ReadingSource interface {
 //
 // Five rather than two, and the three beyond agree/disagree are the reason this type exists. A
 // two-state comparison has to put "neither side answered" somewhere, and every place it can put it
-// is wrong: as agreement it is blind, as disagreement it is noise on classes the engine genuinely
+// is wrong: as agreement it is blind, as disagreement it is noise on classes Tailwind genuinely
 // does not compile.
 type Outcome string
 
@@ -80,18 +80,18 @@ const (
 	OutcomeAgreed Outcome = "agreed"
 	// OutcomeDisagreed is both sides answering different readings. A defect in the port.
 	OutcomeDisagreed Outcome = "disagreed"
-	// OutcomeGoSilent is the engine answering and the Go side declining.
+	// OutcomeGoSilent is Tailwind answering and the Go side declining.
 	//
 	// A defect unless it is a known boundary of the model. The descriptor model declines the 18
 	// per-declaration roots deliberately, and that is the difference between a boundary that was
 	// measured and a component that quietly stopped answering, which look identical in a count.
 	OutcomeGoSilent Outcome = "go-silent"
-	// OutcomeEngineSilent is the Go side answering where the engine returned null.
+	// OutcomeTailwindSilent is the Go side answering where Tailwind returned null.
 	//
 	// Always a defect, and the direction that is easiest to miss. The Go side inventing a reading
-	// for a class the engine does not compile is a rule that will sort a class nobody can write, and
+	// for a class Tailwind does not compile is a rule that will sort a class nobody can write, and
 	// no count of agreements will surface it.
-	OutcomeEngineSilent Outcome = "engine-silent"
+	OutcomeTailwindSilent Outcome = "tailwind-silent"
 	// OutcomeBothSilent is neither side answering.
 	//
 	// Counted and bounded, never scored. This is requirement three of the harness: a side reporting
@@ -112,10 +112,10 @@ type Divergence struct {
 	Population string
 	// Outcome is which of the four non-agreeing states this landed in.
 	Outcome Outcome
-	// EngineReading is what the engine said, valid only when EngineAnswered.
-	EngineReading Reading
-	// EngineAnswered is whether the engine produced a reading at all.
-	EngineAnswered bool
+	// TailwindReading is what Tailwind said, valid only when TailwindAnswered.
+	TailwindReading Reading
+	// TailwindAnswered is whether Tailwind produced a reading at all.
+	TailwindAnswered bool
 	// GoReading is what the Go side said, valid only when GoAnswered.
 	GoReading Reading
 	// GoAnswered is whether the Go side produced a reading at all.
@@ -200,7 +200,7 @@ const minimumPlausibleRegistryClasses = 20000
 
 // minimumPlausibleCorpusClasses is the same floor for the corpus, which is two orders smaller.
 //
-// The corpus is the population that carries the engine's null readings, so a run that lost it still
+// The corpus is the population that carries Tailwind's null readings, so a run that lost it still
 // compares 190,000 registry classes and looks entirely healthy while having stopped testing the one
 // case this harness was built for.
 const minimumPlausibleCorpusClasses = 400
@@ -210,7 +210,7 @@ const minimumPlausibleCorpusClasses = 400
 // This is requirement three as a number. Both-silent classes are not scored as agreement, which
 // stops them inflating the rate, and that alone does not stop a run drifting into total silence:
 // zero disagreements over zero answered classes is not a failure in any comparison that only looks
-// at divergences. So the silence has a ceiling. Measured, the expanded registry runs 30 engine nulls
+// at divergences. So the silence has a ceiling. Measured, the expanded registry runs 30 Tailwind nulls
 // per system out of 95,136 and the corpus 11 of 1,244 on ahra and 84 of 1,055 on connected, which is
 // under one percent overall; five percent is far enough above that to never fire on a real run and
 // far below any run that has actually gone quiet.
@@ -219,10 +219,10 @@ const maximumPlausibleBothSilentRate = 0.05
 // PopulationRegistry and PopulationCorpus are the two populations, named rather than spelled at each
 // use site.
 //
-// They answer different questions and the difference is load-bearing. The registry is what the
-// engine advertises, which is the population; the corpus is what someone happened to write, which is
+// They answer different questions and the difference is load-bearing. The registry is what
+// Tailwind advertises, which is the population; the corpus is what someone happened to write, which is
 // a sample, and an earlier table in this slice built from a corpus missed nine families. They also
-// carry different evidence: the corpus is where the engine's null readings live, so a run that lost
+// carry different evidence: the corpus is where Tailwind's null readings live, so a run that lost
 // it still compares 190,000 registry classes and looks healthy while having stopped testing the case
 // this harness exists for.
 const (
@@ -230,18 +230,18 @@ const (
 	PopulationCorpus   = "corpus"
 )
 
-// ClassCase is one class and the engine's answer for it.
+// ClassCase is one class and Tailwind's answer for it.
 type ClassCase struct {
 	// ClassName is the class as an author would write it.
 	ClassName string
 	// Population is PopulationRegistry or PopulationCorpus.
 	Population string
-	// EngineReading is what the engine computed, valid only when EngineAnswered.
-	EngineReading Reading
-	// EngineAnswered is whether the engine produced a reading. False is a real measurement and not
-	// missing data: the engine declines `border/50`, which it advertised, and 10 corpus classes on
+	// TailwindReading is what Tailwind computed, valid only when TailwindAnswered.
+	TailwindReading Reading
+	// TailwindAnswered is whether Tailwind produced a reading. False is a real measurement and not
+	// missing data: Tailwind declines `border/50`, which it advertised, and 10 corpus classes on
 	// ahra.
-	EngineAnswered bool
+	TailwindAnswered bool
 }
 
 // SystemCases is one design system's whole population.
@@ -252,7 +252,7 @@ type SystemCases struct {
 	Cases []ClassCase
 }
 
-// Compare runs one Go side against the engine's answers and returns the report.
+// Compare runs one Go side against Tailwind's answers and returns the report.
 //
 // The controls run inside the same call rather than in a second pass, for the reason
 // `internal/differential` plants before running: two passes over a population that can change
@@ -287,8 +287,8 @@ func Compare(
 			default:
 				population.UnknownPopulationClasses++
 			}
-			if !aCase.EngineAnswered {
-				population.EngineNullReadings++
+			if !aCase.TailwindAnswered {
+				population.TailwindNullReadings++
 			}
 
 			goReading, goAnswered := goSide.Reading(aCase.ClassName)
@@ -298,13 +298,13 @@ func Compare(
 				continue
 			}
 			report.Divergences = append(report.Divergences, Divergence{
-				ClassName:      aCase.ClassName,
-				Population:     aCase.Population,
-				Outcome:        outcome,
-				EngineReading:  aCase.EngineReading,
-				EngineAnswered: aCase.EngineAnswered,
-				GoReading:      goReading,
-				GoAnswered:     goAnswered,
+				ClassName:        aCase.ClassName,
+				Population:       aCase.Population,
+				Outcome:          outcome,
+				TailwindReading:  aCase.TailwindReading,
+				TailwindAnswered: aCase.TailwindAnswered,
+				GoReading:        goReading,
+				GoAnswered:       goAnswered,
 			})
 		}
 
@@ -325,15 +325,15 @@ func Compare(
 // is not a `continue`, it is a bucket with a name and a ceiling.
 func classify(aCase ClassCase, goReading Reading, goAnswered bool) Outcome {
 	switch {
-	case aCase.EngineAnswered && goAnswered:
-		if aCase.EngineReading.Equal(goReading) {
+	case aCase.TailwindAnswered && goAnswered:
+		if aCase.TailwindReading.Equal(goReading) {
 			return OutcomeAgreed
 		}
 		return OutcomeDisagreed
-	case aCase.EngineAnswered && !goAnswered:
+	case aCase.TailwindAnswered && !goAnswered:
 		return OutcomeGoSilent
-	case !aCase.EngineAnswered && goAnswered:
-		return OutcomeEngineSilent
+	case !aCase.TailwindAnswered && goAnswered:
+		return OutcomeTailwindSilent
 	default:
 		return OutcomeBothSilent
 	}
@@ -362,14 +362,14 @@ func runControl(systems []SystemCases, honest ReadingSource, control Control, re
 			// carrying tens of thousands of planted rows would bury the observed ones.
 			if result.Detections == 1 {
 				report.Divergences = append(report.Divergences, Divergence{
-					ClassName:      aCase.ClassName,
-					Population:     aCase.Population,
-					Outcome:        outcome,
-					EngineReading:  aCase.EngineReading,
-					EngineAnswered: aCase.EngineAnswered,
-					GoReading:      goReading,
-					GoAnswered:     goAnswered,
-					Planted:        true,
+					ClassName:        aCase.ClassName,
+					Population:       aCase.Population,
+					Outcome:          outcome,
+					TailwindReading:  aCase.TailwindReading,
+					TailwindAnswered: aCase.TailwindAnswered,
+					GoReading:        goReading,
+					GoAnswered:       goAnswered,
+					Planted:          true,
 				})
 			}
 		}

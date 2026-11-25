@@ -122,7 +122,7 @@ var NoImportAssign = rule.Rule[rule.NoOptions]{
 		judged := map[*ast.Node]bool{}
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
-				// The engine hands every rule a nil checker when the program could not be built, and
+				// The linter hands every rule a nil checker when the program could not be built, and
 				// this rule can answer nothing without one. A mutant removing this survives the
 				// fixtures, because typescript-go tolerates a nil receiver on this path and returns no
 				// symbol; that is an implementation detail of a vendored compiler rather than a

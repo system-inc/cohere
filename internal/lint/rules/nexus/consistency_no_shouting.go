@@ -60,7 +60,7 @@ func messageShoutingInComment(token string) rule.Message {
 // tools match exactly.
 //
 // The rule takes no options. Kirk ruled on 2026-11-06 (#4b337jk) that there is no per-project allow
-// list: the shared safe list in internal/shouting, which every engine reads, is the one mechanism, so
+// list: the shared safe list in internal/shouting, which every language reads, is the one mechanism, so
 // an acronym a project needs earns its place there with its reason, and a config that writes `allow`
 // is refused.
 var ConsistencyNoShouting = rule.Rule[rule.NoOptions]{
@@ -131,8 +131,8 @@ type commentBodySpan struct {
 // commentBody is the text of a comment the masks read, its delimiters out (#xfa3q6w): the command
 // patterns anchor at a line's start, so a `// git commit` line, or a `/* git commit */` on one line,
 // read whole opens on its slashes and is never a command. A `//` line loses its slashes and the one
-// space after them, as shouting.GoCommentBody reads a Go line and the Swift engine a Swift one, so a
-// code block's indentation is measured alike in every engine. A block comment loses its `/*` and `*/`,
+// space after them, as shouting.GoCommentBody reads a Go line and cohere-swift a Swift one, so a
+// code block's indentation is measured alike in every language. A block comment loses its `/*` and `*/`,
 // as ESLint's comment value does. The body is a substring of the text, so it returns where it starts
 // there, and a word maps back to the source by it.
 func commentBody(comment comments.Comment) (body string, bodyStart int) {

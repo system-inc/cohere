@@ -13,7 +13,7 @@ import (
 // cache, does, and measured work no run of the binary pays twice. A run of a binary with the system cache restores
 // none on its first, cold run and writes what it computed, so restoring none is no refusal on its own, as it was when
 // every release carried its table (#syscache). A corpus refuses when its runs do not all share one findings md5: the
-// engine's findings never depend on the side's cache, so two md5s in one corpus mean a run checked something else.
+// Go child's findings never depend on the side's cache, so two md5s in one corpus mean a run checked something else.
 // Stderr that is not empty refuses nothing, and the table shows it.
 func refusals(records []runRecord) []string {
 	failures := []string{}

@@ -6,7 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 func messageCanonicalCollapse(inputs []string, output string) rule.Message {
@@ -21,7 +21,7 @@ func messageCanonicalCollapse(inputs []string, output string) rule.Message {
 }
 
 // messageCanonicalSingle is upstream's own `single` message, word for word, because better-tailwindcss
-// prints it and a project running both engines should read one finding the same way in each (#15swfzq).
+// prints it and a project running both linters should read one finding the same way in each (#15swfzq).
 func messageCanonicalSingle(className string, canonical string) rule.Message {
 	return rule.Message{
 		Id:          "canonicalSingle",
@@ -67,12 +67,12 @@ type EnforceCanonicalClassesOptions struct {
 // Porting its answers is a different proposition. 327 functional roots produce 53,301 pairs, of
 // which 44 collapse, and each family is a fact about roots rather than a computation per class:
 // `px + py => p` holds for every value the two roots share. So this rule reads a generated table and
-// needs no JavaScript engine at lint time.
+// needs no JavaScript runtime at lint time.
 //
 // # What it can and cannot see
 //
-// Measured by diffing this rule against the real engine over 2,693 literals with planted
-// violations: 13 of the engine's 14 findings, and zero false positives.
+// Measured by diffing this rule against the real Tailwind over 2,693 literals with planted
+// violations: 13 of Tailwind's 14 findings, and zero false positives.
 //
 // The one miss is `text-sm + leading-relaxed => text-sm/relaxed`, which merges by folding one
 // class's value into the other's slash modifier rather than producing a third root. That is a
@@ -172,12 +172,12 @@ var EnforceCanonicalClasses = rule.Rule[EnforceCanonicalClassesOptions]{
 				// Upstream signs every class under the same options it collapses with, so a project that
 				// turns collapse off compares signatures without expanding shorthands.
 				canonicalizer := designSystem.Canonicalizer.WithFeatures(
-					tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical),
+					tailwindcollapse.SignatureFeaturesFor(collapse.enabled, collapse.logical),
 				)
 				reportSingles(ruleContext, literal, ignored, designSystem.System, canonicalizer, merged)
 			}
 			canonicalizer := designSystem.Canonicalizer.WithFeatures(
-				tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical),
+				tailwindcollapse.SignatureFeaturesFor(collapse.enabled, collapse.logical),
 			)
 			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
 				reportTemplateCanonical(ruleContext, segments, ignored, designSystem, canonicalizer, collapse)
@@ -196,7 +196,7 @@ var EnforceCanonicalClasses = rule.Rule[EnforceCanonicalClassesOptions]{
 // classes it reported as merged so reportSingles leaves them to this finding.
 //
 // Applied repeatedly, because collapses compose: `mt-1 mb-1 ml-1 mr-1` becomes `m-1` only through
-// `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against the engine, which produces
+// `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against Tailwind, which produces
 // the same single finding for the four-class case.
 func reportCollapses(
 	ruleContext rule.Context,
@@ -228,7 +228,7 @@ type canonicalCollapse struct {
 // the singles pass leaves them to the collapse's finding.
 //
 // Applied repeatedly, because collapses compose: `mt-1 mb-1 ml-1 mr-1` becomes `m-1` only through
-// `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against the engine, which produces
+// `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against Tailwind, which produces
 // the same single finding for the four-class case.
 func collapsesIn(
 	classes []string,
@@ -299,7 +299,7 @@ func reportTemplateCanonical(
 	segments []ClassSegment,
 	ignored []*ignorePattern,
 	designSystem DesignSystemResult,
-	canonicalizer *tailwindengine.Canonicalizer,
+	canonicalizer *tailwindcollapse.Canonicalizer,
 	collapse canonicalCollapseOptions,
 ) {
 	system := designSystem.System
@@ -362,8 +362,8 @@ func reportSingles(
 	ruleContext rule.Context,
 	literal ClassLiteral,
 	ignored []*ignorePattern,
-	system *tailwindengine.LoadedDesignSystem,
-	canonicalizer *tailwindengine.Canonicalizer,
+	system *tailwindcollapse.LoadedDesignSystem,
+	canonicalizer *tailwindcollapse.Canonicalizer,
 	merged map[string]bool,
 ) {
 	classes := SplitClasses(literal.Text)
@@ -462,7 +462,7 @@ func mergeOnce(
 
 // collapseOutputFor looks up two roots in the generated table, in either order.
 func collapseOutputFor(left string, right string, collapse canonicalCollapseOptions) (string, bool) {
-	for _, family := range tailwindengine.CollapseFamilies {
+	for _, family := range tailwindcollapse.CollapseFamilies {
 		if family.RequiresLogicalToPhysical && !collapse.logical {
 			continue
 		}

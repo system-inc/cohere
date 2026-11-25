@@ -161,31 +161,31 @@ func buildFileStem(build project.Build) string {
 }
 
 // keepMustCheckSet keeps set as extra's must-check set for the census to write, from the build's own goroutine.
-func (engine *pipeline) keepMustCheckSet(extra project.Build, set *mustCheckSet) {
-	engine.mustCheckSetsLock.Lock()
-	defer engine.mustCheckSetsLock.Unlock()
-	if engine.mustCheckSets == nil {
-		engine.mustCheckSets = map[string]*mustCheckSet{}
+func (pipeline *pipeline) keepMustCheckSet(extra project.Build, set *mustCheckSet) {
+	pipeline.mustCheckSetsLock.Lock()
+	defer pipeline.mustCheckSetsLock.Unlock()
+	if pipeline.mustCheckSets == nil {
+		pipeline.mustCheckSets = map[string]*mustCheckSet{}
 	}
-	engine.mustCheckSets[extra.String()] = set
+	pipeline.mustCheckSets[extra.String()] = set
 }
 
 // writeMustCheckCensus writes each extra build's must-check set of runs, and its wide file, into the census's
 // directory, when the run was asked to and kept the build's set (keepMustCheckSet). A file that cannot be written is
 // noted and changes nothing else.
-func (engine *pipeline) writeMustCheckCensus(runs []buildRun) {
-	if engine.mustCheckCensus == "" {
+func (pipeline *pipeline) writeMustCheckCensus(runs []buildRun) {
+	if pipeline.mustCheckCensus == "" {
 		return
 	}
 	// Every build has ended here, but the lock costs the census alone, and holds the read to the writes' own rule.
-	engine.mustCheckSetsLock.Lock()
-	defer engine.mustCheckSetsLock.Unlock()
+	pipeline.mustCheckSetsLock.Lock()
+	defer pipeline.mustCheckSetsLock.Unlock()
 	for _, run := range runs[1:] {
-		set := engine.mustCheckSets[run.build.String()]
+		set := pipeline.mustCheckSets[run.build.String()]
 		if set == nil {
 			continue
 		}
-		stem := filepath.Join(engine.mustCheckCensus, buildFileStem(run.build))
+		stem := filepath.Join(pipeline.mustCheckCensus, buildFileStem(run.build))
 		for _, file := range []struct {
 			name  string
 			lines []string
@@ -196,7 +196,7 @@ func (engine *pipeline) writeMustCheckCensus(runs []buildRun) {
 				contents = strings.Join(file.lines, "\n") + "\n"
 			}
 			if writeError := os.WriteFile(file.name, []byte(contents), 0o644); writeError != nil {
-				engine.note("the must-check census: %v", writeError)
+				pipeline.note("the must-check census: %v", writeError)
 			}
 		}
 	}

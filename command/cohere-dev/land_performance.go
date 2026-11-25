@@ -21,9 +21,9 @@ import (
 )
 
 // Every landing measures itself (#6wnsnq2), in Kirk's words "nothing gets committed to main without timing numbers".
-// After the gate passes and before the landing commit is made, land runs the Go engine on Shackler, the quiet house Mac
+// After the gate passes and before the landing commit is made, land runs cohere-go on Shackler, the quiet house Mac
 // that holds numbers of record, and writes what it measured to Performance.jsonc at the root of the tree that lands. So
-// main's history is its performance series, and each landing's diff of the file shows what it did to the engine.
+// main's history is its performance series, and each landing's diff of the file shows what it did to cohere.
 //
 // Rulings that keep it honest (@system_cohere, on #6wnsnq2):
 //
@@ -38,9 +38,9 @@ import (
 //     old one, and "level" otherwise; another machine, another build or another shape of measurement is a line of its
 //     own, never a comparison.
 //   - The file records that the box was held quiet, and her load before and after.
-//   - A test-only landing measures too, and Go is the only engine measured.
+//   - A test-only landing measures too, and Go is the only language measured.
 //
-// A tree with no command/cohere, every land test's fixture, has no engine to time, and lands saying so. cohere's own
+// A tree with no command/cohere, every land test's fixture, has no cohere to time, and lands saying so. cohere's own
 // tree always has it.
 
 // performanceFileName is the file at the root of every landing's tree that holds main's performance at that commit.
@@ -93,14 +93,15 @@ const (
 	performanceWarmRounds      = 3
 )
 
-// performanceBuild is how the script builds the binary it times: a release's Go build, without the Swift engine. The
+// performanceBuild is how the script builds the binary it times: a release's Go build, without cohere-swift. The
 // file's tools say it whole.
 const performanceBuild = "CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'"
 
-// performanceSchema is the file's schema, which Adamic's Performance.jsonc matches (#hed1mkb). Schema 2 spells each
-// key whole, minimum, maximum and system where schema 1 wrote min, max and sys (Kirk, Nov 23, #cc5ftw6), so a file of
-// schema 1 is another shape of measurement, its note's own line, never compared.
-const performanceSchema = 2
+// performanceSchema is the file's schema (#hed1mkb). Schema 2 spells each key whole, minimum, maximum and system where
+// schema 1 wrote min, max and sys (Kirk, Nov 23, #cc5ftw6), and schema 3 names the measurement checks where schema 2
+// named it engine (#9gjmwgs), so a file of an older schema is another shape of measurement, its note's own line, never
+// compared, and a renamed key is never read as a zero. Adamic's Performance.jsonc still writes schema 2.
+const performanceSchema = 3
 
 // performanceHeader opens the file, above the body native.FormatHouse prints.
 const performanceHeader = "// Performance.jsonc: main's performance at this commit, rewritten by cohere-dev land " +
@@ -117,10 +118,10 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 //   - It checks the Go toolchain against its digest (sharedBoxToolchainCheck) and the module cache against go.sum, and
 //     builds the binary with them on a Go cache it keeps under the scratch across landings, so a build compiles only
 //     what changed.
-//   - It makes an empty system store for this binary, says her load before, and runs the engine each time with the
+//   - It makes an empty system store for this binary, says her load before, and runs cohere each time with the
 //     kit's clean environment under /usr/bin/time -l: at the root two untimed fills and the cold rounds, at deeafbf4
 //     two fills and its rounds, at the root one untimed warm run and the warm rounds, and one timeline run. Each run
-//     says what it checked in the engine's own words, its lint record's files walked and its summary's findings, and
+//     says what it checked in cohere's own words, its lint record's files walked and its summary's findings, and
 //     refuses without them. Then it says the timeline's record and her load after.
 //
 // Each phase says its milliseconds, so what costs what can be read.
@@ -196,7 +197,7 @@ cd "$base"
 phase build
 say "tested $commit on $(go env GOOS)/$(go env GOARCH)"
 # The binary's digest: a -trimpath build of the same source is the same bytes, so a landing that changed no file the
-# engine compiles builds main's binary again, and its note can say any difference is the box's (#6wnsnq2).
+# binary compiles builds main's binary again, and its note can say any difference is the box's (#6wnsnq2).
 say "binary $(sha256sum "$base/cohere" | cut -d' ' -f1)"
 say "machine $(sysctl -n hw.ncpu) $(sysctl -n machdep.cpu.brand_string)"
 say "go $(go env GOVERSION)"
@@ -217,20 +218,20 @@ clean=(env -u GOFLAGS -u PWD -u GOGC -u GOMEMLIMIT -u COHERE_SCRATCH_BUILDS_WIDT
 recorded() {
   grep -m 1 "\"kind\":\"$1\"" run.jsonl | grep -o "\"$2\":[0-9]*" | head -n 1 | cut -d : -f 2 || true
 }
-# engineSaid is the engine's own last line in run.err, the one before /usr/bin/time's report, which run.err ends with.
-engineSaid() {
+# cohereSaid is cohere's own last line in run.err, the one before /usr/bin/time's report, which run.err ends with.
+cohereSaid() {
   awk '/ real +[0-9.]+ user +[0-9.]+ sys/ { exit } { last = $0 } END { print last }' run.err
 }
-# run runs the engine once at the tree $2 for the row $1, round $3 ("fill" for an untimed one), with the flags after,
+# run runs cohere once at the tree $2 for the row $1, round $3 ("fill" for an untimed one), with the flags after,
 # and says its wall, user and system milliseconds from /usr/bin/time, its exit, how many findings it printed, and what
-# the engine's own records say it checked: the lint record's files walked and the summary's findings. A run that
+# cohere's own records say it checked: the lint record's files walked and the summary's findings. A run that
 # checked less reads faster, so a run with no record of what it checked measures nothing and refuses.
 run() {
   runMode=$1; runTree=$2; runRound=$3; shift 3
   where="$base/$runTree"
   rm -f run.jsonl run.err
-  if (cd "$where" && "${clean[@]}" PWD="$where" COHERE_SYSTEM_CACHE="$base/system" COHERE_GO_ENGINE_CHILD=1 \
-    /usr/bin/time -l "$base/cohere" go-engine --contract 3 --root "$where" --no-fix "$@" > "$base/run.jsonl" \
+  if (cd "$where" && "${clean[@]}" PWD="$where" COHERE_SYSTEM_CACHE="$base/system" COHERE_GO_CHILD=1 \
+    /usr/bin/time -l "$base/cohere" go-language --contract 3 --root "$where" --no-fix "$@" > "$base/run.jsonl" \
     2> "$base/run.err"); then
     runCode=0
   else
@@ -242,10 +243,10 @@ run() {
   findings=$(grep -c '"kind":"finding"' run.jsonl || true)
   walked=$(recorded lint filesWalked)
   [ -n "$walked" ] ||
-    refuse "the $runMode run at $runTree, round $runRound, printed no lint record: $(engineSaid)"
+    refuse "the $runMode run at $runTree, round $runRound, printed no lint record: $(cohereSaid)"
   summarized=$(recorded summary findings)
   [ -n "$summarized" ] ||
-    refuse "the $runMode run at $runTree, round $runRound, printed no summary record: $(engineSaid)"
+    refuse "the $runMode run at $runTree, round $runRound, printed no summary record: $(cohereSaid)"
   say "run $runMode $runTree $runRound $times $runCode $findings $walked $summarized"
 }
 # rounds runs the row $1 at the tree $2, $3 untimed fills and then $4 timed rounds, with the flags after.
@@ -272,7 +273,7 @@ type performanceSpread struct {
 	Maximum int64 `json:"maximum"`
 }
 
-// performanceChecked is what a row's rounds checked, each the same: the files the engine walked and the findings it
+// performanceChecked is what a row's rounds checked, each the same: the files cohere walked and the findings it
 // printed. A row that checked less reads faster, so the note compares only rows that checked the same.
 type performanceChecked struct {
 	Files    int `json:"files"`
@@ -288,7 +289,7 @@ type performanceRow struct {
 	Checked *performanceChecked `json:"checked,omitempty"`
 }
 
-// performanceTimeline is the timeline run's level 1 wall areas, each the milliseconds from the engine's start to the
+// performanceTimeline is the timeline run's level 1 wall areas, each the milliseconds from cohere's start to the
 // stamp it names: the host's listing's end, the handover's end, the extra builds' end and the run's end. A stamp the
 // run didn't take, a handover with no extra build, is left out.
 type performanceTimeline struct {
@@ -325,8 +326,8 @@ type performanceTimelineRows struct {
 	Root performanceTimeline `json:"root"`
 }
 
-// performanceEngine is the Go engine's measurement.
-type performanceEngine struct {
+// performanceChecks is cohere-go's measurement.
+type performanceChecks struct {
 	Rounds   performanceRounds       `json:"rounds"`
 	Cold     performanceColdRows     `json:"cold"`
 	Warm     performanceWarmRows     `json:"warm"`
@@ -363,12 +364,12 @@ type performanceFile struct {
 	Machine    performanceMachine `json:"machine"`
 	Tools      performanceTools   `json:"tools"`
 	Note       string             `json:"note"`
-	Engine     performanceEngine  `json:"engine"`
+	Checks     performanceChecks  `json:"checks"`
 }
 
-// performanceRun is one engine run the script said: its row's mode and tree, its round, "fill" for an untimed one, its
-// times in milliseconds, its exit, how many findings it printed, and the files its lint record walked and the findings
-// its summary counted.
+// performanceRun is one run of cohere the script said: its row's mode and tree, its round, "fill" for an untimed one,
+// its times in milliseconds, its exit, how many findings it printed, and the files its lint record walked and the
+// findings its summary counted.
 type performanceRun struct {
 	mode, tree, round               string
 	wall, user, system              int64
@@ -392,9 +393,9 @@ var performanceRows = []struct {
 	name string
 	row  func(file performanceFile) performanceRow
 }{
-	{"cold root", func(file performanceFile) performanceRow { return file.Engine.Cold.Root }},
-	{"cold deeafbf4", func(file performanceFile) performanceRow { return file.Engine.Cold.Deeafbf4 }},
-	{"warm root", func(file performanceFile) performanceRow { return file.Engine.Warm.Root }},
+	{"cold root", func(file performanceFile) performanceRow { return file.Checks.Cold.Root }},
+	{"cold deeafbf4", func(file performanceFile) performanceRow { return file.Checks.Cold.Deeafbf4 }},
+	{"warm root", func(file performanceFile) performanceRow { return file.Checks.Warm.Root }},
 }
 
 // measurePerformance measures gating, the commit the gate ran on, whose tree is tree, on Shackler, against main's
@@ -402,15 +403,15 @@ var performanceRows = []struct {
 // measurement, or tree itself when it has no command/cohere to measure. With it come the sentence the land line and the
 // landing's body say of the measurement, and an exit code, 0 unless it refused the landing, which it has said why.
 func measurePerformance(worktree string, gating string, tree string, mainCommit string) (string, string, int) {
-	engine := strings.TrimPrefix(cohereSource, "./")
-	mode, treeModeError := treeMode(worktree, gating, engine)
+	cohereDirectory := strings.TrimPrefix(cohereSource, "./")
+	mode, treeModeError := treeMode(worktree, gating, cohereDirectory)
 	if treeModeError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading whether there is an engine to measure: %v\n", treeModeError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading whether there is a cohere to measure: %v\n", treeModeError)
 		return "", "", 1
 	}
 	if mode == "" {
-		said := fmt.Sprintf("Nothing measured: %s has no %s, so there is no engine to time", shortCommit(gating),
-			engine)
+		said := fmt.Sprintf("Nothing measured: %s has no %s, so there is no cohere to time", shortCommit(gating),
+			cohereDirectory)
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
 		return tree, said + ".", 0
 	}
@@ -641,7 +642,7 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 		return performanceMeasurement{}, performanceBox + "'s timeline run printed no timeline record"
 	}
 	for _, run := range measurement.runs {
-		// The engine's summary counts the finding records it wrote, so a count of the lines that differs means the
+		// cohere's summary counts the finding records it wrote, so a count of the lines that differs means the
 		// stream was cut or read wrong, and what the run checked can't be said.
 		if run.findingsPrinted != run.findingsSummarized {
 			return performanceMeasurement{}, fmt.Sprintf("%s's %s run at %s, round %s, printed %d findings and its "+
@@ -649,7 +650,7 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 				run.findingsSummarized)
 		}
 		clean := run.exit == 0 && run.findingsPrinted == 0
-		// deeafbf4 is an older tree, in which today's rules may find something: the engine then exits 1 with what it
+		// deeafbf4 is an older tree, in which today's rules may find something: cohere then exits 1 with what it
 		// found printed, which is that tree's honest run. Any other end there, and anything found at the root, where
 		// the gate found nothing, refuses.
 		if run.tree == performanceReferenceTree {
@@ -805,7 +806,7 @@ func performanceFileOf(measurement performanceMeasurement, commit string, measur
 			Go:     measurement.goVersion,
 			Binary: measurement.binary,
 		},
-		Engine: performanceEngine{
+		Checks: performanceChecks{
 			Rounds: performanceRounds{
 				Cold:     performanceColdRounds,
 				Deeafbf4: performanceReferenceRounds,
@@ -878,12 +879,12 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 		return fmt.Sprintf("built as %s, and main's at %s as %s: another build, so not compared", build, against,
 			before)
 	}
-	if previous.Schema != current.Schema || previous.Engine.Rounds != current.Engine.Rounds {
+	if previous.Schema != current.Schema || previous.Checks.Rounds != current.Checks.Rounds {
 		return fmt.Sprintf("main's at %s was measured in another shape (schema %d, rounds %d/%d/%d), so not compared",
-			against, previous.Schema, previous.Engine.Rounds.Cold, previous.Engine.Rounds.Deeafbf4,
-			previous.Engine.Rounds.Warm)
+			against, previous.Schema, previous.Checks.Rounds.Cold, previous.Checks.Rounds.Deeafbf4,
+			previous.Checks.Rounds.Warm)
 	}
-	// The same binary as main's ran: this landing changed nothing the engine compiles, so every difference is the
+	// The same binary as main's ran: this landing changed nothing cohere compiles, so every difference is the
 	// box's own drift between two measurements of one program, which the note says rather than calling it slower.
 	sameBinary := current.Tools.Binary != "" && current.Tools.Binary == previous.Tools.Binary
 	compared := spreadCompared
@@ -910,7 +911,7 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 	}
 	if sameBinary {
 		return "against " + against + ", the same binary (sha256 " + current.Tools.Binary[:12] + "), so no change " +
-			"to the engine and any difference is the box's: " + strings.Join(rows, "; ")
+			"to cohere and any difference is the box's: " + strings.Join(rows, "; ")
 	}
 	return "against " + against + ": " + strings.Join(rows, "; ")
 }
@@ -942,7 +943,7 @@ func spreadCompared(now performanceSpread, before performanceSpread) string {
 }
 
 // driftCompared says how two measurements of one binary compare: level while their ranges overlap, and otherwise
-// drifted up or down by so much, which is the box's spread between runs and never the engine's speed.
+// drifted up or down by so much, which is the box's spread between runs and never cohere's speed.
 func driftCompared(now performanceSpread, before performanceSpread) string {
 	said := spreadCompared(now, before)
 	for _, word := range []string{"slower", "faster"} {

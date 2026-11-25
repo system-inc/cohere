@@ -20,8 +20,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/timing_testing"
 )
 
-// timingMarginChildVariable marks a test binary the margin test started as a timed engine run of its own, which
-// TestMain runs as the engine over its command line rather than as the tests, so the process's CPU is that one run's
+// timingMarginChildVariable marks a test binary the margin test started as a timed cohere-go run of its own, which
+// TestMain runs as cohere-go over its command line rather than as the tests, so the process's CPU is that one run's
 // and no parallel test's.
 const timingMarginChildVariable = "COHERE_TEST_TIMING_MARGIN_CHILD"
 
@@ -34,7 +34,7 @@ const marginSpin = 400 * time.Millisecond
 // cost on a busy machine, would still fit under the process's CPU.
 const marginSpinCeiling = marginSpin * 3 / 2
 
-// runTimingMarginChild is the child's whole run: the engine over arguments, under --timing, with only the rule that
+// runTimingMarginChild is the child's whole run: cohere-go over arguments, under --timing, with only the rule that
 // spins marginSpin once registered.
 func runTimingMarginChild(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
 	var spun atomic.Bool
@@ -59,7 +59,7 @@ func runTimingMarginChild(arguments []string, standardOutput io.Writer, standard
 // The timing table bills a planted rule's known CPU to that rule, once, and its rows never sum past the process's
 // CPU: the planted rule is the first row, billed at least its spin and less than half again more, and the rows,
 // every rule, every shared analyzer, the load's phases this process ran and the measuring's own cost, are no more
-// than the process's user and system CPU. The run is a child process, this test binary started as the engine
+// than the process's user and system CPU. The run is a child process, this test binary started as cohere-go
 // (TestMain), so the process's CPU is that run's alone, where in this process every parallel test would add to it.
 // The go commands the listing ran are its children's CPU, never this process's, so their row is left out of the sum.
 //

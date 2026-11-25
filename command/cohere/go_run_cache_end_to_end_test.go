@@ -23,7 +23,7 @@ import (
 )
 
 // goReplayFixture is a tiny Go module, in a directory of its own so an ancestor go.work can be planted beside it,
-// that the real cohere binary checks: a front door, and itself as the Go engine. Each test has its own, so they run
+// that the real cohere binary checks: a front door, and itself as cohere-go. Each test has its own, so they run
 // in parallel and none sees another's cache table.
 type goReplayFixture struct {
 	test   *testing.T
@@ -42,7 +42,7 @@ type goReplayFixture struct {
 // goReplaySettings is the replay fixtures' settings: no Go rule changed, and the settings file itself left out of
 // the format walk, the one file of theirs the house formatter reads, so a root of them is the Go module alone. A
 // format project beside it (#4wjhppw) would make every run two projects, whose replays are each their own, and these
-// tests are about the Go engine's.
+// tests are about cohere-go's.
 const goReplaySettings = `{"go":{"rules":{}},"ignorePatterns":["CohereSettings.json"]}`
 
 // goReplayFinding is a line the printf rule reports, the finding every planted file carries, so a run that loaded
@@ -165,7 +165,7 @@ func (fixture *goReplayFixture) run(cached bool, arguments ...string) goReplayRu
 	}
 	command := exec.Command(fixture.binary, commandLine...)
 	command.Dir = fixture.root
-	command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), fixture.environment...)
+	command.Env = append(withoutVariable(os.Environ(), goChildVariable), fixture.environment...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
@@ -205,7 +205,7 @@ var goEveryFileCachedFooter = regexp.MustCompile(
 // isGoReplay reports a run the cache answered, by what the run itself says: the framing on its first line and the
 // footer saying so under `--verbose`, the summary's `cache.replayed` under `--json`, and in the default view a
 // footer that checked no file and found every one cached, which only a replay prints for a Go run. A replay never
-// starts the engine, so this is also the proof that none was started: a run of the engine checks its files.
+// starts the child, so this is also the proof that none was started: a run of the child checks its files.
 func isGoReplay(run goReplayRun) bool {
 	return strings.HasPrefix(run.stdout, "cached: ") || goReplayFooter.MatchString(run.stdout) ||
 		strings.Contains(run.stdout, `"replayed":true`) || goEveryFileCachedFooter.MatchString(run.stdout)
@@ -263,7 +263,7 @@ func goReplayBuildLines(replay string) []string {
 	return lines
 }
 
-// goRunBuildLines is each build's lint line a run of the engine printed under `--verbose`.
+// goRunBuildLines is each build's lint line a run of the child printed under `--verbose`.
 func goRunBuildLines(run string) []string {
 	lines := []string{}
 	for _, line := range strings.Split(run, "\n") {
@@ -329,7 +329,7 @@ func goSummaryField(test *testing.T, output string, field string) string {
 }
 
 // TestAGoReplayIsTheColdRunsVerdict: with nothing changed, the second run replays the first without starting the
-// engine, and what it prints is a `--no-cache` run's verdict byte for byte in every view, with the same exit:
+// child, and what it prints is a `--no-cache` run's verdict byte for byte in every view, with the same exit:
 // `--verbose` once the replay's framing and the cold run's invocation lines are off, as the TypeScript run cache's
 // test compares them; `--json` line for line, the summary but for what is the invocation's; and the default view but
 // for the footer, which is the invocation's and says it was replayed. It holds for a plain run, which checks every
@@ -438,11 +438,11 @@ func replayedAsCold(test *testing.T, everyBuild bool, view string) {
 		if replayLines != coldLines {
 			test.Fatalf("the replay's records differ:\n--- replay\n%s\n--- cold\n%s", replayLines, coldLines)
 		}
-		// A replay started no engine, so it says nothing of the engine's package cache, nor of a memory raise
+		// A replay started no child, so it says nothing of the child's package cache, nor of a memory raise
 		// (#5shepvt).
 		for _, invocationOnly := range []string{`"packageCache"`, `"memoryRaisedToBytes"`} {
 			if strings.Contains(summaryJsonOf(test, replayed.stdout), invocationOnly) {
-				test.Errorf("the replay's summary claims the engine's %s:\n%s", invocationOnly, replayed.stdout)
+				test.Errorf("the replay's summary claims the child's %s:\n%s", invocationOnly, replayed.stdout)
 			}
 		}
 		replaySummary := jsonText(test, goSummaryVerdict(test, replayed.stdout))
@@ -473,7 +473,7 @@ func jsonText(test *testing.T, summary map[string]json.RawMessage) string {
 
 // TestAGoRunWithAStaleInputIsNeverReplayed: for every kind of input a Go verdict depends on, a module that replays
 // is changed in that input alone, and the next run is not a replay and prints what a cold run prints. One
-// scenario per kind, since each reaches the record by its own path: the engine's files, its listed directories,
+// scenario per kind, since each reaches the record by its own path: the child's files, its listed directories,
 // its absent paths, the settings file the front door declares, and the key's environment and toolchain. Each run checks
 // the host's build alone, so a file only the scenario's environment builds joins the load only once it is changed.
 func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
@@ -526,7 +526,7 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 		{"go.sum edited", nil, func(fixture *goReplayFixture) {
 			fixture.write("go.sum", "example.com/other v1.0.0/go.mod h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=\n")
 		}},
-		// Held by the front door's own root resolution rather than by the engine's absent paths: a module root loads
+		// Held by the front door's own root resolution rather than by the child's absent paths: a module root loads
 		// with `GOWORK=off`, and a go.work that uses the module moves the root, and with it the key and the cache
 		// directory, before anything is checked. The go command's settings file below is the absent-path case.
 		{"a go.work created in an ancestor directory", nil, func(fixture *goReplayFixture) {
@@ -575,7 +575,7 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			fixture.setVariable("GOOS", target)
 		}},
 		{"CGO_ENABLED changed", nil, func(fixture *goReplayFixture) { fixture.setVariable("CGO_ENABLED", "1") }},
-		// The toolchain that ran, as the engine names it: a `GOROOT` of the fixture's own, its tree the real one's by
+		// The toolchain that ran, as the child names it: a `GOROOT` of the fixture's own, its tree the real one's by
 		// links and its `VERSION` and go.env copies, so the `VERSION` a toolchain's update rewrites can be rewritten
 		// here.
 		// `GOROOT` is set before the hit and never changes, so only the recorded file can tell.
@@ -669,7 +669,7 @@ func TestAGoReplayNeverCrossesTheSystemCache(test *testing.T) {
 	}
 }
 
-// packageCacheOffLine is the account's lint line of a plain run whose engine's per-package cache was off, then what
+// packageCacheOffLine is the account's lint line of a plain run whose child's per-package cache was off, then what
 // the system cache did, and then what the extra builds did with their packs, which a plain run over the replay
 // fixture always says, since it checks every build (#qqyq61s). A `--no-cache` run still reads and writes the system
 // cache, and the account says the packages restored from it and the entries written to it each on its own
@@ -694,7 +694,7 @@ func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 			test.Fatalf("a --no-cache run replayed:\n%s", cold.stdout)
 		}
 		if cold.exitCode != 1 || !strings.Contains(cold.stdout, "cohere-go/printf") {
-			test.Fatalf("a --no-cache run exited %d without the fixture's finding, so the engine did not check it:\n"+
+			test.Fatalf("a --no-cache run exited %d without the fixture's finding, so the child did not check it:\n"+
 				"%s%s", cold.exitCode, cold.stdout, cold.stderr)
 		}
 		switch view {
@@ -702,11 +702,11 @@ func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 			if !strings.Contains(cold.stdout, "  cache: off, by --no-cache: no recorded run was replayed") {
 				test.Errorf("the account does not say the cache was off:\n%s", cold.stdout)
 			}
-			// The flag reached the engine, whose own per-package cache it turns off too. The standard library's
-			// packages the engine restored from its system cache, which `--no-cache` still reads, are said beside it
+			// The flag reached the child, whose own per-package cache it turns off too. The standard library's
+			// packages the child restored from its system cache, which `--no-cache` still reads, are said beside it
 			// when an earlier run of the package's tests warmed it.
 			if !packageCacheOffLine.MatchString(cold.stdout) {
-				test.Errorf("the engine's package cache was not off:\n%s", cold.stdout)
+				test.Errorf("the child's package cache was not off:\n%s", cold.stdout)
 			}
 		case "--json":
 			var summary struct {
@@ -724,7 +724,7 @@ func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 					summary.Cache.Replayed, cold.stdout)
 			}
 			if summary.PackageCache == nil || summary.PackageCache.On {
-				test.Errorf("the summary does not say the engine's package cache was off:\n%s", cold.stdout)
+				test.Errorf("the summary does not say the child's package cache was off:\n%s", cold.stdout)
 			}
 		}
 	}
@@ -780,13 +780,13 @@ func TestAnUnchangedGoModuleReplays(test *testing.T) {
 			}
 			arguments := []string{"--no-fix", "--verbose"}
 			fixture.establishHit(arguments...)
-			// With the engine's own per-package cache on: the recording run wrote its entries under the root's
+			// With the child's own per-package cache on: the recording run wrote its entries under the root's
 			// .cache/cohere/go, during the run and after the clock, and none of them kept the run from replaying.
-			if entries := goEngineCacheEntries(test, fixture.root); entries == 0 {
-				test.Errorf("the engine's package cache wrote no entry, so it was not on for these runs")
+			if entries := goChildCacheEntries(test, fixture.root); entries == 0 {
+				test.Errorf("the child's package cache wrote no entry, so it was not on for these runs")
 			}
 			if shape == "a file added above the module" {
-				// Beside the staticcheck.conf the engine named, in a directory whose listing no load reads.
+				// Beside the staticcheck.conf the child named, in a directory whose listing no load reads.
 				sibling := filepath.Join(fixture.parent, "sibling.txt")
 				if writeError := os.WriteFile(sibling, []byte("beside\n"), 0o644); writeError != nil {
 					test.Fatal(writeError)
@@ -799,8 +799,8 @@ func TestAnUnchangedGoModuleReplays(test *testing.T) {
 	}
 }
 
-// goEngineCacheEntries counts the files the Go engine's per-package findings cache holds under root.
-func goEngineCacheEntries(test *testing.T, root string) int {
+// goChildCacheEntries counts the files cohere-go's per-package findings cache holds under root.
+func goChildCacheEntries(test *testing.T, root string) int {
 	test.Helper()
 	entries := 0
 	walkError := filepath.WalkDir(filepath.Join(cache_directory.Of(root), "go"),
@@ -820,8 +820,8 @@ func goEngineCacheEntries(test *testing.T, root string) int {
 }
 
 // TestAGoInputChangedDuringTheRunIsNeverReplayedOver: an input that changes after the run began reading it, here
-// after the engine read the tree and before the run is recorded, keeps the run from being recorded, so the next
-// run checks it rather than replaying a verdict that never saw the change. The clock starts before the engine is
+// after the child read the tree and before the run is recorded, keeps the run from being recorded, so the next
+// run checks it rather than replaying a verdict that never saw the change. The clock starts before the child is
 // spawned, and every recorded file and listed directory is held to it: a file's bytes edited, and a package created
 // under a directory holding no Go file, whose listing is the only thing that moved.
 func TestAGoInputChangedDuringTheRunIsNeverReplayedOver(test *testing.T) {
@@ -839,12 +839,12 @@ func TestAGoInputChangedDuringTheRunIsNeverReplayedOver(test *testing.T) {
 			fixture := newGoReplayFixture(test)
 			arguments := []string{"--no-fix", "--verbose"}
 			fixture.establishHit(arguments...)
-			// A change of its own first, so the run below is a miss, runs the engine, and is the record in question.
+			// A change of its own first, so the run below is a miss, runs the child, and is the record in question.
 			fixture.write("sub/b.go", "package sub\n\n// Answer answers.\nfunc Answer() int {\n\treturn 43\n}\n")
 			path := filepath.Join(fixture.root, change.path)
 			during := fixture.environment
-			fixture.environment = append(slices.Clone(during), "COHERE_TEST_WRITE_AFTER_GO_ENGINE="+path,
-				"COHERE_TEST_WRITE_AFTER_GO_ENGINE_TEXT="+change.text)
+			fixture.environment = append(slices.Clone(during), "COHERE_TEST_WRITE_AFTER_GO_CHILD="+path,
+				"COHERE_TEST_WRITE_AFTER_GO_CHILD_TEXT="+change.text)
 			if changed := fixture.run(true, arguments...); isGoReplay(changed) {
 				test.Fatalf("the run with the change in it replayed, so it proves nothing:\n%s", changed.stdout)
 			}
@@ -896,7 +896,7 @@ func TestAGoRunThatWritesIsNeverRecorded(test *testing.T) {
 
 // TestEveryProjectOfAMixedRootReplays: at a root holding a Go module and a TypeScript project, each checked by a
 // child of the run (`cohere --directory <project> ...`, see runProject), the second run replays both children, the
-// Go one without starting its engine. Before discovery's children were admitted every one of them ran cold, cohere's
+// Go one without starting the child. Before discovery's children were admitted every one of them ran cold, cohere's
 // own root among them, since `--directory` admits no run.
 func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
 	test.Parallel()
@@ -921,7 +921,7 @@ func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, "--no-fix", "--no-format", "--verbose")
 		command.Dir = root
-		command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_VERDICT_FD=")
+		command.Env = append(withoutVariable(os.Environ(), goChildVariable), "COHERE_VERDICT_FD=")
 		output, runError := command.CombinedOutput()
 		var exitError *exec.ExitError
 		if runError != nil && !errors.As(runError, &exitError) {
@@ -929,7 +929,7 @@ func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
 		}
 		return string(output)
 	}
-	// Each project's section, by the engine its heading names, from the merged report.
+	// Each project's section, by the child its heading names, from the merged report.
 	sections := func(output string) map[string]string {
 		found := map[string]string{}
 		heading := regexp.MustCompile(`(?m)^== (\S+) \((Go|TypeScript)\) ==\n`)
@@ -949,23 +949,23 @@ func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
 		test.Fatalf("the root was not checked as two projects:\n%s", first)
 	}
 	second := sections(run())
-	for _, engine := range []string{"Go", "TypeScript"} {
-		section, found := second[engine]
+	for _, kind := range []string{"Go", "TypeScript"} {
+		section, found := second[kind]
 		if !found {
-			test.Fatalf("no %s section in the second run:\n%v", engine, second)
+			test.Fatalf("no %s section in the second run:\n%v", kind, second)
 		}
 		if !strings.HasPrefix(section, "cached: ") {
-			test.Errorf("the %s project ran again rather than replaying:\n%s", engine, section)
+			test.Errorf("the %s project ran again rather than replaying:\n%s", kind, section)
 		}
 	}
 	if regexp.MustCompile(`(?m)^module described in `).MatchString(second["Go"]) {
-		test.Errorf("the Go project's engine ran on the second run:\n%s", second["Go"])
+		test.Errorf("the Go project's child ran on the second run:\n%s", second["Go"])
 	}
 }
 
 // TestAGoModuleAndItsFormatProjectEachReplay: at a Go module's root holding Markdown, discovery runs the module and
 // the format project beside it, two children given the same arguments in one directory (#4wjhppw). Each records under
-// its own engine's name in the root's cache table, so the second run replays both. Under one name each run would
+// its own child's name in the root's cache table, so the second run replays both. Under one name each run would
 // replay neither, whichever recorded last having overwritten the other.
 func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 	test.Parallel()
@@ -983,7 +983,7 @@ func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 		command := exec.Command(binary, "--no-fix", "--verbose")
 		command.Dir = root
 		command.Env = append(
-			withoutVariable(os.Environ(), goEngineChildVariable),
+			withoutVariable(os.Environ(), goChildVariable),
 			"COHERE_VERDICT_FD=",
 			"CGO_ENABLED=0",
 		)
@@ -993,7 +993,7 @@ func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 			test.Fatalf("running cohere: %v\n%s", runError, output)
 		}
 		found := map[string]string{}
-		heading := regexp.MustCompile(`(?m)^== (\S+) \((Go|Format)\) ==\n`)
+		heading := regexp.MustCompile(`(?m)^== (\S+) \((Go|Folder)\) ==\n`)
 		bounds := heading.FindAllStringSubmatchIndex(string(output), -1)
 		for index, bound := range bounds {
 			end := len(output)
@@ -1009,9 +1009,9 @@ func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 		test.Fatalf("the root was not checked as the module and its format project:\n%v", first)
 	}
 	second := run()
-	for _, engine := range []string{"Go", "Format"} {
-		if section := second[engine]; !strings.HasPrefix(section, "cached: ") {
-			test.Errorf("the %s project ran again rather than replaying:\n%s", engine, section)
+	for _, kind := range []string{"Go", "Folder"} {
+		if section := second[kind]; !strings.HasPrefix(section, "cached: ") {
+			test.Errorf("the %s project ran again rather than replaying:\n%s", kind, section)
 		}
 	}
 }

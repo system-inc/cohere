@@ -23,7 +23,7 @@ func noInnerDeclarationsMessage(declarationType string, bodyDescription string) 
 		Description: fmt.Sprintf("Move %s declaration to %s root. "+
 			"A declaration written inside a block does not belong to that block: `var` reaches the "+
 			"whole enclosing function regardless of the braces around it, and a hoisted function "+
-			"binding has been three different things across engines and editions. Writing it at the "+
+			"binding has been three different things across runtimes and editions. Writing it at the "+
 			"root says what actually happens.", declarationType, bodyDescription),
 	}
 }

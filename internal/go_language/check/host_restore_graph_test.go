@@ -53,7 +53,7 @@ var filesReportAnalyzer = &analysis.Analyzer{
 
 // graphRun is one run of the module at root under rules: the host's, or windows's restoring from host when it is not
 // nil, or from source when it is, with the files report beside the rules and its options as adjust leaves them when
-// it is not nil, loaded again as the engine loads an extra build, until no reload is asked. It returns the result of
+// it is not nil, loaded again as cohere-go loads an extra build, until no reload is asked. It returns the result of
 // the last load's run, its session and its packages to analyze.
 func graphRun(
 	test *testing.T,
@@ -97,7 +97,7 @@ func graphRun(
 			test.Fatalf("running windows %t: %v", windows, runError)
 		}
 		if !windows {
-			// The builds read the host's reads whole and its dependence sets in, as the engine has them.
+			// The builds read the host's reads whole and its dependence sets in, as cohere-go has them.
 			result.ReadWalks.Wait()
 			result.Host.DependenceComputed()
 		}

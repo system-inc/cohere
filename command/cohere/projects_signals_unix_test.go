@@ -15,18 +15,18 @@ import (
 )
 
 // A terminate sent to a mixed-repository run, the way a timeout or a caller's `kill` sends it, reaches the
-// project runs it started and the engines they started, and the run ends as terminated only once none of
-// them is left (#nqb3mjv). Before, the run ended alone and its Swift child went on, with its engine and
-// everything the engine had started.
+// project runs it started and the children they started, and the run ends as terminated only once none of
+// them is left (#nqb3mjv). Before, the run ended alone and its Swift child went on, with the child and
+// everything the child had started.
 func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	marks := test.TempDir()
-	enginePid := filepath.Join(marks, "engine.pid")
+	childPid := filepath.Join(marks, "engine.pid")
 	compilerPid := filepath.Join(marks, "compiler.pid")
-	// An engine that starts a long compile of its own and waits on it, as the engine's types phase waits on
+	// A child that starts a long compile of its own and waits on it, as the child's types phase waits on
 	// swift build.
-	engine := fakeSwiftEngine(test, "echo $$ > '"+enginePid+".partial' && mv '"+enginePid+".partial' '"+enginePid+"'\n"+
+	engine := fakeSwiftEngine(test, "echo $$ > '"+childPid+".partial' && mv '"+childPid+".partial' '"+childPid+"'\n"+
 		"sleep 300 &\necho $! > '"+compilerPid+".partial' && mv '"+compilerPid+".partial' '"+compilerPid+"'\nwait")
 	root := newRepository(test, nil)
 	writeTree(
@@ -54,10 +54,10 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 			}
 			time.Sleep(20 * time.Millisecond)
 		}
-		test.Fatalf("%s was never written: the engine did not start", filepath.Base(path))
+		test.Fatalf("%s was never written: the child did not start", filepath.Base(path))
 		return 0
 	}
-	engineProcess, compilerProcess := readPid(enginePid), readPid(compilerPid)
+	childProcess, compilerProcess := readPid(childPid), readPid(compilerPid)
 
 	if signalError := run.Process.Signal(syscall.SIGTERM); signalError != nil {
 		test.Fatal(signalError)
@@ -81,9 +81,9 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 		)
 	}
 
-	// The engine and its compiler are gone, or going: each was signaled before the run ended, so allow
+	// The child and its compiler are gone, or going: each was signaled before the run ended, so allow
 	// the kernel a moment to reap them.
-	for name, pid := range map[string]int{"engine": engineProcess, "compiler": compilerProcess} {
+	for name, pid := range map[string]int{"engine": childProcess, "compiler": compilerProcess} {
 		deadline := time.Now().Add(10 * time.Second)
 		for syscall.Kill(pid, 0) == nil && time.Now().Before(deadline) {
 			time.Sleep(20 * time.Millisecond)

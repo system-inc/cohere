@@ -504,7 +504,7 @@ func TestRunnerCanDetectAFailure(test *testing.T) {
 		test.Errorf("a result under the wrong heading scored %s", verdict.Outcome)
 	}
 
-	// Nothing at all. This is the case an unimplemented engine would produce if it returned an
+	// Nothing at all. This is the case an unimplemented rule run would produce if it returned an
 	// empty result rather than declining, and it must not read as a pass.
 	if verdict := Compare(expectation, Result{}); verdict.Outcome != OutcomeFailed {
 		test.Errorf("an empty result against a golden expecting an error scored %s", verdict.Outcome)
@@ -538,7 +538,7 @@ func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(test *testing.T) {
 
 	score, runError := Run(fixtures, NothingImplemented{}, Options{})
 	if runError != nil {
-		test.Fatalf("scoring the unimplemented engine: %v", runError)
+		test.Fatalf("scoring the unimplemented rule run: %v", runError)
 	}
 
 	if score.Considered != ExpectedFixtureCount {

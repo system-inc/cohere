@@ -1,7 +1,7 @@
 // Package unused_write is x/tools' unusedwrite pass, a write to a field of a struct or an element of an array that
-// nothing reads again, ported onto the engine's own intermediate representation (#zbfmwt6), so the run builds no
-// x/tools single assignment form for this pass. The engine's representation is built as staticcheck's is, proven
-// identical to it, so where the code below says how staticcheck's form is built, the engine's is built the same.
+// nothing reads again, ported onto cohere's own intermediate representation (#zbfmwt6), so the run builds no
+// x/tools single assignment form for this pass. cohere-go's representation is built as staticcheck's is, proven
+// identical to it, so where the code below says how staticcheck's form is built, cohere-go's is built the same.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/unusedwrite/unusedwrite.go, whose
 // logic it keeps and whose messages it reports word for word, but for the index a write lands at (see indexText). Where
@@ -13,7 +13,7 @@
 // TestPortDiffersFromOriginalOnlyWhereItIsRight. The port finds writes the original misses, rightly: staticcheck lifts
 // the reads of a struct that come before its first use needing its address, so such a read, or one on a path the write
 // never reaches, no longer keeps a later write alive; it builds no load of an array ranged over by index alone, which
-// the Go specification never evaluates; and the engine's source functions, as buildir's do, include the closures of
+// the Go specification never evaluates; and cohere-go's source functions, as buildir's do, include the closures of
 // package-level initializers, which buildssa's leave out. It misses nothing the original finds: the writes
 // staticcheck's form erases when it lifts away the allocation of a pointer to a literal, the element of an array
 // literal of one element and the given fields of a struct literal, are found from the function's syntax
@@ -46,9 +46,9 @@ const Name = "unusedwrite"
 
 // Doc is the rule's documentation.
 const Doc = "Flags a write to a field of a struct or an element of an array that is never read again: x/tools' " +
-	"unusedwrite, ported onto the engine's own intermediate representation."
+	"unusedwrite, ported onto cohere's own intermediate representation."
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own.
 var Listener = rule.Listener{
 	FileLocal: true, IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}

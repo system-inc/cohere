@@ -21,9 +21,9 @@ type AxisReadings struct {
 	// This was measured rather than reasoned about. Eliding it looked structural and correct, and it
 	// silently changed 647 namespace buckets across 303 roots: `font-bold` is a `--font-weight` key
 	// whose reading happens to equal `font`'s fallback, so eliding it dropped the value through to
-	// inference, which types `bold` as a `family-name` and reads `[284]#1` where the engine reads
+	// inference, which types `bold` as a `family-name` and reads `[284]#1` where Tailwind reads
 	// `[288]#2`. That is refinement 2 failing in exactly the way refinement 2 exists to prevent, and
-	// it was invisible to every test that did not compare against the engine.
+	// it was invisible to every test that did not compare against Tailwind.
 	ByNamespace map[string]Reading
 	// Fallback is the reading for a value this axis has nothing more specific for. ByType omits
 	// entries equal to it; ByNamespace does not, for the reason above.

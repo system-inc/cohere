@@ -239,7 +239,7 @@ func TestNoElseReturnStaysSilent(test *testing.T) {
 // Measured rather than assumed: driving the installed rule with cohereAndFix, which loops to a
 // fixed point, produces exactly what this port produces in one pass, character for character
 // including the double spaces its own block unwrap leaves behind. So the end state agrees and
-// only the per-pass deferral differs, which is the edit engine's business rather than a rule's.
+// only the per-pass deferral differs, which is the fix pass's business rather than a rule's.
 // Those cases are asserted in TestNoElseReturnConvergesOnNestedElseBlocks against the converged
 // output, so the difference is recorded rather than hidden.
 //
@@ -476,7 +476,7 @@ func TestNoElseReturnDeclinesToFix(test *testing.T) {
 // Declining is the safe direction and the finding still fires, so nothing is missed and only
 // the automatic repair is withheld. A withheld repair costs a manual edit; a wrong one lifts a
 // binding into a scope where the name is taken, which parses and means something else, and the
-// edit engine's parse check structurally cannot refuse that.
+// fix pass's parse check structurally cannot refuse that.
 //
 // Recorded as reporting-without-a-fix rather than deleted, so the gap is legible and a later
 // scope-depth answer turns these five green rather than leaving no trace they existed.
@@ -583,7 +583,7 @@ func TestNoElseReturnFixPreservesTypeScript(test *testing.T) {
 // The collision question is the only thing here that needs resolution, so the plain harness leaves
 // the rule able to judge but unable to prove a repair safe. Withholding rather than guessing is the
 // right direction: a repair that lifts a binding into a scope where the name is taken parses and
-// means something else, which the edit engine's parse check structurally cannot refuse.
+// means something else, which the fix pass's parse check structurally cannot refuse.
 func TestNoElseReturnReportsWithoutACheckerAndDeclinesToFix(test *testing.T) {
 	test.Parallel()
 

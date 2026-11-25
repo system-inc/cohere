@@ -20,7 +20,7 @@ var unbindableGlobals = map[string]bool{
 // fileLocalRenameFix renames a constant nothing outside its file can name, at its declaration and
 // at every reference, as one edit.
 //
-// One edit rather than one per site, because the engine applies a diagnostic's fixes as independent
+// One edit rather than one per site, because the fix pass applies a diagnostic's fixes as independent
 // proposals and resolves overlap per proposal. A rename split into pieces can land half-applied when
 // another rule's fix overlaps one site, and the half that lands parses, so the parse guard passes a
 // file that no longer compiles. A single replacement spanning the first site to the last is all or

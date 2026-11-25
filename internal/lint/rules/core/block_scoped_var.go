@@ -146,7 +146,7 @@ func checkBlockScopedVarDeclarations(ruleContext rule.Context, file *ast.Node) {
 //
 // The gathering loop is nested declaration-outer, reference-inner, which groups findings by
 // declaration. Upstream's emission order is the other way round: it reports at the reference, and
-// the engine orders findings by position, so all the findings at one use come out together and are
+// the linter orders findings by position, so all the findings at one use come out together and are
 // tie-broken by the declaration each names.
 //
 // `if (foo) { var a = 1; } else if (bar) { var a = 2; } else { var a = 3; }` is what makes this

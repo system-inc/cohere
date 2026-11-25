@@ -269,7 +269,7 @@ func TestOneRunChecksEveryNestedProjectAndEachFileOnce(test *testing.T) {
 		"packages/a/CohereSettings.json": `{"rules":{}}`,
 	})
 
-	output, code := runWithEngine(test, binary, "", root, "--no-fix", "--lint-config", "settings/Cohere.json")
+	output, code := runWithSwiftBinary(test, binary, "", root, "--no-fix", "--lint-config", "settings/Cohere.json")
 	if code == 0 {
 		test.Fatalf("a debugger statement passed the run:\n%s", output)
 	}
@@ -302,7 +302,7 @@ func TestOneRunChecksEveryNestedProjectAndEachFileOnce(test *testing.T) {
 		"src/main.ts":         debugger,
 		"CohereSettings.json": settings,
 	})
-	output, code = runWithEngine(test, binary, "", solution, "--no-fix", "--no-format")
+	output, code = runWithSwiftBinary(test, binary, "", solution, "--no-fix", "--no-format")
 	if code == 0 ||
 		!strings.Contains(output, "main.ts:2:3") ||
 		!strings.Contains(output, ". not run: a solution tsconfig") {

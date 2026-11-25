@@ -22,8 +22,8 @@ func TestOnlyARunWithAFindingsStoreCollectsItsInputsBeside(test *testing.T) {
 		{"with a session and no store", check.NewCacheSession(&check.Caching{}, nil), false},
 		{"with no session", nil, false},
 	} {
-		engine := &pipeline{session: each.session, described: &describedProject{}}
-		if beside := engine.watchedCaching(load.Caching{}).InputsBeside; beside != each.beside {
+		pipeline := &pipeline{session: each.session, described: &describedProject{}}
+		if beside := pipeline.watchedCaching(load.Caching{}).InputsBeside; beside != each.beside {
 			test.Errorf("a run %s collects its inputs beside its loads: %t, want %t", each.name, beside, each.beside)
 		}
 	}

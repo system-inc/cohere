@@ -74,7 +74,7 @@ const (
 //
 // # It offers suggestions, not fixes, and the difference is the whole safety story
 //
-// `meta` carries `hasSuggestions: true` and no `fixable`, so the edit engine never applies this
+// `meta` carries `hasSuggestions: true` and no `fixable`, so the fix pass never applies this
 // repair unattended. Measured rather than read: `cohereAndFix` on a reporting input returns
 // `fixed: false` and leaves the source untouched.
 //

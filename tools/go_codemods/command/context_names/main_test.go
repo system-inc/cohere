@@ -276,10 +276,10 @@ func TestContextNames(test *testing.T) {
 	}
 }
 
-// TestExistingNameCollisionIsRejectedByTheEngine proposes ruleContext for a rule.Context parameter whose
-// function already holds a local named ruleContext in a block that also reads ctx, and confirms the engine
+// TestExistingNameCollisionIsRejectedByTheRenaming proposes ruleContext for a rule.Context parameter whose
+// function already holds a local named ruleContext in a block that also reads ctx, and confirms global_rename
 // refuses it while a sibling function's ctx is accepted.
-func TestExistingNameCollisionIsRejectedByTheEngine(test *testing.T) {
+func TestExistingNameCollisionIsRejectedByTheRenaming(test *testing.T) {
 	test.Parallel()
 	source := `package fixture
 
@@ -335,7 +335,7 @@ func clean(ctx rule.Context) {
 }
 
 // TestNameOfItsOwnTypeIsRejectedAsShadowing proposes composeContext for a `ctx *composeContext` parameter
-// whose function body names the type, which the parameter would shadow there, and confirms the engine refuses
+// whose function body names the type, which the parameter would shadow there, and confirms global_rename refuses
 // it and the report classes it as a conflict with a name already in scope, not as a collision between two
 // proposals. (In the signature itself the type stays visible: a parameter's scope starts at the body.)
 func TestNameOfItsOwnTypeIsRejectedAsShadowing(test *testing.T) {
@@ -376,9 +376,9 @@ func compose(ctx *composeContext) *composeContext {
 	}
 }
 
-// TestContextOverrides names the ctx of each overridden type by the table, and confirms the engine accepts the
+// TestContextOverrides names the ctx of each overridden type by the table, and confirms global_rename accepts the
 // override where the type-derived name was refused for shadowing the type. The same type name in another
-// package takes the type-derived name, which the engine refuses where the function reads the type after the
+// package takes the type-derived name, which global_rename refuses where the function reads the type after the
 // local's declaration, and an exact Context in a package QualifierSpelling spells takes that spelling.
 func TestContextOverrides(test *testing.T) {
 	test.Parallel()
@@ -433,7 +433,7 @@ func TestContextOverrides(test *testing.T) {
 			}, proposals)
 			if refused := len(plan.Accepted) == 0; refused != testCase.refused {
 				test.Fatalf(
-					"engine refused %s: %v, want %v: %+v",
+					"global_rename refused %s: %v, want %v: %+v",
 					testCase.newName,
 					refused,
 					testCase.refused,

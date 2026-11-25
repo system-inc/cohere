@@ -18,7 +18,7 @@ import (
 
 // A folder's name spells its words out (#zyq63kk). Kirk, Nov 13: "has a folder called docs, i want it to be
 // documentation and have a rule on that." A folder holds no file a rule could report in when it holds only Markdown,
-// as a docs/ does, so no engine's rules could see it, and the check sits in the one walk that reads every directory a
+// as a docs/ does, so no language's rules could see it, and the check sits in the one walk that reads every directory a
 // repository keeps: discovery's. One check, for TypeScript, Go and Swift projects alike, reported at the folder.
 //
 // The judgment is internal/file_name_words' FolderAbbreviated: the folder's words, cut as a file stem's are, judged by
@@ -46,7 +46,7 @@ import (
 // replayed over.
 
 // folderCheckLabel labels the folder check's summary under `--json`, beside each project's, as the format project at
-// the root is labelled `. (Format)`: no directory's label can be it.
+// the root is labelled `. (Folder)`: no directory's label can be it.
 const folderCheckLabel = ". (folders)"
 
 // folderFinding is one folder whose name abbreviates a word the house spells out.
@@ -62,7 +62,7 @@ const folderReasoning = "A folder's name is read on every path and every import 
 	"it was named are paid back by every reader who has to expand the word themselves and hope they expanded it the " +
 	"way the author meant."
 
-// folderRuleNames are every engine's rule names, from internal/rule_names, as the Go engine's file-name rule reads
+// folderRuleNames are every language's rule names, from internal/rule_names, as cohere-go's file-name rule reads
 // them, so a folder named for a rule it holds, internal/go_language/rules/no_param_reassign, is not judged on the
 // rule's words.
 var folderRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
@@ -70,7 +70,7 @@ var folderRuleNames = sync.OnceValue(func() file_name_words.RuleNames {
 })
 
 // isForeignToFolders reports whether a folder, and every folder below it, is someone else's: the file-name rules'
-// foreign folders and the format walk's Vendor, as the Swift engine reads it.
+// foreign folders and the format walk's Vendor, as cohere-swift reads it.
 func isForeignToFolders(name string) bool {
 	return file_name_words.IsForeignFolder(name) || name == format_files.VendoredLayer
 }

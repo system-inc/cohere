@@ -132,7 +132,7 @@ func loadHeavyModule(test *testing.T) []*packages.Package {
 	return loaded.Roots
 }
 
-// Under --timing the package the walk over the engine's own intermediate representation reads is billed to the
+// Under --timing the package the walk over cohere's own intermediate representation reads is billed to the
 // representation's build, build_intermediate_representation, never to the dispatcher: the build's row holds the long
 // function's build and counts the one package its analyzer ran on, and the dispatcher's own row, its walk alone, holds
 // almost none of it. The dispatcher is a NewIntermediateRepresentation of the test's own.

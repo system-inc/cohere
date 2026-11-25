@@ -36,7 +36,7 @@ import (
 // home (#qr19hvc), new at the head, or flipped to PerUnit or FileSyntax, claims the rule now judges per unit, so the
 // landing isolates that rule as well (widenedRules). A flip to Composes claims less, and needs nothing.
 
-// rulesDirectory is where the Go engine's rules live, relative to the module's root, each in a directory of its own;
+// rulesDirectory is where cohere-go's rules live, relative to the module's root, each in a directory of its own;
 // the directory itself holds the registry, registryFile, and the table of every rule's inputs, ruleInputsFile.
 const (
 	rulesDirectory = "internal/go_language/rules"

@@ -13,13 +13,13 @@ import (
 
 // The shouting vocabulary, read from cohere's policy/Shouting.json rather than written here as code.
 //
-// It is data because three engines read it. The TypeScript rule and the Go engine's rule read it through this
-// package, and the Swift engine compiles in the same bytes (policy.SwiftFiles), so an acronym added to the file
+// It is data because three languages read it. The TypeScript rule and cohere-go's rule read it through this
+// package, and cohere-swift compiles in the same bytes (policy.SwiftFiles), so an acronym added to the file
 // quiets all three at once, as the abbreviation vocabulary does (#2cqemcd). Each group carries its reason with it,
 // so the file can be pruned by someone who was not there when an entry was earned.
 //
 // What stays in Go is the judgment: the shape tests in isShoutedToken and the masks that hide code. The file is
-// decoded with the standard library alone, as the rest of this package is, since the Go engine links it and must
+// decoded with the standard library alone, as the rest of this package is, since cohere-go links it and must
 // not pull in the TypeScript checker.
 
 // vocabularyFile is the file's shape. Unknown keys are refused when it is read, so a misspelled group is a startup

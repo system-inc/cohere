@@ -6,7 +6,7 @@ import (
 	"testing/fstest"
 )
 
-// The embedded corpus loads, and every engine has cases in it, so no adapter can be green over nothing.
+// The embedded corpus loads, and every language has cases in it, so no adapter can be green over nothing.
 func TestTheEmbeddedCorpusLoads(test *testing.T) {
 	test.Parallel()
 
@@ -17,9 +17,9 @@ func TestTheEmbeddedCorpusLoads(test *testing.T) {
 	if len(corpus.Families) == 0 {
 		test.Fatal("the corpus has no families")
 	}
-	for _, engine := range Engines {
-		if len(corpus.CasesFor(engine)) == 0 {
-			test.Errorf("the corpus has no %s cases", engine)
+	for _, language := range Languages {
+		if len(corpus.CasesFor(language)) == 0 {
+			test.Errorf("the corpus has no %s cases", language)
 		}
 	}
 	for _, family := range corpus.Families {
@@ -73,10 +73,10 @@ func TestTheValidCorpusLoads(test *testing.T) {
 	if loadFromError != nil {
 		test.Fatalf("the valid corpus does not load: %v", loadFromError)
 	}
-	if got := len(corpus.CasesFor(EngineTypeScript)); got != 2 {
+	if got := len(corpus.CasesFor(LanguageTypeScript)); got != 2 {
 		test.Errorf("%d TypeScript cases, want 2", got)
 	}
-	if got := len(corpus.CasesFor(EngineSwift)); got != 0 {
+	if got := len(corpus.CasesFor(LanguageSwift)); got != 0 {
 		test.Errorf("%d Swift cases, want 0", got)
 	}
 }
@@ -113,13 +113,13 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 			`unknown field "note"`,
 		},
 		{
-			"an unknown key in an engine's entry",
+			"an unknown key in a language's entry",
 			with(valid, "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words", `+
 				`"swift": {"none": "a probe", "why": "x"}}}`),
 			`unknown field "why"`,
 		},
 		{
-			"a family where an engine is missing",
+			"a family where a language is missing",
 			with(valid, "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words"}}`),
 			"has no entry for swift",
 		},
@@ -148,7 +148,7 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 			"no go form",
 		},
 		{
-			"two rows for one case in one engine",
+			"two rows for one case in one language",
 			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "case": "w02", `+
 				`"kind": "verdict", "task": "t", "reason": "r"}, {"engine": "typescript", "family": "words", `+
 				`"case": "w02", "kind": "span", "task": "t", "reason": "r"}]`),
@@ -261,19 +261,19 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 			`unknown field "task"`,
 		},
 		{
-			"an engine both none and missing",
+			"a language both none and missing",
 			with(valid, "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words", `+
 				`"swift": {"missing": true, "none": "r"}}}`),
 			"never both",
 		},
 		{
-			"a missing engine with no family-level row",
+			"a missing language with no family-level row",
 			with(valid, "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words", `+
 				`"swift": {"missing": true}}}`),
 			"has no family-level row",
 		},
 		{
-			"a family-level row where the engine names a rule",
+			"a family-level row where the language names a rule",
 			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "task": "t", "reason": "r"}]`),
 			"the row is stale",
 		},
@@ -288,13 +288,13 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 			"family-level row with a kind",
 		},
 		{
-			"a case-level row for a missing engine",
+			"a case-level row for a missing language",
 			withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
 				`{"engine": "swift", "family": "words", "case": "w01", "kind": "span", "task": "t", "reason": "r"}]`),
 			"case-level row where swift has no rule",
 		},
 		{
-			"two family-level rows for one engine",
+			"two family-level rows for one language",
 			withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
 				`{"engine": "swift", "family": "words", "task": "u", "reason": "r"}]`),
 			"second family-level row",
@@ -330,24 +330,24 @@ func withMissingSwift(ledger string) fstest.MapFS {
 	return with(files, "ledger.json", ledger)
 }
 
-// A missing engine with its family-level row loads, and its cases there are not compared, though they are
+// A missing language with its family-level row loads, and its cases there are not compared, though they are
 // written.
-func TestAMissingEngineWithItsRowLoadsAndRunsNothing(test *testing.T) {
+func TestAMissingLanguageWithItsRowLoadsAndRunsNothing(test *testing.T) {
 	test.Parallel()
 
 	corpus, loadFromError := LoadFrom(
 		withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}]`),
 	)
 	if loadFromError != nil {
-		test.Fatalf("a missing engine with its row was refused: %v", loadFromError)
+		test.Fatalf("a missing language with its row was refused: %v", loadFromError)
 	}
-	if got := len(corpus.CasesFor(EngineSwift)); got != 0 {
+	if got := len(corpus.CasesFor(LanguageSwift)); got != 0 {
 		test.Errorf("%d Swift cases compared where Swift has no rule, want 0", got)
 	}
-	if got := len(corpus.CasesFor(EngineTypeScript)); got != 2 {
+	if got := len(corpus.CasesFor(LanguageTypeScript)); got != 2 {
 		test.Errorf("%d TypeScript cases, want 2", got)
 	}
-	if !corpus.Families[0].Cases[0].Has(EngineSwift) {
+	if !corpus.Families[0].Cases[0].Has(LanguageSwift) {
 		test.Error("the control's Swift form was not read")
 	}
 }
@@ -364,10 +364,13 @@ func TestAnOccurrencePerLanguageResolvesInEach(test *testing.T) {
 		test.Fatal(loadFromError)
 	}
 	control := corpus.Families[0].Cases[0]
-	for engine, want := range map[Engine]Range{EngineTypeScript: {Start: 3, End: 7}, EngineGo: {Start: 25, End: 29}} {
-		got, resolveError := Resolve(control.Expect[0], control.Sources[engine], engine)
+	for language, want := range map[Language]Range{
+		LanguageTypeScript: {Start: 3, End: 7},
+		LanguageGo:         {Start: 25, End: 29},
+	} {
+		got, resolveError := Resolve(control.Expect[0], control.Sources[language], language)
 		if resolveError != nil || got != want {
-			test.Errorf("%s resolved to %+v (%v), want %+v", engine, got, resolveError, want)
+			test.Errorf("%s resolved to %+v (%v), want %+v", language, got, resolveError, want)
 		}
 	}
 }
@@ -386,20 +389,20 @@ func TestAnOccurrenceOfZeroLeavesALanguageOut(test *testing.T) {
 		test.Fatalf("an expectation left out of TypeScript's form was refused: %v", loadFromError)
 	}
 	control := corpus.Families[0].Cases[0]
-	if result := Compare(control, EngineTypeScript, []Range{{Start: 3, End: 7}}); !result.Passed() {
+	if result := Compare(control, LanguageTypeScript, []Range{{Start: 3, End: 7}}); !result.Passed() {
 		test.Errorf("TypeScript, with the one finding its form holds, failed: %s", result.Detail)
 	}
-	if result := Compare(control, EngineGo, []Range{{Start: 16, End: 20}}); result.Passed() {
+	if result := Compare(control, LanguageGo, []Range{{Start: 16, End: 20}}); result.Passed() {
 		test.Errorf("Go, missing the finding its form holds, passed: %s", result.Detail)
 	}
-	if result := Compare(control, EngineGo, []Range{{Start: 16, End: 20}, {Start: 25, End: 31}}); !result.Passed() {
+	if result := Compare(control, LanguageGo, []Range{{Start: 16, End: 20}, {Start: 25, End: 31}}); !result.Passed() {
 		test.Errorf("Go, with both findings, failed: %s", result.Detail)
 	}
 }
 
-// An engine's entry may list several rules, whose findings for the family are their union, and one name
+// A language's entry may list several rules, whose findings for the family are their union, and one name
 // written as a string is a list of one.
-func TestAnEngineEntryListsItsRules(test *testing.T) {
+func TestALanguageEntryListsItsRules(test *testing.T) {
 	test.Parallel()
 
 	files := with(validCorpus(), "families.json", `{"words": {"typescript": ["no-words", "no-shouted-words"], `+
@@ -408,11 +411,11 @@ func TestAnEngineEntryListsItsRules(test *testing.T) {
 	if loadFromError != nil {
 		test.Fatalf("a list of rules was refused: %v", loadFromError)
 	}
-	listed, _ := corpus.RuleFor("words", EngineTypeScript)
+	listed, _ := corpus.RuleFor("words", LanguageTypeScript)
 	if !listed.Runs() || strings.Join(listed.Rules, " ") != "no-words no-shouted-words" {
 		test.Errorf("TypeScript's entry read as %v, want both rules in order", listed.Rules)
 	}
-	single, _ := corpus.RuleFor("words", EngineGo)
+	single, _ := corpus.RuleFor("words", LanguageGo)
 	if strings.Join(single.Rules, " ") != "go/no-words" {
 		test.Errorf("Go's entry read as %v, want its one rule", single.Rules)
 	}
@@ -429,10 +432,10 @@ func TestACaseNamesItsFileByPathAndRoot(test *testing.T) {
 		test.Fatal(loadFromError)
 	}
 	named, plain := corpus.Families[0].Cases[1], corpus.Families[0].Cases[0]
-	if got := named.AbsoluteFileName(EngineTypeScript); got != "/checkouts/utils/probe/utils/lf02.generated.ts" {
+	if got := named.AbsoluteFileName(LanguageTypeScript); got != "/checkouts/utils/probe/utils/lf02.generated.ts" {
 		test.Errorf("named %s", got)
 	}
-	if got := plain.AbsoluteFileName(EngineGo); got != "/project/case.go" {
+	if got := plain.AbsoluteFileName(LanguageGo); got != "/project/case.go" {
 		test.Errorf("named %s", got)
 	}
 }
@@ -459,32 +462,32 @@ func TestResolveReadsEachSpanForm(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		name   string
-		span   Span
-		source string
-		engine Engine
-		want   Range
+		name     string
+		span     Span
+		source   string
+		language Language
+		want     Range
 	}{
-		{"the first occurrence", covers("TODO", 1), "// TODO TODO", EngineGo, Range{Start: 3, End: 7}},
-		{"the second occurrence", covers("TODO", 2), "// TODO TODO", EngineGo, Range{Start: 8, End: 12}},
-		{"overlapping occurrences", covers("aa", 2), "aaa", EngineGo, Range{Start: 1, End: 3}},
-		{"bytes, not characters", covers("TODO", 1), "// café TODO", EngineSwift, Range{Start: 9, End: 13}},
-		{"the file's start", Span{FileStart: true}, "one\ntwo\n", EngineGo, Range{Start: 0, End: 0}},
-		{"lines from the third", Span{LinesFrom: 3}, "a\nb\nc\nd\n", EngineGo, Range{Start: 4, End: 8}},
-		{"a lone carriage return in Swift", Span{LinesFrom: 2}, "a\rb\n", EngineSwift, Range{Start: 2, End: 4}},
-		{"a line separator in TypeScript", Span{LinesFrom: 2}, "a\u2028b", EngineTypeScript, Range{Start: 4, End: 5}},
+		{"the first occurrence", covers("TODO", 1), "// TODO TODO", LanguageGo, Range{Start: 3, End: 7}},
+		{"the second occurrence", covers("TODO", 2), "// TODO TODO", LanguageGo, Range{Start: 8, End: 12}},
+		{"overlapping occurrences", covers("aa", 2), "aaa", LanguageGo, Range{Start: 1, End: 3}},
+		{"bytes, not characters", covers("TODO", 1), "// café TODO", LanguageSwift, Range{Start: 9, End: 13}},
+		{"the file's start", Span{FileStart: true}, "one\ntwo\n", LanguageGo, Range{Start: 0, End: 0}},
+		{"lines from the third", Span{LinesFrom: 3}, "a\nb\nc\nd\n", LanguageGo, Range{Start: 4, End: 8}},
+		{"a lone carriage return in Swift", Span{LinesFrom: 2}, "a\rb\n", LanguageSwift, Range{Start: 2, End: 4}},
+		{"a line separator in TypeScript", Span{LinesFrom: 2}, "a\u2028b", LanguageTypeScript, Range{Start: 4, End: 5}},
 		{
 			"a carriage return and line feed as one",
 			Span{LinesFrom: 3},
 			"a\r\nb\r\nc",
-			EngineTypeScript,
+			LanguageTypeScript,
 			Range{Start: 6, End: 7},
 		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			got, resolveError := Resolve(testCase.span, testCase.source, testCase.engine)
+			got, resolveError := Resolve(testCase.span, testCase.source, testCase.language)
 			if resolveError != nil {
 				test.Fatalf("does not resolve: %v", resolveError)
 			}
@@ -496,11 +499,11 @@ func TestResolveReadsEachSpanForm(test *testing.T) {
 
 	// A lone carriage return ends no line in Go, and a line separator ends none in Swift.
 	for _, unresolved := range []struct {
-		source string
-		engine Engine
-	}{{"a\rb", EngineGo}, {"a\u2028b", EngineSwift}} {
-		if _, resolveError := Resolve(Span{LinesFrom: 2}, unresolved.source, unresolved.engine); resolveError == nil {
-			test.Errorf("%q has a second line in %s, and should not", unresolved.source, unresolved.engine)
+		source   string
+		language Language
+	}{{"a\rb", LanguageGo}, {"a\u2028b", LanguageSwift}} {
+		if _, resolveError := Resolve(Span{LinesFrom: 2}, unresolved.source, unresolved.language); resolveError == nil {
+			test.Errorf("%q has a second line in %s, and should not", unresolved.source, unresolved.language)
 		}
 	}
 }
@@ -512,8 +515,8 @@ func probeCase(control bool, source string, expect ...Span) Case {
 		Name:      "probe",
 		Control:   control,
 		Expect:    expect,
-		Languages: []Engine{EngineTypeScript},
-		Sources:   map[Engine]string{EngineTypeScript: source},
+		Languages: []Language{LanguageTypeScript},
+		Sources:   map[Language]string{LanguageTypeScript: source},
 	}
 }
 
@@ -565,7 +568,7 @@ func TestCompareNamesTheKindOfFailure(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := Compare(testCase.testCase, EngineTypeScript, testCase.found)
+			result := Compare(testCase.testCase, LanguageTypeScript, testCase.found)
 			if result.Failure != testCase.want {
 				test.Errorf("failure %q, want %q: %s", result.Failure, testCase.want, result.Detail)
 			}
@@ -585,12 +588,12 @@ func TestJudgeHoldsAResultToTheLedger(test *testing.T) {
 	plain := probeCase(false, source, covers("TODO", 1))
 	control := probeCase(true, source, covers("TODO", 1))
 	verdictRow := LedgerRow{
-		Engine: EngineTypeScript,
-		Family: "words",
-		Case:   "probe",
-		Kind:   KindVerdict,
-		Task:   "t",
-		Reason: "r",
+		Language: LanguageTypeScript,
+		Family:   "words",
+		Case:     "probe",
+		Kind:     KindVerdict,
+		Task:     "t",
+		Reason:   "r",
 	}
 	spanRow := verdictRow
 	spanRow.Kind = KindSpan
@@ -644,8 +647,8 @@ func TestJudgeHoldsAResultToTheLedger(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			corpus := &Corpus{Ledger: testCase.ledger}
-			judgeError := corpus.Judge(EngineTypeScript, testCase.testCase,
-				Compare(testCase.testCase, EngineTypeScript, testCase.found))
+			judgeError := corpus.Judge(LanguageTypeScript, testCase.testCase,
+				Compare(testCase.testCase, LanguageTypeScript, testCase.found))
 			switch {
 			case testCase.mustName == "" && judgeError != nil:
 				test.Errorf("refused: %v", judgeError)

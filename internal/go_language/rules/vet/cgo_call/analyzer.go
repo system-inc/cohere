@@ -18,7 +18,7 @@
 // assertion panics and judges nothing of the package, and the port leaves the import out and judges the rest, as a
 // pass that runs despite type errors is meant to (importedPackage).
 //
-// It is not on the engine's syntax dispatcher, and stays a plain analyzer: it type-checks its own copies of the cgo
+// It is not on cohere-go's syntax dispatcher, and stays a plain analyzer: it type-checks its own copies of the cgo
 // files and walks those, not the package's syntax the dispatcher walks.
 package cgo_call
 

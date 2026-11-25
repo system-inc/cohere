@@ -26,7 +26,7 @@ var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, C
 // A backreference names a group and asks for the text that group captured. When the group cannot
 // have captured anything at the moment the reference is evaluated, the reference matches the empty
 // string instead of failing, so the pattern silently matches more than its author wrote it to
-// match. That is the defect: not a syntax error the engine refuses, but a pattern that quietly
+// match. That is the defect: not a syntax error the regular expression parser refuses, but a pattern that quietly
 // means something else.
 //
 // # Five ways a group cannot have run, and they are five findings
@@ -217,7 +217,7 @@ func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, patte
 	// rather than a running count, because a pattern may reference a group declared later.
 	groupCount := len(structure.groups)
 
-	// A pattern the engine would refuse is not this rule's business. Upstream parses first and
+	// A pattern the regular expression parser would refuse is not this rule's business. Upstream parses first and
 	// reports nothing when the parse fails, so `new RegExp('\\1(a){', 'u')` is silent while
 	// `RegExp('\\1(a){', flags)` reports: the brace is a syntax error under `u` and a literal
 	// without it, and the second call's flags are unknown so no `u` is assumed. Four of upstream's
@@ -270,7 +270,7 @@ func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, patte
 	}
 }
 
-// patternIsWellFormed reports whether the engine would accept the pattern.
+// patternIsWellFormed reports whether the regular expression parser would accept the pattern.
 //
 // This is not a full validator and does not try to be. It answers the three ways a pattern in this
 // corpus is refused, all of which only bite under `u` or `v`, where the grammar stops tolerating
@@ -374,7 +374,7 @@ func opensQuantifier(pattern string, index int) bool {
 //
 // A numeric reference past the group count is not a reference at all but a legacy octal escape,
 // which is why `/\2(a)/` and `/\11(a)/` are both silent. A named reference with no matching group
-// is a syntax error the engine refuses, so it is skipped rather than reported.
+// is a syntax error the regular expression parser refuses, so it is skipped rather than reported.
 //
 // A name can be declared more than once under ES2025 duplicate named groups, where
 // `(?<foo>a)|(?<foo>b)` is legal because the two live in different branches. Upstream reports such
@@ -463,7 +463,7 @@ func classifyBackreference(
 }
 
 // scanRegexStructure reads a pattern into the groups, backreferences and enclosing paths the rule
-// needs. It returns false for a pattern it cannot make sense of, which is a syntax error the engine
+// needs. It returns false for a pattern it cannot make sense of, which is a syntax error the regular expression parser
 // has already refused and where a second opinion would be noise.
 func scanRegexStructure(pattern string, flags regex_syntax.RegexFlags) (regexStructure, bool) {
 	scanner := &regexStructureScanner{pattern: pattern, flags: flags}

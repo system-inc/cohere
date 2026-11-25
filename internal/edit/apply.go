@@ -42,7 +42,7 @@ type Proposal struct {
 	// MeasuredOn is the digest of the text the fix's offsets were measured against, or the zero digest when
 	// the proposer measured it against exactly the text it was handed, which Propose's contract asks of
 	// every proposer. A proposal carried from somewhere else, the fix phase's walk above all, carries the
-	// digest of what the walk read, and the engine refuses it against any other text (#bxmcf34): a file
+	// digest of what the walk read, and the fix pass refuses it against any other text (#bxmcf34): a file
 	// that changed between the walk and the write, under another agent or an editor's save, would
 	// otherwise take offsets into bytes that are no longer there, and a stale fix that still parses is
 	// written as wrong code.

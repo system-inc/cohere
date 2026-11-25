@@ -19,7 +19,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
-// windowsFacts runs the engine over a copy of the fixture under testdata with the findings cache off, configure, when
+// windowsFacts runs cohere-go over a copy of the fixture under testdata with the findings cache off, configure, when
 // not nil, given the pipeline before it runs, and extra after the root, and returns the pipeline it ran and the windows
 // build's record, its second.
 func windowsFacts(
@@ -31,24 +31,24 @@ func windowsFacts(
 ) (*pipeline, contract.BuildRecord) {
 	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", fixture))
-	engine, stream := runOverConfigured(test, root, wantExit, configure, append([]string{"--no-cache"}, extra...)...)
+	pipeline, stream := runOverConfigured(test, root, wantExit, configure, append([]string{"--no-cache"}, extra...)...)
 	lint := lintRecordOf(test, normalize(stream, root))
 	if len(lint.Builds) != 2 {
 		test.Fatalf("want the host's build and windows's, got the records %+v", lint.Builds)
 	}
-	return engine, lint.Builds[1]
+	return pipeline, lint.Builds[1]
 }
 
 // windowsCensus is the facts census of the windows build of the fixture under testdata, under `--build-dependence`,
 // configure given the pipeline as windowsFacts gives it, and the pipeline it ran.
 func windowsCensus(test *testing.T, fixture string, configure func(*pipeline)) (*pipeline, contract.DependenceFacts) {
 	test.Helper()
-	engine, windows := windowsFacts(test, fixture, configure, exitClean, "--build-dependence")
+	pipeline, windows := windowsFacts(test, fixture, configure, exitClean, "--build-dependence")
 	if windows.Dependence == nil || windows.Dependence.Facts == nil {
 		test.Fatalf("the windows build's record has no facts census: %+v", windows.Dependence)
 	}
 	test.Logf("the windows build's facts census: %+v", *windows.Dependence.Facts)
-	return engine, *windows.Dependence.Facts
+	return pipeline, *windows.Dependence.Facts
 }
 
 // noReturnKind is the census's count of ctrlflow's no-return facts.
@@ -120,12 +120,12 @@ func TestAnEqualFactLeavesItsCallerAlone(test *testing.T) {
 func TestAPlainRunComparesNoFacts(test *testing.T) {
 	test.Parallel()
 
-	engine, windows := windowsFacts(test, "build-facts", nil, exitClean)
-	if engine.dependence != nil || windows.Dependence != nil || engine.censusKeepsHostRestoreOff {
+	pipeline, windows := windowsFacts(test, "build-facts", nil, exitClean)
+	if pipeline.dependence != nil || windows.Dependence != nil || pipeline.censusKeepsHostRestoreOff {
 		test.Errorf("a plain run built the graph (%t), wrote the dependence %+v, or kept the host's restore off (%t)",
-			engine.dependence != nil, windows.Dependence, engine.censusKeepsHostRestoreOff)
+			pipeline.dependence != nil, windows.Dependence, pipeline.censusKeepsHostRestoreOff)
 	}
-	for _, run := range engine.buildRuns {
+	for _, run := range pipeline.buildRuns {
 		if run.judged != nil || run.result != nil && run.result.Facts != nil {
 			test.Errorf("a plain run's build %s judged its dependence or collected %d facts", run.build,
 				len(run.result.Facts))
@@ -147,7 +147,7 @@ func TestTheFactsCensusFollowsACallerChainAcrossBothGraphs(test *testing.T) {
 
 	// The case checked from source computes the standard library, beside the case restoring it from the table.
 	coldSystemCacheFor(test)
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	for _, each := range []struct {
 		name      string
 		configure func(*pipeline)
@@ -156,8 +156,8 @@ func TestTheFactsCensusFollowsACallerChainAcrossBothGraphs(test *testing.T) {
 		{name: "checked from source"},
 		{name: "restored from the table", configure: readingSystemCache(filled, ""), restores: true},
 	} {
-		engine, census := windowsCensus(test, "build-facts-chain", each.configure)
-		hasGraph := engine.dependence.standardLibrary != nil && engine.dependence.standardLibrary.graph != nil
+		pipeline, census := windowsCensus(test, "build-facts-chain", each.configure)
+		hasGraph := pipeline.dependence.standardLibrary != nil && pipeline.dependence.standardLibrary.graph != nil
 		if hasGraph != each.restores {
 			test.Fatalf("%s: want a graph of the standard library %t, got %t", each.name, each.restores, hasGraph)
 		}
@@ -382,9 +382,9 @@ func TestARestoredMethodAnswerMeetsItsOwnMethodWhereMethodSetsDiverge(test *test
 	}}
 	// Through restoredAnswer, as compareFacts asks, the host having restored os and the standard library's graph
 	// holding it.
-	engine := &pipeline{dependence: &hostDependence{restoredAnswers: map[string]*fact_resolver.Answers{"os": answers},
+	pipeline := &pipeline{dependence: &hostDependence{restoredAnswers: map[string]*fact_resolver.Answers{"os": answers},
 		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{"os": host.GoFiles}}}}
-	hosted, isHeld, isPlaced := engine.restoredAnswer(check.ExportedFact{Package: build,
+	hosted, isHeld, isPlaced := pipeline.restoredAnswer(check.ExportedFact{Package: build,
 		Analyzer: "function_purity", FactType: "answer", Object: method, Answer: true}, &objectpath.Encoder{},
 		&byDeclaringUnit{standardLibrary: standardLibrary})
 	if !isPlaced || !isHeld || string(hosted.Encoded) != "its own" {
@@ -439,12 +439,16 @@ func answerAbout(
 	answers *fact_resolver.Answers,
 ) (check.ExportedFact, bool, bool) {
 	graph, standardLibrary := splitGraph(host)
-	engine := &pipeline{dependence: &hostDependence{
+	pipeline := &pipeline{dependence: &hostDependence{
 		restoredAnswers: map[string]*fact_resolver.Answers{host.ID: answers},
 		standardLibrary: &standardLibraryDependence{graph: graph, files: map[string][]string{host.ID: host.GoFiles}},
 	}}
-	return engine.restoredAnswer(check.ExportedFact{Package: build, Analyzer: "odd_slice_argument", FactType: "answer",
-		Object: object, Answer: true}, &objectpath.Encoder{}, &byDeclaringUnit{standardLibrary: standardLibrary})
+	return pipeline.restoredAnswer(
+		check.ExportedFact{Package: build, Analyzer: "odd_slice_argument", FactType: "answer",
+			Object: object, Answer: true},
+		&objectpath.Encoder{},
+		&byDeclaringUnit{standardLibrary: standardLibrary},
+	)
 }
 
 // splitFunction is the function name that loaded, the census-split fixture's package, declares.

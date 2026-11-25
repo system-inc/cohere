@@ -35,7 +35,7 @@ const (
 // and required in the Nexus tier.
 const FormatKey = "format"
 
-// SwiftKey is the Swift engine's block, which cohere-swift reads itself.
+// SwiftKey is cohere-swift's block, which cohere-swift reads itself.
 const SwiftKey = "swift"
 
 // schemaNode is one node of a schema, in as much of JSON Schema 2020-12 as these schemas use. Its fields are
@@ -243,7 +243,7 @@ func typeShape(name string, fieldType reflect.Type) (*schemaNode, error) {
 }
 
 // goReasonPattern matches a reason that is not blank: one character, at least, outside the White_Space set that
-// strings.TrimSpace trims, which is what the Go engine's loader refuses a departure's reason by. A plain `\S` would
+// strings.TrimSpace trims, which is what cohere-go's loader refuses a departure's reason by. A plain `\S` would
 // differ from it on `U+0085` and `U+FEFF`, since JavaScript's whitespace is not the same set.
 const goReasonPattern = `[^\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]`
 
@@ -276,13 +276,13 @@ func ignoreEntryShape() *schemaNode {
 	}}
 }
 
-// goShape is the Go engine's block, as internal/go_language/settings reads it: rules, each a severity or
+// goShape is cohere-go's block, as internal/go_language/settings reads it: rules, each a severity or
 // [severity] or [severity, options object], departures, each rule's reason for loosening it past the house,
 // reasons, why each off is off, and targets, the platforms checked beside the ones the files name.
-// Its severities are that loader's own list, exact, so the schema never allows what the engine refuses. Rule
-// names are left open, in rules, departures and reasons alike, since the Go engine's registry is not the TypeScript
-// one this package lists; the engine refuses a name it does not know. Which options loosen a rule is the rule's to
-// say, so a departure excusing nothing is the engine's refusal, at configuration, and not the schema's, and so is a
+// Its severities are that loader's own list, exact, so the schema never allows what the language refuses. Rule
+// names are left open, in rules, departures and reasons alike, since cohere-go's registry is not the TypeScript
+// one this package lists; the language refuses a name it does not know. Which options loosen a rule is the rule's to
+// say, so a departure excusing nothing is the language's refusal, at configuration, and not the schema's, and so is a
 // reason for a rule the block does not turn off, and an off with no reason inside our tiers.
 func goShape() *schemaNode {
 	severity := &schemaNode{Type: "string", Enum: settings.SeveritySpellings}
@@ -301,18 +301,18 @@ func goShape() *schemaNode {
 	return &schemaNode{
 		Type:                 "object",
 		AdditionalProperties: noAdditionalProperties,
-		// The engine refuses a go block with no rules, since it reads as configured and configures nothing.
+		// The language refuses a go block with no rules, since it reads as configured and configures nothing.
 		Required: []string{"rules"},
 		Properties: map[string]*schemaNode{
 			"rules": {
 				Type:                 "object",
-				Description:          "Each cohere-go/<rule> the Go engine runs, and its severity.",
+				Description:          "Each cohere-go/<rule> cohere-go runs, and its severity.",
 				AdditionalProperties: &additionalProperties{schema: setting},
 			},
 			"departures": {
 				Type: "object",
 				Description: "For each cohere-go/<rule> whose options loosen it past the house's value, why, in a " +
-					"sentence. The engine refuses a loosening option with no departure, and a departure for a rule " +
+					"sentence. The language refuses a loosening option with no departure, and a departure for a rule " +
 					"whose options loosen nothing.",
 				AdditionalProperties: &additionalProperties{
 					schema: &schemaNode{Type: "string", Pattern: goReasonPattern},
@@ -342,15 +342,15 @@ func goShape() *schemaNode {
 	}
 }
 
-// swiftSeverities are the severities the Swift engine accepts, as written: its RuleConfiguration.Severity,
+// swiftSeverities are the severities cohere-swift accepts, as written: its RuleConfiguration.Severity,
 // whose raw values are compared exactly. Fewer than the TypeScript loader's, so the block has its own
-// rather than the shared severity definition, which would complete a "warn" the engine refuses.
+// rather than the shared severity definition, which would complete a "warn" the language refuses.
 var swiftSeverities = []string{"error", "warning", "off"}
 
-// swiftShape is what the Swift engine reads from its block (RuleConfiguration.parse): a rules object, each
+// swiftShape is what cohere-swift reads from its block (RuleConfiguration.parse): a rules object, each
 // value a severity or an array of a severity and at most one options object, and nothing else, since the
-// engine refuses a block with no rules and a format key in it. Which options a rule reads, and their limits,
-// stay the engine's (RuleConfiguration.optionsRead), which refuses by name any it does not read, so the
+// language refuses a block with no rules and a format key in it. Which options a rule reads, and their limits,
+// stay the language's (RuleConfiguration.optionsRead), which refuses by name any it does not read, so the
 // schema does not copy them and cannot drift from them.
 func swiftShape() *schemaNode {
 	severity := &schemaNode{Type: "string", Enum: swiftSeverities}

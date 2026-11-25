@@ -33,7 +33,7 @@ type wave3Fixture struct {
 // They are the case the descriptor model was built for. A root's reading being a pure function of its
 // value's resolved type is exactly what `Table.Lookup` answers, and Phase 0 measured that model on
 // 37,643 registry classes before any of this port existed. So these roots needed no new table, and
-// this test is the evidence rather than a claim: every one of them is compared against the engine
+// this test is the evidence rather than a claim: every one of them is compared against Tailwind
 // through the existing lookup.
 //
 // Kept as a standing test rather than deleted after the measurement, because the interesting failure
@@ -85,7 +85,7 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 				inventedOnRegistry++
 				disagreements = append(
 					disagreements,
-					testCase.ClassName+": registry class the engine declines, table read "+formatReading(reading),
+					testCase.ClassName+": registry class Tailwind declines, table read "+formatReading(reading),
 				)
 			} else {
 				inventedOnProbe++
@@ -93,7 +93,7 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 		case testCase.Reading != nil && !answered:
 			tableSilent++
 			disagreements = append(disagreements, testCase.ClassName+
-				": engine reads "+
+				": Tailwind reads "+
 				formatReading(Reading{Order: testCase.Reading.Order, Count: testCase.Reading.Count})+
 				", table declined")
 		default:
@@ -104,7 +104,7 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 			}
 			disagreements = append(
 				disagreements,
-				testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading),
+				testCase.ClassName+": Tailwind "+formatReading(expected)+", table "+formatReading(reading),
 			)
 		}
 	}
@@ -121,7 +121,7 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 		inventedOnProbe,
 	)
 
-	// A share of what the engine answered rather than a count, so the floor holds each copy to the same
+	// A share of what Tailwind answered rather than a count, so the floor holds each copy to the same
 	// standard: it was 7,000 of ahra's 7,621, and 92% is that, rounded up.
 	if agreed*100 < fixture.Answered*92 {
 		test.Errorf(
@@ -131,7 +131,7 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 		)
 	}
 	if inventedOnRegistry > 0 {
-		test.Errorf("%d registry classes are answered by the table and declined by the engine", inventedOnRegistry)
+		test.Errorf("%d registry classes are answered by the table and declined by Tailwind", inventedOnRegistry)
 	}
 	for index, disagreement := range disagreements {
 		if index >= 20 {
@@ -149,7 +149,7 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 // passing while the pairs underneath it change.
 func TestWave3ValueDependentRootsReadByType(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
+	forEachTailwindSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
 		table := NewTable(system)
 
 		cases := []struct {

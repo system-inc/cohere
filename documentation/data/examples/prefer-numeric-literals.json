@@ -10,7 +10,7 @@
                 "endLine": 1,
                 "endColumn": 18,
                 "messageId": "useLiteral",
-                "message": "Use binary literals instead of parseInt(). A literal says the value in the base it was written in, with no call to read and no radix argument to get wrong, and the engine reads it at parse time rather than at every evaluation.",
+                "message": "Use binary literals instead of parseInt(). A literal says the value in the base it was written in, with no call to read and no radix argument to get wrong, and the runtime reads it at parse time rather than at every evaluation.",
                 "fix": true
             }
         ],

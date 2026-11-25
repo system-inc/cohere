@@ -15,7 +15,7 @@ var goEnvironmentHooks = answerHooks{byWorkspace: map[string]func(environment []
 // HookGoEnvironmentAnswers calls hook with each answer go env gives in workspace, absolute, and the environment the
 // caller asked under, before anything reads the answer and on the goroutine that asked, until stop is called: a test
 // changes an answer there, as another toolchain's would read, or holds it back. Only a test calls it; it is exported
-// for the engine's tests, as WatchGoEnvironmentAsks is.
+// for cohere-go's tests, as WatchGoEnvironmentAsks is.
 func HookGoEnvironmentAnswers(
 	workspace string,
 	hook func(environment []string, answer map[string]string),

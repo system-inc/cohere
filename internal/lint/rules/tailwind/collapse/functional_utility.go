@@ -2,7 +2,7 @@
 //
 // Ported from `functionalUtility` and its inner `handleFunctionalUtility` in `src/utilities.ts` at
 // Tailwind 4.3.3, read at the pinned tag rather than from the minified bundle, so a disagreement
-// with the engine is a finding rather than version skew.
+// with Tailwind is a finding rather than version skew.
 //
 // # What this is and what it deliberately is not
 //
@@ -12,8 +12,8 @@
 //
 // The split is not arbitrary. The resolution above is one function shared by every functional root,
 // so an inexact port corrupts every reading downstream at once, in the direction of a plausible
-// answer rather than an error. The handle bodies fail one root at a time and are visible against the
-// engine per root. Testing them together would let a resolution defect hide behind a handler that
+// answer rather than an error. The handle bodies fail one root at a time and are visible against
+// Tailwind per root. Testing them together would let a resolution defect hide behind a handler that
 // happens to emit the same properties for two different values.
 //
 // # The order is the contract
@@ -43,7 +43,7 @@
 // A negative candidate wraps its resolved value in `calc(<value> * -1)` and routes it through
 // `addWhitespaceAroundMathOperators`. Emitting `calc(<value>*-1)` instead is the same CSS and a
 // different string, and since this port compares readings rather than text it would pass every
-// assertion here while disagreeing with the engine anywhere the text reaches a data-type inference.
+// assertion here while disagreeing with Tailwind anywhere the text reaches a data-type inference.
 package tailwind
 
 import (
@@ -430,7 +430,7 @@ func resolveArmColor(candidate *ParsedCandidate, arm *FunctionalUtilityArm, them
 // That place is precision. `9007199254740993` is past 2^53, so `Number(value)` rounds it to
 // `9007199254740992`, `String(num)` prints the rounded form, and upstream returns false. A
 // digits-only scan returns true. The round-trip below reproduces the rejection rather than
-// approximating it, because a bare value that large is a value the engine refuses and this port
+// approximating it, because a bare value that large is a value Tailwind refuses and this port
 // would otherwise resolve.
 func isPositiveInteger(input string) bool {
 	if input == "" {

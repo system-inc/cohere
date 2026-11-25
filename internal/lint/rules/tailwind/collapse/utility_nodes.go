@@ -65,7 +65,7 @@ func cloneNode(node *Node) *Node {
 // counts declarations and an emptied rule holds none, so pruning would produce the same reading.
 // Mutating this to prune changed no reading anywhere in the corpus, which is the honest state of it.
 // It is written the upstream way because the tree is the compiled body, and a consumer that ever
-// reads structure rather than only the reading would see a tree the engine does not produce.
+// reads structure rather than only the reading would see a tree Tailwind does not produce.
 func removeNodes(nodes []*Node, removed map[*Node]bool) []*Node {
 	if len(removed) == 0 {
 		return nodes
@@ -112,7 +112,7 @@ func unionNodeSets(left, right map[*Node]bool) map[*Node]bool {
 // the parent's list at the call's position and does not descend into them. A ValueNode holds no
 // parent pointer, so the splice is expressed as turning the function node into a container that
 // reprints as exactly its children: an empty name with a synthetic wrapper would print parentheses
-// the engine does not, so the node becomes a word whose text is the reprinted replacement instead.
+// Tailwind does not, so the node becomes a word whose text is the reprinted replacement instead.
 //
 // Reprinting rather than restructuring is safe here because ValueToCss is the exact inverse of
 // ParseValue for every string these resolutions produce: theme references, numbers, and bracketed

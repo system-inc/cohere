@@ -13,7 +13,7 @@
 //            shown by VS Code, which offers no way to read a notification back, so its wording is held
 //            by cohere-format.test.js and its look by a person.
 //   go       in a Go module, saves a misformatted Go file and requires it handed to cohere and saved as gofmt
-//            prints it, then a TypeScript file, which cohere is handed and the Go engine declines there,
+//            prints it, then a TypeScript file, which cohere is handed and cohere-go declines there,
 //            and requires it saved as typed. COHERE_GATE_LOG holds each command line cohere ran with. That
 //            the decline shows no message is held by cohere-format.test.js, for the same reason.
 
@@ -116,9 +116,9 @@ async function checkGoModule(folder, probe) {
 
     const saved = await saveAsTyped(probe);
     NodeAssert.ok(cohereRuns().includes(probe), `the TypeScript file was never handed to cohere:\n${cohereRuns()}`);
-    NodeAssert.equal(saved, typed, 'the Go engine declined the TypeScript file, and it did not save as typed');
+    NodeAssert.equal(saved, typed, 'cohere-go declined the TypeScript file, and it did not save as typed');
     console.log(
-        'cohere gate: go: the Go file saved as gofmt prints it, and the TypeScript file the Go engine declined saved as typed',
+        'cohere gate: go: the Go file saved as gofmt prints it, and the TypeScript file cohere-go declined saved as typed',
     );
 }
 

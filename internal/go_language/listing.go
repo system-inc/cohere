@@ -13,10 +13,10 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// engineName is the provenance record's `engine`.
-const engineName = "cohere-go"
+// programName is the provenance record's `engine`.
+const programName = "cohere-go"
 
-// provenanceRecord says which engine wrote the stream. The engine is this cohere binary run as a child, so its
+// provenanceRecord says which program wrote the stream. cohere-go is this cohere binary run as a child, so its
 // version, commit and tree are cohere's own; the toolchain is the one that built it, which is the go/types and
 // gofmt every finding came from.
 func provenanceRecord() contract.ProvenanceRecord {
@@ -27,7 +27,7 @@ func provenanceRecord() contract.ProvenanceRecord {
 	}
 	return contract.ProvenanceRecord{
 		Contract:           contract.Version,
-		Engine:             engineName,
+		Engine:             programName,
 		Version:            current.Version,
 		Commit:             commit,
 		SourceTreeModified: current.SourceTreeModified,

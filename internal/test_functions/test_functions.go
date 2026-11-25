@@ -1,5 +1,5 @@
 // Package test_functions holds go test's check of test function signatures, read from syntax alone, so both
-// loaders, the tests' go_types and the Go engine's, refuse the same functions go test refuses before it builds a
+// loaders, the tests' go_types and cohere-go's, refuse the same functions go test refuses before it builds a
 // test's main. go list reports only the first such function in a package; this names every one.
 package test_functions
 

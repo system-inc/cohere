@@ -1,6 +1,6 @@
 package main
 
-// A comment that cites a renamed name by its old spelling. The engine respells the old name in its own
+// A comment that cites a renamed name by its old spelling. global_rename respells the old name in its own
 // declaration's comments; a comment elsewhere that cites it, `the paired fixtures in TestBlockScopedVarIgnores...`,
 // would point at a name that no longer exists. The pass respells such a citation where the old name can mean only
 // the renamed declaration: it is written in camel case, as no English word is, nothing left in the workspace is

@@ -57,7 +57,7 @@ type Context struct {
 	// requires is the analyzers this rule's listener requires, the only ones whose results ResultOf hands it, so a
 	// check never comes to depend on what another rule happened to require.
 	requires []*analysis.Analyzer
-	// options is the flags of the rule's own analyzer, which the engine sets from the rule's settings.
+	// options is the flags of the rule's own analyzer, which cohere-go sets from the rule's settings.
 	options *flag.FlagSet
 	// state is what the check gathers over the package, made by State on first use as the type the check asks for.
 	//cohere:ignore consistency-no-any each check chooses its own state type, read back through State's type parameter
@@ -82,7 +82,7 @@ type Context struct {
 // NewContext is the context a check registered as ruleName reads over the package pass analyzes, its findings handed
 // to sink. requires is what the rule's listener requires, each of which pass must have required too, options is the
 // flags of the rule's own analyzer, and isGenerated is staticcheck's judgment of the package's files, which the
-// dispatcher reads once for every rule. Only the code that calls checks builds one: the engine's dispatchers.
+// dispatcher reads once for every rule. Only the code that calls checks builds one: cohere-go's dispatchers.
 func NewContext(
 	ruleName string,
 	pass *analysis.Pass,

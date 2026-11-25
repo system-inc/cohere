@@ -9,7 +9,7 @@ import (
 
 // selectorGroup is one kind's selectors, with each name's answer remembered: which of them it matches.
 //
-// The answers are a memo because names repeat and the patterns run on a backtracking engine: ahra's
+// The answers are a memo because names repeat and the patterns run on a backtracking tailwind: ahra's
 // attributes are almost all `className`, asked about on every JSX attribute in 3,978 files, and
 // upstream's defaults hold 25 callee selectors. An answer is a pure function of the name, so the memo
 // is shared by every worker reading with these settings.

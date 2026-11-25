@@ -15,7 +15,7 @@ import (
 )
 
 // A command started in its own group and stopped at the deadline takes its children with it: a shell that started a
-// sleep in the background, as the engine starts go list, is stopped, and so is the sleep, which a kill of the
+// sleep in the background, as the Go child starts go list, is stopped, and so is the sleep, which a kill of the
 // shell's pid alone would have left running.
 func TestStopGroupStopsTheChildrenToo(test *testing.T) {
 	test.Parallel()

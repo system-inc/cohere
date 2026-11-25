@@ -46,7 +46,7 @@ func requireIdenticalFacts(
 	defer target.held(test)()
 	exported := map[*analysis.Analyzer][]Finding{original: {}, port: {}}
 	for _, fixtures := range loadFixtures(test, target, testdata, patterns, nil) {
-		graph, analyzeError := checker.Analyze([]*analysis.Analyzer{original, port}, fixtures.roots, engineOptions())
+		graph, analyzeError := checker.Analyze([]*analysis.Analyzer{original, port}, fixtures.roots, portOptions())
 		if analyzeError != nil {
 			test.Fatalf("analyzing %s: %v", fixtures.described(), analyzeError)
 		}

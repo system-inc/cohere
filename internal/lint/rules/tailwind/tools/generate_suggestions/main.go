@@ -1,4 +1,4 @@
-// Command generate_suggestions turns the engine's suggestion recipes into Go.
+// Command generate_suggestions turns Tailwind's suggestion recipes into Go.
 //
 // Usage:
 //
@@ -105,7 +105,7 @@ func main() {
 			fail("read %s: %v", *output, readError)
 		}
 		if !bytes.Equal(existing, source) {
-			fail("%s is stale: the engine's recipes changed, so regenerate it and read the diff", *output)
+			fail("%s is stale: Tailwind's recipes changed, so regenerate it and read the diff", *output)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_suggestions: %s is current\n", *output)

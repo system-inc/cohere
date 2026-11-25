@@ -33,7 +33,7 @@ func (source classOrderStubSource) Reading(className string) (Reading, bool) {
 // classOrderSyntheticPopulation builds a population large enough to clear the plausibility floors,
 // so a test can isolate the assertion it means to exercise instead of failing on volume.
 func classOrderSyntheticPopulation(
-	registryCount, corpusCount, engineNullCount int,
+	registryCount, corpusCount, tailwindNullCount int,
 ) ([]SystemCases, map[string]Reading) {
 	readings := map[string]Reading{}
 	cases := make([]ClassCase, 0, registryCount+corpusCount)
@@ -42,19 +42,19 @@ func classOrderSyntheticPopulation(
 		className := "reg-" + itoa(index)
 		reading := Reading{Order: []int{index % 300}, Count: 1}
 		cases = append(cases, ClassCase{
-			ClassName:      className,
-			Population:     PopulationRegistry,
-			EngineReading:  reading,
-			EngineAnswered: true,
+			ClassName:        className,
+			Population:       PopulationRegistry,
+			TailwindReading:  reading,
+			TailwindAnswered: true,
 		})
 		readings[className] = reading
 	}
 	for index := 0; index < corpusCount; index++ {
 		className := "cor-" + itoa(index)
 		aCase := ClassCase{ClassName: className, Population: PopulationCorpus}
-		if index >= engineNullCount {
+		if index >= tailwindNullCount {
 			reading := Reading{Order: []int{index % 300}, Count: 2}
-			aCase.EngineReading, aCase.EngineAnswered = reading, true
+			aCase.TailwindReading, aCase.TailwindAnswered = reading, true
 			readings[className] = reading
 		}
 		cases = append(cases, aCase)
@@ -87,8 +87,8 @@ func classOrderHealthyDivergence() SystemDivergence {
 // TestClassOrderHarnessScoresMutualSilenceAsFailure is the requirement this whole file exists for.
 //
 // A side reporting nothing must be a failed run and not a clean one. The check is deliberately
-// adversarial: the Go side is silent on exactly the classes the engine is silent on, which produces
-// zero disagreements, zero go-silent and zero engine-silent. Every divergence-counting assertion
+// adversarial: the Go side is silent on exactly the classes Tailwind is silent on, which produces
+// zero disagreements, zero go-silent and zero tailwind-silent. Every divergence-counting assertion
 // sees a perfectly clean run. Only the both-silent ceiling and the empty-denominator rule catch it.
 func TestClassOrderHarnessScoresMutualSilenceAsFailure(test *testing.T) {
 	test.Parallel()
@@ -104,7 +104,7 @@ func TestClassOrderHarnessScoresMutualSilenceAsFailure(test *testing.T) {
 		if systems[0].Cases[index].Population != PopulationRegistry || index%10 != 0 {
 			continue
 		}
-		systems[0].Cases[index].EngineAnswered = false
+		systems[0].Cases[index].TailwindAnswered = false
 		delete(readings, systems[0].Cases[index].ClassName)
 		silenced++
 	}
@@ -141,7 +141,7 @@ func TestClassOrderHarnessRefusesAnEmptyDenominator(test *testing.T) {
 	test.Parallel()
 	systems, _ := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 0)
 	for index := range systems[0].Cases {
-		systems[0].Cases[index].EngineAnswered = false
+		systems[0].Cases[index].TailwindAnswered = false
 	}
 
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),
@@ -172,7 +172,7 @@ func TestClassOrderHarnessRefusesALostPopulation(test *testing.T) {
 		expectReason  string
 	}{
 		{"registry lost", 10, minimumPlausibleCorpusClasses + 1, "below the plausible floor"},
-		{"corpus lost", minimumPlausibleRegistryClasses + 1, 3, "the corpus is where the engine's null readings live"},
+		{"corpus lost", minimumPlausibleRegistryClasses + 1, 3, "the corpus is where Tailwind's null readings live"},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -192,12 +192,12 @@ func TestClassOrderHarnessRefusesALostPopulation(test *testing.T) {
 	}
 }
 
-// TestClassOrderHarnessRefusesAPopulationWithNoEngineNulls guards the population that proves the
+// TestClassOrderHarnessRefusesAPopulationWithNoTailwindNulls guards the population that proves the
 // silence rule is live.
 //
-// If the fixture stopped carrying classes the engine declines, every assertion about not scoring
+// If the fixture stopped carrying classes Tailwind declines, every assertion about not scoring
 // silence would still pass while testing nothing, and it would do so invisibly.
-func TestClassOrderHarnessRefusesAPopulationWithNoEngineNulls(test *testing.T) {
+func TestClassOrderHarnessRefusesAPopulationWithNoTailwindNulls(test *testing.T) {
 	test.Parallel()
 	systems, readings := classOrderSyntheticPopulation(
 		minimumPlausibleRegistryClasses+1,
@@ -207,14 +207,14 @@ func TestClassOrderHarnessRefusesAPopulationWithNoEngineNulls(test *testing.T) {
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),
 		classOrderStubSource{name: "stub", readings: readings}, nil)
 
-	if nulls := report.Populations[0].EngineNullReadings; nulls != 0 {
-		test.Fatalf("the setup is wrong: %d engine nulls, expected none", nulls)
+	if nulls := report.Populations[0].TailwindNullReadings; nulls != 0 {
+		test.Fatalf("the setup is wrong: %d Tailwind nulls, expected none", nulls)
 	}
 	trustworthy, reasons := report.Trustworthy()
 	if trustworthy {
-		test.Fatal("a population in which the engine declined nothing was reported as trustworthy")
+		test.Fatal("a population in which Tailwind declined nothing was reported as trustworthy")
 	}
-	if !classOrderAnyReasonContains(reasons, "the engine declined no class at all") {
+	if !classOrderAnyReasonContains(reasons, "Tailwind declined no class at all") {
 		test.Errorf("expected the missing-nulls reason, got %v", reasons)
 	}
 }
@@ -223,7 +223,7 @@ func TestClassOrderHarnessRefusesAPopulationWithNoEngineNulls(test *testing.T) {
 // direction of detection standing in for the other.
 //
 // A harness that can see a wrong reading and cannot see an invented one reports a clean run for
-// every class the Go side answers and the engine does not, which is the direction nothing else in
+// every class the Go side answers and Tailwind does not, which is the direction nothing else in
 // the suite watches.
 func TestClassOrderHarnessRequiresBothSilentDirections(test *testing.T) {
 	test.Parallel()
@@ -241,12 +241,12 @@ func TestClassOrderHarnessRequiresBothSilentDirections(test *testing.T) {
 		},
 		ExpectedOutcome: OutcomeGoSilent, MinimumDetections: 1,
 	}
-	engineSilentOnly := Control{
-		Name: "engine-silent only", Detail: "answers everything",
+	tailwindSilentOnly := Control{
+		Name: "tailwind-silent only", Detail: "answers everything",
 		Corrupt: func(ReadingSource) ReadingSource {
 			return classOrderAlwaysAnswers{}
 		},
-		ExpectedOutcome: OutcomeEngineSilent, MinimumDetections: 1,
+		ExpectedOutcome: OutcomeTailwindSilent, MinimumDetections: 1,
 	}
 
 	if report := Compare(
@@ -263,16 +263,16 @@ func TestClassOrderHarnessRequiresBothSilentDirections(test *testing.T) {
 		systems,
 		classOrderHealthyDivergence(),
 		honest,
-		[]Control{engineSilentOnly},
+		[]Control{tailwindSilentOnly},
 	); report.ControlsProven() {
-		test.Error("a single engine-silent control was accepted as proof of detection in both directions")
+		test.Error("a single tailwind-silent control was accepted as proof of detection in both directions")
 	}
 	report := Compare(
 		"4.3.3",
 		systems,
 		classOrderHealthyDivergence(),
 		honest,
-		[]Control{goSilentOnly, engineSilentOnly},
+		[]Control{goSilentOnly, tailwindSilentOnly},
 	)
 	if !report.ControlsProven() {
 		test.Error("both directions were demonstrated and ControlsProven still said no")
@@ -486,7 +486,7 @@ func TestClassOrderUnresolvableAlphaPredicateIsNarrow(test *testing.T) {
 // that can say no.
 //
 // Here both silent directions are present, so the direction check is satisfied, and one of the two
-// controls did not fire. That must still be refused: a harness whose engine-silent control is dead
+// controls did not fire. That must still be refused: a harness whose tailwind-silent control is dead
 // cannot see an invented reading, whatever its go-silent control managed.
 func TestClassOrderHarnessRefusesAnUnfiredControlEvenWithBothDirections(test *testing.T) {
 	test.Parallel()
@@ -504,15 +504,15 @@ func TestClassOrderHarnessRefusesAnUnfiredControlEvenWithBothDirections(test *te
 		},
 		ExpectedOutcome: OutcomeGoSilent, MinimumDetections: 1,
 	}
-	// Same direction as a working engine-silent control and deliberately inert, so it cannot fire.
-	deadEngineSilent := Control{
-		Name: "engine-silent, dead", Detail: "corrupts nothing",
+	// Same direction as a working tailwind-silent control and deliberately inert, so it cannot fire.
+	deadTailwindSilent := Control{
+		Name: "tailwind-silent, dead", Detail: "corrupts nothing",
 		Corrupt:         func(honest ReadingSource) ReadingSource { return honest },
-		ExpectedOutcome: OutcomeEngineSilent, MinimumDetections: 1,
+		ExpectedOutcome: OutcomeTailwindSilent, MinimumDetections: 1,
 	}
 
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(), honest,
-		[]Control{firingGoSilent, deadEngineSilent})
+		[]Control{firingGoSilent, deadTailwindSilent})
 
 	if !report.Controls[0].Detected {
 		test.Fatal("the setup is wrong: the go-silent control did not fire")
@@ -547,12 +547,12 @@ func TestClassOrderHarnessRefusesNoControlsWithNothingElseWrong(test *testing.T)
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),
 		classOrderStubSource{name: "stub", readings: readings}, nil)
 
-	// Everything else about this run is sound: the populations clear their floors, the engine
+	// Everything else about this run is sound: the populations clear their floors, Tailwind
 	// declined classes, and both sides agreed on every class they both answered.
 	if population := report.Populations[0]; population.ByOutcome[OutcomeDisagreed] != 0 ||
-		population.EngineNullReadings == 0 {
-		test.Fatalf("the setup is wrong: %d disagreements and %d engine nulls",
-			population.ByOutcome[OutcomeDisagreed], population.EngineNullReadings)
+		population.TailwindNullReadings == 0 {
+		test.Fatalf("the setup is wrong: %d disagreements and %d Tailwind nulls",
+			population.ByOutcome[OutcomeDisagreed], population.TailwindNullReadings)
 	}
 	if len(report.Controls) != 0 {
 		test.Fatalf("the setup is wrong: %d controls", len(report.Controls))
@@ -616,10 +616,10 @@ func TestClassOrderHarnessRefusesAnUnknownPopulation(test *testing.T) {
 		5,
 	)
 	systems[0].Cases = append(systems[0].Cases, ClassCase{
-		ClassName:      "mislabelled",
-		Population:     "registryy",
-		EngineReading:  Reading{Order: []int{1}, Count: 1},
-		EngineAnswered: true,
+		ClassName:        "mislabelled",
+		Population:       "registryy",
+		TailwindReading:  Reading{Order: []int{1}, Count: 1},
+		TailwindAnswered: true,
 	})
 
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),

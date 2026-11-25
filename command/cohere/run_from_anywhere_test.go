@@ -73,14 +73,20 @@ type stampedBinary struct {
 	buildError error
 }
 
-// runWithEngine runs cohere from a directory with the Swift engine the override names, or none when it is empty.
+// runWithSwiftBinary runs cohere from a directory with the cohere-swift the override names, or none when it is empty.
 // Here rather than beside the Swift tests, which build on Unix only, because the TypeScript-only ownership tests
-// call it with no engine on every platform (#tejf9bc).
-func runWithEngine(test *testing.T, binary string, engine string, directory string, arguments ...string) (string, int) {
+// call it with no child on every platform (#tejf9bc).
+func runWithSwiftBinary(
+	test *testing.T,
+	binary string,
+	swiftBinary string,
+	directory string,
+	arguments ...string,
+) (string, int) {
 	test.Helper()
 	command := exec.Command(binary, verboseArguments(arguments)...)
 	command.Dir = directory
-	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine, "COHERE_VERDICT_FD=")
+	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+swiftBinary, "COHERE_VERDICT_FD=")
 	output, outputError := command.CombinedOutput()
 	if outputError == nil {
 		return string(output), 0

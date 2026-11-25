@@ -223,7 +223,7 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 			return
 		}
 		// Two void expressions inside one arrow body report twice and would each propose the same
-		// repair, which this engine reads as an overlap rather than deduplicating. Upstream's own
+		// repair, which this linter reads as an overlap rather than deduplicating. Upstream's own
 		// vector for `foo => (foo ? a : b)` is a single rewrite against two findings, so the fix
 		// is attached to the first finding for a given arrow and withheld from the rest.
 		fix, fixable := noConfusingVoidExpressionArrowFix(ruleContext, invalidAncestor)

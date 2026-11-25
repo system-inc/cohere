@@ -11,7 +11,7 @@ import (
 )
 
 // representationReader walks every source function of its package in the representation the readers walk, as a rule
-// on the engine's own representation does, and finds nothing.
+// on cohere-go's own representation does, and finds nothing.
 var representationReader = &analysis.Analyzer{
 	Name:     "representationReader",
 	Doc:      "walks every source function of the package in the readers' representation, and finds nothing",

@@ -96,7 +96,7 @@ func describeEnumeration(enumeration format_files.Enumeration, formattable int) 
 		description += fmt.Sprintf(", skipped %d symbolic links, which are never followed", enumeration.SymbolicLinks)
 	}
 
-	// Declines are the requirement this whole change exists for: a file the engine cannot handle is a
+	// Declines are the requirement this whole change exists for: a file the child cannot handle is a
 	// named zero rather than an absence.
 	if len(enumeration.DeclinedExtensions) > 0 {
 		extensions := make([]string, 0, len(enumeration.DeclinedExtensions))

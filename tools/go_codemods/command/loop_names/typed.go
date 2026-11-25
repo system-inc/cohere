@@ -16,7 +16,7 @@ import (
 // The rules in this file name a letter no loop or comparator names, from what its declaration says it holds:
 // a pair of parameters, the collection a function literal is handed with, the call that produced it, its type,
 // and last the conventional meaning of a few letters for a basic type. Each rule gives names in order of
-// preference, and the engine takes the first it accepts.
+// preference, and global_rename takes the first it accepts.
 
 // typeTable names the standard and common library types a letter holds, by their full type string, decided
 // once: a type whose own name is a keyword, or whose last word says less than the name the tree already uses
@@ -513,7 +513,7 @@ func fileImportNames(info *types.Info, file *ast.File) map[string]bool {
 
 // usableNames keeps the names a letter may take in file, each once: an identifier of three letters or more that is not
 // a keyword, a predeclared identifier, an import's name in the file, or a standard library package a reader would
-// take it for. A conflict with a name in scope is the engine's to find.
+// take it for. A conflict with a name in scope is global_rename's to find.
 func usableNames(names []string, importNames map[string]bool) []string {
 	var usable []string
 	for _, name := range names {

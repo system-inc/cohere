@@ -118,5 +118,5 @@ var CollapseFamilies = []CollapseFamily{
 // TailwindVersion is the version these families were enumerated from.
 //
 // Recorded so a mismatch between this and the installed Tailwind is greppable, and so a reader of a
-// finding can tell which engine's opinion produced it.
+// finding can tell which side's opinion produced it.
 const TailwindVersion = "4.3.3"

@@ -10,7 +10,7 @@ import (
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 )
 
-// This file is better-tailwindcss 4.7.0's matcher engine (utils/matchers.js getLiteralNodesByMatchers
+// This file is better-tailwindcss 4.7.0's matcher (utils/matchers.js getLiteralNodesByMatchers
 // and parsers/es.js getESMatcherFunctions), walking typescript-go's tree where upstream walks ESTree.
 //
 // The two trees disagree in ways that matter here, and each is answered once, in esParent and

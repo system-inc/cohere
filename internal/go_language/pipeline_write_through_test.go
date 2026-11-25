@@ -74,9 +74,9 @@ func TestTheRunAfterAColdOneHitsEveryBuildsOwnStore(test *testing.T) {
 func TestNoBuildWritesThroughWithoutTheCache(test *testing.T) {
 	test.Parallel()
 
-	engine, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
+	pipeline, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
 	restored := 0
-	for _, run := range engine.buildRuns {
+	for _, run := range pipeline.buildRuns {
 		restored += len(run.result.FromHost.Restored) + len(run.result.FromHost.Untouched)
 		if written := run.result.Cache.WrittenThrough; written != 0 {
 			test.Errorf("%s wrote %d entries through under --no-cache, want none", run.build, written)

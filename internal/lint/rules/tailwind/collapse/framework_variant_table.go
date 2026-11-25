@@ -4,7 +4,7 @@
 //
 //	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root <tailwindcss package>
 //
-// Source: Tailwind 4.3.3, read from the engine's own variant registry.
+// Source: Tailwind 4.3.3, read from Tailwind's own variant registry.
 // 88 registrations over 82 distinct order numbers, 2 of which are shared by more than one root,
 // and 4 of which carry a comparison function.
 //
@@ -35,12 +35,12 @@
 
 package tailwind
 
-// FrameworkVariantRegistration is one variant the framework registers, with the order number the
-// engine assigned it.
+// FrameworkVariantRegistration is one variant the framework registers, with the order number
+// Tailwind assigned it.
 //
 // Order is carried rather than re-derived, and that is the whole reason this type exists alongside
 // FrameworkVariant. Replaying these through Register in sequence would give every root its own
-// number, and the engine shares numbers: six roots hold one order in a default build. A shared
+// number, and Tailwind shares numbers: six roots hold one order in a default build. A shared
 // order is where a comparison function gets to speak, and comparison is how the five breakpoints
 // order by their resolved widths instead of alphabetically.
 type FrameworkVariantRegistration struct {
@@ -58,11 +58,11 @@ type FrameworkVariantRegistration struct {
 //
 // The function itself cannot be generated: upstream's is a closure over the design system's theme,
 // and reading a hardcoded breakpoint scale here would be the per-repository bug this port exists to
-// remove. Measured on the engine, redefining `--breakpoint-sm` to `200rem` moves `sm` from dense
+// remove. Measured on Tailwind, redefining `--breakpoint-sm` to `200rem` moves `sm` from dense
 // index 0 to index 4. So what is generated is the order number and the direction, and
 // LoadDesignSystem attaches CompareBreakpoints over the live theme.
 //
-// Ascending is probed against the engine rather than read from variants.ts, so a release that
+// Ascending is probed against Tailwind rather than read from variants.ts, so a release that
 // flipped one produces a diff here instead of silently reversing every class in the group.
 type FrameworkVariantComparisonGroup struct {
 	// Order is the shared registration number the comparison is keyed on.
@@ -78,7 +78,7 @@ type FrameworkVariantComparisonGroup struct {
 // FrameworkVariantRegistrations is every variant the installed Tailwind registers, in registration
 // order.
 //
-// In order rather than sorted by name, so a reader sees the sequence the engine performed and an
+// In order rather than sorted by name, so a reader sees the sequence Tailwind performed and an
 // upgrade's diff shows where a new variant was inserted. Registrations() sorts by name when a
 // caller needs that.
 var FrameworkVariantRegistrations = []FrameworkVariantRegistration{

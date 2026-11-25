@@ -1,11 +1,11 @@
-// Package warning_comment is what counts as a task left for later in a comment, in one place, for every engine that
+// Package warning_comment is what counts as a task left for later in a comment, in one place, for every language that
 // judges comments (#4b337jk, textrules-decisions.md "Warning comments").
 //
-// The TypeScript rule nexus/consistency-no-warning-comment and the Go engine's cohere-go/consistency-no-warning-comment
-// both read it, so the words, what makes one a whole word, and which text is code are decided once. Each engine
+// The TypeScript rule nexus/consistency-no-warning-comment and cohere-go's cohere-go/consistency-no-warning-comment
+// both read it, so the words, what makes one a whole word, and which text is code are decided once. Each language
 // hands it a group of comments, read as one text, and applies only its own language's facts first: which comments
 // form a group, and which are a tool's directive rather than prose. It lives in its own package, importing nothing
-// heavier than internal/shouting, because the nexus rules package links the TypeScript checker and the Go engine
+// heavier than internal/shouting, because the nexus rules package links the TypeScript checker and cohere-go
 // must not.
 //
 // The words are `TODO`, `FIXME` and `XXX`, matched as written, in capitals, since a lowercase todo is ordinary
@@ -121,8 +121,8 @@ func WordsIn(texts []string) []Word {
 // in capitals and with no word boundary, this is exactly warningWord.MatchString, and it turns away no comment the
 // regexp would read.
 //
-// It is exported as an engine's gate: every Word WordsIn returns is texts[Comment][Start:End], one of the words spelled
-// in that comment's own text, so a group none of whose texts it holds for has no Word, and an engine may skip
+// It is exported as a linter's gate: every Word WordsIn returns is texts[Comment][Start:End], one of the words spelled
+// in that comment's own text, so a group none of whose texts it holds for has no Word, and a linter may skip
 // gathering the group at all.
 func HoldsWarningWord(text string) bool {
 	for _, word := range warningWords {

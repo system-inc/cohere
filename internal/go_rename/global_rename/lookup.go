@@ -29,7 +29,7 @@ type embeddedEntry struct {
 // lookupMember mirrors go/types' LookupFieldOrMethod with names given by name: the shallowest depth holding
 // a field or method of that name wins, two at that depth are a collision, a method set needs a pointer for a
 // pointer method unless addressable, and an unexported name matches only in its own package. go/types cannot
-// be asked to look up a name an object does not have yet, so the search is redone here; the engine checks it
+// be asked to look up a name an object does not have yet, so the search is redone here; the renaming checks it
 // against every selection go/types recorded, under the old names, before trusting it under the new.
 func lookupMember(receiver types.Type, addressable bool, from *types.Package, wanted string, name nameOf) member {
 	matches := func(object types.Object) bool {

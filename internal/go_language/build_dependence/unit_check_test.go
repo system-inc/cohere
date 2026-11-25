@@ -106,7 +106,7 @@ func fixtureWorkspace(loaded *packages.Package) bool {
 	return !strings.HasSuffix(loaded.PkgPath, "/dependency")
 }
 
-// graphOf is the graph of host's packages, each added from a goroutine of its own, as the engine adds them while each
+// graphOf is the graph of host's packages, each added from a goroutine of its own, as cohere-go adds them while each
 // package's rules run, except those excluded names.
 func graphOf(host loadedBuild, excluded func(*packages.Package) bool) *Graph {
 	graph := NewGraph()
@@ -122,12 +122,12 @@ func graphOf(host loadedBuild, excluded func(*packages.Package) bool) *Graph {
 }
 
 // differenceOf is what build changes against host, from the two loads' file sets: each file matched by its path as
-// written (GoFiles), as the engine matches them, and each build-only file taken from the build's syntax, which is the
+// written (GoFiles), as cohere-go matches them, and each build-only file taken from the build's syntax, which is the
 // file as written but in a package the cgo tool translated: there a cgo file's syntax is its translation, matched by
 // the file a reader sees, and the file the tool generates is none of the build's files as written. A package the build
-// keeps cgo on in is said so (KeepsCgo), as the engine says it. Each file the two do not share is scanned for a line
-// directive as the disk holds it, the bytes these loads parsed, as the engine scans the bytes its run holds
-// (HoldsLineDirective): a cgo file by its name as written, as the engine scans it.
+// keeps cgo on in is said so (KeepsCgo), as cohere-go says it. Each file the two do not share is scanned for a line
+// directive as the disk holds it, the bytes these loads parsed, as cohere-go scans the bytes its run holds
+// (HoldsLineDirective): a cgo file by its name as written, as cohere-go scans it.
 func differenceOf(host loadedBuild, build loadedBuild) Difference {
 	difference := Difference{
 		Packages:          map[string]PackageDifference{},

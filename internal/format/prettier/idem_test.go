@@ -16,7 +16,7 @@ func TestFormatIsIdempotent(test *testing.T) {
 	test.Parallel()
 
 	listPath := needs.OptIn(test, "COHERE_IDEM_LIST", "it formats a list of files twice and compares them")
-	engine := newTestEngine(test)
+	formatter := newTestFormatter(test)
 	listBytes, listReadError := os.ReadFile(listPath)
 	if listReadError != nil {
 		test.Fatalf("reading the list: %v", listReadError)
@@ -26,18 +26,18 @@ func TestFormatIsIdempotent(test *testing.T) {
 	var changedFromSource int
 	for _, path := range strings.Split(strings.TrimSpace(string(listBytes)), "\n") {
 		path = strings.TrimSpace(path)
-		if path == "" || !engine.Handles(path) {
+		if path == "" || !formatter.Handles(path) {
 			continue
 		}
 		source, readError := os.ReadFile(path)
 		if readError != nil {
 			continue
 		}
-		once, formatError := engine.Format(path, string(source))
+		once, formatError := formatter.Format(path, string(source))
 		if formatError != nil {
 			continue
 		}
-		twice, formatError := engine.Format(path, once)
+		twice, formatError := formatter.Format(path, once)
 		if formatError != nil {
 			continue
 		}

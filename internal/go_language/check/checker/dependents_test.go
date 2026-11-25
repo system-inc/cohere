@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 )
 
-// dependentsKey stands in for the engine's key, an analyzer that is never run.
+// dependentsKey stands in for cohere-go's key, an analyzer that is never run.
 var dependentsKey = &analysis.Analyzer{
 	Name: "dependents_key",
 	Doc:  "keys the set of a pass's dependents and never runs",

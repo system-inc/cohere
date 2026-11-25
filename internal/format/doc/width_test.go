@@ -143,7 +143,7 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 // Mutates: seen gains every line collected, so the caller's next corpus skips the lines this one found.
 func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string {
 	test.Helper()
-	engine, newPrettierError := prettier.New(format_options.Default())
+	formatter, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -164,7 +164,7 @@ func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string 
 			pending = append(pending, filepath.Join(current, nested))
 		}
 
-		enumeration, enumerateError := engine.Enumerate(current)
+		enumeration, enumerateError := formatter.Enumerate(current)
 		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) {
 			test.Logf("skipping %s, not yet adopted: %v", current, enumerateError)
 			continue

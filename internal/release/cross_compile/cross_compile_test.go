@@ -185,7 +185,7 @@ func TestTypeCheckCatchesAPlatformOnlyBreak(test *testing.T) {
 // included, so a test that cannot build there fails here and not on a Windows machine someone finally runs
 // it on.
 //
-// Release targets prove only what ships: command/cohere's tests used a Unix-only stand-in engine for weeks
+// Release targets prove only what ships: command/cohere's tests used a Unix-only stand-in binary for weeks
 // without anything noticing, since only three named Windows tests run in release.yml (#tejf9bc). Windows
 // alone, because it is the one shipped platform that is not Unix: a file a Unix build constraint keeps
 // out of linux builds would also be kept out of darwin's, which every test run here already compiles.

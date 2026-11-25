@@ -68,7 +68,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/settings"
 )
 
-var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from the engine")
+var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from cohere-go")
 
 // fixtureOnlyFiles are a case directory's files that describe the case rather than belong to its project. A
 // platform's own expected stream, `expected.<GOOS>.jsonl` (expectedStreamPath), is one too, by platformStreamPattern.
@@ -91,7 +91,7 @@ func expectedStreamPath(name string) string {
 
 // platformStreamReasons is why each platform's own expected stream differs from its case's expected.jsonl, by its
 // path under testdata: the platform fact the stream records. A platform stream is an escape from a fixture's one
-// expectation, so each must say what on that platform makes the engine's honest record differ (#gj6rcxs).
+// expectation, so each must say what on that platform makes cohere-go's honest record differ (#gj6rcxs).
 var platformStreamReasons = map[string]string{
 	"generated-rules-withheld/expected.linux.jsonl": "The generated file calls net/http, the one package the " +
 		"response-status rule reads, and on linux net compiles cgo_unix.go, a dependency's cgo the types record " +
@@ -210,9 +210,9 @@ var panickingRule = rule.Rule{
 	Origin: rule.OriginHouse,
 	Analyzer: &analysis.Analyzer{
 		Name: "alwayspanics",
-		Doc:  "alwayspanics panics on every package, so the engine's crash path has a rule to catch.",
+		Doc:  "alwayspanics panics on every package, so cohere-go's crash path has a rule to catch.",
 		Run: func(*analysis.Pass) (any, error) {
-			// Invariant: this rule exists to panic; the engine must turn it into a crash entry.
+			// Invariant: this rule exists to panic; cohere-go must turn it into a crash entry.
 			panic("planted")
 		},
 	},
@@ -327,7 +327,7 @@ func newUnconfiguredAnalyzer() *analysis.Analyzer {
 	return analyzer
 }
 
-// endToEndCase is one run of the engine over a copy of a fixture, compared with the case's expected stream.
+// endToEndCase is one run of cohere-go over a copy of a fixture, compared with the case's expected stream.
 type endToEndCase struct {
 	// name is the case, and the directory under testdata holding its expected files.
 	name string
@@ -343,7 +343,7 @@ type endToEndCase struct {
 
 	exitCode int
 
-	// needsCgo marks a case whose project has cgo of its own, which the engine has go list -compiled's cgo tool
+	// needsCgo marks a case whose project has cgo of its own, which cohere-go has go list -compiled's cgo tool
 	// translate: it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as Loom's, which
 	// refuses to compile (see cgo_testing).
 	needsCgo bool
@@ -511,7 +511,7 @@ var endToEndCases = []endToEndCase{
 		rules: ownLongFileAnalyzer(), verify: renamedTree("rename", "rename-wrap-declined"),
 	},
 	// maxBytes is read by a file only windows builds and one only freebsd builds: it is renamed in all three, and
-	// the rewrite is proven under each platform with the engine's own load for it as well as the host's.
+	// the rewrite is proven under each platform with cohere-go's own load for it as well as the host's.
 	{
 		name: "rename-platforms-rewritten", fixture: "rename-platforms", exitCode: 0,
 		verify: renamedTree("rename-platforms", "rename-platforms-rewritten"),
@@ -832,7 +832,7 @@ func TestEndToEnd(test *testing.T) {
 	}
 }
 
-// runCase copies the case's fixture, runs the engine over the copy, and compares what it wrote, normalized, with
+// runCase copies the case's fixture, runs cohere-go over the copy, and compares what it wrote, normalized, with
 // the case's expected files, or rewrites them under -update.
 func runCase(test *testing.T, endToEnd endToEndCase) {
 	test.Helper()
@@ -885,7 +885,7 @@ func withOwnAnalyzer(registered rule.Rule, analyzer *analysis.Analyzer) rule.Rul
 	return registered
 }
 
-// refuseSharedOptions fails a case whose settings set an option on an analyzer the registry holds. The engine sets
+// refuseSharedOptions fails a case whose settings set an option on an analyzer the registry holds. cohere-go sets
 // options on the analyzer's flags, which outlive a run: in its own process that is one run, but here every case runs
 // in one process, in parallel, so the value would reach whichever case runs that rule next, and a golden written
 // then records the leak. Such a case registers the rule with an analyzer of its own (withOwnAnalyzer).
@@ -893,7 +893,7 @@ func refuseSharedOptions(test *testing.T, root string, registered []rule.Rule) {
 	test.Helper()
 	ruleSettings, loadError := settings.Load(root, "", knownRuleNames(registered), nil)
 	if loadError != nil {
-		// Ignored: a case whose settings are refused is testing that refusal, and the engine configures nothing
+		// Ignored: a case whose settings are refused is testing that refusal, and cohere-go configures nothing
 		// before it, so no option can be set on any analyzer.
 		return
 	}
@@ -951,7 +951,7 @@ var (
 	// The packages the findings cache missed, wrote and could not store, the facts it dropped, the waves it
 	// analyzed them in, and the records the builds' packs served, found stale and did not hold (#b2t9xmf), count the
 	// toolchain's own packages, which a Go release changes, as it changes the packages loaded; the shard stamps the
-	// builds read turn on which shards the engine's keys fall in, and which build asked first. Hit stays, since a fresh
+	// builds read turn on which shards cohere-go's keys fall in, and which build asked first. Hit stays, since a fresh
 	// copy hits nothing.
 	// The milliseconds the cgo tool's load took vary like any elapsed time.
 	cgoMillisecondsPattern = regexp.MustCompile(`("cgoTranslation":\{"packages":\d+,"milliseconds":)\d+`)
@@ -984,7 +984,7 @@ var (
 			`(,"buildsWidthSlack":true)?(,"buildsWidthFromHostLive":true)?(,"buildsPoolSize":\d+)?`)
 	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance = contract.ProvenanceRecord{
-		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",
+		Contract: contract.Version, Engine: programName, Version: "test", Commit: "test", Toolchain: "test",
 	}
 )
 
@@ -1039,8 +1039,8 @@ func normalize(stream string, root string) string {
 }
 
 // withHostArchitectureUnnamed is stream with architecture, the host's, written `architecture` in the two reasons that
-// name a platform the engine made on the host's own architecture (#h7cztk1): the project record's reason for a file
-// only a cgo build of another platform compiles, which the engine reaches only for a platform on the host's
+// name a platform cohere-go made on the host's own architecture (#h7cztk1): the project record's reason for a file
+// only a cgo build of another platform compiles, which cohere-go reaches only for a platform on the host's
 // architecture (one on another architecture is given its own reason first, project.BuildsFor), and the lint record's
 // reason an extra build linted none of a file, which names the build. The fixtures that hold them name no target
 // platform, so each such build is made on the host's `GOARCH`, and the architecture in them is always the machine's.
@@ -1117,7 +1117,7 @@ func inputsInside(line string, root string) string {
 
 // copyFixture copies a fixture into a fresh directory named project, in a git repository of its own with the
 // fixture's gitlinks in its index, and returns the directory with every symbolic link above it resolved, so the
-// paths the engine writes are the ones the copy is replaced by. The repository is written without git
+// paths cohere-go writes are the ones the copy is replaced by. The repository is written without git
 // (writeRepository) unless the fixture has gitlinks, whose index only git writes: each git child forks this process,
 // and on darwin a fork makes the whole heap fault again on its next write (#2htryg8).
 func copyFixture(test *testing.T, fixture string) string {
@@ -1362,7 +1362,7 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 				wantExit = exitFindings
 			}
 			if record.ExitCode != wantExit || exitCode != wantExit {
-				test.Errorf("the summary says exit %d and the engine exited %d, want %d", record.ExitCode, exitCode,
+				test.Errorf("the summary says exit %d and cohere-go exited %d, want %d", record.ExitCode, exitCode,
 					wantExit)
 			}
 		}

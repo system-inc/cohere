@@ -71,14 +71,14 @@ type skippedRecorder struct {
 	judged  []skippedJudgment
 }
 
-// hook has engine tell the recorder of every load of every extra build, of every skip of each and of its judgment
+// hook has pipeline tell the recorder of every load of every extra build, of every skip of each and of its judgment
 // (pipeline.extraBuildLoads, skippedAtLoad and judgedSkipped).
 //
-// Mutates: engine its three hooks are the recorder's
-func (recorder *skippedRecorder) hook(engine *pipeline) {
-	engine.extraBuildLoads = recorder.load
-	engine.skippedAtLoad = recorder.skip
-	engine.judgedSkipped = recorder.record
+// Mutates: pipeline its three hooks are the recorder's
+func (recorder *skippedRecorder) hook(pipeline *pipeline) {
+	pipeline.extraBuildLoads = recorder.load
+	pipeline.skippedAtLoad = recorder.skip
+	pipeline.judgedSkipped = recorder.record
 }
 
 // load is the test's hook for a load (pipeline.extraBuildLoads).
@@ -143,13 +143,13 @@ type skippedTally struct {
 	declined int
 }
 
-// judgeSkips fails the test naming every judgment of judged that declined, every package a build of engine skipped in
+// judgeSkips fails the test naming every judgment of judged that declined, every package a build of pipeline skipped in
 // more loads than it was judged in, so a hook that judged nothing proves nothing, and every package a build's last
 // load recorded as skipped (skippedOf) that no load told of. It returns each extra build's tally, by build, its loads
 // counted from loaded, the build of each load told.
 func judgeSkips(
 	test *testing.T,
-	engine *pipeline,
+	pipeline *pipeline,
 	loaded []string,
 	skipped []skippedPackage,
 	judged []skippedJudgment,
@@ -162,7 +162,7 @@ func judgeSkips(
 		tallies[build] = tally
 	}
 	runs := map[string]buildRun{}
-	for _, run := range engine.buildRuns[1:] {
+	for _, run := range pipeline.buildRuns[1:] {
 		runs[run.build.String()] = run
 	}
 	skips, judgments := map[skippedPackage]int{}, map[skippedPackage]int{}
@@ -195,7 +195,7 @@ func judgeSkips(
 				"rest", skip.build, skip.identifier, skips[skip], judgments[skip])
 		}
 	}
-	for _, run := range engine.buildRuns[1:] {
+	for _, run := range pipeline.buildRuns[1:] {
 		name := run.build.String()
 		tally := tallies[name]
 		for _, identifier := range skippedOf(run) {
@@ -218,7 +218,7 @@ func compareSkippedPackages(first skippedPackage, second skippedPackage) int {
 	return strings.Compare(first.identifier, second.identifier)
 }
 
-// logTallies logs a line for every extra build engine ran, zeros included: its tally, the loads first, which are the
+// logTallies logs a line for every extra build pipeline ran, zeros included: its tally, the loads first, which are the
 // test's own count, and then what the run's record says of its restore from the host's run (check.HostRestoreCounts),
 // each said as the load it is of. Restored is the last load's, none once the restore is off. Visited is the last load's
 // that had the restore on, since a load with it off, which a second round of declines leaves it, counts nothing anew.
@@ -228,13 +228,13 @@ func compareSkippedPackages(first skippedPackage, second skippedPackage) int {
 // (extraBuildRun returns with an empty result), so its record says nothing of its last load, and the line says why in
 // place of those figures, rather than read "0 of them by the last" beside the skips its load told of. It fails naming
 // every build with a line that was told of no load:
-// a build engine ran loaded, so the hook is not wired and nothing was counted. It fails naming every build the census
+// a build pipeline ran loaded, so the hook is not wired and nothing was counted. It fails naming every build the census
 // needs beside the host's that has no line, since a build the differential says nothing of cannot be told apart from
 // one it never judged.
-func logTallies(test *testing.T, label string, engine *pipeline, tallies map[string]skippedTally) {
+func logTallies(test *testing.T, label string, pipeline *pipeline, tallies map[string]skippedTally) {
 	test.Helper()
 	lined := map[string]bool{}
-	for _, run := range engine.buildRuns[1:] {
+	for _, run := range pipeline.buildRuns[1:] {
 		tally := tallies[run.build.String()]
 		var fromHost check.HostRestoreCounts
 		if run.result != nil {
@@ -257,7 +257,7 @@ func logTallies(test *testing.T, label string, engine *pipeline, tallies map[str
 		}
 		lined[run.build.String()] = true
 	}
-	for _, build := range engine.described.builds[1:] {
+	for _, build := range pipeline.described.builds[1:] {
 		if !lined[build.String()] {
 			test.Errorf("%s, %s: the census needs this build and the differential has no line for it, so a build it "+
 				"never judged reads as one that skipped nothing", label, build)
@@ -310,13 +310,13 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 			fixture := filepath.Join("testdata", step.fixture)
 			recorder := &skippedRecorder{}
 			root := copyFixture(test, fixture)
-			engine, judgedRaw := runOverConfigured(test, root, step.wantExit, recorder.hook, "--no-cache")
-			if len(engine.buildRuns) < 2 {
-				test.Fatalf("the run checked %d builds, want an extra build beside the host's", len(engine.buildRuns))
+			pipeline, judgedRaw := runOverConfigured(test, root, step.wantExit, recorder.hook, "--no-cache")
+			if len(pipeline.buildRuns) < 2 {
+				test.Fatalf("the run checked %d builds, want an extra build beside the host's", len(pipeline.buildRuns))
 			}
-			tallies := judgeSkips(test, engine, recorder.loads(), recorder.skips(), recorder.judgments())
-			logTallies(test, step.fixture, engine, tallies)
-			for _, run := range engine.buildRuns[1:] {
+			tallies := judgeSkips(test, pipeline, recorder.loads(), recorder.skips(), recorder.judgments())
+			logTallies(test, step.fixture, pipeline, tallies)
+			for _, run := range pipeline.buildRuns[1:] {
 				if loads := tallies[run.build.String()].loads; loads != step.wantLoads {
 					test.Errorf("%s: the test was told of %d loads, want %d", run.build, loads, step.wantLoads)
 				}
@@ -356,16 +356,16 @@ func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
 		test.Skipf("%s names no tree", packageDifferentialRootVariable)
 	}
 	recorder := &skippedRecorder{}
-	engine, _, standardError, exitCode := runOverExiting(test, root, rules.All(), recorder.hook, "--no-cache",
+	pipeline, _, standardError, exitCode := runOverExiting(test, root, rules.All(), recorder.hook, "--no-cache",
 		"--no-fix")
 	if exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("the run over %s exited %d:\n%s", root, exitCode, standardError)
 	}
-	if len(engine.buildRuns) < 2 {
+	if len(pipeline.buildRuns) < 2 {
 		test.Skipf("the census of %s needs no extra build", root)
 	}
-	tallies := judgeSkips(test, engine, recorder.loads(), recorder.skips(), recorder.judgments())
-	logTallies(test, root, engine, tallies)
+	tallies := judgeSkips(test, pipeline, recorder.loads(), recorder.skips(), recorder.judgments())
+	logTallies(test, root, pipeline, tallies)
 	judgedByTypes := 0
 	for _, tally := range tallies {
 		judgedByTypes += tally.byTypes
@@ -386,9 +386,9 @@ func TestTheDifferentialReportsAPackageTheDecisionLetThroughWrongly(test *testin
 
 	fixture := filepath.Join("testdata", "walk-square")
 	recorder := &skippedRecorder{}
-	runOverConfigured(test, copyFixture(test, fixture), exitFindings, func(engine *pipeline) {
-		recorder.hook(engine)
-		engine.forcedThrough = walkU
+	runOverConfigured(test, copyFixture(test, fixture), exitFindings, func(pipeline *pipeline) {
+		recorder.hook(pipeline)
+		pipeline.forcedThrough = walkU
 	}, "--no-cache")
 	var declined []skippedJudgment
 	for _, judgment := range recorder.judgments() {
@@ -405,7 +405,7 @@ func TestTheDifferentialReportsAPackageTheDecisionLetThroughWrongly(test *testin
 
 	forcedRoot := copyFixture(test, fixture)
 	_, forced := runOverConfigured(test, forcedRoot, exitFindings,
-		func(engine *pipeline) { engine.forcedThrough = walkU }, "--no-cache")
+		func(pipeline *pipeline) { pipeline.forcedThrough = walkU }, "--no-cache")
 	_, plain := runOver(test, copyFixture(test, fixture), exitFindings)
 	if normalize(forced, forcedRoot) != plain {
 		test.Errorf("the option without the hook changed the run's stream:\nwith it\n%s\nwithout it\n%s",

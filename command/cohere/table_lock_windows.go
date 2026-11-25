@@ -2,7 +2,7 @@ package main
 
 import "time"
 
-// On Windows the dispatcher always waits for the engine (takeVerdictFile), so no run writes the table
+// On Windows the dispatcher always waits for the child (takeVerdictFile), so no run writes the table
 // after its caller has moved on and there is nothing to keep in order.
 
 func holdTableLock(directory string) func() {

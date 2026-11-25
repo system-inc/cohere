@@ -1,5 +1,5 @@
-// Command generate_syntax_tree captures compiled utility trees from the real Tailwind engine, together
-// with the {order, count} reading the engine takes from each, so that the Go AST and PropertySort
+// Command generate_syntax_tree captures compiled utility trees from Tailwind itself, together
+// with the {order, count} reading Tailwind takes from each, so that the Go AST and PropertySort
 // in internal/tailwind are tested against measurements rather than against a reading of the
 // TypeScript source.
 //
@@ -12,7 +12,7 @@
 // it bites harder here. `getPropertySort` looks like a tree walk and is not one: it is a
 // breadth-first queue that descends only into `rule` and `at-rule`. A port that reads the source
 // quickly and reaches for the file's own `walk` helper gets a depth-first traversal that also
-// descends into `at-root`, and that port agrees with the engine on the overwhelming majority of
+// descends into `at-root`, and that port agrees with Tailwind on the overwhelming majority of
 // real input. The fixture carries the trees where it does not.
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
@@ -120,7 +120,7 @@ func main() {
 
 // enumerate runs the Node side and returns its JSON.
 //
-// The engine is JavaScript and there is no faithful way to ask it these questions from Go. The
+// Tailwind is JavaScript and there is no faithful way to ask it these questions from Go. The
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot string) ([]byte, error) {

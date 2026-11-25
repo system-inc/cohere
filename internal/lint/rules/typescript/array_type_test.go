@@ -455,7 +455,7 @@ func TestArrayTypeStaysSilentOnUpstreamPassCases(test *testing.T) {
 // of six that differ only in wording. The spans say where the finding points, which for a readonly
 // array is the type operator rather than the array. The rendered text says what the reader is told,
 // including the collapse of a non-simple element to the letter `T`, which no id can see. And the
-// applied source says what the edit engine will write into the file unattended.
+// applied source says what the fix pass will write into the file unattended.
 func TestArrayTypeFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()
 

@@ -11,7 +11,7 @@ package typescript
 // Each finding records the message id and the exact text the installed rule's location covers.
 //
 // cohere's module is TypeScript's, a file with an import or export, so a row upstream parses as
-// `sourceType: "module"` with neither gets `export {};` appended (exportAppended), and both engines see a module.
+// `sourceType: "module"` with neither gets `export {};` appended (exportAppended), and both linters see a module.
 // 5 upstream rows carry what cohere cannot express, named in pinned, and are recorded with that part
 // taken out: globals configuration dropped, /*global*/ directives off through noInlineConfig, globalReturn dropped.
 // TestNoRedeclareUpstreamCorpus replays this table.

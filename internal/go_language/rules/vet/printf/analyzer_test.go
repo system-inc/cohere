@@ -103,12 +103,12 @@ func extractArchive(test *testing.T, name string) string {
 	return directory
 }
 
-// BenchmarkOverTheCheckPackage weighs the port over the engine's check package, a real package of the repository
+// BenchmarkOverTheCheckPackage weighs the port over cohere-go's check package, a real package of the repository
 // and one of its largest, whose many fmt calls with constant formats are parsed operation by operation. The package
 // is loaded once and inspect run once on it, so each iteration is the port's run alone, and the allocations reported
 // are the port's. The facts of the package's dependencies are never computed here, so every import of one misses,
 // which finds no wrapper outside the package and leaves every call of fmt and the rest of the known names checked as
-// the engine checks them. It is skipped under -short.
+// cohere-go checks them. It is skipped under -short.
 func BenchmarkOverTheCheckPackage(benchmark *testing.B) {
 	if testing.Short() {
 		benchmark.Skip("loads a package of the repository")

@@ -15,7 +15,7 @@ import (
 // whose range is wrong takes every other fix in the same file down with it. classLiteralFrom took a
 // literal's Loc, whose start sits before the leading whitespace, so for a literal on its own line
 // the quote strip cut the opening quote instead of the first class character. The rewrite stopped
-// parsing and the engine refused the whole pass, the import fix below included. Measured by
+// parsing and the fix pass refused the whole pass, the import fix below included. Measured by
 // @system_cohere_format_markdown on perturbed input (#vf1hd6j): 174 files and 1,755 refused fixes in
 // ahra, 175 files and 1,932 in www-phi-health. Fixed in cohere c079219.
 //

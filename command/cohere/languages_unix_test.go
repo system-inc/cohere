@@ -1,6 +1,6 @@
 //go:build unix
 
-// The stand-in Swift engine here is a /bin/sh script, as combined_footer_unix_test.go's is, so the file builds on Unix.
+// The stand-in cohere-swift here is a /bin/sh script, as combined_footer_unix_test.go's is, so the file builds on Unix.
 
 package main
 
@@ -96,7 +96,7 @@ func TestLanguagesCheckWhatTheyNameWhereverItLives(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, arguments...)
 		command.Dir = root
-		command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+swiftEngine, goEngineChildVariable+"=")
+		command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+swiftEngine, goChildVariable+"=")
 		var standardOutput bytes.Buffer
 		var standardError bytes.Buffer
 		command.Stdout, command.Stderr = &standardOutput, &standardError
@@ -235,7 +235,7 @@ func TestANarrowedRunNamesWhatItLeftOutWhileItsProjectReplays(test *testing.T) {
 	if initializeOutput, initializeError := initialize.CombinedOutput(); initializeError != nil {
 		test.Fatalf("git init: %v\n%s", initializeError, initializeOutput)
 	}
-	environment := []string{"COHERE_SWIFT_ENGINE=" + swiftEngine, goEngineChildVariable + "="}
+	environment := []string{"COHERE_SWIFT_ENGINE=" + swiftEngine, goChildVariable + "="}
 	leftOut := "⚠ left out: swift"
 	// Twice: the first plain run's Go project is never recorded, since the Swift project's run beside it makes
 	// swift/.cache while the Go census reads that directory, which the Go run then refuses to vouch for. The second

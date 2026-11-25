@@ -58,7 +58,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA9005",
 	"SA9005",
 	"Flags a struct given to encoding/json or encoding/xml that has fields, none exported, and no method to "+
-		"marshal it: staticcheck's SA9005, ported onto the engine's own intermediate representation.",
+		"marshal it: staticcheck's SA9005, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

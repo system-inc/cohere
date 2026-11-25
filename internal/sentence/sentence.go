@@ -5,7 +5,7 @@
 // because a capital or a period in the middle of a chain reads wrong. A person reads the chain once, at
 // the edge where it is printed, and there it is a sentence: a capital first letter and a closing period
 // (ruling 4 on #pp04nv8). This package is that edge, so every place cohere prints an error to a person,
-// the front door, the launcher and the Go engine alike, renders it the same way, and no error string
+// the front door, the launcher and cohere-go alike, renders it the same way, and no error string
 // anywhere carries its own capital or period.
 package sentence
 

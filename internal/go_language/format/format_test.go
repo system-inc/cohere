@@ -47,7 +47,7 @@ var manySources = []string{formattedSource, unformattedSource, brokenSource, gen
 var fixtureDirectory string
 
 func TestMain(suite *testing.M) {
-	directory, createError := os.MkdirTemp("", "cohere-go-engine-format-")
+	directory, createError := os.MkdirTemp("", "cohere-go-language-format-")
 	if createError != nil {
 		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "creating the fixture directory: %v\n", createError)

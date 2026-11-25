@@ -1,6 +1,6 @@
 package main
 
-// An external name's doc comment, under -rename-owned-spellings. The engine respells a renamed name's old
+// An external name's doc comment, under -rename-owned-spellings. global_rename respells a renamed name's old
 // spelling wherever it stands as a word in the declaration's own comments, which is right for a name that is only
 // ours and wrong for one that cites an outside name: `charCodeAt is css.charCodeAt(index)` would come out citing a
 // css.characterCodeAt no JavaScript has. So for an external name only the doc's opening name, its subject, takes the
@@ -19,14 +19,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 )
 
-// plannedExternal is what one proposed external name's comments become if the engine accepts the rename.
+// plannedExternal is what one proposed external name's comments become if global_rename accepts the rename.
 type plannedExternal struct {
 	oldName string
 	newName string
 	// spelling is the outside name the declaration cites.
 	spelling string
 	filename string
-	// commentRanges are the byte ranges of the declaration's own doc and line comments, in which the engine's
+	// commentRanges are the byte ranges of the declaration's own doc and line comments, in which global_rename's
 	// respellings are dropped.
 	commentRanges [][2]int
 	// subject is the respelling of the doc's opening name, or nil when the doc does not open with it.
@@ -55,7 +55,7 @@ const (
 )
 
 // planExternal reads the declaration an external name's identifier declares and plans its comments: which
-// ranges the engine may not respell, the subject's respelling, and the note, when no doc names the spelling.
+// ranges global_rename may not respell, the subject's respelling, and the note, when no doc names the spelling.
 func planExternal(
 	fileSet *token.FileSet,
 	file *ast.File,
@@ -171,7 +171,7 @@ func isIdentifierByte(character byte) bool {
 }
 
 // declaration is the node an identifier declares, as its comments are read: the doc that documents it, every
-// comment group the engine respells for it, and where a new doc would go.
+// comment group global_rename respells for it, and where a new doc would go.
 type declaration struct {
 	doc      *ast.CommentGroup
 	comments []*ast.CommentGroup
@@ -179,7 +179,7 @@ type declaration struct {
 }
 
 // declarationOf finds the declaration of identifier in file. A spec of a parenthesized group is documented by
-// its own doc; a lone spec, by its declaration's. The engine respells a lone spec's declaration doc and every
+// its own doc; a lone spec, by its declaration's. global_rename respells a lone spec's declaration doc and every
 // spec's own doc and line comment, so those are the comments returned.
 func declarationOf(file *ast.File, identifier *ast.Ident) declaration {
 	var found declaration
@@ -242,10 +242,10 @@ func declarationOf(file *ast.File, identifier *ast.Ident) declaration {
 	return found
 }
 
-// keepExternalSpellings replaces the engine's comment respellings in each accepted external name's own comments
+// keepExternalSpellings replaces global_rename's comment respellings in each accepted external name's own comments
 // with its plan: the subject respelled, every other occurrence kept, the note added where no doc names the
 // spelling. It returns what became of each, in position order.
-// Mutates: result each plan replaces the engine's respellings in the result's comment edits, which the write reads
+// Mutates: result each plan replaces global_rename's respellings in the result's comment edits, which the write reads
 func keepExternalSpellings(result *global_rename.Result, externals map[string]plannedExternal) []externalRespelling {
 	accepted := map[string]global_rename.Rename{}
 	for _, renamed := range result.Accepted {

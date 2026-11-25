@@ -270,7 +270,7 @@ var (
 // One measurement rather than a principle, since the brief asks for it: the rewrite is a single
 // replacement over the dependency array node, so it is one edit per finding and could not hit the
 // overlap refusal in `internal/fix.Resolve` even if it were a fix. The decision is about what the
-// edit means, not about whether the engine would accept it.
+// edit means, not about whether the fix pass would accept it.
 //
 // oxc's rewrite also formats differently from React's (three or more dependencies come out as
 // `[\n\tx,\n\ty,\n\tz\n]` from its code generator against React's `[x, y, z]`), so there was no
@@ -356,7 +356,7 @@ var (
 // setState loop.
 //
 // `enableDangerousAutofixThisMayCauseInfiniteLoops` promotes each repair React offers as a suggestion
-// to a fix the engine applies unattended, at the five places React offers one: the corrected array,
+// to a fix the fix pass applies unattended, at the five places React offers one: the corrected array,
 // `[callback]` for a callback that is not a function written here, a dependency array added to an
 // effect that sets state, removing a useEffectEvent function from the array, and wrapping a function
 // used outside the Hook in useCallback. That is the hazard "The repair" above describes, and it is the

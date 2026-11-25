@@ -52,7 +52,7 @@ type pipeline struct {
 
 	// memory is what Main decided about the process's memory limit, its record written on the types record, nil in a
 	// test; loads is the limit across the run's loads, nil in a run that raises nothing (loadMemory).
-	memory *engineMemory
+	memory *memoryAccount
 	loads  *loadMemory
 
 	// writeError is the first record that could not be written. Every write after it is skipped, and the run
@@ -238,7 +238,7 @@ type pipeline struct {
 	// fingerprint, each root's walk and each steady module file's digest beside them (#qqyq61s). A fingerprint is of
 	// the bytes the run held when it was read, so every change to those bytes, a fix written or held, a wrap, a
 	// rename, starts them over (heldChanged), and a load after the change reads the bytes it left. The host's last
-	// load is after the run's last write, and the engine writes nothing once the builds start (extraBuildRun), so the
+	// load is after the run's last write, and cohere-go writes nothing once the builds start (extraBuildRun), so the
 	// builds take the fingerprints of the bytes they read. A build's own go list still may write, go.work.sum when the
 	// workspace's guard runs it in the tree, and go.mod and go.sum under -mod=mod, so those are never held, and every
 	// load reads them again (load.Fingerprints). One a run, made here, so nothing is carried to the next.
@@ -378,7 +378,7 @@ func newPipeline(
 	registered []rule.Rule,
 	standardOutput io.Writer,
 	standardError io.Writer,
-	memory *engineMemory,
+	memory *memoryAccount,
 ) *pipeline {
 	// The description's, opened before the go commands it started, with the shard stamps its store holds, as every
 	// store the run opens holds them (cache.Open).
@@ -414,7 +414,7 @@ func newTiming(request invocation) *timing.Collector {
 }
 
 // timingKinds is the timing record's answer to which analyzer is which rule's, read from registered, the one place
-// that knows: each registered rule's analyzer is its rule's; staticcheck's buildir and the engine's own intermediate
+// that knows: each registered rule's analyzer is its rule's; staticcheck's buildir and cohere-go's own intermediate
 // representation build are the intermediate representation builds; a dispatcher's analyzer, found among what the
 // rules require and known by its result as the checker knows it (dispatch.IsDispatcher), is a dispatcher's walk; and
 // any other analyzer, inspect or ctrlflow, is one several rules read.
@@ -461,111 +461,111 @@ func timingKinds(registered []rule.Rule) timing.Kinds {
 }
 
 // run writes the whole stream, every phase once and in order, and returns the exit code the summary states.
-func (engine *pipeline) run() int {
-	engine.write(provenanceRecord())
-	engine.write(engine.described.record)
-	for _, unreadable := range engine.described.unreadable {
-		engine.write(unreadable)
-		engine.incomplete = true
+func (pipeline *pipeline) run() int {
+	pipeline.write(provenanceRecord())
+	pipeline.write(pipeline.described.record)
+	for _, unreadable := range pipeline.described.unreadable {
+		pipeline.write(unreadable)
+		pipeline.incomplete = true
 	}
 
-	needsTypes := engine.request.requests(contract.PhaseTypes) || engine.request.requests(contract.PhaseLint)
+	needsTypes := pipeline.request.requests(contract.PhaseTypes) || pipeline.request.requests(contract.PhaseLint)
 	// The long-line wrap waits for a load that finds the types sound, so a run that wraps loads even when no phase
 	// reads the types.
-	wraps := engine.wrapsLongLines()
+	wraps := pipeline.wrapsLongLines()
 	if needsTypes || wraps {
-		engine.session = engine.cacheSession(engine.described.workspace.Environment(),
-			engine.described.goEnvironment, cache.FileDigests{}, engine.standardError)
+		pipeline.session = pipeline.cacheSession(pipeline.described.workspace.Environment(),
+			pipeline.described.goEnvironment, cache.FileDigests{}, pipeline.standardError)
 		// The host's build keeps its packages' entries for the extra builds to restore from (#b2t9xmf).
-		if engine.session != nil && engine.keepsForBuilds() {
-			engine.session.KeepForBuilds()
+		if pipeline.session != nil && pipeline.keepsForBuilds() {
+			pipeline.session.KeepForBuilds()
 			// Under `--build-dependence` the host's graph is read from the records the store keeps of the packages it
 			// restores, and the records of those it checks are written beside their entries (#6a3kjvz).
-			if engine.request.judgesDependence() && engine.request.requests(contract.PhaseLint) {
-				engine.session.KeepDependenceRecords(decodeWholeRecord)
+			if pipeline.request.judgesDependence() && pipeline.request.requests(contract.PhaseLint) {
+				pipeline.session.KeepDependenceRecords(decodeWholeRecord)
 			}
 			// A plain run asked for the must-check census reads its declarations-only graph's records of the packages
 			// it restores instead, and writes those it builds once its walks end (#anfjtr3).
-			if engine.mustCheckCensus != "" && !engine.request.judgesDependence() &&
-				engine.request.requests(contract.PhaseLint) {
-				engine.session.KeepDeclarationsRecords(decodeDeclarationsRecord)
+			if pipeline.mustCheckCensus != "" && !pipeline.request.judgesDependence() &&
+				pipeline.request.requests(contract.PhaseLint) {
+				pipeline.session.KeepDeclarationsRecords(decodeDeclarationsRecord)
 			}
 		}
 	}
 	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8), and is joined
 	// on every way out, a return or a panic, so none outlives the run.
-	defer engine.joinChildren()
-	engine.startChildrenFirst()
+	defer pipeline.joinChildren()
+	pipeline.startChildrenFirst()
 	var loaded *load.Loaded
 	var loadError error
-	if (needsTypes || wraps) && engine.loadsBesideFix() {
+	if (needsTypes || wraps) && pipeline.loadsBesideFix() {
 		// Under `--no-fix` the first load runs beside gofmt's check, which writes nothing the load reads.
-		loaded, loadError = engine.loadBesideFix(wraps, needsTypes)
+		loaded, loadError = pipeline.loadBesideFix(wraps, needsTypes)
 	} else {
-		engine.runFix(wraps)
+		pipeline.runFix(wraps)
 		// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file and a
 		// phase reads the types.
 		if needsTypes || wraps {
-			loaded, loadError = engine.loadWorkspace(needsTypes)
+			loaded, loadError = pipeline.loadWorkspace(needsTypes)
 		}
 	}
-	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
+	loaded, loadError = pipeline.wrapAfterLoad(loaded, loadError, needsTypes)
 	// The host's graph is built from the load's syntax before any rules let go of it, the rename's first pass's
 	// included, for the extra builds to be judged on under `--build-dependence`.
-	engine.buildDependenceGraph(loaded, loadError)
+	pipeline.buildDependenceGraph(loaded, loadError)
 	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, a load of what it
 	// wrote is the one the types and lint phases read in place of this one.
 	var linted *lintPass
-	loaded, linted, loadError = engine.runRename(loaded, loadError)
+	loaded, linted, loadError = pipeline.runRename(loaded, loadError)
 	// The fix phase's records come before any of the types phase's, so the stream reads in phase order.
-	engine.writeFix()
+	pipeline.writeFix()
 	if !needsTypes {
 		// A load made for the wrap alone feeds no phase, and writes no inputs, as a run that asked for no types never
 		// has.
 		loaded, loadError = nil, nil
 	}
-	engine.censusMissed = engine.missedByCensus(loaded)
-	engine.runTypes(loaded, loadError)
-	engine.checkCensusAgainstLoad()
+	pipeline.censusMissed = pipeline.missedByCensus(loaded)
+	pipeline.runTypes(loaded, loadError)
+	pipeline.checkCensusAgainstLoad()
 	// A rename that wrote loaded the written tree again, which the lint phase reads, so the graph is built again from
 	// it.
-	engine.buildDependenceGraph(loaded, loadError)
+	pipeline.buildDependenceGraph(loaded, loadError)
 	// The inputs are those of the load the lint ran over, the final round's when a reload ran it again, and the first
 	// load is let go before a reload loads again.
-	loaded = engine.runLint(loaded, loadError, linted)
-	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
-	engine.writeDuplicates()
+	loaded = pipeline.runLint(loaded, loadError, linted)
+	pipeline.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
+	pipeline.writeDuplicates()
 	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
-	if engine.timing != nil {
-		record := engine.timing.Record(timingKinds(engine.registered))
-		record.ExtraBuildsFromSource = extraBuildsFromSource(engine.buildRuns)
-		engine.write(record)
+	if pipeline.timing != nil {
+		record := pipeline.timing.Record(timingKinds(pipeline.registered))
+		record.ExtraBuildsFromSource = extraBuildsFromSource(pipeline.buildRuns)
+		pipeline.write(record)
 	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
 	// read is not known. The memory record comes just before them, under the same condition, once every load has
 	// ended, so it names each raise that landed.
 	if loaded != nil {
-		engine.write(engine.raisesRecord())
-		engine.write(engine.inputsRecord(loaded))
+		pipeline.write(pipeline.raisesRecord())
+		pipeline.write(pipeline.inputsRecord(loaded))
 	}
 
 	exitCode := exitClean
-	if engine.findingsWritten > 0 || engine.incomplete {
+	if pipeline.findingsWritten > 0 || pipeline.incomplete {
 		exitCode = exitFindings
 	}
 	// The timeline, under `--timeline`, is the last record before the summary, so its last stamp is the run's end. A
 	// run also under `--timing` says so, since its shape is a timed run's: no cache, and the builds one at a time.
-	if engine.request.timeline != nil {
-		engine.request.timeline.Stamp("run.end")
-		engine.write(engine.request.timeline.Record(engine.timing != nil))
+	if pipeline.request.timeline != nil {
+		pipeline.request.timeline.Stamp("run.end")
+		pipeline.write(pipeline.request.timeline.Record(pipeline.timing != nil))
 	}
-	engine.write(contract.SummaryRecord{
-		Findings: engine.findingsWritten, Complete: !engine.incomplete, ExitCode: exitCode,
-		UnguardedWorkspaceSums: engine.unguardedWorkspaceSums(),
+	pipeline.write(contract.SummaryRecord{
+		Findings: pipeline.findingsWritten, Complete: !pipeline.incomplete, ExitCode: exitCode,
+		UnguardedWorkspaceSums: pipeline.unguardedWorkspaceSums(),
 	})
-	if engine.writeError != nil {
-		return broken(engine.standardError, engine.writeError)
+	if pipeline.writeError != nil {
+		return broken(pipeline.standardError, pipeline.writeError)
 	}
 	return exitCode
 }
@@ -595,12 +595,12 @@ func extraBuildsFromSource(runs []buildRun) int {
 // files left out count too, so a module whose every file builds only elsewhere, which holds no file here, is seen. A
 // census of nothing beside a load of something, as at a root reached through a symbolic link, misses every file
 // (#yyv7nr2). A load that failed, or that no phase asked for, has nothing to set beside the census.
-func (engine *pipeline) missedByCensus(loaded *load.Loaded) []contract.CensusMissedFile {
+func (pipeline *pipeline) missedByCensus(loaded *load.Loaded) []contract.CensusMissedFile {
 	if loaded == nil {
 		return nil
 	}
-	counted := make(map[string]bool, len(engine.described.census.Files))
-	for _, file := range engine.described.census.Files {
+	counted := make(map[string]bool, len(pipeline.described.census.Files))
+	for _, file := range pipeline.described.census.Files {
 		counted[file] = true
 	}
 	var missed []contract.CensusMissedFile
@@ -624,49 +624,49 @@ func (engine *pipeline) missedByCensus(loaded *load.Loaded) []contract.CensusMis
 
 // checkCensusAgainstLoad marks the run incomplete, and says why, when the load reached a file the census never counted
 // (missedByCensus), so such a run never calls itself complete.
-func (engine *pipeline) checkCensusAgainstLoad() {
-	if len(engine.censusMissed) == 0 {
+func (pipeline *pipeline) checkCensusAgainstLoad() {
+	if len(pipeline.censusMissed) == 0 {
 		return
 	}
-	engine.incomplete = true
-	engine.note("the load reached %d Go files in the workspace at %s that its census never counted, %s in %s first, "+
-		"so the run checked none of them", len(engine.censusMissed), engine.described.record.Root,
-		engine.censusMissed[0].File, engine.censusMissed[0].Package)
+	pipeline.incomplete = true
+	pipeline.note("the load reached %d Go files in the workspace at %s that its census never counted, %s in %s first, "+
+		"so the run checked none of them", len(pipeline.censusMissed), pipeline.described.record.Root,
+		pipeline.censusMissed[0].File, pipeline.censusMissed[0].Package)
 }
 
 // write writes one record, counting findings, unless an earlier record already could not be written.
-func (engine *pipeline) write(record contract.Record) {
-	if engine.writeError != nil {
+func (pipeline *pipeline) write(record contract.Record) {
+	if pipeline.writeError != nil {
 		return
 	}
-	if writeError := engine.writer.Write(record); writeError != nil {
-		engine.writeError = writeError
+	if writeError := pipeline.writer.Write(record); writeError != nil {
+		pipeline.writeError = writeError
 		return
 	}
 	if _, isFinding := record.(contract.FindingRecord); isFinding {
-		engine.findingsWritten++
+		pipeline.findingsWritten++
 	}
 }
 
 // phase writes a phase record. A phase not reached is always a gap, since only a requested phase can be.
-func (engine *pipeline) phase(
+func (pipeline *pipeline) phase(
 	name contract.PhaseName, outcome contract.Outcome, elapsed time.Duration, detail string,
 ) {
 	if outcome == contract.OutcomeNotReached {
-		engine.incomplete = true
+		pipeline.incomplete = true
 	}
 	// The duplicates report reads the lint phase's pass, so a lint phase that did not run says why the report did not.
 	if name == contract.PhaseLint && outcome != contract.OutcomeRan {
-		engine.duplicatesNotRun = "the lint phase did not run (" + detail + "), and the report reads its pass"
+		pipeline.duplicatesNotRun = "the lint phase did not run (" + detail + "), and the report reads its pass"
 	}
-	engine.write(contract.PhaseRecord{
+	pipeline.write(contract.PhaseRecord{
 		Name: name, Outcome: outcome, ElapsedMilliseconds: int(elapsed.Milliseconds()), Detail: detail,
 	})
 }
 
 // note writes a line of prose to stderr, which the front door passes through untouched.
-func (engine *pipeline) note(template string, values ...any) {
-	noteTo(engine.standardError, template, values...)
+func (pipeline *pipeline) note(template string, values ...any) {
+	noteTo(pipeline.standardError, template, values...)
 }
 
 // noteTo writes a line of prose to notes as note writes it to stderr, for an extra build, which notes into a buffer
@@ -678,8 +678,8 @@ func noteTo(notes io.Writer, template string, values ...any) {
 }
 
 // severityOf is the severity a rule's findings carry, and false when the settings turn the rule off.
-func (engine *pipeline) severityOf(name string) (contract.Severity, bool) {
-	switch engine.settings.Rules[name].Severity {
+func (pipeline *pipeline) severityOf(name string) (contract.Severity, bool) {
+	switch pipeline.settings.Rules[name].Severity {
 	case settings.SeverityOff:
 		return "", false
 	case settings.SeverityWarning:
@@ -708,8 +708,8 @@ type heldFix struct {
 	known *format.KnownFiles
 
 	// formatKnown and wrapKnown count the files gofmt and the wrap answered from known rather than formatting or
-	// wrapping, each left as it was when the run last saw the same bytes. They are the engine's own account of what a
-	// verdict spared, held beside the record rather than in it, since the fix record is the contract every engine
+	// wrapping, each left as it was when the run last saw the same bytes. They are cohere-go's own account of what a
+	// verdict spared, held beside the record rather than in it, since the fix record is the contract every language
 	// writes and none reports such a count yet (#3hygsbr).
 	formatKnown int
 	wrapKnown   int
@@ -717,49 +717,50 @@ type heldFix struct {
 
 // runFix is the fix and format phase's gofmt: over every readable file in scope, written unless `--no-fix`, and
 // under `--no-fix` one finding per file gofmt would change, at the first line it would change. It holds the phase's
-// record unwritten in engine.fix, so the long-line wrap after the load (wrapAfterLoad) and the renames the naming rules
-// ask for (runRename) can add to it, and writeFix writes it before the types phase. No other analyzer fix is applied.
-func (engine *pipeline) runFix(wraps bool) {
-	engine.watch(preludeFixBegan)
-	defer engine.watch(preludeFixReturned)
-	if !engine.request.requests(contract.PhaseFix) {
-		engine.phase(contract.PhaseFix, contract.OutcomeSkipped, 0, detailNotRequested)
+// record unwritten in pipeline.fix, so the long-line wrap after the load (wrapAfterLoad) and the renames the naming
+// rules ask for (runRename) can add to it, and writeFix writes it before the types phase. No other analyzer fix is
+// applied.
+func (pipeline *pipeline) runFix(wraps bool) {
+	pipeline.watch(preludeFixBegan)
+	defer pipeline.watch(preludeFixReturned)
+	if !pipeline.request.requests(contract.PhaseFix) {
+		pipeline.phase(contract.PhaseFix, contract.OutcomeSkipped, 0, detailNotRequested)
 		return
 	}
 	started := time.Now()
-	candidates := engine.described.readable()
+	candidates := pipeline.described.readable()
 	held := &heldFix{record: contract.FixRecord{
 		FilesConsidered:     len(candidates),
 		RefusalsByReason:    map[string]int{},
 		NotFormattedReasons: map[string]int{},
-		FormatScope:         engine.described.scopeWords(),
+		FormatScope:         pipeline.described.scopeWords(),
 		ChangedFiles:        []contract.ChangedFile{},
 		NotWritten:          []contract.NotWrittenFile{},
 	}}
-	engine.fix = held
+	pipeline.fix = held
 	// A run that writes resolves its root once, before any phase writes: gofmt, the wrap and the rename, which
 	// `--no-format` still runs. A check writes nothing and asks nothing of it.
-	if !engine.request.switches["no-fix"] {
-		engine.writeRoot = engine.resolveWriteRoot()
+	if !pipeline.request.switches["no-fix"] {
+		pipeline.writeRoot = pipeline.resolveWriteRoot()
 	}
-	if engine.request.switches["no-format"] {
+	if pipeline.request.switches["no-format"] {
 		held.record.FormatScope = noFormatScope
 		held.elapsed = time.Since(started)
 		return
 	}
 
-	severity, reported := engine.severityOf(ruleRequireFormatting)
-	held.known = engine.knownFiles()
+	severity, reported := pipeline.severityOf(ruleRequireFormatting)
+	held.known = pipeline.knownFiles()
 	held.wraps = wraps
 	// The editor's save formats in memory and writes nothing (runStdin).
-	saves := engine.request.stdinPath != ""
+	saves := pipeline.request.stdinPath != ""
 	result := format.Run(candidates, format.Options{
-		Write:          !engine.request.switches["no-fix"] && !saves,
+		Write:          !pipeline.request.switches["no-fix"] && !saves,
 		KeepOutput:     saves,
-		Root:           engine.writeRoot,
-		SingleThreaded: engine.request.switches["single-threaded"],
+		Root:           pipeline.writeRoot,
+		SingleThreaded: pipeline.request.switches["single-threaded"],
 		Known:          held.known,
-		Held:           engine.held,
+		Held:           pipeline.held,
 	})
 	held.formatKnown = result.Known
 	// Neither a file gofmt could not format nor a generated one is the wrap's to change.
@@ -774,7 +775,7 @@ func (engine *pipeline) runFix(wraps bool) {
 	// as gofmt's output, and it is not this run's to write. Its finding is reported below, as a check reports it.
 	for _, withheld := range result.Withheld {
 		skipped[withheld.File] = true
-		engine.withhold(withheld.File, withheld.RealPath)
+		pipeline.withhold(withheld.File, withheld.RealPath)
 	}
 	for _, file := range candidates {
 		if !skipped[file] {
@@ -788,11 +789,11 @@ func (engine *pipeline) runFix(wraps bool) {
 			held.record.FilesReformatted++
 			held.record.ChangedFiles = append(held.record.ChangedFiles,
 				contract.ChangedFile{File: changed.File, FixedBy: map[string]int{}, Formatted: true})
-			engine.hold(changed)
+			pipeline.hold(changed)
 			continue
 		}
 		if reported {
-			engine.write(contract.FindingRecord{
+			pipeline.write(contract.FindingRecord{
 				Source:      contract.SourceFormat,
 				File:        changed.File,
 				Line:        changed.FirstDifferingLine,
@@ -813,8 +814,8 @@ func (engine *pipeline) runFix(wraps bool) {
 		held.record.NotFormattedReasons[kind]++
 		held.record.FilesNotFormatted++
 		// A file nobody could format is one whose formatting nobody knows, so a run over it is not complete.
-		engine.incomplete = true
-		engine.note("%s was not formatted: %s", notFormatted.File, notFormatted.Reason)
+		pipeline.incomplete = true
+		pipeline.note("%s was not formatted: %s", notFormatted.File, notFormatted.Reason)
 	}
 	held.elapsed = time.Since(started)
 }
@@ -823,52 +824,52 @@ func (engine *pipeline) runFix(wraps bool) {
 // to them, and keeps gofmt's verdicts and the wrap's for the next run. Every file a write was withheld from is named on
 // the record and on stderr, and makes the run incomplete: its fixes were not made, and a run that says nothing of
 // them would read as one that fixed everything it could.
-func (engine *pipeline) writeFix() {
-	if engine.fix == nil {
+func (pipeline *pipeline) writeFix() {
+	if pipeline.fix == nil {
 		return
 	}
-	for _, file := range slices.Sorted(maps.Keys(engine.withheld)) {
-		engine.fix.record.NotWritten = append(engine.fix.record.NotWritten,
-			contract.NotWrittenFile{File: file, RealPath: engine.withheld[file]})
-		engine.incomplete = true
-		engine.note("%s was not written: it is reached through a link to %s, outside the root, so its fixes are "+
-			"withheld and its findings stand", file, engine.withheld[file])
+	for _, file := range slices.Sorted(maps.Keys(pipeline.withheld)) {
+		pipeline.fix.record.NotWritten = append(pipeline.fix.record.NotWritten,
+			contract.NotWrittenFile{File: file, RealPath: pipeline.withheld[file]})
+		pipeline.incomplete = true
+		pipeline.note("%s was not written: it is reached through a link to %s, outside the root, so its fixes are "+
+			"withheld and its findings stand", file, pipeline.withheld[file])
 	}
-	engine.keepKnownFiles(engine.fix.known)
-	engine.write(engine.fix.record)
-	engine.phase(contract.PhaseFix, contract.OutcomeRan, engine.fix.elapsed, "")
+	pipeline.keepKnownFiles(pipeline.fix.known)
+	pipeline.write(pipeline.fix.record)
+	pipeline.phase(contract.PhaseFix, contract.OutcomeRan, pipeline.fix.elapsed, "")
 }
 
 // resolveWriteRoot is the WriteRoot of the root the run was given. A root that cannot be resolved, which the run has
 // already read, leaves the zero WriteRoot, so every write is withheld and named rather than made blind.
-func (engine *pipeline) resolveWriteRoot() write_root.WriteRoot {
-	writeRoot, rootError := write_root.New(engine.described.workspace.Root)
+func (pipeline *pipeline) resolveWriteRoot() write_root.WriteRoot {
+	writeRoot, rootError := write_root.New(pipeline.described.workspace.Root)
 	if rootError != nil {
-		engine.note("the root could not be resolved, so no fix is written: %v", rootError)
+		pipeline.note("the root could not be resolved, so no fix is written: %v", rootError)
 	}
 	return writeRoot
 }
 
 // withhold keeps file, a write refused since its real path is outside the root, for writeFix to name.
-func (engine *pipeline) withhold(file string, realPath string) {
-	if engine.withheld == nil {
-		engine.withheld = map[string]string{}
+func (pipeline *pipeline) withhold(file string, realPath string) {
+	if pipeline.withheld == nil {
+		pipeline.withheld = map[string]string{}
 	}
-	engine.withheld[file] = realPath
+	pipeline.withheld[file] = realPath
 }
 
 // wrapsLongLines is whether the fix phase wraps the long-line rule's findings: only in a run that writes, formats and
 // asks for fixes, so neither `--no-fix`, `--no-format` nor `--format-only` gets one, and only while the registry holds
 // the rule and the settings leave it on, so the fix never acts for a rule that reports nothing.
-func (engine *pipeline) wrapsLongLines() bool {
-	if !engine.request.requests(contract.PhaseFix) || engine.request.switches["no-fix"] ||
-		engine.request.switches["no-format"] || engine.request.switches["format-only"] {
+func (pipeline *pipeline) wrapsLongLines() bool {
+	if !pipeline.request.requests(contract.PhaseFix) || pipeline.request.switches["no-fix"] ||
+		pipeline.request.switches["no-format"] || pipeline.request.switches["format-only"] {
 		return false
 	}
-	if _, on := engine.severityOf(consistency_no_long_line.Name); !on {
+	if _, on := pipeline.severityOf(consistency_no_long_line.Name); !on {
 		return false
 	}
-	return slices.ContainsFunc(engine.registered, func(registered rule.Rule) bool {
+	return slices.ContainsFunc(pipeline.registered, func(registered rule.Rule) bool {
 		return registered.Name == consistency_no_long_line.Name
 	})
 }
@@ -878,38 +879,38 @@ const knownFilesLabel = "gofmt verdicts"
 
 // knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache or its store, so
 // a run under `--no-cache` neither reads nor keeps them.
-func (engine *pipeline) knownFiles() *format.KnownFiles {
-	if engine.session == nil || !engine.session.HasStore() {
+func (pipeline *pipeline) knownFiles() *format.KnownFiles {
+	if pipeline.session == nil || !pipeline.session.HasStore() {
 		return nil
 	}
-	encoded, _ := engine.session.Kept(engine.session.KeyFor(knownFilesLabel))
+	encoded, _ := pipeline.session.Kept(pipeline.session.KeyFor(knownFilesLabel))
 	return format.DecodeKnownFiles(encoded)
 }
 
 // keepKnownFiles keeps gofmt's verdicts for the next run, and writes nothing when they are the ones the run read.
-func (engine *pipeline) keepKnownFiles(known *format.KnownFiles) {
+func (pipeline *pipeline) keepKnownFiles(known *format.KnownFiles) {
 	if known == nil || !known.Changed() {
 		return
 	}
 	encoded, encodeError := known.Encode()
 	if encodeError == nil {
-		encodeError = engine.session.Keep(engine.session.KeyFor(knownFilesLabel), encoded)
+		encodeError = pipeline.session.Keep(pipeline.session.KeyFor(knownFilesLabel), encoded)
 	}
 	if encodeError != nil {
-		engine.note("the findings cache could not keep gofmt's verdicts, so the next run formats every file: %v",
+		pipeline.note("the findings cache could not keep gofmt's verdicts, so the next run formats every file: %v",
 			encodeError)
 	}
 }
 
 // hold makes the bytes the run holds of a file the fix phase changed the bytes the change left: the output itself for
 // a save, which formats in memory (format.Options.KeepOutput), and the disk's, read again, for a run that wrote it.
-func (engine *pipeline) hold(changed format.ChangedFile) {
+func (pipeline *pipeline) hold(changed format.ChangedFile) {
 	if changed.Output != nil {
-		engine.described.contents[changed.File] = changed.Output
-		engine.heldChanged()
+		pipeline.described.contents[changed.File] = changed.Output
+		pipeline.heldChanged()
 		return
 	}
-	engine.reread(changed.File)
+	pipeline.reread(changed.File)
 }
 
 // reread reads a file the fix phase just rewrote, so the suppression comments lint reads are on the lines the
@@ -918,30 +919,30 @@ func (engine *pipeline) hold(changed format.ChangedFile) {
 // A process that refuses writes, the editor's save (format.RefuseWrites), rewrote nothing, and the file it names holds
 // what the editor has not saved, so it reads nothing again: the disk's bytes would take the place of the buffer. A
 // write it was asked for anyway was refused, and the bytes it holds are the ones that stand.
-func (engine *pipeline) reread(file string) {
+func (pipeline *pipeline) reread(file string) {
 	if format.WritesRefused() {
 		return
 	}
 	// Whether the read finds the file or not, the bytes the run holds of it are no longer the ones it fingerprinted.
-	engine.heldChanged()
+	pipeline.heldChanged()
 	contents, readError := os.ReadFile(file)
 	if readError != nil {
 		// Without its contents the file gets no suppression index, so its findings are kept rather than
 		// withheld by directives on lines that may have moved.
-		delete(engine.described.contents, file)
-		engine.note("%s was rewritten and could not be read again, so its //cohere:ignore comments are not "+
+		delete(pipeline.described.contents, file)
+		pipeline.note("%s was rewritten and could not be read again, so its //cohere:ignore comments are not "+
 			"read: %v", file, readError)
 		return
 	}
-	engine.described.contents[file] = contents
+	pipeline.described.contents[file] = contents
 }
 
 // heldChanged starts the run's fingerprints over, since the bytes they were read from have changed: a load after it
 // reads every directory again from the bytes the change left, and keeps what it reads for the loads after it. The
 // pattern walks start over with them, so the builds take no walk a load made before the change (#vnb7btx).
-func (engine *pipeline) heldChanged() {
-	engine.fingerprints = load.NewFingerprints()
-	engine.walks = load.NewPackageWalks()
+func (pipeline *pipeline) heldChanged() {
+	pipeline.fingerprints = load.NewFingerprints()
+	pipeline.walks = load.NewPackageWalks()
 }
 
 // held is the bytes the run holds for file, as load.Held asks: described.contents, every readable file in scope as it
@@ -956,8 +957,8 @@ func (engine *pipeline) heldChanged() {
 // the main goroutine runs the long-line wrap, which stops them before its first reread, and under `--no-fix` gofmt's
 // check reads it on a goroutine of its own beside the first load and those rules, and writes none of it
 // (loadsBesideFix).
-func (engine *pipeline) held(file string) ([]byte, bool) {
-	contents, isHeld := engine.described.contents[file]
+func (pipeline *pipeline) held(file string) ([]byte, bool) {
+	contents, isHeld := pipeline.described.contents[file]
 	return contents, isHeld
 }
 
@@ -969,7 +970,7 @@ func (engine *pipeline) held(file string) ([]byte, bool) {
 // file it holds nothing for, a dependency's, a cgo output the load did not rewrite, one outside the scope or one whose
 // reread failed, is read from disk, where the load read it. The bytes are shared rather than copied, which holds while
 // every reader only reads them, as every analyzer does.
-func (engine *pipeline) sourceReader(
+func (pipeline *pipeline) sourceReader(
 	overlay map[string][]byte,
 	rewritten *load.Rewritten,
 ) func(file string) ([]byte, error) {
@@ -982,7 +983,7 @@ func (engine *pipeline) sourceReader(
 		if contents, isRewritten := rewritten.Lookup(file); isRewritten {
 			return contents, nil
 		}
-		if contents, isHeld := engine.held(file); isHeld {
+		if contents, isHeld := pipeline.held(file); isHeld {
 			return contents, nil
 		}
 		return os.ReadFile(file)
@@ -993,29 +994,29 @@ func (engine *pipeline) sourceReader(
 // withheld in a dependency the cgo tool would translate, which the record names instead, as it counts the
 // dependency's declarations the rules were given without what reaches cgo, and every file in scope that no
 // analyzed package holds is a file nothing saw.
-func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
-	if !engine.request.requests(contract.PhaseTypes) {
-		engine.phase(contract.PhaseTypes, contract.OutcomeSkipped, 0, detailNotRequested)
+func (pipeline *pipeline) runTypes(loaded *load.Loaded, loadError error) {
+	if !pipeline.request.requests(contract.PhaseTypes) {
+		pipeline.phase(contract.PhaseTypes, contract.OutcomeSkipped, 0, detailNotRequested)
 		return
 	}
 	if loadError != nil {
-		engine.phase(contract.PhaseTypes, contract.OutcomeNotReached, 0, "the load failed: "+oneLine(loadError))
+		pipeline.phase(contract.PhaseTypes, contract.OutcomeNotReached, 0, "the load failed: "+oneLine(loadError))
 		return
 	}
 	for _, diagnostic := range loaded.Diagnostics {
-		engine.write(engine.compilerFinding(diagnostic))
+		pipeline.write(pipeline.compilerFinding(diagnostic))
 	}
-	withoutRecord := engine.filesWithoutRecord(loaded)
+	withoutRecord := pipeline.filesWithoutRecord(loaded)
 	if len(withoutRecord) > 0 {
-		engine.incomplete = true
+		pipeline.incomplete = true
 	}
 	withheld := make([]contract.WithheldFile, 0, len(loaded.WithheldInDependencyCgo))
 	for _, each := range loaded.WithheldInDependencyCgo {
 		if each.Errors < 1 {
 			// Invariant: load's withheldErrors makes an entry only by counting an error it withheld, so a file with
 			// none is a bug in the load, and written it would read as a file withheld for nothing. A panic ends the
-			// stream before its summary, which the front door reports as an engine that checked nothing.
-			panic(fmt.Sprintf("go_engine: %s is withheld with %d type errors", each.File, each.Errors))
+			// stream before its summary, which the front door reports as a child that checked nothing.
+			panic(fmt.Sprintf("go_language: %s is withheld with %d type errors", each.File, each.Errors))
 		}
 		withheld = append(withheld, contract.WithheldFile{Package: each.Package, File: each.File, Errors: each.Errors})
 	}
@@ -1029,35 +1030,35 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 			"packages with cgo files, each package type-checked from source unless the findings cache holds its " +
 			"export data"
 	}
-	engine.write(contract.TypesRecord{
+	pipeline.write(contract.TypesRecord{
 		Diagnostics:         len(loaded.Diagnostics),
-		Files:               engine.filesTypeChecked(loaded),
+		Files:               pipeline.filesTypeChecked(loaded),
 		ElapsedMilliseconds: int(loaded.Elapsed.Milliseconds()),
 		FilesWithoutRecord:  withoutRecord,
 		Build: fmt.Sprintf("%s: %d packages, %d in the workspace", build,
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
-		CensusMissed:                      engine.censusMissed,
+		CensusMissed:                      pipeline.censusMissed,
 		WithheldInDependencyCgo:           withheld,
 		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
 		CgoTranslation: contract.CgoTranslation{
 			Packages:     loaded.CgoTranslatedPackages,
 			Milliseconds: int(loaded.CgoTranslationElapsed.Milliseconds()),
 		},
-		Memory:          engine.memoryRecord(),
-		HeadersUnshared: engine.reads.HeadersUnshared(),
+		Memory:          pipeline.memoryRecord(),
+		HeadersUnshared: pipeline.reads.HeadersUnshared(),
 	})
-	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
+	pipeline.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }
 
 // filesTypeChecked counts the distinct files in scope that the analyzed packages hold. A file the project record names
 // as excluded is type-checked with its package all the same, and never counted, so a run with none in scope reads 0
 // files. It reads GoFiles, the files as written, since a translated cgo package's CompiledGoFiles are generated files
 // in the build cache.
-func (engine *pipeline) filesTypeChecked(loaded *load.Loaded) int {
+func (pipeline *pipeline) filesTypeChecked(loaded *load.Loaded) int {
 	seen := map[string]bool{}
 	for _, analyzedPackage := range loaded.Packages {
 		for _, file := range analyzedPackage.GoFiles {
-			if engine.described.inScopeSet[file] {
+			if pipeline.described.inScopeSet[file] {
 				seen[file] = true
 			}
 		}
@@ -1069,10 +1070,10 @@ func (engine *pipeline) filesTypeChecked(loaded *load.Loaded) int {
 // the rule is empty and the messageId is the diagnostic's kind. A diagnostic that names no file is placed at
 // the root's go.work or go.mod, and a missing line or column at 1, because the front door refuses a finding
 // with no position and an error is never dropped for lack of one.
-func (engine *pipeline) compilerFinding(diagnostic load.Diagnostic) contract.FindingRecord {
+func (pipeline *pipeline) compilerFinding(diagnostic load.Diagnostic) contract.FindingRecord {
 	file := diagnostic.File
 	if file == "" {
-		file = engine.described.manifest
+		file = pipeline.described.manifest
 	}
 	return contract.FindingRecord{
 		Source:      contract.SourceCompiler,
@@ -1092,10 +1093,10 @@ func (engine *pipeline) compilerFinding(diagnostic load.Diagnostic) contract.Fin
 // once and sorted, from three sources that each catch what the others may not: the load's Unseen, which no package
 // holds though the constraints would build them; any file the load excluded that the project record did not name,
 // since the two judging a file differently must show as a gap; and any readable file in scope that no analyzed
-// package holds, the engine's own check, which needs nothing from the load but its packages.
-func (engine *pipeline) filesWithoutRecord(loaded *load.Loaded) []string {
+// package holds, cohere-go's own check, which needs nothing from the load but its packages.
+func (pipeline *pipeline) filesWithoutRecord(loaded *load.Loaded) []string {
 	named := map[string]bool{}
-	for _, excluded := range engine.described.record.Excluded {
+	for _, excluded := range pipeline.described.record.Excluded {
 		named[excluded.File] = true
 	}
 	held := map[string]bool{}
@@ -1110,14 +1111,14 @@ func (engine *pipeline) filesWithoutRecord(loaded *load.Loaded) []string {
 			candidates = append(candidates, excluded.File)
 		}
 	}
-	for _, file := range engine.described.readable() {
+	for _, file := range pipeline.described.readable() {
 		if !held[file] {
 			candidates = append(candidates, file)
 		}
 	}
 	withoutRecord := []string{}
 	for _, file := range candidates {
-		if engine.described.inScopeSet[file] {
+		if pipeline.described.inScopeSet[file] {
 			withoutRecord = append(withoutRecord, file)
 		}
 	}
@@ -1133,20 +1134,20 @@ func oneLine(cause error) string {
 // workPool is the run's one set of slots, which every load and check of the run shares, the host's and every extra
 // build's, so builds side by side never run more work at once than the run has cores (#ckm0hsp): one slot per core,
 // or one under `--single-threaded`, which asks for one thing at a time.
-func (engine *pipeline) workPool() *bounded.Pool {
-	engine.poolMaking.Do(func() {
+func (pipeline *pipeline) workPool() *bounded.Pool {
+	pipeline.poolMaking.Do(func() {
 		size := runtime.GOMAXPROCS(0)
 		switch {
-		case engine.poolSizeForced > 0:
-			size = engine.poolSizeForced
-		case engine.request.switches["single-threaded"]:
+		case pipeline.poolSizeForced > 0:
+			size = pipeline.poolSizeForced
+		case pipeline.request.switches["single-threaded"]:
 			size = 1
 		}
-		engine.pool = bounded.NewPool(size)
-		engine.poolsMade++
-		if engine.poolObserve != nil {
-			engine.pool.Observe(engine.poolObserve)
+		pipeline.pool = bounded.NewPool(size)
+		pipeline.poolsMade++
+		if pipeline.poolObserve != nil {
+			pipeline.pool.Observe(pipeline.poolObserve)
 		}
 	})
-	return engine.pool
+	return pipeline.pool
 }

@@ -1,6 +1,6 @@
 //go:build unix
 
-// The stand-in engines here are /bin/sh scripts, so the file builds on Unix, where the engine ships.
+// The stand-in children here are /bin/sh scripts, so the file builds on Unix, where the child ships.
 
 package main
 
@@ -113,8 +113,8 @@ func swiftPackage(test *testing.T, parent string) string {
 	return root
 }
 
-// runInstalled runs an installed cohere from directory with no engine named by the override, so the
-// run resolves its engine the way an installed one does. The override is cleared in the child's
+// runInstalled runs an installed cohere from directory with no child named by the override, so the
+// run resolves the child the way an installed one does. The override is cleared in the child's
 // environment alone, not this process's, so the tests that call it run in parallel (#nxgt2ca).
 func runInstalled(test *testing.T, binary string, directory string, arguments ...string) (string, int) {
 	test.Helper()
@@ -127,10 +127,10 @@ func runInstalled(test *testing.T, binary string, directory string, arguments ..
 	)
 }
 
-// swiftShipsForMacOnly is why a test of a shipped Swift engine runs on macOS alone.
+// swiftShipsForMacOnly is why a test of a shipped cohere-swift runs on macOS alone.
 const swiftShipsForMacOnly = "cohere-swift ships for macOS alone, and elsewhere a Swift package is refused by name"
 
-// A released cohere runs the engine its package ships beside it, with no checkout anywhere, reached
+// A released cohere runs the child its package ships beside it, with no checkout anywhere, reached
 // through a symlink the way a package manager's `bin` link reaches it.
 func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 	test.Parallel()
@@ -144,15 +144,15 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 	}
 	root := swiftPackage(test, "")
 
-	// --verbose, so an engine build would say so: by default a build is silent off a terminal (#ytqqv8v),
+	// --verbose, so a child build would say so: by default a build is silent off a terminal (#ytqqv8v),
 	// and the check below would pass over one.
 	output, exitCode := runInstalled(test, link, root, "--no-fix", "--verbose")
 	if exitCode != 0 {
-		test.Fatalf("a released cohere with its engine beside it exited %d:\n%s", exitCode, output)
+		test.Fatalf("a released cohere with the child beside it exited %d:\n%s", exitCode, output)
 	}
 	recorded, readError := os.ReadFile(invoked)
 	if readError != nil {
-		test.Fatalf("the engine beside cohere was never run:\n%s", output)
+		test.Fatalf("the child beside cohere was never run:\n%s", output)
 	}
 	resolvedRoot, evalSymlinksError := filepath.EvalSymlinks(root)
 	if evalSymlinksError != nil {
@@ -162,21 +162,21 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 		!(strings.Contains(string(recorded), root) || strings.Contains(string(recorded), resolvedRoot)) {
 		test.Fatalf("the shipped engine was run with %q, expected the contract and the package root %s", recorded, root)
 	}
-	if strings.Contains(output, "building the Swift engine") {
-		test.Fatalf("a released cohere built an engine:\n%s", output)
+	if strings.Contains(output, "building cohere-swift") {
+		test.Fatalf("a released cohere built a child:\n%s", output)
 	}
 
-	// The release reads the contract from the cohere it stages, outside any project, and refuses an
-	// engine that will not speak it, so the line is held here in the shape it parses.
+	// The release reads the contract from the cohere it stages, outside any project, and refuses a
+	// child that will not speak it, so the line is held here in the shape it parses.
 	version, exitCode := runInstalled(test, binary, test.TempDir(), "--version")
 	if exitCode != 0 || !strings.HasPrefix(version, "cohere 1.0.0\n") ||
-		!strings.Contains(version, "\n  swift contract: "+strconv.Itoa(engineContractVersion)+"\n") {
+		!strings.Contains(version, "\n  swift contract: "+strconv.Itoa(contractVersion)+"\n") {
 		test.Fatalf("a released cohere's --version does not state its Swift contract (exit %d):\n%s", exitCode, version)
 	}
 }
 
-// A released cohere with no engine beside it is a broken install, and says so, even standing inside a
-// cohere checkout it could build one from: an engine built there would run unpaired rules under the
+// A released cohere with no child beside it is a broken install, and says so, even standing inside a
+// cohere checkout it could build one from: a child built there would run unpaired rules under the
 // release's version.
 func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 	test.Parallel()
@@ -194,7 +194,7 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 	// --verbose, so a build from the checkout would say so (see above).
 	output, exitCode := runInstalled(test, binary, root, "--no-fix", "--verbose")
 	if exitCode != 1 {
-		test.Fatalf("a released cohere with no engine exited %d, expected 1:\n%s", exitCode, output)
+		test.Fatalf("a released cohere with no child exited %d, expected 1:\n%s", exitCode, output)
 	}
 	// Named as the run names it, with the executable's symlinks resolved, which on macOS turns /tmp into
 	// /private/tmp.
@@ -203,16 +203,16 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 		test.Fatal(resolveSymlinksError)
 	}
 	expected := filepath.Join(installed, release.SwiftEngineFileName)
-	if !strings.Contains(output, "This cohere 1.0.0 install has no Swift engine: expected "+expected) ||
+	if !strings.Contains(output, "This cohere 1.0.0 install has no cohere-swift: expected "+expected) ||
 		!strings.Contains(output, "reinstall cohere") {
 		test.Fatalf("the missing engine was not named with the way out:\n%s", output)
 	}
-	if strings.Contains(output, "building the Swift engine") || strings.Contains(output, "swift --version") {
+	if strings.Contains(output, "building cohere-swift") || strings.Contains(output, "swift --version") {
 		test.Fatalf("a released cohere reached for the checkout:\n%s", output)
 	}
 }
 
-// A development cohere never takes an engine from beside itself, so a stale cohere-swift next to a
+// A development cohere never takes a child from beside itself, so a stale cohere-swift next to a
 // `go build -o` cannot run in place of the checkout's. Outside a checkout it has none, and says so.
 func TestADevelopmentCohereIgnoresAnEngineBesideIt(test *testing.T) {
 	test.Parallel()
@@ -223,18 +223,18 @@ func TestADevelopmentCohereIgnoresAnEngineBesideIt(test *testing.T) {
 	root := swiftPackage(test, "")
 
 	output, exitCode := runInstalled(test, binary, root, "--no-fix")
-	if exitCode != 1 || !strings.Contains(output, "the Swift engine is built from a cohere checkout") {
+	if exitCode != 1 || !strings.Contains(output, "cohere-swift is built from a cohere checkout") {
 		test.Fatalf("a development cohere outside a checkout exited %d:\n%s", exitCode, output)
 	}
 	if _, statError := os.Stat(invoked); statError == nil {
-		test.Fatalf("a development cohere ran the engine beside it:\n%s", output)
+		test.Fatalf("a development cohere ran the child beside it:\n%s", output)
 	}
 }
 
-// Where the engine does not ship, a Swift package is refused by name before anything is looked for or
-// built, whichever kind of cohere is running. The engine named by the override still runs: it is the
-// engine developer's, and naming one is saying what to run.
-// Not parallel: it sets the Swift engine override variable with test.Setenv, the working directory with test.Chdir,
+// Where the child does not ship, a Swift package is refused by name before anything is looked for or
+// built, whichever kind of cohere is running. The child named by the override still runs: it is the
+// child developer's, and naming one is saying what to run.
+// Not parallel: it sets cohere-swift override variable with test.Setenv, the working directory with test.Chdir,
 // and the package-level swiftEnginePlatform
 func TestSwiftIsRefusedByNameWhereTheEngineDoesNotShip(test *testing.T) {
 	test.Setenv(dispatch.SwiftEngineOverrideVariable, "")
@@ -273,7 +273,7 @@ func TestSwiftIsRefusedByNameWhereTheEngineDoesNotShip(test *testing.T) {
 		location,
 		release.Provenance{Version: "1.0.0"},
 	); resolveSwiftEngineBinaryError == nil ||
-		!strings.Contains(resolveSwiftEngineBinaryError.Error(), "install has no Swift engine") {
+		!strings.Contains(resolveSwiftEngineBinaryError.Error(), "install has no cohere-swift") {
 		test.Errorf("on macOS a released cohere was not sent to its sibling: %v", resolveSwiftEngineBinaryError)
 	}
 

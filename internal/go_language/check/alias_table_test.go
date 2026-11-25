@@ -21,7 +21,7 @@ func TestABuildsAliasTableKeepsEveryAliasExactAndTheNewestWithinItsBound(test *t
 	test.Parallel()
 
 	store := cache.Open(test.TempDir(), nil)
-	context := cache.Context{FormatVersion: "test", EngineIdentity: "engine", Build: []string{"GOOS=darwin"},
+	context := cache.Context{FormatVersion: "test", ExecutableIdentity: "executable", Build: []string{"GOOS=darwin"},
 		RuleSet: []string{"rule"}}
 	first, second, third := aliasKeyNamed("first"), aliasKeyNamed("second"), aliasKeyNamed("third")
 	if addError := newAliasTable(store, context).add(map[cache.Key]cache.Key{

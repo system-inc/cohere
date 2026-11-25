@@ -53,7 +53,7 @@
 // Not answered, and the honest statement of it:
 //
 //   - A repository `@utility` root's reading. `synthetic-fn-small` parses and its value resolves,
-//     and `Table.Lookup` declines it, because a measured row needs the engine and nothing in shipped
+//     and `Table.Lookup` declines it, because a measured row needs Tailwind and nothing in shipped
 //     Go can probe 527 value shapes. `addRepositoryFunctionalRoots` makes that an explicit decline
 //     rather than a wrong answer, and the `@utility` evaluator answers it instead. Measured:
 //     declining moves 180 fixture cases from answered to declined and every one is recoverable.
@@ -451,7 +451,7 @@ var baseReadings = []Reading{
 	{Order: []int{291}, Count: 1},
 }
 
-// BaseTailwindVersion is the engine version this file was generated against.
+// BaseTailwindVersion is the Tailwind version this file was generated against.
 //
 // Carried so a table built against an upgraded tailwindcss is a loud failure rather than a subtly
 // wrong sort. NewTable compares it with the live design system's version.

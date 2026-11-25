@@ -1,5 +1,5 @@
 // Command generate_class_order captures the Tier 2 differential fixture: `{order, count}` for
-// every class in every design system, as the shipped Tailwind engine computes it, together with the
+// every class in every design system, as the shipped Tailwind computes it, together with the
 // per-repository tables the Go side needs to answer the same question.
 //
 // Usage:
@@ -10,7 +10,7 @@
 // # Why this tool exists next to six that look like it
 //
 // Each landed component has a `generate_*` of its own and each captures that component's inputs
-// and outputs. This one captures neither: it captures a *class name* and the engine's answer, and
+// and outputs. This one captures neither: it captures a *class name* and Tailwind's answer, and
 // nothing about the path between them. That is the whole distinction. A component fixture supplies a
 // value the JavaScript side has already decoded, which is correct for testing the component and
 // steps over the seam between components. `segment` is the recorded precedent: verified only
@@ -101,13 +101,13 @@ func main() {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
 				os.Stderr,
-				"%s is stale: the engine now reads at least one class differently. Re-run without -check and read the diff.\n",
+				"%s is stale: Tailwind now reads at least one class differently. Re-run without -check and read the diff.\n",
 				*output,
 			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
-		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
+		fmt.Fprintf(os.Stderr, "%s matches Tailwind\n", *output)
 		return
 	}
 
@@ -125,7 +125,7 @@ func main() {
 	for _, system := range summary.Systems {
 		// Ignored: the rest of the same summary, which changes nothing already written.
 		fmt.Fprintf(os.Stderr,
-			"  %s: %d registry classes (%d engine nulls), %d corpus classes (%d engine nulls), %d distinct readings, %d utility roots\n",
+			"  %s: %d registry classes (%d Tailwind nulls), %d corpus classes (%d Tailwind nulls), %d distinct readings, %d utility roots\n",
 			system.Name,
 			system.Counts.RegistryClasses, system.Counts.RegistryNullReadings,
 			system.Counts.CorpusClasses, system.Counts.CorpusNullReadings,
@@ -158,7 +158,7 @@ type systemDefinition struct {
 
 // fixture is the file this command writes.
 type fixture struct {
-	// TailwindVersion is the engine every system was measured against. A single field rather than
+	// TailwindVersion is Tailwind every system was measured against. A single field rather than
 	// one per system, because a fixture spanning two Tailwind versions would report version skew as
 	// a port defect, and the build refuses to produce one.
 	TailwindVersion string `json:"tailwindVersion"`
@@ -259,7 +259,7 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 			// two Tailwind versions is not a finding about this repository. Refused rather than
 			// recorded, because a fixture that carries the skew makes every later run argue about it.
 			return nil, fixture{}, fmt.Errorf(
-				"%s is on tailwind %s and %s is on %s; a differential across two engine versions reports skew as a port defect",
+				"%s is on tailwind %s and %s is on %s; a differential across two Tailwind versions reports skew as a port defect",
 				system.Name, system.TailwindVersion, built.Systems[0].Name, built.TailwindVersion,
 			)
 		}

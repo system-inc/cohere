@@ -14,7 +14,7 @@ import (
  *
  * This replaced a function that returned a directory. That shape made disk the default and embedding
  * the special case, which is backwards once embedding is the norm, and it left the guard in
- * `internal/release` vouching for a directory while the engine read somewhere else. Returning bytes
+ * `internal/release` vouching for a directory while the formatter read somewhere else. Returning bytes
  * plus their provenance means a caller cannot ask where the bundles are without also being told
  * which mode produced them.
  *
@@ -129,7 +129,7 @@ func embeddedBundles() (BundleSource, error) {
 
 // diskBundles reads the bundles from a fork checkout.
 //
-// Every name in BundleFiles must be present or this fails and says which. No partial load: an engine
+// Every name in BundleFiles must be present or this fails and says which. No partial load: a formatter
 // that quietly loaded seven of eight would format the eighth's files by falling through to no parser
 // at all, and the failure would look like a file type nobody formats rather than a broken checkout.
 func diskBundles(directory string) (BundleSource, error) {

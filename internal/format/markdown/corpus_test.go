@@ -41,7 +41,7 @@ func oracleTextToDoc(test *testing.T, options format_options.Options) printing.T
 	if os.Getenv("COHERE_MARKDOWN_EMBED_ORACLE") == "" {
 		return nil
 	}
-	engine, newPrettierError := prettier.New(options)
+	formatter, newPrettierError := prettier.New(options)
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -55,7 +55,7 @@ func oracleTextToDoc(test *testing.T, options format_options.Options) printing.T
 		if !strings.Contains(parser, ".") {
 			fileName = fileNames[parser]
 		}
-		formatted, formatError := engine.Format(fileName, text)
+		formatted, formatError := formatter.Format(fileName, text)
 		if formatError != nil {
 			return nil, formatError
 		}
@@ -86,7 +86,7 @@ type markdownCorpus struct {
 }
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the
-// engine's ignore layers, and into each nested repository as a corpus of its own, with its own config.
+// formatter's ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 	test.Helper()
 	enumerator, newPrettierError := prettier.New(format_options.Default())

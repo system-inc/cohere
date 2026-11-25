@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -276,7 +276,7 @@ func TestNoConflictingClassesStaysSilent(test *testing.T) {
 		{
 			// Different elements. `divide-*` emits under `:where(.CLASS > :not(:last-child))` and
 			// styles children; `border-*` styles the element. Both declare `border-color` and they
-			// do not collide. This is the pair that made the rule look engine-bound.
+			// do not collide. This is the pair that made the rule look Tailwind-bound.
 			name:     "divide against border",
 			fileName: "Component.tsx",
 			source:   `const element = <div className="divide-neutral-200 border-neutral-200" />;`,
@@ -324,7 +324,7 @@ func TestNoConflictingClassesStaysSilent(test *testing.T) {
 //
 // Upstream declares `autofix: true`. On our side removing either of two conflicting classes changes
 // what renders, and only the author knows which one was meant, so this must be a Suggestion. The
-// edit engine never applies suggestions, which makes the difference concrete: ported as a Fix it
+// edit Tailwind never applies suggestions, which makes the difference concrete: ported as a Fix it
 // would silently pick one; ported as a suggestion a human chooses.
 //
 // This was caught by `@system_cohere_lint_fix`'s research pass rather than by reading the source,
@@ -340,7 +340,7 @@ func TestConflictingClassesProposeSuggestionsNotFixes(test *testing.T) {
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
 			test.Fatal("this rule must not propose an automatic fix: removing either conflicting class " +
-				"changes what renders, and the edit engine would apply the choice unattended")
+				"changes what renders, and the edit Tailwind would apply the choice unattended")
 		}
 	}
 }
@@ -356,7 +356,7 @@ func TestConflictingClassesProposeSuggestionsNotFixes(test *testing.T) {
 // during the migration.
 func TestPropertyLookupUsesTheLongestRoot(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		// The real lookup.
 		left, canResolveLeft := resolveClassFactsIn("border-l-4", designSystem)
@@ -595,7 +595,7 @@ func TestSelectorShapeCannotProduceAWrongFinding(test *testing.T) {
 		test.Fatalf("writing the staging stylesheet: %v", writeError)
 	}
 
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: findTailwindPackageRoot(staging, diskFileExists),
 	})

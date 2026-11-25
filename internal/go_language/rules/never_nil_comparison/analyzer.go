@@ -1,5 +1,5 @@
 // Package never_nil_comparison is staticcheck's SA4031, an if statement that compares with nil a value the function
-// itself made and that can never be nil, an allocation, a make, a function or a closure, ported onto the engine's own
+// itself made and that can never be nil, an allocation, a make, a function or a closure, ported onto cohere-go's own
 // intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4031/sa4031.go, whose logic it keeps and
@@ -33,7 +33,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own. It reads the function's expression map.
 var Listener = rule.Listener{
 	FileLocal: true,
@@ -49,7 +49,7 @@ var Listener = rule.Listener{
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4031",
 	"SA4031",
-	"Flags a comparison with nil of a value that is never nil: staticcheck's SA4031, ported onto the engine's "+
+	"Flags a comparison with nil of a value that is never nil: staticcheck's SA4031, ported onto cohere-go's "+
 		"own intermediate representation.",
 	&Listener,
 )

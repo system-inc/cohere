@@ -1,4 +1,4 @@
-// Package go_language is the Go engine: a hidden mode of the cohere binary, `cohere go-engine --contract 3 --root
+// Package go_language is cohere-go: a hidden mode of the cohere binary, `cohere go-language --contract 3 --root
 // <dir> [switches] [--lint-config <file>] [paths]`, that the front door runs as a child the way it runs
 // cohere-swift, and whose stdout is swift/Contract.md's record stream.
 //
@@ -26,7 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/suppression"
 )
 
-// The exit codes the contract gives an engine.
+// The exit codes the contract gives a child.
 const (
 	// exitClean is a summary with no findings over a complete run.
 	exitClean = 0
@@ -38,25 +38,25 @@ const (
 	// Nothing is on stdout, and the reason is one sentence on stderr.
 	exitRefused = 2
 
-	// exitBroken is a stream the engine could not finish writing. The contract reads any exit but 0, 1 and 2
+	// exitBroken is a stream cohere-go could not finish writing. The contract reads any exit but 0, 1 and 2
 	// as a crash, which is what a half-written stream is: the front door says nothing was checked.
 	exitBroken = 3
 )
 
 // ruleRequireFormatting is the rule a file gofmt would change is reported under, the same leaf as Swift's,
-// so one name means one thing whichever engine prints it. It is the engine's own rather than an analyzer's,
+// so one name means one thing whichever language prints it. It is cohere-go's own rather than an analyzer's,
 // since formatting runs before the load.
 const ruleRequireFormatting = rule.Namespace + "consistency-require-formatting"
 
-// notFormattedMessage is the finding's text, Swift's verbatim, so the two engines' format gates read alike.
+// notFormattedMessage is the finding's text, Swift's verbatim, so the two languages' format gates read alike.
 const notFormattedMessage = "not formatted the house way; a run without --no-fix rewrites it"
 
 // notFormattedMessageId is the finding's messageId, Swift's.
 const notFormattedMessageId = "notFormatted"
 
-// engineRuleNames are the rules the engine reports under itself rather than through an analyzer: the format
+// pipelineRuleNames are the rules cohere-go reports under itself rather than through an analyzer: the format
 // finding, and suppression's two.
-var engineRuleNames = []string{
+var pipelineRuleNames = []string{
 	ruleRequireFormatting,
 	suppression.RuleNoUnusedIgnore,
 	suppression.RuleRequireIgnoreReason,
@@ -65,7 +65,7 @@ var engineRuleNames = []string{
 // mainHasRun is set by the first Main in this process.
 var mainHasRun atomic.Bool
 
-// Main runs the engine over the command line the front door sends, writing records to standardOutput and
+// Main runs cohere-go over the command line the front door sends, writing records to standardOutput and
 // prose to standardError, and returns the exit code. availableMemoryBytes is the memory the front door's policy
 // read as available when this process started, 0 when it could not, which the memory limit is sized from.
 // standardInput is read only by the editor's save, whose buffer it is, and whose standardOutput is that file's text
@@ -78,16 +78,16 @@ func Main(
 	standardError io.Writer,
 ) int {
 	// A run sets its rule options on the registry's analyzers, which outlive it, so a second run in this process
-	// would be judged by the first's options with no error. The front door starts one engine process per Go root
+	// would be judged by the first's options with no error. The front door starts one cohere-go process per Go root
 	// and main exits after this call, so a second call is a caller's mistake, refused before anything runs.
 	if mainHasRun.Swap(true) {
-		return refuse(standardError, errors.New("refusing a second engine run in one process, since the first run's "+
-			"rule options are still set on the analyzers; start a new engine process for each project"))
+		return refuse(standardError, errors.New("refusing a second run in one process, since the first run's "+
+			"rule options are still set on the analyzers; start a new executable process for each project"))
 	}
-	// Here rather than in run, so a test running the engine in process never changes its own memory limit. The limit
+	// Here rather than in run, so a test running cohere-go in process never changes its own memory limit. The limit
 	// the front door's policy set is read before capMemory lowers it, since a late raise never passes it (lateLimit).
 	inheritedBytes := debug.SetMemoryLimit(-1)
-	memory := engineMemory{
+	memory := memoryAccount{
 		record:         capMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes),
 		inheritedBytes: inheritedBytes,
 		setMemoryLimit: debug.SetMemoryLimit,
@@ -95,13 +95,13 @@ func Main(
 	}
 	// A save writes no file, refused where every write of a source file passes (format.RefuseWrites), so no phase, one
 	// added later included, can write over a file the editor holds unsaved. Here rather than in run, as the memory
-	// limit is, since the refusal is process-wide, and a test running the engine in process writes files beside it.
+	// limit is, since the refusal is process-wide, and a test running cohere-go in process writes files beside it.
 	request, parseError := parseInvocation(arguments)
 	if parseError == nil && request.mode() == modeStdin {
 		format.RefuseWrites()
 	}
 	// Here rather than in run, as the memory limit is, since a profile is the whole process's, and a test running the
-	// engine in process runs beside others. Begun before the run reads anything, so it holds the whole run, and a
+	// cohere-go in process runs beside others. Begun before the run reads anything, so it holds the whole run, and a
 	// command line the run would refuse is refused there, as ever, with the profile written but holding nothing.
 	if parseError == nil && request.profilePath != "" {
 		stopProfile, startProfileError := startProfile(request.profilePath)
@@ -115,7 +115,7 @@ func Main(
 }
 
 // runWithStandardLibrary is Main with the analyzer rules handed in, no standard input, and source as where its standard
-// library comes from and goes, so a test can run the engine with a rule planted in place of the registry's, such as
+// library comes from and goes, so a test can run cohere-go with a rule planted in place of the registry's, such as
 // one that panics, or give a run a system cache and a stamp of its own. memory is what Main decided about the memory
 // limit, nil in a test, which decides nothing and never raises the limit.
 func runWithStandardLibrary(
@@ -123,7 +123,7 @@ func runWithStandardLibrary(
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *engineMemory,
+	memory *memoryAccount,
 	source standardLibrarySource,
 ) int {
 	return runOverlapping(arguments, nil, standardOutput, standardError, registered, memory, source, true, nil)
@@ -140,7 +140,7 @@ func runOverlapping(
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *engineMemory,
+	memory *memoryAccount,
 	source standardLibrarySource,
 	overlaps bool,
 	answersInPart map[string]bool,
@@ -169,7 +169,7 @@ func runOverlapping(
 		}
 		request.buffer = buffer
 	}
-	// Begun before the settings, go env and go list, so the run's first key finds the engine's identity hashed, or
+	// Begun before the settings, go env and go list, so the run's first key finds cohere-go's identity hashed, or
 	// nearly, rather than hashing it there, between the listing and the type check (cache.StartExecutableIdentity).
 	if request.keysByIdentity() {
 		cache.StartExecutableIdentity()
@@ -190,27 +190,27 @@ func runOverlapping(
 	}
 	if request.mode() == modeStdin {
 		// The save's standard output is the file's text, so the records it would write go nowhere.
-		engine := newPipeline(request, described, ruleSettings, registered, io.Discard, standardError, memory)
-		return engine.runStdin(standardOutput)
+		pipeline := newPipeline(request, described, ruleSettings, registered, io.Discard, standardError, memory)
+		return pipeline.runStdin(standardOutput)
 	}
-	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, standardError, memory)
-	engine.overlaps = overlaps
-	engine.bodyReachCensus = os.Getenv(bodyReachCensusVariable)
-	engine.bodyDifferential = os.Getenv(bodyDifferentialVariable) == "1"
-	engine.standingBodies = os.Getenv(standingBodiesVariable) == "1"
-	engine.bodyReachFromSourceRecord = os.Getenv(bodyReachFromSourceRecordVariable)
-	engine.bodyReachFromSource = os.Getenv(bodyReachFromSourceVariable)
-	engine.mustCheckCensus = os.Getenv(mustCheckCensusVariable)
-	return engine.run()
+	pipeline := newPipeline(request, described, ruleSettings, registered, standardOutput, standardError, memory)
+	pipeline.overlaps = overlaps
+	pipeline.bodyReachCensus = os.Getenv(bodyReachCensusVariable)
+	pipeline.bodyDifferential = os.Getenv(bodyDifferentialVariable) == "1"
+	pipeline.standingBodies = os.Getenv(standingBodiesVariable) == "1"
+	pipeline.bodyReachFromSourceRecord = os.Getenv(bodyReachFromSourceRecordVariable)
+	pipeline.bodyReachFromSource = os.Getenv(bodyReachFromSourceVariable)
+	pipeline.mustCheckCensus = os.Getenv(mustCheckCensusVariable)
+	return pipeline.run()
 }
 
-// knownRuleNames is every rule a run knows: the analyzers', and the engine's own.
+// knownRuleNames is every rule a run knows: the analyzers', and cohere-go's own.
 func knownRuleNames(registered []rule.Rule) []string {
-	names := make([]string, 0, len(registered)+len(engineRuleNames))
+	names := make([]string, 0, len(registered)+len(pipelineRuleNames))
 	for _, registeredRule := range registered {
 		names = append(names, registeredRule.Name)
 	}
-	return append(names, engineRuleNames...)
+	return append(names, pipelineRuleNames...)
 }
 
 // refuse writes a refusal's reason as one sentence and returns exit 2.
@@ -226,7 +226,7 @@ func refusalSentence(refusal error) string {
 	sentence := strings.TrimSpace(refusal.Error())
 	first, size := utf8.DecodeRuneInString(sentence)
 	if size == 0 {
-		return "The Go engine refused the run and gave no reason."
+		return "cohere-go refused the run and gave no reason."
 	}
 	sentence = string(unicode.ToUpper(first)) + sentence[size:]
 	if !strings.HasSuffix(sentence, ".") {

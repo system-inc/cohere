@@ -977,15 +977,15 @@ func TestArrowBodyStyleKeepsCommentsOnEitherSide(test *testing.T) {
 	}
 }
 
-// No two fixes may share a boundary, because the engine drops one of them when they do.
+// No two fixes may share a boundary, because the fix pass drops one of them when they do.
 //
 // This exists because of a defect that shipped past all 87 imported cases. The repair emitted each
 // parenthesis as its own zero-width insertion, at a position that was also the edge of a removal.
 // `ExpectFixedSource` applies every proposed fix in order and produced the right text; the real
-// engine treats a shared boundary as an overlap, dropped the insertion, and rewrote
+// fix pass treats a shared boundary as an overlap, dropped the insertion, and rewrote
 // `() => { return { a: 1 }; }` into `() => { a: 1 }` -- which still parses, as a labelled block, and
 // means something else. A fix producing source that parses and does not mean the same thing is the
-// one failure the engine structurally cannot refuse.
+// one failure the fix pass structurally cannot refuse.
 //
 // So the check is structural rather than textual: assert directly that the ranges are pairwise
 // disjoint. A test that only compared the rewritten source would keep passing under the same defect,
@@ -1011,12 +1011,12 @@ func TestArrowBodyStyleProposesDisjointFixes(test *testing.T) {
 						left, right = right, left
 					}
 					// Touching counts. Two edits meeting at one offset, including a zero-width one
-					// sitting on the edge of a removal, are what the engine refuses.
+					// sitting on the edge of a removal, are what the fix pass refuses.
 					if right.start <= left.end && !(left.start == left.end &&
 						right.start == right.end && left.start != right.start) {
 						if right.start < left.end || left.start == left.end ||
 							right.start == right.end {
-							test.Errorf("fixes [%d,%d) and [%d,%d) touch or overlap, so the engine "+
+							test.Errorf("fixes [%d,%d) and [%d,%d) touch or overlap, so the linter "+
 								"will drop one", left.start, left.end, right.start, right.end)
 						}
 					}

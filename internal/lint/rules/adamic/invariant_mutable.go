@@ -75,7 +75,7 @@ var (
  *
  * # No fix
  *
- * Every repair changes a type (add `readonly`, or copy), so none preserves meaning, and the edit engine
+ * Every repair changes a type (add `readonly`, or copy), so none preserves meaning, and the fix pass
  * applies only fixes that do.
  */
 var InvariantMutable = rule.Rule[rule.NoOptions]{

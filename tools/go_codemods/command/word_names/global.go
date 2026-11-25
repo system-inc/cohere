@@ -2,7 +2,7 @@ package main
 
 // The -global pass: every name the rule flags whose uses reach past one function, functions, methods, fields, types,
 // constants and package variables, and the locals and parameters holding an advice-only word (args, arg, fn), which
-// the local pass leaves as waves. Every rename goes through the global rename engine, which follows a name across
+// the local pass leaves as waves. Every rename goes through global_rename, which follows a name across
 // packages and refuses what would change an interface's satisfaction, an encoder's key, or a resolution, and the
 // write is proven by an overlay reload before anything is written. A name that spells an upstream rule or an outside
 // name is listed, unless -rename-owned-spellings asks for it too: the Go identifier is ours, and only the string a
@@ -41,7 +41,7 @@ type listedName struct {
 const (
 	reasonOtherPass      = "holds err or ctx, which the error and context passes name"
 	reasonLocalPass      = "a local without an advice word, which the local pass names"
-	reasonTypeSwitch     = "a type switch's bound name, which no engine renames"
+	reasonTypeSwitch     = "a type switch's bound name, which no renaming reaches"
 	reasonUpstreamRule   = "spells the upstream rule "
 	reasonExternalPrefix = "spells an external name: "
 	reasonNoNote         = "spells an external name no doc comment of its own names, and external.go writes it no note"

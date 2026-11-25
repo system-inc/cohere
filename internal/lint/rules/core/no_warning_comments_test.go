@@ -528,7 +528,7 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(test *testing.T) {
 // that assumed `u` made `\b` Unicode-aware would add a boundary where upstream has none.
 //
 // The six rows below are where the two would disagree if they did. All six were driven through the
-// installed rule and through Go's own regexp engine, and both agree on every one: a non-ASCII letter
+// installed rule and through Go's own regexp package, and both agree on every one: a non-ASCII letter
 // is a non-word character to both, so a term adjacent to one is bounded and matches.
 //
 // The Cyrillic row is the control that makes the rest meaningful -- it is clean because the Te is a

@@ -25,14 +25,14 @@ func TestParseInvocationRefuses(test *testing.T) {
 		{"a contract that is no number", []string{"--contract", "three", "--root", "/project"}, "not a version number"},
 		{
 			"a mismatch before an unknown flag", []string{"--contract", "4", "--frobnicate", "--root", "/project"},
-			"the front door speaks contract 4 and this engine speaks contract 3",
+			"the front door speaks contract 4 and cohere-go speaks contract 3",
 		},
 		{"an unknown flag", append(slices.Clone(contractArguments), "--frobnicate"), "--frobnicate is not a flag"},
 		// Every build is checked unless `--host-build-only` is named (#qqyq61s), so the switch that asked for them is
-		// gone, refused as any flag the engine does not take.
+		// gone, refused as any flag cohere-go does not take.
 		{
 			"the switch that asked for every build", append(slices.Clone(contractArguments), "--other-builds"),
-			"--other-builds is not a flag the Go engine takes",
+			"--other-builds is not a flag cohere-go takes",
 		},
 		{"a flag with one dash", append(slices.Clone(contractArguments), "-fix"), "spelled with two dashes"},
 		{"a switch neither true nor false", append(slices.Clone(contractArguments), "--fix=maybe"), "true or false"},
@@ -134,7 +134,7 @@ func TestParseInvocationReads(test *testing.T) {
 		{"version", append(slices.Clone(contractArguments), "--version"), modeVersion, nil, nil},
 		{"a save", append(slices.Clone(contractArguments), "--fix", "--format", "--stdin-filepath",
 			"/project/value.go"), modeStdin, nil, nil},
-		// The front door forwards it for a cache the engine will keep of its own, so it is read, never refused.
+		// The front door forwards it for a cache cohere-go will keep of its own, so it is read, never refused.
 		{"no-cache", append(slices.Clone(contractArguments), "--no-cache", "--no-fix"), modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
 		// The system cache's switch is read as the project store's is (#syscache).
@@ -238,7 +238,7 @@ func TestRefusalSentence(test *testing.T) {
 		//cohere:ignore consistency-require-error-clause the period is this case's input, as a foreign error carries one
 		{errors.New("reading the go block. The go block takes \"rules\"."),
 			"Reading the go block. The go block takes \"rules\"."},
-		{errors.New("  "), "The Go engine refused the run and gave no reason."},
+		{errors.New("  "), "cohere-go refused the run and gave no reason."},
 	}
 	for _, sentence := range cases {
 		if got := refusalSentence(sentence.refusal); got != sentence.want {
@@ -247,7 +247,7 @@ func TestRefusalSentence(test *testing.T) {
 	}
 }
 
-// TestMainRefusesASecondRun holds the engine to one run per process, since a run's rule options stay set on the
+// TestMainRefusesASecondRun holds cohere-go to one run per process, since a run's rule options stay set on the
 // registry's analyzers and a second run would be judged by them.
 //
 // Not parallel: it sets `GOMEMLIMIT`, so Main leaves this test process's memory limit alone, and it spends the one
@@ -265,16 +265,16 @@ func TestMainRefusesASecondRun(test *testing.T) {
 	if exitCode := Main(versionArguments, 0, nil, &secondOutput, &secondError); exitCode != exitRefused {
 		test.Fatalf("the second run exited %d, want %d", exitCode, exitRefused)
 	}
-	if secondOutput.Len() != 0 || !strings.Contains(secondError.String(), "second engine run in one process") {
+	if secondOutput.Len() != 0 || !strings.Contains(secondError.String(), "second run in one process") {
 		test.Errorf("the second run wrote %q to stdout and %q to stderr, want nothing and the refusal",
 			secondOutput.String(), secondError.String())
 	}
 }
 
-// A run hashes the engine's executable early only when it may key something by the engine's identity
+// A run hashes cohere-go's executable early only when it may key something by cohere-go's identity
 // (keysByIdentity): never under `--no-cache --no-system-cache`, which keys nothing, nor for a run that only formats,
 // and always for a run that loads its packages with a project store or a system cache to key.
-func TestOnlyARunThatMayKeyHashesTheEngineEarly(test *testing.T) {
+func TestOnlyARunThatMayKeyHashesTheExecutableEarly(test *testing.T) {
 	test.Parallel()
 
 	for _, each := range []struct {
@@ -295,7 +295,7 @@ func TestOnlyARunThatMayKeyHashesTheEngineEarly(test *testing.T) {
 			test.Fatalf("%q: %v", each.arguments, parseError)
 		}
 		if got := request.keysByIdentity(); got != each.want {
-			test.Errorf("%q: hashes the engine early %t, want %t", each.arguments, got, each.want)
+			test.Errorf("%q: hashes cohere-go early %t, want %t", each.arguments, got, each.want)
 		}
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// ErrorOpeningWords.json is the closed vocabulary of ordinary English words the Go engine's
+// ErrorOpeningWords.json is the closed vocabulary of ordinary English words cohere-go's
 // consistency-require-error-clause flags when an error's text opens on one capitalized. It is data rather than
 // code so a word joins or leaves the list as a decision about the house, in one place.
 //

@@ -1,4 +1,4 @@
-// Command cohere-pairs measures one pair: the Go engine of a base commit against the Go engine of a branch commit,
+// Command cohere-pairs measures one pair: cohere-go of a base commit against cohere-go of a branch commit,
 // over the corpora every pair since 2026-11-10 was measured on, and prints the table a pair is posted with (#j9e4ejd).
 // It is one command so a Loom job, which lays a cohere commit on a machine and runs one command there, can measure a
 // pair with nothing else running. It runs the same on two roads:
@@ -41,13 +41,13 @@
 // must be in them: both sides, the compiler each pins, and the corpus pins (corpus_pins.go).
 //
 // Measuring never reaches the network: every go command it starts, both release builds, the standard library tables a
-// side's release from before #znqfjw2 still generates, and each engine run's go list, runs with `GOPROXY=off` and no
+// side's release from before #znqfjw2 still generates, and each Go child run's go list, runs with `GOPROXY=off` and no
 // checksum database (offlineGoEnvironment). So the machine must hold, before it measures, the go each side's go.mod
 // asks for, every toolchain such a side's tables are generated under (a side after #znqfjw2 needs none), and the module
 // graph of each side and each corpus; the preflight checks each, and refuses naming what is missing. --prepare, run
 // with the network and the same flags into the same `GOMODCACHE`, puts all of it in the module cache and lists it, one
 // "path version" a line, toolchains included, for an image to be baked from. Go's build cache must be writable, as for
-// any go build. On darwin cohere-release also builds the Swift engine, so a Mac needs Swift, and SwiftPM fetches its
+// any go build. On darwin cohere-release also builds cohere-swift, so a Mac needs Swift, and SwiftPM fetches its
 // packages unless its scratch already holds them.
 //
 // --out holds:
@@ -62,7 +62,7 @@
 //	trash                         every .cache directory a cache-on run found, moved aside rather than deleted,
 //	                              and each side's system cache before the side's cache-on run
 //	system-cache-base, -branch    each side's own system cache (COHERE_SYSTEM_CACHE), filled by its cache-on run
-//	raw/<corpus>-<side>-<round>-<mode>.jsonl and .stderr   what each run of the engine printed
+//	raw/<corpus>-<side>-<round>-<mode>.jsonl and .stderr   what each run of the Go child printed
 //	runs.jsonl                    one record per run (runRecord)
 //	table.md                      the table, also printed, written only when every check holds
 //

@@ -26,7 +26,7 @@ type excludedRun struct {
 }
 
 // excludedModule writes a git repository holding a module of one package, example.com/value, with each of files at
-// its name, and returns its directory, resolved, so the file names the engine reports are the ones written here.
+// its name, and returns its directory, resolved, so the file names cohere-go reports are the ones written here.
 func excludedModule(test *testing.T, files map[string]string) string {
 	test.Helper()
 	directory, resolveError := filepath.EvalSymlinks(test.TempDir())
@@ -170,13 +170,13 @@ func TestAWholeRunAfterANarrowedOneFindsWhatTheNarrowedRunSavedAsADependency(tes
 	})
 	outsideFinding := `"file":"` + filepath.Join(root, "outside", "outside.go") + `"`
 
-	narrowed := runCachedEngine(test, root, filepath.Join(root, "inside"))
+	narrowed := runCached(test, root, filepath.Join(root, "inside"))
 	if strings.Contains(narrowed.stream, outsideFinding) || narrowed.counts.Written == 0 {
 		test.Fatalf("want a narrowed run that writes entries and reports nothing in outside, got %+v in\n%s",
 			narrowed.counts, narrowed.stream)
 	}
-	whole := runCachedEngine(test, root)
-	uncached := runCachedEngine(test, root, "--no-cache")
+	whole := runCached(test, root)
+	uncached := runCached(test, root, "--no-cache")
 	if !strings.Contains(uncached.stream, outsideFinding) {
 		test.Fatalf("want the run without the cache to report outside's finding, got\n%s", uncached.stream)
 	}

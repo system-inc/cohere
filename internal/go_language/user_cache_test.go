@@ -18,7 +18,7 @@ import (
 // nothing, cached and under `--no-cache` alike.
 //
 // Not parallel: it moves the process's own `TMPDIR` and the variable os.UserCacheDir reads, `HOME` on darwin and
-// `XDG_CACHE_HOME` elsewhere, which every go command the engine runs reads too.
+// `XDG_CACHE_HOME` elsewhere, which every go command cohere-go runs reads too.
 func TestAStaticcheckConfAppliesToAProjectUnderTheUserCacheDirectory(test *testing.T) {
 	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" {
 		// os.UserCacheDir reads neither variable there, so the stand-in would not be the user's cache directory.
@@ -60,8 +60,8 @@ func TestAStaticcheckConfAppliesToAProjectUnderTheUserCacheDirectory(test *testi
 		if writeError := os.WriteFile(configuration, allowing, 0o644); writeError != nil {
 			test.Fatalf("writing %s: %v", configuration, writeError)
 		}
-		cached := runCachedEngine(test, root)
-		uncached := runCachedEngine(test, root, "--no-cache")
+		cached := runCached(test, root)
+		uncached := runCached(test, root, "--no-cache")
 		if cached.withoutCounts != uncached.withoutCounts {
 			test.Fatalf("cached\n%s\nunder --no-cache\n%s", cached.withoutCounts, uncached.withoutCounts)
 		}
@@ -74,7 +74,7 @@ func TestAStaticcheckConfAppliesToAProjectUnderTheUserCacheDirectory(test *testi
 
 // pinGoSettings sets the go command's build cache, module cache, path and settings file in the environment as go env
 // reports them now, for the rest of the test, so moving `HOME` or `XDG_CACHE_HOME`, under which go finds each by
-// default, moves none of them: the engine's go commands read the caches and settings every other test does.
+// default, moves none of them: cohere-go's go commands read the caches and settings every other test does.
 func pinGoSettings(test *testing.T) {
 	test.Helper()
 	output, outputError := exec.Command("go", "env", "-json", "GOCACHE", "GOMODCACHE", "GOPATH", "GOENV").Output()

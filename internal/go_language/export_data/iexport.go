@@ -1,17 +1,17 @@
 // cohere:copied golang.org/x/tools@v0.50.0 internal/gcimporter/iexport.go
 // cohere:until golang.org/x/tools/go/gcexportdata writes and reads shallow
 // export data, as its internal gcimporter's IExportShallow and IImportShallow
-// do for gopls. Then the engine calls gcexportdata again and this copy goes
+// do for gopls. Then cohere-go calls gcexportdata again and this copy goes
 // away.
 //
 // cohere: an internal package of x/tools cannot be imported from this module,
-// so the engine carries its own copy of the shallow export and import it
+// so cohere-go carries its own copy of the shallow export and import it
 // caches types with, one file to each upstream file: iexport.go and
 // iimport.go, predeclared.go and the vestiges of bimport.go they call, and
 // the parts of internal/aliases and internal/typesinternal they call, in
 // subpackages of the same names. The unified reader, the archive reading
 // and pkgbits are not copied, and neither is any deep export or import, so
-// every read of the engine's export data is shallow, against packages the
+// every read of cohere-go's export data is shallow, against packages the
 // reader already holds.
 
 // Copyright 2019 The Go Authors. All rights reserved.
@@ -335,7 +335,7 @@ type ReportFunc = func(string, ...any)
 const bundleVersion = 0
 
 // cohere: dropped: IExportData and IExportBundle, the deep exports. The
-// cohere: engine writes shallow export data only.
+// cohere: cohere-go writes shallow export data only.
 func iexportCommon(out io.Writer, fset *token.FileSet, bundle, shallow bool, version int, pkgs []*types.Package, reportf ReportFunc) (err error) {
 	if !debug {
 		defer func() {

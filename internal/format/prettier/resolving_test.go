@@ -66,8 +66,8 @@ func TestResolvingFormatsEachFileWithItsOwnConfiguration(test *testing.T) {
 	if !strings.Contains(formattedTogether, `"x">`) {
 		test.Errorf("the repository with bracketSameLine did not put `>` on the attribute line:\n%s", formattedTogether)
 	}
-	if len(resolving.engines) != 2 {
-		test.Errorf("built %d engines for two distinct configs, want 2", len(resolving.engines))
+	if len(resolving.formatters) != 2 {
+		test.Errorf("built %d formatters for two distinct configs, want 2", len(resolving.formatters))
 	}
 }
 

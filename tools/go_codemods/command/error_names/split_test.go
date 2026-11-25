@@ -18,8 +18,8 @@ type passResult struct {
 	dropped    map[string]string
 }
 
-// runPass runs the pass over one fixture file exactly as run does over a package: candidates, the rename
-// engine, the splits, and the package check, then the rewrite.
+// runPass runs the pass over one fixture file exactly as run does over a package: candidates, the
+// renaming, the splits, and the package check, then the rewrite.
 func runPass(test *testing.T, source string) passResult {
 	test.Helper()
 	checked := typeCheck(test, source)

@@ -24,7 +24,7 @@ type Build struct {
 	Flags []string
 }
 
-// HostBuild is the host's build as the engine reads it: buildContext is the context load reads from go env
+// HostBuild is the host's build as cohere-go reads it: buildContext is the context load reads from go env
 // (`GOOS`, `GOARCH`, `CGO_ENABLED`, and the `-tags` of `GOFLAGS` as its BuildTags), and goFlags are that `GOFLAGS`'s
 // flags, whose `-tags` the build holds as Tags instead.
 func HostBuild(buildContext *build.Context, goFlags []string) Build {

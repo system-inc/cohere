@@ -7,14 +7,14 @@ import (
 	"testing"
 )
 
-// The fixture is what the shipped Tailwind 4.3.3 engine built and read, captured by
+// The fixture is what the shipped Tailwind 4.3.3 built and read, captured by
 // internal/lint/rules/tailwind/tools/generate_syntax_tree and checked in next to this test.
 //
 // Measured rather than transcribed, because `getPropertySort` does not do what a reading of it
 // suggests. It looks like a tree walk and is a breadth-first queue; it appears to exclude
 // `@property` bodies and in fact excludes the `at-root` wrapper they sit inside, with `@property`
 // never named. A hand-written expectation set would encode the plausible version of both and agree
-// with the engine on nearly every real class.
+// with Tailwind on nearly every real class.
 
 type astCorpus struct {
 	TailwindVersion    string `json:"tailwindVersion"`
@@ -31,14 +31,14 @@ type astCorpus struct {
 	TraversalCases []traversalCase `json:"traversalCases"`
 }
 
-// astCase is one compiled utility: the tree the engine built and the reading it took.
+// astCase is one compiled utility: the tree Tailwind built and the reading it took.
 type astCase struct {
 	ClassName string `json:"className"`
 	Signature string `json:"signature"`
 	// Node is the declaration list getPropertySort was seeded with: the utility's body before its
 	// wrapping rule and before any variant was applied.
 	Node *fixtureNode `json:"node"`
-	// EmittedNode is the post-variant tree the engine returns. For a duplicating variant such as
+	// EmittedNode is the post-variant tree Tailwind returns. For a duplicating variant such as
 	// `not-hover:` it holds more declarations than the reading counts, which is why the reading is
 	// taken from Node and never from here.
 	EmittedNode *fixtureNode `json:"emittedNode"`
@@ -62,7 +62,7 @@ type fixtureReading struct {
 	Count int   `json:"count"`
 }
 
-// fixtureNode mirrors the engine's node shape as JSON, so that converting it to a Node is an
+// fixtureNode mirrors Tailwind's node shape as JSON, so that converting it to a Node is an
 // explicit step this test controls rather than something struct tags do invisibly.
 type fixtureNode struct {
 	Kind         string            `json:"kind"`
@@ -124,9 +124,9 @@ func loadAstCorpus(test *testing.T) astCorpus {
 	return corpus
 }
 
-// TestPropertySortMatchesEngine is the main claim: for every compiled tree the engine built, the Go
-// PropertySort produces the reading the engine produced.
-func TestPropertySortMatchesEngine(test *testing.T) {
+// TestPropertySortMatchesTailwind is the main claim: for every compiled tree Tailwind built, the Go
+// PropertySort produces the reading Tailwind produced.
+func TestPropertySortMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadAstCorpus(test)
 
@@ -137,10 +137,10 @@ func TestPropertySortMatchesEngine(test *testing.T) {
 		got := PropertySort(seedFor(node))
 
 		if got.Count != testCase.PropertySort.Count {
-			test.Errorf("%s: count = %d, engine says %d", testCase.ClassName, got.Count, testCase.PropertySort.Count)
+			test.Errorf("%s: count = %d, Tailwind says %d", testCase.ClassName, got.Count, testCase.PropertySort.Count)
 		}
 		if !equalInts(got.Order, testCase.PropertySort.Order) {
-			test.Errorf("%s: order = %v, engine says %v", testCase.ClassName, got.Order, testCase.PropertySort.Order)
+			test.Errorf("%s: order = %v, Tailwind says %v", testCase.ClassName, got.Order, testCase.PropertySort.Order)
 		}
 
 		if treeHasKind(node, KindAtRoot) {
@@ -187,7 +187,7 @@ func TestPropertySortIsBreadthFirst(test *testing.T) {
 
 		if !equalStrings(got, testCase.BreadthFirst) {
 			test.Errorf(
-				"%s: visit order = %v, engine's queue visits %v",
+				"%s: visit order = %v, Tailwind's queue visits %v",
 				testCase.ClassName,
 				got,
 				testCase.BreadthFirst,
@@ -200,7 +200,7 @@ func TestPropertySortIsBreadthFirst(test *testing.T) {
 		// assertion above must be the thing that rejects it.
 		if equalStrings(got, testCase.DepthFirst) {
 			test.Errorf(
-				"%s: visit order matches depth-first %v, so the traversal is not the engine's",
+				"%s: visit order matches depth-first %v, so the traversal is not Tailwind's",
 				testCase.ClassName,
 				testCase.DepthFirst,
 			)
@@ -208,7 +208,7 @@ func TestPropertySortIsBreadthFirst(test *testing.T) {
 	}
 
 	test.Logf(
-		"%d trees where breadth-first and depth-first diverge; across the full %d-candidate class list the engine's own measurement is %d divergent and %d carrying an at-root subtree",
+		"%d trees where breadth-first and depth-first diverge; across the full %d-candidate class list Tailwind's own measurement is %d divergent and %d carrying an at-root subtree",
 		len(corpus.TraversalCases), corpus.FullList.Compiled,
 		corpus.FullList.BreadthFirstDiffersFromDepthFirst, corpus.FullList.WithAtRootSubtree,
 	)
@@ -357,7 +357,7 @@ func TestPropertySortTwSortLatch(test *testing.T) {
 }
 
 // TestPropertySortOrderIsAscendingAndDeduplicated pins the shape of Order over the whole corpus,
-// which the per-case comparison would satisfy vacuously if the engine's own answers happened to be
+// which the per-case comparison would satisfy vacuously if Tailwind's own answers happened to be
 // already sorted.
 func TestPropertySortOrderIsAscendingAndDeduplicated(test *testing.T) {
 	test.Parallel()
@@ -376,7 +376,7 @@ func TestPropertySortOrderIsAscendingAndDeduplicated(test *testing.T) {
 
 // TestVariantsDoNotChangeTheReading pins the contract that made the fixture's shape necessary.
 //
-// The engine takes a candidate's reading from its body before any variant is applied, so
+// Tailwind takes a candidate's reading from its body before any variant is applied, so
 // `hover:flex` and `flex` read alike even though `not-hover:flex` compiles to twice the
 // declarations. The fixture records both trees; this asserts the emitted tree really can differ
 // while the reading does not, so the invariance is demonstrated rather than assumed.
@@ -400,10 +400,10 @@ func TestVariantsDoNotChangeTheReading(test *testing.T) {
 			whereEmittedDiffers++
 		}
 
-		// The reading is the engine's, taken from the pre-variant body. The post-variant tree is
+		// The reading is Tailwind's, taken from the pre-variant body. The post-variant tree is
 		// never the input.
 		if got := PropertySort(seedFor(read)); got.Count != testCase.PropertySort.Count {
-			test.Errorf("%s: count = %d, engine says %d", testCase.ClassName, got.Count, testCase.PropertySort.Count)
+			test.Errorf("%s: count = %d, Tailwind says %d", testCase.ClassName, got.Count, testCase.PropertySort.Count)
 		}
 	}
 
@@ -460,10 +460,10 @@ func TestPropertySortDoesNotMutateItsInput(test *testing.T) {
 	}
 }
 
-// seedFor recovers the declaration list the engine seeded getPropertySort with.
+// seedFor recovers the declaration list Tailwind seeded getPropertySort with.
 //
 // The fixture stores that list already wrapped in the candidate's `.selector` rule, because that is
-// the shape compileAstNodes returns. Unwrapping one level asks the same question the engine asked.
+// the shape compileAstNodes returns. Unwrapping one level asks the same question Tailwind asked.
 func seedFor(node *Node) []*Node {
 	if node.Kind == KindRule {
 		return node.Nodes

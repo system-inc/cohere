@@ -45,7 +45,7 @@ var messageNonoctalDecimalEscape = rule.Message{
 //
 // Every finding carries suggestions rather than fixes, because the two repairs mean different
 // things and only the author knows which was meant. `'\8'` may have been intended as the digit or
-// as a literal backslash before a digit, and an engine that picked one unattended would silently
+// as a literal backslash before a digit, and a linter that picked one unattended would silently
 // change the string half the time.
 var NoNonoctalDecimalEscape = rule.Rule[rule.NoOptions]{
 	Name: "no-nonoctal-decimal-escape",

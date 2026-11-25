@@ -19,7 +19,7 @@ func smallMacBinary(test *testing.T, goArchitecture string) string {
 	test.Helper()
 
 	if runtime.GOOS != "darwin" {
-		test.Skip("NOT MEASURED: lipo and vtool are macOS tools, and the Swift engine is only packaged on macOS")
+		test.Skip("NOT MEASURED: lipo and vtool are macOS tools, and cohere-swift is only packaged on macOS")
 	}
 
 	directory := test.TempDir()
@@ -57,7 +57,7 @@ func TestArchitectureIsReadFromTheBinary(test *testing.T) {
 
 // TestMinimumMacOsIsReadFromTheBinary uses one binary twice: as Go built it, which passes, and with its
 // recorded minimum rewritten to macOS 27 by vtool, which is refused. The rewritten copy is the case the
-// guard exists for, an engine built against a deployment target newer than the release promises.
+// guard exists for, a binary built against a deployment target newer than the release promises.
 func TestMinimumMacOsIsReadFromTheBinary(test *testing.T) {
 	test.Parallel()
 
@@ -137,14 +137,14 @@ func TestSwiftArchitectureNamesEveryMacTarget(test *testing.T) {
 			continue
 		}
 		if _, swiftArchitectureError := swiftArchitecture(target.GoArchitecture); swiftArchitectureError != nil {
-			test.Errorf("%s ships the Swift engine and has no Swift architecture: %v", target, swiftArchitectureError)
+			test.Errorf("%s ships cohere-swift and has no Swift architecture: %v", target, swiftArchitectureError)
 		}
 	}
 }
 
-// contractPair writes a stand-in cohere whose `--version` prints cohereVersion, and a stand-in engine that
+// contractPair writes a stand-in cohere whose `--version` prints cohereVersion, and a stand-in binary that
 // runs engineScript with its arguments in "$@". Shell scripts rather than real builds, because what is
-// under test is how the release reads the two answers, and a real engine takes fifteen minutes to build.
+// under test is how the release reads the two answers, and a real binary takes fifteen minutes to build.
 func contractPair(test *testing.T, cohereVersion string, engineScript string) (coherePath string, enginePath string) {
 	test.Helper()
 
@@ -172,11 +172,11 @@ func contractPair(test *testing.T, cohereVersion string, engineScript string) (c
 	return coherePath, enginePath
 }
 
-// stampedCommit is the commit the stand-in engines below say they were built from, and the one the
+// stampedCommit is the commit the stand-in binaries below say they were built from, and the one the
 // release is told it stamped.
 const stampedCommit = "0123456789abcdef0123456789abcdef01234567"
 
-// speaksContract is an engine stamped with stampedCommit that answers `--contract <its> --version` with its
+// speaksContract is a binary stamped with stampedCommit that answers `--contract <its> --version` with its
 // provenance record and refuses any other contract the way the real one does: a sentence on stderr and
 // exit 2.
 func speaksContract(contract string) string {
@@ -213,15 +213,20 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 		engineScript  string
 		says          string
 	}{
-		{"the engine refuses the flag", "cohere 1.0.0\n  swift contract: 4", speaksContract("3"), "refused contract 4"},
-		{"the engine accepts the flag and its record names another contract", "cohere 1.0.0\n  swift contract: 3",
+		{
+			"cohere-swift refuses the flag",
+			"cohere 1.0.0\n  swift contract: 4",
+			speaksContract("3"),
+			"refused contract 4",
+		},
+		{"cohere-swift accepts the flag and its record names another contract", "cohere 1.0.0\n  swift contract: 3",
 			`echo '{"kind":"provenance","contract":2}'`, "speaks contract 2"},
-		{"the engine answers with something that is not provenance", "cohere 1.0.0\n  swift contract: 3",
+		{"cohere-swift answers with something that is not provenance", "cohere 1.0.0\n  swift contract: 3",
 			`echo '{"kind":"summary","contract":3}'`, "not a provenance record"},
-		{"the engine's record names no contract", "cohere 1.0.0\n  swift contract: 3",
+		{"cohere-swift's record names no contract", "cohere 1.0.0\n  swift contract: 3",
 			`echo '{"kind":"provenance"}'`, "not a provenance record"},
 		{"cohere names no contract", "cohere 1.0.0", speaksContract("3"), "names no Swift contract"},
-		{"the engine was not stamped", "cohere 1.0.0\n  swift contract: 3",
+		{"cohere-swift was not stamped", "cohere 1.0.0\n  swift contract: 3",
 			`echo '{"kind":"provenance","contract":3,"commit":"dev"}'`, `built from "dev"`},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -239,7 +244,7 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 	}
 }
 
-// TestSwiftEngineBuildReadsTheTreeAsItIsNow builds a stand-in engine through buildSwiftEngine twice in one
+// TestSwiftEngineBuildReadsTheTreeAsItIsNow builds a stand-in binary through buildSwiftEngine twice in one
 // repository: clean, then with a tracked file edited. It is laid out as cohere-swift is, a CohereSwift
 // target with the stamp gitignored under Command/, its manifest defines a flag from
 // `Context.gitInformation.hasUncommittedChanges` as cohere-swift's does, and the product prints that flag
@@ -252,7 +257,7 @@ func TestSwiftEngineBuildReadsTheTreeAsItIsNow(test *testing.T) {
 	test.Parallel()
 
 	if runtime.GOOS != "darwin" {
-		test.Skip("NOT MEASURED: the Swift engine is only built on macOS")
+		test.Skip("NOT MEASURED: cohere-swift is only built on macOS")
 	}
 	if _, lookPathError := exec.LookPath("swift"); lookPathError != nil {
 		test.Skip("NOT MEASURED: no swift toolchain on PATH")
@@ -282,7 +287,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	writeFile(test, filepath.Join(module, ".gitignore"), ".scratch/\n")
 	gitIn(test, module, "init", "--quiet")
 	gitIn(test, module, "add", ".")
-	gitIn(test, module, "commit", "--quiet", "-m", "stand-in engine")
+	gitIn(test, module, "commit", "--quiet", "-m", "stand-in binary")
 	commit, readReleaseCommitError := readReleaseCommit(module)
 	if readReleaseCommitError != nil {
 		test.Fatal(readReleaseCommitError)
@@ -310,7 +315,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	}
 
 	if got := says(); got != "clean "+commit {
-		test.Fatalf("an engine built from a clean tree says %q, and should say clean and its commit %s", got, commit)
+		test.Fatalf("a binary built from a clean tree says %q, and should say clean and its commit %s", got, commit)
 	}
 	if _, statError := os.Stat(
 		filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftEngineStampFileName),
@@ -320,7 +325,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	writeFile(test, source, program+"// edited\n")
 	if got := says(); got != "modified "+commit {
 		test.Fatalf(
-			"an engine built after a tracked file was edited says %q, so its provenance would call the tree clean",
+			"a binary built after a tracked file was edited says %q, so its provenance would call the tree clean",
 			got,
 		)
 	}

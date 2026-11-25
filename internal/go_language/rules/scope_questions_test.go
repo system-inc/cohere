@@ -665,7 +665,7 @@ func scopeAsksOf(questions []scopeQuestion, typed map[string]*packages.Package) 
 // fails, saying which. A rule that declares scopeUses must ask an identifier's name somewhere, the one name the body
 // reach honours that entry for, by Shadowed. A question in a package that holds no rule's code fails where reaching
 // names a rule package whose code reaches it, a rule's helper, whose rules cannot be told, and is otherwise the
-// engine's own machinery under the rules' directory, which no rule's finding reads, named in returned's second part,
+// checker's own machinery under the rules' directory, which no rule's finding reads, named in returned's second part,
 // for the log.
 func scopeQuestionFailures(
 	asks []scopeAsk,
@@ -766,8 +766,8 @@ func loadedPackages(test *testing.T, mode packages.LoadMode, patterns ...string)
 // each of those rules' lines in rule_inputs.txt (Declared.Scope) names what it asks, read from the call's argument by
 // the types (scopeNameResolver), so the body reach knows every name a one-side declaration could move a finding or a
 // fix by. A question a package holds that no rule's code lies in fails where a rule package's code reaches it, and is
-// otherwise the engine's machinery, logged: standing_facts' two, function_finder.go's objectAt and methodAt, which
-// find the build's own object for one the host named, are run by the engine before any rule, and no rule package
+// otherwise cohere-go's machinery, logged: standing_facts' two, function_finder.go's objectAt and methodAt, which
+// find the build's own object for one the host named, are run by cohere-go before any rule, and no rule package
 // imports them.
 //
 // The guard matches spellings, so it cannot see a question asked another way: a scope held in a variable,
@@ -824,7 +824,7 @@ func TestEveryScopeQuestionOfARuleIsDeclared(test *testing.T) {
 	for _, failure := range failures {
 		test.Error(failure)
 	}
-	test.Logf("%d scope questions; the engine's machinery's, which no rule's code holds: %q", len(questions),
+	test.Logf("%d scope questions; cohere-go's machinery's, which no rule's code holds: %q", len(questions),
 		machinery)
 
 	trimPackage := rulesPackagePath + "/duplicate_trim_character"

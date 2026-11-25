@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// An engine already installed under its hash is never replaced, not even by different bytes. A run reads
+// A binary already installed under its hash is never replaced, not even by different bytes. A run reads
 // the binary as one of its inputs, so a second install's replacement under a run already reading it gave
 // the binary a new identity and times, and the run refused its record (#p5ndwqa).
 func TestInstallingTheEngineKeepsABinaryAlreadyThere(test *testing.T) {
@@ -24,7 +24,7 @@ func TestInstallingTheEngineKeepsABinaryAlreadyThere(test *testing.T) {
 	}
 
 	if copyExecutableError := copyExecutable(source, destination); copyExecutableError != nil {
-		test.Fatalf("installing over an engine already there: %v", copyExecutableError)
+		test.Fatalf("installing over a binary already there: %v", copyExecutableError)
 	}
 
 	after, statError := os.Stat(destination)
@@ -32,18 +32,18 @@ func TestInstallingTheEngineKeepsABinaryAlreadyThere(test *testing.T) {
 		test.Fatal(statError)
 	}
 	if !os.SameFile(before, after) {
-		test.Error("the installed engine was replaced by another file, so a run reading it would see it change")
+		test.Error("the installed binary was replaced by another file, so a run reading it would see it change")
 	}
 	if !after.ModTime().Equal(before.ModTime()) {
-		test.Errorf("the installed engine's modification time moved from %v to %v", before.ModTime(), after.ModTime())
+		test.Errorf("the installed binary's modification time moved from %v to %v", before.ModTime(), after.ModTime())
 	}
 	if contents := readFile(test, destination); contents != "the first build" {
-		test.Errorf("the installed engine now holds %q", contents)
+		test.Errorf("the installed binary now holds %q", contents)
 	}
 	expectNoPartialFiles(test, directory)
 }
 
-// A missing engine is installed whole and executable, with the product's bytes.
+// A missing binary is installed whole and executable, with the product's bytes.
 func TestInstallingTheEnginePutsTheProductInPlace(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -52,7 +52,7 @@ func TestInstallingTheEnginePutsTheProductInPlace(test *testing.T) {
 	writeFile(test, source, "the build")
 
 	if copyExecutableError := copyExecutable(source, destination); copyExecutableError != nil {
-		test.Fatalf("installing a missing engine: %v", copyExecutableError)
+		test.Fatalf("installing a missing binary: %v", copyExecutableError)
 	}
 
 	info, statError := os.Stat(destination)
@@ -60,15 +60,15 @@ func TestInstallingTheEnginePutsTheProductInPlace(test *testing.T) {
 		test.Fatal(statError)
 	}
 	if info.Mode().Perm()&0o111 == 0 {
-		test.Errorf("the installed engine is not executable: %v", info.Mode())
+		test.Errorf("the installed binary is not executable: %v", info.Mode())
 	}
 	if contents := readFile(test, destination); contents != "the build" {
-		test.Errorf("the installed engine holds %q", contents)
+		test.Errorf("the installed binary holds %q", contents)
 	}
 	expectNoPartialFiles(test, directory)
 }
 
-// Processes that find the engine missing at once and all install it leave one binary, whole, and nothing
+// Processes that find cohere-swift missing at once and all install it leave one binary, whole, and nothing
 // else.
 func TestInstallingTheEngineConcurrentlyLeavesOneBinary(test *testing.T) {
 	test.Parallel()
@@ -95,7 +95,7 @@ func TestInstallingTheEngineConcurrentlyLeavesOneBinary(test *testing.T) {
 		}
 	}
 	if contents := readFile(test, destination); contents != "the build" {
-		test.Errorf("the installed engine holds %q", contents)
+		test.Errorf("the installed binary holds %q", contents)
 	}
 	expectNoPartialFiles(test, directory)
 }

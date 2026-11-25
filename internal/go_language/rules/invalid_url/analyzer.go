@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1007",
 	"SA1007",
 	"Flags a URL given as a constant to net/url.Parse that does not parse: staticcheck's SA1007, ported onto "+
-		"the engine's own intermediate representation.",
+		"cohere's own intermediate representation.",
 	&Listener,
 )
 

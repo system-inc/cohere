@@ -5,7 +5,7 @@
 // coverage existed only on that machine and nobody could tell. A test asks for a corpus by name instead.
 // The corpus's variable says where it is. When the variable is unset the test skips with a line naming it,
 // and `cohere-dev test` ends every run by naming the corpora it did not cover, so a green run says what it
-// left out. No test names a path: the Go engine's cohere-go/testing-no-machine-path fails one that names a home
+// left out. No test names a path: cohere-go's cohere-go/testing-no-machine-path fails one that names a home
 // directory.
 //
 // `cohere-dev test` sets each unset variable from the user's corpora file, so a developer who has the

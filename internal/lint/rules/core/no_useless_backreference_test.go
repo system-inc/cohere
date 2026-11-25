@@ -437,18 +437,18 @@ func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(test *testing.T) {
 	}
 }
 
-// TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse covers the scanner's error
+// TestNoUselessBackreferenceStaysSilentOnAPatternTheRegularExpressionParserWouldRefuse covers the scanner's error
 // paths, which the corpus reaches only glancingly.
 //
 // Written for three surviving mutants: dropping the balanced-parenthesis check, accepting a `{`
 // with no digits as a quantifier, and ignoring a failed escape skip. All three are reachable and
 // none is defensive, because a pattern arrives here as a *string* and a string can hold anything.
-// `RegExp('\\1(a')` is a runtime error the engine raises, not a lint finding, and a scanner that
+// `RegExp('\\1(a')` is a runtime error the regular expression parser raises, not a lint finding, and a scanner that
 // walks it anyway builds a group list whose spans are nonsense and then reports against them.
 //
 // Upstream reaches two of these (`RegExp('\\1(a)[')` is in its pass vector) and stops there, so
 // the unbalanced and trailing-backslash shapes are ours.
-func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(test *testing.T) {
+func TestNoUselessBackreferenceStaysSilentOnAPatternTheRegularExpressionParserWouldRefuse(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

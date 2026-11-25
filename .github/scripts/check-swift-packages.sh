@@ -4,7 +4,7 @@
 #     check-swift-packages.sh <checkout> <platform>:<flag> [<platform>:<flag> ...]
 #     check-swift-packages.sh "$GITHUB_WORKSPACE" darwin-arm64:--no-fix darwin-x64:--lint
 #
-# A released cohere runs the cohere-swift shipped beside it, never a checkout, and the engine reads
+# A released cohere runs the cohere-swift shipped beside it, never a checkout, and cohere-swift reads
 # nothing from the tree it was built in: its vocabulary comes from cohere. <checkout> is that tree, or
 # wherever one could be, so it is made unreadable, and a copy of each package from ./dist checks a
 # sample package from outside it, the way a user's machine runs one.
@@ -13,7 +13,7 @@
 # would fail for a reason that has nothing to do with the package.
 #
 # The flag is the run: `--no-fix` runs every phase and must cover a file in types and in lint. `--lint`
-# must cover one in lint. An x64 package on Apple silicon runs under Rosetta, so an engine built for the
+# must cover one in lint. An x64 package on Apple silicon runs under Rosetta, so a cohere-swift built for the
 # wrong Mac is executed, not only inspected. It can only lint there: the types phase loads the
 # toolchain's libclang, and Xcode on Apple silicon ships it for arm64 only.
 set -euo pipefail
@@ -60,7 +60,7 @@ for run in "$@"; do
 
     # Findings exit 1, and that is a run that checked, unless the front door says the run did not
     # check or cannot be trusted. Anything above 1 did not check either.
-    if [ "$status" -gt 1 ] || grep -Eq "nothing was checked|engine is broken" "$gate/$platform.log"; then
+    if [ "$status" -gt 1 ] || grep -Eq "nothing was checked|is broken, so nothing it reported" "$gate/$platform.log"; then
         echo "$platform $flag: the Swift run did not check the sample (exit $status)"
         exit 1
     fi

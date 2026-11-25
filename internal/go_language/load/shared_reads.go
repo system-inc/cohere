@@ -25,7 +25,7 @@ import (
 // sharing is exact: it changes where the bytes come from, never which.
 //
 // A run's loads share one SharedReads only once nothing will write a file it read: a file the run holds is always read
-// from its held bytes first (Held), which follow every write, and the engine never adds or removes a file, so a
+// from its held bytes first (Held), which follow every write, and cohere-go never adds or removes a file, so a
 // directory's entries hold for the run. A nil SharedReads shares nothing, and each listing reads the disk itself.
 type SharedReads struct {
 	// pastHead counts the readers that read on past a file's shared head, opening it on disk, and directoryReads
@@ -39,7 +39,7 @@ type SharedReads struct {
 
 	// resolved is each path's filepath.EvalSymlinks, empty where it failed, a string by path, and isDirectories
 	// whether each path is a directory, a bool by path, which go/build's HasSubdir and IsDir read (hasSubdirectory,
-	// isDirectory): a path's links and kind hold for the run, as its entries do, since the engine adds or removes no
+	// isDirectory): a path's links and kind hold for the run, as its entries do, since cohere-go adds or removes no
 	// file. That is an invariant every fixer has to keep: the wrap and the rename rewrite files and the store writes
 	// under a dot directory go never walks, and a fixer that ever adds or removes a file leaves both tables stale.
 	// Each is a sync.Map, not under mutex: they are filled once and read for every directory of every build listing

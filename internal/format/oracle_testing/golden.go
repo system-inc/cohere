@@ -220,10 +220,10 @@ func (golden *Golden) Answer(key string, compute func() (string, error)) (string
 	return answer.Output, nil
 }
 
-// Engine answers as prettier.New(options) would, from the golden. The real engine is built only when
+// Formatter answers as prettier.New(options) would, from the golden. The real formatter is built only when
 // recording, and only once.
-func (golden *Golden) Engine(options format_options.Options) *Engine {
-	return &Engine{golden: golden, options: options}
+func (golden *Golden) Formatter(options format_options.Options) *Formatter {
+	return &Formatter{golden: golden, options: options}
 }
 
 var bundlesDigest struct {

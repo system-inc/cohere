@@ -92,10 +92,10 @@ func TestSwiftLiteralsOutrunTheText(test *testing.T) {
 	}
 }
 
-// TestOneEditReachesBothEngines: one edited entry shows in the Go rule's rendered message and in the
+// TestOneEditReachesBothLanguages: one edited entry shows in the Go rule's rendered message and in the
 // Swift source generated from the same files. The Swift test theFindingIsTheCatalogsMessage closes the
 // chain from that source to the finding a user sees.
-func TestOneEditReachesBothEngines(test *testing.T) {
+func TestOneEditReachesBothLanguages(test *testing.T) {
 	test.Parallel()
 	edited := fstest.MapFS{}
 	walkDirectoryError := fs.WalkDir(MessageFiles(), ".", func(name string, entry fs.DirEntry, pathError error) error {

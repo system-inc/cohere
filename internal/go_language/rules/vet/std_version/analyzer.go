@@ -13,7 +13,7 @@
 // version after go1.0, the same 6,784 entries in the same order, and nothing else, since the pass never reports a
 // symbol of go1.0. x/tools' internal/versions helpers are the public go/version they copy. The registry runs the port
 // in the original's place, and the original stays the oracle: the parity tests beside this file run both over the
-// same packages. The two agree everywhere, so there is no differences fixture. It sits on the engine's syntax
+// same packages. The two agree everywhere, so there is no differences fixture. It sits on cohere-go's syntax
 // dispatcher, hearing each file and each identifier on the walk the dispatcher makes once for every syntax rule.
 package std_version
 

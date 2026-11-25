@@ -19,7 +19,7 @@ var allowedRuleImports = map[string]bool{
 	// prefix without a trailing slash would also admit `internal/tailwindanything`, and one with a
 	// trailing slash matches no package at all when the package is the directory itself.
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse": true,
-	// The house policy both engines read as data: rule names, message text. It imports only the
+	// The house policy both languages read as data: rule names, message text. It imports only the
 	// standard library and moves when a shared decision changes, which is the event a rebuild should
 	// follow. Measured on 2026-10-03 when Base's bare-throw rule began rendering its message from it,
 	// three warm rounds each under the same load: editing a rule that imports it rebuilds in 1.13 to
@@ -34,8 +34,8 @@ var allowedRuleImports = map[string]bool{
 	// the high-level IR already, which is under the shelf's prefix, so naming it directly adds no
 	// package to any rule edit's rebuild.
 	"github.com/system-inc/cohere/static_single_assignment": true,
-	// The house vocabularies both Go engines read: the abbreviation words' loader and finder, and the shouting
-	// safe list and masks. Each moved out of package nexus so the Go engine's rules could read the same data
+	// The house vocabularies both Go languages read: the abbreviation words' loader and finder, and the shouting
+	// safe list and masks. Each moved out of package nexus so cohere-go's rules could read the same data
 	// without linking the TypeScript checker (#ec8mvbg). internal/naming/abbreviation imports only the standard
 	// library and policy, and internal/shouting only the standard library and internal/lint/ecmascript/text, which
 	// is under the shelf's prefix, so both are leaves by their imports and change only when the house vocabulary
@@ -46,7 +46,7 @@ var allowedRuleImports = map[string]bool{
 	// to base's 33, so the load and the package's own size dominate that gap; it does not isolate the imports.
 	"github.com/system-inc/cohere/internal/naming/abbreviation": true,
 	"github.com/system-inc/cohere/internal/shouting":            true,
-	// The SQL reading nexus/security-no-interpolated-sql-string and its Go engine twin share: which holes in SQL
+	// The SQL reading nexus/security-no-interpolated-sql-string and its cohere-go twin share: which holes in SQL
 	// text sit inside a quoted value or bare after a comparison. It moved out of package nexus so the Go rule reads
 	// SQL as the TypeScript one does without linking the TypeScript checker, the move internal/shouting made. It
 	// imports only `strings`, and `go list -deps` names nothing past the standard library, so it is a leaf by its
@@ -56,20 +56,20 @@ var allowedRuleImports = map[string]bool{
 	// package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule that imports it,
 	// 2.57 to 2.76s.
 	"github.com/system-inc/cohere/internal/sql_text": true,
-	// The warning-comment judgment nexus/consistency-no-warning-comment and its Go engine twin share: the words, the
+	// The warning-comment judgment nexus/consistency-no-warning-comment and its cohere-go twin share: the words, the
 	// whole-word test and the masks (#jmx59gd). It imports only the standard library and internal/shouting, a leaf
 	// on this list, so it is a leaf by its imports, and it changes only when the shared judgment does. Measured on
 	// 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a load average
 	// of about 30: 0.20 to 0.25s, and `go build -v` shows it is the only package rebuilt.
 	"github.com/system-inc/cohere/internal/warning_comment": true,
-	// The separated-folder-words judgment nexus/consistency-require-separated-folder-words and its Go engine twin
+	// The separated-folder-words judgment nexus/consistency-require-separated-folder-words and its cohere-go twin
 	// share: the parts, the pieces a split may use and the tie rule (#narw7aq). It imports only the standard library
 	// and policy, on this list, so it is a leaf by its imports, and it changes only when the shared judgment does.
 	// Measured on 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a
 	// load average of about 24 to 34: 0.24 to 0.26s, and `go build -v` shows it is the only package rebuilt.
 	"github.com/system-inc/cohere/internal/folder_words": true,
 	// The file-name judgment nexus/consistency-no-utils-file-name and nexus/consistency-no-abbreviated-file-name share
-	// with their Go engine twins: a file name's words, and what the utils word and the abbreviation vocabulary make
+	// with their cohere-go twins: a file name's words, and what the utils word and the abbreviation vocabulary make
 	// of them (#2xt6v5r). It imports only the standard library, internal/folder_words and
 	// internal/naming/abbreviation, both on this list, so it is a leaf by its imports, and it changes only when the
 	// shared judgment does. Measured on 2026-11-09, three rounds of `go build -v ./internal/lint/registry` after a
@@ -143,7 +143,7 @@ func TestRulePackagesStayLeaves(test *testing.T) {
 	 *
 	 * The two were the same thing while every directory under `rules/` held rules and nothing else.
 	 * They came apart when each namespace's own machinery moved in beside its rules: the Tailwind
-	 * collapse engine, React's vendored conformance corpus and the score computed against it. Those
+	 * collapse language, React's vendored conformance corpus and the score computed against it. Those
 	 * are not on the loop a rule author sits in, and the guard reported all three as violations for
 	 * importing exactly what they exist to import.
 	 *

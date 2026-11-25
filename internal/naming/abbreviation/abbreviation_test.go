@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/policy"
 )
 
-// Every finding carries exactly the values its message's text uses, since each engine renders the id it names with
+// Every finding carries exactly the values its message's text uses, since each language renders the id it names with
 // those values and a missing one would print its placeholder. Run over one generated name per form of every entry,
 // the same names nexus's tests judge, so no form of any word goes unchecked.
 func TestFindGivesEachMessageItsValues(test *testing.T) {
@@ -40,7 +40,7 @@ func TestFindGivesEachMessageItsValues(test *testing.T) {
 	}
 }
 
-// A finding's spellings are the advice's own list: every one is quoted in the text the finding renders, so an engine
+// A finding's spellings are the advice's own list: every one is quoted in the text the finding renders, so a language
 // that renames by them renames to what the message says, never to a second reading of the entry.
 func TestFindSpellsOnlyWhatItsAdviceSays(test *testing.T) {
 	test.Parallel()
@@ -69,7 +69,7 @@ func TestFindNamesTheSpellingsItsAdviceOffers(test *testing.T) {
 		want []string
 	}{
 		{"cfg", []string{"configuration"}},
-		// The vocabulary names Go's own word for it, and leaves to an engine whether that word is free.
+		// The vocabulary names Go's own word for it, and leaves to a language whether that word is free.
 		{"err", []string{"error"}},
 		{"cfgPath", []string{"configurationPath"}},
 		{"parseCfgFile", []string{"parseConfigurationFile"}},
@@ -301,7 +301,7 @@ func TestFindAsksWhatAnUnlistableWordHolds(test *testing.T) {
 	}
 }
 
-// The loader refuses an expansion list the engines would read as something other than meant, and the key it
+// The loader refuses an expansion list the languages would read as something other than meant, and the key it
 // replaced, so a file written for the single expansion fails at startup rather than judging with none.
 func TestLoadRefusesABrokenExpansionList(test *testing.T) {
 	test.Parallel()
@@ -382,7 +382,7 @@ func TestNameWordsReadEveryWordTheSharedVocabularyHoldsAsItDoes(test *testing.T)
 		if !inBoth {
 			continue
 		}
-		// The reason is each file's own, saying why the word is in it; everything the engines read is the same.
+		// The reason is each file's own, saying why the word is in it; everything the languages read is the same.
 		sameEntry := *entry
 		sameEntry.Reason = sharedEntry.Reason
 		if !reflect.DeepEqual(&sameEntry, sharedEntry) {

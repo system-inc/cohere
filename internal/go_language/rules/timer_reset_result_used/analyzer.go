@@ -1,5 +1,5 @@
 // Package timer_reset_result_used is staticcheck's SA1025, a branch on the result of (*time.Timer).Reset that drains
-// a timer's channel, which races with the timer firing anew, ported onto the engine's own intermediate
+// a timer's channel, which races with the timer firing anew, ported onto cohere-go's own intermediate
 // representation (#tey4xje).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1025/sa1025.go, whose logic it keeps and
@@ -38,7 +38,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1025",
 	"SA1025",
 	"Flags a branch on the result of (*time.Timer).Reset that drains a timer's channel: staticcheck's SA1025, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

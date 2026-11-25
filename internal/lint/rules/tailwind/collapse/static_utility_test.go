@@ -59,7 +59,7 @@ func TestFrameworkStaticsReproduceTheBaseTable(test *testing.T) {
 
 // TestFrameworkStaticsCoverTheDeprecatedRegistrations is the finding this component was built on.
 //
-// 21 statics are registered by the engine and absent from `baseStatics`, all of them deprecated
+// 21 statics are registered by Tailwind and absent from `baseStatics`, all of them deprecated
 // utilities that `getClassList()` does not advertise. Three are written in the ahra tree today.
 // Asserting them by name rather than by count is deliberate: a count keeps passing while the set
 // underneath it changes, and the point is which classes were missing.
@@ -90,7 +90,7 @@ func TestFrameworkStaticsCoverTheDeprecatedRegistrations(test *testing.T) {
 		}
 		if !readingsEqual(expected, actual) {
 			test.Errorf(
-				"%s reads %v#%d, expected %v#%d from the engine",
+				"%s reads %v#%d, expected %v#%d from Tailwind",
 				name,
 				actual.Order,
 				actual.Count,

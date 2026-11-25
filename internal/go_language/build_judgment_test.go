@@ -51,7 +51,7 @@ func layoutRestored(test *testing.T) (*packages.Package, *packages.Package) {
 	if writeError != nil {
 		test.Fatal(writeError)
 	}
-	// The dependency's own imports keep the types their load checked, as a restored package's do in the engine's
+	// The dependency's own imports keep the types their load checked, as a restored package's do in cohere-go's
 	// load, and the read adds the dependency itself.
 	imported := load.ClosureTypes(dependency)
 	_, readError := export_data.Read(token.NewFileSet(), imported, exportData, layoutDependency)

@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 )
 
-// TestUnseenAloneIsAGap gives the types phase a file every package holds, so the engine's own held-check finds
+// TestUnseenAloneIsAGap gives the types phase a file every package holds, so cohere-go's own held-check finds
 // nothing, and that the load nonetheless names as Unseen. The file must be in filesWithoutRecord, and the run
 // incomplete, on the load's word alone.
 func TestUnseenAloneIsAGap(test *testing.T) {
@@ -30,15 +30,15 @@ func TestUnseenAloneIsAGap(test *testing.T) {
 		Unseen:   []string{file},
 	}
 	var output bytes.Buffer
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request:       invocation{switches: map[string]bool{}},
 		described:     described,
 		writer:        contract.NewWriter(&output),
 		standardError: io.Discard,
 	}
-	engine.write(provenanceRecord())
+	pipeline.write(provenanceRecord())
 
-	engine.runTypes(loaded, nil)
+	pipeline.runTypes(loaded, nil)
 
 	var types contract.TypesRecord
 	for _, line := range strings.Split(output.String(), "\n") {
@@ -52,7 +52,7 @@ func TestUnseenAloneIsAGap(test *testing.T) {
 		test.Errorf("filesWithoutRecord %q, want the unseen file alone; stream:\n%s", types.FilesWithoutRecord,
 			output.String())
 	}
-	if !engine.incomplete {
+	if !pipeline.incomplete {
 		test.Error("a file the load saw nothing of left the run complete")
 	}
 }
@@ -68,15 +68,15 @@ func TestWithheldDependencyCgoErrorsAreOnTheTypesRecord(test *testing.T) {
 		WithheldDependencyCgoDeclarations: 4,
 	}
 	var output bytes.Buffer
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request:       invocation{switches: map[string]bool{}},
 		described:     &describedProject{inScopeSet: map[string]bool{}, contents: map[string][]byte{}},
 		writer:        contract.NewWriter(&output),
 		standardError: io.Discard,
 	}
-	engine.write(provenanceRecord())
+	pipeline.write(provenanceRecord())
 
-	engine.runTypes(loaded, nil)
+	pipeline.runTypes(loaded, nil)
 
 	var types contract.TypesRecord
 	for _, line := range strings.Split(output.String(), "\n") {
@@ -95,7 +95,7 @@ func TestWithheldDependencyCgoErrorsAreOnTheTypesRecord(test *testing.T) {
 		test.Errorf("withheldDependencyCgoDeclarations %d, want 4; stream:\n%s",
 			types.WithheldDependencyCgoDeclarations, output.String())
 	}
-	if engine.findingsWritten > 0 || types.Diagnostics > 0 {
+	if pipeline.findingsWritten > 0 || types.Diagnostics > 0 {
 		test.Errorf("a withheld error was written as a finding; stream:\n%s", output.String())
 	}
 }
@@ -108,13 +108,13 @@ func TestAWithheldDependencyCgoFileWithNoErrorsIsRefused(test *testing.T) {
 		WithheldInDependencyCgo: []load.Withheld{{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 0}},
 	}
 	var output bytes.Buffer
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request:       invocation{switches: map[string]bool{}},
 		described:     &describedProject{inScopeSet: map[string]bool{}, contents: map[string][]byte{}},
 		writer:        contract.NewWriter(&output),
 		standardError: io.Discard,
 	}
-	engine.write(provenanceRecord())
+	pipeline.write(provenanceRecord())
 	defer func() {
 		recovered := recover()
 		message, isString := recovered.(string)
@@ -126,5 +126,5 @@ func TestAWithheldDependencyCgoFileWithNoErrorsIsRefused(test *testing.T) {
 		}
 	}()
 
-	engine.runTypes(loaded, nil)
+	pipeline.runTypes(loaded, nil)
 }

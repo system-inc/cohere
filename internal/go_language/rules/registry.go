@@ -1,4 +1,4 @@
-// Package rules is the list of rules the Go engine runs: one place that names every rule, so the engine,
+// Package rules is the list of rules cohere-go runs: one place that names every rule, so cohere-go,
 // `--rules` and the docs all read the same list.
 package rules
 
@@ -248,7 +248,7 @@ import (
 // false, for the docs, and which a syntax-only walk must be (rule.ValidateSyntaxOnlyWalk). It says nothing of whether
 // a pass's findings on a file are the file's alone: that is the SyntaxOnly mark, on a listener or in syntaxOnlyWalks,
 // which a pass here may lack, as unreachable does. Every other pass in vet's suite reads pass.TypesInfo, the ports of
-// nilness and unusedwrite read the engine's own intermediate representation built from it, and staticcheck's checks
+// nilness and unusedwrite read cohere's own intermediate representation built from it, and staticcheck's checks
 // read it through the helpers they share. A pass missing from this table counts as type aware, so a pass a newer
 // release adds is never described as running without types before someone has read it.
 var typeFree = map[string]bool{
@@ -320,13 +320,13 @@ var stylecheckRuledOn = map[string]bool{
 	"ST1019": true,
 }
 
-// All is every rule the Go engine knows, in the order `--rules` lists them before sorting.
+// All is every rule cohere-go knows, in the order `--rules` lists them before sorting.
 //
 // vet's suite comes first, read from vet.Suite rather than retyped, so `cohere` in a Go repository is
 // never weaker than `go vet`, and a newer x/tools that adds a pass adds its rule here with no edit. Then
 // two of x/tools' own passes that vet leaves out, which find real bugs: a nil dereference or a comparison
 // with nil whose answer is already known, and a write to a struct or array nothing reads again. Each runs as
-// our port onto the engine's own intermediate representation, under the original's name, so the run builds one
+// our port onto cohere's own intermediate representation, under the original's name, so the run builds one
 // program form where x/tools' would build a second for these two alone (#pn1xvnd). Then
 // staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 as our port,
 // which reports what it finds where the original returns its verdict for staticcheck's runner to report

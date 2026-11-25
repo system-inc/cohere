@@ -1,4 +1,4 @@
-// Package intermediate_representation is the Go engine's own IR: a function's blocks and instructions,
+// Package intermediate_representation is cohere-go's own IR: a function's blocks and instructions,
 // lowered from its syntax and types, for the checks that read control and data flow (#dz6qbwm).
 //
 // It is staticcheck's go/ir (honnef.co/go/tools v0.8.1), copied and renamed to the house's words by

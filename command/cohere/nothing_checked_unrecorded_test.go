@@ -58,11 +58,11 @@ func TestTheFactAloneFailsARunThatCheckedNothing(test *testing.T) {
 	}
 }
 
-// TestAnEngineRunThatDroppedEveryFileUncountedFails is an engine's project record of three files in the package,
-// none in scope, and no file excluded: the engine left every file out and said nothing of why. The engine's own
+// TestAContractRunThatDroppedEveryFileUncountedFails is a child's project record of three files in the package,
+// none in scope, and no file excluded: the child left every file out and said nothing of why. The child's own
 // summary exits 0, and the front door fails it, naming the three as unrecorded.
-// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary.
-func TestAnEngineRunThatDroppedEveryFileUncountedFails(test *testing.T) {
+// Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary.
+func TestAContractRunThatDroppedEveryFileUncountedFails(test *testing.T) {
 	records := contractFixture(test, "Clean.jsonl")
 	records[1] = projectRecordAt(test, records[1], "/project", nil)
 	records[1] = strings.Replace(records[1], `"filesInScope":2`, `"filesInScope":0`, 1)
@@ -71,12 +71,12 @@ func TestAnEngineRunThatDroppedEveryFileUncountedFails(test *testing.T) {
 		test.Fatalf("the fixture's project record is not the one this test rewrites: %s", records[1])
 	}
 	activeSummary = runSummary{}
-	output, code, renderRecordsError := renderRecords(test, engineModeCheck, records, 0)
+	output, code, renderRecordsError := renderRecords(test, contractModeCheck, records, 0)
 	if renderRecordsError != nil {
 		test.Fatalf("%v\n%s", renderRecordsError, output)
 	}
 	if code != 1 {
-		test.Errorf("an engine run that checked none of its 3 files exits %d, want 1:\n%s", code, output)
+		test.Errorf("a child run that checked none of its 3 files exits %d, want 1:\n%s", code, output)
 	}
 	want := []excludedReason{{Reason: unrecordedReason, Count: 3}}
 	if !reflect.DeepEqual(activeSummary.Gaps.Excluded, want) {

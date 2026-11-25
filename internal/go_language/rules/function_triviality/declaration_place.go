@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
 )
 
-// declarationPlace is where a top-level declaration starts, as the engine keys a unit: the file a reader sees, past
+// declarationPlace is where a top-level declaration starts, as cohere-go keys a unit: the file a reader sees, past
 // any //line directive, and the offset of the declaration's first byte in the file as parsed.
 type declarationPlace struct {
 	File   string

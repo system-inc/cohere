@@ -21,7 +21,7 @@ import (
 // environment every go command of a load runs with, the build target, the go environment the inputs record names, and
 // every variable of goEnvironmentNames by name. The project's description asks for it beside its census and its reads,
 // and judges the census's constraints by it (ExcludedByConstraints), and a load handed it through Caching asks go env
-// nothing, so a run asks once where it asked twice (#f53yra8); the load's lister, its kept listing and the engine's
+// nothing, so a run asks once where it asked twice (#f53yra8); the load's lister, its kept listing and cohere-go's
 // findings cache read their variables from it too, so a build asks go env once where it asked up to five times
 // (#4rpt1jh). Nothing a run writes moves it: go env reads the environment, the go env files and the go.mod and go.work
 // go finds, and a run rewrites only Go files.
@@ -59,7 +59,7 @@ var CgoToolchainNames = []string{
 
 // goEnvironmentNames are every variable a reader of a GoEnvironment reads, asked of go env in one command: the kept
 // listing's key (listingEnvironment), which holds the lister's `GOVERSION`, `GODEBUG`, `GOFLAGS`, `GOWORK` and
-// `GOFIPS140`, and the findings cache's `GOROOT` and build names (go_engine's buildNames), then the build target's
+// `GOFIPS140`, and the findings cache's `GOROOT` and build names (go_language's buildNames), then the build target's
 // go env file and build cache, which the inputs record names (constraintContext), and the C toolchain the keys hold
 // under the cgo-translated loader (CgoToolchainNames).
 var goEnvironmentNames = slices.Concat(listingEnvironment, []string{"GOENV", "GOCACHE"}, CgoToolchainNames)
@@ -127,7 +127,7 @@ func ReadGoEnvironmentTelling(
 }
 
 // askGoEnvironment is go env's answer of goEnvironmentNames in workspace under environment, the whole environment,
-// by name: the one go env the engine runs for a run's build (#4rpt1jh). It asks with `PWD` set to workspace, as
+// by name: the one go env cohere-go runs for a run's build (#4rpt1jh). It asks with `PWD` set to workspace, as
 // runList does, so the go.mod and go.work it reports, and the modules a go.work uses below it, are spelled under
 // workspace as the load names it, never through a link the caller's working directory went through (#hd5bsqh): a run
 // through a linked root then names its inputs as a run at the real root does. The command is recorded in children, and
@@ -235,7 +235,7 @@ func (goEnvironment *GoEnvironment) Values() map[string]string {
 }
 
 // Target is the build target go env reported, a copy of the context the census judged the files by, and the
-// `GOFLAGS` every load under the answer runs with, so the engine reads the host's build (project.HostBuild) from
+// `GOFLAGS` every load under the answer runs with, so cohere-go reads the host's build (project.HostBuild) from
 // what its loads read rather than asking go env again.
 func (goEnvironment *GoEnvironment) Target() (*build.Context, []string) {
 	buildContext := *goEnvironment.buildContext

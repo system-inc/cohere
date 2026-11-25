@@ -15,16 +15,16 @@ import (
 
 // typedReach is every package a rule's run reaches (ruleReach), loaded with types, and what the load cost.
 type typedReach struct {
-	// byDirectory is each reached package by its directory relative to the go_engine directory.
+	// byDirectory is each reached package by its directory relative to the go_language directory.
 	byDirectory map[string]*packages.Package
 
 	// wall is how long the load took.
 	wall time.Duration
 }
 
-// reachedEngine is the rules' reach loaded with types, once for every test of the package that reads it.
-var reachedEngine = sync.OnceValues(func() (*typedReach, error) {
-	parsed, parseError := engineSource()
+// reachedGoLanguage is the rules' reach loaded with types, once for every test of the package that reads it.
+var reachedGoLanguage = sync.OnceValues(func() (*typedReach, error) {
+	parsed, parseError := goLanguageSource()
 	if parseError != nil {
 		return nil, parseError
 	}
@@ -37,7 +37,7 @@ var reachedEngine = sync.OnceValues(func() (*typedReach, error) {
 	}
 	started := time.Now()
 	// The module root, three directories above the check package's own, holds the go.mod whose replaces name every
-	// module the engine imports, so the load needs no workspace file. Each package is loaded alone, never its test
+	// module cohere-go imports, so the load needs no workspace file. Each package is loaded alone, never its test
 	// variant, since the guard reads what a run executes.
 	loaded, loadError := load.PackagesCached(filepath.Join("..", "..", ".."), patterns, []string{"GOWORK=off"}, nil,
 		load.Caching{WithoutTests: true})
@@ -53,18 +53,18 @@ var reachedEngine = sync.OnceValues(func() (*typedReach, error) {
 	}
 	reach := &typedReach{byDirectory: map[string]*packages.Package{}, wall: wall}
 	for _, root := range loaded.Roots {
-		if directory, isBelow := strings.CutPrefix(root.PkgPath, engineImportPath); isBelow {
+		if directory, isBelow := strings.CutPrefix(root.PkgPath, goLanguageImportPath); isBelow {
 			reach.byDirectory[directory] = root
 		}
 	}
 	return reach, nil
 })
 
-// loadedReach is reachedEngine, failing the test when it could not be loaded.
+// loadedReach is reachedGoLanguage, failing the test when it could not be loaded.
 func loadedReach(test *testing.T) *typedReach {
 	test.Helper()
 
-	reach, loadError := reachedEngine()
+	reach, loadError := reachedGoLanguage()
 	if loadError != nil {
 		test.Fatalf("loading the rules' reach with types: %v", loadError)
 	}

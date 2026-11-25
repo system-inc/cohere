@@ -11,7 +11,7 @@ var messageNoIterator = rule.Message{
 	Id: "noIterator",
 	Description: "This uses the reserved name `__iterator__`. That was SpiderMonkey's " +
 		"pre-standard iteration protocol, removed from Firefox in 2015 and never implemented " +
-		"anywhere else, so the property does nothing in any engine running today. Use " +
+		"anywhere else, so the property does nothing in any runtime running today. Use " +
 		"`[Symbol.iterator]`, which is the standard protocol that replaced it.",
 }
 

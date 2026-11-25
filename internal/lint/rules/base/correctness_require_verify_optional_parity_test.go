@@ -161,12 +161,12 @@ func TestVerifyOptionalParityStaysSilent(test *testing.T) {
 		{
 			name:   "no decorators at all",
 			source: "class Entity { name?: string; }",
-			reason: "A property the validation engine never looks at is outside the rule's scope.",
+			reason: "A property the validator never looks at is outside the rule's scope.",
 		},
 		{
 			name:   "a non-Verify decorator only",
 			source: "class Entity { @NotAVerifyDecorator() name?: string; }",
-			reason: "The prefix test is what limits the rule to the validation engine's decorators.",
+			reason: "The prefix test is what limits the rule to the validator's decorators.",
 		},
 		{
 			name:   "the sentinel with an optional type",
@@ -209,7 +209,7 @@ func TestVerifyOptionalParityStaysSilent(test *testing.T) {
 		{
 			name:   "a plain constructor parameter is not a property",
 			source: "class Entity { constructor(@VerifyIsString() name?: string) {} }",
-			reason: "Without an accessibility or readonly modifier the parameter declares no property, so there is nothing for the engine to validate. This is the guard the estree original gets for free from its TSParameterProperty node kind.",
+			reason: "Without an accessibility or readonly modifier the parameter declares no property, so there is nothing for the validator to check. This is the guard the estree original gets for free from its TSParameterProperty node kind.",
 		},
 		{
 			name:   "a computed key is not read",

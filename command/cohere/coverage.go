@@ -134,7 +134,7 @@ type coverageRuleCrash struct {
 	Cause string
 }
 
-// suppressionCoverage is what disable comments withheld. Nil when the engine reports none.
+// suppressionCoverage is what disable comments withheld. Nil when the child reports none.
 type suppressionCoverage struct {
 	Suppressed              int
 	SuppressedWithoutReason int
@@ -147,7 +147,7 @@ type suppressionCoverage struct {
 	ForUnrunRules int
 
 	// DeadSites is where each dead directive sits, listed under `--coverage`, sorted by file and line.
-	// Nil for an engine that counts them without saying where.
+	// Nil for a child that counts them without saying where.
 	DeadSites []program.DeadSuppression
 }
 
@@ -312,7 +312,7 @@ func writeCoverageDetails(out *bufio.Writer, summary coverageSummary) {
 		}
 		fmt.Fprintf(out, "  %s (%d): %s\n", coverageCategoryTerms[category], count, coverageCategoryMeanings[category])
 		if unnamed := summary.Unnamed[category]; unnamed > 0 {
-			fmt.Fprintf(out, "    %d the engine's record counts and does not name\n", unnamed)
+			fmt.Fprintf(out, "    %d the child's record counts and does not name\n", unnamed)
 		}
 		for _, entry := range summary.Entries {
 			if entry.Category != category {
@@ -507,7 +507,7 @@ func writeCrashedNote(out *bufio.Writer, crash runCrash) {
 }
 
 // namedGapsSentence is what "this run did not check everything" says when every phase ran and a file
-// still went unchecked, named in the notes above it. One sentence for both engines.
+// still went unchecked, named in the notes above it. One sentence for both languages.
 const namedGapsSentence = "the notes above name the files nothing checked"
 
 // namedRuleGapsSentence is the same fact when what went unchecked is one rule's verdict on a file rather
@@ -535,7 +535,7 @@ func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuratio
 	}
 	missing := []string{}
 	for name, setting := range lintConfiguration.Rules {
-		if configuration.IsEngineCheck(name) || setting.Severity == configuration.SeverityOff {
+		if configuration.IsLinterCheck(name) || setting.Severity == configuration.SeverityOff {
 			continue
 		}
 		if !implementsConfiguredRule(name, implemented) {
@@ -550,7 +550,7 @@ func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuratio
 func wantedConfiguredRules(lintConfiguration *configuration.Configuration) int {
 	wanted := 0
 	for name, setting := range lintConfiguration.Rules {
-		if !configuration.IsEngineCheck(name) && setting.Severity != configuration.SeverityOff {
+		if !configuration.IsLinterCheck(name) && setting.Severity != configuration.SeverityOff {
 			wanted++
 		}
 	}
@@ -612,7 +612,7 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
 	// The dash is escaped, not changed: internal/differential finds this line by it, and swift/Contract.md
-	// names it as the line both engines print.
+	// names it as the line both languages print.
 	printInvocation(
 		accountOutput(out),
 		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited%s, %s%s\n",

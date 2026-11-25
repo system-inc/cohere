@@ -8,12 +8,12 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 )
 
-// The live table is verified against the engine, not against itself.
+// The live table is verified against Tailwind, not against itself.
 //
 // A constructor that composes two halves can be self-consistent and wrong: the halves can agree with
 // each other and disagree with Tailwind, which is the failure the whole descriptor slice is tested
 // against rather than around. So the contract test builds a table with NewTable from a real design
-// system and scores it against the engine's own readings in the fixture corpus, case for case, under
+// system and scores it against Tailwind's own readings in the fixture corpus, case for case, under
 // the same rules descriptor_test.go uses for the measured table.
 //
 // Measured on both corpus repositories: 6,808 of 6,808 scored cases on ahra, and 6,806 of 6,806 on
@@ -109,29 +109,29 @@ func findTailwindPackageRootForTest(start string) string {
 	}
 }
 
-// TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus is the contract.
+// TestLiveTableAgreesWithTailwindOverTheFixtureCorpus is the contract.
 //
-// The live table is scored against the engine's own readings, exactly as descriptor_test.go scores
-// the measured table, over the same corpus and with the same rules: a case with no engine reading is
+// The live table is scored against Tailwind's own readings, exactly as descriptor_test.go scores
+// the measured table, over the same corpus and with the same rules: a case with no Tailwind reading is
 // reported and never counted as agreement, and a decline is only free on a per-declaration root.
 //
-// Scoring against the engine rather than against the measured table is deliberate. Two tables built
+// Scoring against Tailwind rather than against the measured table is deliberate. Two tables built
 // from one extraction can agree with each other and disagree with Tailwind, and the whole point of
-// this constructor is that its checked-in half was measured to be a fact about the framework. The
-// engine is the only thing that can refuse it.
+// this constructor is that its checked-in half was measured to be a fact about the framework.
+// Tailwind is the only thing that can refuse it.
 //
 // Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
-func TestLiveTableAgreesWithTheEngineOverTheFixtureCorpus(test *testing.T) {
+func TestLiveTableAgreesWithTailwindOverTheFixtureCorpus(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "descriptor_fixtures.json", func(test *testing.T, fixtureName string) {
 		fixtures := loadDescriptorFixtures(test, fixtureName)
 		_, live := liveTableForOracle(test, fixtures.EntryPoint)
-		expectLiveTableAgreesWithTheEngine(test, fixtures, live)
+		expectLiveTableAgreesWithTailwind(test, fixtures, live)
 	})
 }
 
-// expectLiveTableAgreesWithTheEngine scores one live table against the engine's readings in one oracle.
-func expectLiveTableAgreesWithTheEngine(test *testing.T, fixtures *descriptorFixtures, live *Table) {
+// expectLiveTableAgreesWithTailwind scores one live table against Tailwind's readings in one oracle.
+func expectLiveTableAgreesWithTailwind(test *testing.T, fixtures *descriptorFixtures, live *Table) {
 	test.Helper()
 
 	if fixtures.TailwindVersion != live.TailwindVersion {
@@ -155,7 +155,7 @@ func expectLiveTableAgreesWithTheEngine(test *testing.T, fixtures *descriptorFix
 				if !found || !descriptor.PerDeclaration {
 					mismatched++
 					if mismatched <= 20 {
-						test.Errorf("%s: the live table declined but the engine read %v#%d",
+						test.Errorf("%s: the live table declined but Tailwind read %v#%d",
 							one.ClassName, one.Reading.Order, one.Reading.Count)
 					}
 				}
@@ -163,7 +163,7 @@ func expectLiveTableAgreesWithTheEngine(test *testing.T, fixtures *descriptorFix
 			continue
 		}
 		if one.Reading == nil {
-			// No engine reading is neither an agreement nor a disagreement. See the same branch in
+			// No Tailwind reading is neither an agreement nor a disagreement. See the same branch in
 			// descriptor_test.go for why these exist and why they are counted rather than skipped.
 			withoutReading++
 			continue
@@ -172,7 +172,7 @@ func expectLiveTableAgreesWithTheEngine(test *testing.T, fixtures *descriptorFix
 		if !got.Equal(want) {
 			mismatched++
 			if mismatched <= 20 {
-				test.Errorf("%s (root %q, %s %q, modifier %s %q): the live table read %v#%d, the engine said %v#%d",
+				test.Errorf("%s (root %q, %s %q, modifier %s %q): the live table read %v#%d, Tailwind said %v#%d",
 					one.ClassName, one.Root, one.ValueKind, one.Value, one.ModifierKind, one.ModifierValue,
 					got.Order, got.Count, want.Order, want.Count)
 			}
@@ -182,11 +182,11 @@ func expectLiveTableAgreesWithTheEngine(test *testing.T, fixtures *descriptorFix
 	}
 
 	if mismatched > 0 {
-		test.Errorf("%d of %d cases disagreed with the engine", mismatched, len(fixtures.Cases))
+		test.Errorf("%d of %d cases disagreed with Tailwind", mismatched, len(fixtures.Cases))
 	}
 	scored := agreed + mismatched
 	test.Logf("the live table agreed on %d of %d scored cases over %d roots", agreed, scored, fixtures.Counts.Roots)
-	test.Logf("  %d cases had no engine reading and were reported rather than scored", withoutReading)
+	test.Logf("  %d cases had no Tailwind reading and were reported rather than scored", withoutReading)
 	test.Logf("  %d lookups declined", declined)
 
 	// Volume assertions, in the extractor's spirit: a suite that agreed on everything because it
@@ -225,7 +225,7 @@ func checkTableCarriesTheTheme(test *testing.T, name string, system *LoadedDesig
 	if len(table.Namespaces) == 0 {
 		test.Fatal("the table carries no namespaces, so every bare value resolves through inference alone")
 	}
-	// Longest-first is the engine's precedence and a contract of the field.
+	// Longest-first is Tailwind's precedence and a contract of the field.
 	for index := 1; index < len(table.Namespaces); index++ {
 		if len(table.Namespaces[index-1]) < len(table.Namespaces[index]) {
 			test.Fatalf("namespaces are not longest-first at %d: %q before %q",
@@ -328,7 +328,7 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(test *testing.T) {
 // The live table declines on every repository `@utility` root, where the measured table carries a
 // row for the ones that are not per-declaration. That is a deliberate loss and this test is what
 // stops it being a silent one: every case the live table declines and the measured table answers
-// must be recoverable from the `@utility` evaluator, or have no engine reading at all.
+// must be recoverable from the `@utility` evaluator, or have no Tailwind reading at all.
 //
 // Without this, "the evaluator picks it up" is a claim in a comment. A comment cannot fail.
 //
@@ -385,7 +385,7 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(
 		}
 		moved++
 		if one.Reading == nil {
-			// The measured table answered a case the engine gave no reading for, so nothing is lost
+			// The measured table answered a case Tailwind gave no reading for, so nothing is lost
 			// by declining it: it was never scorable.
 			unscored++
 			continue
@@ -400,7 +400,7 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(
 		}
 		want := Reading{Order: one.Reading.Order, Count: one.Reading.Count}
 		if !reading.Equal(want) {
-			test.Errorf("%s: the evaluator read %v#%d where the engine said %v#%d",
+			test.Errorf("%s: the evaluator read %v#%d where Tailwind said %v#%d",
 				one.ClassName, reading.Order, reading.Count, want.Order, want.Count)
 			continue
 		}
@@ -411,7 +411,7 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(
 		test.Fatal("no cases moved from answered to declined, so this test proved nothing")
 	}
 	test.Logf(
-		"%d cases the live table declines and the measured table answers: %d recovered exactly by the evaluator, %d had no engine reading",
+		"%d cases the live table declines and the measured table answers: %d recovered exactly by the evaluator, %d had no Tailwind reading",
 		moved,
 		recovered,
 		unscored,

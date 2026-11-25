@@ -9,8 +9,8 @@ import (
 // and answers both prefix phases from an index of EarlyPrefixes and LatePrefixes by abbreviation (prefixEntry), never
 // walking those two.
 //
-// The tables are exported for the engines that build their own lookups from them, like the TypeScript rule's
-// candidate gate, and for the tests that pin their order. They are read, never written: every engine shares the one
+// The tables are exported for the languages that build their own lookups from them, like the TypeScript rule's
+// candidate gate, and for the tests that pin their order. They are read, never written: every language shares the one
 // loaded vocabulary.
 type Vocabulary struct {
 	WholeByName     map[string]*Entry
@@ -138,10 +138,10 @@ func isAsciiLowercase(character byte) bool {
 // Find answers what the vocabulary reports for a name, if anything, in the phase order the rule has always used:
 // whole word, early prefix, suffix, late prefix, segment.
 //
-// It knows nothing about where the name sits. An engine asks it before or after its own skips, whichever is cheaper,
+// It knows nothing about where the name sits. A language asks it before or after its own skips, whichever is cheaper,
 // and silences its own exemptions by the form and word it returns.
 //
-// Every name an engine judges meets every entry, and nearly every name matches none, so each form is tested first
+// Every name a language judges meets every entry, and nearly every name matches none, so each form is tested first
 // as the literal text its pattern holds, and only a name that passes costs a regular expression run. A literal test
 // that fails is a pattern that could not have matched, so the findings are the ones the patterns alone gave
 // (#300qvxj), and find_equivalence_test.go holds them to that over every name in this repository and the ahra tree.
@@ -156,8 +156,8 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 		return wholeFinding(entry, name), true
 	}
 
-	// Past the whole word every form needs an ASCII capital in the name, so a name with none, most of the names an
-	// engine declares, finds nothing and is answered here. Load accepts only letters a to z in an abbreviation, which
+	// Past the whole word every form needs an ASCII capital in the name, so a name with none, most of the names a
+	// language declares, finds nothing and is answered here. Load accepts only letters a to z in an abbreviation, which
 	// is what makes each form's capital certain: a prefix ends at one (prefixEntry), a suffix and a segment are the
 	// abbreviation capitalized, the millisecond word holds `Ms`, and an allowed segment only ever says nothing is
 	// found. find_equivalence_test.go and prefix_index_test.go hold this to the Finds without it.

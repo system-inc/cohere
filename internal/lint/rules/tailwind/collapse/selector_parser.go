@@ -3,7 +3,7 @@
 // they hold.
 //
 // Ported from `src/selector-parser.ts` at the v4.3.3 tag, read at the tag rather than from the
-// minified bundle, so a disagreement with the engine is a finding rather than version skew.
+// minified bundle, so a disagreement with Tailwind is a finding rather than version skew.
 //
 // # The shape of the tree
 //

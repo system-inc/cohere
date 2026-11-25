@@ -6,7 +6,7 @@ import "github.com/microsoft/TypeScript/tsc/shim/core"
 //
 // The four rules in this package that fix (`no-duplicate-classes`, `no-unnecessary-whitespace`,
 // `no-deprecated-classes` and `enforce-consistent-class-order`) all used to rewrite a literal whole.
-// The edit engine lands one edit per range per pass and refuses the rest as overlapping, so a
+// The edit Tailwind lands one edit per range per pass and refuses the rest as overlapping, so a
 // shuffled, duplicated, badly spaced literal took a pass per rule, and every pass but the last
 // counted refusals. Measured by @system_cohere_format_markdown on the perturbed corpus (#vf1hd6j):
 // 6,847 overlap refusals in ahra and 8,517 in www-phi-health, every one of them landing a pass

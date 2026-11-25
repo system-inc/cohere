@@ -14,7 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/documentation_data/capture"
-	goenginerules "github.com/system-inc/cohere/internal/go_language/rules"
+	golanguagerules "github.com/system-inc/cohere/internal/go_language/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -63,8 +63,8 @@ func TestTheRenderedFilesAreCurrent(test *testing.T) {
 	}
 }
 
-// TestTheRuleNamesPackageHoldsTheRenderedRuleNames: internal/rule_names is the Go file Build writes for the Go
-// engine's file-name rule and the folder check, which read every engine's rule names because the Go engine can't link
+// TestTheRuleNamesPackageHoldsTheRenderedRuleNames: internal/rule_names is the Go file Build writes for
+// cohere-go's file-name rule and the folder check, which read every language's rule names because cohere-go can't link
 // the TypeScript registry (#2xt6v5r). TestTheRenderedFilesAreCurrent holds that file to what Build renders now, as it
 // holds documentation/data, and this holds the compiled names to the rows of rules.json, in its order, so the two
 // renderings can never disagree.
@@ -170,9 +170,9 @@ func TestCheckSeesATierChange(test *testing.T) {
 	}
 }
 
-// TestEveryRegisteredRuleHasOneRow: rules.json names every rule each engine registers exactly once, under
-// that engine's language, and nothing else. The Swift registry is read from swift/Rules.json, which a
-// Swift test holds to the Swift engine's registry.
+// TestEveryRegisteredRuleHasOneRow: rules.json names every rule each language registers exactly once, under
+// that language's language, and nothing else. The Swift registry is read from swift/Rules.json, which a
+// Swift test holds to cohere-swift's registry.
 func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	test.Parallel()
 	committed, readError := os.ReadFile(filepath.Join(moduleRoot, RulesPath))
@@ -197,7 +197,7 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	for _, entry := range swiftEntries {
 		registered["Swift"] = append(registered["Swift"], entry.Name)
 	}
-	for _, goRule := range goenginerules.All() {
+	for _, goRule := range golanguagerules.All() {
 		registered["Go"] = append(registered["Go"], goRule.Name)
 	}
 
@@ -210,7 +210,7 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	}
 	// Go is held to its registry in both directions like the others, but is not refused when empty: its
 	// rules arrive one unit at a time, and until the first does, zero Go rows is the true answer. The
-	// vacuity guard stays on the two engines that have always registered rules.
+	// vacuity guard stays on the two languages that have always registered rules.
 	for _, language := range []string{"TypeScript", "Swift", "Go"} {
 		if len(registered[language]) == 0 && language != "Go" {
 			test.Fatalf("no %s rule is registered, so the rows were checked against nothing", language)
@@ -230,13 +230,13 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 		}
 		for name := range rows[language] {
 			if !names[name] {
-				test.Errorf("rules.json has a %s row for %s, which that engine does not register", language, name)
+				test.Errorf("rules.json has a %s row for %s, which that language does not register", language, name)
 			}
 		}
 	}
 	for language := range rows {
 		if registered[language] == nil {
-			test.Errorf("rules.json has rows in %s, which no engine registers", language)
+			test.Errorf("rules.json has rows in %s, which no language registers", language)
 		}
 	}
 	if rules.Count != len(rules.Rules) {

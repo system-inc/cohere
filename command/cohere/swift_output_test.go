@@ -18,9 +18,9 @@ func TestASwiftWarningIsAWarning(test *testing.T) {
 
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
+	run := newContractRun(stream, contractModeCheck, swiftLanguage, "", time.Now())
 	for _, severity := range []string{"warning", "error"} {
-		record := &engineFindingRecord{Source: "compiler", File: "Sources/A.swift", Line: 3, Column: 7,
+		record := &contractFindingRecord{Source: "compiler", File: "Sources/A.swift", Line: 3, Column: 7,
 			Severity: severity, Rule: "VariableNeverMutated", Message: "never mutated"}
 		if acceptFindingError := run.acceptFinding(record); acceptFindingError != nil {
 			test.Fatal(acceptFindingError)
@@ -50,9 +50,9 @@ func TestASwiftGapSaysItself(test *testing.T) {
 		{0, 3, "3 files nothing checked: 3 unreadable"},
 		{0, 0, ""},
 	} {
-		if got := engineUncheckedFiles(testCase.withoutRecord, testCase.unreadable); got != testCase.want {
+		if got := contractUncheckedFiles(testCase.withoutRecord, testCase.unreadable); got != testCase.want {
 			test.Errorf(
-				"engineUncheckedFiles(%d, %d) = %q, want %q",
+				"contractUncheckedFiles(%d, %d) = %q, want %q",
 				testCase.withoutRecord,
 				testCase.unreadable,
 				got,

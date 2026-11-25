@@ -633,7 +633,7 @@ func TestPreserveManualMemoizationSpans(test *testing.T) {
 // TestPreserveManualMemoizationRequiresTheTypeChecker pins the declaration and the decline.
 //
 // Read what this does and does not prove. The declaration check is the load-bearing half: without
-// `NeedsTypeChecker` the engine hands this rule files with no checker and the pipeline resolves
+// `NeedsTypeChecker` the linter hands this rule files with no checker and the pipeline resolves
 // nothing, so every finding disappears while the suite stays green.
 //
 // The silence check below is weaker than it looks, and saying so is the honest version. Handed a

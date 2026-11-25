@@ -1,9 +1,9 @@
-// Package prettier formats source by running our own Prettier fork inside a JavaScript engine.
+// Package prettier formats source by running our own Prettier fork inside a JavaScript runtime.
 //
 // The fork at ~/Projects/system/prettier is what formats this codebase today, so running it is the
 // only way to be byte-identical with the gate we are replacing rather than merely close to it. The
 // alternative that was measured and rejected was typescript-go's own formatter: FormatCodeSettings
-// has no printWidth field and no line-breaking engine at all, and 21.8% of tracked files diverge
+// has no printWidth field and no line-breaking logic at all, and 21.8% of tracked files diverge
 // from our Prettier after every settings-reachable fix.
 package prettier
 
@@ -16,7 +16,7 @@ import (
 
 // parserForExtension maps a file extension to the Prettier parser that handles it.
 //
-// This is the whole of what the engine can format, and it is deliberately a table rather than a
+// This is the whole of what the formatter can format, and it is deliberately a table rather than a
 // try-and-see. A caller needs to know whether a file is a candidate before formatting it, and
 // learning by attempting means running the formatter to discover it should not have run.
 //
@@ -45,7 +45,7 @@ var parserForExtension = map[string]string{
 	".yml":     "yaml",
 }
 
-// parserFor returns the Prettier parser for a file, and whether this engine handles it at all.
+// parserFor returns the Prettier parser for a file, and whether the formatter handles it at all.
 //
 // The filename matters and not only its extension: Prettier's own file-info inference picks
 // json-stringify for package.json, and a formatter that used plain json there would rewrite npm's

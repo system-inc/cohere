@@ -89,7 +89,7 @@ type GetterReturnOptions struct {
 // The port this rule followed skipped TypeScript outright, as oxc does, because the compiler reports
 // a `get` accessor with no return (TS2378), and typescript-eslint's eslint-recommended turns the rule
 // off for .ts files for the same reason. The house does not: Kirk ruled on 2026-08-25 (#mnmx9s4)
-// that the core correctness rules stay on in TypeScript in both engines, so that the engines agree on
+// that the core correctness rules stay on in TypeScript in both linters, so that the linters agree on
 // what runs, and Nexus turns getter-return on there. Skipping .ts files left cohere silent where
 // ESLint reports, which every consumer's zero hid, and all 35 of ESLint's corpus rows read as missing
 // (#jjfa7qb). It also missed what the compiler never checks: a descriptor's `get` is a plain function

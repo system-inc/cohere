@@ -8,7 +8,7 @@ import (
 )
 
 // ownProcessGroup is the process attributes that start a command as the leader of a process group of its own, so
-// stopGroup reaches everything it starts: the engine runs go list and cgo, which a stop aimed at its pid alone would
+// stopGroup reaches everything it starts: the Go child runs go list and cgo, which a stop aimed at its pid alone would
 // leave running past the deadline.
 func ownProcessGroup() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{Setpgid: true}

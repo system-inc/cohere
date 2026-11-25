@@ -8,8 +8,8 @@
 # never a quiet skip. It exits 0 only when every step passed, 1 when one failed, and 3 when none failed but one met a
 # gap, as Loom's lay kit does. The steps:
 #   toolchain  the go on the path, as the image's opening sets it
-#   modules    every module the engine's tests and cohere-pairs build from, read from the module cache offline
-#   engine     the Go engine's heaviest ordinary tests, cold: the root package (it runs git, so a box without git is a
+#   modules    every module cohere-go's tests and cohere-pairs build from, read from the module cache offline
+#   go_language cohere-go's heaviest ordinary tests, cold: the root package (it runs git, so a box without git is a
 #              gap for it alone), load, and six of their kin; about 4.5 minutes on Pupa, 8 cores (Nov 16)
 #   pairs      cohere-pairs built, then one round of a pair of one commit against itself, the smallest honest one,
 #              when the box holds its four sources at their pins; a box without them is a gap, named
@@ -65,16 +65,16 @@ packages="$packages ./internal/go_language/build_dependence ./internal/go_langua
 if command -v git > /dev/null; then
   packages="./internal/go_language $packages"
 else
-  gap engine-root "there is no git on the path, and the root package's tests build repositories with it"
+  gap go_language-root "there is no git on the path, and the root package's tests build repositories with it"
 fi
 started=$(date +%s)
 # shellcheck disable=SC2086 # the packages are words on purpose
-if go test -count=1 -timeout 9m $packages > "$work/engine.log" 2>&1; then
-  pass "engine: $(echo $packages | wc -w | tr -d ' ') packages in $(($(date +%s) - started))s"
+if go test -count=1 -timeout 9m $packages > "$work/go_language.log" 2>&1; then
+  pass "go_language: $(echo $packages | wc -w | tr -d ' ') packages in $(($(date +%s) - started))s"
 else
-  failed=$(grep -E -- '^(--- FAIL|FAIL|panic)' "$work/engine.log" | head -n 5 | tr '\n' ' ')
-  fail engine "${failed:-$(lastLine "$work/engine.log")}"
-  grep -E -- '--- FAIL|_test.go:[0-9]+:' "$work/engine.log" | head -n 30
+  failed=$(grep -E -- '^(--- FAIL|FAIL|panic)' "$work/go_language.log" | head -n 5 | tr '\n' ' ')
+  fail go_language "${failed:-$(lastLine "$work/go_language.log")}"
+  grep -E -- '--- FAIL|_test.go:[0-9]+:' "$work/go_language.log" | head -n 30
 fi
 
 if GOWORK=off go build -o "$work/cohere-pairs" ./command/cohere-pairs > "$work/pairs-build.log" 2>&1; then

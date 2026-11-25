@@ -278,7 +278,7 @@ func preferFunctionTypeFix(
 		// A member may be separated by a comma instead, and upstream's fixer only knows about the
 		// semicolon. Measured on the installed 8.67.0 build: `type Foo = { (): string, };` is
 		// rewritten to `type Foo = () => string,;`, which the TypeScript parser rejects with
-		// "';' expected". That is a fix, so the edit engine would apply it with nobody watching.
+		// "';' expected". That is a fix, so the fix pass would apply it with nobody watching.
 		//
 		// This port reports the case, as upstream does, and declines the repair. Rewriting the
 		// comma to a semicolon instead would be the obvious improvement and is deliberately not

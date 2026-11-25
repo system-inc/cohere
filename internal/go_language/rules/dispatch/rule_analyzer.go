@@ -1,10 +1,10 @@
 // Package dispatch walks each package once for every dispatched rule, where each rule's analyzer would otherwise walk
 // it on its own. A rule registers a rule.Listener through RuleAnalyzer, which returns an analyzer of the rule's own
-// whose run reports what the dispatcher found under the rule's name, or returns the rule's crash. So the engine's
+// whose run reports what the dispatcher found under the rule's name, or returns the rule's crash. So cohere-go's
 // handling of a rule, its settings, suppression, crash accounting, findings cache and rulesRun, reads a dispatched
 // rule as any other.
 //
-// There are two dispatchers, one per walk: IntermediateRepresentation over the engine's own intermediate
+// There are two dispatchers, one per walk: IntermediateRepresentation over cohere-go's own intermediate
 // representation, and Syntax over the syntax tree. A listener hears one of them, never both, and the process shares
 // one of each, so every rule's analyzer requires the one dispatcher that holds its listener.
 package dispatch
@@ -15,7 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 )
 
-// sharedIntermediateRepresentation is the process's one dispatcher over the engine's own intermediate
+// sharedIntermediateRepresentation is the process's one dispatcher over cohere-go's own intermediate
 // representation, which RuleAnalyzer registers every such rule on. One, built with the package, is what makes the
 // checker walk a package once for all its rules, and keeps every rule's analyzer requiring the very dispatcher that
 // holds its listener, however many times the registry is read.

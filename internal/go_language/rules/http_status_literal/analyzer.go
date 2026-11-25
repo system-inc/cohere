@@ -1,6 +1,6 @@
 // Package http_status_literal is staticcheck's `ST1013`, an HTTP status code written as a number, such as 506, where
 // net/http names it, http.StatusVariantAlsoNegotiates, in the argument of a net/http function that takes one, ported
-// onto the engine's syntax dispatcher.
+// onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1013/st1013.go, whose messages and fixes
 // it reports word for word, at the argument, with no range option, and withholds in a generated file as the
@@ -12,11 +12,11 @@
 // parentheses and a qualifying package, as SymbolIndex does, and neither function is generic, so the two find the
 // same calls. Like the original, it reads the codes left alone from staticcheck's config pass, whose
 // http_status_code_whitelist a staticcheck.conf can set, by default 200, 400, 404 and 500, through the pass as the
-// engine runs it (staticcheck_configuration), which reads it under the user's cache directory too, where the
+// checker runs it (staticcheck_configuration), which reads it under the user's cache directory too, where the
 // original's never does, a difference the parity fixtures record as dropped (#sc5qmy7).
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package http_status_literal
 
 import (

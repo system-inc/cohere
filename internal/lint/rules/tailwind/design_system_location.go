@@ -12,7 +12,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // tailwindSettingsNamespaces are the two keys upstream reads its settings from, the first preferred:
@@ -273,7 +273,7 @@ func loadConfiguredDesignSystem(
 	if stylesheetResolverAtError != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Error: stylesheetResolverAtError}
 	}
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 		Resolve:             resolve,
@@ -296,10 +296,10 @@ func stylesheetResolverAt(
 	configured string,
 	packageRoot string,
 	fileSystem *rule.RecordingFileSystem,
-) (tailwindengine.StylesheetResolver, error) {
+) (tailwindcollapse.StylesheetResolver, error) {
 	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 	readFile := func(path string) (string, bool) { return fileSystem.ReadFile(tspath.RootedFilePath(path)) }
-	next := tailwindengine.NodeStylesheetResolver(packageRoot)
+	next := tailwindcollapse.NodeStylesheetResolver(packageRoot)
 	configurationPath := findTsconfig(cwd, configured, fileExists)
 	if configurationPath == "" {
 		return next, nil

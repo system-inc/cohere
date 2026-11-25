@@ -167,7 +167,7 @@ func singleCall(written *variableWrites) (*ast.CallExpr, bool) {
 // isDeclaredNear is whether a name is declared in the scope a local is declared in, in any scope enclosing it, or in
 // any scope nested in it. The first would make the rename a redeclaration, the second would shadow a name its uses
 // may read after the rename, and the third would capture its uses inside that scope. A nested scope that holds none
-// of the local's uses is counted too, which declines a rename the engine's own check would allow, the safe side.
+// of the local's uses is counted too, which declines a rename cohere-go's own check would allow, the safe side.
 func isDeclaredNear(scope *types.Scope, name string) bool {
 	if _, object := scope.LookupParent(name, token.NoPos); object != nil {
 		return true

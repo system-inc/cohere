@@ -126,7 +126,7 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 	}{
 		"finding":              {schema.Defs["finding"], findingJson{}},
 		"changedFile":          {schema.Defs["changedFile"], changedFileJson{}},
-		"engineBuild":          {schema.Defs["engineBuild"], engineBuildJson{}},
+		"programBuild":         {schema.Defs["programBuild"], programBuildJson{}},
 		"summary":              {summary, summaryJson{}},
 		"summary.phase":        {*summary.Properties["phases"].Items, phaseJson{}},
 		"summary.cache":        {summary.Properties["cache"], cacheUse{}},
@@ -136,7 +136,7 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 		"summary.gaps":         {summary.Properties["gaps"], runGaps{}},
 		"summary.gaps.unchecked": {
 			*summary.Properties["gaps"].Properties["unchecked"].Items,
-			uncheckedEngineFile{},
+			uncheckedContractFile{},
 		},
 		"summary.gaps.crashes": {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
 		"summary.swift":        {summary.Properties["swift"], swiftSummary{}},

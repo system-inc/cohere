@@ -23,7 +23,7 @@
 #   - oxlint runs its default rules plus every type-aware rule those defaults enable. Not the project's
 #     rules either, and neither rival's findings are comparable to cohere's.
 #   - Both formatters get the options cohere formats with, the format block of cohere's TypeScript set
-#     read at the engine's commit, so all three format to the same width, indent, quotes and semicolons.
+#     read at the cohere binary's commit, so all three format to the same width, indent, quotes and semicolons.
 #     Prettier also gets its Tailwind plugin, pointed at the project's own Tailwind entry point and class
 #     functions; oxfmt gets no plugin. Both check exactly the files the project's tsconfig puts in the
 #     program, less the format block's ignores, named one by one, so neither formats a file cohere would
@@ -50,7 +50,7 @@
 #   --runs N           rounds (default 3)
 #   --load-ceiling L   the highest one-minute load a quiet run may start or end at (default: cores / 4)
 #   --settle SECONDS   before each measured run, wait up to this long for the load to reach the ceiling
-#   --cohere PATH      the cohere launcher, or an engine binary (default: `cohere` on PATH)
+#   --cohere PATH      the cohere launcher, or a cohere binary (default: `cohere` on PATH)
 #   --work DIR         where the copies live (default $TMPDIR/cohere-quiet-machine, shared with
 #                      quiet_machine.sh so both measure the same copy)
 #   --tools DIR        where the rivals are installed (default <work>/rival-tools)
@@ -96,7 +96,7 @@ prepare_copy
 logs=$copy/.cache/rivals-$(date +%Y%m%d-%H%M%S)
 mkdir -p $logs
 runs_table=$logs/runs.tsv
-pin_engine $logs
+pin_cohere $logs
 
 # The tools directory is keyed by the versions, so changing one installs a fresh set rather than mixing
 # versions in one node_modules.
@@ -119,10 +119,10 @@ tsgolint_binary=($tools/node_modules/@oxlint-tsgolint/*/tsgolint(N))
 # logs, except ESLint's, which has to sit in the tools directory to import typescript-eslint from it.
 # Paths in them are absolute, because each is read from outside the project it describes.
 #
-# The format options are cohere's own, from the cohere checkout the engine was built from, at the commit
+# The format options are cohere's own, from the cohere checkout the cohere binary was built from, at the commit
 # it reports, so the rivals format exactly as cohere does on this run. The Tailwind plugin is resolved in
 # the tools directory, since by name it would find the project's own, built against another Prettier.
-cohere_checkout=${engine_source:h:h:h:h}
+cohere_checkout=${cohere_source:h:h:h:h}
 cohere_commit=$(print -- "$cohere_version" | awk '$1 == "commit:" { print $2 }')
 format_set=$(git -C $cohere_checkout show $cohere_commit:internal/lint/configuration/sets/typescript.json) ||
   fail "cannot read cohere's TypeScript set at $cohere_commit in $cohere_checkout"
@@ -184,8 +184,8 @@ print
 tool_commands() {
   local stack=$1 mode=$2
   case $stack-$mode in
-    cohere-cold) print "cohere\t$engine --no-fix --format --no-cache" ;;
-    cohere-warm) print "cohere\t$engine --no-fix --format" ;;
+    cohere-cold) print "cohere\t$cohere_pinned --no-fix --format --no-cache" ;;
+    cohere-warm) print "cohere\t$cohere_pinned --no-fix --format" ;;
     oxc-*)
       print "oxlint\tenv OXLINT_TSGOLINT_PATH=$tsgolint_binary[1] $bin/oxlint --type-aware --type-check"
       print "oxfmt\t$bin/oxfmt --check -c $logs/oxfmtrc.json @FILES" ;;

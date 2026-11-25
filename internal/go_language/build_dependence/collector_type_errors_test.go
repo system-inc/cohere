@@ -12,7 +12,7 @@ import (
 
 // A struct whose field is named twice is a type error, and the type checker records the struct with the name once, so
 // its syntax holds more fields than its type: the collector declares the fields its type holds and stops at the
-// syntax's surplus (collectFields), so a graph handed such a package, which the engine never hands it (#jzzdvcf), adds
+// syntax's surplus (collectFields), so a graph handed such a package, which cohere-go never hands it (#jzzdvcf), adds
 // it without panicking and declares Shape. Index the type's fields by the syntax's alone and the add panics.
 func TestAGraphAddsAStructWithADuplicateFieldName(test *testing.T) {
 	test.Parallel()
@@ -26,7 +26,7 @@ func TestAGraphAddsAStructWithADuplicateFieldName(test *testing.T) {
 	information := &types.Info{Types: map[ast.Expr]types.TypeAndValue{}, Defs: map[*ast.Ident]types.Object{},
 		Uses: map[*ast.Ident]types.Object{}, Selections: map[*ast.SelectorExpr]*types.Selection{},
 		Instances: map[*ast.Ident]types.Instance{}, Implicits: map[ast.Node]types.Object{}}
-	// An Error func has the checker go on past the duplicate field, as the engine's load does, and record the rest.
+	// An Error func has the checker go on past the duplicate field, as cohere-go's load does, and record the rest.
 	var typeErrors []error
 	configuration := types.Config{Error: func(typeError error) { typeErrors = append(typeErrors, typeError) }}
 	checked, checkError := configuration.Check("example.com/broken", fileSet, []*ast.File{file}, information)

@@ -3,7 +3,7 @@ package cache
 import "sync"
 
 // executableDigest is an opened executable's sha256, computed once, by whichever asks first: start, which hashes on a
-// goroutine of its own as soon as the run knows it will key by the engine's identity, or get. Hashing is tens of
+// goroutine of its own as soon as the run knows it will key by cohere-go's identity, or get. Hashing is tens of
 // milliseconds over tens of megabytes, and a run that asks only as it keys its first package would wait for it there,
 // between the listing and the type check; started early, it runs beside go env and go list. What is hashed is the
 // file the process opened as it started either way, so starting early changes when, never what.

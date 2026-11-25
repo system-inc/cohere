@@ -4,7 +4,7 @@
 // nil.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/httpresponse/httpresponse.go,
-// whose logic it keeps and whose messages it reports word for word, at the same position. It sits on the engine's
+// whose logic it keeps and whose messages it reports word for word, at the same position. It sits on cohere-go's
 // syntax dispatcher, hearing each call on the walk the dispatcher makes once for every syntax rule, and like the
 // original it finds the statement list a call sits in from the walk's stack of the call's ancestors. The registry
 // runs the port in the original's place, and the original stays the oracle: the parity tests beside this file run

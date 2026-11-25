@@ -23,7 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/needs"
 )
 
-// performanceFixture is a landing of a tree with a command/cohere, so there is an engine to measure: the land fixture's
+// performanceFixture is a landing of a tree with a command/cohere, so there is a cohere to measure: the land fixture's
 // worktree a with a command/cohere of its own, cohere on the tree stood in for by a clean run, and ahra by macBoxAhra,
 // Shackler answering from replies as a gate box does.
 type performanceFixture struct {
@@ -53,7 +53,7 @@ func newPerformanceFixture(test *testing.T) *performanceFixture {
 	worktree := fixture.worktree("a")
 	writeFixtureFile(test, filepath.Join(worktree, "command", "cohere", "main.go"), "package main\n\nfunc main() {}\n")
 	fixture.git(worktree, "add", "command")
-	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("an engine to measure"))
+	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a cohere to measure"))
 	return fixture
 }
 
@@ -62,7 +62,7 @@ func newPerformanceFixture(test *testing.T) *performanceFixture {
 func (fixture *performanceFixture) landing(environment ...string) (bool, string, string) {
 	fixture.test.Helper()
 	before := fixture.git(fixture.repository, "rev-parse", "main")
-	landing := exec.Command(fixture.wrapper, "land", "--message", "an engine measured")
+	landing := exec.Command(fixture.wrapper, "land", "--message", "a cohere measured")
 	landing.Dir, landing.Env = fixture.worktree("a"), append(fixture.environment, environment...)
 	// Ignored: whether it landed is read from main, and what it said is the output.
 	output, _ := landing.CombinedOutput()
@@ -124,7 +124,7 @@ func shacklerSays(coldWalls []int64) string {
 	say("phase warm-root 9800")
 	run("timeline", "root", "1", 9900, 0, 0)
 	say("phase timeline-root 9900")
-	say(`timeline {"kind":"timeline","stamps":[{"label":"engine.main.begin","wallMicroseconds":12,` +
+	say(`timeline {"kind":"timeline","stamps":[{"label":"main.begin","wallMicroseconds":12,` +
 		`"userMicroseconds":0,"systemMicroseconds":0},{"label":"host.listing.end","wallMicroseconds":812345,` +
 		`"userMicroseconds":0,"systemMicroseconds":0},{"build":"windows/amd64","label":"builds.end",` +
 		`"wallMicroseconds":1000,"userMicroseconds":0,"systemMicroseconds":0},{"label":"handover.end",` +
@@ -155,8 +155,8 @@ func previousPerformance(test *testing.T, commit string, machine string, wall pe
 	if machine != performanceBox {
 		file.Machine.Cpu, file.Machine.Cores = "Apple M1", 8
 	}
-	file.Engine.Cold.Root.Wall, file.Engine.Cold.Root.User = wall, user
-	// main's binary was another program than the one being landed, as a landing that changes the engine builds.
+	file.Checks.Cold.Root.Wall, file.Checks.Cold.Root.User = wall, user
+	// main's binary was another program than the one being landed, as a landing that changes cohere builds.
 	file.Tools.Binary = performanceMainBinary
 	file.Note = "the first measurement, so nothing to compare"
 	contents, renderError := renderPerformance(file)
@@ -167,7 +167,7 @@ func previousPerformance(test *testing.T, commit string, machine string, wall pe
 }
 
 // sameBinaryPerformance is a previous file's contents with its binary the one the stand-in Shackler says she built,
-// as main's file reads before a landing that changed nothing the engine compiles.
+// as main's file reads before a landing that changed nothing cohere compiles.
 func sameBinaryPerformance(test *testing.T, contents []byte) []byte {
 	test.Helper()
 	file := performanceFile{}
@@ -189,7 +189,7 @@ func uncountedPerformance(test *testing.T, contents []byte) []byte {
 	if decodeError := json.Unmarshal([]byte(performanceBody(string(contents))), &file); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	file.Engine.Cold.Root.Checked, file.Engine.Cold.Deeafbf4.Checked, file.Engine.Warm.Root.Checked = nil, nil, nil
+	file.Checks.Cold.Root.Checked, file.Checks.Cold.Deeafbf4.Checked, file.Checks.Warm.Root.Checked = nil, nil, nil
 	uncounted, renderError := renderPerformance(file)
 	if renderError != nil {
 		test.Fatal(renderError)
@@ -237,7 +237,7 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 			name: "the same binary reads as the box's drift",
 			previous: sameBinaryPerformance(test, previousPerformance(test, performancePreviousCommit,
 				performanceBox, performanceSpreadOf(12000, 11900, 12100), performanceSpreadOf(48000, 47600, 48400))),
-			note: "against 11111111, the same binary (sha256 5f0c3a9e1d2b), so no change to the engine and any " +
+			note: "against 11111111, the same binary (sha256 5f0c3a9e1d2b), so no change to cohere and any " +
 				"difference is the box's: cold root wall drifted down by 2200 ms, 18%, the box's ranges apart " +
 				"(9800 ms, was 12000), user drifted down by 8800 ms, 18%, the box's ranges apart (39200 ms, was " +
 				"48000); cold deeafbf4 wall level",
@@ -288,7 +288,7 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 			if gated := fixture.git(fixture.repository, "rev-parse", measured.Commit+"^{tree}"); gated != gatedTree {
 				test.Errorf("the file names %s, whose tree is %s, not the gated %s", measured.Commit, gated, gatedTree)
 			}
-			cold, warm := measured.Engine.Cold, measured.Engine.Warm
+			cold, warm := measured.Checks.Cold, measured.Checks.Warm
 			for _, check := range []struct {
 				what      string
 				got, want any
@@ -301,9 +301,9 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 				{"cold root checked", cold.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
 				{"cold deeafbf4 checked", cold.Deeafbf4.Checked, &performanceChecked{Files: 95, Findings: 7}},
 				{"warm root checked", warm.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
-				{"rounds", measured.Engine.Rounds, performanceRounds{Cold: performanceColdRounds,
+				{"rounds", measured.Checks.Rounds, performanceRounds{Cold: performanceColdRounds,
 					Deeafbf4: performanceReferenceRounds, Warm: performanceWarmRounds}},
-				{"timeline", measured.Engine.Timeline.Root,
+				{"timeline", measured.Checks.Timeline.Root,
 					performanceTimeline{Listing: 812, Handover: 5100, Builds: 6201, Run: 9700}},
 				{"machine", fmt.Sprint(measured.Machine), fmt.Sprint(performanceMachine{Name: "Shackler",
 					Cpu: "Apple M2 Max", Cores: 12, LoadBefore: []float64{0.89, 0.91, 1.28},
@@ -311,7 +311,7 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 				{"tools", measured.Tools, performanceTools{Cohere: shortCommit(measured.Commit) +
 					" CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache " +
 					"the box kept", Go: "go1.27.1", Binary: performanceFixtureBinary}},
-				{"schema", measured.Schema, 2},
+				{"schema", measured.Schema, 3},
 			} {
 				if fmt.Sprint(check.got) != fmt.Sprint(check.want) {
 					test.Errorf("the file's %s is %+v, want %+v", check.what, check.got, check.want)
@@ -420,7 +420,7 @@ func TestAMeasurementThatFailsRefusesTheLanding(test *testing.T) {
 	}{
 		{
 			name: "the box refuses",
-			run:  performanceRefusedMarker + "cohere didn't build at COMMIT: undefined: engine\n",
+			run:  performanceRefusedMarker + "cohere didn't build at COMMIT: undefined: cohere\n",
 			exit: "1",
 			said: "Shackler refused to measure it: cohere didn't build at ",
 		},
@@ -493,9 +493,9 @@ func TestAMeasurementThatFailsRefusesTheLanding(test *testing.T) {
 	}
 }
 
-// A tree with no command/cohere, every other land test's fixture, has no engine to measure: it lands its gated tree
+// A tree with no command/cohere, every other land test's fixture, has no cohere to measure: it lands its gated tree
 // as it was, saying so on the land line and in its body, and never asks ahra anything.
-func TestALandingWithNoEngineLandsSayingThereIsNothingToMeasure(test *testing.T) {
+func TestALandingWithNoCohereLandsSayingThereIsNothingToMeasure(test *testing.T) {
 	test.Parallel()
 	fixture := newLandFixture(test)
 	replies := test.TempDir()
@@ -514,7 +514,7 @@ func TestALandingWithNoEngineLandsSayingThereIsNothingToMeasure(test *testing.T)
 	if tree := fixture.git(fixture.repository, "rev-parse", "main^{tree}"); tree != gatedTree {
 		test.Errorf("main's tree is %s, not the gated %s", tree, gatedTree)
 	}
-	commit := regexp.MustCompile(`Nothing measured: ([0-9a-f]{8}) has no command/cohere, so there is no engine ` +
+	commit := regexp.MustCompile(`Nothing measured: ([0-9a-f]{8}) has no command/cohere, so there is no cohere ` +
 		`to time\.`).FindStringSubmatch(string(output))
 	if commit == nil {
 		test.Fatalf("the land line does not say there is nothing to measure:\n%s", output)
@@ -541,15 +541,15 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 	current := performanceFileOf(measurement, performancePreviousCommit, time.Unix(0, 0))
 	otherBuild, otherShape, otherChecked, sameBinary, otherBinary := current, current, current, current, current
 	otherBuild.Tools.Go = "go1.27.2"
-	otherShape.Engine.Rounds.Cold = 5
+	otherShape.Checks.Rounds.Cold = 5
 	// A file written before keys were spelled whole, schema 1, reads as another shape, its min and max never read.
 	oldSpelling := current
 	oldSpelling.Schema = 1
-	otherChecked.Engine.Cold.Deeafbf4.Checked = &performanceChecked{Files: 2210, Findings: 1100}
+	otherChecked.Checks.Cold.Deeafbf4.Checked = &performanceChecked{Files: 2210, Findings: 1100}
 	otherChecked.Tools.Binary = performanceMainBinary
 	// main's file measured the same binary a little faster at the root, and another binary just the same.
-	sameBinary.Engine.Cold.Root.Wall = performanceSpreadOf(9500, 9450, 9550)
-	otherBinary.Engine.Cold.Root.Wall = sameBinary.Engine.Cold.Root.Wall
+	sameBinary.Checks.Cold.Root.Wall = performanceSpreadOf(9500, 9450, 9550)
+	otherBinary.Checks.Cold.Root.Wall = sameBinary.Checks.Cold.Root.Wall
 	otherBinary.Tools.Binary = performanceMainBinary
 	for _, row := range []struct {
 		name     string
@@ -561,7 +561,7 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 			"-ldflags='-s -w', darwin/arm64, on a cache the box kept with go1.27.1, and main's at 11111111 as " +
 			"CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache the box " +
 			"kept with go1.27.2: another build, so not compared"},
-		{"another shape", otherShape, "", fmt.Sprintf("main's at 11111111 was measured in another shape (schema 2, "+
+		{"another shape", otherShape, "", fmt.Sprintf("main's at 11111111 was measured in another shape (schema 3, "+
 			"rounds 5/2/%d), so not compared", performanceWarmRounds)},
 		{"the old spelling", oldSpelling, "", fmt.Sprintf("main's at 11111111 was measured in another shape "+
 			"(schema 1, rounds %d/%d/%d), so not compared", performanceColdRounds, performanceReferenceRounds,
@@ -572,7 +572,7 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 			"9800), user level (39200 ms, was 39200); cold deeafbf4 checked 95 files and 7 findings, and main's 2210 " +
 			"and 1100, so not compared; warm root wall level (800 ms, was 800), user level (3200 ms, was 3200)"},
 		{"the same binary", sameBinary, "", "against 11111111, the same binary (sha256 5f0c3a9e1d2b), so no change " +
-			"to the engine and any difference is the box's: cold root wall drifted up by 300 ms, 3%, the box's " +
+			"to cohere and any difference is the box's: cold root wall drifted up by 300 ms, 3%, the box's " +
 			"ranges apart (9800 ms, was 9500), user level (39200 ms, was 39200); cold deeafbf4 wall level (4100 ms, " +
 			"was 4100), user level (16400 ms, was 16400); warm root wall level (800 ms, was 800), user level (3200 " +
 			"ms, was 3200)"},
@@ -603,11 +603,11 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 // The measurement's script, run with bash against mirrors and a toolchain of its own (#6wnsnq2): it waits for the
 // mirror, lays the root at the commit and deeafbf4 at its own, each with TypeScript at its pin, under
 // ~/scratch/system_cohere_tools/performance, checks the toolchain by its digest, builds the binary on the Go cache it
-// keeps there, and runs the engine 2 fills and 3 rounds cold at the root, 2 and 2 at deeafbf4, 1 and 1 warm and one
+// keeps there, and runs cohere 2 fills and 3 rounds cold at the root, 2 and 2 at deeafbf4, 1 and 1 warm and one
 // timeline run, each over the binary's own system store under /usr/bin/time -l, saying each in lines readPerformance
-// reads as a whole measurement, with the files walked and findings the engine's own records say. Run again, it keeps
+// reads as a whole measurement, with the files walked and findings cohere's own records say. Run again, it keeps
 // deeafbf4 as laid, and clears what the runs before left in either tree. Both runs leave no configuration file behind.
-// A run whose engine printed no lint record or no summary refuses, naming its row and the engine's last words.
+// A run whose cohere printed no lint record or no summary refuses, naming its row and cohere's last words.
 func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	test.Parallel()
 	needs.Platform(test, "darwin", "the script reads a Mac's sysctl and /usr/bin/time -l, and Shackler is one")
@@ -640,7 +640,7 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	git(source, "update-index", "--add", "--cacheinfo", "160000,"+pin+",TypeScript")
 	git(source, "commit", "-q", "-m", "the older cohere")
 	reference := git(source, "rev-parse", "HEAD")
-	writeFixtureFile(test, filepath.Join(source, "command", "cohere", "engine.go"), "package main\n")
+	writeFixtureFile(test, filepath.Join(source, "command", "cohere", "landed.go"), "package main\n")
 	git(source, "add", "command")
 	git(source, "commit", "-q", "-m", "the cohere being landed")
 	commit := git(source, "rev-parse", "HEAD")
@@ -650,23 +650,23 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		git(from, "push", "-q", filepath.Join(mirrors, name), "HEAD:refs/heads/main")
 	}
 
-	// A toolchain whose go answers what the script asks, records each build, and builds a stand-in for the engine that
+	// A toolchain whose go answers what the script asks, records each build, and builds a stand-in for cohere that
 	// records each run, walks 2 files at the root and finds 1 thing in 1 file at deeafbf4, exiting 1 there as the
-	// engine does, its lint and summary records saying so. With PERFORMANCE_ENGINE_UNLINTED set it prints no lint
-	// record, and with PERFORMANCE_ENGINE_UNSUMMARIZED no summary.
+	// real one does, its lint and summary records saying so. With PERFORMANCE_COHERE_UNLINTED set it prints no lint
+	// record, and with PERFORMANCE_COHERE_UNSUMMARIZED no summary.
 	builds := filepath.Join(directory, "builds")
 	runs := filepath.Join(directory, "runs")
-	engine := filepath.Join(directory, "engine")
-	engineScript := "#!/bin/sh\necho \"$PWD $COHERE_SYSTEM_CACHE $COHERE_GO_ENGINE_CHILD $*\" >> '" + runs + "'\n" +
+	binary := filepath.Join(directory, "stand-in-cohere")
+	binaryScript := "#!/bin/sh\necho \"$PWD $COHERE_SYSTEM_CACHE $COHERE_GO_CHILD $*\" >> '" + runs + "'\n" +
 		"root=''; timeline=''\n" +
 		"while [ \"$#\" -gt 0 ]; do case \"$1\" in --root) root=\"$2\"; shift ;; --timeline) timeline=1 ;; esac; " +
 		"shift; done\n" +
 		"[ -z \"$timeline\" ] || echo '{\"kind\":\"timeline\",\"stamps\":[{\"label\":\"host.listing.end\"," +
 		"\"wallMicroseconds\":1500,\"userMicroseconds\":0,\"systemMicroseconds\":0},{\"label\":\"run.end\"," +
 		"\"wallMicroseconds\":4000,\"userMicroseconds\":0,\"systemMicroseconds\":0}]}'\n" +
-		"[ -z \"$PERFORMANCE_ENGINE_UNLINTED\" ] || { echo 'the lint phase never ran' >&2; " +
+		"[ -z \"$PERFORMANCE_COHERE_UNLINTED\" ] || { echo 'the lint phase never ran' >&2; " +
 		"echo '{\"kind\":\"summary\",\"findings\":0,\"complete\":false,\"exitCode\":0}'; exit 0; }\n" +
-		"[ -z \"$PERFORMANCE_ENGINE_UNSUMMARIZED\" ] || { echo 'the engine was killed' >&2; " +
+		"[ -z \"$PERFORMANCE_COHERE_UNSUMMARIZED\" ] || { echo 'cohere was killed' >&2; " +
 		"echo '{\"kind\":\"lint\",\"findings\":0,\"rulesRun\":237,\"filesWalked\":2,\"nodesVisited\":80}'; " +
 		"exit 0; }\n" +
 		"case \"$root\" in */deeafbf4) echo '{\"kind\":\"finding\"}'; " +
@@ -674,13 +674,13 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		"echo '{\"kind\":\"summary\",\"findings\":1,\"complete\":true,\"exitCode\":1}'; exit 1 ;; esac\n" +
 		"echo '{\"kind\":\"lint\",\"findings\":0,\"rulesRun\":237,\"filesWalked\":2,\"nodesVisited\":80}'\n" +
 		"echo '{\"kind\":\"summary\",\"findings\":0,\"complete\":true,\"exitCode\":0}'\n"
-	writeFixtureFile(test, engine, engineScript)
+	writeFixtureFile(test, binary, binaryScript)
 	goroot := filepath.Join(directory, "go")
 	goScript := "#!/bin/sh\ncase \"$1\" in\nmod) exit 0 ;;\n" +
 		"env) case \"$2\" in GOOS) echo darwin ;; GOARCH) echo arm64 ;; GOVERSION) echo go1.27.1 ;; esac; exit 0 ;;\n" +
 		"build) echo \"GOCACHE=$GOCACHE CGO_ENABLED=$CGO_ENABLED $*\" >> '" + builds + "'\n" +
 		"  while [ \"$#\" -gt 0 ]; do [ \"$1\" != -o ] || output=\"$2\"; shift; done\n" +
-		"  cp '" + engine + "' \"$output\"; chmod +x \"$output\"; exit 0 ;;\nesac\n" +
+		"  cp '" + binary + "' \"$output\"; chmod +x \"$output\"; exit 0 ;;\nesac\n" +
 		"echo \"the stand-in go has no answer for: $*\" >&2; exit 2\n"
 	if makeError := os.MkdirAll(filepath.Join(goroot, "bin"), 0o755); makeError != nil {
 		test.Fatal(makeError)
@@ -737,11 +737,11 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	want := performanceFills + performanceColdRounds + performanceFills + performanceReferenceRounds + 1 +
 		performanceWarmRounds + 1
 	if len(ran) != want {
-		test.Errorf("the engine ran %d times, want %d, fills included:\n%s", len(ran), want, strings.Join(ran, "\n"))
+		test.Errorf("cohere ran %d times, want %d, fills included:\n%s", len(ran), want, strings.Join(ran, "\n"))
 	}
 	for _, line := range ran {
-		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-engine --contract 3 --root ") {
-			test.Errorf("a run was not the engine over the binary's own system store: %s", line)
+		if !strings.Contains(line, " "+filepath.Join(scratch, "system")+" 1 go-language --contract 3 --root ") {
+			test.Errorf("a run was not cohere over the binary's own system store: %s", line)
 		}
 	}
 	for _, run := range measurement.runs {
@@ -776,8 +776,8 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 
 	for _, unrecorded := range []struct{ variable, want string }{
-		{"PERFORMANCE_ENGINE_UNLINTED", "no lint record: the lint phase never ran"},
-		{"PERFORMANCE_ENGINE_UNSUMMARIZED", "no summary record: the engine was killed"},
+		{"PERFORMANCE_COHERE_UNLINTED", "no lint record: the lint phase never ran"},
+		{"PERFORMANCE_COHERE_UNSUMMARIZED", "no summary record: cohere was killed"},
 	} {
 		output, _, problem := read(unrecorded.variable + "=1")
 		if want := "Shackler refused to measure it: the cold run at root, round fill, printed " +

@@ -144,9 +144,9 @@ func dispositionsFor(mode ReturnAwaitMode) (errorHandling returnAwaitDisposition
 // # A fix or a suggestion, decided by whether the edit can change behaviour
 //
 // When the position does not affect error handling, adding or removing the await cannot change
-// which handler runs, so upstream ships a fix and the engine applies it unattended. When it does
+// which handler runs, so upstream ships a fix and the fix pass applies it unattended. When it does
 // affect error handling, the same edit is a judgment about control flow and upstream ships a
-// suggestion instead. Collapsing the two would have the edit engine silently rewriting which frame
+// suggestion instead. Collapsing the two would have the fix pass silently rewriting which frame
 // catches a rejection. `nonPromiseAwait` is always a fix, because removing an await from a
 // non-thenable cannot change control flow at all.
 //

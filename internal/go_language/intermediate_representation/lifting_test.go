@@ -277,7 +277,7 @@ func liftingStillLiftable(function *intermediate_representation.Function,
 	return true
 }
 
-// TestLiftingIsTheDefault builds a program no test set options on, as the engine builds one, and holds it lifted:
+// TestLiftingIsTheDefault builds a program no test set options on, as cohere-go builds one, and holds it lifted:
 // the variable an if assigns on both arms is a phi, and no Allocation is left.
 func TestLiftingIsTheDefault(test *testing.T) {
 	test.Parallel()

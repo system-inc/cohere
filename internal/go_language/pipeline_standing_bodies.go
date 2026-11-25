@@ -22,20 +22,20 @@ const standingBodiesVariable = "COHERE_STANDING_BODIES"
 // leavesBodiesStanding is whether the run's extra builds leave the bodies standing_facts settles as standing to the
 // host's findings: the switch is on and the run takes the census path, whose builds are handed the host's sides for the
 // facts' reach (takesBodyReach). A run off the census path never leaves a body standing, the switch or not.
-func (engine *pipeline) leavesBodiesStanding() bool {
-	return engine.standingBodies && engine.takesBodyReach()
+func (pipeline *pipeline) leavesBodiesStanding() bool {
+	return pipeline.standingBodies && pipeline.takesBodyReach()
 }
 
 // standingConfinedRules are the rules of enabled confined for the standing bodies, by name: each with a Listener that
 // rules.DeclaredInputs, with the declarations a test planted (plantedInputs) laid over it, declares PerUnit or
 // FileSyntax. It is asked once a run, as the extra builds start, and only when the run leaves bodies standing.
-func (engine *pipeline) standingConfinedRules(enabled []rule.Rule) map[string]bool {
+func (pipeline *pipeline) standingConfinedRules(enabled []rule.Rule) map[string]bool {
 	// Ignored: a table that does not parse is TestTheInputsTableParses's to fail, and confines only what a test
 	// planted, so every other rule hears every body.
 	declared, _ := rules.DeclaredInputs()
 	confined := map[string]bool{}
 	for _, each := range enabled {
-		declaration, isDeclared := engine.plantedInputs[each.Name]
+		declaration, isDeclared := pipeline.plantedInputs[each.Name]
 		if !isDeclared {
 			declaration = declared[each.Name]
 		}

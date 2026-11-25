@@ -23,7 +23,7 @@ import (
 // COHERE_ name a test sets: a string literal "COHERE_NAME=...", an os or testing Setenv of the name, or a
 // constant holding the name joined to "=...". Each must be read somewhere:
 //   - mentioned in any source of ours that is not a Go test, in any language, since a program a test starts may
-//     be cohere, the Swift engine, a script or an editor extension;
+//     be cohere, cohere-swift, a script or an editor extension;
 //   - read by a Go test with os.Getenv or os.LookupEnv, of the literal or of a constant holding it, the way a
 //     test binary started again as its own helper child reads its marker;
 //   - read as `$NAME` or `${NAME}` inside a string literal of a Go test, a shell script the test writes;
@@ -274,8 +274,8 @@ func constantsOf(file *ast.File) map[string]string {
 	return constants
 }
 
-// sourceExtensions are the files a program a test starts may be written in: cohere and its tools, the Swift
-// engine, scripts, and the editor extensions.
+// sourceExtensions are the files a program a test starts may be written in: cohere and its tools,
+// cohere-swift, scripts, and the editor extensions.
 var sourceExtensions = map[string]bool{
 	".go": true, ".swift": true, ".sh": true, ".zsh": true, ".bash": true,
 	".js": true, ".mjs": true, ".cjs": true, ".ts": true, ".py": true,

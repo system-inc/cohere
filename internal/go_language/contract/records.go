@@ -1,4 +1,4 @@
-// Package contract is the record stream the Go engine prints on stdout, swift/Contract.md's contract 3,
+// Package contract is the record stream cohere-go prints on stdout, swift/Contract.md's contract 3,
 // which the front door already renders for cohere-swift.
 //
 // The JSON names here are the contract's and the front door's (command/cohere/swift_records.go), spelled
@@ -7,7 +7,7 @@
 // written twice.
 package contract
 
-// Version is the version of swift/Contract.md this engine speaks, written in the provenance record and
+// Version is the version of swift/Contract.md cohere-go speaks, written in the provenance record and
 // checked against the front door's `--contract`.
 const Version = 3
 
@@ -20,7 +20,7 @@ const (
 	KindProvenance Kind = "provenance"
 	// KindProject describes what the run looked at, the counterpart of `graph built in`.
 	KindProject Kind = "project"
-	// KindUnreadable names one file the engine could not read.
+	// KindUnreadable names one file cohere-go could not read.
 	KindUnreadable Kind = "unreadable"
 	// KindFinding is one finding.
 	KindFinding Kind = "finding"
@@ -72,7 +72,7 @@ type ExcludedFile struct {
 	Source string `json:"source,omitempty"`
 }
 
-// Source is which part of the engine produced a finding.
+// Source is which part of cohere-go produced a finding.
 type Source string
 
 const (
@@ -95,7 +95,7 @@ const (
 	SeverityWarning Severity = "warning"
 )
 
-// Edit replaces the bytes from Start to End, 0-based UTF-8 offsets into the file as the engine read it.
+// Edit replaces the bytes from Start to End, 0-based UTF-8 offsets into the file as cohere-go read it.
 type Edit struct {
 	Start int    `json:"start"`
 	End   int    `json:"end"`

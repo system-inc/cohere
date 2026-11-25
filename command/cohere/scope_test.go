@@ -241,7 +241,7 @@ func enumerationOf(
 
 // A whole-tree scope must become the enumeration, not the type graph.
 //
-// This is the ruling's core: the format phase's universe is what the walk found and the engine
+// This is the ruling's core: the format phase's universe is what the walk found and the child
 // handles. Intersecting with the type graph is what made css, markdown, json and yaml invisible,
 // because a tsconfig enumerates TypeScript by construction.
 func TestAWholeTreeScopeBecomesTheEnumeration(test *testing.T) {
@@ -251,7 +251,7 @@ func TestAWholeTreeScopeBecomesTheEnumeration(test *testing.T) {
 
 	scope := wholeTreeScope().narrowToEnumeration(enumeration)
 
-	// Every language the engine handles is in scope, which is the thing that was broken.
+	// Every language the child handles is in scope, which is the thing that was broken.
 	for _, fileName := range files {
 		if !scope.includes(fileName) {
 			test.Fatalf("%s was enumerated and handled but is not in scope: %v", fileName, scope.FileNames)
@@ -275,7 +275,7 @@ func TestAWholeTreeScopeBecomesTheEnumeration(test *testing.T) {
 	}
 }
 
-// A file the engine cannot handle must be a named zero, not an absence.
+// A file the child cannot handle must be a named zero, not an absence.
 //
 // This is the requirement the ruling attached and the one place in this pipeline where a file could
 // previously go missing without a word: a `.json` in a TypeScript project was never a candidate, so
@@ -360,7 +360,7 @@ func TestANarrowScopeReportsHowMuchIsFormattable(test *testing.T) {
 		},
 		Description: "3 named paths",
 	}
-	// The engine handles the ts and the css; the rb was declined during the walk.
+	// The child handles the ts and the css; the rb was declined during the walk.
 	enumeration := enumerationOf("/repo", []string{"/repo/a.ts", "/repo/c.css"}, 40, map[string]int{".rb": 1}, nil, nil)
 
 	narrowed := scope.narrowToEnumeration(enumeration)

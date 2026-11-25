@@ -55,10 +55,10 @@ func findingLines(stream string) []string {
 }
 
 // libraryDependence is the library's own judgment of the fixture at root: the host and the build loaded whole with
-// go/packages under the environments the engine's run loaded them under, the graph built from every package of the
+// go/packages under the environments cohere-go's run loaded them under, the graph built from every package of the
 // host's, the module's the workspace, and the difference of the two loads' files as written, a build-only file parsed
-// for its syntax alone. It shares appendParsed with the engine, the one parse both must make alike, and marks a
-// package both have as the engine does: by a build-only file that parse cannot read or parse, and by a line directive
+// for its syntax alone. It shares appendParsed with cohere-go, the one parse both must make alike, and marks a
+// package both have as cohere-go does: by a build-only file that parse cannot read or parse, and by a line directive
 // in a file the two do not share (build_dependence.HoldsLineDirective).
 func libraryDependence(test *testing.T, root string, hostEnvironment []string, buildEnvironment []string) Counts {
 	test.Helper()
@@ -114,7 +114,7 @@ func libraryJudgment(
 			difference.BuildOnlyPackages[identifier] = true
 			differing.Workspace = workspace(buildPackage)
 		}
-		// Parsed for syntax alone, comments left out, as the engine and the counter parse a build-only file, so its
+		// Parsed for syntax alone, comments left out, as cohere-go and the counter parse a build-only file, so its
 		// nodes count alike.
 		for _, file := range buildPackage.GoFiles {
 			if !isShared || !slices.Contains(hostPackage.GoFiles, file) {
@@ -173,7 +173,7 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 		test.Fatal("the windows build's record writes no dependence")
 	}
 	// The process's environment under the run's own, a later variable taking the place of an earlier one, as the
-	// engine's loads read them.
+	// pipeline's loads read them.
 	hostEnvironment := append(os.Environ(), on.described.workspace.Environment()...)
 	buildEnvironment := append(slices.Clone(hostEnvironment), on.buildRuns[1].build.Environment()...)
 	want := libraryDependence(test, root, hostEnvironment, buildEnvironment)
@@ -203,7 +203,7 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 	}
 }
 
-// The engine's own scan for a line directive reaches each build's judgment (#9paaen9): under `--build-dependence`, the
+// cohere-go's own scan for a line directive reaches each build's judgment (#9paaen9): under `--build-dependence`, the
 // build-dependence-line-directive fixture's 7 workspace units are judged on windows and on freebsd, each of which
 // declares p's Helper a string. p's gen_other.go, which neither compiles, declares Helper an int under
 // `//line shared.go:1`, so its unit is named by a file every build compiles, and only the scan of that host-only file
@@ -221,7 +221,7 @@ func TestEachBuildsDependenceIsTheLibrarysJudgment(test *testing.T) {
 // disk again: with gen_other.go rewritten on disk without its directive once the run has read it, as a save in the
 // middle of a run leaves it, the graph still names Helper by shared.go, the scan still seeds p, and the counts are the
 // same.
-func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.T) {
+func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheCheck(test *testing.T) {
 	test.Parallel()
 
 	for _, each := range []struct {
@@ -243,9 +243,16 @@ func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.
 						"//go:build !windows && !freebsd\n\npackage p\n\nfunc Helper() int { return 1 }\n")
 				}
 			}
-			engine, stream := runOverConfigured(test, root, exitFindings, configure, "--no-cache", "--build-dependence")
+			pipeline, stream := runOverConfigured(
+				test,
+				root,
+				exitFindings,
+				configure,
+				"--no-cache",
+				"--build-dependence",
+			)
 			lint := lintRecordOf(test, stream)
-			if len(lint.Builds) != 3 || len(engine.buildRuns) != 3 {
+			if len(lint.Builds) != 3 || len(pipeline.buildRuns) != 3 {
 				test.Fatalf("want the host's build, windows's and freebsd's, got the records %+v", lint.Builds)
 			}
 			for index, want := range []struct {
@@ -256,7 +263,7 @@ func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.
 				{operatingSystem: "windows", dependent: 6, independent: "q's Alone"},
 				{operatingSystem: "freebsd", dependent: 5, independent: "q's Alone and r's Steady"},
 			} {
-				if got := engine.buildRuns[index+1].build.OperatingSystem; got != want.operatingSystem {
+				if got := pipeline.buildRuns[index+1].build.OperatingSystem; got != want.operatingSystem {
 					test.Fatalf("want extra build %d on %s, got %s", index+1, want.operatingSystem, got)
 				}
 				recorded := lint.Builds[index+1].Dependence
@@ -273,7 +280,7 @@ func TestALineDirectiveInAnUnsharedFileSeedsItsPackageInTheEngine(test *testing.
 	}
 }
 
-// The engine's scan reads a file the run holds from the held bytes, never the disk's, and answers a second ask from
+// cohere-go's scan reads a file the run holds from the held bytes, never the disk's, and answers a second ask from
 // its first scan (hostDependence.lineDirectives), as a second build asks; a file the run holds nothing for, read from
 // disk, that cannot be read there is said to hold a directive, failing wide.
 func TestTheLineDirectiveScanAnswersFromTheHeldBytesOnceAndFailsWide(test *testing.T) {
@@ -282,20 +289,20 @@ func TestTheLineDirectiveScanAnswersFromTheHeldBytesOnceAndFailsWide(test *testi
 	directory := test.TempDir()
 	held := filepath.Join(directory, "held.go")
 	writeTestFile(test, held, "package p\n\nfunc Helper() int { return 1 }\n")
-	engine := &pipeline{dependence: &hostDependence{}, described: &describedProject{contents: map[string][]byte{
+	pipeline := &pipeline{dependence: &hostDependence{}, described: &describedProject{contents: map[string][]byte{
 		held: []byte("package p\n\n//line shared.go:1\nfunc Helper() int { return 1 }\n"),
 	}}}
 	for _, ask := range []string{"first", "again"} {
-		if !engine.holdsLineDirective(held) {
+		if !pipeline.holdsLineDirective(held) {
 			test.Errorf("asked %s, want the directive the run holds of held.go, which its disk lacks", ask)
 		}
 	}
-	if !engine.holdsLineDirective(filepath.Join(directory, "unread.go")) {
+	if !pipeline.holdsLineDirective(filepath.Join(directory, "unread.go")) {
 		test.Error("want unread.go, which neither the run nor the disk holds, said to hold a directive")
 	}
 }
 
-// The standard library's graph is judged with the engine's scan too (standardLibraryDifference): a package of it with
+// The standard library's graph is judged with cohere-go's scan too (standardLibraryDifference): a package of it with
 // a host-only file under a line directive naming a shared file is seeded whole. No file of the standard library the
 // builds do not share holds a directive today, so the build-dependence-line-directive fixture's p stands in for one:
 // its load on darwin is the standard library's graph, which the host restored, and its load on windows the build's.
@@ -340,7 +347,7 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.
 			// The standard library's graph has ended, as every build waits for it to.
 			done := make(chan struct{})
 			close(done)
-			engine := &pipeline{described: &describedProject{}, dependence: &hostDependence{
+			pipeline := &pipeline{described: &describedProject{}, dependence: &hostDependence{
 				graph:    build_dependence.NewGraph(),
 				files:    map[string][]string{},
 				paths:    map[string]string{},
@@ -348,7 +355,7 @@ func TestTheStandardLibrarysGraphIsJudgedWithTheLineDirectiveScan(test *testing.
 				standardLibrary: &standardLibraryDependence{done: done, graph: standardLibrary,
 					files: map[string][]string{identifier: each.hostFiles}},
 			}}
-			record, _ := engine.dependenceOf(&load.Loaded{Roots: []*packages.Package{each.built}})
+			record, _ := pipeline.dependenceOf(&load.Loaded{Roots: []*packages.Package{each.built}})
 			if record == nil || record.Restored == nil {
 				test.Fatalf("want a record of the restored standard library's judgment, got %+v", record)
 			}
@@ -382,15 +389,15 @@ func TestAPackageWhoseBuildOnlyFileIsUnparsedIsSeededWhole(test *testing.T) {
 
 			root := copyFixture(test, filepath.Join("testdata", "build-dependence-unparsed"))
 			writeTestFile(test, filepath.Join(root, "s", "broken_windows.go"), each.broken)
-			engine, _ := runOverConfigured(test, root, exitFindings, nil, "--no-cache", "--build-dependence")
-			if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
-				test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
+			pipeline, _ := runOverConfigured(test, root, exitFindings, nil, "--no-cache", "--build-dependence")
+			if len(pipeline.buildRuns) != 2 || pipeline.buildRuns[1].build.OperatingSystem != "windows" {
+				test.Fatalf("want the host's build and windows's, got %d builds", len(pipeline.buildRuns))
 			}
-			if engine.buildRuns[1].judged == nil {
+			if pipeline.buildRuns[1].judged == nil {
 				test.Fatal("the windows build judged no dependence")
 			}
 			var workspace []build_dependence.Unit
-			for _, unit := range engine.buildRuns[1].judged.dependence.Units() {
+			for _, unit := range pipeline.buildRuns[1].judged.dependence.Units() {
 				if unit.Workspace {
 					workspace = append(workspace, unit)
 				}
@@ -438,23 +445,23 @@ func TestABuildOnlyFileOfAPackageTheBuildChecksAsItsVariantIsJudged(test *testin
 					writeTestFile(test, filepath.Join(root, "v", "shape_windows.go"), "package v\n")
 				}
 			}
-			engine, _ := runOverConfigured(test, root, exitClean, configure, "--no-cache", "--build-dependence")
-			if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
-				test.Fatalf("want the host's build and windows's, got %d builds", len(engine.buildRuns))
+			pipeline, _ := runOverConfigured(test, root, exitClean, configure, "--no-cache", "--build-dependence")
+			if len(pipeline.buildRuns) != 2 || pipeline.buildRuns[1].build.OperatingSystem != "windows" {
+				test.Fatalf("want the host's build and windows's, got %d builds", len(pipeline.buildRuns))
 			}
 			const shapes = "example.com/dependencevariant/v"
-			if engine.buildRuns[0].analyzed[shapes+" ["+shapes+".test]"] ||
-				!engine.buildRuns[1].analyzed[shapes+" ["+shapes+".test]"] {
+			if pipeline.buildRuns[0].analyzed[shapes+" ["+shapes+".test]"] ||
+				!pipeline.buildRuns[1].analyzed[shapes+" ["+shapes+".test]"] {
 				test.Fatalf("want v [v.test] analyzed on windows alone, got the host's %v and windows's %v",
-					engine.buildRuns[0].analyzed, engine.buildRuns[1].analyzed)
+					pipeline.buildRuns[0].analyzed, pipeline.buildRuns[1].analyzed)
 			}
-			if engine.buildRuns[1].judged == nil {
+			if pipeline.buildRuns[1].judged == nil {
 				test.Fatal("the windows build judged no dependence")
 			}
 			// Each package's workspace units, dependent and in all, as "dependent of units".
 			got := map[string]string{}
 			counts := map[string][2]int{}
-			for _, unit := range engine.buildRuns[1].judged.dependence.Units() {
+			for _, unit := range pipeline.buildRuns[1].judged.dependence.Units() {
 				if !unit.Workspace {
 					continue
 				}
@@ -479,15 +486,15 @@ func TestABuildOnlyFileOfAPackageTheBuildChecksAsItsVariantIsJudged(test *testin
 			// The build-only units are counted from each build-only file's syntax as the run holds it: v [v.test]'s
 			// 8, a package the host does not have, counted whole, and String in each of plain v's, plain u's and
 			// u [u.test]'s comparisons, 11.
-			if buildOnly := engine.buildRuns[1].judged.dependence.Counts().Workspace.BuildOnlyUnits; buildOnly != 11 {
+			if buildOnly := pipeline.buildRuns[1].judged.dependence.Counts().Workspace.BuildOnlyUnits; buildOnly != 11 {
 				test.Errorf("want 11 build-only units on windows, got %d", buildOnly)
 			}
 			// The variants' own GoFiles, which the judgment compared less their test files, are the build's as it
 			// loaded them, each test file among the files windows has a say on.
 			for _, file := range []string{filepath.Join(root, "v", "shape_windows_test.go"),
 				filepath.Join(root, "u", "kind_test.go")} {
-				if !engine.buildRuns[1].said[file] {
-					test.Errorf("want windows to have a say on %s, got %v", file, engine.buildRuns[1].said)
+				if !pipeline.buildRuns[1].said[file] {
+					test.Errorf("want windows to have a say on %s, got %v", file, pipeline.buildRuns[1].said)
 				}
 			}
 		})
@@ -641,7 +648,7 @@ func TestDependenceOfSeedsAPackageWhoseOnlyDifferenceIsCgo(test *testing.T) {
 		{"a build that checks as written what the host did too", map[string][]string{},
 			asWritten(nativePlain, nativeCgo), asWritten(standardPlain, standardCgo), false},
 	} {
-		engine := &pipeline{dependence: &hostDependence{
+		pipeline := &pipeline{dependence: &hostDependence{
 			graph:    graph,
 			files:    map[string][]string{nativePath: native.GoFiles, standardPath: standard.GoFiles},
 			cgoFiles: build.hostCgoFiles,
@@ -650,7 +657,7 @@ func TestDependenceOfSeedsAPackageWhoseOnlyDifferenceIsCgo(test *testing.T) {
 			standardLibrary: &standardLibraryDependence{done: sideLoaded, graph: standardGraph,
 				files: map[string][]string{standardPath: standard.GoFiles}},
 		}}
-		_, judged := engine.dependenceOf(&load.Loaded{Roots: []*packages.Package{
+		_, judged := pipeline.dependenceOf(&load.Loaded{Roots: []*packages.Package{
 			{ID: nativePath, PkgPath: nativePath, GoFiles: native.GoFiles, CompiledGoFiles: build.nativeCompiled},
 			{ID: standardPath, PkgPath: standardPath, GoFiles: standard.GoFiles,
 				CompiledGoFiles: build.standardCompiled},
@@ -705,7 +712,7 @@ func TestTheHostsGraphKeepsItsCgoFilesForEveryBuildsJudgment(test *testing.T) {
 	native.GoFiles = []string{nativePlain, nativeCgo}
 	native.CompiledGoFiles = []string{nativePlain, generated, translation}
 
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request: invocation{switches: map[string]bool{"build-dependence": true}},
 		described: &describedProject{
 			builds: []project.Build{
@@ -715,11 +722,11 @@ func TestTheHostsGraphKeepsItsCgoFilesForEveryBuildsJudgment(test *testing.T) {
 			inScopeSet: map[string]bool{nativePlain: true, nativeCgo: true},
 		},
 	}
-	engine.buildDependenceGraph(&load.Loaded{Roots: []*packages.Package{native}}, nil)
-	if engine.dependence == nil {
+	pipeline.buildDependenceGraph(&load.Loaded{Roots: []*packages.Package{native}}, nil)
+	if pipeline.dependence == nil {
 		test.Fatal("want the host's graph built from its load")
 	}
-	if cgoFiles := engine.dependence.cgoFiles[nativePath]; !slices.Equal(cgoFiles, []string{nativeCgo}) {
+	if cgoFiles := pipeline.dependence.cgoFiles[nativePath]; !slices.Equal(cgoFiles, []string{nativeCgo}) {
 		test.Errorf("want the host's graph to keep %s as native's cgo file, got %q", nativeCgo, cgoFiles)
 	}
 	variantFiles := append(slices.Clone(native.GoFiles), "/native/native_tagged_test.go")
@@ -733,7 +740,7 @@ func TestTheHostsGraphKeepsItsCgoFilesForEveryBuildsJudgment(test *testing.T) {
 			ID: nativePath + " [" + nativePath + ".test]", PkgPath: nativePath, ForTest: nativePath,
 			GoFiles: variantFiles, CompiledGoFiles: variantFiles}},
 	} {
-		_, judged := engine.dependenceOf(&load.Loaded{Roots: []*packages.Package{build.root}})
+		_, judged := pipeline.dependenceOf(&load.Loaded{Roots: []*packages.Package{build.root}})
 		if judged == nil || judged.dependence == nil {
 			test.Fatalf("%s: want a judgment of the host's graph, got %+v", build.name, judged)
 		}
@@ -831,7 +838,7 @@ func TestAWithheldDeclarationPastALineDirectiveIsPlaced(test *testing.T) {
 		test.Errorf("want l's Raw withheld, placed past the directive, got %q", withheld)
 	}
 
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request: invocation{switches: map[string]bool{"build-dependence": true}},
 		described: &describedProject{
 			builds: []project.Build{
@@ -841,11 +848,11 @@ func TestAWithheldDeclarationPastALineDirectiveIsPlaced(test *testing.T) {
 			inScopeSet: map[string]bool{filepath.Join(projectRoot, "app", "app.go"): true},
 		},
 	}
-	engine.buildDependenceGraph(host, nil)
-	if engine.dependence == nil {
+	pipeline.buildDependenceGraph(host, nil)
+	if pipeline.dependence == nil {
 		test.Fatal("want the host's graph built from its load")
 	}
-	dependence := engine.dependence.graph.Against(build_dependence.Difference{})
+	dependence := pipeline.dependence.graph.Against(build_dependence.Difference{})
 	for local, want := range map[string]bool{"Raw": true, "Steady": false} {
 		if bits, isDeclared := dependence.NameBits(lPath, local); !isDeclared || bits.Name != want {
 			test.Errorf("l's %s: want its name bit %t under a build that says nothing of l, got %+v, declared %t",
@@ -901,7 +908,7 @@ func TestWhatTheHostWithheldIsASeedInEveryBuild(test *testing.T) {
 			builtWithheld)
 	}
 
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request: invocation{switches: map[string]bool{"build-dependence": true}},
 		described: &describedProject{
 			builds: []project.Build{
@@ -911,11 +918,11 @@ func TestWhatTheHostWithheldIsASeedInEveryBuild(test *testing.T) {
 			inScopeSet: map[string]bool{filepath.Join(projectRoot, "app", "app.go"): true},
 		},
 	}
-	engine.buildDependenceGraph(host, nil)
-	if engine.dependence == nil {
+	pipeline.buildDependenceGraph(host, nil)
+	if pipeline.dependence == nil {
 		test.Fatal("want the host's graph built from its load")
 	}
-	_, judged := engine.dependenceOf(built)
+	_, judged := pipeline.dependenceOf(built)
 	if judged == nil || judged.dependence == nil {
 		test.Fatalf("want a judgment of the host's graph, got %+v", judged)
 	}

@@ -154,7 +154,7 @@ func TestUnusedDisableSeverity(test *testing.T) {
 				test.Fatalf("coverage lost the dead count:\n%s", verbose)
 			}
 			if strings.Contains(verbose, "parity:") {
-				test.Fatalf("engine setting was treated as unported:\n%s", verbose)
+				test.Fatalf("linter setting was treated as unported:\n%s", verbose)
 			}
 			output, exit = runCohere(test, binary, project.root, "--fix", "--no-format", "--no-cache", "--json")
 			if exit != 0 {

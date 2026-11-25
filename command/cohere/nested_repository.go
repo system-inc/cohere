@@ -168,7 +168,7 @@ func prepareNestedCacheDirectories(root string) {
 // nobody running here. Each submodule is walked as a run rooted there would walk it, with its own ignore
 // layers. Only the formatter is asked: a fix in a library's code is a finding the project's lint already
 // reports, at its position, so repeating it here would count one problem twice.
-func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (nestedDriftCheck, error) {
+func checkNestedRepositories(formatter fileFormatter, root string, formatAll bool) (nestedDriftCheck, error) {
 	var check nestedDriftCheck
 
 	pending, declaredBelowError := declaredBelow(root, "")
@@ -209,7 +209,7 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 		}
 		pending = append(pending, inner...)
 
-		enumeration, enumerateError := engine.Enumerate(repositoryRoot)
+		enumeration, enumerateError := formatter.Enumerate(repositoryRoot)
 		if enumerateError != nil {
 			return check, fmt.Errorf("reading nested repository %s: %w", relative, enumerateError)
 		}
@@ -220,12 +220,12 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 		// formatted at its current bytes is not formatted again here. An entry proves its bytes are a fixed
 		// point of this formatter under these options, so skipping it cannot hide drift.
 		record := nestedFormatRecord(repositoryRoot)
-		transform := record.observe(formatTransform(engine), engine.OptionsFingerprint)
+		transform := record.observe(formatTransform(formatter), formatter.OptionsFingerprint)
 		// `--format-all` is every file, nested ones included: the record says nothing about which files it
 		// reads, and only learns from what the formatter sees, as at the top level.
 		unformatted := enumeration.Files
 		if !formatAll {
-			unformatted = record.unformatted(enumeration.Files, engine.OptionsFingerprint)
+			unformatted = record.unformatted(enumeration.Files, formatter.OptionsFingerprint)
 		}
 		check.Checked += len(unformatted)
 		for index, outcome := range formatNestedFiles(transform, unformatted) {
@@ -277,10 +277,10 @@ type nestedCheckResult struct {
 // answer will arrive. The check reads only the nested repositories and writes only their records, and a
 // run that checks writes nothing at all, so the two share no state; run one after the other, the check
 // was a second walk and format the whole run waited for.
-func startNestedCheck(engine formatEngine, root string, formatAll bool) <-chan nestedCheckResult {
+func startNestedCheck(formatter fileFormatter, root string, formatAll bool) <-chan nestedCheckResult {
 	answer := make(chan nestedCheckResult, 1)
 	go func() {
-		check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, formatAll)
+		check, checkNestedRepositoriesError := checkNestedRepositories(formatter, root, formatAll)
 		answer <- nestedCheckResult{check: check, checkError: checkNestedRepositoriesError}
 	}()
 	return answer

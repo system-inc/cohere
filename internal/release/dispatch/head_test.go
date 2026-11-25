@@ -111,7 +111,7 @@ func TestReadHeadRefusesWhatIsNotACommit(test *testing.T) {
 	}
 }
 
-// After the first run at a commit, the Swift engine's inputs are read from what that run kept, and git
+// After the first run at a commit, cohere-swift's inputs are read from what that run kept, and git
 // is not asked again: the module directory here stops being a repository at all, and the answer holds.
 func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 	test.Parallel()
@@ -138,7 +138,7 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 	writeFile(test, filepath.Join(module, "swift", "Package.resolved"), "{}\n")
 	writeFile(test, filepath.Join(module, "swift", "Sources", "A.swift"), "let a = 1\n")
 	run("add", ".")
-	run("commit", "--quiet", "-m", "engine")
+	run("commit", "--quiet", "-m", "cohere-swift")
 	commit := run("rev-parse", "HEAD")
 
 	paths := Paths{ModuleDirectory: module, CacheDirectory: test.TempDir()}

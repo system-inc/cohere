@@ -1,4 +1,4 @@
-// Package consistency_require_default_last is the Go engine's rule that a switch, type switch or select keeps its
+// Package consistency_require_default_last is cohere-go's rule that a switch, type switch or select keeps its
 // default clause last.
 //
 // Go picks the default only when no other clause matches, wherever the default sits, so its place says nothing to
@@ -36,7 +36,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_default_last", "
 	"and a reader looks for that fallback at the bottom. A default that falls through into the next clause, or that "+
 	"the clause before falls through into, is left alone, since there its place is the program's meaning.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads only the order of clauses in the syntax tree.
+// Rule is this rule's entry in cohere-go's registry. It reads only the order of clauses in the syntax tree.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var defaultNotLastMessage = policy.MessageOf(Name, "defaultNotLast")

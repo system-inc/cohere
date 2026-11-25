@@ -94,7 +94,7 @@ type privateClassMember struct {
 // all. Deleting a member changes the shape of the class: the surrounding comment may describe it,
 // a `declare` may be pinning a type another file depends on, and the author's answer is at least as
 // often "add the reader I forgot" as "delete this". That is a choice a human makes, so nothing is
-// proposed here rather than proposing a rewrite the engine would apply while the reader is not
+// proposed here rather than proposing a rewrite the fix pass would apply while the reader is not
 // looking.
 var NoUnusedPrivateClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "no-unused-private-class-members",

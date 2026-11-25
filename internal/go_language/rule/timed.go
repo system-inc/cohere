@@ -6,7 +6,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Timed keys, in a pass's ResultOf, the run's *timing.Collector under `--timing`, which the engine's checker hands
+// Timed keys, in a pass's ResultOf, the run's *timing.Collector under `--timing`, which cohere-go's checker hands
 // every pass when its checker.Options.Timed is this key and its Options.Timing is set (#3apgjer). The checker measures
 // each analyzer's run itself; a dispatcher reads the collector here to bill each listener's calls to its rule rather
 // than to its own walk. It lives beside Dependents, for Dependents' reasons.

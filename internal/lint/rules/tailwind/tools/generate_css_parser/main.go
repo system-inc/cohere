@@ -113,7 +113,7 @@ func main() {
 	fmt.Fprintf(
 		os.Stderr,
 		"wrote %s: tailwind %s, parse() located by identity as %s, %d parse cases and %d error cases; "+
-			"across %d real stylesheets the engine saw %d @theme entries, %d @utility blocks, %d @custom-variant rules\n",
+			"across %d real stylesheets Tailwind saw %d @theme entries, %d @utility blocks, %d @custom-variant rules\n",
 		*output,
 		summary.TailwindVersion,
 		summary.ParseExportName,
@@ -128,7 +128,7 @@ func main() {
 
 // enumerate runs the Node side and returns its JSON.
 //
-// The engine is JavaScript and there is no faithful way to ask it these questions from Go. The
+// Tailwind is JavaScript and there is no faithful way to ask it these questions from Go. The
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot, stylesheets string) ([]byte, error) {

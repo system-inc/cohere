@@ -83,10 +83,10 @@ func goRootOf(test *testing.T) string {
 // standardLibraryContext is what a test's standard-library keys share, under stamp, with goRoot.
 func standardLibraryContext(stamp string, goRoot string) cache.StandardLibraryContext {
 	return cache.StandardLibraryContext{
-		FormatVersion:  CacheFormatVersion,
-		EngineIdentity: stamp,
-		Build:          []string{"GOOS=" + runtime.GOOS, "GOARCH=" + runtime.GOARCH},
-		Goroot:         goRoot,
+		FormatVersion:      CacheFormatVersion,
+		ExecutableIdentity: stamp,
+		Build:              []string{"GOOS=" + runtime.GOOS, "GOARCH=" + runtime.GOARCH},
+		Goroot:             goRoot,
 	}
 }
 
@@ -195,7 +195,7 @@ func runSessionWith(
 // A run without a project's store, as under `--no-cache`, names the owner of every answer a standard-library package
 // read by its standard-library key, so none of the entries it writes to the system cache's store holds reads it could
 // not name: such an entry would have every extra build decline it, and what imports it, at the check, and load again.
-// Over the engine's standard-library fixture, with every rule, 36 of its 78 entries read answers of other packages.
+// Over cohere-go's standard-library fixture, with every rule, 36 of its 78 entries read answers of other packages.
 func TestARunWithoutAStoreNamesEveryStandardLibraryRead(test *testing.T) {
 	test.Parallel()
 
@@ -299,7 +299,7 @@ func TestAStandardLibraryPackageFromTheSystemCacheIsNeverAnalyzedOrParsed(test *
 }
 
 // A standard-library entry in the system cache's store is read only under its own context: a warm run under another
-// engine identity, another target, another Go version, another `GOROOT` or other fact analyzers' options keys every
+// executable identity, another target, another Go version, another `GOROOT` or other fact analyzers' options keys every
 // package apart, restores nothing and analyzes the standard library, as a linux session must never read a darwin
 // entry, while one under the context the store was filled under restores every package. A key that left one out would
 // find the entries, and they would restore.
@@ -334,7 +334,7 @@ func TestAStandardLibraryEntryIsReadOnlyUnderItsOwnContext(test *testing.T) {
 	otherVersion := own
 	otherVersion.Build = []string{"GOOS=" + runtime.GOOS, "GOARCH=" + runtime.GOARCH, "GOVERSION=go1.26.0"}
 	otherIdentity := own
-	otherIdentity.EngineIdentity = "another engine"
+	otherIdentity.ExecutableIdentity = "another executable"
 	for name, context := range map[string]cache.StandardLibraryContext{
 		"another target":     otherTarget,
 		"another Go version": otherVersion,

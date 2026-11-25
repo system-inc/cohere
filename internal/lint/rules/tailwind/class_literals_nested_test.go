@@ -181,7 +181,7 @@ func TestWhitespaceAtAHoleLiteralsEdgeIsASeparator(test *testing.T) {
 // A template whose source is not its value is reported and not fixed.
 //
 // `\“ decodes to a backtick, so writing the decoded classes back over the source would close the
-// template early, the file would stop parsing, and the engine would refuse every fix in it.
+// template early, the file would stop parsing, and Tailwind would refuse every fix in it.
 func TestAnEscapedTemplateIsReportedWithoutAFix(test *testing.T) {
 	test.Parallel()
 	result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx",

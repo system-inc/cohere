@@ -1,9 +1,9 @@
-// Package check is the Go engine's lint phase: every enabled rule over the loaded packages once, through
+// Package check is cohere-go's lint phase: every enabled rule over the loaded packages once, through
 // checker.Analyze, with facts flowing across packages. One broken analyzer never takes the run down and is never
 // silent: a panic, an error or a failed prerequisite becomes a crash, which makes the run incomplete, and every
 // other rule's findings still come back.
 //
-// It takes and returns plain values; the engine turns them into the lint record and finding records.
+// It takes and returns plain values; cohere-go turns them into the lint record and finding records.
 package check
 
 import (
@@ -54,7 +54,7 @@ type Options struct {
 	// ReleaseAnalyzed lets each analyzed package's syntax and type information go once the rules have finished on it,
 	// as a dependency's already go, rather than when the run ends; the Result is the same either way. Run then
 	// leaves the analyzed packages without their Syntax and TypesInfo, so only a caller that runs once over a load
-	// and reads neither afterwards sets it, as the engine does. A caller that runs again over the same load, as the
+	// and reads neither afterwards sets it, as cohere-go does. A caller that runs again over the same load, as the
 	// tests do over loads they share, leaves it unset.
 	ReleaseAnalyzed bool
 
@@ -78,7 +78,7 @@ type Options struct {
 	Timing *timing.Collector
 
 	// Counted, when not nil, is which files FilesWalked and NodesVisited count, of those the rules were given; nil
-	// counts every one. The engine leaves out its project's files outside the scope, since a package's file the run
+	// counts every one. cohere-go leaves out its project's files outside the scope, since a package's file the run
 	// excludes is still the package's and read with it, and is not one the run checked. The findings, and the walks
 	// the findings cache keeps, are the same either way.
 	Counted func(file string) bool
@@ -141,7 +141,7 @@ type Options struct {
 	// FactReachPresence, when not nil, is how a run with FactReach reads what each package's bodies hold that the
 	// presence rows read, and its marker interfaces, while the package's syntax and type information are whole
 	// (FactReachPackage.Presence and Markers): standing_presence's (standing_presence.ReadPackage), which this package
-	// never imports, so no rule package's registration rides into a binary that links the engine's core (#f5g7ym6).
+	// never imports, so no rule package's registration rides into a binary that links cohere-go's core (#f5g7ym6).
 	// Left nil, the run reads no presence, as a run without FactReach: every package is captured unread
 	// (FactReachPackage.PresenceRead), and a build lints it whole.
 	FactReachPresence func(read *packages.Package) (map[fact_reach.Place]fact_reach.BodyRecord, []string)
@@ -223,7 +223,7 @@ type Options struct {
 // ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
 var ErrAbandoned = errors.New("the rules were abandoned before they finished")
 
-// Finding is one diagnostic of one rule. Positions are of the file as the engine read it, not as a `//line`
+// Finding is one diagnostic of one rule. Positions are of the file as cohere-go read it, not as a `//line`
 // directive renames it, so they agree with the edits' offsets and with the suppression comments in that file.
 type Finding struct {
 	Rule string
@@ -245,7 +245,7 @@ type Finding struct {
 	Suggestions []Suggestion
 }
 
-// Suggestion is one repair an analyzer offered, which the engine offers and never applies.
+// Suggestion is one repair an analyzer offered, which cohere-go offers and never applies.
 type Suggestion struct {
 	Message string
 	Edits   []Edit
@@ -274,7 +274,7 @@ type Crash struct {
 // FindingsByRule that are not in CrashedRules: only such a rule ran on every package it was given and reported
 // nothing. A crashed rule also has 0, from the packages it never finished, and counting it quiet would read a
 // rule that saw nothing as a rule that found nothing. rulesSilent, the rules
-// that listened to no file at all, is the engine's to name, since only it knows which rules the config kept from
+// that listened to no file at all, is cohere-go's to name, since only it knows which rules the config kept from
 // every file before they reached this run; a run over no files leaves every rule it was given silent.
 type Result struct {
 	// Findings are every diagnostic of every rule that finished, but a house rule's in a generated or copied file
@@ -305,7 +305,7 @@ type Result struct {
 	// WithheldAsGenerated is, by rule name, how many findings of a house rule were dropped because their file is
 	// generated, only for rules that had any. A house rule is about how we write code, which a generator's output
 	// does not answer to, while a vet or tools finding there is still a bug in what we ship, so those stay. The
-	// engine writes these counts into the lint record, so a run over generated files never reads as clean when it
+	// cohere-go writes these counts into the lint record, so a run over generated files never reads as clean when it
 	// withheld what it found there.
 	WithheldAsGenerated map[string]int
 
@@ -914,10 +914,10 @@ func abandoned(abandon <-chan struct{}) bool {
 	}
 }
 
-// DispatchOptions is new checker options holding what the engine's dispatchers read of the checker, as every run of the
-// rules sets it, Run's and the parity harness's alike, so a port's tests run its rule as the engine does. Dependents
+// DispatchOptions is new checker options holding what cohere-go's dispatchers read of the checker, as every run of the
+// rules sets it, Run's and the parity harness's alike, so a port's tests run its rule as cohere-go does. Dependents
 // hands each dispatcher the rules of this run that require it on a package, so it calls only their listeners, never
-// those of a rule the run left out that registered on it all the same, and the engine's own representation records the
+// those of a rule the run left out that registered on it all the same, and cohere-go's own representation records the
 // expression map only where a rule that reads it runs. Failed and Tolerant let a dispatcher run past a listener's
 // requirement failing on a package, so only that listener's rule fails there, as it did walking by itself, never every
 // rule on the dispatcher. ForDependents keeps a dispatcher's requirement for its listeners only where a rule of this

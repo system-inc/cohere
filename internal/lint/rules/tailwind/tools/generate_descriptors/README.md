@@ -116,7 +116,7 @@ probes, all `<shadow-root>-[16/9]/[<arbitrary>]`, none of which any registry con
   are met while the `@utility` and `@theme` content that makes a design system per-repository is
   entirely absent. The same defect was found independently in the candidate parser (`a219c8f`).
 
-    The check is the delta against a bare install built through the same borrowed engine: **35
+    The check is the delta against a bare install built through the same borrowed Tailwind: **35
     utility roots and 325 theme keys** are ahra's own, and a system contributing zero of both is
     refused by name. It is counted rather than named, because a hardcoded canary (`fade-in` on ahra,
     `brand-hover` on connected) is the same baked-in assumption it exists to catch. The floor is 1,

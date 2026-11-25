@@ -13,9 +13,9 @@
 // *Program` is program, `t *checker.Type` subjectType), and last a few letters' conventional meaning for a basic
 // type (a rune is a character, an integer i an index). Every letter receiver of a type takes one name, and a
 // type switch's letter is `typed` in every clause. A struct field is renamed through globalrename. Each letter
-// carries its names best first, and a letter the engine refuses one name for tries the next; the coordinates
+// carries its names best first, and a letter global_rename refuses one name for tries the next; the coordinates
 // x, y and z, and the blank identifier, are never touched, and every letter no rule names is listed for the
-// waves with its function and line. Every rename goes through the rename engine, which refuses any that would
+// waves with its function and line. Every rename goes through global_rename, which refuses any that would
 // change what an identifier resolves to; the rewrite is proven in memory by workspace.ApplyVerified before
 // anything is written.
 package main
@@ -74,7 +74,7 @@ func runCommandLine() int {
 // candidate is one single-letter local and what the generator decided for it.
 type candidate struct {
 	variable *types.Var
-	// names are the proposed names, best first: the engine's fixpoint takes the first it accepts. Empty when the
+	// names are the proposed names, best first: global_rename's fixpoint takes the first it accepts. Empty when the
 	// variable is not eligible.
 	names []string
 	// category says why the variable is not eligible, or "" when it is.
@@ -1004,21 +1004,21 @@ type declarationRecord struct {
 	filename string
 	offset   int
 	oldName  string
-	// names are the names the rules gave, best first; newName is the one the engine accepted.
+	// names are the names the rules gave, best first; newName is the one global_rename accepted.
 	names    []string
 	newName  string
 	rule     string
 	category string
 	call     string
 	function string
-	// refusal is the engine's reason for the last name, when it refused every name the rules gave.
+	// refusal is global_rename's reason for the last name, when it refused every name the rules gave.
 	refusal string
 }
 
-// settle runs the engine until every candidate holds a name it accepts or has run out of names: a candidate,
-// or every candidate of its group together, whose name the engine refuses tries its next name, and the whole set
+// settle runs global_rename until every candidate holds a name it accepts or has run out of names: a candidate,
+// or every candidate of its group together, whose name global_rename refuses tries its next name, and the whole set
 // is judged again. Each round moves at least one group forward and none back, so this ends. It returns the
-// final plan and, for every group that ran out, the engine's reason for its last name.
+// final plan and, for every group that ran out, global_rename's reason for its last name.
 func settle(renamePackage rename.Package, candidates []candidate) (rename.Plan, map[string]string) {
 	groupOf := map[types.Object]string{}
 	for _, decided := range candidates {
@@ -1172,11 +1172,11 @@ func run(root string, skips []string, dryRun bool) int {
 	}
 	fmt.Fprintf(streams.Output, "candidates (single-letter locals the analyzer flags): %d\n", candidateCount)
 	fmt.Fprintf(streams.Output, "eligible (a rule gave names): %d\n", eligibleCount)
-	fmt.Fprintf(streams.Output, "accepted by the engine: %d\n", acceptedCount)
+	fmt.Fprintf(streams.Output, "accepted by global_rename: %d\n", acceptedCount)
 	printCounts(acceptedRules, 0)
 	fmt.Fprintln(streams.Output, "which of its names each accepted letter took:")
 	printCounts(nameSteps, 0)
-	fmt.Fprintf(streams.Output, "refused by the engine, every name: %d\n", eligibleCount-acceptedCount)
+	fmt.Fprintf(streams.Output, "refused by global_rename, every name: %d\n", eligibleCount-acceptedCount)
 	printCounts(refusedByReason, 0)
 	fmt.Fprintf(streams.Output, "not eligible, left for the waves: %d\n", candidateCount-eligibleCount)
 	printCounts(notEligibleByCategory, 0)
@@ -1337,7 +1337,7 @@ func run(root string, skips []string, dryRun bool) int {
 	return apply(loaded, root, skips, edits, editsByFile)
 }
 
-// refusalClass groups the engine's reasons for counting: a conflict with a name in scope or another rename,
+// refusalClass groups global_rename's reasons for counting: a conflict with a name in scope or another rename,
 // or the reason itself.
 func refusalClass(reason string) string {
 	if _, detail, found := strings.Cut(reason, ": "); found {

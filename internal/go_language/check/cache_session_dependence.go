@@ -15,7 +15,7 @@ import (
 // package's record (build_dependence's packageRecord, encoded) beside the package's entry, under a key derived from
 // the entry's first key (DependenceRecordKey), never in the entry's body, so a plain run neither writes, reads nor
 // knows of them. The first key holds every input a record reads: the package's own files, its import map, every
-// dependency's key, the build, the engine and the format, so a record found under it is the package's as the run
+// dependency's key, the build, cohere-go and the format, so a record found under it is the package's as the run
 // finds it, whether or not its entry hit, and a change anywhere below leaves a miss, never a stale record.
 //
 // A run with them on looks up the record of every package its host's load keyed, hit or miss, beside the entries in

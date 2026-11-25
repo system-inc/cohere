@@ -12,8 +12,8 @@ import (
 
 var messageInvalidRegexp = rule.Message{
 	Id: "invalidRegexp",
-	Description: "This RegExp constructor is handed a pattern or flags the engine cannot parse, so " +
-		"the line throws a SyntaxError when it runs. A regex literal with the same mistake is caught " +
+	Description: "This RegExp constructor is handed a pattern or flags the regular expression parser cannot " +
+		"parse, so the line throws a SyntaxError when it runs. A regex literal with the same mistake is caught " +
 		"by the parser and never ships; written as a string it survives compilation, type checking " +
 		"and review, and fails at the moment the constructor is reached.",
 }
@@ -105,15 +105,15 @@ func allowedConstructorFlags(options rule.Given[NoInvalidRegexpOptions]) map[run
 // such rows as clean, and they read as extra until the global was asked (#jjfa7qb).
 //
 // A pattern under `v` is not checked, only its flags. `v` has its own grammar (set operations like
-// `[A--B]`, nested classes, `\q{...}`), and the engine this compiles with does not speak it, so
+// `[A--B]`, nested classes, `\q{...}`), and the regular expression package this compiles with does not speak it, so
 // reading the pattern as `u` reported valid `v` patterns, three of ESLint's rows, and passed invalid
 // ones. Silence is the honest answer when cohere cannot parse what it is asked about. The full answer
-// is an ECMAScript pattern validator in place of the engine (#4bgr3h2 tracks it).
+// is an ECMAScript pattern validator in place of that package (#4bgr3h2 tracks it).
 //
 // # allowConstructorFlags
 //
 // Upstream's one option names flag characters a constructor call may carry beyond the language's
-// own, for an engine that defines extra ones. With `{"allowConstructorFlags": ["a"]}`,
+// own, for a runtime that defines extra ones. With `{"allowConstructorFlags": ["a"]}`,
 // `new RegExp('.', 'a')` is clean and `new RegExp('.', 'aa')` still reports, as a duplicate. The
 // allowed flags are threaded through the flag walk exactly as the language's are, struck once each,
 // so a second copy is the same defect a second `g` is.
@@ -179,7 +179,7 @@ var NoInvalidRegexp = rule.Rule[NoInvalidRegexpOptions]{
 			pattern := patternNode.AsStringLiteral().Text
 
 			if flags != nil {
-				// Under `v` the pattern has a grammar the engine does not parse; see the doc above
+				// Under `v` the pattern has a grammar the regular expression parser does not parse; see the doc above
 				if strings.ContainsRune(*flags, 'v') {
 					return
 				}
@@ -191,7 +191,7 @@ var NoInvalidRegexp = rule.Rule[NoInvalidRegexpOptions]{
 
 			// Unknown flags: report only when no reachable flag combination accepts the pattern.
 			// `v` could also reach it, and is unknowable here, so a pattern is reported only when
-			// both readings the engine can check refuse it and `v` is the one left unasked
+			// both readings the regular expression parser can check refuse it and `v` is the one left unasked
 			withUnicode := invalidPatternMessage(pattern, "u")
 			withNeither := invalidPatternMessage(pattern, "")
 			if withUnicode != "" && withNeither != "" {
@@ -265,7 +265,7 @@ func invalidPatternMessage(pattern string, flags string) string {
 
 	if _, compileError := esregexp.Compile(pattern, compileFlags); compileError != nil {
 		text := compileError.Error()
-		// The underlying engine prefixes "error parsing regexp: ", which repeats what the message
+		// Go's regexp package prefixes "error parsing regexp: ", which repeats what the message
 		// already says. Trimming to the first ": " drops it. Our parser's own refusals put the
 		// refused construct after that same separator, so trimming there would keep the construct
 		// and throw away the explanation, which is why they are excluded.

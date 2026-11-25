@@ -14,7 +14,7 @@ import (
 // value, passes one the text has no place for, or names a message the catalog lacks does not compile.
 //
 // The Swift text is resolved here, at generation: its terms in their Swift words and its string phrases
-// in place. The engine never reads the catalog. An object phrase becomes an enum whose cases are its
+// in place. cohere-swift never reads the catalog. An object phrase becomes an enum whose cases are its
 // options, each carrying the values its own text uses. The function takes that enum, so the rule names
 // its choice at the call.
 //

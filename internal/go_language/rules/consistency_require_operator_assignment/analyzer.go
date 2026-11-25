@@ -1,4 +1,4 @@
-// Package consistency_require_operator_assignment is the Go engine's rule that an assignment which reads its own
+// Package consistency_require_operator_assignment is cohere-go's rule that an assignment which reads its own
 // target through a binary operator says so with the compound form: `count = count + 1` is `count += 1`.
 //
 // Writing the target twice makes a reader check that the two spellings name the same place, and a later edit that
@@ -47,7 +47,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_operator_assignm
 	"twice makes a reader check the two spellings match. x = y op x is flagged without a fix when op is *, &, | or ^, "+
 	"and left alone otherwise.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var longFormAssignmentMessage = policy.MessageOf(Name, "longFormAssignment")

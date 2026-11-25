@@ -209,7 +209,7 @@ func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(test *testing.T) {
 //
 // Three things are asserted per row. The ids say which of the three arms ran, and they differ in
 // what they name. The spans say where the finding points, which is the whole statement. And the
-// applied source says what the edit engine will write unattended, which for the mixed cases is a
+// applied source says what the fix pass will write unattended, which for the mixed cases is a
 // statement split into two and is the thing a message-id assertion cannot see at all.
 func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()

@@ -55,17 +55,17 @@ const markPollInterval = time.Millisecond
 //     its builds read nothing of it, the restore off: they check every package, and stay one at a time.
 //   - A run without a store whose builds restore nothing, after a rename that wrote or with the restore off, never
 //     regressed: it read one at a time before #syscache too, and nothing has measured that it should widen.
-func (engine *pipeline) fixedBuildsWidth(extras int, host *check.HostRun, hostMostlyHit bool) (int, bool) {
-	if !hostMostlyHit && !engine.buildsWidthUnguarded && !engine.wouldRestoreFromHost(host) {
+func (pipeline *pipeline) fixedBuildsWidth(extras int, host *check.HostRun, hostMostlyHit bool) (int, bool) {
+	if !hostMostlyHit && !pipeline.buildsWidthUnguarded && !pipeline.wouldRestoreFromHost(host) {
 		return 1, true
 	}
-	if engine.buildsWidthForced > 0 {
-		return min(engine.buildsWidthForced, max(extras, 1)), true
+	if pipeline.buildsWidthForced > 0 {
+		return min(pipeline.buildsWidthForced, max(extras, 1)), true
 	}
 	// A heap of one byte held by each build is the least any can be, so the widest the builds and the limit allow:
 	// when even that is one at a time, no heap can widen it, and the run pays no collection to measure one.
-	if width, _ := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, 1, 1,
-		engine.withFindingsStore()); width == 1 {
+	if width, _ := buildsWidth(extras, pipeline.request.switches["single-threaded"], pipeline.memory, 1, 1,
+		pipeline.withFindingsStore()); width == 1 {
 		return 1, true
 	}
 	return 0, false
@@ -118,19 +118,19 @@ func holdingBudget(gated bool) float64 {
 // Only when the builds restore from the host's run: a run judging each build's dependence restores nothing from it for
 // the facts census (censusKeepsHostRestoreOff, #f9br7sg), so every build's share would be high and the gate would fall
 // back to the measured rule after holding every build for nothing: it takes the measured rule whole from the start.
-func (engine *pipeline) takesShareGate(hostCache check.CacheCounts) bool {
-	if engine.censusKeepsHostRestoreOff {
+func (pipeline *pipeline) takesShareGate(hostCache check.CacheCounts) bool {
+	if pipeline.censusKeepsHostRestoreOff {
 		return false
 	}
-	return !engine.withFindingsStore() || engine.hostMostlyHitStore(hostCache)
+	return !pipeline.withFindingsStore() || pipeline.hostMostlyHitStore(hostCache)
 }
 
 // hostMostlyHitStore reports whether the run has a findings store and hostCache, what the host's session did, says
 // the host mostly hit it: its missed share (hostMissedShare) at or under lowShareAtGate, the share gate's line
 // (takesShareGate). A run without a store is never one, whatever its counts. Its builds then mostly hit their own
 // stores, which is what lets their width past the guard for builds that restore nothing (fixedBuildsWidth, #s1hdd3z).
-func (engine *pipeline) hostMostlyHitStore(hostCache check.CacheCounts) bool {
-	return engine.withFindingsStore() && hostMissedShare(hostCache) <= lowShareAtGate
+func (pipeline *pipeline) hostMostlyHitStore(hostCache check.CacheCounts) bool {
+	return pipeline.withFindingsStore() && hostMissedShare(hostCache) <= lowShareAtGate
 }
 
 // hostMissedShare is the share of the packages the host's store answered for that it missed, checked from source over
@@ -153,10 +153,16 @@ func budgetedHolding(holding uint64, budget float64) uint64 {
 // (lowShareAtGate), in a run that takes the gate (takesShareGate): each build is budgeted at the host's live heap,
 // hostLive, measured by a collection as the builds started, times buildHoldingBudget, and nothing is measured again
 // (#ghb3rcn). It returns the width, whether the slack added its last build (buildsWidth), and the budgeted holding.
-func (engine *pipeline) hostLiveBuildsWidth(extras int, hostLive uint64) (int, bool, uint64) {
+func (pipeline *pipeline) hostLiveBuildsWidth(extras int, hostLive uint64) (int, bool, uint64) {
 	holding := budgetedHolding(hostLive, buildHoldingBudget)
-	width, slack := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
-		engine.withFindingsStore())
+	width, slack := buildsWidth(
+		extras,
+		pipeline.request.switches["single-threaded"],
+		pipeline.memory,
+		hostLive,
+		holding,
+		pipeline.withFindingsStore(),
+	)
 	return width, slack, holding
 }
 
@@ -171,10 +177,16 @@ func (engine *pipeline) hostLiveBuildsWidth(extras int, hostLive uint64) (int, b
 // lowShareAtGate: the other builds' listings, graphs and restores are live as it measures, since they wait at the gate,
 // so the holding reads high, which errs narrow, and it is budgeted at buildHoldingBudget times. Beside the width it
 // returns whether the slack added its last build (buildsWidth).
-func (engine *pipeline) measuredBuildsWidth(extras int, hostLive uint64, gated bool) (int, bool, uint64) {
+func (pipeline *pipeline) measuredBuildsWidth(extras int, hostLive uint64, gated bool) (int, bool, uint64) {
 	holding := budgetedHolding(holdingAbove(forcedLiveHeapBytes(), hostLive), holdingBudget(gated))
-	width, slack := buildsWidth(extras, engine.request.switches["single-threaded"], engine.memory, hostLive, holding,
-		engine.withFindingsStore())
+	width, slack := buildsWidth(
+		extras,
+		pipeline.request.switches["single-threaded"],
+		pipeline.memory,
+		hostLive,
+		holding,
+		pipeline.withFindingsStore(),
+	)
 	return width, slack, holding
 }
 
@@ -223,8 +235,8 @@ func heaviestFirst(host project.Build, extras []project.Build) []int {
 // census's restore off (censusKeepsHostRestoreOff) is the census's alone and no reason here (#f9br7sg): a run judging
 // each build's dependence still keeps the host's entries, and its builds run at the width a plain run's would, measured
 // by its first build rather than at the share gate (takesShareGate).
-func (engine *pipeline) wouldRestoreFromHost(host *check.HostRun) bool {
-	return host.EntriesKept() > 0 && !engine.keepsHostRestoreOff && !engine.renamed
+func (pipeline *pipeline) wouldRestoreFromHost(host *check.HostRun) bool {
+	return host.EntriesKept() > 0 && !pipeline.keepsHostRestoreOff && !pipeline.renamed
 }
 
 // buildPeakOverLoadEndWithStore and buildPeakOverLoadEndWithoutStore are how many times what a build holds as its load
@@ -276,13 +288,13 @@ func buildPeakOverLoadEndMeasured(withStore bool) (float64, string) {
 // withFindingsStore reports whether the host's findings cache reads a store, which decides the mode the width's
 // factors are taken in: it has none under `--no-cache`, under `--timing`, whose run has no session, or when the store
 // could not be opened.
-func (engine *pipeline) withFindingsStore() bool {
-	return engine.session != nil && engine.session.HasStore()
+func (pipeline *pipeline) withFindingsStore() bool {
+	return pipeline.session != nil && pipeline.session.HasStore()
 }
 
 // buildPeakFactor is the factor the run's width takes, in the run's mode (withFindingsStore).
-func (engine *pipeline) buildPeakFactor() float64 {
-	return buildPeakOverLoadEnd(engine.withFindingsStore())
+func (pipeline *pipeline) buildPeakFactor() float64 {
+	return buildPeakOverLoadEnd(pipeline.withFindingsStore())
 }
 
 // buildsWidth is how many of extras extra builds run side by side: as many as the memory cap holds beside the host's
@@ -303,8 +315,8 @@ func (engine *pipeline) buildPeakFactor() float64 {
 // and holdingBytes what each build is budgeted to hold beyond it as its load ends (budgetedHolding): the host's live
 // heap when every share at the share gate is low, and otherwise what the heaviest build holds, the bound taken for each
 // build, since an extra build loads the same workspace under another environment, restoring from the host what holds
-// there, so none holds more than the heaviest does. The cap is the limit the engine holds its heap under,
-// engineMemoryCap, read from memory, which Main decided (capMemory).
+// there, so none holds more than the heaviest does. The cap is the limit cohere-go holds its heap under,
+// memoryCap, read from memory, which Main decided (capMemory).
 //
 // It is one at a time when:
 //   - the run is single-threaded (`--single-threaded`), which asks for one thing at a time;
@@ -317,7 +329,7 @@ func (engine *pipeline) buildPeakFactor() float64 {
 func buildsWidth(
 	extras int,
 	singleThreaded bool,
-	memory *engineMemory,
+	memory *memoryAccount,
 	hostLiveBytes uint64,
 	holdingBytes uint64,
 	withStore bool,
@@ -435,8 +447,8 @@ func lintPeakOverLoadEnd(heldAtLoadEnd uint64, heldAtLintPeak uint64) float64 {
 // are checked against the maximum measured without a store, the mode they ran in.
 //
 // Mutates: record gains BuildsPeakProblems
-func (engine *pipeline) recordBuildsPeakProblems(record *contract.LintRecord) {
-	measured, name := buildPeakOverLoadEndMeasured(engine.withFindingsStore())
+func (pipeline *pipeline) recordBuildsPeakProblems(record *contract.LintRecord) {
+	measured, name := buildPeakOverLoadEndMeasured(pipeline.withFindingsStore())
 	for _, build := range record.Builds {
 		if build.LintPeakOverLoadEnd <= measured {
 			continue
@@ -445,7 +457,7 @@ func (engine *pipeline) recordBuildsPeakProblems(record *contract.LintRecord) {
 			"%s, %.2f, the largest ratio measured, which the builds' width spends its slack to", build.Target,
 			build.LintPeakOverLoadEnd, name, measured)
 		record.BuildsPeakProblems = append(record.BuildsPeakProblems, problem)
-		engine.note("%s", problem)
+		pipeline.note("%s", problem)
 	}
 }
 

@@ -1,4 +1,4 @@
-// Package testing_no_uncached_run is the Go engine's rule that no code runs go test with -count=1.
+// Package testing_no_uncached_run is cohere-go's rule that no code runs go test with -count=1.
 //
 // Go's test cache is keyed honestly: a cached pass is replayed only while the code, the environment and the files the
 // test read are unchanged, so it is a real pass. -count=1 throws that away, usually to rerun around a flaky test
@@ -50,7 +50,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "testing_no_uncached_run", "Flags an 
 	"-args, which go to the test binary, leave it quiet, as does a // Uncached: <reason> comment directly above the "+
 	"call's statement or at the end of it.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var uncachedRunMessage = policy.MessageOf(Name, "uncachedRun")
@@ -97,7 +97,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 	if state.indexes == nil {
 		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 		if !isIndexes {
-			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// Invariant: marker's result is always its Indexes, so another is a mistake in cohere-go, and the
 			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}

@@ -118,7 +118,7 @@ func TestAHandOnTheAnswersHearsWhatIsComputedAndAnswersInItsPlace(test *testing.
 	}
 }
 
-// Only a test puts a hand on a run's answers: no file of the module but a test's calls HoldAnswers, so no engine run
+// Only a test puts a hand on a run's answers: no file of the module but a test's calls HoldAnswers, so no cohere-go run
 // ever answers from anything but its own packages.
 func TestOnlyATestHoldsTheAnswers(test *testing.T) {
 	test.Parallel()

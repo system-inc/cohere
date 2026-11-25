@@ -68,7 +68,7 @@ type classOrderSystem struct {
 
 // classOrderCase is one class and an index into the system's interned readings.
 //
-// `readingIndex` of -1 is the engine declining, and it is deliberately a value in the same column as
+// `readingIndex` of -1 is Tailwind declining, and it is deliberately a value in the same column as
 // every other answer rather than an absent field. This harness exists to refuse to score silence as
 // agreement, and spelling silence as missing data would be a poor start.
 type classOrderCase struct {
@@ -110,8 +110,8 @@ func classOrderCases(system *classOrderSystem) SystemCases {
 			aCase := ClassCase{ClassName: entry.ClassName, Population: population}
 			if entry.ReadingIndex >= 0 {
 				reading := system.Readings[entry.ReadingIndex]
-				aCase.EngineReading = Reading{Order: reading.Order, Count: reading.Count}
-				aCase.EngineAnswered = true
+				aCase.TailwindReading = Reading{Order: reading.Order, Count: reading.Count}
+				aCase.TailwindAnswered = true
 			}
 			cases = append(cases, aCase)
 		}
@@ -121,7 +121,7 @@ func classOrderCases(system *classOrderSystem) SystemCases {
 	return SystemCases{SystemName: system.Name, Cases: cases}
 }
 
-// classOrderDesignSystem answers the parser's four questions from the tables the engine reported.
+// classOrderDesignSystem answers the parser's four questions from the tables Tailwind reported.
 //
 // It carries its own registration tables rather than borrowing `candidate_fixtures.json`, which
 // belongs to the candidate parser's suite and whose shape is that author's to change. A harness
@@ -225,7 +225,7 @@ func classOrderTable(test *testing.T, system *classOrderSystem) *Table {
 	}
 	// The unlisted statics first, so the registry's own measurement wins any collision. `order-none`
 	// is the one on this design system: a class an author can write that `getClassList()` never
-	// advertised, so a table without it declines a class the engine reads.
+	// advertised, so a table without it declines a class Tailwind reads.
 	for name, value := range contextFile.UnlistedStatics {
 		if value == nil {
 			continue
@@ -277,7 +277,7 @@ func classOrderTable(test *testing.T, system *classOrderSystem) *Table {
 // The two mechanisms this tier found on its first run, and the tasks that own them.
 //
 // They are written as *predicates over the fixture* rather than as a list of class names. Both were
-// reduced to a reproducible probe against the engine before being written down, and a predicate says
+// reduced to a reproducible probe against Tailwind before being written down, and a predicate says
 // which mechanism a class falls under, so a class that stops matching stops being excused and a
 // class that starts matching is covered without anyone editing a list. A hand-written list would
 // drift silently the moment a repository added a shadow token.
@@ -295,12 +295,12 @@ func classOrderTable(test *testing.T, system *classOrderSystem) *Table {
 // probed registry classes and fails on 23, all in the shadow families, identically on both design
 // systems, which is what says the mechanism belongs to Tailwind rather than to either repository.
 //
-// It is visible in the emitted CSS. A statically resolvable alpha lets the engine fold the colour at
+// It is visible in the emitted CSS. A statically resolvable alpha lets Tailwind fold the colour at
 // build time into one declaration:
 //
 //	shadow-lg/[0.5]      --tw-shadow: ... oklab(from rgb(0 0 0 / 0.1) l a b / 50%) ...
 //
-// An alpha holding a runtime `var()` cannot be folded, so the engine emits a literal fallback *and*
+// An alpha holding a runtime `var()` cannot be folded, so Tailwind emits a literal fallback *and*
 // an `@supports (color: lab(from red l a b))` block carrying the relative-colour form:
 //
 //	shadow-lg/[var(--a)] --tw-shadow: ... rgb(0 0 0 / 0.1) ...
@@ -314,7 +314,7 @@ var classOrderUnresolvableAlphaRoots = []string{"shadow", "inset-shadow", "text-
 // classOrderUnresolvableAlpha reports whether a class is the fourth-modifier-state mechanism.
 //
 // The modifier must be arbitrary and must contain a `var()` reference, which is the only construct
-// among the probed shapes that the engine cannot fold at build time.
+// among the probed shapes that Tailwind cannot fold at build time.
 func classOrderUnresolvableAlpha(className string) bool {
 	slash := strings.LastIndex(className, "/[")
 	if slash < 0 || !strings.HasSuffix(className, "]") {
@@ -347,12 +347,12 @@ const classOrderExpectedUnresolvableAlpha = 15
 // # The mechanism
 //
 // `Table.Lookup` maps a bare value through the namespace precedence and falls through to a fallback
-// reading when nothing claims it. The engine instead emits no declarations at all, because a utility
-// whose value resolved to nothing has nothing to declare. So Go answers and the engine declines.
+// reading when nothing claims it. Tailwind instead emits no declarations at all, because a utility
+// whose value resolved to nothing has nothing to declare. So Go answers and Tailwind declines.
 //
 // Phase 0 could not have caught this. It measured nulls on the corpus, reported them separately and
 // never scored them, which is correct for a component fixture and means the claim "the model does not
-// invent readings for classes the engine declines" was asserted nowhere. This tier asserts it, which
+// invent readings for classes Tailwind declines" was asserted nowhere. This tier asserts it, which
 // is the reason the tier exists above the per-component one.
 //
 // Six registry classes on both systems, every one the colour-keyword-plus-alpha shape
@@ -370,7 +370,7 @@ const classOrderExpectedInventedReadings = 12
 // the Go side in a different direction and names the bucket it must land classes in, because a
 // control that only had to "make something fail" would let one direction of detection stand in for
 // the other. A harness that can see wrong readings and cannot see invented ones reports a clean run
-// for every class the Go side answers and the engine does not.
+// for every class the Go side answers and Tailwind does not.
 //
 // The floors are floors and not exact counts, so the registry can grow without anyone re-tuning a
 // control. Each is far enough above zero that a corruption which changed nothing cannot pass, and
@@ -427,7 +427,7 @@ func classOrderControls() []Control {
 		},
 		{
 			Name:   "invented-reading",
-			Detail: "the Go side answers where the engine declined, which no count of agreements would surface",
+			Detail: "the Go side answers where Tailwind declined, which no count of agreements would surface",
 			Corrupt: func(honest ReadingSource) ReadingSource {
 				return classOrderCorruptedSource{
 					honest: honest,
@@ -436,12 +436,12 @@ func classOrderControls() []Control {
 							return reading, true
 						}
 						// A plausible-looking reading, which is the point: an invented answer does not
-						// announce itself, and the engine's silence is the only thing that contradicts it.
+						// announce itself, and Tailwind's silence is the only thing that contradicts it.
 						return Reading{Order: []int{1}, Count: 1}, true
 					},
 				}
 			},
-			ExpectedOutcome:   OutcomeEngineSilent,
+			ExpectedOutcome:   OutcomeTailwindSilent,
 			MinimumDetections: 40,
 		},
 	}
@@ -520,12 +520,12 @@ func classOrderAssertReport(test *testing.T, fixture *classOrderFixture, source 
 	}
 
 	if len(unexplainedDisagreements) > 0 {
-		test.Errorf("%s: %d classes read differently in Go and the engine, under no known mechanism",
+		test.Errorf("%s: %d classes read differently in Go and Tailwind, under no known mechanism",
 			population.SystemName, len(unexplainedDisagreements))
 		for _, divergence := range classOrderSample(unexplainedDisagreements, 20) {
-			test.Errorf("  %s (%s): engine %s, go %s",
+			test.Errorf("  %s (%s): Tailwind %s, go %s",
 				divergence.ClassName, divergence.Population,
-				divergence.EngineReading.Format(), divergence.GoReading.Format())
+				divergence.TailwindReading.Format(), divergence.GoReading.Format())
 		}
 	}
 	if len(unresolvableAlpha) < classOrderExpectedUnresolvableAlpha {
@@ -534,22 +534,22 @@ func classOrderAssertReport(test *testing.T, fixture *classOrderFixture, source 
 			population.SystemName, len(unresolvableAlpha), classOrderExpectedUnresolvableAlpha)
 	}
 
-	// An invented reading is the direction nothing else in the suite looks at. The engine declining
-	// a class is the only evidence that contradicts a Go answer, so an unchecked engine-silent
+	// An invented reading is the direction nothing else in the suite looks at. Tailwind declining
+	// a class is the only evidence that contradicts a Go answer, so an unchecked tailwind-silent
 	// bucket means the port can invent readings freely.
 	//
 	// Bounded above rather than forbidden, because the mechanism is understood and belongs to the
 	// `@utility` evaluator: the model has no membership test for "does this value resolve at all".
 	// A ceiling fails the moment the port starts inventing more than the mechanism accounts for.
-	if invented := grouped[OutcomeEngineSilent]; len(invented) > classOrderExpectedInventedReadings {
+	if invented := grouped[OutcomeTailwindSilent]; len(invented) > classOrderExpectedInventedReadings {
 		test.Errorf(
-			"%s: %d classes where Go answered and the engine declined, above the %d the known mechanism accounts for",
+			"%s: %d classes where Go answered and Tailwind declined, above the %d the known mechanism accounts for",
 			population.SystemName,
 			len(invented),
 			classOrderExpectedInventedReadings,
 		)
 		for _, divergence := range classOrderSample(invented, 20) {
-			test.Errorf("  %s (%s): engine declined, go %s",
+			test.Errorf("  %s (%s): Tailwind declined, go %s",
 				divergence.ClassName, divergence.Population, divergence.GoReading.Format())
 		}
 	}
@@ -631,7 +631,7 @@ func classOrderUntrustworthyReasons(report Report) []string {
 //
 // `max-w-screen` is registered as both a static and a functional utility. The parser correctly reads
 // `max-w-screen-sm` as functional rooted there; the extractor recorded the root as a static and
-// wrote no functional row, so `Lookup` declines a class the engine compiles to `[46]#1`. One class
+// wrote no functional row, so `Lookup` declines a class Tailwind compiles to `[46]#1`. One class
 // on www-connected-app and none on ahra, because ahra's registry does not advertise it.
 //
 // Thirteen further roots are registered functional with no descriptor row and produce no visible
@@ -770,7 +770,7 @@ type classOrderRootCount struct {
 //
 // The root cannot be recovered from the class name alone and the first attempt here proved it:
 // stripping the final segment reads `fade-in-translate-full` as rooted at `fade-in-translate`, when
-// the engine and the parser both root it at `fade-in`, a per-declaration root. That mis-grouping
+// Tailwind and the parser both root it at `fade-in`, a per-declaration root. That mis-grouping
 // turned 18 correctly-declined classes into 18 phantom "missing table rows", which is precisely the
 // kind of confident wrong answer this whole tier exists to catch, arriving, fittingly, in the
 // harness itself.
@@ -840,7 +840,7 @@ func TestClassOrderAcknowledgementsAreStillEarned(test *testing.T) {
 				if classOrderUnresolvableAlpha(aCase.ClassName) {
 					unresolvableAlpha++
 				}
-			case OutcomeEngineSilent:
+			case OutcomeTailwindSilent:
 				invented++
 			case OutcomeGoSilent:
 				root := classOrderRootOf(source, aCase.ClassName)

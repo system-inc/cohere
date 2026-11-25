@@ -14,7 +14,7 @@ import (
 )
 
 // The house rules' message text, one file per idea: a rule and its twin in the other language, or a
-// lone house rule. Each engine renders its findings from these files, so the same idea reads the same in
+// lone house rule. Each language renders its findings from these files, so the same idea reads the same in
 // Go and Swift, and a fix to the wording lands once (#xd6f0n6, under #s05t0hs).
 //
 // A file holds the rules it speaks for, by language, and their messages by id. The id is one for both
@@ -22,7 +22,7 @@ import (
 // category or verb. A message's text carries two kinds of placeholder:
 //
 //	{{name}}   a value the rule supplies when it reports, in ESLint's spelling, so a message ported from
-//	           an original keeps its text. Each engine supplies exactly the values its text uses.
+//	           an original keeps its text. Each language supplies exactly the values its text uses.
 //	[[name]]   a term: words that differ by language (`console` against `print`), resolved when the
 //	           file is read. A term gives a text for every language the file's rules cover, and may
 //	           carry values. Terms are the exception; a message with none reads the same in both.
@@ -69,8 +69,8 @@ type messageFile struct {
 type messageFileMessage struct {
 	Text  string                       `json:"text"`
 	Terms map[string]map[string]string `json:"terms"`
-	// Languages names the engines that render this message, when only some of the file's rules do: a
-	// twin file can hold a message only one engine detects. Left out, it is every language the file
+	// Languages names the languages that render this message, when only some of the file's rules do: a
+	// twin file can hold a message only one language detects. Left out, it is every language the file
 	// names.
 	Languages []string `json:"languages"`
 }
@@ -168,7 +168,7 @@ func messageLanguagesOf(message messageFileMessage, rules map[string]string) ([]
 		return languages, nil
 	}
 	if len(message.Languages) == 0 {
-		return nil, fmt.Errorf("languages is empty, so no engine renders it")
+		return nil, fmt.Errorf("languages is empty, so no language renders it")
 	}
 	seen := map[string]bool{}
 	for _, language := range message.Languages {

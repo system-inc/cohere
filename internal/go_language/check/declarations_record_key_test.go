@@ -8,9 +8,10 @@ import (
 
 // Both declarations-only record keys move with the whole records' version, DependenceRecordVersion (#anfjtr3): what
 // the collector records is what that version names, so a collector change that moves it alone must leave every
-// declarations-only record a miss, in the project's store and in the system cache's, whose engine identity a stamp can
-// hold still across binaries. A record put under each key today is a miss under the same key at another whole records'
-// version, and a hit at this one. Hash the version into neither key, and each record is a hit at the other version.
+// declarations-only record a miss, in the project's store and in the system cache's, whose executable identity a stamp
+// can hold still across binaries. A record put under each key today is a miss under the same key at another whole
+// records' version, and a hit at this one. Hash the version into neither key, and each record is a hit at the other
+// version.
 func TestADeclarationsRecordMissesOnceTheWholeRecordsVersionMoves(test *testing.T) {
 	test.Parallel()
 
@@ -22,8 +23,8 @@ func TestADeclarationsRecordMissesOnceTheWholeRecordsVersionMoves(test *testing.
 		after cache.Key
 	}{
 		{"the project's", DeclarationsRecordKey(key), declarationsRecordKeyAt(moved, key)},
-		{"the standard library's", StandardLibraryDeclarationsRecordKey(key, "engine", "go1.27"),
-			standardLibraryDeclarationsRecordKeyAt(moved, key, "engine", "go1.27")},
+		{"the standard library's", StandardLibraryDeclarationsRecordKey(key, "executable", "go1.27"),
+			standardLibraryDeclarationsRecordKeyAt(moved, key, "executable", "go1.27")},
 	} {
 		if putError := store.Put(kind.today, record); putError != nil {
 			test.Fatal(putError)

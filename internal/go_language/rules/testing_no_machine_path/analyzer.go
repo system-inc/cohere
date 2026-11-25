@@ -1,4 +1,4 @@
-// Package testing_no_machine_path is the Go engine's rule that a test names no home directory unless it says why.
+// Package testing_no_machine_path is cohere-go's rule that a test names no home directory unless it says why.
 //
 // A test that reads a path on one developer's machine skips everywhere else, so its coverage exists on that machine
 // alone and nobody can tell (#sycrdr6). Code outside the repository is asked for by a name the environment resolves.
@@ -47,7 +47,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "testing_no_machine_path", "Flags a s
 	"covers nothing anywhere else, unless a comment opening with // Not a machine path: <reason> ends the literal's "+
 	"line or sits on lines of its own directly above the statement or declaration holding it.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads no types: a literal's text and the comments around
+// Rule is this rule's entry in cohere-go's registry. It reads no types: a literal's text and the comments around
 // it decide everything.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
@@ -80,7 +80,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 	if state.table == nil {
 		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 		if !isIndexes {
-			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// Invariant: marker's result is always its Indexes, so another is a mistake in cohere-go, and the
 			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}

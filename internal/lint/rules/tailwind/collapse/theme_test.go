@@ -13,18 +13,18 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// The fixture is the theme the shipped Tailwind 4.3.3 engine resolved for every stylesheet in the
+// The fixture is the theme the shipped Tailwind 4.3.3 resolved for every stylesheet in the
 // corpus, captured by internal/lint/rules/tailwind/tools/generate_theme and checked in next to this test.
 //
 // Measured rather than transcribed, because the two are different claims and the ignored-key map is
 // where they part. Reading `theme.ts` suggests `--font` names every key beginning `--font-`; asking
-// the engine says `--font-weight-*` and `--font-size-*` are excluded from it. A hand-written
-// expectation set would have encoded the plausible version and agreed with the engine on every
+// Tailwind says `--font-weight-*` and `--font-size-*` are excluded from it. A hand-written
+// expectation set would have encoded the plausible version and agreed with Tailwind on every
 // namespace that has no ignored siblings, which is most of them.
 //
 // The corpus has two halves and needs both. The repository half is the exit criterion for this
 // component: two real repositories on the same Tailwind, whose themes differ, diffed key by key
-// against what the engine built from the same files. The synthetic half reaches the branches a real
+// against what Tailwind built from the same files. The synthetic half reaches the branches a real
 // theme never does, `initial` deletion, namespace clearing, `@theme default` losing to a
 // non-default value, prefixes, and the dot-to-underscore retry, which is roughly half of `theme.ts`
 // and all of the half where a port fails silently.
@@ -36,7 +36,7 @@ type themeCorpus struct {
 	Cases               []themeCase `json:"cases"`
 }
 
-// themeCase is one stylesheet and the theme the engine resolved from it.
+// themeCase is one stylesheet and the theme Tailwind resolved from it.
 //
 // A synthetic case carries its stylesheet inline in Input. A repository case carries EntryPath
 // instead, because the Go side must resolve the same `@import` graph from disk: the import
@@ -220,8 +220,8 @@ func coveredRepositoryCases(test *testing.T, fixture themeCorpus) int {
 	return covered
 }
 
-// TestThemeMatchesEngine is the differential: every answer the port gives, against the answer the
-// engine gave for the same question.
+// TestThemeMatchesTailwind is the differential: every answer the port gives, against the answer
+// Tailwind gave for the same question.
 //
 // The counts are printed on success rather than only on failure. A suite that compared twelve
 // answers and a suite that compared two hundred thousand are indistinguishable from a green line,
@@ -231,15 +231,15 @@ func coveredRepositoryCases(test *testing.T, fixture themeCorpus) int {
 // Run on the public theme's copy of the fixture and on ahra's (#f598zk0). Their synthetic cases are the
 // same; the public copy's repository case is testdata/public_theme, so the repository half runs on every
 // machine.
-func TestThemeMatchesEngine(test *testing.T) {
+func TestThemeMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "theme_fixtures.json", func(test *testing.T, fixtureName string) {
-		expectThemeMatchesEngine(test, loadThemeCorpus(test, fixtureName))
+		expectThemeMatchesTailwind(test, loadThemeCorpus(test, fixtureName))
 	})
 }
 
-// expectThemeMatchesEngine compares every answer one copy of the fixture holds with the port's.
-func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
+// expectThemeMatchesTailwind compares every answer one copy of the fixture holds with the port's.
+func expectThemeMatchesTailwind(test *testing.T, fixture themeCorpus) {
 	test.Helper()
 
 	var totalEntries int
@@ -263,10 +263,10 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 			}
 
 			if theme.Prefix != aCase.Theme.Prefix {
-				test.Errorf("Prefix = %q, engine says %q", theme.Prefix, aCase.Theme.Prefix)
+				test.Errorf("Prefix = %q, Tailwind says %q", theme.Prefix, aCase.Theme.Prefix)
 			}
 			if theme.Size() != aCase.Theme.Size {
-				test.Errorf("Size() = %d, engine says %d", theme.Size(), aCase.Theme.Size)
+				test.Errorf("Size() = %d, Tailwind says %d", theme.Size(), aCase.Theme.Size)
 			}
 
 			// Entries, compared positionally. Insertion order is part of the contract; comparing
@@ -275,18 +275,22 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 			// wrong in production while green here.
 			entries := theme.Entries()
 			if len(entries) != len(aCase.Theme.Entries) {
-				test.Errorf("Entries() returned %d entries, engine returned %d", len(entries), len(aCase.Theme.Entries))
+				test.Errorf(
+					"Entries() returned %d entries, Tailwind returned %d",
+					len(entries),
+					len(aCase.Theme.Entries),
+				)
 			}
 			for index := range aCase.Theme.Entries {
 				if index >= len(entries) {
-					test.Errorf("Entries()[%d] missing; engine has %q", index, aCase.Theme.Entries[index].Key)
+					test.Errorf("Entries()[%d] missing; Tailwind has %q", index, aCase.Theme.Entries[index].Key)
 					continue
 				}
 				want := aCase.Theme.Entries[index]
 				got := entries[index]
 				if got.Key != want.Key || got.Value != want.Value || int(got.Options) != want.Options {
 					test.Errorf(
-						"Entries()[%d] = {%q, %q, %d}, engine says {%q, %q, %d}",
+						"Entries()[%d] = {%q, %q, %d}, Tailwind says {%q, %q, %d}",
 						index, got.Key, got.Value, got.Options, want.Key, want.Value, want.Options,
 					)
 				}
@@ -299,7 +303,7 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 				gotEntries := theme.Namespace(wantNamespace.Namespace)
 				if len(gotEntries) != len(wantNamespace.Entries) {
 					test.Errorf(
-						"Namespace(%q) returned %d entries, engine returned %d",
+						"Namespace(%q) returned %d entries, Tailwind returned %d",
 						wantNamespace.Namespace, len(gotEntries), len(wantNamespace.Entries),
 					)
 				}
@@ -311,7 +315,7 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 					got := gotEntries[index]
 					if got.KeyIsNull != want.KeyIsNull || got.Key != want.Key || got.Value != want.Value {
 						test.Errorf(
-							"Namespace(%q)[%d] = {null=%v, %q, %q}, engine says {null=%v, %q, %q}",
+							"Namespace(%q)[%d] = {null=%v, %q, %q}, Tailwind says {null=%v, %q, %q}",
 							wantNamespace.Namespace, index,
 							got.KeyIsNull, got.Key, got.Value,
 							want.KeyIsNull, want.Key, want.Value,
@@ -323,7 +327,7 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 				gotKeys := theme.KeysInNamespaces([]string{wantNamespace.Namespace})
 				if !equalStringSlices(gotKeys, wantNamespace.KeysInNamespace) {
 					test.Errorf(
-						"KeysInNamespaces([%q]) = %s, engine says %s",
+						"KeysInNamespaces([%q]) = %s, Tailwind says %s",
 						wantNamespace.Namespace,
 						summarizeStrings(gotKeys),
 						summarizeStrings(wantNamespace.KeysInNamespace),
@@ -378,7 +382,7 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 				}
 				if len(gotExtra) != len(want.Extra) {
 					test.Errorf(
-						"ResolveWith(%q, %v, %v) extra has %d keys, engine has %d",
+						"ResolveWith(%q, %v, %v) extra has %d keys, Tailwind has %d",
 						want.CandidateValue, want.ThemeKeys, want.NestedKeys, len(gotExtra), len(want.Extra),
 					)
 				}
@@ -386,14 +390,14 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 					gotNested, present := gotExtra[nestedKey]
 					if !present {
 						test.Errorf(
-							"ResolveWith(%q, %v, %v) extra missing %q; engine says %q",
+							"ResolveWith(%q, %v, %v) extra missing %q; Tailwind says %q",
 							want.CandidateValue, want.ThemeKeys, want.NestedKeys, nestedKey, wantNested,
 						)
 						continue
 					}
 					if gotNested != wantNested {
 						test.Errorf(
-							"ResolveWith(%q, %v, %v) extra[%q] = %q, engine says %q",
+							"ResolveWith(%q, %v, %v) extra[%q] = %q, Tailwind says %q",
 							want.CandidateValue, want.ThemeKeys, want.NestedKeys, nestedKey, gotNested, wantNested,
 						)
 					}
@@ -410,10 +414,10 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 				assertOptionalString(test, gotGet, gotGetOk, want.Get, fmt.Sprintf("Get([%q])", want.Key))
 
 				if got := theme.HasDefault(want.Key); got != want.HasDefault {
-					test.Errorf("HasDefault(%q) = %v, engine says %v", want.Key, got, want.HasDefault)
+					test.Errorf("HasDefault(%q) = %v, Tailwind says %v", want.Key, got, want.HasDefault)
 				}
 				if got := theme.GetOptions(want.Key); int(got) != want.Options {
-					test.Errorf("GetOptions(%q) = %d, engine says %d", want.Key, got, want.Options)
+					test.Errorf("GetOptions(%q) = %d, Tailwind says %d", want.Key, got, want.Options)
 				}
 			}
 			totalOptionQueries += len(aCase.Theme.OptionQueries)
@@ -563,7 +567,7 @@ func TestThemeLoaderReportsSkippedDirectives(test *testing.T) {
 }
 
 // TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph is TestThemeLoaderReportsSkippedDirectives'
-// engine half on a design system in testdata (#f598zk0), asked of LoadDesignSystem, which is what
+// Tailwind half on a design system in testdata (#f598zk0), asked of LoadDesignSystem, which is what
 // production loads through, rather than of the test-only theme loader. testdata/directives_theme writes an
 // `@config` and an `@plugin` in a file its entry point imports, so each must be found where it was
 // written, and the theme beside them still loads.
@@ -690,7 +694,7 @@ func TestThemeAddRejectsInvalidNamespaceClear(test *testing.T) {
 	test.Parallel()
 	theme := NewTheme()
 	if addError := theme.Add("--color-*", "red", ThemeOptionNone); addError == nil {
-		test.Fatal("Add(\"--color-*\", \"red\") returned no error; the engine throws")
+		test.Fatal("Add(\"--color-*\", \"red\") returned no error; Tailwind throws")
 	}
 	if theme.Size() != 0 {
 		test.Errorf("Size() = %d after a rejected clear directive, want 0", theme.Size())
@@ -767,23 +771,23 @@ func assertThemeKeyOrder(test *testing.T, theme *Theme, what string, want ...str
 //
 // The distinction between "resolved to the empty string" and "did not resolve" is what this exists
 // to preserve. A theme entry declared with an empty value resolves successfully to "", and a port
-// that returned "" for a miss would agree with the engine on every hit and disagree on every miss
+// that returned "" for a miss would agree with Tailwind on every hit and disagree on every miss
 // while looking identical in a printout.
 func assertOptionalString(test *testing.T, got string, ok bool, want *string, what string) {
 	test.Helper()
 
 	if want == nil {
 		if ok {
-			test.Errorf("%s = %q, engine resolved nothing", what, got)
+			test.Errorf("%s = %q, Tailwind resolved nothing", what, got)
 		}
 		return
 	}
 	if !ok {
-		test.Errorf("%s resolved nothing, engine says %q", what, *want)
+		test.Errorf("%s resolved nothing, Tailwind says %q", what, *want)
 		return
 	}
 	if got != *want {
-		test.Errorf("%s = %q, engine says %q", what, got, *want)
+		test.Errorf("%s = %q, Tailwind says %q", what, got, *want)
 	}
 }
 

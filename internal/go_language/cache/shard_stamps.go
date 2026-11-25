@@ -30,8 +30,9 @@ type ShardStamps struct {
 
 	lock     sync.Mutex
 	readings map[shardInStore]ShardReading
-	// swept are the store directories whose packs of other engines the run has removed (Store.RemoveOtherEnginesPacks),
-	// so the first build to write a pack removes them and no other build of the run reads the directory again.
+	// swept are the store directories whose packs of other executables the run has removed
+	// (Store.RemoveOtherIdentitiesPacks), so the first build to write a pack removes them and no other build of the run
+	// reads the directory again.
 	swept map[string]bool
 }
 

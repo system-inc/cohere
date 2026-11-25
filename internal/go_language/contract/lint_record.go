@@ -3,7 +3,7 @@ package contract
 // LintRecord summarizes the lint phase, for the lint line and its coverage notes.
 type LintRecord struct {
 	Findings int `json:"findings"`
-	// TypeErrors is additive within contract 3, and the Go engine's alone: the type errors of the run's other builds,
+	// TypeErrors is additive within contract 3, and cohere-go's alone: the type errors of the run's other builds,
 	// checked unless `--host-build-only` is named, which the lint phase writes as compiler finding records beside the
 	// Findings it counts, since only the merge of every build's verdict knows them (#rw6tg3a). The finding records of
 	// the phase are Findings plus TypeErrors. Absent for a run of one build, so such a run writes the record it always
@@ -23,10 +23,10 @@ type LintRecord struct {
 	// ConfigNote is the line saying which defaults ran when no config was read, empty when one was.
 	ConfigNote string `json:"configNote"`
 	// FilesReplayed is additive within contract 3 (swift/Contract.md): of FilesWalked, the files whose every rule's
-	// verdict the engine read from a per-file verdict store rather than computed, as the Swift engine's lint verdict
-	// cache does. This engine leaves it unset and so unwritten: its cache restores packages (Cache below), and how
+	// verdict cohere-go read from a per-file verdict store rather than computed, as cohere-swift's lint verdict
+	// cache does. cohere-go leaves it unset and so unwritten: its cache restores packages (Cache below), and how
 	// many files a restored package stands for is not a count it keeps, so what the field means for a Go run is for
-	// this engine's owner to define. It is a pointer so a Swift record's count, 0 included, survives a reencode.
+	// cohere-go's owner to define. It is a pointer so a Swift record's count, 0 included, survives a reencode.
 	FilesReplayed *int `json:"filesReplayed,omitempty"`
 
 	// WithheldBySuppression, WithheldAsGenerated and WithheldAsCopied are additive within contract 3, which the
@@ -39,25 +39,25 @@ type LintRecord struct {
 	WithheldAsGenerated   map[string]int `json:"withheldAsGenerated"`
 	WithheldAsCopied      map[string]int `json:"withheldAsCopied"`
 
-	// Cache is what the Go engine's per-package findings cache did in the lint phase, additive within contract 3
+	// Cache is what cohere-go's per-package findings cache did in the lint phase, additive within contract 3
 	// as the withheld counts are. It changes no finding and no count above.
 	Cache LintCache `json:"cache"`
 
 	// Builds is additive within contract 3: every build a run checked when it checked more than one, the host's first
 	// (#72n9mq0). It is absent for a run of one build, so such a run writes the record it always has.
 	Builds []BuildRecord `json:"builds,omitempty"`
-	// BuildsAtOnce is additive within contract 3, and the Go engine's alone: how many of the extra builds ran side by
+	// BuildsAtOnce is additive within contract 3, and cohere-go's alone: how many of the extra builds ran side by
 	// side, decided once from the memory cap, the host's live heap and what the heaviest build holds as its load ends
 	// (#b2t9xmf, #rmzehfg). It changes no finding, no note and no key: a run one build at a time writes the same
 	// records but this one. Absent when Builds is.
 	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
-	// BuildsWidthLiveBytes is additive within contract 3, and the Go engine's alone: the host's live heap that decision
+	// BuildsWidthLiveBytes is additive within contract 3, and cohere-go's alone: the host's live heap that decision
 	// was given, measured by a collection as the extra builds started with nothing else running, so a reader sees why a
 	// width was chosen. Absent when the decision needed none: under `--single-threaded`, a limit other than the cap,
 	// builds that restore nothing from the host for any reason but the facts census (#f9br7sg), or one build alone,
 	// which no heap can widen.
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
-	// BuildsWidthBuildBytes is additive within contract 3, and the Go engine's alone: the holding each extra build was
+	// BuildsWidthBuildBytes is additive within contract 3, and cohere-go's alone: the holding each extra build was
 	// budgeted beyond that heap as its load ends: what the first build to start, the heaviest, held then, measured the
 	// same way, in a run with a findings store, and in a run without one 1.2 times that, or 1.2 times that heap when
 	// BuildsWidthFromHostLive (#ghb3rcn). With
@@ -67,11 +67,11 @@ type LintRecord struct {
 	// when BuildsWidthLiveBytes is.
 	BuildsWidthBuildBytes uint64  `json:"buildsWidthBuildBytes,omitempty"`
 	BuildsWidthPeakFactor float64 `json:"buildsWidthPeakFactor,omitempty"`
-	// BuildsWidthSlack is additive within contract 3, and the Go engine's alone: whether the width's slack added
+	// BuildsWidthSlack is additive within contract 3, and cohere-go's alone: whether the width's slack added
 	// BuildsAtOnce's last build, one past that floor, since one more fit by the largest ratio measured in the run's
 	// mode, 3.22 with a findings store and 2.16 without one, with 512 MiB to spare (#ewkp7w0). Absent when it did not.
 	BuildsWidthSlack bool `json:"buildsWidthSlack,omitempty"`
-	// BuildsWidthFromHostLive is additive within contract 3, and the Go engine's alone: whether the width was decided
+	// BuildsWidthFromHostLive is additive within contract 3, and cohere-go's alone: whether the width was decided
 	// from the host's live heap alone, at the share gate every extra build waits at before its type check in a run
 	// without a findings store, or in one with a store whose host missed at most 0.10 of the packages its store hit or
 	// missed (#ybjbqm2), since every build's share there, its CheckedFromSourceAtGate over its PackagesLoaded, was at
@@ -79,24 +79,24 @@ type LintRecord struct {
 	// nothing was measured again. Absent when the first build's holding was measured instead, a share being over the
 	// line or the run having a store its host mostly missed, which takes no gate, or the width needed no heap.
 	BuildsWidthFromHostLive bool `json:"buildsWidthFromHostLive,omitempty"`
-	// BuildsPeakProblems is additive within contract 3, and the Go engine's alone: a sentence for each extra build of
+	// BuildsPeakProblems is additive within contract 3, and cohere-go's alone: a sentence for each extra build of
 	// a run under `--timing` whose LintPeakOverLoadEnd passed the largest ratio measured in the run's mode, which the
 	// slack spends to, naming the build, its ratio and the constant, each also noted on stderr (#ewkp7w0). Absent
 	// when none did.
 	BuildsPeakProblems []string `json:"buildsPeakProblems,omitempty"`
-	// BuildsPoolSize is additive within contract 3, and the Go engine's alone: how many slots the run's one pool holds,
+	// BuildsPoolSize is additive within contract 3, and cohere-go's alone: how many slots the run's one pool holds,
 	// which every load and check of the run shares, the host's and every extra build's, so however many builds run side
 	// by side the run never runs more of that work at once (#ckm0hsp). One per core, one under `--single-threaded`.
 	// Absent when Builds is.
 	BuildsPoolSize int `json:"buildsPoolSize,omitempty"`
-	// OffReasons is additive within contract 3, and the Go engine's alone: why the settings turn each rule off, for
+	// OffReasons is additive within contract 3, and cohere-go's alone: why the settings turn each rule off, for
 	// every off the go block's reasons explain (#v11k0g2), which the front door prints beside the rule in coverage.
-	// Always written, `{}` when no off is explained, so a reader tells an engine that explains its offs, where a rule
-	// off and not named here has no reason, from one that never does, a Swift engine's.
+	// Always written, `{}` when no off is explained, so a reader tells a child that explains its offs, where a rule
+	// off and not named here has no reason, from one that never does, cohere-swift's.
 	OffReasons map[string]string `json:"offReasons"`
-	// ChildProcessesAfterLoad is additive within contract 3, and the Go engine's alone: how many go commands the run
+	// ChildProcessesAfterLoad is additive within contract 3, and cohere-go's alone: how many go commands the run
 	// started after its first load began, and ChildProcessesAfterLoadNamed names each, go and its first arguments,
-	// sorted (#sktb2y8). On darwin each child started once the engine's heap has grown makes every resident page fault
+	// sorted (#sktb2y8). On darwin each child started once cohere-go's heap has grown makes every resident page fault
 	// again, so a run with extra builds starts every go command its builds need before that load, and reads 0 here; a
 	// run of one build starts its own lister's two beside its census and reads 0 too (#q9ezwvw), except under
 	// `--timing`, where it starts them within its first load. Both are absent when none started. They count the go
@@ -159,7 +159,7 @@ type BuildRecord struct {
 
 	// SystemCacheRestored counts the standard-library packages the build restored from the system cache's table of its
 	// own build context (#syscache), and SystemCacheWritten the entries it added to that table this run. Additive
-	// within contract 3, and the Go engine's alone. Each is written only when not 0, so a build under
+	// within contract 3, and cohere-go's alone. Each is written only when not 0, so a build under
 	// `--no-system-cache`, or one whose table held everything it reached, writes none.
 	SystemCacheRestored int `json:"systemCacheRestored,omitempty"`
 	SystemCacheWritten  int `json:"systemCacheWritten,omitempty"`
@@ -249,7 +249,7 @@ type BuildRecord struct {
 	NotLinted       []string `json:"notLinted,omitempty"`
 	NotLintedReason string   `json:"notLintedReason,omitempty"`
 
-	// Dependence, additive within contract 3 and the Go engine's alone, is an extra build's under
+	// Dependence, additive within contract 3 and cohere-go's alone, is an extra build's under
 	// `--build-dependence` in a run of every build (#qkq4gx5): which of the host's package-level declarations the
 	// build can change, observed only, so it changes no finding. Absent unless the switch was on, and on the host's
 	// record always.
@@ -437,11 +437,11 @@ type DependenceCounts struct {
 // is written only when it is not 0. On is false under `--no-cache`, and every count 0 but FromSystemCache, which the
 // system cache can still give, FactsSkipped of what they restored, and Reloads of them.
 // Problems counts what kept the cache from being read or written, the host's build's and every other build's alike,
-// each of which the engine also notes on stderr, so a run read through `--json` alone still shows it (#27r8r24).
-// WriteFailed counts every miss whose entry could not be written, every build's, of which the engine notes only the
+// each of which cohere-go also notes on stderr, so a run read through `--json` alone still shows it (#27r8r24).
+// WriteFailed counts every miss whose entry could not be written, every build's, of which cohere-go notes only the
 // first as a problem, so a store that refused 400 writes says 400 rather than 1; a dependence record that could not be
 // written beside its entry counts there too. Each is written only when not 0. DependenceRecords, additive within
-// contract 3 and the Go engine's alone, is written only by a run under `--build-dependence` with a store
+// contract 3 and cohere-go's alone, is written only by a run under `--build-dependence` with a store
 // (#6a3kjvz). Packs, additive within contract 3, is what every extra build did with its packs, summed (#b2t9xmf),
 // absent in a run with no extra build.
 type LintCache struct {
@@ -471,16 +471,16 @@ type LintCache struct {
 // records from, its findings cache's and the system cache's, a file holding every record it read or wrote there in its
 // last run, with the stamp of each shard directory of the store they were read from, which it reads once rather than
 // open each record. Read counts the packs read whole, and Missing those there were none of, as on a build's first run
-// or a new engine's, which is no refusal. RecordsServed counts the records the packs served, which the build opened no
-// file for: a record is served only while its shard's stamp is the one the pack holds, so the store holds exactly what
-// the pack was made of. RecordsStale counts the records a pack held whose shard had moved since, as any write, removal
-// or trim of a file there moves it, and RecordsMissed the records asked that no pack held, each read from the store,
-// found or not. ShardReads counts the shard stamps read, each shard of each store once a run whatever the builds.
-// RefusedBy counts each pack that was there and was ignored whole, by the first word of why: unreadable, short, sum,
-// version or malformed, absent when none was; a build whose pack was refused reads its store as it would with none, and
-// its findings are the same. Written counts the packs written at a build's save, since its run read or wrote a record
-// its pack did not hold, a shard's stamp moved, or its pack was missing or refused, so a warm run whose packs served
-// every record writes none.
+// or a new executable's, which is no refusal. RecordsServed counts the records the packs served, which the build opened
+// no file for: a record is served only while its shard's stamp is the one the pack holds, so the store holds exactly
+// what the pack was made of. RecordsStale counts the records a pack held whose shard had moved since, as any write,
+// removal or trim of a file there moves it, and RecordsMissed the records asked that no pack held, each read from the
+// store, found or not. ShardReads counts the shard stamps read, each shard of each store once a run whatever the
+// builds. RefusedBy counts each pack that was there and was ignored whole, by the first word of why: unreadable, short,
+// sum, version or malformed, absent when none was; a build whose pack was refused reads its store as it would with
+// none, and its findings are the same. Written counts the packs written at a build's save, since its run read or wrote
+// a record its pack did not hold, a shard's stamp moved, or its pack was missing or refused, so a warm run whose packs
+// served every record writes none.
 type BuildPacks struct {
 	Read          int            `json:"read"`
 	Missing       int            `json:"missing"`

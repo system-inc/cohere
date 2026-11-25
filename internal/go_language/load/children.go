@@ -12,7 +12,7 @@ const childNameArguments = 3
 
 // Children is a run's account of the go commands its loads start, and of those started once its first load has begun
 // (#sktb2y8). On darwin go starts a child process with fork, which marks the whole address space copy-on-write, so
-// each child started once the engine's heap has grown makes every resident page fault again on its next write: the
+// each child started once cohere-go's heap has grown makes every resident page fault again on its next write: the
 // run starts every go command it needs before the host's first load, while the heap is small, and one started after
 // it is counted and named here, so a late one shows on the lint record. It is the run's own, never package-level
 // state, since tests run many pipelines in one process. A nil Children records nothing.

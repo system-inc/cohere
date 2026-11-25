@@ -7,7 +7,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
-	goenginerule "github.com/system-inc/cohere/internal/go_language/rule"
+	golanguagerule "github.com/system-inc/cohere/internal/go_language/rule"
 )
 
 // placeholderAnalyzer stands in for a rule's analyzer: the rows read a rule's naming and provenance, never
@@ -24,15 +24,15 @@ var placeholderAnalyzer = &analysis.Analyzer{
 func TestAGoRuleHasARowInRulesJson(test *testing.T) {
 	test.Parallel()
 	inputs := sourceInputs(test)
-	inputs.GoRules = []goenginerule.Rule{
+	inputs.GoRules = []golanguagerule.Rule{
 		{
 			Name:     "cohere-go/performance-require-parallel-test",
-			Origin:   goenginerule.OriginHouse,
+			Origin:   golanguagerule.OriginHouse,
 			Analyzer: placeholderAnalyzer,
 		},
 		{
 			Name:         "cohere-go/printf",
-			Origin:       goenginerule.OriginVet,
+			Origin:       golanguagerule.OriginVet,
 			UpstreamName: "printf",
 			TypeAware:    true,
 			Analyzer:     placeholderAnalyzer,
@@ -70,9 +70,9 @@ func TestAGoRuleHasARowInRulesJson(test *testing.T) {
 func TestAGoRuleARunFixesIsMarkedFix(test *testing.T) {
 	test.Parallel()
 	inputs := sourceInputs(test)
-	inputs.GoRules = []goenginerule.Rule{
-		{Name: "cohere-go/consistency-no-long-line", Origin: goenginerule.OriginHouse, Analyzer: placeholderAnalyzer},
-		{Name: "cohere-go/performance-require-parallel-test", Origin: goenginerule.OriginHouse,
+	inputs.GoRules = []golanguagerule.Rule{
+		{Name: "cohere-go/consistency-no-long-line", Origin: golanguagerule.OriginHouse, Analyzer: placeholderAnalyzer},
+		{Name: "cohere-go/performance-require-parallel-test", Origin: golanguagerule.OriginHouse,
 			Analyzer: placeholderAnalyzer},
 	}
 	inputs.GoFixingRules = []string{"cohere-go/consistency-no-long-line"}
@@ -96,8 +96,8 @@ func TestAGoRuleARunFixesIsMarkedFix(test *testing.T) {
 // do not list.
 func TestAFixingRuleTheRegistryDoesNotHoldRefusesTheBuild(test *testing.T) {
 	test.Parallel()
-	registered := []goenginerule.Rule{
-		{Name: "cohere-go/performance-require-parallel-test", Origin: goenginerule.OriginHouse,
+	registered := []golanguagerule.Rule{
+		{Name: "cohere-go/performance-require-parallel-test", Origin: golanguagerule.OriginHouse,
 			Analyzer: placeholderAnalyzer},
 	}
 	_, buildError := buildGoRows(registered, []string{"cohere-go/consistency-no-long-line"})
@@ -112,32 +112,32 @@ func TestAMalformedGoRuleRefusesTheBuild(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
 		name     string
-		goRule   goenginerule.Rule
+		goRule   golanguagerule.Rule
 		expected string
 	}{
 		{
 			name: "a house name outside the scheme",
-			goRule: goenginerule.Rule{
+			goRule: golanguagerule.Rule{
 				Name:     "cohere-go/nothing-like-a-category",
-				Origin:   goenginerule.OriginHouse,
+				Origin:   golanguagerule.OriginHouse,
 				Analyzer: placeholderAnalyzer,
 			},
 			expected: "cohere-go/nothing-like-a-category",
 		},
 		{
 			name: "a port with no upstream name",
-			goRule: goenginerule.Rule{
+			goRule: golanguagerule.Rule{
 				Name:     "cohere-go/printf",
-				Origin:   goenginerule.OriginVet,
+				Origin:   golanguagerule.OriginVet,
 				Analyzer: placeholderAnalyzer,
 			},
 			expected: "names no upstream rule",
 		},
 		{
 			name: "a rule with no analyzer",
-			goRule: goenginerule.Rule{
+			goRule: golanguagerule.Rule{
 				Name:         "cohere-go/printf",
-				Origin:       goenginerule.OriginVet,
+				Origin:       golanguagerule.OriginVet,
 				UpstreamName: "printf",
 			},
 			expected: "has no analyzer",
@@ -146,7 +146,7 @@ func TestAMalformedGoRuleRefusesTheBuild(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			_, buildError := buildGoRows([]goenginerule.Rule{testCase.goRule}, nil)
+			_, buildError := buildGoRows([]golanguagerule.Rule{testCase.goRule}, nil)
 			if buildError == nil || !strings.Contains(buildError.Error(), testCase.expected) {
 				test.Fatalf("buildGoRows refused with %v, expected an error naming %q", buildError, testCase.expected)
 			}

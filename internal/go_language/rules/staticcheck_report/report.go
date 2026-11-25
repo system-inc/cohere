@@ -5,7 +5,7 @@
 // StdlibVersion and File of analysis/code/code.go that its version gates read. A finding lands where staticcheck's
 // lands, a node's Pos and End or an instruction's Source(), each cut short by ShortRange the same way, and the options
 // keep staticcheck's meaning and their order's. Where staticcheck reads a pass, the kit reads a rule.Context, the
-// package's files from Files and staticcheck's generated-file judgment from IsGenerated, so a check on the engine's
+// package's files from Files and staticcheck's generated-file judgment from IsGenerated, so a check on cohere-go's
 // dispatcher reports through it as a check on an analyzer does (see PassContext).
 //
 // It differs in one place, adjudicated: staticcheck's MaximumLanguageVersion sets the minimum language version, so it
@@ -41,7 +41,7 @@ type fullPositioner interface {
 	End() token.Pos
 }
 
-// sourcer is a Positioner built from syntax, as an instruction of the engine's intermediate representation is, and of
+// sourcer is a Positioner built from syntax, as an instruction of cohere-go's intermediate representation is, and of
 // staticcheck's, whose finding spans that syntax.
 type sourcer interface {
 	Source() ast.Node
@@ -78,7 +78,7 @@ func Report(context *rule.Context, node Positioner, message string, options ...O
 
 	if shape.filterGenerated {
 		if context.IsGenerated == nil {
-			// Invariant: every context a check reports through is built by PassContext or the engine's dispatcher,
+			// Invariant: every context a check reports through is built by PassContext or cohere-go's dispatcher,
 			// both of which give it staticcheck's judgment; a context built without one is a bug in its builder.
 			panic("staticcheck_report: FilterGenerated asked of a context with no IsGenerated judgment")
 		}

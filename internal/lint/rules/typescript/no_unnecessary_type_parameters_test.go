@@ -870,7 +870,7 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(test *testing.T) {
 // Upstream ships `replaceUsagesWithConstraint` as a suggestion rather than a fix, and that
 // distinction is part of what is being ported: rewriting every use of a parameter to its constraint
 // and deleting the parameter changes what the signature means to callers, so a human chooses it and
-// the engine never applies it unattended. A rule that shipped this as a fix would pass every
+// the fix pass never applies it unattended. A rule that shipped this as a fix would pass every
 // message-id fixture while rewriting code upstream would only have offered to rewrite.
 func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(test *testing.T) {
 	test.Parallel()

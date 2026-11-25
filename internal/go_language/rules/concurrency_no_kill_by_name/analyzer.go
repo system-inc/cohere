@@ -1,4 +1,4 @@
-// Package concurrency_no_kill_by_name is the Go engine's rule against stopping processes by name.
+// Package concurrency_no_kill_by_name is cohere-go's rule against stopping processes by name.
 //
 // pkill, killall, and a kill given a name rather than a pid stop every process on the machine whose name matches, not
 // the one the code started. On a machine shared by several agents and runs, that takes their work down with it, and
@@ -36,7 +36,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "concurrency_no_kill_by_name", "Flags
 	"it. Only constant programs and arguments are judged, and a script is read as words, not parsed as a shell would "+
 	"parse it, so a quoted or commented pkill is flagged too.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var killByNameMessage = policy.MessageOf(Name, "killByName")

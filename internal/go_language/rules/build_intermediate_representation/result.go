@@ -45,7 +45,7 @@ func (result *Result) Package() *intermediate_representation.Package {
 func ResultOf(pass *analysis.Pass) (*Result, error) {
 	result, isResult := pass.ResultOf[Analyzer].(*Result)
 	if !isResult || result == nil {
-		return nil, fmt.Errorf("reading %s's result: it is %T, where the engine's own intermediate representation "+
+		return nil, fmt.Errorf("reading %s's result: it is %T, where cohere's own intermediate representation "+
 			"was expected", Analyzer.Name, pass.ResultOf[Analyzer])
 	}
 	return result, nil

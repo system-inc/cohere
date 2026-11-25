@@ -150,7 +150,7 @@ func TestNoUselessConstructorFires(test *testing.T) {
 // applyUselessConstructorSuggestion replays a suggestion's fixes, back to front.
 //
 // `rule_testing` applies a fix but has no suggestion support at all, so this lives here. Same
-// ordering the fix engine uses, for the same reason.
+// ordering the fix pass uses, for the same reason.
 func applyUselessConstructorSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()
 	if len(suggestion.Fixes) == 0 {

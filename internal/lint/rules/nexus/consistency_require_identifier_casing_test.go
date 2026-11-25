@@ -170,7 +170,7 @@ func TestConsistencyRequireIdentifierCasingFires(test *testing.T) {
 		},
 		{"a brand spelled otherwise", "export class imessageThing {}\n", []string{"imessageThing"}},
 		// A leading underscore is flagged on every name we declare (us05), and a trailing one with it, as
-		// the Go and Swift engines flag both.
+		// cohere-go and cohere-swift flag both.
 		{
 			"underscores at either end",
 			"export function run(_cache: number, __meta__: number, event_: number, _Unit_Count: number) { let _running_total = 0; return _running_total; }\n",
@@ -451,7 +451,7 @@ func TestConsistencyRequireIdentifierCasingAdvice(test *testing.T) {
 			"requireUpperCamelCaseType",
 			`The interface "iMessage_thing" is a type, so spell it in UpperCamelCase: "iMessageThing".`,
 		},
-		// A leading underscore is told about itself, as the Go and Swift engines tell it, whatever casing the
+		// A leading underscore is told about itself, as cohere-go and cohere-swift tell it, whatever casing the
 		// advice then takes.
 		{
 			"a leading underscore",

@@ -264,7 +264,7 @@ func TestDescribeProjectAsksGoEnvironmentBesideItsReads(test *testing.T) {
 // manyFileProject is a module of count files of one package, and the files, sorted as the census sorts them.
 func manyFileProject(test *testing.T, count int) (string, []string) {
 	test.Helper()
-	// Resolved, as the engine resolves its root to its real path (#yyv7nr2), so the files name the paths it reads.
+	// Resolved, as cohere-go resolves its root to its real path (#yyv7nr2), so the files name the paths it reads.
 	root, resolveError := filepath.EvalSymlinks(test.TempDir())
 	if resolveError != nil {
 		test.Fatalf("resolving the temporary directory: %v", resolveError)

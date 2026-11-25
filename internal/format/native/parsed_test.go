@@ -17,12 +17,12 @@ import (
 // such as ahra, read the way the fixtures are. Unset, the proof reads the repository's fixtures alone.
 const parsedCorpusVariable = "COHERE_PARSE_FROM_CORPUS"
 
-// The formatter prints a TypeScript file from the fix engine's guard's tree rather than parsing it again
+// The formatter prints a TypeScript file from the fix pass's guard's tree rather than parsing it again
 // (#dk2502g). estree's TestTheGuardsTreeIsTheTreeTheFormatterWouldParse proves the two trees convert to one
 // ESTree; this proves what a run relies on, the printed bytes, so anything the printer reads off the tree
 // besides the ESTree (node flags, the script kind it was parsed with) is covered too. Asked for by
 // @system_cohere_lint_fix in review. Every TypeScript file of the fixtures and of any tree the variable names is
-// formatted twice, with the tree the engine hands its transform and with none, and the outputs, or the errors,
+// formatted twice, with the tree the formatter hands its transform and with none, and the outputs, or the errors,
 // must be equal. A tree of other bytes is offered too, and must be refused, printing what no tree prints.
 func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T) {
 	test.Parallel()

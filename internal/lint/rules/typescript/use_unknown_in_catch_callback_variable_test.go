@@ -298,7 +298,7 @@ func TestUseUnknownInCatchCallbackVariableFires(test *testing.T) {
 // whole rewritten file against the output upstream records for it.
 //
 // This is the assertion the harness does not supply. ExpectFixedSource applies fixes, and every
-// repair this rule offers is a suggestion, which the engine never applies unattended, so the applier
+// repair this rule offers is a suggestion, which the fix pass never applies unattended, so the applier
 // is the one in this package that await-thenable already needed.
 //
 // It is where this rule can be wrong invisibly. A finding carrying a repair that overwrites the

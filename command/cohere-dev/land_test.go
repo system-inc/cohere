@@ -819,8 +819,8 @@ func TestLandRefusesSubjectsTheHouseDoesNotWrite(test *testing.T) {
 			want: []string{"86 characters, over 72"}},
 		{name: "no area", subject: "add the thing (#" + fixtureTask + ")",
 			want: []string{"no `area: ` before what changed"}},
-		{name: "an unknown area", subject: "goengine: a thing (#" + fixtureTask + ")",
-			want: []string{`"goengine" names no folder or top-level file in the tree`, `("go_engine" is one)`}},
+		{name: "an unknown area", subject: "golanguage: a thing (#" + fixtureTask + ")",
+			want: []string{`"golanguage" names no folder or top-level file in the tree`, `("go_language" is one)`}},
 		{name: "a second task", subject: "base: another thing (#tskfix2)", arguments: []string{"--message", "things"},
 			want: []string{"name 2 tasks, #" + fixtureTask + ", #tskfix2", "--task"}},
 		{name: "a second commit", subject: fixtureSubject("another thing"),
@@ -830,14 +830,14 @@ func TestLandRefusesSubjectsTheHouseDoesNotWrite(test *testing.T) {
 			test.Parallel()
 			fixture := newLandFixture(test)
 			worktreeA := fixture.worktree("a")
-			engine := filepath.Join(worktreeA, "go_engine")
-			if createDirectoryError := os.MkdirAll(engine, 0o755); createDirectoryError != nil {
+			directory := filepath.Join(worktreeA, "go_language")
+			if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
 				test.Fatal(createDirectoryError)
 			}
-			if writeError := os.WriteFile(filepath.Join(engine, "x.txt"), []byte("x\n"), 0o644); writeError != nil {
+			if writeError := os.WriteFile(filepath.Join(directory, "x.txt"), []byte("x\n"), 0o644); writeError != nil {
 				test.Fatal(writeError)
 			}
-			fixture.git(worktreeA, "add", "go_engine")
+			fixture.git(worktreeA, "add", "go_language")
 			fixture.git(worktreeA, "commit", "-q", "-m", refusal.subject)
 			before := fixture.git(fixture.repository, "rev-parse", "main")
 			landing := exec.Command(fixture.wrapper, append([]string{"land"}, refusal.arguments...)...)

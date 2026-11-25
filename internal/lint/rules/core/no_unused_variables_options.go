@@ -59,7 +59,7 @@ type NoUnusedVariablesOptions struct {
 	// used, so the pattern cannot hide a name that lies about itself. See reportUsedIgnoredName.
 	ReportUsedIgnorePattern bool `json:"reportUsedIgnorePattern"`
 	// EnableAutofixRemoval is typescript-eslint's alone (core ESLint has no fixer here). Its one key,
-	// imports, makes the removal of an unused import a fix the edit engine applies; off, the default,
+	// imports, makes the removal of an unused import a fix the fix pass applies; off, the default,
 	// the same removal is offered as a suggestion. See importRemoval.
 	EnableAutofixRemoval NoUnusedVariablesAutofixRemoval `json:"enableAutofixRemoval"`
 }

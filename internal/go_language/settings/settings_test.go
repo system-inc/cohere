@@ -21,7 +21,7 @@ var knownRules = []string{parallelRule, namingRule}
 // fixtureRoot is the directory every fixture below sits in, written once for the package by TestMain.
 var fixtureRoot string
 
-// rootFixtures are the engine roots, each a directory holding the named files.
+// rootFixtures are cohere-go roots, each a directory holding the named files.
 var rootFixtures = map[string]map[string]string{
 	"workspace": {"go.work": "go 1.27\n\nuse .\n", "go.mod": "module example.com/workspace\n\ngo 1.27\n"},
 	"module":    {"go.mod": "module example.com/module\n\ngo 1.27\n"},
@@ -34,7 +34,7 @@ var rootFixtures = map[string]map[string]string{
 
 // fileFixtures are settings files named by an explicit path, written to files/<name>.json.
 var fileFixtures = map[string]string{
-	// The TypeScript engine's keys, a top-level format among them, beside no go block.
+	// The TypeScript linter's keys, a top-level format among them, beside no go block.
 	"no-go-block": `{"rules": {"no-debugger": "error"}, "format": {"tabWidth": 4}}`,
 
 	"every-shape": `{
@@ -109,7 +109,7 @@ var fileFixtures = map[string]string{
 }
 
 func TestMain(suite *testing.M) {
-	root, createError := os.MkdirTemp("", "go-engine-settings-")
+	root, createError := os.MkdirTemp("", "go-language-settings-")
 	if createError != nil {
 		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "creating the fixture directory: %v\n", createError)
@@ -244,14 +244,14 @@ func TestAnExplicitPathWinsAndIsNeverReplacedByTheDefaults(test *testing.T) {
 	}
 }
 
-// TestAFileWithNoGoBlockRunsEveryRuleAtError: the TypeScript engine's keys, a top-level format among them,
+// TestAFileWithNoGoBlockRunsEveryRuleAtError: the TypeScript linter's keys, a top-level format among them,
 // are not this loader's to refuse, and the note names the file that has no go block.
 func TestAFileWithNoGoBlockRunsEveryRuleAtError(test *testing.T) {
 	test.Parallel()
 	path := filePath("no-go-block")
 	loaded, loadError := Load(fixtureRoot, path, knownRules, nil)
 	if loadError != nil {
-		test.Fatalf("a file with the TypeScript engine's keys and no go block was refused: %v", loadError)
+		test.Fatalf("a file with the TypeScript linter's keys and no go block was refused: %v", loadError)
 	}
 	requireEveryRuleAtError(test, loaded)
 	want := "config: " + path + " has no go block, so every house rule ran at error"
@@ -354,7 +354,7 @@ func TestEveryBadShapeIsRefusedByName(test *testing.T) {
 		"go-null":            {"the go block is not an object"},
 		"go-without-rules":   {"no rules object"},
 		"rules-not-object":   {"rules is not an object"},
-		"unknown-rule":       {`"cohere-go/performance-require-paralel-test"`, "not a rule the Go engine knows"},
+		"unknown-rule":       {`"cohere-go/performance-require-paralel-test"`, "not a rule cohere-go knows"},
 		"unknown-severity":   {parallelRule, `"fatal"`},
 		"capital-severity":   {parallelRule, `"Error"`},
 		"array-bad-severity": {parallelRule, `"deny"`},
@@ -370,13 +370,13 @@ func TestEveryBadShapeIsRefusedByName(test *testing.T) {
 
 		"departures-not-object":  {"departures is", "not an object"},
 		"departures-null":        {"departures is null", "not an object"},
-		"departure-unknown-rule": {`"cohere-go/performance-require-paralel-test"`, "not a rule the Go engine knows"},
+		"departure-unknown-rule": {`"cohere-go/performance-require-paralel-test"`, "not a rule cohere-go knows"},
 		"departure-blank-reason": {parallelRule, "blank reason"},
 		"departure-empty-reason": {parallelRule, "blank reason"},
 		"departure-not-string":   {parallelRule, "is 2", "not a reason written as a string"},
 
 		"reasons-not-object":      {"reasons is", "not an object"},
-		"reason-unknown-rule":     {`"cohere-go/performance-require-paralel-test"`, "not a rule the Go engine knows"},
+		"reason-unknown-rule":     {`"cohere-go/performance-require-paralel-test"`, "not a rule cohere-go knows"},
 		"reason-blank":            {parallelRule, "give no reason"},
 		"reason-not-string":       {parallelRule, "is 2", "not a sentence written as a string"},
 		"reason-for-a-rule-on":    {parallelRule, "do not turn off"},

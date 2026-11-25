@@ -39,16 +39,16 @@ return context.options.reduce((result, selectorOrObject) => {
 
 Every configured selector becomes a listener key, and ESLint's own listener dispatch resolves it
 through esquery. So porting the rule means porting esquery, and esquery is not a table of node
-names: it is a query engine over a tree this repository does not have.
+names: it is a query language over a tree this repository does not have.
 
-### 1. There is no selector engine here, and it is not small
+### 1. There is no selector matcher here, and it is not small
 
 `internal/lint/ecmascript/` has no esquery equivalent, and neither does anything else in the tree —
 `grep -rn esquery --include='*.go'` outside the vendored compiler returns nothing. The installed
-engine is esquery 1.7.0, 4,426 lines of generated parser plus matcher.
+matcher is esquery 1.7.0, 4,426 lines of generated parser plus matcher.
 
 Upstream's own 34-case corpus reaches 22 distinct selectors, and between them they exercise
-essentially the whole grammar, so a partial engine would not cover the corpus:
+essentially the whole grammar, so a partial matcher would not cover the corpus:
 
 ```
 *  ~  *                                              sibling combinator
@@ -92,7 +92,7 @@ selector in upstream's corpus that filters a declaration is in this class, and s
 project would plausibly write about `const` versus `let`.
 
 Making selectors work would therefore mean projecting the typescript-go tree into an ESTree-shaped
-one — node types, field names, field positions and all — and then running a selector engine over the
+one — node types, field names, field positions and all — and then running a selector matcher over the
 projection. That is a substrate, not a rule port. It is roughly the surface of `@typescript-eslint`'s
 own AST converter, and it would have to stay faithful as the vendored compiler moves.
 

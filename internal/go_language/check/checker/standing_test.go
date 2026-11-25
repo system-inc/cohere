@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 )
 
-// standingKey stands in for the engine's key, rule.Standing, an analyzer that is never run.
+// standingKey stands in for cohere-go's key, rule.Standing, an analyzer that is never run.
 var standingKey = &analysis.Analyzer{
 	Name: "standing_key",
 	Doc:  "keys a package's standing bodies and never runs",
@@ -215,7 +215,7 @@ func TestADispatcherFollowsTheStandingAnalyzerAndItsRuleHoldsTheSameAnswer(test 
 }
 
 // The analyzers that follow Options.StandingAfter are the ones Options.FollowsStanding names, never the ones
-// Options.Tolerant names: a follower that is no dispatcher, as the build of the engine's representation is none, runs
+// Options.Tolerant names: a follower that is no dispatcher, as the build of cohere-go's representation is none, runs
 // after the followed analyzer and holds the answer asked with its result, and a tolerant analyzer FollowsStanding does
 // not name follows nothing, so it may run before the answer and holds none.
 func TestTheFollowersAreTheOnesFollowsStandingNames(test *testing.T) {

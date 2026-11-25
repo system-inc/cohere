@@ -96,11 +96,11 @@ func runStdin(callerContext context.Context, request stdinRequest, input io.Read
 	return writeError
 }
 
-// stdinTransform is the gate's format transform for one named file: the same engine, the same ignore
+// stdinTransform is the gate's format transform for one named file: the same formatter, the same ignore
 // layers, the same scope a run naming this path would have. A file outside it comes back skipped, and so
 // does an Adamic `.a` file the program does not hold (held is the program's `.a` files; see claimAdamic).
 func stdinTransform(
-	formatter formatEngine,
+	formatter fileFormatter,
 	location projectLocation,
 	path string,
 	held map[string]struct{},

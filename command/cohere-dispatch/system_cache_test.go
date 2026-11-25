@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/system_cache_testing"
 )
 
-// TestMain gives the engine every test here starts, through the dispatcher, a system cache of this test binary's
+// TestMain gives cohere every test here starts, through the dispatcher, a system cache of this test binary's
 // own, which it inherits, so no run reads, trims or writes the person's (#syscache).
 func TestMain(suite *testing.M) {
 	removeSystemCache, isolateError := system_cache_testing.Isolate()
@@ -19,7 +19,7 @@ func TestMain(suite *testing.M) {
 	os.Exit(code)
 }
 
-// Every engine the tests start reads a system cache of the tests' own, never the person's: `COHERE_SYSTEM_CACHE` is
+// Every cohere the tests start reads a system cache of the tests' own, never the person's: `COHERE_SYSTEM_CACHE` is
 // set, absolute, and outside their user cache directory.
 func TestTheTestsSystemCacheIsNotTheUsers(test *testing.T) {
 	test.Parallel()

@@ -37,7 +37,7 @@
 // So `hover` is index 0 in a run that parsed `hover` and `focus`, and index 1 in a run that also
 // parsed `group-hover`. The registration numbers survive only as the comparison key inside
 // `compare`; the index a consumer sees is a rank within one run's population. A static table cannot
-// express that, and one built from a default build agrees with the engine on any corpus whose
+// express that, and one built from a default build agrees with Tailwind on any corpus whose
 // variant set happens to match it and diverges silently on every other. That is why this file
 // names its own type RunVariantOrder and builds one per class list, rather than exporting a
 // package-level map. The generated `VariantOrder` table in property_order_table.go is the shape
@@ -70,7 +70,7 @@ import (
 	"strings"
 )
 
-// VariantRegistration is what the engine records about one registered variant root.
+// VariantRegistration is what Tailwind records about one registered variant root.
 //
 // Order is upstream's `order` field. It is a comparison key rather than a position: several roots
 // share one, and a shared order may carry a comparison function that separates them. See the file
@@ -93,7 +93,7 @@ type VariantRegistration struct {
 // grouped.
 type VariantComparison func(left ParsedVariant, right ParsedVariant) int
 
-// VariantRegistry is the engine's variant registry: every registered root and its order.
+// VariantRegistry is Tailwind's variant registry: every registered root and its order.
 //
 // The zero value is not usable; build one with NewVariantRegistry. A registry is not safe for
 // concurrent mutation and is safe for concurrent reads once built, matching Theme and for the same
@@ -168,12 +168,12 @@ func (registry *VariantRegistry) nextOrder() int {
 	return registry.lastOrder + 1
 }
 
-// RegisterFrameworkVariants replays a generated registry: names, kinds, and the order numbers the
-// engine itself assigned.
+// RegisterFrameworkVariants replays a generated registry: names, kinds, and the order numbers
+// Tailwind itself assigned.
 //
 // Separate from Register, and the separation is the point. Register computes the next order, which
 // is right for a `@custom-variant` appending past the framework and wrong for replaying the
-// framework: the engine shares order numbers across the roots registered inside one
+// framework: Tailwind shares order numbers across the roots registered inside one
 // `Variants.group`, and 88 registrations hold only 82 distinct numbers in a default build. Feeding
 // those 88 through Register in sequence would give each its own number, which reads as a harmless
 // off-by-a-few and is not. A shared order is the only place a comparison function is consulted, so
@@ -432,7 +432,7 @@ func (registry *VariantRegistry) BuildVariantOrder(variants []ParsedVariant) *Ru
 	// extra entries are not inert: they consume dense indices and shift every later variant's bit
 	// upward.
 	//
-	// Measured on the engine, the class list `dark:flex group-hover:disabled:flex` ranks four
+	// Measured on Tailwind, the class list `dark:flex group-hover:disabled:flex` ranks four
 	// variants, of which the standalone `hover` was never written by either class. Without it
 	// `disabled` takes index 1 instead of 2 and `dark` takes 2 instead of 3, so both masks come out
 	// half their true value. The relative order survives that particular shift, which is exactly
@@ -482,11 +482,11 @@ func (registry *VariantRegistry) BuildVariantOrder(variants []ParsedVariant) *Ru
 
 // appendVariantAndNested adds a variant and every variant nested inside it.
 //
-// A compound's inner variant is appended after the compound itself, matching the order the engine's
+// A compound's inner variant is appended after the compound itself, matching the order Tailwind's
 // parse cache receives them: `parseVariant('group-hover')` inserts the compound, and the recursive
 // parse of its argument inserts the inner `hover`. The sort that follows makes the arrival order
 // irrelevant to the result, but keeping it faithful means a future reader diffing the population
-// against the engine's cache sees the same sequence rather than a reordering they have to explain.
+// against Tailwind's cache sees the same sequence rather than a reordering they have to explain.
 func appendVariantAndNested(population []ParsedVariant, variant ParsedVariant) []ParsedVariant {
 	grown := append(population, variant)
 	if variant.Variant != nil {
@@ -505,8 +505,8 @@ func appendVariantAndNested(population []ParsedVariant, variant ParsedVariant) [
 // which they differ. So a class's position is governed by its single highest-ranked variant, and
 // only ties on that are broken by the next one down. It follows that a stacked variant does not
 // sort after every single variant. `group-hover:disabled:` sets bits for `group-hover` and
-// `disabled`, and `dark:` sets one much higher bit; the stacked class sorts first. Measured on the
-// engine, `group-hover:disabled:flex` precedes `dark:flex`, and in a four-class list it lands
+// `disabled`, and `dark:` sets one much higher bit; the stacked class sorts first. Measured on
+// Tailwind, `group-hover:disabled:flex` precedes `dark:flex`, and in a four-class list it lands
 // between `hover:flex` and `dark:flex` rather than after both.
 //
 // A depth-first rule, "every single variant precedes every stacked one", agrees with this on the

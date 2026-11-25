@@ -68,7 +68,7 @@ type platformTwin struct {
 
 // read records, from one platform's load, the files it builds, and for each file only it builds, what every
 // identifier resolves to, the package-level twins declared there and the methods.
-func (reading *platformReading) read(engine *engine, load *workspace.PlatformLoad, hostBuilt map[string]bool) {
+func (reading *platformReading) read(renaming *renaming, load *workspace.PlatformLoad, hostBuilt map[string]bool) {
 	platform := load.Platform
 	reading.built[platform] = map[string]bool{}
 	if len(load.Clean.Roots) == 0 {

@@ -8,10 +8,10 @@ import (
 )
 
 // capMemoryWatched is a decision under the cap with room above it, whose limit and collector reads watch keeps.
-func capMemoryWatched(watch *memoryWatch, collecting func() bool) *engineMemory {
-	return &engineMemory{
+func capMemoryWatched(watch *memoryWatch, collecting func() bool) *memoryAccount {
+	return &memoryAccount{
 		record: contract.Memory{
-			LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: contract.MemorySourceCap,
+			LimitBytes: memoryCap, CapBytes: memoryCap, Source: contract.MemorySourceCap,
 		},
 		inheritedBytes: 32 << 30,
 		setMemoryLimit: watch.setMemoryLimit,
@@ -35,30 +35,30 @@ func TestALoadMemoryWithoutADecisionDoesNothing(test *testing.T) {
 // only the last to end lets the raise land.
 func TestLoadsInFlightShareOneRaise(test *testing.T) {
 	test.Parallel()
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 	loads := newLoadMemory(capMemoryWatched(watch, watch.collecting), false)
-	raised := engineMemoryCap + lateMemoryAllowance
+	raised := memoryCap + lateMemoryAllowance
 
 	loads.begin()
 	loads.begin()
 	loads.end()
 
-	if set := watch.setLimits(); !slices.Equal(set, []int64{engineMemoryCap}) {
+	if set := watch.setLimits(); !slices.Equal(set, []int64{memoryCap}) {
 		test.Fatalf("with a load still in flight the limit was set to %v, want only the cap at the first's start", set)
 	}
 	loads.end()
-	if set := watch.setLimits(); !slices.Equal(set, []int64{engineMemoryCap, raised}) {
+	if set := watch.setLimits(); !slices.Equal(set, []int64{memoryCap, raised}) {
 		test.Errorf("after the last load ended the limit was set to %v, want %v", set,
-			[]int64{engineMemoryCap, raised})
+			[]int64{memoryCap, raised})
 	}
 }
 
 // raisedTo is the one place that knows the raises the run made: each that landed, in order.
 func TestRaisedToNamesEveryRaiseThatLanded(test *testing.T) {
 	test.Parallel()
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 	loads := newLoadMemory(capMemoryWatched(watch, watch.collecting), false)
-	raised := engineMemoryCap + lateMemoryAllowance
+	raised := memoryCap + lateMemoryAllowance
 
 	for range 2 {
 		loads.begin()
@@ -76,9 +76,9 @@ func TestRaisedToNamesEveryRaiseThatLanded(test *testing.T) {
 // case (#44n0vap, #b2t9xmf), however many loads there are.
 func TestManyLoadsNeverRaiseTheLimitPastOneAllowance(test *testing.T) {
 	test.Parallel()
-	watch := &memoryWatch{current: engineMemoryCap}
+	watch := &memoryWatch{current: memoryCap}
 	loads := newLoadMemory(capMemoryWatched(watch, watch.collecting), false)
-	ceiling := engineMemoryCap + lateMemoryAllowance
+	ceiling := memoryCap + lateMemoryAllowance
 
 	const loadCount = 8
 	for range loadCount {
@@ -86,8 +86,8 @@ func TestManyLoadsNeverRaiseTheLimitPastOneAllowance(test *testing.T) {
 		watch.lock.Lock()
 		during := watch.current
 		watch.lock.Unlock()
-		if during != engineMemoryCap {
-			test.Errorf("a load ran under a limit of %d, want the cap %d", during, engineMemoryCap)
+		if during != memoryCap {
+			test.Errorf("a load ran under a limit of %d, want the cap %d", during, memoryCap)
 		}
 		loads.end()
 	}

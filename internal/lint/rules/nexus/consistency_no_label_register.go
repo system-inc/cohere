@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // at once touch nothing in common.
 //
 // No decoder: the rule takes no options. Labels are banned in every language, and an option exempting
-// a loop or a switch would let a project's engines disagree.
+// a loop or a switch would let a project's languages disagree.
 func init() {
 	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoLabel})
 }

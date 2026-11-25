@@ -103,7 +103,11 @@ type RunCache struct {
 // 5: A run ends with a footer that is not in Output, and Summary carries what a replay renders it from.
 // A version-4 manifest has the old phase account in Output and no Summary, and would replay with no
 // footer at all.
-const runCacheVersion = 5
+//
+// 6: The facts name a project by its kind, kind=GoModule and kind=SwiftPackage, and cohere-swift's choice as
+// swift-binary, where version 5 wrote engine=Go, engine=Swift and swift-engine (#9gjmwgs). A version-5 entry was
+// keyed on the old spellings, so it misses whole rather than being read under the new ones.
+const runCacheVersion = 6
 
 // ErrRunCacheMiss is the one answer a check gives when it cannot prove a hit. Callers treat every
 // error from Check as a miss and run normally; this exists so a test can tell a clean miss
@@ -185,7 +189,7 @@ func RecordRunCache(
 
 // RecordRunCacheWithin is RecordRunCache recording the directory holding a file only when that directory is one of
 // roots or lies inside one, for a run whose inputs name every path outside them whose presence decides its verdict,
-// as the Go engine's record does: a staticcheck.conf or a .gitignore above the module, the toolchain's files, the
+// as cohere-go's record does: a staticcheck.conf or a .gitignore above the module, the toolchain's files, the
 // module cache's, the git index in a worktree's git directory, each there or absent. Such a file is decided by its
 // own signature; a file added beside it changes nothing, and its directory would only move with whatever else lives
 // there: a home directory, a repository's top, a git directory that every git command in the worktree writes a lock

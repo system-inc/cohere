@@ -1,6 +1,6 @@
 package main
 
-// What follows is the Go engine's cohere-go/consistency-no-abbreviated-identifier reading of which declared names
+// What follows is cohere-go's cohere-go/consistency-no-abbreviated-identifier reading of which declared names
 // are its package's own, kept to its letter (internal/goengine/rules/consistency_no_abbreviated_identifier), so
 // the -global pass proposes exactly the names the rule flags.
 

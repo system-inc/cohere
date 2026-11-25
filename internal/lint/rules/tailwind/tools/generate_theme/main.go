@@ -1,4 +1,4 @@
-// Command generate_theme captures the theme the real Tailwind engine resolved for a corpus of
+// Command generate_theme captures the theme Tailwind itself resolved for a corpus of
 // stylesheets, so that the Go port in internal/lint/rules/tailwind/collapse/theme.go is tested against measurements
 // rather than against a reading of the TypeScript source.
 //
@@ -9,7 +9,7 @@
 //
 // The distinction this tool enforces is the one generate_data_type and generate_css_parser
 // enforce, and for this component it lands on the ignored-key map. Reading the source suggests
-// `--font` names every key starting `--font-`; asking the engine says `--font-weight-*` and
+// `--font` names every key starting `--font-`; asking Tailwind says `--font-weight-*` and
 // `--font-size-*` are excluded, so a repository's `--color` namespace holds 567 keys while
 // `keysInNamespaces(['--color'])` returns 558. A port that missed the map returns nine extra keys
 // under a namespace, which is plausible on inspection and wrong on every lookup that walks them.
@@ -84,13 +84,13 @@ func main() {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
 				os.Stderr,
-				"%s is stale: the engine now resolves a different theme. Re-run without -check and read the diff.\n",
+				"%s is stale: Tailwind now resolves a different theme. Re-run without -check and read the diff.\n",
 				*output,
 			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
-		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
+		fmt.Fprintf(os.Stderr, "%s matches Tailwind\n", *output)
 		return
 	}
 
@@ -151,7 +151,7 @@ func main() {
 
 // enumerate runs the Node side and returns its JSON.
 //
-// The engine is JavaScript and there is no faithful way to ask it these questions from Go. The
+// Tailwind is JavaScript and there is no faithful way to ask it these questions from Go. The
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot, stylesheets string) ([]byte, error) {

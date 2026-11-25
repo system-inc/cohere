@@ -13,7 +13,7 @@ import (
 // projectChildren are the project runs a mixed-repository run has going, held so a signal to this run
 // reaches them.
 //
-// Each child is a whole cohere run that ends its own engine on a signal (see runEngineBinaryUntil), but
+// Each child is a whole cohere run that ends its own child on a signal (see runContractBinaryUntil), but
 // only a signal it receives. A terminal's interrupt reaches the whole foreground group, while a caller's
 // `kill <pid>`, or a timeout's terminate, reaches this process alone. That used to end this process and
 // leave its children checking, a Swift child's compiler among them, with nobody waiting for their verdict

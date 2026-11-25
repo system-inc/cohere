@@ -1,4 +1,4 @@
-// Package consistency_no_uppercase_initialism is the Go engine's rule that an initialism in a name is spelled as a
+// Package consistency_no_uppercase_initialism is cohere-go's rule that an initialism in a name is spelled as a
 // word.
 //
 // The house writes an initialism the way it writes any other word in a name, capitalized at its first letter only:
@@ -47,7 +47,7 @@ const (
 		"JSONEncoder or ID, and suggests it spelled as a word, userId, ParseUrl, JsonEncoder, Id, since the house " +
 		"capitalizes only an initialism's first letter. Uses, package names, methods an interface of another " +
 		"package fixes, //go:linkname and cgo //export names, Example functions and screaming snake case are left. " +
-		"The finding offers the suggested name as a rename, which the engine applies at every reference. The " +
+		"The finding offers the suggested name as a rename, which cohere-go applies at every reference. The " +
 		"renameExports option lets that rename reach an exported name of an importable package, and never changes " +
 		"a finding."
 )
@@ -60,7 +60,7 @@ func NewAnalyzer() *analysis.Analyzer {
 }
 
 // newAnalyzer registers the rule's listener on dispatcher and gives the analyzer it returns its renameExports flag,
-// which the engine sets from the rule's settings and the context's Option reads off this analyzer.
+// which cohere-go sets from the rule's settings and the context's Option reads off this analyzer.
 func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 	analyzer := dispatcher.RuleAnalyzer(Name, analyzerName, doc, &listener)
 	rule.AddRenameExportsOption(analyzer)
@@ -70,7 +70,7 @@ func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 // Analyzer runs the rule over one package, reporting what the shared syntax dispatcher's walk found for it.
 var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 
-// Rule is this rule's entry in the Go engine's registry. It reads the types to tell a method an interface fixes.
+// Rule is this rule's entry in cohere-go's registry. It reads the types to tell a method an interface fixes.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var uppercaseInitialismMessage = policy.MessageOf(Name, "uppercaseInitialism")

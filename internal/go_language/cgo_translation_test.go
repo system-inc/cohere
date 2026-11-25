@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
-// typesRecordOf runs the engine over a copy of fixture, in process and under `--no-cache`, so the load is the
+// typesRecordOf runs cohere-go over a copy of fixture, in process and under `--no-cache`, so the load is the
 // fixture's whole, and returns its types record as written.
 func typesRecordOf(test *testing.T, fixture string) contract.TypesRecord {
 	test.Helper()

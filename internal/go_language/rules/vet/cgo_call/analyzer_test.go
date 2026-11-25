@@ -23,7 +23,7 @@ import (
 // expects, and to nothing more. a and typeparams have cgo of their own, so the load has the cgo tool translate them,
 // and the pass judges them through the translation's `//line` directives; b and c name a C that is not cgo, and
 // import no runtime/cgo. The translation needs a go that compiles and a toolchain with cgo, so the test skips, named,
-// where either is missing, as every test of the engine that translates cgo does.
+// where either is missing, as every test of cohere-go that translates cgo does.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
 	cgo_testing.RequireTranslation(test)

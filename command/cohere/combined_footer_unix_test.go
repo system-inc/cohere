@@ -1,6 +1,6 @@
 //go:build unix
 
-// The stand-in Swift engine here is a /bin/sh script, so the file builds on Unix.
+// The stand-in cohere-swift here is a /bin/sh script, so the file builds on Unix.
 
 package main
 

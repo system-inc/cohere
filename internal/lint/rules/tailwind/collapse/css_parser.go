@@ -215,11 +215,11 @@ func ParseCss(input string) ([]*Node, error) {
 		// neither can be used to find its end. This scans forward tracking bracket depth and ends
 		// only at a `;` or `}` seen at depth zero.
 		//
-		// Two consequences are easy to miss and both were measured against the engine rather than
+		// Two consequences are easy to miss and both were measured against Tailwind rather than
 		// reasoned about. The value is taken by slicing the input directly, so it keeps its
 		// original interior whitespace including newlines: the whitespace-collapsing branches
-		// above never run over it. `--font-sans` in a real Structure theme comes back from the
-		// engine holding a literal `\n        `, and a parser that routed these bytes through the
+		// above never run over it. `--font-sans` in a real Structure theme comes back from
+		// Tailwind holding a literal `\n        `, and a parser that routed these bytes through the
 		// normal buffer path returns the same value with a single space instead: still plausible,
 		// still wrong, and wrong identically on all 420 theme entries. And the colon index is
 		// recorded during this scan rather than searched for afterwards, because a `:` may appear
@@ -524,7 +524,7 @@ func topOfStack(stack []byte) byte {
 // shortest at-rule in CSS is `@page`, so no name boundary can appear before then, and starting
 // later skips five comparisons per at-rule. An at-rule shorter than `@page` therefore parses as
 // all-name with empty params. That is upstream's behaviour and it is reproduced rather than
-// improved, because a port that handled `@x` correctly would disagree with the engine it is
+// improved, because a port that handled `@x` correctly would disagree with Tailwind it is
 // checked against.
 func ParseAtRule(buffer string, nodes ...*Node) *Node {
 	name := buffer

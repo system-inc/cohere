@@ -30,7 +30,7 @@ const (
 )
 
 // reviewedLiterals are string literals read in their files and judged unable to name the declaration a
-// candidate renames: by the name the literal spells, then the file relative to the root, the reason. The engine
+// candidate renames: by the name the literal spells, then the file relative to the root, the reason. global_rename
 // still refuses a rename for any literal of that name in any other file.
 var reviewedLiterals = map[string]map[string]string{
 	"OS": {

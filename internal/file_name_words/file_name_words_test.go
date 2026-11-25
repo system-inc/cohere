@@ -418,7 +418,7 @@ func TestIsForeignFolder(test *testing.T) {
 	}
 }
 
-// registeredForTest stands in for an engine's registry, upstream names and namespaced ones among them.
+// registeredForTest stands in for a language's registry, upstream names and namespaced ones among them.
 var registeredForTest = NewRuleNames([]string{
 	"max-lines",
 	"no-var",

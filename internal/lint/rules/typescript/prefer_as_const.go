@@ -122,7 +122,7 @@ var PreferAsConst = rule.Rule[rule.NoOptions]{
 // warnings, so the reasoning is recorded rather than assumed.
 //
 // The repair is two edits at separated offsets: delete the annotation, and append ` as const` after
-// the initializer. Our engine flattens a diagnostic's fixes into independent proposals, so a pair
+// the initializer. Our fix pass flattens a diagnostic's fixes into independent proposals, so a pair
 // that only means something jointly is normally a Suggestion, whose Fixes field is the atomic
 // container. core.NoCaseDeclarations is the shipped precedent.
 //

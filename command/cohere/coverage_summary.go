@@ -8,12 +8,12 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// coverageSummary is everything the coverage block says, built by each engine from its own records
+// coverageSummary is everything the coverage block says, built by each language from its own records
 // and printed by one writer, so a Swift run and a TypeScript run say the same thing about the same
 // fact.
 type coverageSummary struct {
 	Entries []ruleCoverageEntry
-	// Unnamed counts rules a category holds that the engine's record does not name: the Swift record
+	// Unnamed counts rules a category holds that the child's record does not name: the Swift record
 	// counts its quiet rules and names none. They count toward the total and print as a count.
 	Unnamed map[coverageCategory]int
 	// PartialFacts are facts about rules the record counts and does not name, said once by name under

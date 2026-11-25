@@ -40,7 +40,7 @@ import (
 	"github.com/system-inc/cohere/internal/bench_results"
 )
 
-// regressedExit is the exit of a regressed night, apart from 1 so a nightly script can tell a slower engine
+// regressedExit is the exit of a regressed night, apart from 1 so a nightly script can tell a slower cohere
 // from a guard that could not judge.
 const regressedExit = 3
 
@@ -142,7 +142,7 @@ func judge(state string, tonightPath string, threshold float64, stdout io.Writer
 	if readRecordError != nil {
 		return 1, readRecordError
 	}
-	// A modified engine's record fails Validate for that alone, and Guard calls its night Unmeasured, which is
+	// A modified cohere's record fails Validate for that alone, and Guard calls its night Unmeasured, which is
 	// the verdict a nightly script needs rather than a refusal; every other record is held to its own runs.
 	if !tonight.Cohere.Dirty {
 		if validateError := bench_results.Validate(tonight); validateError != nil {
@@ -360,18 +360,18 @@ func acceptBaseline(state string, recordPath string, because string) error {
 	return writeBaseline(state, record, because)
 }
 
-// refuseNarrowedBaseline refuses a record narrowed to one engine's project (bench_results.Record.Engine) as a
+// refuseNarrowedBaseline refuses a record narrowed to one project (bench_results.Record.ProjectKind) as a
 // baseline, on both paths that make one: the first night and -accept. The nightly guard times whole roots, and
 // bench_results.Guard refuses to compare a narrowed record with a whole-root one, so a narrowed baseline would
 // turn every later night into a refusal that points at the baseline rather than at the record that caused it.
 func refuseNarrowedBaseline(record bench_results.Record) error {
-	if record.Engine == "" {
+	if record.ProjectKind == "" {
 		return nil
 	}
 	return fmt.Errorf(
-		"the record checked the %s project alone (engine %s), and a baseline is a record of the whole root",
-		record.Engine,
-		record.Engine,
+		"the record checked the %s project alone (project kind %s), and a baseline is a record of the whole root",
+		record.ProjectKind,
+		record.ProjectKind,
 	)
 }
 
@@ -403,7 +403,7 @@ func writeBaseline(state string, record bench_results.Record, because string) er
 }
 
 // readRecord decodes a record, refusing a field the record does not have, as bench_results.Read does. It is
-// not validated here: the caller decides, since a modified engine's night is judged rather than refused.
+// not validated here: the caller decides, since a modified cohere's night is judged rather than refused.
 func readRecord(path string) (bench_results.Record, error) {
 	contents, readError := os.ReadFile(path)
 	if readError != nil {

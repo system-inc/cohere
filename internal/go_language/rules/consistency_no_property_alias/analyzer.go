@@ -1,4 +1,4 @@
-// Package consistency_no_property_alias is the Go engine's rule that a local does not exist only to rename a field.
+// Package consistency_no_property_alias is cohere-go's rule that a local does not exist only to rename a field.
 //
 //	name := server.name
 //	return name
@@ -67,7 +67,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_property_alias", "Fla
 	"there rather than at the declaration. A local read again, in a closure or a loop, written through, or read after "+
 	"a call, may be a snapshot, so it is not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var noPropertyAliasMessage = policy.MessageOf(Name, "noPropertyAlias")

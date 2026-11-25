@@ -183,7 +183,7 @@ var PreferConst = rule.Rule[PreferConstOptions]{
 
 		return rule.Listeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
-				// The engine hands every rule a nil checker when the program could not be built,
+				// The linter hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one. Silence is the correct failure
 				// here rather than a guess, for the reason in the doc above.
 				if ruleContext.TypeChecker == nil {
@@ -265,7 +265,7 @@ var PreferConst = rule.Rule[PreferConstOptions]{
 				// exactly one of the list's findings however many bindings report. Attaching it to
 				// each one produced several identical rewrites of the same three bytes, which the
 				// fixture harness correctly refuses to apply rather than guessing which copy wins,
-				// and which in the engine would be a pile of overlapping edits for no reason. The
+				// and which in the fix pass would be a pile of overlapping edits for no reason. The
 				// first reported binding carries it; the rest carry the diagnosis alone.
 				fixAlreadyOffered := false
 				for _, declaration := range declarations {
@@ -781,7 +781,7 @@ func enclosingStatementList(node *ast.Node) *ast.Node {
 //
 // The span is the keyword alone rather than the whole declaration. oxc replaces the entire
 // declaration span deliberately, so that an overlapping fix from another rule conflicts and only
-// one lands; our engine resolves overlaps itself, so the narrow span is both correct and easier to
+// one lands; our fix pass resolves overlaps itself, so the narrow span is both correct and easier to
 // read in a diff.
 //
 // The keyword is located by scanning forward from the list's start for the three characters, rather

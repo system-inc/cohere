@@ -1,4 +1,4 @@
-// Package consistency_require_matching_file_name is the Go engine's rule that a file is named for the type it serves.
+// Package consistency_require_matching_file_name is cohere-go's rule that a file is named for the type it serves.
 //
 // It is the Go form of the house rule its TypeScript and Swift twins enforce: Button.tsx holds Button, and
 // Registry.swift holds Registry. Go idiom names files freely, several types to a file, but the house serves one type
@@ -37,7 +37,7 @@ var Analyzer = &analysis.Analyzer{
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It reads the types a file serves from package served, which
+// Rule is this rule's entry in cohere-go's registry. It reads the types a file serves from package served, which
 // resolves every receiver through the types and which the one type per file rule reads too, so the type a file is
 // judged against is the one that rule counts.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}

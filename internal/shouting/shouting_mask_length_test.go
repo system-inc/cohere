@@ -6,8 +6,8 @@ import (
 )
 
 // MaskCodeAndCommands keeps the input's byte length and its newlines where they were, whatever the masked code
-// holds, because the Go engine masks a whole comment group and slices the result by each comment's byte offsets. A
-// mask that blanked a multi-byte rune to one space shrank the text, and the engine read past its end. Each case puts
+// holds, because cohere-go masks a whole comment group and slices the result by each comment's byte offsets. A
+// mask that blanked a multi-byte rune to one space shrank the text, and the language read past its end. Each case puts
 // multi-byte runes inside one mask's shape.
 func TestMaskKeepsByteLengthAndNewlines(test *testing.T) {
 	test.Parallel()

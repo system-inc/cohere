@@ -5,12 +5,12 @@ import (
 	"slices"
 )
 
-// Floor is the size from which a group is reported, in each engine's own instructions. Measured on #6rj7jw7: below
+// Floor is the size from which a group is reported, in each language's own instructions. Measured on #6rj7jw7: below
 // it most matches were delegations, upstream ports mirrored on purpose and decorator arrows; from it up nearly every
 // match was a helper that belongs in a library (@system_cohere's ruling, 2026-11-08).
 const Floor = 11
 
-// RuleName is the name a suppression gives to keep a function in its shape, spelled as each engine's house rules are
+// RuleName is the name a suppression gives to keep a function in its shape, spelled as each language's house rules are
 // (policy/RuleNaming.json). It is a rule's name before it is a rule's: the gate on #faxsxch turns it into one, and a
 // suppression written for the report today is the one the gate reads.
 const (

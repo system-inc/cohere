@@ -31,14 +31,14 @@ func censusLines(test *testing.T, path string) []string {
 // writes none (#anfjtr3). The fixture's own package, whose mode file differs and which declares Mode, dependent on
 // windows, is in the set for its files and its declarations, and so is os, whose PathSeparator windows declares in a
 // file of its own. The whole set is the one the library's own judgment of the same two loads gives, every package of
-// its difference and every package declaring a dependent object, less the host's alone, though the engine judged the
+// its difference and every package declaring a dependent object, less the host's alone, though cohere-go judged the
 // standard library on a graph of its own. Nothing was answered wide. A run without the census keeps no set.
 func TestEachBuildWritesItsMustCheckSet(test *testing.T) {
 	test.Parallel()
 
 	census := test.TempDir()
 	root := copyFixture(test, filepath.Join("testdata", "build-dependence"))
-	on, _ := runOverConfigured(test, root, exitClean, func(engine *pipeline) { engine.mustCheckCensus = census },
+	on, _ := runOverConfigured(test, root, exitClean, func(pipeline *pipeline) { pipeline.mustCheckCensus = census },
 		"--no-cache", "--build-dependence")
 	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
 		"--build-dependence")
@@ -106,12 +106,12 @@ func TestARepeatedConstSpecsReaderIsInTheSet(test *testing.T) {
 		{"build dependence", []string{"--no-cache", "--no-system-cache", "--build-dependence"}},
 	} {
 		census := test.TempDir()
-		engine, _ := runOverConfigured(test, copyFixture(test, fixture), exitClean,
-			func(engine *pipeline) { engine.mustCheckCensus = census }, path.flags...)
-		if len(engine.buildRuns) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
-			test.Fatalf("%s: want the host's build and windows's, got %d runs", path.name, len(engine.buildRuns))
+		pipeline, _ := runOverConfigured(test, copyFixture(test, fixture), exitClean,
+			func(pipeline *pipeline) { pipeline.mustCheckCensus = census }, path.flags...)
+		if len(pipeline.buildRuns) != 2 || pipeline.buildRuns[1].build.OperatingSystem != "windows" {
+			test.Fatalf("%s: want the host's build and windows's, got %d runs", path.name, len(pipeline.buildRuns))
 		}
-		lines := censusLines(test, filepath.Join(census, buildFileStem(engine.buildRuns[1].build)+".txt"))
+		lines := censusLines(test, filepath.Join(census, buildFileStem(pipeline.buildRuns[1].build)+".txt"))
 		if !slices.Contains(lines, want) {
 			test.Errorf("%s: want the line %q in the windows build's set, got %q", path.name, want, lines)
 		}

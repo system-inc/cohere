@@ -5,7 +5,7 @@
 // evaluating the utility, which is what lets `utilities.ts` (6,827 lines, most of it computing
 // values `getPropertySort` never reads) collapse to a few hundred rows.
 //
-// The claim was measured before any of this was written, against the shipped engine on two
+// The claim was measured before any of this was written, against the shipped Tailwind on two
 // repositories: 37,625 of 37,643 registry classes, every sampled modifier class, and 132,199 of
 // 132,203 arbitrary probes over 327 roots and 527 value shapes. See
 // `internal/lint/rules/tailwind/tools/generate_descriptors/README.md`, which is the specification this file implements.
@@ -67,7 +67,7 @@
 //
 // It is worth stating plainly because of how it failed. Every one of those 647 still produced a
 // well-formed reading, the table got 45 KB smaller, and the only symptom was that `font-bold` read
-// `[284]#1` instead of `[288]#2`. Nothing but a comparison against the engine over the whole
+// `[284]#1` instead of `[288]#2`. Nothing but a comparison against Tailwind over the whole
 // registry would have found it, which is why this package is tested that way rather than against
 // its own expectations. See AxisReadings.ByNamespace.
 package tailwind
@@ -102,7 +102,7 @@ var themedModifierValues = map[string]bool{"none": true}
 //
 // A nil modifier is absent, which is the spelling the candidate parser uses and the reason this
 // takes a pointer. A named modifier is themed only when it is in the set above; an arbitrary one
-// never is, because `/[none]` is a bracketed value that happens to spell a theme key and the engine
+// never is, because `/[none]` is a bracketed value that happens to spell a theme key and Tailwind
 // does not consult the theme for it.
 func ModifierAxisFor(modifier *ParsedModifier) ModifierAxis {
 	if modifier == nil {
@@ -137,7 +137,7 @@ var colorKeywords = map[string]bool{"current": true, "inherit": true, "transpare
 type Descriptor struct {
 	// Root is the utility root, such as `bg` or `slide-in-from-top`.
 	Root string
-	// TypeList is the root's own type list, in the engine's order.
+	// TypeList is the root's own type list, in Tailwind's order.
 	//
 	// The order is the first refinement above and it is carried, never derived. `InferDataType`
 	// returns the first match, so re-sorting this list changes readings: `bg` puts `position` before

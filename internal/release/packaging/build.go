@@ -63,7 +63,7 @@ type Options struct {
 	// is not supported is an unsigned release that looks signed, so the state is always reported.
 	Signing Signing
 
-	// SwiftScratchDirectory is where SwiftPM builds the Swift engine. Empty means the user cache
+	// SwiftScratchDirectory is where SwiftPM builds cohere-swift. Empty means the user cache
 	// directory's cohere/release-swift-build, so a second release on one machine builds incrementally.
 	// Never inside OutputDirectory: the scratch is over a gigabyte, and everything in the output is
 	// packed into the artifact every proof downloads.
@@ -102,21 +102,21 @@ type StagedPackage struct {
 // MinimumReleaseCommit is the oldest cohere commit a release may be built from.
 //
 // It is `1bd41fb1`, where formatting options started coming only from CohereSettings.json's format
-// block. An engine from before it does not know that block, and in a repository whose package.json
+// block. A binary from before it does not know that block, and in a repository whose package.json
 // no longer has a prettier key it formats silently with Prettier's defaults rather than failing:
 // one printed 2-space indentation over api's GraphQL. A repository that pins a published version
-// gets that version's engine and nothing newer can intervene, so the only place to stop it is here,
+// gets that version's binary and nothing newer can intervene, so the only place to stop it is here,
 // before it is published.
 //
 // A launcher check was considered and rejected. Platform packages are pinned to the launcher's
-// exact version, so a normal install never pairs a new launcher with an old engine, and an old
+// exact version, so a normal install never pairs a new launcher with an old binary, and an old
 // published version carries an old launcher that no check written later can reach.
 //
 // Written out in full because an abbreviated hash is only unambiguous for the history it was
 // abbreviated against.
 const MinimumReleaseCommit = "1bd41fb1bdb465f4453c472bcb1e17da5d2d6cf1"
 
-const minimumReleaseReason = "older engines ignore CohereSettings.json's format block and format with Prettier's defaults"
+const minimumReleaseReason = "older binaries ignore CohereSettings.json's format block and format with Prettier's defaults"
 
 // Build stages every platform package and the dispatcher package.
 //
@@ -291,7 +291,7 @@ func buildPlatformPackage(
 		return StagedPackage{}, cohereBinaryError
 	}
 
-	// The Swift engine, beside cohere in the same bin/, on the platforms that ship it. A released cohere
+	// cohere-swift, beside cohere in the same bin/, on the platforms that ship it. A released cohere
 	// looks for it there and nowhere else, so a package missing it is a broken package, not a smaller
 	// one: the build fails rather than staging without it.
 	executables := []string{binaryPath}
@@ -430,7 +430,7 @@ func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, e
 	return StagedPackage{Name: DispatcherPackageName, Directory: directory}, nil
 }
 
-// swiftScratchDirectory resolves where SwiftPM builds the engine, and refuses a directory inside the
+// swiftScratchDirectory resolves where SwiftPM builds cohere-swift, and refuses a directory inside the
 // output, which the release packs and uploads whole: 1.3 GB of scratch beside 200 MB of packages, measured
 // on a full staging when the scratch was `<output>/.swift-build`.
 func swiftScratchDirectory(options Options) (string, error) {
@@ -438,7 +438,7 @@ func swiftScratchDirectory(options Options) (string, error) {
 	if scratch == "" {
 		cache, userCacheDirectoryError := os.UserCacheDir()
 		if userCacheDirectoryError != nil {
-			return "", fmt.Errorf("finding a cache directory for the Swift engine's build: %w", userCacheDirectoryError)
+			return "", fmt.Errorf("finding a cache directory for cohere-swift's build: %w", userCacheDirectoryError)
 		}
 		scratch = filepath.Join(cache, "cohere", "release-swift-build")
 	}
@@ -455,7 +455,7 @@ func swiftScratchDirectory(options Options) (string, error) {
 		scratch,
 	); relativePathError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf(
-			"the Swift engine's build directory %s is inside the output %s, which is packed and uploaded whole",
+			"cohere-swift's build directory %s is inside the output %s, which is packed and uploaded whole",
 			scratch,
 			output,
 		)

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Standing keys, in a pass's ResultOf, the package's StandingBodies, which the engine's checker hands every pass on a
+// Standing keys, in a pass's ResultOf, the package's StandingBodies, which cohere-go's checker hands every pass on a
 // package when its checker.Options.Standing is this key and its Options.StandingBodies answers for the package
 // (#e4rd5dw): the function declarations an extra build leaves to the host there, whose bodies a confined rule never
 // hears and whose findings it reports from the host's as its own. It lives beside Inherited, the same seam one level
@@ -67,7 +67,7 @@ type StandingSpan struct {
 // StandingSpans is each standing function declaration of pass's package, by its token file and sorted by where it
 // starts, from the package's StandingBodies, which the checker hands pass under Standing. A dispatcher reads them
 // once as it starts, for every listener. A pass without a StandingBodies, the host's and any driver's but the
-// engine's, has none, and neither has a package nothing stands in. A parsed file whose bodies are asked under a name
+// checker's, has none, and neither has a package nothing stands in. A parsed file whose bodies are asked under a name
 // another parsed file of the package asks its own under too has none either (sharingAName), so it lints whole.
 func StandingSpans(pass *analysis.Pass) map[*token.File][]StandingSpan {
 	standing, stands := pass.ResultOf[Standing].(StandingBodies)

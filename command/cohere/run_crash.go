@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // runCrash is a rule that could not finish a file, or a file nothing could check, because cohere crashed.
 //
@@ -13,21 +16,21 @@ type runCrash struct {
 	// Rule is the rule that crashed, empty when the whole file was lost.
 	Rule  string `json:"rule,omitempty"`
 	Cause string `json:"cause"`
-	// Engine names the contract engine that could not finish the file, as a reader says it ("Swift", "Go"),
-	// and is empty for a TypeScript crash. Such a crash's Cause is the engine's own sentence, and it is never a
-	// panic of cohere's: the Swift engine reports a file its typed rules had no index for, the Go engine a rule
+	// Language names the contract child's language that could not finish the file, as a reader says it ("Swift", "Go"),
+	// and is empty for a TypeScript crash. Such a crash's Cause is the child's own sentence, and it is never a
+	// panic of cohere's: cohere-swift reports a file its typed rules had no index for, cohere-go a rule
 	// that failed on a package, and each says which rule it cost while every other rule ran. Wrapping that in
 	// cohere's crash words would say nothing was checked and call it a bug to report, so message says the
-	// engine's sentence instead. Kept out of `--json`, where the cause already is that sentence.
-	Engine string `json:"-"`
+	// child's sentence instead. Kept out of `--json`, where the cause already is that sentence.
+	Language string `json:"-"`
 }
 
 // message says what crashed, that it is cohere's bug, what is missing because of it, and where to report it.
-// For a file a contract engine could not finish, it says the engine's sentence, which already names what is
+// For a file a contract child could not finish, it says the child's sentence, which already names what is
 // missing.
 func (crash runCrash) message() string {
-	if crash.Engine != "" {
-		return "the " + crash.Engine + " engine could not finish this file: " + crash.Cause
+	if crash.Language != "" {
+		return "cohere-" + strings.ToLower(crash.Language) + " could not finish this file: " + crash.Cause
 	}
 	what := fmt.Sprintf("cohere's rule %s crashed on this file (%s). This is a bug in cohere, not in your code: "+
 		"the rule's verdict on this file is missing, and the file's other rules ran.", crash.Rule, crash.Cause)

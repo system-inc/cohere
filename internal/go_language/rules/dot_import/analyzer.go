@@ -1,17 +1,17 @@
 // Package dot_import is staticcheck's `ST1001`, an import with a dot for its name, which leaves a reader unable to
-// tell a name of the importing package from one of the imported, ported onto the engine's syntax dispatcher.
+// tell a name of the importing package from one of the imported, ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1001/st1001.go, whose message it reports
 // word for word, over the whole import, with no fix, as the original does, and withholds in a generated file as the
 // original's FilterGenerated does. Like the original, it leaves alone every import in a test file, internal or
 // external, and every import whose path the staticcheck.conf above the package lists in dot_import_whitelist, read
-// through the original's config analyzer as the engine runs it (staticcheck_configuration), which reads it under the
+// through the original's config analyzer as cohere-go runs it (staticcheck_configuration), which reads it under the
 // user's cache directory too, where the original's never does, a difference the parity fixtures record as dropped
 // (#sc5qmy7). The original reads only each file's imports and the configuration, as the port does, so neither builds
 // an intermediate representation.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package dot_import
 
 import (

@@ -27,9 +27,9 @@
 // compiling `px-4` needs the framework's utility handlers, which is `utilities.ts`, 6,827 lines,
 // and porting it had been rejected twice.
 //
-// That is no longer true. The handle bodies are ported across three files in the engine package,
-// and `DeclaredPropertiesFor` runs them, so a class's declared properties are computed the way the
-// engine computes them. The four tables, 1,183 entries and 62 KB, are deleted.
+// That is no longer true. The handle bodies are ported across three files in Tailwind package,
+// and `DeclaredPropertiesFor` runs them, so a class's declared properties are computed the way
+// Tailwind computes them. The four tables, 1,183 entries and 62 KB, are deleted.
 //
 // The shortcut this comment warned against is still the wrong one, and naming it is still worth the
 // space because it is the obvious move for anyone reading the emitters for the first time.
@@ -111,7 +111,7 @@ package tailwind
 import (
 	"strings"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // resolveClassFactsIn reads a class's four deciding facts against a live design system.
@@ -144,7 +144,7 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 	//
 	// This was four generated tables until #mz0m6k8: a static list, a root list, thirteen per-class
 	// overrides and fifteen colour arms. `DeclaredPropertiesFor` runs the ported handle bodies
-	// instead, so the answer follows from the value the way the engine's does and the three override
+	// instead, so the answer follows from the value the way Tailwind's does and the three override
 	// tables have nothing left to patch. The measurement that justified deleting them ran while both
 	// sides existed: 13 of 13 class overrides and 15 of 15 colour arms reproduced, and 839 of 839
 	// statics, with 8 declines that were this repository's own `@utility` blocks captured into a
@@ -153,7 +153,7 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 	// What this fixes rather than preserves is the blindness the tables had to a repository's own
 	// roots. A generated table knows the repository it was generated from, and 29 of ahra's roots
 	// and 27 of www-connected-app's were absent from it.
-	parsed := tailwindengine.ParseCandidate(className, designSystem.System)
+	parsed := tailwindcollapse.ParseCandidate(className, designSystem.System)
 	if len(parsed) == 0 {
 		return classFacts{}, false
 	}
@@ -161,7 +161,7 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 	// `gate.go:227` for the measurement that choice rests on.
 	candidate := parsed[0]
 
-	properties, canCompute := tailwindengine.DeclaredPropertiesFor(
+	properties, canCompute := tailwindcollapse.DeclaredPropertiesFor(
 		&candidate,
 		valueResolutionIn(base, &candidate, designSystem.System),
 	)
@@ -173,7 +173,7 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 	// and a functional class on its root, which is the same split the deleted tables made: `flex` is
 	// the static `display: flex` and also the root of `flex-4`, and one key cannot serve both.
 	shapeKey := base
-	if candidate.Kind == tailwindengine.ParsedCandidateKindFunctional {
+	if candidate.Kind == tailwindcollapse.ParsedCandidateKindFunctional {
 		shapeKey = candidate.Root
 	}
 
@@ -203,14 +203,14 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 // Returns false for a root no emitter answers, which is the same decline the property computation
 // makes for it, so the two stay consistent about which roots exist.
 func composesForRoot(root string) bool {
-	composes, _ := tailwindengine.ComposesFor(root)
+	composes, _ := tailwindcollapse.ComposesFor(root)
 	return composes
 }
 
 // valueResolutionIn asks this repository's theme what a class's value resolved through.
 //
 // The emitters need this and deliberately do not compute it: which keys are in `--color` or `--font`
-// is a fact about the repository's `@theme`, and answering it inside the engine's framework tables
+// is a fact about the repository's `@theme`, and answering it inside Tailwind's framework tables
 // would put one repository's tokens in a file describing Tailwind. So the question is asked here,
 // where a live design system is in hand.
 //
@@ -224,14 +224,14 @@ func composesForRoot(root string) bool {
 // 206 across both repositories.
 func valueResolutionIn(
 	base string,
-	candidate *tailwindengine.ParsedCandidate,
-	system *tailwindengine.LoadedDesignSystem,
-) tailwindengine.ValueResolution {
-	if candidate.Kind != tailwindengine.ParsedCandidateKindFunctional {
-		return tailwindengine.ValueResolution{}
+	candidate *tailwindcollapse.ParsedCandidate,
+	system *tailwindcollapse.LoadedDesignSystem,
+) tailwindcollapse.ValueResolution {
+	if candidate.Kind != tailwindcollapse.ParsedCandidateKindFunctional {
+		return tailwindcollapse.ValueResolution{}
 	}
 
-	resolution := tailwindengine.ValueResolution{
+	resolution := tailwindcollapse.ValueResolution{
 		IsColor: valueIsColorIn(base, candidate.Root, system),
 	}
 
@@ -239,7 +239,7 @@ func valueResolutionIn(
 	// a value that happens to name a font key change an unrelated root's answer, which is the shape
 	// of defect the bare-value precedence in `descriptor.go` exists to prevent.
 	if candidate.Root == "font" && candidate.Value != nil &&
-		candidate.Value.Kind == tailwindengine.ParsedValueKindNamed && system != nil {
+		candidate.Value.Kind == tailwindcollapse.ParsedValueKindNamed && system != nil {
 		if _, isFontKey := system.Theme().Get([]string{"--font-" + candidate.Value.Value}); isFontKey {
 			resolution.Namespace = "--font"
 		}
@@ -268,7 +268,7 @@ func repositoryClassFacts(
 		return classFacts{}, false
 	}
 
-	parsed := tailwindengine.ParseCandidate(className, designSystem.System)
+	parsed := tailwindcollapse.ParseCandidate(className, designSystem.System)
 	if len(parsed) == 0 {
 		return classFacts{}, false
 	}
@@ -323,13 +323,13 @@ func repositoryClassFacts(
 //
 // Returns false when the class reads as static or arbitrary, which the caller handles separately:
 // a static's properties are keyed on its whole name rather than on a root.
-func functionalRootIn(className string, system *tailwindengine.LoadedDesignSystem) (string, bool) {
-	parsed := tailwindengine.ParseCandidate(className, system)
+func functionalRootIn(className string, system *tailwindcollapse.LoadedDesignSystem) (string, bool) {
+	parsed := tailwindcollapse.ParseCandidate(className, system)
 	if len(parsed) == 0 {
 		return "", false
 	}
 	candidate := parsed[0]
-	if candidate.Kind != tailwindengine.ParsedCandidateKindFunctional {
+	if candidate.Kind != tailwindcollapse.ParsedCandidateKindFunctional {
 		return "", false
 	}
 	return candidate.Root, true
@@ -353,7 +353,7 @@ func functionalRootIn(className string, system *tailwindengine.LoadedDesignSyste
 // none of them, because it was generated from ahra. A generated palette is wrong for every
 // repository except the one it came from, which is the defect `KnownStatics` and
 // `StaticDeclaredProperties` were deleted for.
-func valueIsColorIn(base string, root string, system *tailwindengine.LoadedDesignSystem) bool {
+func valueIsColorIn(base string, root string, system *tailwindcollapse.LoadedDesignSystem) bool {
 	if len(base) <= len(root) {
 		return false
 	}
@@ -378,5 +378,5 @@ func valueIsColorIn(base string, root string, system *tailwindengine.LoadedDesig
 	}
 
 	// Tailwind's own colour keywords, which sit in no theme namespace and so cannot be asked for.
-	return tailwindengine.IsColorKeyword(value)
+	return tailwindcollapse.IsColorKeyword(value)
 }

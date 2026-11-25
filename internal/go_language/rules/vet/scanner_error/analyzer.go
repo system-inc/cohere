@@ -11,7 +11,7 @@
 // variable. The registry runs the port in the original's place, and the original stays the oracle: the parity tests
 // beside this file run both over the same packages. The two agree everywhere, so there is no differences fixture.
 //
-// The port sits on the engine's syntax dispatcher, hearing each call on the walk the dispatcher makes once for every
+// The port sits on cohere-go's syntax dispatcher, hearing each call on the walk the dispatcher makes once for every
 // syntax rule, with the call's cursor, which it reads where the call sits in its parent. Once the walk has covered the
 // package, it walks the identifiers for the scanners' uses on the dispatcher's own inspector, only in a package that
 // holds a scanner to judge, as before.

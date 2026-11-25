@@ -1,4 +1,4 @@
-// Package consistency_no_utils_file_name is the Go engine's rule that no file's name holds `util` or `utils` as a word:
+// Package consistency_no_utils_file_name is cohere-go's rule that no file's name holds `util` or `utils` as a word:
 // util.go, string_utils.go and util_test.go are each reported once, at the file's start (#2xt6v5r).
 //
 // A file named for nothing in particular collects whatever has no other home, which is what a folder of that name
@@ -37,7 +37,7 @@ var Analyzer = &analysis.Analyzer{
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It reads file names and the import path, which a load has
+// Rule is this rule's entry in cohere-go's registry. It reads file names and the import path, which a load has
 // before any type is checked, so it reads no type information.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
@@ -66,7 +66,7 @@ func run(pass *analysis.Pass) (any, error) {
 			continue
 		}
 		// A point at the file's start rather than a range, since the finding is about the file's name and no text
-		// inside the file is to blame, as every engine's folder finding is.
+		// inside the file is to blame, as every language's folder finding is.
 		pass.Report(analysis.Diagnostic{
 			Pos:      file.FileStart,
 			End:      file.FileStart,

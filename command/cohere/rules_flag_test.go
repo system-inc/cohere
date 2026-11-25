@@ -18,7 +18,7 @@ func TestRulesFlagListsEveryRegisteredRule(test *testing.T) {
 	binary := buildCohere(test)
 
 	// Run outside every project: this package's directory is inside cohere's own Go workspace, and `-rules`
-	// there lists the Go engine's rules, as it lists Swift's in a Swift package. This test is about the
+	// there lists cohere-go's rules, as it lists Swift's in a Swift package. This test is about the
 	// TypeScript registry, which a run in no project lists.
 	command := exec.Command(binary, "-rules")
 	command.Dir = test.TempDir()

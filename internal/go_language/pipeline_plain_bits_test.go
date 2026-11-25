@@ -66,23 +66,23 @@ func TestAPlainRunsBitsJudgeEachBuildAsTheWholeGraph(test *testing.T) {
 		root    func(test *testing.T) string
 		exit    int
 		inSet   string
-		builtIn func(engine *pipeline) bool
+		builtIn func(pipeline *pipeline) bool
 	}{
 		{"build-dependence", func(test *testing.T) string {
 			return copyFixture(test, filepath.Join("testdata", "build-dependence"))
-		}, exitClean, dependenceModule + "\tFiles,Declares", func(engine *pipeline) bool {
-			return engine.buildRuns[1].build.OperatingSystem == "windows"
+		}, exitClean, dependenceModule + "\tFiles,Declares", func(pipeline *pipeline) bool {
+			return pipeline.buildRuns[1].build.OperatingSystem == "windows"
 		}},
 		{"withheld under a tag", withheldUnderATagFixture, exitClean, "example.com/dependency/d\tDeclares",
-			func(engine *pipeline) bool {
-				return slices.Equal(engine.buildRuns[1].build.Tags, []string{"purego"})
+			func(pipeline *pipeline) bool {
+				return slices.Equal(pipeline.buildRuns[1].build.Tags, []string{"purego"})
 			}},
 	} {
 		test.Run(fixture.name, func(test *testing.T) {
 			test.Parallel()
 
 			census := func(directory string) func(*pipeline) {
-				return func(engine *pipeline) { engine.mustCheckCensus = directory }
+				return func(pipeline *pipeline) { pipeline.mustCheckCensus = directory }
 			}
 			reference := test.TempDir()
 			whole, _ := runOverConfigured(test, fixture.root(test), fixture.exit, census(reference), "--no-cache",
@@ -106,18 +106,18 @@ func TestAPlainRunsBitsJudgeEachBuildAsTheWholeGraph(test *testing.T) {
 			// the three compare.
 			normalized := func(configure func(*pipeline), extra ...string) (*pipeline, string) {
 				root := fixture.root(test)
-				engine, stream := runOverConfigured(test, root, fixture.exit, configure, extra...)
-				return engine, normalize(stream, root)
+				pipeline, stream := runOverConfigured(test, root, fixture.exit, configure, extra...)
+				return pipeline, normalize(stream, root)
 			}
 			beside, besideStream := normalized(census(besideDirectory), "--no-cache", "--no-system-cache")
 			stored, storedStream := normalized(census(storedDirectory), "--no-system-cache")
 			off, offStream := normalized(nil, "--no-cache", "--no-system-cache")
 			for _, plain := range []struct {
 				name      string
-				engine    *pipeline
+				pipeline  *pipeline
 				directory string
 			}{{"beside the load", beside, besideDirectory}, {"with a cold store", stored, storedDirectory}} {
-				if plain.engine.plainBits == nil {
+				if plain.pipeline.plainBits == nil {
 					test.Errorf("%s: want the plain run's bits, got none", plain.name)
 				}
 				if got := censusFiles(test, plain.directory); !maps.Equal(got, want) {
@@ -148,7 +148,7 @@ func TestAPlainRunsDeclarationsRecordsStandInTheStore(test *testing.T) {
 
 	reference := test.TempDir()
 	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
-		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		func(pipeline *pipeline) { pipeline.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
 		"--build-dependence")
 	want := censusFiles(test, reference)
 
@@ -157,17 +157,17 @@ func TestAPlainRunsDeclarationsRecordsStandInTheStore(test *testing.T) {
 	backfilledDirectory, warmDirectory := test.TempDir(), test.TempDir()
 	var steps []declarationsStep
 	var stepsLock sync.Mutex
-	_, backfilledStream := runOverConfigured(test, root, exitClean, func(engine *pipeline) {
-		engine.mustCheckCensus = backfilledDirectory
+	_, backfilledStream := runOverConfigured(test, root, exitClean, func(pipeline *pipeline) {
+		pipeline.mustCheckCensus = backfilledDirectory
 		// The hook is called from the builds' goroutines too.
-		engine.declarationsSteps = func(step declarationsStep) {
+		pipeline.declarationsSteps = func(step declarationsStep) {
 			stepsLock.Lock()
 			defer stepsLock.Unlock()
 			steps = append(steps, step)
 		}
 	}, "--no-system-cache")
 	_, warmStream := runOverConfigured(test, root, exitClean,
-		func(engine *pipeline) { engine.mustCheckCensus = warmDirectory }, "--no-system-cache")
+		func(pipeline *pipeline) { pipeline.mustCheckCensus = warmDirectory }, "--no-system-cache")
 
 	if want := []declarationsStep{declarationsWalksWhole, declarationsRecordsWriting}; len(steps) < len(want) ||
 		!slices.Equal(steps[:len(want)], want) {
@@ -205,17 +205,17 @@ func TestAPlainRunsStandardLibraryRecordsStandInTheSystemCache(test *testing.T) 
 
 	reference := test.TempDir()
 	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")), exitClean,
-		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		func(pipeline *pipeline) { pipeline.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
 		"--build-dependence")
 	want := censusFiles(test, reference)
 	censusRun := func(systemCache string) (*pipeline, map[string]string) {
 		directory := test.TempDir()
-		engine, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")),
-			exitClean, func(engine *pipeline) {
-				sharingSystemCache(systemCache)(engine)
-				engine.mustCheckCensus = directory
+		pipeline, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence")),
+			exitClean, func(pipeline *pipeline) {
+				sharingSystemCache(systemCache)(pipeline)
+				pipeline.mustCheckCensus = directory
 			}, "--no-cache")
-		return engine, censusFiles(test, directory)
+		return pipeline, censusFiles(test, directory)
 	}
 
 	checkedCache, filledCache := test.TempDir(), test.TempDir()
@@ -278,7 +278,7 @@ func TestEachBuildIsJudgedAtItsRestore(test *testing.T) {
 	fixture := filepath.Join("testdata", "build-dependence-embedded")
 	reference := test.TempDir()
 	whole, _ := runOverConfigured(test, copyFixture(test, fixture), exitClean,
-		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		func(pipeline *pipeline) { pipeline.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
 		"--build-dependence")
 	if len(whole.buildRuns) != 2 || whole.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(whole.buildRuns))
@@ -301,11 +301,11 @@ func TestEachBuildIsJudgedAtItsRestore(test *testing.T) {
 	}
 
 	census := func(directory string, configure func(*pipeline)) func(*pipeline) {
-		return func(engine *pipeline) {
+		return func(pipeline *pipeline) {
 			if configure != nil {
-				configure(engine)
+				configure(pipeline)
 			}
-			engine.mustCheckCensus = directory
+			pipeline.mustCheckCensus = directory
 		}
 	}
 	systemCache, storedRoot := test.TempDir(), copyFixture(test, fixture)
@@ -366,9 +366,9 @@ func TestABuildsJudgmentWaitsForTheWholeGraph(test *testing.T) {
 	listed := make(chan struct{})
 	var listedOnce sync.Once
 	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "build-dependence-embedded")), exitClean,
-		func(engine *pipeline) {
-			engine.mustCheckCensus = test.TempDir()
-			engine.declarationsSteps = func(step declarationsStep) {
+		func(pipeline *pipeline) {
+			pipeline.mustCheckCensus = test.TempDir()
+			pipeline.declarationsSteps = func(step declarationsStep) {
 				if step == declarationsReady {
 					// Held, with no lock, until the build has listed: waiting there, or judging already.
 					<-listed
@@ -418,7 +418,7 @@ func TestAPackageInNoGraphIsInTheSet(test *testing.T) {
 
 	reference := test.TempDir()
 	whole, _ := runOverConfigured(test, bufferedFixture(test), exitClean,
-		func(engine *pipeline) { engine.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
+		func(pipeline *pipeline) { pipeline.mustCheckCensus = reference }, "--no-cache", "--no-system-cache",
 		"--build-dependence")
 	if len(whole.buildRuns) != 2 || whole.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(whole.buildRuns))
@@ -434,10 +434,10 @@ func TestAPackageInNoGraphIsInTheSet(test *testing.T) {
 	filledCache, census := test.TempDir(), test.TempDir()
 	runOverConfigured(test, bufferedFixture(test), exitClean, sharingSystemCache(filledCache), "--no-cache")
 	refused := errors.New("the side load is refused")
-	plain, _ := runOverConfigured(test, bufferedFixture(test), exitClean, func(engine *pipeline) {
-		sharingSystemCache(filledCache)(engine)
-		engine.mustCheckCensus = census
-		engine.sideLoadRefused = refused
+	plain, _ := runOverConfigured(test, bufferedFixture(test), exitClean, func(pipeline *pipeline) {
+		sharingSystemCache(filledCache)(pipeline)
+		pipeline.mustCheckCensus = census
+		pipeline.sideLoadRefused = refused
 	}, "--no-cache")
 	if plain.plainBits == nil || !errors.Is(plain.plainBits.sideLoadProblem, refused) {
 		test.Fatal("want the plain run's side load refused")

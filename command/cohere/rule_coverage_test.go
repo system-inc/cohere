@@ -140,12 +140,12 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	}
 
 	// The Swift record's parts add up to its whole the same way.
-	swift, classifyEngineCoverageError := classifyEngineCoverage(&engineLintRecord{
+	swift, classifyContractCoverageError := classifyContractCoverage(&contractLintRecord{
 		RulesRun: 9, RulesWatchedAndQuiet: 3, RulesSilent: []string{"a", "b", "c"},
 		RulesNotConfigured: []string{"a"}, RulesScopedOff: map[string]int{"b": 2, "quiet-but-partly-off": 1},
 	}, swiftLanguage)
-	if classifyEngineCoverageError != nil {
-		test.Fatal(classifyEngineCoverageError)
+	if classifyContractCoverageError != nil {
+		test.Fatal(classifyContractCoverageError)
 	}
 	if swift.total() != 9 || swift.count(coverageFoundSomething) != 3 {
 		test.Fatalf(
@@ -160,12 +160,13 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 // counted line would state arithmetic nobody can vouch for.
 func TestSwiftCoverageRefusesPartsLargerThanTheWhole(test *testing.T) {
 	test.Parallel()
-	_, classifyEngineCoverageError := classifyEngineCoverage(
-		&engineLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}},
+	_, classifyContractCoverageError := classifyContractCoverage(
+		&contractLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}},
 		swiftLanguage,
 	)
-	if classifyEngineCoverageError == nil || !strings.Contains(classifyEngineCoverageError.Error(), "more than that") {
-		test.Fatalf("a record counting 3 rules among 2 was accepted: %v", classifyEngineCoverageError)
+	if classifyContractCoverageError == nil ||
+		!strings.Contains(classifyContractCoverageError.Error(), "more than that") {
+		test.Fatalf("a record counting 3 rules among 2 was accepted: %v", classifyContractCoverageError)
 	}
 }
 
@@ -404,7 +405,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 	// Not parallel: it drives the Swift record stream through renderRecords, whose acceptors set the package-level
 	// activeSummary
 	test.Run("unreadable files", func(test *testing.T) {
-		output, _, renderError := renderRecords(test, engineModeCheck, contractFixture(test, "Unreadable.jsonl"), 1)
+		output, _, renderError := renderRecords(test, contractModeCheck, contractFixture(test, "Unreadable.jsonl"), 1)
 		if renderError != nil {
 			test.Fatal(renderError)
 		}
@@ -865,12 +866,12 @@ func TestARuleThatSkippedSomeFilesStillNeedsActionForTheRest(test *testing.T) {
 
 // TestAGoOffReadsItsReasonInCoverage: a rule the Go settings turn off reads in coverage with the reason its go block
 // gave, as a TypeScript off does, and one turned off with no reason is marked so, which only a project outside our
-// tiers can have (#v11k0g2). A record with no offReasons, a Swift engine's, marks neither: it never explains its offs.
+// tiers can have (#v11k0g2). A record with no offReasons, cohere-swift's, marks neither: it never explains its offs.
 func TestAGoOffReadsItsReasonInCoverage(test *testing.T) {
 	test.Parallel()
-	entryOf := func(record *engineLintRecord, name string) ruleCoverageEntry {
+	entryOf := func(record *contractLintRecord, name string) ruleCoverageEntry {
 		test.Helper()
-		summary, classifyError := classifyEngineCoverage(record, goLanguage("module"))
+		summary, classifyError := classifyContractCoverage(record, goLanguage("module"))
 		if classifyError != nil {
 			test.Fatal(classifyError)
 		}
@@ -882,8 +883,8 @@ func TestAGoOffReadsItsReasonInCoverage(test *testing.T) {
 		test.Fatalf("no coverage entry for %s in %+v", name, summary.Entries)
 		return ruleCoverageEntry{}
 	}
-	offRecord := func(offReasons map[string]string) *engineLintRecord {
-		return &engineLintRecord{
+	offRecord := func(offReasons map[string]string) *contractLintRecord {
+		return &contractLintRecord{
 			RulesRun: 2, RulesSilent: []string{"reasoned", "unreasoned"},
 			RulesScopedOff: map[string]int{"reasoned": 4, "unreasoned": 4}, OffReasons: offReasons,
 		}
@@ -895,9 +896,9 @@ func TestAGoOffReadsItsReasonInCoverage(test *testing.T) {
 		test.Errorf("the reasoned off reads %+v, want its reason beside it", reasoned)
 	}
 	if unreasoned := entryOf(explained, "unreasoned"); !unreasoned.OffWithoutReason {
-		test.Errorf("an off with no reason from an engine that explains its offs is not marked: %+v", unreasoned)
+		test.Errorf("an off with no reason from a child that explains its offs is not marked: %+v", unreasoned)
 	}
 	if swift := entryOf(offRecord(nil), "unreasoned"); swift.OffWithoutReason {
-		test.Errorf("an off from an engine that never explains its offs is marked as having no reason: %+v", swift)
+		test.Errorf("an off from a child that never explains its offs is marked as having no reason: %+v", swift)
 	}
 }

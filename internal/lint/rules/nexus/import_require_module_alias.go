@@ -132,7 +132,7 @@ func messageRequireNamespaceStyle(source string, expected string) rule.Message {
 // The style fix has the same defect and no guard at all in the original: rewriting `* as ts` to
 // `TypeScript` changes the binding name in the same stroke, so every existing `ts.` reference in the
 // file dangles. Porting the fix would be shipping a rewrite that compiles to a broken file, and the
-// edit engine's parse guard cannot catch it, since the corrupted output still parses.
+// fix pass's parse guard cannot catch it, since the corrupted output still parses.
 //
 // The repair is a rename, which an editor does correctly with the whole file in view. The rule's
 // job here is to say which name and which form, and to say why.

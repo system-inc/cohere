@@ -32,7 +32,7 @@ var goAnswersModules = map[string]map[string]string{
 // A go env answer kept for one workspace and moved to another holding the same files under the same key is, field by
 // field, the whole `go env -json` go env answers there (#2htryg8): over a module and over a go.work, from a copy to
 // another copy deeper below another directory. A field go env answers otherwise on each ask in one place, as
-// `GOGCCFLAGS`, which names a build directory of its own each time, is one the engine never asks (goEnvironmentNames),
+// `GOGCCFLAGS`, which names a build directory of its own each time, is one cohere-go never asks (goEnvironmentNames),
 // and every other field matches. A copy whose go.mod differs keys apart.
 func TestAKeptGoEnvironmentMovedToAnotherWorkspaceIsWhatGoEnvironmentAnswersThere(test *testing.T) {
 	test.Parallel()
@@ -84,7 +84,7 @@ func TestAKeptGoEnvironmentMovedToAnotherWorkspaceIsWhatGoEnvironmentAnswersTher
 			for _, field := range names {
 				if first[field] != again[field] {
 					if slices.Contains(goEnvironmentNames, field) {
-						test.Errorf("go env answers %s otherwise on each ask, and the engine asks it", field)
+						test.Errorf("go env answers %s otherwise on each ask, and cohere-go asks it", field)
 					}
 					continue
 				}

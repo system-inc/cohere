@@ -278,7 +278,7 @@ func reportArrowBodyStyleWantingNoBraces(
 
 	fixes := arrowBodyStyleRemoveBracesFixes(ruleContext, node, body, blockBody)
 	if len(fixes) == 0 {
-		// Upstream's fixer returns an empty edit list rather than declining, which the engine
+		// Upstream's fixer returns an empty edit list rather than declining, which the linter
 		// treats as no fix. Reproduced as reporting with no repair, which is what its corpus
 		// records as `output: null`.
 		ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, body), message)
@@ -357,16 +357,16 @@ func arrowBodyStyleRemoveBracesFixes(
 
 	// # Every parenthesis rides inside a removal, and none is its own insertion
 	//
-	// The engine treats two edits sharing a boundary as an overlap and drops one of them, and a
+	// The fix pass treats two edits sharing a boundary as an overlap and drops one of them, and a
 	// zero-width insertion at the edge of a removal is exactly that shape. Emitting `(` as its own
 	// edit at the value's start, beside a removal ending there, silently lost the parenthesis in
 	// the real fix phase while `ExpectFixedSource` applied both and went green -- so `() => {
 	// return { a: 1 }; }` was rewritten to `() => { a: 1 }`, which parses as a labelled block and
-	// means something else entirely. Found by running the fix engine over a seeded tree; nothing in
+	// means something else entirely. Found by running the fix pass over a seeded tree; nothing in
 	// the 87-case corpus could see it.
 	//
 	// So each parenthesis is carried as the replacement text of the removal it sits against, which
-	// makes the whole repair a set of disjoint replacements the engine cannot split up.
+	// makes the whole repair a set of disjoint replacements the fix pass cannot split up.
 	var fixes []rule.Fix
 	// A comment anywhere in the ceremony has to survive, so only the tokens themselves are removed
 	// and the whitespace around them is left in place. Without a comment the whitespace goes too,
@@ -450,7 +450,7 @@ func reportArrowBodyStyleWantingBraces(ruleContext rule.Context, node *ast.Node,
 
 		// The closing parenthesis is deleted and a closing brace is appended, and in the common
 		// shape `() => ({x: 1})` those two edits meet: the parenthesis is the last token, so its
-		// removal ends exactly where the brace would be inserted. The engine reads a shared
+		// removal ends exactly where the brace would be inserted. The fix pass reads a shared
 		// boundary as an overlap and drops one of the pair, which silently threw away the entire
 		// repair -- measured by running the fix phase over a seeded tree and watching nothing
 		// change. Merged into one replacement when they touch, kept apart when they do not, which

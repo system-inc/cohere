@@ -35,7 +35,7 @@ var (
 )
 
 // messageIdentifierCasing renders a finding's message. A name opening on an underscore is told about the
-// underscore, whatever casing its suggestion takes, as the Go and Swift engines tell it, since that is
+// underscore, whatever casing its suggestion takes, as cohere-go and cohere-swift tell it, since that is
 // what the name chose and the advice removes.
 func messageIdentifierCasing(
 	text policy.MessageHandle,
@@ -56,7 +56,7 @@ func messageIdentifierCasing(
 }
 
 // ConsistencyRequireIdentifierCasing spells values in lowerCamelCase and types in UpperCamelCase, at the
-// declaration, which is what the Go and Swift engines already judge (#h97gacx, the text rules' casing
+// declaration, which is what cohere-go and cohere-swift already judge (#h97gacx, the text rules' casing
 // family).
 //
 //	valid:   function sum(firstValue: number) { let runningTotal = firstValue }
@@ -96,7 +96,7 @@ func messageIdentifierCasing(
 //     decorator, as Base's `Inject*` and `With*` are;
 //   - a constructor: a function the file calls with `new`, or one that assigns properties of `this`.
 //
-// A leading underscore is flagged on every name this rule judges, as the Go and Swift engines flag it
+// A leading underscore is flagged on every name this rule judges, as cohere-go and cohere-swift flag it
 // (Kirk, 2026-11-06, #4b337jk, case us05), and so is a trailing one, which both of them report too:
 // `_cache` is told `cache`, `__meta__` `meta` and `event_` `event`. The underscore is a convention for
 // private or for unused, and TypeScript says private with `#` or `private`, which the compiler checks,

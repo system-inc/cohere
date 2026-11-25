@@ -28,7 +28,7 @@ func honestRecord() Record {
 			Round:          1,
 			VerdictSeconds: 0.11,
 			SettledSeconds: 0.2,
-			EngineSeconds:  0.08,
+			SummarySeconds: 0.08,
 			LoadBefore:     6,
 			LoadAfter:      6,
 			IdleBefore:     96,
@@ -40,7 +40,7 @@ func honestRecord() Record {
 			Round:          1,
 			VerdictSeconds: 0.7,
 			SettledSeconds: 0.9,
-			EngineSeconds:  0.65,
+			SummarySeconds: 0.65,
 			LoadBefore:     3,
 			LoadAfter:      5,
 			IdleBefore:     95,
@@ -52,7 +52,7 @@ func honestRecord() Record {
 			Round:          1,
 			VerdictSeconds: 1.8,
 			SettledSeconds: 2.1,
-			EngineSeconds:  1.75,
+			SummarySeconds: 1.75,
 			LoadBefore:     3.5,
 			LoadAfter:      4,
 			IdleBefore:     92,
@@ -64,7 +64,7 @@ func honestRecord() Record {
 			Round:          2,
 			VerdictSeconds: 0.1,
 			SettledSeconds: 0.2,
-			EngineSeconds:  0.07,
+			SummarySeconds: 0.07,
 			LoadBefore:     1,
 			LoadAfter:      1.5,
 			IdleBefore:     97,
@@ -76,7 +76,7 @@ func honestRecord() Record {
 			Round:          2,
 			VerdictSeconds: 0.68,
 			SettledSeconds: 0.8,
-			EngineSeconds:  0.62,
+			SummarySeconds: 0.62,
 			LoadBefore:     2,
 			LoadAfter:      2,
 			IdleBefore:     80,
@@ -88,7 +88,7 @@ func honestRecord() Record {
 			Round:          2,
 			VerdictSeconds: 1.9,
 			SettledSeconds: 2.2,
-			EngineSeconds:  1.85,
+			SummarySeconds: 1.85,
 			LoadBefore:     2,
 			LoadAfter:      2.5,
 			IdleBefore:     89.9,
@@ -152,7 +152,7 @@ func coldOnlyRecord() Record {
 				Round:          round + 1,
 				VerdictSeconds: seconds,
 				SettledSeconds: seconds + 0.04,
-				EngineSeconds:  seconds - 0.01,
+				SummarySeconds: seconds - 0.01,
 				LoadBefore:     4,
 				LoadAfter:      5,
 				IdleBefore:     95,
@@ -202,25 +202,25 @@ func TestAColdOnlyRecordThatStoppedEarlyValidates(test *testing.T) {
 	}
 }
 
-// A run narrowed to the Go engine is a record of its own: it validates with the Go settings it saw, it
+// A run narrowed to cohere-go is a record of its own: it validates with the Go settings it saw, it
 // takes a file name the same day's whole-root record of the same commit and machine never takes, and it
 // reads back, through Read, with what it said. A record without either field, as every record written before
 // them, still validates and keeps the name it had.
-func TestARecordNarrowedToOneEngineIsNamedApart(test *testing.T) {
+func TestARecordNarrowedToOneProjectKindIsNamedApart(test *testing.T) {
 	test.Parallel()
 	whole := coldOnlyRecord()
 	narrowed := coldOnlyRecord()
-	narrowed.Engine = EngineGo
+	narrowed.ProjectKind = ProjectKindGoModule
 	narrowed.GoEnvironment = &GoEnvironment{Gogc: "200", Gomaxprocs: "8"}
 	for _, record := range []Record{whole, narrowed} {
 		if validateError := Validate(record); validateError != nil {
-			test.Fatalf("engine %q: %v", record.Engine, validateError)
+			test.Fatalf("project kind %q: %v", record.ProjectKind, validateError)
 		}
 	}
 	if got := FileName(whole); got != "2026-10-05-aaaaaaaaaaaa-mac16-5.json" {
 		test.Errorf("the whole-root record is named %s", got)
 	}
-	if got := FileName(narrowed); got != "2026-10-05-aaaaaaaaaaaa-mac16-5-go.json" {
+	if got := FileName(narrowed); got != "2026-10-05-aaaaaaaaaaaa-mac16-5-gomodule.json" {
 		test.Errorf("the Go record is named %s", got)
 	}
 
@@ -238,9 +238,9 @@ func TestARecordNarrowedToOneEngineIsNamedApart(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	// Read sorts by file name, and `-go.json` sorts before `.json`, so the narrowed record reads first.
-	if len(records) != 2 || records[0].Engine != EngineGo || records[1].Engine != "" {
-		test.Fatalf("read back %d records, engines %q", len(records), engineNames(records))
+	// Read sorts by file name, and `-gomodule.json` sorts before `.json`, so the narrowed record reads first.
+	if len(records) != 2 || records[0].ProjectKind != ProjectKindGoModule || records[1].ProjectKind != "" {
+		test.Fatalf("read back %d records, project kinds %q", len(records), projectKindNames(records))
 	}
 	if settings := records[0].GoEnvironment; settings == nil || *settings != *narrowed.GoEnvironment {
 		test.Errorf("the Go settings read back %+v, want %+v", settings, narrowed.GoEnvironment)
@@ -249,14 +249,14 @@ func TestARecordNarrowedToOneEngineIsNamedApart(test *testing.T) {
 		test.Errorf("a record that kept no Go settings read back %+v", records[1].GoEnvironment)
 	}
 
-	// The whole root's record says nothing of an engine, so absent means the whole root, as every record
+	// The whole root's record says nothing of a project kind, so absent means the whole root, as every record
 	// written before the field reads.
 	encoded, encodeError := Encode(whole)
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
-	if strings.Contains(string(encoded), `"engine"`) {
-		test.Errorf("the whole-root record names an engine:\n%s", encoded)
+	if strings.Contains(string(encoded), `"projectKind"`) {
+		test.Errorf("the whole-root record names a project kind:\n%s", encoded)
 	}
 }
 
@@ -266,7 +266,7 @@ func TestARecordNarrowedToOneEngineIsNamedApart(test *testing.T) {
 func TestAnEncodedRecordIsInTheHouseFormat(test *testing.T) {
 	test.Parallel()
 	narrowed := honestRecord()
-	narrowed.Engine = EngineGo
+	narrowed.ProjectKind = ProjectKindGoModule
 	narrowed.GoEnvironment = &GoEnvironment{Gogc: "200"}
 	for _, record := range []Record{honestRecord(), narrowed} {
 		encoded, encodeError := Encode(record)
@@ -283,12 +283,12 @@ func TestAnEncodedRecordIsInTheHouseFormat(test *testing.T) {
 	}
 }
 
-func engineNames(records []Record) []Engine {
-	engines := []Engine{}
+func projectKindNames(records []Record) []ProjectKind {
+	kinds := []ProjectKind{}
 	for _, record := range records {
-		engines = append(engines, record.Engine)
+		kinds = append(kinds, record.ProjectKind)
 	}
-	return engines
+	return kinds
 }
 
 // Each way a record could claim more than its runs measured is refused.
@@ -344,9 +344,9 @@ func TestADishonestRecordIsRefused(test *testing.T) {
 		"a run whose output was not read": func(
 			record *Record,
 		) {
-			record.Runs[0].EngineSeconds = 0
+			record.Runs[0].SummarySeconds = 0
 		},
-		"an engine from a modified tree": func(record *Record) { record.Cohere.Dirty = true },
+		"a cohere from a modified tree": func(record *Record) { record.Cohere.Dirty = true },
 		"an abbreviated commit": func(
 			record *Record,
 		) {
@@ -404,7 +404,7 @@ func TestADishonestRecordIsRefused(test *testing.T) {
 			record.Runs[1].Quiet = true
 			record.Modes = Summarize(loadSchemaModes, record.Runs)
 		},
-		"an engine no run is narrowed to": func(record *Record) { record.Engine = "Swift" },
+		"a project kind no run is narrowed to": func(record *Record) { record.ProjectKind = "SwiftPackage" },
 		"a schema 1 ceiling of zero": func(record *Record) {
 			*record = loadSchemaRecord()
 			record.LoadCeiling = 0

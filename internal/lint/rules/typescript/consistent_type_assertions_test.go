@@ -40,7 +40,7 @@ func asTheAssertionsHarnessWroteIt(text string) string {
 // suggestions each and the corpus records the exact output of both, so asserting only message ids
 // would leave the entire suggestion surface unchecked.
 //
-// Back to front so an earlier edit cannot move a later one's offsets, which is what the fix engine
+// Back to front so an earlier edit cannot move a later one's offsets, which is what the fix pass
 // does. These suggestions carry two fixes each, so the ordering is load-bearing here rather than
 // incidental.
 func applyConsistentTypeAssertionsSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
@@ -1571,7 +1571,7 @@ func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(test *testing.T) {
 //
 // The nested-assertion case is asserted separately, in the test below this one, because two
 // assertions on one expression produce two overlapping fixes and the harness refuses to apply
-// overlapping edits rather than guessing which wins. That refusal is right: the fix engine has an
+// overlapping edits rather than guessing which wins. That refusal is right: the fix pass has an
 // overlap policy and a fixture reimplementing it would assert a result the real pipeline never
 // produces. So that case is pinned on the fix text it proposes instead.
 func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(test *testing.T) {

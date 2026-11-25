@@ -171,14 +171,14 @@ func quietOn(directory string, arguments []string, now time.Time, output *bufio.
 	reasonWords := arguments
 	for len(reasonWords) > 0 && (reasonWords[0] == "--for" || reasonWords[0] == quietThroughFlag) {
 		if len(reasonWords) < 2 {
-			fmt.Fprintf(errorStream, "cohere-dev: %s wants a value: --for 30m, %s engine-pairs\n",
+			fmt.Fprintf(errorStream, "cohere-dev: %s wants a value: --for 30m, %s go-pairs\n",
 				reasonWords[0], quietThroughFlag)
 			return 2
 		}
 		if reasonWords[0] == quietThroughFlag {
 			through = strings.TrimSpace(reasonWords[1])
 			if through == "" || strings.ContainsAny(through, " \t\n") {
-				fmt.Fprintf(errorStream, "cohere-dev: %s is %q, want one word naming the run, like engine-pairs\n",
+				fmt.Fprintf(errorStream, "cohere-dev: %s is %q, want one word naming the run, like go-pairs\n",
 					quietThroughFlag, reasonWords[1])
 				return 2
 			}

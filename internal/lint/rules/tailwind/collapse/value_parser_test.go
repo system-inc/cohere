@@ -36,11 +36,11 @@ type valueParserCorpus struct {
 	ExhaustiveCases    []valueParserCase `json:"exhaustiveCases"`
 }
 
-// valueParserCase is one value, the tree the engine built for it, and what that tree prints as.
+// valueParserCase is one value, the tree Tailwind built for it, and what that tree prints as.
 type valueParserCase struct {
 	Value string      `json:"value"`
 	Ast   []ValueNode `json:"ast"`
-	// Css is the engine's own reprint of the tree. Structure and printed form are different
+	// Css is Tailwind's own reprint of the tree. Structure and printed form are different
 	// claims: a tree that merged two words and a tree that dropped a separator can both print
 	// correctly, and a structurally correct tree can still print wrong if whitespace moved
 	// between nodes. Both are compared.
@@ -74,9 +74,9 @@ func loadValueParserCorpus(test *testing.T) valueParserCorpus {
 	return corpus
 }
 
-// TestParseValueMatchesEngine is the whole point of this suite: every tree, for every shape,
-// compared node for node against what the shipped engine built.
-func TestParseValueMatchesEngine(test *testing.T) {
+// TestParseValueMatchesTailwind is the whole point of this suite: every tree, for every shape,
+// compared node for node against what the shipped Tailwind built.
+func TestParseValueMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadValueParserCorpus(test)
 
@@ -87,7 +87,7 @@ func TestParseValueMatchesEngine(test *testing.T) {
 	for _, testCase := range corpus.Cases {
 		got := ParseValue(testCase.Value)
 		if difference := diffValueNodes(got, testCase.Ast, ""); difference != "" {
-			test.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  engine: %s",
+			test.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  tailwind: %s",
 				testCase.Value, difference, renderValueNodes(got), renderValueNodes(testCase.Ast))
 		}
 		comparedValues++
@@ -96,11 +96,11 @@ func TestParseValueMatchesEngine(test *testing.T) {
 			maximumDepth = depth
 		}
 
-		// The engine's own reprint of its own tree, compared against this port's reprint of this
+		// Tailwind's own reprint of its own tree, compared against this port's reprint of this
 		// port's tree. Two ports agreeing on structure but disagreeing on printing would pass the
 		// check above and fail here.
 		if printed := ValueToCss(got); printed != testCase.Css {
-			test.Errorf("ValueToCss(ParseValue(%q)) = %q, engine prints %q", testCase.Value, printed, testCase.Css)
+			test.Errorf("ValueToCss(ParseValue(%q)) = %q, Tailwind prints %q", testCase.Value, printed, testCase.Css)
 		}
 	}
 
@@ -117,7 +117,7 @@ func TestParseValueMatchesEngine(test *testing.T) {
 	)
 }
 
-// TestParseValueMatchesEngineExhaustively parses every string of length 1 to 3 over an alphabet of
+// TestParseValueMatchesTailwindExhaustively parses every string of length 1 to 3 over an alphabet of
 // the characters whose branches interact: the escape, both quote kinds, both parens, separators,
 // the slash, and multi-byte characters of two, three and four UTF-8 bytes.
 //
@@ -127,7 +127,7 @@ func TestParseValueMatchesEngine(test *testing.T) {
 // value in the corpus, and both rules are correct only because a UTF-8 continuation byte can match
 // no separator, quote, or paren and so reaches the buffer either way. That is an argument; this is
 // the measurement behind it.
-func TestParseValueMatchesEngineExhaustively(test *testing.T) {
+func TestParseValueMatchesTailwindExhaustively(test *testing.T) {
 	test.Parallel()
 	corpus := loadValueParserCorpus(test)
 
@@ -138,14 +138,19 @@ func TestParseValueMatchesEngineExhaustively(test *testing.T) {
 			// Bounded output: a broken branch disagrees on hundreds of these at once, and the
 			// first handful name the shape as well as all of them would.
 			if disagreements < 10 {
-				test.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  engine: %s",
+				test.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  tailwind: %s",
 					testCase.Value, difference, renderValueNodes(got), renderValueNodes(testCase.Ast))
 			}
 			disagreements++
 		}
 		if printed := ValueToCss(got); printed != testCase.Css {
 			if disagreements < 10 {
-				test.Errorf("ValueToCss(ParseValue(%q)) = %q, engine prints %q", testCase.Value, printed, testCase.Css)
+				test.Errorf(
+					"ValueToCss(ParseValue(%q)) = %q, Tailwind prints %q",
+					testCase.Value,
+					printed,
+					testCase.Css,
+				)
 			}
 			disagreements++
 		}
@@ -252,7 +257,7 @@ func TestTrailingBackslashReadsPastTheEnd(test *testing.T) {
 //
 // The final buffer flush pushes to `ast`, never to the still-open parent, so text that visually sits
 // inside an unclosed function ends up beside it. A port that flushed into the open function would
-// produce the tree a reader expects and disagree with the engine.
+// produce the tree a reader expects and disagree with Tailwind.
 func TestUnclosedFunctionKeepsRemainderAtTopLevel(test *testing.T) {
 	test.Parallel()
 	got := ParseValue("foo(bar")
@@ -322,7 +327,7 @@ func TestSeparatorRunsArePreservedVerbatim(test *testing.T) {
 
 // TestValueArgumentListsParseAsNodes covers the shape this port exists to serve: the `--value(...)`
 // argument lists the @utility evaluator reads. The arguments are nodes, and the separator between
-// them is a node too, so a caller walking the list sees the same tree the engine does.
+// them is a node too, so a caller walking the list sees the same tree Tailwind does.
 func TestValueArgumentListsParseAsNodes(test *testing.T) {
 	test.Parallel()
 	got := ParseValue("--value(--percentage-*, [*])")
@@ -378,7 +383,7 @@ func TestQuotedStringsHoldTheirContents(test *testing.T) {
 	// than swallowing the tail. `"unterminated` is one word because it holds no separator, and
 	// that single shape is not enough to pin the behavior. `"a b` is the case that discriminates,
 	// and its absence from the corpus hid a real bug in this port: an implementation that jumped
-	// to the end of input agreed with the engine on the first and disagreed on the second.
+	// to the end of input agreed with Tailwind on the first and disagreed on the second.
 	for _, testCase := range []struct {
 		input string
 		want  []ValueNode
@@ -501,15 +506,15 @@ func valueNodeDepthAcross(cases []valueParserCase) int {
 // into a nested value is otherwise unreadable in the failure output.
 func diffValueNodes(got, want []ValueNode, path string) string {
 	if len(got) != len(want) {
-		return fmt.Sprintf("at %s: %d nodes, engine has %d", pathOrRoot(path), len(got), len(want))
+		return fmt.Sprintf("at %s: %d nodes, Tailwind has %d", pathOrRoot(path), len(got), len(want))
 	}
 	for index := range want {
 		here := fmt.Sprintf("%s[%d]", path, index)
 		if got[index].Kind != want[index].Kind {
-			return fmt.Sprintf("at %s: kind %q, engine says %q", here, got[index].Kind, want[index].Kind)
+			return fmt.Sprintf("at %s: kind %q, Tailwind says %q", here, got[index].Kind, want[index].Kind)
 		}
 		if got[index].Value != want[index].Value {
-			return fmt.Sprintf("at %s: value %q, engine says %q", here, got[index].Value, want[index].Value)
+			return fmt.Sprintf("at %s: value %q, Tailwind says %q", here, got[index].Value, want[index].Value)
 		}
 		if want[index].Kind == ValueNodeKindFunction {
 			if difference := diffValueNodes(got[index].Nodes, want[index].Nodes, here); difference != "" {

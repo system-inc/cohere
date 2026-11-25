@@ -621,7 +621,7 @@ func TestAFileARuleInheritsWholeStandsInNoPart(test *testing.T) {
 	}
 }
 
-// A rule heard over the engine's own intermediate representation swaps its findings at its action as a syntax rule
+// A rule heard over cohere's own intermediate representation swaps its findings at its action as a syntax rule
 // does, since both dispatchers start their listeners one way: of a rule reporting every source function where it is
 // declared, the findings on the standing functions, and on the function literal inside one, are dropped for the
 // host's, and its findings on the others, the function literal in a variable's initializer among them, are kept.

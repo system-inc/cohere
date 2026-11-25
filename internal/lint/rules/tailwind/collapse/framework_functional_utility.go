@@ -50,7 +50,7 @@ func (utility FrameworkFunctionalUtility) Description() *FunctionalUtilityDescri
 // Reading returns what a candidate reads against this root, and whether it reads anything.
 //
 // Computed rather than named. The root's ported handle body emits declarations and `PropertySort`
-// reads them, which is the same two steps the engine takes, so the reading here is a consequence of
+// reads them, which is the same two steps Tailwind takes, so the reading here is a consequence of
 // the emission rather than a second claim about it. That is what makes the acceptance test in
 // frameworkhandlers_test.go worth running: `Property` on the row and the emitter in
 // frameworkhandlers.go are two independent statements of the same fact, and this method uses only

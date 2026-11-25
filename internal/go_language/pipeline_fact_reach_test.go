@@ -25,8 +25,8 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 
 	root := copyFixture(test, filepath.Join("testdata", "fact-reach-sides"))
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
-	on, onStream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = censusFile
+	on, onStream := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = censusFile
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	off, offStream := runOver(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings,
 		"--no-fix", "--build-dependence")
@@ -71,9 +71,15 @@ func TestTheHostsSidesForTheFactsReachAreMadeUnderTheBodyReachCensus(test *testi
 func TestEachBuildHandsItsPassesTheHostsSideWithItsUnreachedBodiesStanding(test *testing.T) {
 	test.Parallel()
 
-	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings,
-		func(engine *pipeline) { engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt") }, "--no-cache",
-		"--no-fix", "--build-dependence")
+	on, _ := runOverConfigured(
+		test,
+		copyFixture(test, filepath.Join("testdata", "fact-reach-sides")),
+		exitFindings,
+		func(pipeline *pipeline) { pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt") },
+		"--no-cache",
+		"--no-fix",
+		"--build-dependence",
+	)
 	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings, "--no-fix",
 		"--build-dependence")
 
@@ -112,8 +118,15 @@ func TestEachBuildSettlesItsStandingBodiesAndTheCensusCountsThem(test *testing.T
 	test.Parallel()
 
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
-	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings,
-		func(engine *pipeline) { engine.bodyReachCensus = censusFile }, "--no-cache", "--no-fix", "--build-dependence")
+	on, _ := runOverConfigured(
+		test,
+		copyFixture(test, filepath.Join("testdata", "fact-reach-sides")),
+		exitFindings,
+		func(pipeline *pipeline) { pipeline.bodyReachCensus = censusFile },
+		"--no-cache",
+		"--no-fix",
+		"--build-dependence",
+	)
 	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "fact-reach-sides")), exitFindings, "--no-fix",
 		"--build-dependence")
 
@@ -151,8 +164,8 @@ func TestAWarmRunGivesARestoredPackageNoSideForTheFactsReach(test *testing.T) {
 
 	root := copyFixture(test, filepath.Join("testdata", "fact-reach-sides"))
 	runOverConfigured(test, root, exitFindings, nil, "--no-fix", "--build-dependence")
-	warm, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+	warm, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
 	}, "--no-fix", "--build-dependence")
 
 	if warm.factReachSides == nil {
@@ -178,9 +191,9 @@ func TestTheSecondLegComparesWhatTheFactsReachLeftStanding(test *testing.T) {
 
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "standing-facts")), exitFindings,
-		func(engine *pipeline) {
-			engine.bodyReachCensus = censusFile
-			engine.bodyDifferential = true
+		func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = censusFile
+			pipeline.bodyDifferential = true
 		}, "--no-cache", "--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].bodyDifferential == nil {
@@ -254,12 +267,12 @@ func TestTheSecondLegFailsWhereAStandingAnswerIsNotTheHosts(test *testing.T) {
 			censusFile := filepath.Join(test.TempDir(), "reach.txt")
 			var wantLine string
 			on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "standing-facts")),
-				exitFindings, func(engine *pipeline) {
-					engine.bodyReachCensus = censusFile
-					engine.bodyDifferential = true
+				exitFindings, func(pipeline *pipeline) {
+					pipeline.bodyReachCensus = censusFile
+					pipeline.bodyDifferential = true
 					// Windows's is the one extra build, and its census comes before its passes read the side.
-					engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
-						wantLine = each.alter(engine.factReachSides.packages["example.com/standing"])
+					pipeline.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
+						wantLine = each.alter(pipeline.factReachSides.packages["example.com/standing"])
 						return census
 					}
 				}, "--no-cache", "--no-fix", "--build-dependence")
@@ -295,12 +308,12 @@ func TestAHostsDeprecationTheBuildLacksTakesTheFunctionAndItsUserOut(test *testi
 	test.Parallel()
 
 	on, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "standing-facts")), exitFindings,
-		func(engine *pipeline) {
-			engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-			engine.bodyDifferential = true
+		func(pipeline *pipeline) {
+			pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+			pipeline.bodyDifferential = true
 			// Windows's is the one extra build, and its census comes before its passes read the side.
-			engine.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
-				hosted := engine.factReachSides.packages["example.com/standing"]
+			pipeline.bodyDifferentialCensus = func(census *buildBodyReach) *buildBodyReach {
+				hosted := pipeline.factReachSides.packages["example.com/standing"]
 				for index, function := range hosted.functions {
 					if function.Identity.Path == "Stable" {
 						pushed := maps.Clone(function.Pushed)

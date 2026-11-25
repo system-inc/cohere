@@ -25,7 +25,7 @@ import (
 const projectMarker = "tsconfig.json"
 
 // swiftProjectMarker is the file whose directory is a Swift package's root, and the run there belongs
-// to the Swift engine rather than to this binary's own phases.
+// to cohere-swift rather than to this binary's own phases.
 //
 // Discovery looks for both markers at each directory on the way up, and the nearest directory holding
 // either wins, for the reason projectMarker gives: the nearer project is the one the caller is
@@ -33,12 +33,12 @@ const projectMarker = "tsconfig.json"
 // above it, which would check a program that excludes `projects/` and print a green about Swift code
 // nothing looked at.
 //
-// For one engine's run, a directory holding both is TypeScript's. A run from the root checks both: discovery
-// finds each marker as a project of its own, and each project's run names its engine (see discovery.go).
+// For one language's run, a directory holding both is TypeScript's. A run from the root checks both: discovery
+// finds each marker as a project of its own, and each project's run names the child (see discovery.go).
 const swiftProjectMarker = "Package.swift"
 
-// goWorkspaceMarker is the file whose directory is a Go workspace's root, and the run there belongs to the
-// Go engine, over every module the workspace uses.
+// goWorkspaceMarker is the file whose directory is a Go workspace's root, and the run there belongs to
+// cohere-go, over every module the workspace uses.
 //
 // It shares the walk with the other markers and comes after them in one directory, so a tsconfig.json or a
 // Package.swift beside it keeps the run it had. Ahead of goModuleMarker, because a directory holding both is
@@ -52,25 +52,6 @@ const goWorkspaceMarker = "go.work"
 // and stands where go would (see goModuleRoot).
 const goModuleMarker = "go.mod"
 
-// projectEngine is which engine checks the project at a root.
-type projectEngine string
-
-const (
-	// engineTypeScript is this binary's own pipeline, over the program a tsconfig defines.
-	engineTypeScript projectEngine = "TypeScript"
-
-	// engineSwift is cohere-swift, which this binary runs and whose records it renders.
-	engineSwift projectEngine = "Swift"
-
-	// engineGo is the Go engine, over a workspace a go.work defines or a module a go.mod does.
-	engineGo projectEngine = "Go"
-
-	// engineFormat is this binary's format phase alone, at a repository root no TypeScript project holds: the
-	// JSON, Markdown and the rest the house formatter reads there, which no other engine formats. It has no
-	// marker, since discovery adds it (see addRootFormatProject).
-	engineFormat projectEngine = "Format"
-)
-
 // locationRequest is what the command line said, before anything was resolved.
 type locationRequest struct {
 	// WorkingDirectory is the process's own, absolute.
@@ -79,9 +60,9 @@ type locationRequest struct {
 	// Directory is `--directory`, empty when not given.
 	Directory string
 
-	// Engine, when set, is the engine that checks Directory, overriding what its markers say: the run of a
+	// Kind, when set, is the child that checks Directory, overriding what its markers say: the run of a
 	// discovered project names it, since a directory holding both markers is two projects (#f9nftxz).
-	Engine projectEngine
+	Kind projectKind
 
 	ConfigFileName      string
 	ConfigFileNameGiven bool
@@ -103,7 +84,7 @@ type locationRequest struct {
 //     it uses is that workspace's. See projectMarker for why the tsconfig and not the lint config,
 //     swiftProjectMarker for how the markers share the walk, and goModuleMarker for the workspace.
 //
-// The engine follows the marker. `--tsconfig` names a TypeScript program, so it is always TypeScript.
+// The child follows the marker. `--tsconfig` names a TypeScript program, so it is always TypeScript.
 // `--directory` is a `cd`, so the directory it names is read for markers the way discovery reads each
 // directory it passes.
 //
@@ -123,27 +104,27 @@ func locateProject(request locationRequest) (projectLocation, error) {
 		location.ConfigFileName = absoluteFrom(base, request.ConfigFileName)
 		// A directory with neither marker stays TypeScript, so the graph builder fails naming the
 		// tsconfig it could not find, as it did before Swift existed.
-		location.Engine = engineTypeScript
-		if engine, found := engineAt(base); found {
-			location.Engine = engine
+		location.Kind = projectKindTypeScriptProgram
+		if kind, found := kindAt(base); found {
+			location.Kind = kind
 		}
-		if request.Engine != "" {
-			location.Engine = request.Engine
+		if request.Kind != "" {
+			location.Kind = request.Kind
 		}
 
 	case request.ConfigFileNameGiven:
 		location.ConfigFileName = absoluteFrom(base, request.ConfigFileName)
 		location.Root = filepath.Dir(location.ConfigFileName)
-		location.Engine = engineTypeScript
+		location.Kind = projectKindTypeScriptProgram
 
 	default:
-		root, engine, findProjectRootError := findProjectRoot(base)
+		root, kind, findProjectRootError := findProjectRoot(base)
 		if findProjectRootError != nil {
 			return projectLocation{}, findProjectRootError
 		}
 		location.Root = root
-		location.Engine = engine
-		if engine == engineTypeScript {
+		location.Kind = kind
+		if kind == projectKindTypeScriptProgram {
 			location.ConfigFileName = filepath.Join(root, request.ConfigFileName)
 		}
 	}
@@ -158,22 +139,22 @@ func locateProject(request locationRequest) (projectLocation, error) {
 }
 
 // findProjectRoot walks up from a directory to the nearest one holding a tsconfig.json, a Package.swift,
-// a go.work or a go.mod, and says which engine that marker belongs to. A go.mod alone hands the walk on
+// a go.work or a go.mod, and says which language that marker belongs to. A go.mod alone hands the walk on
 // to goModuleRoot, which finds the workspace go would build it in.
 //
 // Finding nothing is an error that names where the walk began, never a fallback to the starting
 // directory. A fallback would hand the graph builder a tsconfig path that does not exist, and the
 // error that came back would name a file in the wrong directory, which sends a reader looking for a
 // typo rather than for the fact that they are standing outside any project.
-func findProjectRoot(start string) (string, projectEngine, error) {
+func findProjectRoot(start string) (string, projectKind, error) {
 	directory := filepath.Clean(start)
 	for {
-		if engine, found := engineAt(directory); found {
-			if engine == engineGo && !isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
+		if kind, found := kindAt(directory); found {
+			if kind == projectKindGoModule && !isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
 				root, goModuleRootError := goModuleRoot(directory)
-				return root, engineGo, goModuleRootError
+				return root, projectKindGoModule, goModuleRootError
 			}
-			return directory, engine, nil
+			return directory, kind, nil
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
@@ -187,43 +168,43 @@ func findProjectRoot(start string) (string, projectEngine, error) {
 	}
 }
 
-// engineAt says which engine owns a directory by the marker it holds: TypeScript, then Swift, then Go by
+// kindAt says which language owns a directory by the marker it holds: TypeScript, then Swift, then Go by
 // either of its markers. See swiftProjectMarker for why a directory holding more than one is the first
 // one's, and goWorkspaceMarker for why the Go markers come last.
-func engineAt(directory string) (projectEngine, bool) {
+func kindAt(directory string) (projectKind, bool) {
 	if isRegularFile(filepath.Join(directory, projectMarker)) {
-		return engineTypeScript, true
+		return projectKindTypeScriptProgram, true
 	}
 	if isRegularFile(filepath.Join(directory, swiftProjectMarker)) {
-		return engineSwift, true
+		return projectKindSwiftPackage, true
 	}
 	if isRegularFile(filepath.Join(directory, goWorkspaceMarker)) ||
 		isRegularFile(filepath.Join(directory, goModuleMarker)) {
-		return engineGo, true
+		return projectKindGoModule, true
 	}
 	return "", false
 }
 
-// enginesAt is every engine whose project a directory is, in engineAt's order: a Go module counts only when its run
+// kindsAt is every kind whose project a directory is, in kindAt's order: a Go module counts only when its run
 // stands there, never when a workspace above it builds it (goModuleRoot), since that workspace is its project.
-func enginesAt(directory string) []projectEngine {
-	var engines []projectEngine
+func kindsAt(directory string) []projectKind {
+	var kinds []projectKind
 	if isRegularFile(filepath.Join(directory, projectMarker)) {
-		engines = append(engines, engineTypeScript)
+		kinds = append(kinds, projectKindTypeScriptProgram)
 	}
 	if isRegularFile(filepath.Join(directory, swiftProjectMarker)) {
-		engines = append(engines, engineSwift)
+		kinds = append(kinds, projectKindSwiftPackage)
 	}
 	if isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
-		return append(engines, engineGo)
+		return append(kinds, projectKindGoModule)
 	}
 	if isRegularFile(filepath.Join(directory, goModuleMarker)) {
 		root, rootError := goModuleRoot(directory)
 		if rootError == nil && filepath.Clean(root) == filepath.Clean(directory) {
-			engines = append(engines, engineGo)
+			kinds = append(kinds, projectKindGoModule)
 		}
 	}
-	return engines
+	return kinds
 }
 
 // goModuleRoot is the root a Go module's run stands on: the directory of the nearest go.work above it, when

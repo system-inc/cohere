@@ -1,5 +1,5 @@
 // Package duplicate_import is staticcheck's `ST1019`, a file importing one package more than once under different
-// names, which is seldom meant and usually left behind by a refactoring, ported onto the engine's syntax dispatcher.
+// names, which is seldom meant and usually left behind by a refactoring, ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1019/st1019.go, whose message and related
 // information it reports word for word, at the file's first import of the path, with every later import of it
@@ -12,7 +12,7 @@
 // the port reports the same findings in an order that never changes between runs.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package duplicate_import
 
 import (

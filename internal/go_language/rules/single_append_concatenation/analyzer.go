@@ -37,7 +37,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, whose syntax it walks when the function is where syntax starts, so each range
 // statement is judged once. It listens to that walk, not the syntax's, because it reads function_purity's facts,
 // which say which calls in the loop's slices may have side effects and are built from our representation, so only on

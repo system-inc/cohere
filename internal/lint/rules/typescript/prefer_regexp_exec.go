@@ -525,7 +525,7 @@ func preferRegexpExecLiteralHasGlobalFlag(literal string) bool {
 // then write `/[a-z/.exec(str)`, which does not parse. Upstream's corpus carries that exact case and
 // a first draft here failed it -- the only row of thirty-seven it got wrong.
 func preferRegexpExecRegexLiteralFor(value string) (string, bool) {
-	// `esregexp` is this tree's JavaScript-semantics regular-expression engine, already used by
+	// `esregexp` is this tree's JavaScript-semantics regular-expression package, already used by
 	// two other rules to answer "would `new RegExp(source)` throw".
 	if _, compileError := esregexp.Compile(value, ""); compileError != nil {
 		return "", false

@@ -51,7 +51,7 @@ type earlyFormat struct {
 // run would have loaded, and transform is built from it the way the fix phase builds its own. write is whether the
 // run writes, which decides whether the speculation may keep a changed result (speculateFormat).
 func startEarlyFormat(
-	engine formatEngine,
+	formatter fileFormatter,
 	record *formatRecord,
 	root string,
 	maximumPasses int,
@@ -72,13 +72,13 @@ func startEarlyFormat(
 		); parseDurationError == nil {
 			time.Sleep(held)
 		}
-		early.universe, early.universeError = enumerateFormatUniverse(engine, root)
+		early.universe, early.universeError = enumerateFormatUniverse(formatter, root)
 		if early.universeError != nil {
 			early.started(speculateFormatOn(nil, nil, maximumPasses, 0, write, nil))
 			return
 		}
-		early.scope = unformattedScopeOf(engine, record, early.universe)
-		transform := early.lineEndings.observing(early.transform(engine))
+		early.scope = unformattedScopeOf(formatter, record, early.universe)
+		transform := early.lineEndings.observing(early.transform(formatter))
 		early.started(speculateFormatOn(
 			early.scope.formatCandidates(),
 			transform,
@@ -119,9 +119,9 @@ func (early *earlyFormat) speculationOf() *formatSpeculation {
 }
 
 // transform is the fix phase's format transform over this pass's scope, built the same way.
-func (early *earlyFormat) transform(engine formatEngine) edit.Transform {
+func (early *earlyFormat) transform(formatter fileFormatter) edit.Transform {
 	return early.formatting.timing(
-		scopedTransform(early.record.observe(formatTransform(engine), optionsFingerprintOf(engine)), early.scope),
+		scopedTransform(early.record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), early.scope),
 	)
 }
 

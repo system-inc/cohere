@@ -19,14 +19,14 @@ type walksHanded struct {
 	begun func(loads int)
 }
 
-// watching is the prelude watch that keeps the walks each of engine's host loads is handed as it begins. A load begins
-// on the pipeline's goroutine, the only one that appends.
-func (handed *walksHanded) watching(engine *pipeline) func(step preludeStep) {
+// watching is the prelude watch that keeps the walks each of pipeline's host loads is handed as it begins. A load
+// begins on the pipeline's goroutine, the only one that appends.
+func (handed *walksHanded) watching(pipeline *pipeline) func(step preludeStep) {
 	return func(step preludeStep) {
 		if step != preludeLoadBegan {
 			return
 		}
-		handed.walks = append(handed.walks, engine.walks)
+		handed.walks = append(handed.walks, pipeline.walks)
 		if handed.begun != nil {
 			handed.begun(len(handed.walks))
 		}
@@ -49,12 +49,12 @@ func buildLoads(runs []buildRun) int64 {
 // before any build starts, so that one walk is the host's.
 func TestARunWalksEachPatternOnce(test *testing.T) {
 	test.Parallel()
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings, "--no-fix")
-	if len(engine.buildRuns) != 3 {
-		test.Fatalf("the run checked %d builds, want 3", len(engine.buildRuns))
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings, "--no-fix")
+	if len(pipeline.buildRuns) != 3 {
+		test.Fatalf("the run checked %d builds, want 3", len(pipeline.buildRuns))
 	}
-	loads := int64(engine.hostLoads.Load()) + buildLoads(engine.buildRuns)
-	patterns, walked, asked := engine.walks.Walked()
+	loads := int64(pipeline.hostLoads.Load()) + buildLoads(pipeline.buildRuns)
+	patterns, walked, asked := pipeline.walks.Walked()
 	if patterns != 1 || walked != 1 {
 		test.Errorf("the run's walks hold %d patterns, walked %d times, want the module's one, walked once", patterns,
 			walked)
@@ -89,29 +89,29 @@ func TestTheBuildsTakeTheWalksReadAfterTheWrapWrote(test *testing.T) {
 			test.Error(writeError)
 		}
 	}}
-	engine, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.watchPrelude = handed.watching(engine)
+	pipeline, stream := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.watchPrelude = handed.watching(pipeline)
 	}, "--no-cache")
 	if !strings.Contains(stream, `"fixedBy":{"cohere-go/consistency-no-long-line":1}`) {
 		test.Fatalf("want the wrap to break the long line of %s, got\n%s", file, stream)
 	}
-	if len(handed.walks) < 2 || len(engine.buildRuns) != 3 {
+	if len(handed.walks) < 2 || len(pipeline.buildRuns) != 3 {
 		test.Fatalf("the host loaded %d times and the run checked %d builds, want a load of what the wrap wrote and "+
-			"3 builds", len(handed.walks), len(engine.buildRuns))
+			"3 builds", len(handed.walks), len(pipeline.buildRuns))
 	}
 	last := handed.walks[len(handed.walks)-1]
-	if handed.walks[0] == last || engine.walks != last {
+	if handed.walks[0] == last || pipeline.walks != last {
 		test.Errorf("the first load was handed the walks %p, the last %p, and the builds read %p, want the last's "+
-			"for the builds and others for the first", handed.walks[0], last, engine.walks)
+			"for the builds and others for the first", handed.walks[0], last, pipeline.walks)
 	}
-	for _, run := range engine.buildRuns[1:] {
+	for _, run := range pipeline.buildRuns[1:] {
 		if !slices.Contains(run.inputs().Files, added) {
 			test.Errorf("%s's load does not name %s, so its listing took a walk made before the wrap wrote",
 				run.build, added)
 		}
 	}
 	// The host's loads after the write and every build's asked for the one pattern, and the first of them walked it.
-	loads := int64(len(handed.walks)-1) + buildLoads(engine.buildRuns)
+	loads := int64(len(handed.walks)-1) + buildLoads(pipeline.buildRuns)
 	if patterns, walked, asked := last.Walked(); patterns != 1 || walked != 1 || asked != loads {
 		test.Errorf("the walks read after the wrap wrote hold %d patterns, walked %d times and asked %d, want one, "+
 			"walked once and asked by each of the %d loads after the write", patterns, walked, asked, loads)
@@ -124,17 +124,17 @@ func TestTheBuildsTakeTheWalksReadAfterTheWrapWrote(test *testing.T) {
 func TestAfterARenameTheBuildsWalkForThemselves(test *testing.T) {
 	test.Parallel()
 	handed := &walksHanded{}
-	engine, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "rename-platforms")), exitClean,
-		func(engine *pipeline) { engine.watchPrelude = handed.watching(engine) }, "--no-cache")
-	if !engine.renamed || len(engine.buildRuns) < 2 || len(handed.walks) == 0 {
+	pipeline, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "rename-platforms")), exitClean,
+		func(pipeline *pipeline) { pipeline.watchPrelude = handed.watching(pipeline) }, "--no-cache")
+	if !pipeline.renamed || len(pipeline.buildRuns) < 2 || len(handed.walks) == 0 {
 		test.Fatalf("the run renamed %t, checked %d builds and began %d loads through the host's caching, want a "+
-			"rename, an extra build and a first load", engine.renamed, len(engine.buildRuns), len(handed.walks))
+			"rename, an extra build and a first load", pipeline.renamed, len(pipeline.buildRuns), len(handed.walks))
 	}
-	if engine.walks == handed.walks[0] {
-		test.Errorf("the builds read the walks %p, the first load's, made before the rename wrote", engine.walks)
+	if pipeline.walks == handed.walks[0] {
+		test.Errorf("the builds read the walks %p, the first load's, made before the rename wrote", pipeline.walks)
 	}
-	loads := buildLoads(engine.buildRuns)
-	if patterns, walked, asked := engine.walks.Walked(); patterns != 1 || walked != 1 || asked != loads {
+	loads := buildLoads(pipeline.buildRuns)
+	if patterns, walked, asked := pipeline.walks.Walked(); patterns != 1 || walked != 1 || asked != loads {
 		test.Errorf("the builds' walks hold %d patterns, walked %d times and asked %d, want one, walked once and "+
 			"asked by the builds' %d loads alone", patterns, walked, asked, loads)
 	}
@@ -148,12 +148,12 @@ func TestAHostWhoseListingWasKeptLeavesTheBuildsToWalk(test *testing.T) {
 	test.Parallel()
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 	runOverWith(test, root, exitClean, "--no-fix", "--host-build-only")
-	engine, _ := runOverWith(test, root, exitFindings, "--no-fix")
-	if len(engine.buildRuns) != 3 {
-		test.Fatalf("the run checked %d builds, want 3", len(engine.buildRuns))
+	pipeline, _ := runOverWith(test, root, exitFindings, "--no-fix")
+	if len(pipeline.buildRuns) != 3 {
+		test.Fatalf("the run checked %d builds, want 3", len(pipeline.buildRuns))
 	}
-	loads := buildLoads(engine.buildRuns)
-	if patterns, walked, asked := engine.walks.Walked(); patterns != 1 || walked != 1 || asked != loads {
+	loads := buildLoads(pipeline.buildRuns)
+	if patterns, walked, asked := pipeline.walks.Walked(); patterns != 1 || walked != 1 || asked != loads {
 		test.Errorf("the run's walks hold %d patterns, walked %d times and asked %d, want one, walked once and asked "+
 			"by the builds' %d loads alone, the host's listing kept", patterns, walked, asked, loads)
 	}
@@ -203,10 +203,10 @@ func TestAFixingRunLeavesItsDirectoriesAndModuleFilesAsTheyWere(test *testing.T)
 			test.Parallel()
 			root := copyFixture(test, filepath.Join("testdata", fixture.name))
 			before := treeShape(test, root)
-			engine, _, _, _ := runOverExiting(test, root, rules.All(), nil)
-			if engine.fix == nil || engine.fix.record.FilesRewritten == 0 || engine.renamed != fixture.renames {
+			pipeline, _, _, _ := runOverExiting(test, root, rules.All(), nil)
+			if pipeline.fix == nil || pipeline.fix.record.FilesRewritten == 0 || pipeline.renamed != fixture.renames {
 				test.Fatalf("the run rewrote no file, or renamed %t where the fixture renames %t, so it holds nothing "+
-					"to the invariant", engine.renamed, fixture.renames)
+					"to the invariant", pipeline.renamed, fixture.renames)
 			}
 			if after := treeShape(test, root); !slices.Equal(after, before) {
 				test.Errorf("the run left the directories and go.mod files\n%s\nwant them as they were\n%s",

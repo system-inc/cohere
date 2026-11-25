@@ -203,7 +203,7 @@ func main() {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
 				os.Stderr,
-				"generate_descriptor_base: %s is Tailwind %s and an earlier input is Tailwind %s; refusing to mix engines\n",
+				"generate_descriptor_base: %s is Tailwind %s and an earlier input is Tailwind %s; refusing to mix Tailwind versions\n",
 				inputPaths[index],
 				loaded.table.TailwindVersion,
 				systems0Version(systems),
@@ -580,7 +580,7 @@ var baseReadings = []Reading{
 	}
 	fmt.Fprintf(&body, "}\n\n")
 
-	fmt.Fprintf(&body, `// BaseTailwindVersion is the engine version this file was generated against.
+	fmt.Fprintf(&body, `// BaseTailwindVersion is the Tailwind version this file was generated against.
 //
 // Carried so a table built against an upgraded tailwindcss is a loud failure rather than a subtly
 // wrong sort. NewTable compares it with the live design system's version.
@@ -680,7 +680,7 @@ func writeDescriptor(out *bytes.Buffer, entry *rootEntry, frameworkNamespaces ma
 		for index, typeName := range entry.TypeList {
 			typeParts[index] = fmt.Sprintf("%q", typeName)
 		}
-		// The order is the engine's, recovered by topological sort from observation. Written out
+		// The order is Tailwind's, recovered by topological sort from observation. Written out
 		// verbatim and never sorted: InferDataType returns the first match.
 		fmt.Fprintf(out, "\t\tTypeList: []DataType{%s},\n", strings.Join(typeParts, ", "))
 	}

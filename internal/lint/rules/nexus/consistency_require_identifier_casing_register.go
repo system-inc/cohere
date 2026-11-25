@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // at once touch nothing in common.
 //
 // No decoder: the rule takes no options. Values are lowerCamelCase and types UpperCamelCase in every
-// engine, and an option bending that would let a project's engines disagree.
+// linter, and an option bending that would let a project's languages disagree.
 func init() {
 	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyRequireIdentifierCasing})
 }

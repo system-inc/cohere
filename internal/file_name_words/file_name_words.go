@@ -1,16 +1,16 @@
-// Package file_name_words is what a file's name says in words, and the two judgments of those words every engine
+// Package file_name_words is what a file's name says in words, and the two judgments of those words every language
 // shares, in one place (#2xt6v5r): a file name holds no `util` or `utils`, as a folder's name holds neither, and its
 // words abbreviate nothing policy/Abbreviations.json names, as an identifier's do not, nor anything
 // policy/NameWords.json names, the words a name on a path spells out and an identifier need not (#zyq63kk). A
 // folder's name is judged by NameWords alone (FolderAbbreviated), by the folder check in discovery.
 //
-// The TypeScript rules nexus/consistency-no-utils-file-name and nexus/consistency-no-abbreviated-file-name and the Go
-// engine's rules of the same names read it, so which parts of a name are words, and what each judgment makes of them,
-// are decided once. Swift's two rules port it, held to the same verdicts by the text rules corpus (families
-// `utils-file-name` and `abbreviated-file-name`), and read the same vocabulary compiled in. Each engine decides only
+// The TypeScript rules nexus/consistency-no-utils-file-name and nexus/consistency-no-abbreviated-file-name and
+// cohere-go's rules of the same names read it, so which parts of a name are words, and what each judgment makes of
+// them, are decided once. Swift's two rules port it, held to the same verdicts by the text rules corpus (families
+// `utils-file-name` and `abbreviated-file-name`), and read the same vocabulary compiled in. Each language decides only
 // its own language's facts first: which files are its own to judge, and where a finding sits. It lives in its own
 // package, importing nothing heavier than policy and the vocabulary, because the nexus rules package links the
-// TypeScript checker and the Go engine must not.
+// TypeScript checker and cohere-go must not.
 //
 // A file name is read in three steps:
 //
@@ -19,7 +19,7 @@
 //     reads them; and a dotted role marker (`.test`, `.spec`, `.stories`, `.d`, `.config`) in TypeScript.
 //   - A name nobody inside the project chose is never judged: a generated file's (the `.generated` marker), and one a
 //     tool requires by its exact spelling (Go's `doc.go`, SwiftPM's `Package.swift`). TypeScript's framework names
-//     are the TypeScript rule's to decide, from internal/lint/ecmascript/nextjs, which the Go engine must not link.
+//     are the TypeScript rule's to decide, from internal/lint/ecmascript/nextjs, which cohere-go must not link.
 //   - What is left is cut into words: each run of ASCII letters, cut again where folder_words.IsCaseBoundary says a
 //     word ends, so `string_utils`, `stringUtils`, `StringUtils` and `string-utils` are all `string` and `utils`.
 package file_name_words
@@ -35,11 +35,11 @@ import (
 type Language string
 
 const (
-	// LanguageTypeScript is a TypeScript or JavaScript file, judged by the TypeScript engine.
+	// LanguageTypeScript is a TypeScript or JavaScript file, judged by the TypeScript linter.
 	LanguageTypeScript Language = "TypeScript"
-	// LanguageGo is a Go file, judged by the Go engine.
+	// LanguageGo is a Go file, judged by cohere-go.
 	LanguageGo Language = "Go"
-	// LanguageSwift is a Swift file, judged by the Swift engine.
+	// LanguageSwift is a Swift file, judged by cohere-swift.
 	LanguageSwift Language = "Swift"
 )
 

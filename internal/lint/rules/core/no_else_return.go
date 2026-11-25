@@ -106,7 +106,7 @@ func DecodeNoElseReturnOptions(raw []byte) (NoElseReturnSettings, error) {
 // enclosing function, to avoid conflicting with `no-useless-return` and with a second `else` block
 // in the same function. We have no such tracker, and widening a repair to a whole function by hand
 // is the kind of range this project has already been burned by. The narrow replacement is what ships
-// and the conflict case is left to the edit engine, which sees every proposal at once and is the
+// and the conflict case is left to the fix pass, which sees every proposal at once and is the
 // only component that can reason about two overlapping ones.
 //
 // # A TypeScript hazard upstream's corpus cannot express
@@ -329,7 +329,7 @@ func elseUnwrapFix(ruleContext rule.Context, ifStatement *ast.Node, alternate *a
 // `let arguments`, is a strict-mode parse error rather than a shape.
 //
 // A conditional function declaration is refused outright, matching upstream: its scoping and
-// hoisting differ between engines, so no analysis here would be worth trusting.
+// hoisting differ between runtimes, so no analysis here would be worth trusting.
 func isSafeFromNameCollisions(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node) bool {
 	if alternate.Kind == ast.KindFunctionDeclaration {
 		return false
@@ -366,7 +366,7 @@ func isSafeFromNameCollisions(ruleContext rule.Context, ifStatement *ast.Node, a
 	//	                                                            both decline
 	//
 	// Left as is deliberately. A withheld repair costs a manual edit; a wrong one lifts a `let` into
-	// a scope where the name is taken and changes what the program means, and the edit engine's
+	// a scope where the name is taken and changes what the program means, and the fix pass's
 	// parse check cannot refuse that because the result parses. The finding still fires either way,
 	// so nothing is missed, only the automatic repair on one shape.
 	for _, symbol := range ruleContext.TypeChecker.GetSymbolsInScope(ifStatement, ^ast.SymbolFlags(0)) {

@@ -11,7 +11,7 @@ import (
 
 // Resolving formats each file with the options Prettier would resolve for that file.
 //
-// The format phase used to build one Engine from format_options.Default, ahra's block, and run it over
+// The format phase used to build one Formatter from format_options.Default, ahra's block, and run it over
 // whatever repository cohere was pointed at. That formatted api-phi-health with the wrong
 // bracketSameLine, which a differential measured as 41 files "rewritten" that are in fact a fixed point
 // of their own configuration. Formatting a repository with another repository's options is a bug,
@@ -22,35 +22,35 @@ import (
 // which would be true of our repositories today and would quietly stop being true when one grows a
 // nested config.
 //
-// Engines are built per distinct set of options and kept, so a repository with one config pays for
-// one engine. The parser table is independent of options, which is why Handles and Enumerate need no
+// Formatters are built per distinct set of options and kept, so a repository with one config pays for
+// one formatter. The parser table is independent of options, which is why Handles and Enumerate need no
 // resolution at all.
 type Resolving struct {
 	mutex       sync.Mutex
-	first       *Engine
-	engines     map[format_options.Options]*Engine
+	first       *Formatter
+	formatters  map[format_options.Options]*Formatter
 	byDirectory map[string]format_options.Resolution
 }
 
-// NewResolving builds the engine for startDirectory's options eagerly.
+// NewResolving builds the formatter for startDirectory's options eagerly.
 //
 // Eagerly, so a formatter whose bundles cannot be evaluated, or whose starting directory carries a
 // config cohere refuses, stops the run before any phase does work, rather than failing on the first
 // file after the fix phase has begun.
 func NewResolving(startDirectory string) (*Resolving, error) {
 	resolving := &Resolving{
-		engines:     map[format_options.Options]*Engine{},
+		formatters:  map[format_options.Options]*Formatter{},
 		byDirectory: map[string]format_options.Resolution{},
 	}
 	resolution, resolveError := resolving.resolve(startDirectory)
 	if resolveError != nil {
 		return nil, resolveError
 	}
-	engine, engineForError := resolving.engineFor(resolution.Options)
-	if engineForError != nil {
-		return nil, engineForError
+	formatter, formatterForError := resolving.formatterFor(resolution.Options)
+	if formatterForError != nil {
+		return nil, formatterForError
 	}
-	resolving.first = engine
+	resolving.first = formatter
 	return resolving, nil
 }
 
@@ -59,7 +59,7 @@ func (resolving *Resolving) Resolution(fileName string) (format_options.Resoluti
 	return resolving.resolve(filepath.Dir(fileName))
 }
 
-// Handles reports whether any engine formats this file type. Options do not change the answer.
+// Handles reports whether any formatter formats this file type. Options do not change the answer.
 func (resolving *Resolving) Handles(fileName string) bool {
 	return resolving.first.Handles(fileName)
 }
@@ -75,11 +75,11 @@ func (resolving *Resolving) Format(fileName string, text string) (string, error)
 	if resolveError != nil {
 		return "", fmt.Errorf("resolving the Prettier config for %s: %w", fileName, resolveError)
 	}
-	engine, engineForError := resolving.engineFor(resolution.Options)
-	if engineForError != nil {
-		return "", engineForError
+	formatter, formatterForError := resolving.formatterFor(resolution.Options)
+	if formatterForError != nil {
+		return "", formatterForError
 	}
-	return engine.Format(fileName, text)
+	return formatter.Format(fileName, text)
 }
 
 func (resolving *Resolving) resolve(directory string) (format_options.Resolution, error) {
@@ -104,16 +104,16 @@ func (resolving *Resolving) resolve(directory string) (format_options.Resolution
 	return resolution, nil
 }
 
-func (resolving *Resolving) engineFor(options format_options.Options) (*Engine, error) {
+func (resolving *Resolving) formatterFor(options format_options.Options) (*Formatter, error) {
 	resolving.mutex.Lock()
 	defer resolving.mutex.Unlock()
-	if engine, present := resolving.engines[options]; present {
-		return engine, nil
+	if formatter, present := resolving.formatters[options]; present {
+		return formatter, nil
 	}
-	engine, newPrettierError := New(options)
+	formatter, newPrettierError := New(options)
 	if newPrettierError != nil {
 		return nil, newPrettierError
 	}
-	resolving.engines[options] = engine
-	return engine, nil
+	resolving.formatters[options] = formatter
+	return formatter, nil
 }

@@ -46,7 +46,7 @@ silent rows (both real shapes, each arm on a number, literal unions, a branded n
 `-(-big)`, a constrained type parameter, a non-null-asserted number) and twelve reporting controls,
 then seven string and boolean silent rows (DialogRoot.tsx:175's boolean expression among them) and
 seven reporting controls. The four sites were then written as `zoom` (Structure c62c077e), which says
-the same thing and which neither engine reports (#cn8sthd).
+the same thing and which neither linter reports (#cn8sthd).
 
 ## Why this recommendation
 

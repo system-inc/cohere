@@ -37,18 +37,18 @@ func loadFunctionalFixture(test *testing.T, name string) functionalFixture {
 	return fixture
 }
 
-// TestFunctionalResolutionRejectsWhatTheEngineRejects is the half of the fixture that is unambiguous.
+// TestFunctionalResolutionRejectsWhatTailwindRejects is the half of the fixture that is unambiguous.
 //
 // Resolution is an intermediate and the fixture observes it through the declarations a class
 // compiles to, which is a weaker signal than the other generators produce: a handler can transform
-// the value on its way out. The rejections are not weak in that way. A class the engine compiles to
+// the value on its way out. The rejections are not weak in that way. A class Tailwind compiles to
 // no CSS at all is a class this pipeline must refuse to resolve, with nothing to interpret, so these
 // carry the test.
 //
 // Three of the four are the modifier-cancels rule in its three positions, which is the detail most
 // likely to be dropped in a port: upstream spells it three separate times and each one guards a
 // different branch.
-func TestFunctionalResolutionRejectsWhatTheEngineRejects(test *testing.T) {
+func TestFunctionalResolutionRejectsWhatTailwindRejects(test *testing.T) {
 	test.Parallel()
 	fixture := loadFunctionalFixture(test, "functional_fixtures.json")
 
@@ -77,7 +77,7 @@ func TestFunctionalResolutionRejectsWhatTheEngineRejects(test *testing.T) {
 		build, known := byClassName[probe.ClassName]
 		if !known {
 			test.Errorf(
-				"%s (%s) is rejected by the engine and this test has no case for it, so the rejection is unchecked",
+				"%s (%s) is rejected by Tailwind and this test has no case for it, so the rejection is unchecked",
 				probe.ClassName,
 				probe.Branch,
 			)
@@ -87,7 +87,7 @@ func TestFunctionalResolutionRejectsWhatTheEngineRejects(test *testing.T) {
 		candidate, description, negative := build()
 		if _, produced := ResolveFunctionalUtilityValue(&candidate, description, NewTheme(), negative); produced {
 			test.Errorf(
-				"%s (%s): the engine compiles it to no CSS and the pipeline resolved it to a value",
+				"%s (%s): Tailwind compiles it to no CSS and the pipeline resolved it to a value",
 				probe.ClassName,
 				probe.Branch,
 			)
@@ -163,7 +163,7 @@ func TestFunctionalResolutionModifierCancelsBareValue(test *testing.T) {
 		Modifier: &ParsedModifier{Kind: ParsedModifierKindNamed, Value: "3"},
 	}
 	if _, produced := ResolveFunctionalUtilityValue(&withModifier, description, theme, false); produced {
-		test.Error("a bare value without a slash resolved while a modifier was present; the engine produces nothing")
+		test.Error("a bare value without a slash resolved while a modifier was present; Tailwind produces nothing")
 	}
 
 	withSlash := withModifier
@@ -175,9 +175,9 @@ func TestFunctionalResolutionModifierCancelsBareValue(test *testing.T) {
 
 // TestFunctionalResolutionNegatesThroughMathOperatorSpacing pins the string, not only the arithmetic.
 //
-// The engine emits `calc(10 * -1)` for `-z-10`, measured in the fixture. Emitting `calc(10*-1)` is
+// Tailwind emits `calc(10 * -1)` for `-z-10`, measured in the fixture. Emitting `calc(10*-1)` is
 // the same CSS and a different string, and since this port compares readings rather than text it
-// would pass every assertion in this package while disagreeing with the engine anywhere the text
+// would pass every assertion in this package while disagreeing with Tailwind anywhere the text
 // reaches a data-type inference.
 func TestFunctionalResolutionNegatesThroughMathOperatorSpacing(test *testing.T) {
 	test.Parallel()
@@ -196,16 +196,16 @@ func TestFunctionalResolutionNegatesThroughMathOperatorSpacing(test *testing.T) 
 		test.Fatal("a negative bare value produced nothing")
 	}
 	if resolved.Value != "calc(10 * -1)" {
-		test.Errorf("negation produced %q, the engine produces %q", resolved.Value, "calc(10 * -1)")
+		test.Errorf("negation produced %q, Tailwind produces %q", resolved.Value, "calc(10 * -1)")
 	}
 }
 
-// TestFunctionalResolutionFractionMatchesTheEngineExactly pins branch 4 against the measured string.
+// TestFunctionalResolutionFractionMatchesTailwindExactly pins branch 4 against the measured string.
 //
 // The fixture records `w-1/2` compiling to `calc(1 / 2 * 100%)`. The spacing is upstream's own and a
 // port emitting `calc(1/2 * 100%)` would be the same CSS and a different string, in a value that
 // reaches `inferDataType` downstream.
-func TestFunctionalResolutionFractionMatchesTheEngineExactly(test *testing.T) {
+func TestFunctionalResolutionFractionMatchesTailwindExactly(test *testing.T) {
 	test.Parallel()
 	theme := NewTheme()
 	description := &FunctionalUtilityDescription{SupportsFractions: true, ThemeKeys: []string{"--width"}}
@@ -220,7 +220,7 @@ func TestFunctionalResolutionFractionMatchesTheEngineExactly(test *testing.T) {
 		test.Fatal("a supported fraction produced nothing")
 	}
 	if resolved.Value != "calc(1 / 2 * 100%)" {
-		test.Errorf("fraction produced %q, the engine produces %q", resolved.Value, "calc(1 / 2 * 100%)")
+		test.Errorf("fraction produced %q, Tailwind produces %q", resolved.Value, "calc(1 / 2 * 100%)")
 	}
 
 	// A non-integer half returns rather than falling through, which is upstream returning inside the
@@ -228,7 +228,7 @@ func TestFunctionalResolutionFractionMatchesTheEngineExactly(test *testing.T) {
 	nonInteger := candidate
 	nonInteger.Value = &ParsedValue{Kind: ParsedValueKindNamed, Value: "1.5", Fraction: "1.5/2"}
 	if _, produced := ResolveFunctionalUtilityValue(&nonInteger, description, theme, false); produced {
-		test.Error("a fraction with a non-integer numerator resolved; the engine compiles w-1.5/2 to nothing")
+		test.Error("a fraction with a non-integer numerator resolved; Tailwind compiles w-1.5/2 to nothing")
 	}
 }
 
@@ -251,7 +251,7 @@ func TestFunctionalResolutionValuelessModifierProducesNothing(test *testing.T) {
 
 	valueless := ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "bg", Modifier: modifier}
 	if _, produced := ResolveFunctionalUtilityValue(&valueless, description, theme, false); produced {
-		test.Error("a valueless candidate with a modifier resolved; the engine compiles bg/50 to nothing")
+		test.Error("a valueless candidate with a modifier resolved; Tailwind compiles bg/50 to nothing")
 	}
 
 	arbitrary := ParsedCandidate{
@@ -261,7 +261,7 @@ func TestFunctionalResolutionValuelessModifierProducesNothing(test *testing.T) {
 		Modifier: modifier,
 	}
 	if _, produced := ResolveFunctionalUtilityValue(&arbitrary, description, theme, false); produced {
-		test.Error("an arbitrary value with a modifier resolved; the engine compiles w-[3px]/50 to nothing")
+		test.Error("an arbitrary value with a modifier resolved; Tailwind compiles w-[3px]/50 to nothing")
 	}
 }
 
@@ -301,7 +301,7 @@ func TestFunctionalResolutionThemeBeforeStaticValues(test *testing.T) {
 	}
 }
 
-// TestIsPositiveIntegerMatchesTheEngineIncludingPrecision pins the predicate against measured answers.
+// TestIsPositiveIntegerMatchesTailwindIncludingPrecision pins the predicate against measured answers.
 //
 // Upstream is `Number.isInteger(num) && num >= 0 && String(num) === String(value)`, and the
 // round-trip clause is the whole predicate. Every case below was run against that JavaScript rather
@@ -311,7 +311,7 @@ func TestFunctionalResolutionThemeBeforeStaticValues(test *testing.T) {
 // and `String(num)` prints the rounded form, and upstream returns false where a digit scan returns
 // true. It is the only disagreement in this corpus, which is exactly why it needs to be here: a port
 // that dropped the round-trip would pass every other case in this test.
-func TestIsPositiveIntegerMatchesTheEngineIncludingPrecision(test *testing.T) {
+func TestIsPositiveIntegerMatchesTailwindIncludingPrecision(test *testing.T) {
 	test.Parallel()
 	cases := map[string]bool{
 		"0": true, "1": true, "10": true,
@@ -321,16 +321,16 @@ func TestIsPositiveIntegerMatchesTheEngineIncludingPrecision(test *testing.T) {
 	}
 	for input, expected := range cases {
 		if actual := isPositiveInteger(input); actual != expected {
-			test.Errorf("isPositiveInteger(%q) = %v, the engine says %v", input, actual, expected)
+			test.Errorf("isPositiveInteger(%q) = %v, Tailwind says %v", input, actual, expected)
 		}
 	}
 
 	// The strict form differs from the loose one on exactly one input, so that is what is asserted
 	// rather than the whole corpus a second time.
 	if isStrictPositiveInteger("0") {
-		test.Error(`isStrictPositiveInteger("0") = true, the engine says false`)
+		test.Error(`isStrictPositiveInteger("0") = true, Tailwind says false`)
 	}
 	if !isStrictPositiveInteger("1") {
-		test.Error(`isStrictPositiveInteger("1") = false, the engine says true`)
+		test.Error(`isStrictPositiveInteger("1") = false, Tailwind says true`)
 	}
 }

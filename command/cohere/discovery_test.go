@@ -45,11 +45,11 @@ func TestDiscoveryFindsEveryProjectTheRepositoryKeeps(test *testing.T) {
 		test.Fatal(discoverProjectsError)
 	}
 	want := []discoveredProject{
-		{Directory: ".", Engine: engineTypeScript},
-		{Directory: ".", Engine: engineSwift},
-		{Directory: "apps/web", Engine: engineTypeScript},
-		{Directory: "packages/a/b", Engine: engineSwift},
-		{Directory: "packages/a-b", Engine: engineTypeScript},
+		{Directory: ".", Kind: projectKindTypeScriptProgram},
+		{Directory: ".", Kind: projectKindSwiftPackage},
+		{Directory: "apps/web", Kind: projectKindTypeScriptProgram},
+		{Directory: "packages/a/b", Kind: projectKindSwiftPackage},
+		{Directory: "packages/a-b", Kind: projectKindTypeScriptProgram},
 	}
 	if !reflect.DeepEqual(found.Projects, want) {
 		test.Fatalf("found %+v, want %+v", found.Projects, want)
@@ -78,8 +78,8 @@ func TestDiscoveryLetsAGoWorkspaceClaimTheModulesItUses(test *testing.T) {
 		test.Fatal(discoverProjectsError)
 	}
 	want := []discoveredProject{
-		{Directory: ".", Engine: engineGo},
-		{Directory: "tools/unused", Engine: engineGo},
+		{Directory: ".", Kind: projectKindGoModule},
+		{Directory: "tools/unused", Kind: projectKindGoModule},
 	}
 	if !reflect.DeepEqual(found.Projects, want) {
 		test.Fatalf("found %+v, want %+v", found.Projects, want)
@@ -122,9 +122,9 @@ func TestDiscoveryKeepsAMalformedGoWorkToItsOwnProject(test *testing.T) {
 		test.Fatalf("one malformed go.work stopped discovery for every project: %v", discoveryError)
 	}
 	want := []discoveredProject{
-		{Directory: ".", Engine: engineTypeScript},
-		{Directory: "workspace", Engine: engineGo},
-		{Directory: "workspace/module", Engine: engineGo},
+		{Directory: ".", Kind: projectKindTypeScriptProgram},
+		{Directory: "workspace", Kind: projectKindGoModule},
+		{Directory: "workspace/module", Kind: projectKindGoModule},
 	}
 	if !reflect.DeepEqual(found.Projects, want) {
 		test.Errorf("found %+v, want %+v", found.Projects, want)
@@ -143,21 +143,21 @@ func TestDiscoveryKeepsAMalformedGoWorkToItsOwnProject(test *testing.T) {
 func TestSortProjectsRanksTypeScriptThenSwiftThenGo(test *testing.T) {
 	test.Parallel()
 	found := discovery{Projects: []discoveredProject{
-		{Directory: "app", Engine: engineGo},
-		{Directory: ".", Engine: engineGo},
-		{Directory: "app", Engine: engineSwift},
-		{Directory: ".", Engine: engineSwift},
-		{Directory: "app", Engine: engineTypeScript},
-		{Directory: ".", Engine: engineTypeScript},
+		{Directory: "app", Kind: projectKindGoModule},
+		{Directory: ".", Kind: projectKindGoModule},
+		{Directory: "app", Kind: projectKindSwiftPackage},
+		{Directory: ".", Kind: projectKindSwiftPackage},
+		{Directory: "app", Kind: projectKindTypeScriptProgram},
+		{Directory: ".", Kind: projectKindTypeScriptProgram},
 	}}
 	found.sortProjects()
 	want := []discoveredProject{
-		{Directory: ".", Engine: engineTypeScript},
-		{Directory: ".", Engine: engineSwift},
-		{Directory: ".", Engine: engineGo},
-		{Directory: "app", Engine: engineTypeScript},
-		{Directory: "app", Engine: engineSwift},
-		{Directory: "app", Engine: engineGo},
+		{Directory: ".", Kind: projectKindTypeScriptProgram},
+		{Directory: ".", Kind: projectKindSwiftPackage},
+		{Directory: ".", Kind: projectKindGoModule},
+		{Directory: "app", Kind: projectKindTypeScriptProgram},
+		{Directory: "app", Kind: projectKindSwiftPackage},
+		{Directory: "app", Kind: projectKindGoModule},
 	}
 	if !reflect.DeepEqual(found.Projects, want) {
 		test.Errorf("sorted %+v, want %+v", found.Projects, want)
@@ -168,10 +168,10 @@ func TestSortProjectsRanksTypeScriptThenSwiftThenGo(test *testing.T) {
 func TestSummaryLineCountsGoProjects(test *testing.T) {
 	test.Parallel()
 	runs := []projectRun{
-		{project: discoveredProject{Directory: ".", Engine: engineTypeScript}},
-		{project: discoveredProject{Directory: ".", Engine: engineGo}},
-		{project: discoveredProject{Directory: "swift", Engine: engineSwift}},
-		{project: discoveredProject{Directory: "tools", Engine: engineGo}, exitCode: 1},
+		{project: discoveredProject{Directory: ".", Kind: projectKindTypeScriptProgram}},
+		{project: discoveredProject{Directory: ".", Kind: projectKindGoModule}},
+		{project: discoveredProject{Directory: "swift", Kind: projectKindSwiftPackage}},
+		{project: discoveredProject{Directory: "tools", Kind: projectKindGoModule}, exitCode: 1},
 	}
 	line := summaryLine(discovery{}, runs)
 	if want := "projects: 4 checked (1 TypeScript, 1 Swift, 2 Go), 1 failed"; !strings.HasPrefix(line, want) {
@@ -214,7 +214,9 @@ func TestDiscoveryNeverEntersWhatItMustNot(test *testing.T) {
 	if discoverProjectsError != nil {
 		test.Fatal(discoverProjectsError)
 	}
-	if want := []discoveredProject{{Directory: ".", Engine: engineSwift}}; !reflect.DeepEqual(found.Projects, want) {
+	if want := []discoveredProject{
+		{Directory: ".", Kind: projectKindSwiftPackage},
+	}; !reflect.DeepEqual(found.Projects, want) {
 		test.Fatalf("found %+v, want only the root's package", found.Projects)
 	}
 	// node_modules, .build, .cache and testdata; the root's own .git is passed over without counting.
@@ -415,7 +417,7 @@ func TestARootNoTypeScriptProjectHoldsGetsTheFormatProject(test *testing.T) {
 			found.addRootFormatProject()
 			formatProjects := 0
 			for _, project := range found.Projects {
-				if project.Engine == engineFormat {
+				if project.Kind == projectKindFolder {
 					formatProjects++
 					if project.Directory != "." {
 						test.Errorf("the format project is at %q, want the root", project.Directory)
@@ -435,7 +437,7 @@ func TestARootNoTypeScriptProjectHoldsGetsTheFormatProject(test *testing.T) {
 					rootProjects = append(rootProjects, project)
 				}
 			}
-			if last := rootProjects[len(rootProjects)-1]; last.Engine != engineFormat {
+			if last := rootProjects[len(rootProjects)-1]; last.Kind != projectKindFolder {
 				test.Errorf("the format project sorts before %+v, want it last of the root's", last)
 			}
 			wantYield := projectYield{}
@@ -443,7 +445,7 @@ func TestARootNoTypeScriptProjectHoldsGetsTheFormatProject(test *testing.T) {
 				wantYield.Directories = append(wantYield.Directories, filepath.Join(root, directory))
 			}
 			if yield := found.formatYield(
-				discoveredProject{Directory: ".", Engine: engineFormat},
+				discoveredProject{Directory: ".", Kind: projectKindFolder},
 			); !reflect.DeepEqual(yield, wantYield) {
 				test.Errorf("the format project yields %+v, want %+v", yield, wantYield)
 			}
@@ -451,16 +453,16 @@ func TestARootNoTypeScriptProjectHoldsGetsTheFormatProject(test *testing.T) {
 	}
 }
 
-// The summary line counts the format project after every engine with a marker.
+// The summary line counts the format project after every language with a marker.
 func TestSummaryLineCountsTheFormatProject(test *testing.T) {
 	test.Parallel()
 	runs := []projectRun{
-		{project: discoveredProject{Directory: ".", Engine: engineGo}},
-		{project: discoveredProject{Directory: ".", Engine: engineFormat}, exitCode: 1},
-		{project: discoveredProject{Directory: "swift", Engine: engineSwift}},
+		{project: discoveredProject{Directory: ".", Kind: projectKindGoModule}},
+		{project: discoveredProject{Directory: ".", Kind: projectKindFolder}, exitCode: 1},
+		{project: discoveredProject{Directory: "swift", Kind: projectKindSwiftPackage}},
 	}
 	line := summaryLine(discovery{}, runs)
-	if want := "projects: 3 checked (1 Swift, 1 Go, 1 Format), 1 failed"; !strings.HasPrefix(line, want) {
+	if want := "projects: 3 checked (1 Swift, 1 Go, 1 Folder), 1 failed"; !strings.HasPrefix(line, want) {
 		test.Errorf("summary %q, want it to start %q", line, want)
 	}
 }
@@ -468,7 +470,7 @@ func TestSummaryLineCountsTheFormatProject(test *testing.T) {
 // TestTheFormatProjectsRecordSaysWhatItCovered is #vyjvz9k, through the binary: at a Go module's root holding Markdown
 // and JSON, the format project's `--json` summary counts the files it accounted for: formatted fresh on the first run,
 // vouched for by the format record on the next, and after one file changes, that one fresh and the other two vouched
-// for. Its label is its own, `. (Format)`, beside the Go project's `.`. It used to say 0 files in scope.
+// for. Its label is its own, `. (Folder)`, beside the Go project's `.`. It used to say 0 files in scope.
 func TestTheFormatProjectsRecordSaysWhatItCovered(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -485,7 +487,7 @@ func TestTheFormatProjectsRecordSaysWhatItCovered(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, "--no-fix", "--format-only", "--json")
 		command.Dir = root
-		command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_VERDICT_FD=",
+		command.Env = append(withoutVariable(os.Environ(), goChildVariable), "COHERE_VERDICT_FD=",
 			"CGO_ENABLED=0")
 		output, runError := command.Output()
 		var exitError *exec.ExitError
@@ -519,9 +521,9 @@ func TestTheFormatProjectsRecordSaysWhatItCovered(test *testing.T) {
 			writeTree(test, root, map[string]string{"README.md": want.edit})
 		}
 		found := summaries()
-		formatProject, present := found[". (Format)"]
+		formatProject, present := found[". (Folder)"]
 		if _, goPresent := found["."]; !present || !goPresent {
-			test.Fatalf("run %d: want summaries labeled `.` and `. (Format)`, got %v", run, found)
+			test.Fatalf("run %d: want summaries labeled `.` and `. (Folder)`, got %v", run, found)
 		}
 		if formatProject.FilesInScope != 3 || formatProject.Checked != want.checked ||
 			formatProject.Cached != want.cached {

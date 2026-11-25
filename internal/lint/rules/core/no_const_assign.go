@@ -150,7 +150,7 @@ var NoConstAssign = rule.Rule[rule.NoOptions]{
 		judged := map[*ast.Node]bool{}
 		return rule.Listeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
-				// The engine hands every rule a nil checker when the program could not be built,
+				// The linter hands every rule a nil checker when the program could not be built,
 				// and this rule can answer nothing without one.
 				if ruleContext.TypeChecker == nil {
 					return

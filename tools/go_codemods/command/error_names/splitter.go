@@ -115,7 +115,7 @@ type parameterHost struct {
 }
 
 // split decides one variable. It returns a plan, or "" plans and a category saying why the variable is left.
-// A plan with a single group is a plain rename of the original; the caller sends it to the rename engine. A
+// A plan with a single group is a plain rename of the original; the caller sends it to global_rename. A
 // parameter, written by its caller before the body runs, is split with parameter set.
 func (analysis *splitter) split(variable *types.Var, parameter *parameterHost) (*splitPlan, string) {
 	unit := analysis.functions.innermost(variable.Pos())

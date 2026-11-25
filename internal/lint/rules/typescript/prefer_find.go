@@ -30,7 +30,7 @@ import (
 // is the same. The type is not: `filter` returns `T[]` and indexing it gives `T` under a
 // non-strict index signature, while `find` returns `T | undefined`. Swapping them can therefore
 // turn code that compiled into code that does not, which is why upstream offers the rewrite rather
-// than applying it. Shipping this as a fix would have the edit engine break builds unattended.
+// than applying it. Shipping this as a fix would have the fix pass break builds unattended.
 //
 // # What counts as an index of zero, and where the constant comes from
 //

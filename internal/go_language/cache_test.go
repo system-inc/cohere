@@ -66,7 +66,7 @@ func withoutJsonObject(stream string, field string) string {
 	}
 }
 
-// cachedRun is one engine run over root with extra after the contract and root, its stream normalized, its stream
+// cachedRun is one cohere-go run over root with extra after the contract and root, its stream normalized, its stream
 // without the cache counts, its lint record's cache counts, and its exit code.
 type cachedRun struct {
 	stream        string
@@ -75,16 +75,16 @@ type cachedRun struct {
 	exitCode      int
 }
 
-// runCachedEngine runs the engine over root, in process, and fails the test unless it exits with a summary, 0 or 1,
+// runCached runs cohere-go over root, in process, and fails the test unless it exits with a summary, 0 or 1,
 // says nothing on stderr and writes a lint record.
-func runCachedEngine(test *testing.T, root string, extra ...string) cachedRun {
+func runCached(test *testing.T, root string, extra ...string) cachedRun {
 	test.Helper()
-	return runEngineWith(test, root, standardLibrarySource{}, rules.All(), extra...)
+	return runWith(test, root, standardLibrarySource{}, rules.All(), extra...)
 }
 
-// runEngineWith is runCachedEngine with source as where its standard library comes from and goes and registered as
+// runWith is runCached with source as where its standard library comes from and goes and registered as
 // the rules.
-func runEngineWith(
+func runWith(
 	test *testing.T,
 	root string,
 	source standardLibrarySource,
@@ -92,12 +92,12 @@ func runEngineWith(
 	extra ...string,
 ) cachedRun {
 	test.Helper()
-	return runEngineAnsweringInPart(test, root, source, registered, nil, extra...)
+	return runAnsweringInPart(test, root, source, registered, nil, extra...)
 }
 
-// runEngineAnsweringInPart is runEngineWith writing the entries of the packages answersInPart names, by import path,
+// runAnsweringInPart is runWith writing the entries of the packages answersInPart names, by import path,
 // with only the answers the run's questions computed in them (see check.Caching's AnswersInPart).
-func runEngineAnsweringInPart(
+func runAnsweringInPart(
 	test *testing.T,
 	root string,
 	source standardLibrarySource,
@@ -106,15 +106,15 @@ func runEngineAnsweringInPart(
 	extra ...string,
 ) cachedRun {
 	test.Helper()
-	ran, standardError := runEngineNoting(test, root, source, registered, answersInPart, extra...)
+	ran, standardError := runNoting(test, root, source, registered, answersInPart, extra...)
 	if standardError != "" {
 		test.Fatalf("want nothing on stderr, got:\n%s", standardError)
 	}
 	return ran
 }
 
-// runEngineNoting is runEngineAnsweringInPart with what the run said on stderr, which it leaves to the test.
-func runEngineNoting(
+// runNoting is runAnsweringInPart with what the run said on stderr, which it leaves to the test.
+func runNoting(
 	test *testing.T,
 	root string,
 	source standardLibrarySource,
@@ -189,7 +189,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "vet-finding"))
-	cold := runCachedEngine(test, root, "--no-system-cache")
+	cold := runCached(test, root, "--no-system-cache")
 	if !cold.counts.On || cold.counts.Hit != 0 || cold.counts.Written == 0 ||
 		cold.counts.Written+cold.counts.Unstorable > cold.counts.Missed {
 		test.Fatalf("want a cold run that hit nothing and wrote what it missed, got %+v", cold.counts)
@@ -203,7 +203,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 			"files", cold.counts.Written, len(written))
 	}
 
-	warm := runCachedEngine(test, root, "--no-system-cache")
+	warm := runCached(test, root, "--no-system-cache")
 	if warm.counts.Hit != cold.counts.Written || warm.counts.Missed != cold.counts.Missed-cold.counts.Written {
 		test.Fatalf("want every package written cold hit warm and the rest missed, cold %+v, warm %+v", cold.counts,
 			warm.counts)
@@ -221,7 +221,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 		0o644); writeError != nil {
 		test.Fatalf("editing %s: %v", file, writeError)
 	}
-	edited := runCachedEngine(test, root, "--no-system-cache")
+	edited := runCached(test, root, "--no-system-cache")
 	if edited.counts.Hit != cold.counts.Written-1 || edited.counts.Written != 1 {
 		test.Fatalf("want only the edited package missed and written, cold %+v, edited %+v", cold.counts,
 			edited.counts)
@@ -231,7 +231,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	}
 
 	before := entriesIn(test, root)
-	uncached := runCachedEngine(test, root, "--no-cache", "--no-system-cache")
+	uncached := runCached(test, root, "--no-cache", "--no-system-cache")
 	if uncached.counts != (contract.LintCache{SystemCacheOff: true}) {
 		test.Fatalf("want a run under --no-cache to count nothing, got %+v", uncached.counts)
 	}
@@ -244,7 +244,7 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	}
 
 	fresh := copyFixture(test, filepath.Join("testdata", "vet-finding"))
-	runCachedEngine(test, fresh, "--no-cache", "--no-system-cache")
+	runCached(test, fresh, "--no-cache", "--no-system-cache")
 	if _, statError := os.Stat(filepath.Join(fresh, ".cache", "cohere", "go")); !os.IsNotExist(statError) {
 		test.Fatalf("want no store made under --no-cache, got %v", statError)
 	}
@@ -289,7 +289,7 @@ func TestAKeyNamesTheBytesTheRunCheckedNotTheDisks(test *testing.T) {
 	if writeError := os.WriteFile(file, checked, 0o644); writeError != nil {
 		test.Fatalf("putting %s back: %v", file, writeError)
 	}
-	warm := runCachedEngine(test, root)
+	warm := runCached(test, root)
 	if warm.counts.Hit != cold.Written || warm.counts.Missed != cold.Missed-cold.Written {
 		test.Fatalf("want every entry the first run wrote hit with vet.go put back, cold %+v, warm %+v", cold,
 			warm.counts)
@@ -322,8 +322,8 @@ func TestAStaticcheckConfAboveAPackageIsInItsKey(test *testing.T) {
 		} else if writeError := os.WriteFile(configuration, []byte(state.contents), 0o644); writeError != nil {
 			test.Fatalf("%s: writing %s: %v", state.name, configuration, writeError)
 		}
-		cached := runCachedEngine(test, root)
-		uncached := runCachedEngine(test, root, "--no-cache")
+		cached := runCached(test, root)
+		uncached := runCached(test, root, "--no-cache")
 		if cached.withoutCounts != uncached.withoutCounts {
 			test.Fatalf("%s: cached\n%s\nunder --no-cache\n%s", state.name, cached.withoutCounts,
 				uncached.withoutCounts)
@@ -367,8 +367,8 @@ func TestALintDirectiveIsInItsPackagesKey(test *testing.T) {
 		if writeError := os.WriteFile(file, state.contents, 0o644); writeError != nil {
 			test.Fatalf("%s: writing %s: %v", state.name, file, writeError)
 		}
-		cached := runCachedEngine(test, root)
-		uncached := runCachedEngine(test, root, "--no-cache")
+		cached := runCached(test, root)
+		uncached := runCached(test, root, "--no-cache")
 		if cached.withoutCounts != uncached.withoutCounts {
 			test.Fatalf("%s: cached\n%s\nunder --no-cache\n%s", state.name, cached.withoutCounts,
 				uncached.withoutCounts)
@@ -551,9 +551,9 @@ func TestTheInputsRecordIsTheSameWithAKeptListing(test *testing.T) {
 		test.Fatalf("no inputs record in\n%s", run.stream)
 		return ""
 	}
-	asked := inputsLine(runCachedEngine(test, root))
-	kept := inputsLine(runCachedEngine(test, root))
-	fresh := inputsLine(runCachedEngine(test, root, "--no-cache"))
+	asked := inputsLine(runCached(test, root))
+	kept := inputsLine(runCached(test, root))
+	fresh := inputsLine(runCached(test, root, "--no-cache"))
 	if kept != fresh || asked != fresh {
 		test.Fatalf("the inputs record\nwith a kept listing %s\nasking go list     %s", kept, fresh)
 	}
@@ -572,7 +572,7 @@ func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
 	if readError != nil {
 		test.Fatalf("reading %s: %v", file, readError)
 	}
-	checked := runCachedEngine(test, root)
+	checked := runCached(test, root)
 	if !checked.counts.On {
 		test.Fatalf("want the findings cache on, so gofmt's verdict is kept, got %+v", checked.counts)
 	}
@@ -610,8 +610,8 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 	// One system cache for every run of both copies, as a person's, so each restores the standard library alike and
 	// the counts compare the project's own packages.
 	shared := standardLibrarySource{systemCacheRoot: test.TempDir()}
-	runEngineWith(test, renamed, shared, rules.All())
-	runEngineWith(test, edited, shared, rules.All())
+	runWith(test, renamed, shared, rules.All())
+	runWith(test, edited, shared, rules.All())
 
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
@@ -642,14 +642,14 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 		}
 	}
 
-	next := runEngineWith(test, renamed, shared, rules.All())
-	byHand := runEngineWith(test, edited, shared, rules.All())
+	next := runWith(test, renamed, shared, rules.All())
+	byHand := runWith(test, edited, shared, rules.All())
 	if next.counts.Hit == 0 || next.counts.Missed == 0 || next.counts.Hit != byHand.counts.Hit ||
 		next.counts.Missed != byHand.counts.Missed {
 		test.Fatalf("want the run after the rename to hit and miss as the run after the same edit by hand, after the "+
 			"rename %+v, by hand %+v", next.counts, byHand.counts)
 	}
-	uncached := runEngineWith(test, renamed, shared, rules.All(), "--no-cache")
+	uncached := runWith(test, renamed, shared, rules.All(), "--no-cache")
 	if next.withoutCounts != uncached.withoutCounts {
 		test.Fatalf("after the rename, cached\n%s\nunder --no-cache\n%s", next.withoutCounts, uncached.withoutCounts)
 	}

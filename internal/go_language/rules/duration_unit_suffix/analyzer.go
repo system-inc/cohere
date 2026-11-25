@@ -1,6 +1,6 @@
 // Package duration_unit_suffix is staticcheck's `ST1011`, a variable of type time.Duration, or a pointer to one,
 // whose name ends in a unit of time such as "Ms" or "Secs", though a duration counts nanoseconds whatever it is named,
-// ported onto the engine's syntax dispatcher.
+// ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1011/st1011.go, whose messages it
 // reports word for word, at the name, with no range option and no filter for generated files, as the original does.
@@ -8,7 +8,7 @@
 // requires nothing else, so the port saves only its walk of its own.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package duration_unit_suffix
 
 import (

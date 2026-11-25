@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6002",
 	"SA6002",
 	"Flags a value given to sync.Pool's Put that is not like a pointer, or is a slice, so putting it allocates: "+
-		"staticcheck's SA6002, ported onto the engine's own intermediate representation.",
+		"staticcheck's SA6002, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

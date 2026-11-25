@@ -1,7 +1,7 @@
 // Command handnames applies renames a person chose, one per line of a list: `path:line:column newName`, where
 // the position is the declaring identifier of a local variable (a parameter, named result or local) as the
 // findings census reports it. The judgment is in the list; this command only finds each declaration, hands every
-// rename to the rename engine, which refuses any that would change what an identifier resolves to, and writes
+// rename to global_rename, which refuses any that would change what an identifier resolves to, and writes
 // through the verified apply, which reloads the tree with the rewrite in memory and compares every identifier's
 // resolution before writing anything. A line whose position declares no local is reported, never guessed at.
 package main
@@ -193,9 +193,9 @@ func readList(path string) ([]request, error) {
 	return requests, scanner.Err()
 }
 
-// plan finds each request's declaration, checks every package's requests together through the rename engine,
+// plan finds each request's declaration, checks every package's requests together through global_rename,
 // and returns the edits of the accepted renames, each request's outcome, and a line for each occurrence the
-// engine could not resolve.
+// renaming could not resolve.
 func plan(loaded *workspace.Workspace, requests []request) ([]rename.Edit, map[string]string, []string) {
 	outcomes := map[string]string{}
 	wanted := map[string]request{}
@@ -305,7 +305,7 @@ func typeSwitchClauses(info *types.Info, file *ast.File) map[*ast.Ident][]types.
 	return clausesOf
 }
 
-// isFunctionConstant reports whether object is a constant declared inside a function, which the rename engine
+// isFunctionConstant reports whether object is a constant declared inside a function, which global_rename
 // does not take (it renames variables) but which, like a local variable, is read only inside its own function.
 func isFunctionConstant(object types.Object, packageTypes *types.Package) bool {
 	constant, isConstant := object.(*types.Const)
@@ -316,7 +316,7 @@ func isFunctionConstant(object types.Object, packageTypes *types.Package) bool {
 	return parent != packageTypes.Scope() && parent.Parent() != packageTypes.Scope()
 }
 
-// constantEdits renames every identifier that declares or reads constant. The engine's scope check does not
+// constantEdits renames every identifier that declares or reads constant. global_rename's scope check does not
 // cover constants, so a constant's rename rests on the verified apply: the reload compares every identifier's
 // resolution, and a new name that captured or was captured by another declaration is a mismatch that writes
 // nothing.

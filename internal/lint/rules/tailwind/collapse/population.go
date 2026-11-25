@@ -10,14 +10,14 @@ type Population struct {
 	// SystemName is the design system this population was measured on.
 	SystemName string
 	// RegistryClasses and CorpusClasses are the two populations, kept apart because they answer
-	// different questions. The registry is what the engine advertises and the corpus is what someone
+	// different questions. The registry is what Tailwind advertises and the corpus is what someone
 	// happened to write, and an earlier table in this slice built from a corpus missed nine
 	// families.
 	RegistryClasses int
 	CorpusClasses   int
-	// EngineNullReadings is how many classes the engine itself declined, across both populations.
+	// TailwindNullReadings is how many classes Tailwind itself declined, across both populations.
 	// A run where this is zero on the corpus has almost certainly lost its corpus.
-	EngineNullReadings int
+	TailwindNullReadings int
 	// UnknownPopulationClasses is how many classes named a population this package does not know.
 	//
 	// Never zero by accident: it can only be non-zero if a caller invented a population name, and

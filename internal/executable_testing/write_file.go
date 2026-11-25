@@ -1,4 +1,4 @@
-// Package executable_testing is for tests that write an executable, a stand-in on PATH, an engine a command under
+// Package executable_testing is for tests that write an executable, a stand-in on PATH, a language a command under
 // test starts or a copy of a binary, and then run it. Written with os.WriteFile, such a run can fail on Linux with
 // `text file busy` while a parallel test in the same process starts a process of its own (Go issue 22315).
 package executable_testing

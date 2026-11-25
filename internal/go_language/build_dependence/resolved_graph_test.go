@@ -634,7 +634,7 @@ func TestUnitsComeInPackageOrderAndACallReachesTheNextPackagesFirstUnit(test *te
 	}
 }
 
-// chainLoadUnder is the build-facts-chain fixture of the engine's testdata, its own module, loaded whole under build
+// chainLoadUnder is the build-facts-chain fixture of cohere-go's testdata, its own module, loaded whole under build
 // with its tests: one package of its own and the part of the standard library it reaches. It is not the scratch tests'
 // chainLoad, which loads the fixture once and under the host alone: the benchmark judges a windows build on it too.
 func chainLoadUnder(benchmark *testing.B, build fixtureBuild) loadedBuild {

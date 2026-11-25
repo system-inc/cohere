@@ -204,7 +204,7 @@ func TestRadixSuggestsARadixOfTen(test *testing.T) {
 			}
 			// The rule must not also propose an unattended fix. Upstream offers a suggestion
 			// precisely because adding a radix changes what the call returns, and shipping the
-			// same edit as a fix would have the engine apply it without anyone choosing it.
+			// same edit as a fix would have the fix pass apply it without anyone choosing it.
 			if len(result.Diagnostics[0].Fixes) != 0 {
 				test.Errorf("expected no unattended fix, got %d", len(result.Diagnostics[0].Fixes))
 			}

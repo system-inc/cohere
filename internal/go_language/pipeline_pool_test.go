@@ -21,16 +21,16 @@ func TestEveryBuildSharesTheRunsOnePool(test *testing.T) {
 	var lock sync.Mutex
 	held, peak, ready := 0, 0, 0
 	allReady := make(chan struct{})
-	engine, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
-		engine.buildsWidthForced = 3
-		engine.poolSizeForced = 2
-		engine.poolObserve = func(change int) {
+	pipeline, raw := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(pipeline *pipeline) {
+		pipeline.buildsWidthForced = 3
+		pipeline.poolSizeForced = 2
+		pipeline.poolObserve = func(change int) {
 			lock.Lock()
 			defer lock.Unlock()
 			held += change
 			peak = max(peak, held)
 		}
-		engine.lintSteps = func(_ project.Build, step lintStep, _ int) {
+		pipeline.lintSteps = func(_ project.Build, step lintStep, _ int) {
 			if step != lintStepReady {
 				return
 			}
@@ -43,12 +43,12 @@ func TestEveryBuildSharesTheRunsOnePool(test *testing.T) {
 			awaitStep(test, allReady, "every build's load ending")
 		}
 	}, "--no-cache")
-	if engine.buildsAtOnce != 3 {
+	if pipeline.buildsAtOnce != 3 {
 		test.Fatalf("the builds ran %d at once, want 3, so the pool is shared by builds side by side",
-			engine.buildsAtOnce)
+			pipeline.buildsAtOnce)
 	}
-	if engine.poolsMade != 1 {
-		test.Errorf("the run made %d pools, want one, which every load and check shares", engine.poolsMade)
+	if pipeline.poolsMade != 1 {
+		test.Errorf("the run made %d pools, want one, which every load and check shares", pipeline.poolsMade)
 	}
 	if peak > 2 || peak == 0 {
 		test.Errorf("at most %d of the pool's slots were held at once across every build, want 2, its size, or fewer, "+
@@ -76,16 +76,16 @@ func TestEachBuildsLoadAndRulesTakeThePoolsSlots(test *testing.T) {
 	}
 	windows := map[string]*window{}
 	mark, previousEnded := 0, false
-	engine, _ := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(engine *pipeline) {
-		engine.buildsWidthForced = 1
-		engine.poolObserve = func(change int) {
+	pipeline, _ := runOverConfigured(test, threeExtraBuilds(test), exitFindings, func(pipeline *pipeline) {
+		pipeline.buildsWidthForced = 1
+		pipeline.poolObserve = func(change int) {
 			lock.Lock()
 			defer lock.Unlock()
 			if change > 0 {
 				taken++
 			}
 		}
-		engine.lintSteps = func(extra project.Build, step lintStep, _ int) {
+		pipeline.lintSteps = func(extra project.Build, step lintStep, _ int) {
 			lock.Lock()
 			defer lock.Unlock()
 			name := extra.String()
@@ -103,8 +103,8 @@ func TestEachBuildsLoadAndRulesTakeThePoolsSlots(test *testing.T) {
 			}
 		}
 	}, "--no-cache")
-	if engine.buildsAtOnce != 1 || len(windows) != 3 {
-		test.Fatalf("%d builds ran %d at once, want 3, one at a time", len(windows), engine.buildsAtOnce)
+	if pipeline.buildsAtOnce != 1 || len(windows) != 3 {
+		test.Fatalf("%d builds ran %d at once, want 3, one at a time", len(windows), pipeline.buildsAtOnce)
 	}
 	measured := 0
 	for name, each := range windows {
@@ -130,8 +130,8 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 	streams := map[int]string{}
 	for _, width := range []int{1, 4} {
 		root := threeExtraBuilds(test)
-		_, stream := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-			engine.buildsWidthForced = width
+		_, stream := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+			pipeline.buildsWidthForced = width
 		}, "--no-cache")
 		streams[width] = normalize(stream, root)
 	}
@@ -151,19 +151,26 @@ func TestTheWidthChangesNothingUnderTheOnePool(test *testing.T) {
 func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 	test.Parallel()
 
-	underCap := func() *engineMemory {
-		return &engineMemory{record: contract.Memory{LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap,
+	underCap := func() *memoryAccount {
+		return &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
 			Source: contract.MemorySourceCap}}
 	}
 	measured := threeExtraBuilds(test)
-	engine, raw := runOverConfigured(test, measured, exitFindings, func(engine *pipeline) {
-		engine.memory = underCap()
+	measuredPipeline, raw := runOverConfigured(test, measured, exitFindings, func(pipeline *pipeline) {
+		pipeline.memory = underCap()
 	}, "--no-cache")
-	if engine.buildsWidthBuildBytes == 0 || engine.buildsWidthLiveBytes == 0 || engine.buildsAtOnce < 1 ||
-		engine.buildsWidthFromHostLive {
-		test.Fatalf("the width %d was decided by a live heap of %d and a holding of %d, from the live heap alone %t, "+
-			"want both measured", engine.buildsAtOnce, engine.buildsWidthLiveBytes, engine.buildsWidthBuildBytes,
-			engine.buildsWidthFromHostLive)
+	if measuredPipeline.buildsWidthBuildBytes == 0 ||
+		measuredPipeline.buildsWidthLiveBytes == 0 ||
+		measuredPipeline.buildsAtOnce < 1 ||
+		measuredPipeline.buildsWidthFromHostLive {
+		test.Fatalf(
+			"the width %d was decided by a live heap of %d and a holding of %d, from the live heap alone %t, "+
+				"want both measured",
+			measuredPipeline.buildsAtOnce,
+			measuredPipeline.buildsWidthLiveBytes,
+			measuredPipeline.buildsWidthBuildBytes,
+			measuredPipeline.buildsWidthFromHostLive,
+		)
 	}
 	for _, field := range []string{`"buildsWidthLiveBytes":`, `"buildsWidthBuildBytes":`,
 		`"buildsWidthPeakFactor":2.5`} {
@@ -172,16 +179,16 @@ func TestTheWidthIsMeasuredAsTheFirstBuildsLoadEnds(test *testing.T) {
 		}
 	}
 	stored := threeExtraBuilds(test)
-	_, storedStream := runOverConfigured(test, stored, exitFindings, func(engine *pipeline) {
-		engine.memory = underCap()
+	_, storedStream := runOverConfigured(test, stored, exitFindings, func(pipeline *pipeline) {
+		pipeline.memory = underCap()
 	})
 	if !strings.Contains(storedStream, `"buildsWidthPeakFactor":3.5`) {
 		test.Errorf("a run with a findings store names no peak factor of 3.5:\n%s", storedStream)
 	}
 	one := threeExtraBuilds(test)
-	_, oneStream := runOverConfigured(test, one, exitFindings, func(engine *pipeline) {
-		engine.memory = underCap()
-		engine.buildsWidthForced = 1
+	_, oneStream := runOverConfigured(test, one, exitFindings, func(pipeline *pipeline) {
+		pipeline.memory = underCap()
+		pipeline.buildsWidthForced = 1
 	}, "--no-cache")
 	if normalize(raw, measured) != normalize(oneStream, one) {
 		test.Errorf("the stream at the measured width differs from one at a time's:\nmeasured\n%s\nwidth 1\n%s",
@@ -223,8 +230,8 @@ func TestTimingRecordsEachBuildsHoldings(test *testing.T) {
 	root := threeExtraBuilds(test)
 	var startedLock sync.Mutex
 	var started []string
-	engine, raw := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.lintSteps = func(extra project.Build, step lintStep, _ int) {
+	pipeline, raw := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.lintSteps = func(extra project.Build, step lintStep, _ int) {
 			if step == lintStepReady {
 				startedLock.Lock()
 				started = append(started, extra.String())
@@ -234,8 +241,8 @@ func TestTimingRecordsEachBuildsHoldings(test *testing.T) {
 	}, "--no-cache", "--timing")
 	startedLock.Lock()
 	defer startedLock.Unlock()
-	if engine.buildsAtOnce != 1 {
-		test.Errorf("the builds ran %d at once under --timing, want one at a time", engine.buildsAtOnce)
+	if pipeline.buildsAtOnce != 1 {
+		test.Errorf("the builds ran %d at once under --timing, want one at a time", pipeline.buildsAtOnce)
 	}
 	var lint contract.LintRecord
 	for line := range strings.SplitSeq(raw, "\n") {

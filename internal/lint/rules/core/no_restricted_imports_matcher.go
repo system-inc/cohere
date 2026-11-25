@@ -41,7 +41,7 @@ type noRestrictedImportsGlob struct {
 	negated bool
 
 	// expression is the pattern translated to a regular expression, compiled through the same
-	// engine every other user-supplied pattern in this tree goes through.
+	// regular expression parser every other user-supplied pattern in this tree goes through.
 	expression *esregexp.RegExp
 }
 

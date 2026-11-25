@@ -12,8 +12,8 @@ import (
 
 // Brands.json is the vocabulary of brands whose owners spell them opening lowercase, iMessage as Apple spells it,
 // which the casing rules read where they judge a name as UpperCamelCase (#vf4ytzg). It is data rather than code so a
-// brand joins the list as a reviewed decision about the house, in one place, against the bar the file states. The
-// Swift engine compiles in the same bytes (SwiftFiles).
+// brand joins the list as a reviewed decision about the house, in one place, against the bar the file states.
+// cohere-swift compiles in the same bytes (SwiftFiles).
 //
 //go:embed Brands.json
 var brandsFile []byte

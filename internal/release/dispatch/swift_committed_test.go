@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// The Swift engine a gate runs must come from the commit the gate's cohere was built from. These tests
+// cohere-swift a gate runs must come from the commit the gate's cohere was built from. These tests
 // stand a script in for SwiftPM, because a real cold build takes minutes and what is under test is
 // which tree gets built and when. The script records the tree it was handed, and reports
 // sourceTreeModified the way the real manifest does, from git's view of the package it was built in.
@@ -37,10 +37,10 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 		test.Fatal("an empty cache reported no build")
 	}
 	if output := run(test, first); output != "rule=one\n" {
-		test.Fatalf("the first engine printed %q", output)
+		test.Fatalf("the first binary printed %q", output)
 	}
 
-	// An uncommitted edit in the checkout is not part of the commit, so the same engine serves.
+	// An uncommitted edit in the checkout is not part of the commit, so the same binary serves.
 	writeFile(test, fixture.rule(), "one, uncommitted\n")
 	again, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
 		fixture.paths,
@@ -52,10 +52,10 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 		test.Fatalf("resolving with an uncommitted edit on disk: %v", resolveCommittedSwiftEngineError)
 	}
 	if built || again != first {
-		test.Fatalf("an uncommitted Swift edit changed the engine (built=%v)", built)
+		test.Fatalf("an uncommitted Swift edit changed cohere-swift (built=%v)", built)
 	}
 
-	// A committed edit builds a new engine, and the build reads the commit even while the checkout
+	// A committed edit builds a new binary, and the build reads the commit even while the checkout
 	// holds a different uncommitted edit. A cache hit above could not show that; this fresh build can.
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
@@ -70,13 +70,13 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 		test.Fatalf("building from the second commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if !built || second == first {
-		test.Fatalf("a committed Swift edit did not build a new engine (built=%v)", built)
+		test.Fatalf("a committed Swift edit did not build a new binary (built=%v)", built)
 	}
 	if output := run(test, second); output != "rule=two\n" {
-		test.Fatalf("the engine for the second commit printed %q, so it was not built from that commit", output)
+		test.Fatalf("cohere-swift for the second commit printed %q, so it was not built from that commit", output)
 	}
 
-	// A commit that changes only the engine's tests changes nothing compiled in, so it reuses the engine.
+	// A commit that changes only cohere-swift's tests changes nothing compiled in, so it reuses cohere-swift.
 	writeFile(test, filepath.Join(fixture.repository, "swift", "Tests", "RuleTests.swift"), "// a new test\n")
 	fixture.commit(test, "swift/Tests")
 	third, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
@@ -89,7 +89,7 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 		test.Fatalf("resolving a tests-only commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if built || third != second {
-		test.Fatalf("a tests-only commit rebuilt the engine (built=%v)", built)
+		test.Fatalf("a tests-only commit rebuilt cohere-swift (built=%v)", built)
 	}
 
 	if status := gitCommand(test, fixture.paths.SwiftSourceWorktree(), "status", "--porcelain"); status != "" {
@@ -101,8 +101,8 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 // fixtures at once would build with each other's.
 func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *testing.T) {
 	// The case no provenance check can catch. A member commits, the checkout is clean at the new
-	// commit, and a gate still running the cohere built from the previous one asks for its engine. A
-	// working-tree build would hand it the newer engine, and that engine would honestly report a clean
+	// commit, and a gate still running the cohere built from the previous one asks for cohere-swift. A
+	// working-tree build would hand it the newer binary, and that binary would honestly report a clean
 	// tree. Only building the commit asked for gets this right.
 	fixture := newSwiftFixture(test)
 	older := fixture.head(test)
@@ -111,10 +111,10 @@ func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *t
 
 	engine, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, older, testToolchain, 2)
 	if resolveCommittedSwiftEngineError != nil {
-		test.Fatalf("building the older commit's engine: %v", resolveCommittedSwiftEngineError)
+		test.Fatalf("building the older commit's binary: %v", resolveCommittedSwiftEngineError)
 	}
 	if output := run(test, engine); output != "rule=one\n" {
-		test.Fatalf("the older commit got an engine printing %q, which is the newer commit's", output)
+		test.Fatalf("the older commit got a binary printing %q, which is the newer commit's", output)
 	}
 }
 
@@ -165,19 +165,19 @@ func TestACommittedSwiftEngineReportingAModifiedTreeIsNotCached(test *testing.T)
 	)
 	if resolveCommittedSwiftEngineError == nil ||
 		!strings.Contains(resolveCommittedSwiftEngineError.Error(), "modified source tree") {
-		test.Fatalf("an engine reporting a modified tree was accepted: %v", resolveCommittedSwiftEngineError)
+		test.Fatalf("a binary reporting a modified tree was accepted: %v", resolveCommittedSwiftEngineError)
 	}
-	// A cache that was never created holds nothing a refused engine could have left.
+	// A cache that was never created holds nothing a refused binary could have left.
 	entries, readDirectoryError := os.ReadDir(fixture.paths.BinaryDirectory())
 	if readDirectoryError != nil && !errors.Is(readDirectoryError, os.ErrNotExist) {
 		test.Fatalf("reading the binary cache: %v", readDirectoryError)
 	}
 	for _, entry := range entries {
-		test.Errorf("a refused engine left %s in the cache", entry.Name())
+		test.Errorf("a refused binary left %s in the cache", entry.Name())
 	}
 }
 
-// swiftFixture is a repository holding an engine package, with a stand-in for SwiftPM.
+// swiftFixture is a repository holding a binary package, with a stand-in for SwiftPM.
 type swiftFixture struct {
 	repository     string
 	paths          Paths
@@ -211,7 +211,7 @@ func newSwiftFixture(test *testing.T) *swiftFixture {
 	return fixture
 }
 
-// fakeBuild writes an engine that prints the rule it was built from and the provenance the real
+// fakeBuild writes a binary that prints the rule it was built from and the provenance the real
 // manifest would compute for packageDirectory: the state the build was handed when it was handed one, and
 // git's answer otherwise.
 func (fixture *swiftFixture) fakeBuild(

@@ -1,7 +1,7 @@
 // Performance.jsonc: main's performance at this commit, rewritten by cohere-dev land in every landing commit (#6wnsnq2).
 // Git history is the series. Never edit it by hand. Times are integer milliseconds, the median of the rounds with their minimum and maximum.
 {
-    "schema": 2,
+    "schema": 3,
     "commit": "b3a344038a655535bc310a248053566807cef951",
     "measuredAt": "2026-11-25T07:10:06Z",
     "machine": {
@@ -18,7 +18,7 @@
         "binary": "be55ed4f422c1eb78635d5c8878acea1b7ad08523d5c25c28313fda58a161dbd"
     },
     "note": "against 6f6eeb68: cold root checked 5613 files and 0 findings, and main's 5610 and 0, so not compared; cold deeafbf4 wall level (1875 ms, was 1865), user level (18150 ms, was 18120); warm root checked 5613 files and 0 findings, and main's 5610 and 0, so not compared",
-    "engine": {
+    "checks": {
         "rounds": { "cold": 3, "deeafbf4": 2, "warm": 3 },
         "cold": {
             "root": {

@@ -24,9 +24,9 @@ import (
 // would be counted and named there.
 func TestARunWithBuildsStartsEveryGoCommandBeforeItsFirstLoad(test *testing.T) {
 	test.Parallel()
-	engine, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
-	if len(engine.buildRuns) != 3 {
-		test.Fatalf("the run checked %d builds, want the host's and two extra", len(engine.buildRuns))
+	pipeline, stream := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitFindings)
+	if len(pipeline.buildRuns) != 3 {
+		test.Fatalf("the run checked %d builds, want the host's and two extra", len(pipeline.buildRuns))
 	}
 	lint := lintRecordOf(test, stream)
 	if lint.ChildProcessesAfterLoad != 0 || len(lint.ChildProcessesAfterLoadNamed) != 0 {
@@ -43,9 +43,9 @@ func TestARunsExtraBuildsReadTheHostsBuildList(test *testing.T) {
 	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
 	lists, stop := load.WatchBuildLists(root)
 	defer stop()
-	engine, stream := runOver(test, root, exitFindings)
-	if len(engine.buildRuns) != 3 {
-		test.Fatalf("the run checked %d builds, want the host's and two extra", len(engine.buildRuns))
+	pipeline, stream := runOver(test, root, exitFindings)
+	if len(pipeline.buildRuns) != 3 {
+		test.Fatalf("the run checked %d builds, want the host's and two extra", len(pipeline.buildRuns))
 	}
 	if count := lists.Load(); count != 1 {
 		test.Errorf("the run ran %d build lists, want the host's alone", count)
@@ -87,12 +87,12 @@ func TestAWarmSystemCacheRunsNoBuildContext(test *testing.T) {
 		request.standardLibrary.systemCacheRoot = systemCacheRoot
 		contexts.Store(0)
 		lists.Store(0)
-		engine, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), nil)
+		pipeline, standardOutput, standardError, exitCode := runOverRequest(test, request, rules.All(), nil)
 		if exitCode != exitFindings {
 			test.Fatalf("the run exited %d, want %d:\n%s\n%s", exitCode, exitFindings, standardOutput, standardError)
 		}
-		if len(engine.buildRuns) != 3 {
-			test.Fatalf("the run checked %d builds, want the host's and two extra", len(engine.buildRuns))
+		if len(pipeline.buildRuns) != 3 {
+			test.Fatalf("the run checked %d builds, want the host's and two extra", len(pipeline.buildRuns))
 		}
 		return normalize(standardOutput, root)
 	}
@@ -154,8 +154,8 @@ func runWithSystemCache(
 		test.Fatal(parseError)
 	}
 	request.standardLibrary.systemCacheRoot = systemCacheRoot
-	engine, standardOutput, _, exitCode := runOverRequest(test, request, rules.All(), configure)
-	return engine, normalize(standardOutput, root), exitCode
+	pipeline, standardOutput, _, exitCode := runOverRequest(test, request, rules.All(), configure)
+	return pipeline, normalize(standardOutput, root), exitCode
 }
 
 // heldUntilLoadBegins is a hook of go env's answers (load.HookGoEnvironmentAnswers) that holds the windows build's
@@ -184,14 +184,14 @@ func heldUntilLoadBegins(
 // watchingLoadBegin has a pipeline close loadBegan as its first load begins, once the run's account counts every go
 // command started after as late (load.Children.LoadBegins), then call then, when not nil.
 func watchingLoadBegin(loadBegan chan struct{}, then func()) func(*pipeline) {
-	return func(engine *pipeline) {
+	return func(pipeline *pipeline) {
 		var once sync.Once
-		engine.watchPrelude = func(step preludeStep) {
+		pipeline.watchPrelude = func(step preludeStep) {
 			if step != preludeLoadBegan {
 				return
 			}
 			once.Do(func() {
-				engine.described.children.LoadBegins()
+				pipeline.described.children.LoadBegins()
 				close(loadBegan)
 			})
 			if then != nil {
@@ -201,14 +201,14 @@ func watchingLoadBegin(loadBegan chan struct{}, then func()) func(*pipeline) {
 	}
 }
 
-// requirePredictions fails unless every extra build of engine's run was predicted to fork nothing after its go env,
+// requirePredictions fails unless every extra build of pipeline's run was predicted to fork nothing after its go env,
 // when want, or none was.
-func requirePredictions(test *testing.T, engine *pipeline, want bool) {
+func requirePredictions(test *testing.T, pipeline *pipeline, want bool) {
 	test.Helper()
-	if len(engine.buildGoEnvironments) != 2 {
-		test.Fatalf("the run started %d extra builds, want two", len(engine.buildGoEnvironments))
+	if len(pipeline.buildGoEnvironments) != 2 {
+		test.Fatalf("the run started %d extra builds, want two", len(pipeline.buildGoEnvironments))
 	}
-	for name, build := range engine.buildGoEnvironments {
+	for name, build := range pipeline.buildGoEnvironments {
 		if build.answer(); build.forksNothingAfter != want {
 			test.Errorf("the %s build was predicted to fork nothing after its go env: %t, want %t", name,
 				build.forksNothingAfter, want)
@@ -320,14 +320,14 @@ func TestARunThatStopsAfterItsFirstLoadBeganLeavesNoGoCommandRunning(test *testi
 				panic(recovered)
 			}
 		}()
-		runWithSystemCache(test, root, systemCacheRoot, func(engine *pipeline) {
-			stopped = engine
+		runWithSystemCache(test, root, systemCacheRoot, func(pipeline *pipeline) {
+			stopped = pipeline
 			holdOnce := sync.OnceFunc(func() {
 				held.Store(true)
 				close(lateStarted)
 				<-lateEnds
 			})
-			engine.described.children.WatchStarted(func(name string) {
+			pipeline.described.children.WatchStarted(func(name string) {
 				select {
 				case <-loadBegan:
 				default:
@@ -337,7 +337,7 @@ func TestARunThatStopsAfterItsFirstLoadBeganLeavesNoGoCommandRunning(test *testi
 					holdOnce()
 				}
 			})
-			engine.watchJoin = func() {
+			pipeline.watchJoin = func() {
 				joined.Store(true)
 				letLateEnd()
 			}
@@ -347,7 +347,7 @@ func TestARunThatStopsAfterItsFirstLoadBeganLeavesNoGoCommandRunning(test *testi
 				case <-time.After(time.Minute):
 				}
 				panic(errorStopped)
-			})(engine)
+			})(pipeline)
 		})
 		test.Fatal("the run returned though it was stopped")
 	}()

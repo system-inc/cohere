@@ -74,7 +74,7 @@ func declareProperties(properties ...string) FrameworkEmitter {
 // The distinction between a latching and a non-latching sort is not encoded here, deliberately.
 // `size` writes `--tw-sort: size`, which is not a CSS property, so it does not latch and `width` and
 // `height` contribute their own positions. That falls out of `PropertyOrder` not knowing `size`
-// rather than out of a flag, which is the same way the engine decides it.
+// rather than out of a flag, which is the same way Tailwind decides it.
 func declareSorted(sortValue string, properties ...string) FrameworkEmitter {
 	return func(resolved ResolvedUtilityValue) []*Node {
 		nodes := make([]*Node, 0, len(properties)+1)
@@ -451,7 +451,7 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	// Count keeps rising regardless, which is how `divide-y` reads one position at count six.
 	//
 	// The declarations after the latch are still emitted rather than elided. They cannot change
-	// Order, but each one is a declaration the engine counts, and Count is half the sort key.
+	// Order, but each one is a declaration Tailwind counts, and Count is half the sort key.
 	"divide": declareWrapped(cssChildrenSelector, declareSorted("divide-color", "border-color")),
 	"divide-x": declareWrapped(cssChildrenSelector, declareSorted(
 		"divide-x-width",

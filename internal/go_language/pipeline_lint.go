@@ -40,73 +40,73 @@ var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.
 // every build's findings (#72n9mq0, #qqyq61s): the findings, the withheld counts and the crashes are every build's,
 // merged; another build's type errors are written as the compiler's findings, since the host's lint ran only on a host
 // load without any; and the lint record names each build.
-func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) *load.Loaded {
-	if !engine.request.requests(contract.PhaseLint) {
-		engine.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
+func (pipeline *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) *load.Loaded {
+	if !pipeline.request.requests(contract.PhaseLint) {
+		pipeline.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
 		return loaded
 	}
 	if loadError != nil {
-		engine.abandonSpeculation()
-		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, "the load failed: "+oneLine(loadError))
+		pipeline.abandonSpeculation()
+		pipeline.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, "the load failed: "+oneLine(loadError))
 		return loaded
 	}
 	if count := len(loaded.Diagnostics); count > 0 {
 		// Whatever the rules beside the load found is dropped unread, as main never ran them.
-		engine.abandonSpeculation()
+		pipeline.abandonSpeculation()
 		detail := fmt.Sprintf("types bailed: %d type errors, so lint findings against wrong semantics would be noise",
 			count)
-		if !engine.request.requests(contract.PhaseTypes) {
+		if !pipeline.request.requests(contract.PhaseTypes) {
 			detail = fmt.Sprintf("the load found %d type errors, so lint findings against wrong semantics would be "+
 				"noise; run with --types to see them", count)
 		}
-		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, detail)
+		pipeline.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, detail)
 		return loaded
 	}
 
 	started := time.Now()
 	pass := earlier
-	if pass == nil && engine.speculation != nil {
-		ran := engine.speculativePass()
+	if pass == nil && pipeline.speculation != nil {
+		ran := pipeline.speculativePass()
 		pass = &ran
 	}
 	if pass == nil {
-		ran := engine.lint(loaded)
+		ran := pipeline.lint(loaded)
 		pass = &ran
 		// The pass ran here, so its own time is this phase's; one beside the load is counted only from here, so the
 		// phases still follow one another as they read.
 		started = time.Now()
 	}
 	// The load the pass ran over: loaded, or the last a reload loaded again (reloadedPass).
-	reloaded, lintedLoad := engine.reloadedPass(*pass, loaded)
+	reloaded, lintedLoad := pipeline.reloadedPass(*pass, loaded)
 	pass = &reloaded
 	if pass.checkError != nil {
-		engine.note("the rules could not run: %v", pass.checkError)
-		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0,
+		pipeline.note("the rules could not run: %v", pass.checkError)
+		pipeline.phase(contract.PhaseLint, contract.OutcomeNotReached, 0,
 			"the rules could not run: "+oneLine(pass.checkError))
 		return lintedLoad
 	}
 	result := pass.result
 	var verdict *buildsVerdict
 	var outcome suppressedFindings
-	if engine.request.checksEveryBuild() {
+	if pipeline.request.checksEveryBuild() {
 		// The host's reads, pass.result.Reads, are what an extra build will restore a package by (#b2t9xmf). Their
 		// type-read walks run beside the host's lint and past its end, so otherBuilds waits for every one before any
 		// build decides anything (wholeReads); a run with no extra builds never waits, so the host's verdict never
 		// pays for them. A build started while the host's walks run would wait on each package's walk the same way.
-		if runs := engine.otherBuilds(lintedLoad, pass); len(runs) > 0 {
+		if runs := pipeline.otherBuilds(lintedLoad, pass); len(runs) > 0 {
 			ran := make([]string, 0, len(pass.enabled))
 			for _, enabledRule := range pass.enabled {
 				ran = append(ran, enabledRule.Name)
 			}
-			verdict = engine.mergeBuildRuns(runs, ran)
-			engine.request.timeline.Stamp("merge.end")
+			verdict = pipeline.mergeBuildRuns(runs, ran)
+			pipeline.request.timeline.Stamp("merge.end")
 			outcome = suppressedFindings{
 				kept:              verdict.merged.kept,
 				directiveFindings: verdict.merged.directiveFindings,
 				withheldByRule:    verdict.merged.withheldByRule,
 			}
 			for _, typeError := range verdict.merged.typeErrors {
-				engine.write(engine.compilerFinding(typeError))
+				pipeline.write(pipeline.compilerFinding(typeError))
 			}
 		}
 	}
@@ -117,11 +117,11 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 
 	findings := make([]contract.FindingRecord, 0, len(outcome.kept)+len(outcome.directiveFindings))
 	for _, kept := range outcome.kept {
-		severity, _ := engine.severityOf(kept.Rule)
+		severity, _ := pipeline.severityOf(kept.Rule)
 		findings = append(findings, ruleFinding(kept, severity))
 	}
 	for _, directiveFinding := range outcome.directiveFindings {
-		severity, on := engine.severityOf(directiveFinding.Rule)
+		severity, on := pipeline.severityOf(directiveFinding.Rule)
 		if !on {
 			continue
 		}
@@ -147,19 +147,19 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		)
 	})
 	for _, finding := range findings {
-		engine.write(finding)
+		pipeline.write(finding)
 	}
 
-	engine.systemCache.failedAt(engine.session)
+	pipeline.systemCache.failedAt(pipeline.session)
 	// Every build has read and written the system cache's store by now, so a trim takes nothing from under a build of
 	// this run. A run under `--timing` reads no cache, so it trims none either, and has no system cache to say it
 	// did not keep.
 	systemCacheNotKept := ""
-	if engine.timing == nil {
-		engine.systemCache.trim()
-		systemCacheNotKept = engine.systemCache.notKeptReason()
+	if pipeline.timing == nil {
+		pipeline.systemCache.trim()
+		systemCacheNotKept = pipeline.systemCache.notKeptReason()
 	}
-	record := engine.lintCoverage(result, findings, pass.turnedOff, notConfigured(pass.enabled))
+	record := pipeline.lintCoverage(result, findings, pass.turnedOff, notConfigured(pass.enabled))
 	if verdict != nil {
 		// Written above as compiler findings, so the record counts every finding record of the phase (#rw6tg3a).
 		record.TypeErrors = len(verdict.merged.typeErrors)
@@ -184,11 +184,11 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		WriteFailed:     result.Cache.WriteFailed,
 
 		SystemCacheWritten: result.Cache.SystemCacheWritten,
-		SystemCacheOff:     engine.systemCache.off,
+		SystemCacheOff:     pipeline.systemCache.off,
 		SystemCacheNotKept: systemCacheNotKept,
 	}
 	if record.Cache.SystemCacheNotKept != "" {
-		engine.note("the system cache was not kept: %s", record.Cache.SystemCacheNotKept)
+		pipeline.note("the system cache was not kept: %s", record.Cache.SystemCacheNotKept)
 	}
 	if counted := result.Cache.DependenceRecords; counted != nil {
 		record.Cache.DependenceRecords = &contract.DependenceRecords{Read: counted.Read, Written: counted.Written,
@@ -200,13 +200,13 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	}
 	// The standard library's records are written once its side load has ended, after the host's counts were taken
 	// (awaitStandardLibrary), so their failed writes, and the note of the first, are counted here.
-	if engine.dependence != nil && engine.dependence.standardLibrary != nil &&
-		engine.dependence.standardLibrary.writeFailed > 0 {
-		record.Cache.WriteFailed += engine.dependence.standardLibrary.writeFailed
+	if pipeline.dependence != nil && pipeline.dependence.standardLibrary != nil &&
+		pipeline.dependence.standardLibrary.writeFailed > 0 {
+		record.Cache.WriteFailed += pipeline.dependence.standardLibrary.writeFailed
 		record.Cache.Problems++
 	}
 	for _, problem := range result.Cache.Problems {
-		engine.note("the findings cache: %s", problem)
+		pipeline.note("the findings cache: %s", problem)
 	}
 	if verdict != nil {
 		record.Crashes = make([]contract.Crash, 0, len(verdict.merged.crashes))
@@ -217,7 +217,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		// The host's problems and failed writes are counted above, from its result, the first run's; each other
 		// build's problems are noted under its name as it ends (extraBuildRun), and they and its failed writes are
 		// counted here, so the record holds every note the cache made and every write it lost.
-		for _, run := range engine.buildRuns[1:] {
+		for _, run := range pipeline.buildRuns[1:] {
 			if run.result != nil {
 				record.Cache.Problems += len(run.result.Cache.Problems)
 				record.Cache.WriteFailed += run.result.Cache.WriteFailed
@@ -226,30 +226,30 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				record.Cache.Packs = summedPacks(record.Cache.Packs, run.result.Cache.Packs)
 			}
 		}
-		record.BuildsAtOnce = engine.buildsAtOnce
-		record.BuildsPoolSize = engine.workPool().Size()
-		record.BuildsWidthLiveBytes = engine.buildsWidthLiveBytes
-		record.BuildsWidthBuildBytes = engine.buildsWidthBuildBytes
-		if engine.buildsWidthBuildBytes > 0 {
-			record.BuildsWidthPeakFactor = engine.buildPeakFactor()
+		record.BuildsAtOnce = pipeline.buildsAtOnce
+		record.BuildsPoolSize = pipeline.workPool().Size()
+		record.BuildsWidthLiveBytes = pipeline.buildsWidthLiveBytes
+		record.BuildsWidthBuildBytes = pipeline.buildsWidthBuildBytes
+		if pipeline.buildsWidthBuildBytes > 0 {
+			record.BuildsWidthPeakFactor = pipeline.buildPeakFactor()
 		}
-		record.BuildsWidthSlack = engine.buildsWidthSlack
-		record.BuildsWidthFromHostLive = engine.buildsWidthFromHostLive
-		engine.recordBuildsPeakProblems(&record)
+		record.BuildsWidthSlack = pipeline.buildsWidthSlack
+		record.BuildsWidthFromHostLive = pipeline.buildsWidthFromHostLive
+		pipeline.recordBuildsPeakProblems(&record)
 	}
 	if len(record.Crashes) > 0 {
-		engine.incomplete = true
+		pipeline.incomplete = true
 	}
 	elapsed := pass.elapsed + time.Since(started)
-	if engine.duplicatesRequested() {
-		engine.duplicates = engine.duplicatesReport(result)
+	if pipeline.duplicatesRequested() {
+		pipeline.duplicates = pipeline.duplicatesReport(result)
 	}
 	record.ElapsedMilliseconds = int(elapsed.Milliseconds())
 	// Every load of the run has ended, the builds' too, so every go command a load started is counted.
-	record.ChildProcessesAfterLoadNamed = engine.described.children.Late()
+	record.ChildProcessesAfterLoadNamed = pipeline.described.children.Late()
 	record.ChildProcessesAfterLoad = len(record.ChildProcessesAfterLoadNamed)
-	engine.write(record)
-	engine.phase(contract.PhaseLint, contract.OutcomeRan, elapsed, "")
+	pipeline.write(record)
+	pipeline.phase(contract.PhaseLint, contract.OutcomeRan, elapsed, "")
 	return lintedLoad
 }
 
@@ -278,13 +278,13 @@ type lintPass struct {
 // them. The run's own loads analyze only those already (loadWorkspace); the rename's cannot, since its plan reads
 // every reference, so a load it proved, which the lint phase reads after it wrote, is narrowed here, and with no
 // findings cache, which a renamed run reads none of.
-func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
+func (pipeline *pipeline) lint(loaded *load.Loaded) lintPass {
 	analyzed := slices.DeleteFunc(slices.Clone(loaded.Packages), func(each *packages.Package) bool {
-		return !engine.described.hasFileInScope(each)
+		return !pipeline.described.hasFileInScope(each)
 	})
 	// The host's reads, recorded only when the run has extra builds to restore packages into, collects the standard
 	// library's table or keeps a system cache (recordsReadsOf), walked in the load's slots below its work.
-	return engine.lintPackages(analyzed, loaded.Rewritten,
+	return pipeline.lintPackages(analyzed, loaded.Rewritten,
 		func(each *packages.Package) []string { return loaded.Withheld[each].Declarations },
 		check.Options{Withheld: loaded.Withheld, Bodiless: loaded.Bodiless, Reads: loaded.Reads,
 			WalkSlots: loaded.WalkSlots})
@@ -294,51 +294,51 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 // it has returned, or the Ready and Abandon of a pass beside it. rewritten is the load's rewritten cgo outputs, which
 // the rules read in place of the build cache's (see sourceReader), and withheldOf what the load withheld of a package
 // once it is final, which a plain run's must-check census reads (plainDeclarations).
-func (engine *pipeline) lintPackages(
+func (pipeline *pipeline) lintPackages(
 	analyzed []*packages.Package,
 	rewritten *load.Rewritten,
 	withheldOf func(*packages.Package) []string,
 	options check.Options,
 ) lintPass {
 	started := time.Now()
-	enabled, turnedOff := engine.enabledRules()
-	session := engine.session
-	if engine.renamed {
+	enabled, turnedOff := pipeline.enabledRules()
+	session := pipeline.session
+	if pipeline.renamed {
 		session = nil
 	}
-	options.SingleThreaded = engine.request.switches["single-threaded"]
+	options.SingleThreaded = pipeline.request.switches["single-threaded"]
 	options.Cache = session
 	// The host's run keeps its packages' entries for the extra builds to restore from, only when there are any.
-	options.KeepForBuilds = session != nil && options.Reads != nil && engine.keepsForBuilds()
-	options.Pool = engine.workPool()
-	options.KeptDependence, options.DependenceJoining = engine.keptDependence, engine.dependenceJoining
+	options.KeepForBuilds = session != nil && options.Reads != nil && pipeline.keepsForBuilds()
+	options.Pool = pipeline.workPool()
+	options.KeptDependence, options.DependenceJoining = pipeline.keptDependence, pipeline.dependenceJoining
 	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
-	options.ReadFile = engine.sourceReader(nil, rewritten)
-	options.Timing = engine.timing
+	options.ReadFile = pipeline.sourceReader(nil, rewritten)
+	options.Timing = pipeline.timing
 	// Under `--build-dependence` the host's facts are the ones every extra build's are compared with (#0ghk7vj).
-	options.ExportFacts = engine.dependence != nil
+	options.ExportFacts = pipeline.dependence != nil
 	// What the host's run held of its facts, read while its resolver is alive, which each package's host's side for the
 	// facts' reach is made of, only in a run whose extra builds start with the body reach's host side (#aswfm7a).
-	options.FactReach = engine.keepsForBuilds() && engine.takesBodyReach()
+	options.FactReach = pipeline.keepsForBuilds() && pipeline.takesBodyReach()
 	// And U1000's record of each body it walks, which an extra build's U1000 splices in place of walking a body it
 	// leaves standing (#xeafx79), only in a run whose builds leave any: no other run records a body.
-	options.RecordBodies = options.FactReach && engine.leavesBodiesStanding()
+	options.RecordBodies = options.FactReach && pipeline.leavesBodiesStanding()
 	// Read off U1000's action by U1000's own reader, which check takes and never imports (#f5g7ym6).
 	options.BodyRecorder = unusedBodyRecorder
 	// And what its bodies hold that the presence rows read, by standing_presence's reader, which check takes and never
 	// imports (#f5g7ym6). A run without FactReach never calls it.
 	options.FactReachPresence = standing_presence.ReadPackage
-	options.Counted = engine.described.countedAsWalked
-	if engine.duplicatesRequested() {
+	options.Counted = pipeline.described.countedAsWalked
+	if pipeline.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
 	}
 	// A plain run asked for the must-check census builds its declarations-only graph in the pass's walks, where every
 	// package's syntax is whole (#anfjtr3); one under `--build-dependence` has its whole graph, and any other none.
 	var declarations *plainDeclarations
-	if engine.mustCheckCensus != "" && !engine.request.judgesDependence() && options.Reads != nil {
-		declarations = newPlainDeclarations(engine.described.hasFileInScope, withheldOf)
+	if pipeline.mustCheckCensus != "" && !pipeline.request.judgesDependence() && options.Reads != nil {
+		declarations = newPlainDeclarations(pipeline.described.hasFileInScope, withheldOf)
 		options.Declarations = declarations.add
 		// The session has restored by now, beside the load or within it, so every record it read is final here.
 		if session != nil {
@@ -355,10 +355,10 @@ func (engine *pipeline) lintPackages(
 	// it runs over, as a build's check does, so a reader joins a check to its load by round: the host's last load, the
 	// one a pass beside the load is begun inside and every other pass follows, a rename's counted though it stamps
 	// nothing (hostLoads).
-	options.Timeline = engine.request.timeline.Hook(nil, int(engine.hostLoads.Load()-1), "host.")
+	options.Timeline = pipeline.request.timeline.Hook(nil, int(pipeline.hostLoads.Load()-1), "host.")
 	result, checkError := check.Run(analyzed, enabled, options)
 	timeline.Tell(options.Timeline, "lint.check.end")
-	defer func() { engine.hostLinting.Add(int64(time.Since(started))) }()
+	defer func() { pipeline.hostLinting.Add(int64(time.Since(started))) }()
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}
 	}
@@ -373,10 +373,10 @@ func (engine *pipeline) lintPackages(
 		// The contents it reads are final by now: the fix phase holds what it wrote before any load, and a rename that
 		// writes drops this pass and loads again.
 		outcome: sync.OnceValue(func() suppressedFindings {
-			if engine.hostSuppressed != nil {
-				engine.hostSuppressed()
+			if pipeline.hostSuppressed != nil {
+				pipeline.hostSuppressed()
 			}
-			return engine.suppress(ran, engine.inScope(result.Findings), engine.described.readable())
+			return pipeline.suppress(ran, pipeline.inScope(result.Findings), pipeline.described.readable())
 		}),
 		elapsed:      time.Since(started),
 		declarations: declarations,
@@ -390,28 +390,28 @@ func (engine *pipeline) lintPackages(
 // such a package, so one round names them all. Each round only adds packages to load from source, so it ends; one
 // whose every reload was loaded from source already stands, its crashes naming the reload that failed. The load
 // returned is the one the pass ran over.
-func (engine *pipeline) reloadedPass(pass lintPass, loaded *load.Loaded) (lintPass, *load.Loaded) {
+func (pipeline *pipeline) reloadedPass(pass lintPass, loaded *load.Loaded) (lintPass, *load.Loaded) {
 	// Only pass's time outlives the first round, so nothing of the round a reload drops is held while it loads again.
 	elapsed := pass.elapsed
 	current, currentLoad := pass, loaded
-	for current.checkError == nil && len(current.result.Reloads) > 0 && engine.session != nil &&
-		engine.session.Reload(current.result.Reloads) {
+	for current.checkError == nil && len(current.result.Reloads) > 0 && pipeline.session != nil &&
+		pipeline.session.Reload(current.result.Reloads) {
 		reloads := strings.Join(current.result.Reloads, ", ")
 		var loadError error
-		currentLoad, loadError = engine.loadWorkspace(true)
+		currentLoad, loadError = pipeline.loadWorkspace(true)
 		switch {
 		case loadError != nil:
-			engine.abandonSpeculation()
+			pipeline.abandonSpeculation()
 			current = lintPass{checkError: fmt.Errorf("loading again to check %s from source: %w", reloads,
 				loadError)}
 		case len(currentLoad.Diagnostics) > 0:
-			engine.abandonSpeculation()
+			pipeline.abandonSpeculation()
 			current = lintPass{checkError: fmt.Errorf("loading again to check %s from source found %d type errors "+
 				"the first load did not", reloads, len(currentLoad.Diagnostics))}
-		case engine.speculation != nil:
-			current = engine.speculativePass()
+		case pipeline.speculation != nil:
+			current = pipeline.speculativePass()
 		default:
-			current = engine.lint(currentLoad)
+			current = pipeline.lint(currentLoad)
 		}
 	}
 	// Every round ran after the phase's clock started, which counts it: the pass keeps the time it had.
@@ -420,10 +420,10 @@ func (engine *pipeline) reloadedPass(pass lintPass, loaded *load.Loaded) (lintPa
 }
 
 // inScope are the findings in a file in scope, in order.
-func (engine *pipeline) inScope(found []check.Finding) []check.Finding {
+func (pipeline *pipeline) inScope(found []check.Finding) []check.Finding {
 	inScope := make([]check.Finding, 0, len(found))
 	for _, each := range found {
-		if engine.described.inScopeSet[each.File] {
+		if pipeline.described.inScopeSet[each.File] {
 			inScope = append(inScope, each)
 		}
 	}
@@ -431,9 +431,9 @@ func (engine *pipeline) inScope(found []check.Finding) []check.Finding {
 }
 
 // enabledRules are the registered rules the settings leave on, which run, and the names of those they turn off.
-func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string) {
-	for _, registeredRule := range engine.registered {
-		if _, on := engine.severityOf(registeredRule.Name); on {
+func (pipeline *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string) {
+	for _, registeredRule := range pipeline.registered {
+		if _, on := pipeline.severityOf(registeredRule.Name); on {
 			enabled = append(enabled, registeredRule)
 			continue
 		}
@@ -453,7 +453,7 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // noted to notes: stderr for the host's build, and an extra build's own buffer for one (extraBuildRuns). Every build
 // reads its standard library from the run's system cache and writes it there under its own keys, the host's and each
 // extra build's, in a run judging each build's dependence as in any other (#wzre5eg).
-func (engine *pipeline) cacheSession(
+func (pipeline *pipeline) cacheSession(
 	environment []string,
 	goEnvironment *load.GoEnvironment,
 	files cache.FileDigests,
@@ -462,16 +462,16 @@ func (engine *pipeline) cacheSession(
 	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
 	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
 	// the system cache's standard-library entries included (#3apgjer).
-	if engine.timing != nil {
+	if pipeline.timing != nil {
 		return nil
 	}
-	enabled, _ := engine.enabledRules()
-	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, goEnvironment,
-		enabled, engine.described.children, engine.systemCache, engine.shardStamps)
+	enabled, _ := pipeline.enabledRules()
+	caching, cachingError := lintCache(pipeline.request, pipeline.described.workspace, environment, goEnvironment,
+		enabled, pipeline.described.children, pipeline.systemCache, pipeline.shardStamps)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}
-	if caching == nil && cachingError == nil && engine.keepsForBuilds() {
+	if caching == nil && cachingError == nil && pipeline.keepsForBuilds() {
 		// Nothing is stored or read from a store: the session keeps entries in memory for the extra builds alone.
 		caching = &check.Caching{ExtraInputs: newStaticcheckConfigurationInputs().inputs}
 	}
@@ -480,7 +480,7 @@ func (engine *pipeline) cacheSession(
 	}
 	caching.Files = files
 	// The session's own work on every core runs under the run's one pool's slots, as its loads and checks do.
-	caching.Pool = engine.workPool()
+	caching.Pool = pipeline.workPool()
 	// Every run keys the bytes it holds for a file in scope (held), the bytes its load parsed, rather than open the
 	// file again (#1sxhadk). A run's held bytes are the disk's as described read them, each write after reread before
 	// the next load, so its keys are of what it checked by construction, and a file changed on disk mid-run is keyed as
@@ -489,8 +489,8 @@ func (engine *pipeline) cacheSession(
 	// as what that file holds. The one time held runs ahead of the disk, inside the rename (askedOver), no key is
 	// taken: the rename runs its rules without the findings cache, and a run that renamed reads none. A file the run
 	// holds nothing for, outside the scope or a dependency's, is hashed from disk.
-	caching.Held = engine.held
-	if engine.duplicatesRequested() {
+	caching.Held = pipeline.held
+	if pipeline.duplicatesRequested() {
 		return check.NewCacheSession(caching, enabled, canonical_function_hash.Analyzer)
 	}
 	return check.NewCacheSession(caching, enabled)
@@ -510,7 +510,7 @@ type suppressedFindings struct {
 // turned off is neither used nor unused. The files are indexed as many at once as there are cores, since each index
 // is its own file's, each through the run's indexes (suppressionIndexes), so a file every build compiles is indexed
 // once for the run rather than once a build (#qqyq61s).
-func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []string) suppressedFindings {
+func (pipeline *pipeline) suppress(ran []string, inScope []check.Finding, files []string) suppressedFindings {
 	indexes := make([]*suppression.Index, len(files))
 	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
 	var group sync.WaitGroup
@@ -518,7 +518,7 @@ func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []
 		slots <- struct{}{}
 		group.Go(func() {
 			defer func() { <-slots }()
-			indexes[index] = engine.suppressionIndexes.of(file, engine.described.contents[file])
+			indexes[index] = pipeline.suppressionIndexes.of(file, pipeline.described.contents[file])
 		})
 	}
 	group.Wait()
@@ -529,7 +529,7 @@ func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []
 	// The duplicates report's name is known, so a suppression keeping a function in its shape is never an unknown
 	// rule, and never ran here, so lint neither applies nor dead-checks it: the report does both
 	// (pipeline_duplicates.go).
-	known := append(knownRuleNames(engine.registered), duplicate_functions.GoRuleName)
+	known := append(knownRuleNames(pipeline.registered), duplicate_functions.GoRuleName)
 	applied := suppression.Apply(known, ran, indexes, located)
 
 	// Kept holds the located findings no directive covered, in the order given. Whether one is withheld depends
@@ -557,7 +557,7 @@ func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []
 // ruleFinding is one analyzer finding as a record. A suggestion is offered only when every edit is in the
 // finding's own file, since an edit's offsets are into the file the record names. A naming rule's rename is never
 // offered: its one edit renames the declaration alone, so an editor applying it would leave every use of the old name
-// broken, and the engine applies it at every reference itself (see renameOf). The message already names the spelling.
+// broken, and cohere-go applies it at every reference itself (see renameOf). The message already names the spelling.
 func ruleFinding(found check.Finding, severity contract.Severity) contract.FindingRecord {
 	suggestions := []contract.Suggestion{}
 	offered := found.Suggestions
@@ -616,7 +616,7 @@ func notConfigured(enabled []rule.Rule) []string {
 // and wrote no finding, whether they had nothing to say or everything they said was outside the scope or
 // withheld, are watched and quiet, unless they crashed on a package; the rest found something. A crash is in
 // crashes, which makes the run incomplete.
-func (engine *pipeline) lintCoverage(
+func (pipeline *pipeline) lintCoverage(
 	result *check.Result, written []contract.FindingRecord, turnedOff []string, unconfigured []string,
 ) contract.LintRecord {
 	writtenByRule := map[string]int{}
@@ -634,7 +634,7 @@ func (engine *pipeline) lintCoverage(
 		ranNames = append(ranNames, name)
 	}
 	for _, name := range lintSuppressionRules {
-		if _, on := engine.severityOf(name); on {
+		if _, on := pipeline.severityOf(name); on {
 			ranNames = append(ranNames, name)
 			continue
 		}
@@ -651,8 +651,8 @@ func (engine *pipeline) lintCoverage(
 		Crashes:            []contract.Crash{},
 		RulesScopedOff:     map[string]int{},
 		RulesNotConfigured: unconfigured,
-		ConfigNote:         engine.settings.Note,
-		OffReasons:         engine.settings.OffReasons,
+		ConfigNote:         pipeline.settings.Note,
+		OffReasons:         pipeline.settings.OffReasons,
 	}
 	// A rule that crashed on a package did not watch all of it, so its silence there is not quiet.
 	for _, name := range ranNames {

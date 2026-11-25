@@ -3,11 +3,11 @@
 // spelling) takes the name that call gives it: `context.WithTimeout` gives timeoutContext,
 // `(*testing.T).Context` testContext, and so on; one from any other call is left for the waves. A
 // context.Context parameter came from the caller, and is named for that: callerContext. The parameter's name
-// and the call table are internal/naming/go_origin_names, which the Go engine's naming rule asks too, so its
+// and the call table are internal/naming/go_origin_names, which cohere-go's naming rule asks too, so its
 // suggestion and this rename agree. A ctx parameter or variable whose type, after one pointer, is a named type
 // of our own module ending in Context takes the type's name: `composeContext` stays composeContext, and an
 // exact `Context` takes its package's name in front (`rule.Context` gives ruleContext). Every rename goes
-// through the rename engine, which refuses any that would change what an identifier resolves to; after
+// through global_rename, which refuses any that would change what an identifier resolves to; after
 // writing, the tree is reloaded and every identifier's resolution compared. Everything left alone is reported.
 package main
 
@@ -379,15 +379,15 @@ type declarationRecord struct {
 	newName  string
 	category string
 	call     string
-	// rejection is the engine's reason class, when it refused the proposal.
+	// rejection is global_rename's reason class, when it refused the proposal.
 	rejection string
 	reason    string
 }
 
-// declaredAt finds the position an engine conflict reason names as the other declaration.
+// declaredAt finds the position a global_rename conflict reason names as the other declaration.
 var declaredAt = regexp.MustCompile(`declared at (\S+) instead of`)
 
-// insteadOf finds the old name of the object an engine conflict reason says the occurrence belongs to.
+// insteadOf finds the old name of the object a global_rename conflict reason says the occurrence belongs to.
 var insteadOf = regexp.MustCompile(`instead of "([^"]*)"$`)
 
 func run(root string, skips []string, dryRun bool) int {
@@ -518,8 +518,8 @@ func run(root string, skips []string, dryRun bool) int {
 	}
 	fmt.Fprintf(streams.Output, "candidates (locals named ctx): %d\n", candidateCount)
 	fmt.Fprintf(streams.Output, "eligible (proposed): %d\n", eligibleCount)
-	fmt.Fprintf(streams.Output, "accepted by the engine: %d\n", acceptedCount)
-	fmt.Fprintf(streams.Output, "rejected by the engine: %d\n", eligibleCount-acceptedCount)
+	fmt.Fprintf(streams.Output, "accepted by global_rename: %d\n", acceptedCount)
+	fmt.Fprintf(streams.Output, "rejected by global_rename: %d\n", eligibleCount-acceptedCount)
 	printCounts(rejectedByReason, 0)
 	fmt.Fprintf(streams.Output, "not eligible: %d\n", candidateCount-eligibleCount)
 	printCounts(notEligibleByCategory, 0)

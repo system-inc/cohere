@@ -1,6 +1,6 @@
 // Package hoisted_map_key_conversion is staticcheck's SA6001, a conversion of a byte slice to a string stored in a
 // variable and read only as the key of map lookups, where converting inside each lookup would let the compiler skip
-// the copy, ported onto the engine's own intermediate representation (#tf4cb8g).
+// the copy, ported onto cohere's own intermediate representation (#tf4cb8g).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa6001/sa6001.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the conversion, where staticcheck's report
@@ -39,7 +39,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6001",
 	"SA6001",
 	"Flags a byte slice converted to a string ahead of the map lookups that are its only readers: staticcheck's "+
-		"SA6001, ported onto the engine's own intermediate representation.",
+		"SA6001, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

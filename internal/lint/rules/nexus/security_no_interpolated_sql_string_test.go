@@ -250,7 +250,7 @@ func TestSecurityNoInterpolatedSqlStringFiresOnQuoteOnlyEscape(test *testing.T) 
 	securityNoInterpolatedSqlStringExpectSpans(test, result, sourceText, []string{"viewIdentifier", "viewIdentifier"})
 }
 
-// The same nerve with backslashes doubled before quotes: no input can close the string on any engine,
+// The same nerve with backslashes doubled before quotes: no input can close the string on any database,
 // so the finding's claim would be false, and nothing fires.
 func TestSecurityNoInterpolatedSqlStringStaysSilentOnCompleteEscape(test *testing.T) {
 	test.Parallel()
@@ -589,13 +589,13 @@ func TestSecurityNoInterpolatedSqlStringStaysSilent(test *testing.T) {
 			"    return `WHERE name = '${name}` + `'`;",
 			"}",
 		}},
-		// Where the string ends depends on the engine.
+		// Where the string ends depends on the database.
 		{"a backslash inside a string", []string{
 			"export function find(name: string) {",
 			"    return `SELECT id FROM Contact WHERE a = 'x\\\\' AND name = '${name}'`;",
 			"}",
 		}},
-		// A comment on MySQL only, so where the next string starts depends on the engine.
+		// A comment on MySQL only, so where the next string starts depends on the database.
 		{"a hash outside a string", []string{
 			"export function find(clause: string) {",
 			"    return `SELECT id FROM Contact # a = 'b",

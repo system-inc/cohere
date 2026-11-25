@@ -160,7 +160,7 @@ var messageReplaceWithAlt = rule.Message{
 //
 // Upstream's fixer replaces the entire JsxText node with the node's raw text carrying one character
 // substituted. Replacing just the character produces byte-identical output and would be the obvious
-// simplification. It is not taken, because it is not the same edit: the fix engine reasons about
+// simplification. It is not taken, because it is not the same edit: the fix pass reasons about
 // overlaps between proposed ranges, and two findings in one JsxText that upstream would have made
 // mutually exclusive (both replacing the whole node) would become independently applicable here.
 // Reproducing the decision means reproducing the range it covers, so the range is the node.
@@ -212,7 +212,7 @@ var NoUnescapedEntities = rule.Rule[NoUnescapedEntitiesOptions]{
 //
 // So upstream's emission order is an artifact rather than a decision, and reproducing it here would
 // be reproducing a workaround for a constraint we do not have. `rule_testing.ExpectFindings` asserts
-// emission order directly, and the fix engine reasons over proposals in the order they arrive, so
+// emission order directly, and the fix pass reasons over proposals in the order they arrive, so
 // out-of-order emission is a real difference here where it was none there. Upstream's corpus agrees
 // with source order too: its three-finding case `Multiple errors: '>> default parser` lists its
 // errors as `'`, `>`, `>`, which is source order and is what the loops below produce.

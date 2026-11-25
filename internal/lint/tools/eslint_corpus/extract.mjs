@@ -25,7 +25,7 @@
  *
  * # How a row is run
  *
- * Every row runs as a module named Case.ts under the TypeScript parser, in both engines, so both see
+ * Every row runs as a module named Case.ts under the TypeScript parser, in both linters, so both see
  * the same text in the same mode. That costs the rows that only parse as a script or under another
  * parser, and each of those is written out as skipped with its reason rather than dropped: a corpus
  * that silently shrank would read as a rule that agreed.

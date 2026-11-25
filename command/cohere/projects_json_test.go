@@ -1,6 +1,6 @@
 //go:build unix
 
-// The stand-in Swift engine here is a /bin/sh script, so the file builds on Unix.
+// The stand-in cohere-swift here is a /bin/sh script, so the file builds on Unix.
 
 package main
 
@@ -19,7 +19,7 @@ import (
 
 // TestAMixedRunUnderJsonWritesOnlyRecordsToStdout: a repository holding a TypeScript program and a Swift
 // package is checked as two projects, and under `--json` every line of stdout is a record, while what a
-// project's run wrote to stderr, here the note that the Swift engine was named by the override, reaches
+// project's run wrote to stderr, here the note that cohere-swift was named by the override, reaches
 // stderr. The two used to share stdout, so a program reading the records met a line of prose.
 func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	test.Parallel()

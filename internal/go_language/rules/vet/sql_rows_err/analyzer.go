@@ -10,7 +10,7 @@
 // typeutil.Callee, is one of database/sql's seven query methods, judged method by method in the original's order and
 // within a method in preorder, as typeindex.Index.Calls yields them, and the identifiers that use each candidate
 // variable, in preorder, as typeindex.Index.Uses yields them. It reads cursors rather than a stack, since the
-// judgment reads each node's parent edge and its enclosing loop. It sits on the engine's syntax dispatcher, hearing
+// judgment reads each node's parent edge and its enclosing loop. It sits on cohere-go's syntax dispatcher, hearing
 // each call on the walk the dispatcher makes once for every syntax rule with the call's cursor, and walks the
 // package's identifiers itself only where a call was a candidate. The registry runs the port in the original's place,
 // and the original stays the oracle: the parity tests beside this file run both over the same packages. The two agree

@@ -40,22 +40,25 @@ type speculativeLint struct {
 // findings cache's store. A run that wraps long lines or renames overlaps too, since each stops or takes the pass
 // before it writes (see speculativeLint). A run judging each build's dependence never overlaps, since the host's
 // graph is built from every package's syntax between the load's end and the rules' start (judgesDependence).
-func (engine *pipeline) lintOverlaps() bool {
-	return engine.overlaps && engine.speculation == nil && (engine.session == nil || !engine.session.HasStore()) &&
-		engine.request.requests(contract.PhaseLint) && !engine.request.judgesDependence()
+func (pipeline *pipeline) lintOverlaps() bool {
+	return pipeline.overlaps &&
+		pipeline.speculation == nil &&
+		(pipeline.session == nil || !pipeline.session.HasStore()) &&
+		pipeline.request.requests(contract.PhaseLint) &&
+		!pipeline.request.judgesDependence()
 }
 
 // beginSpeculativeLint starts the lint pass over overlap's packages, each once the load has made it final, as the
 // load's begin hook, which it calls on the pipeline's goroutine before the first type check.
-func (engine *pipeline) beginSpeculativeLint(overlap *load.Overlap) {
+func (pipeline *pipeline) beginSpeculativeLint(overlap *load.Overlap) {
 	speculation := &speculativeLint{abandon: make(chan struct{}), finished: make(chan struct{})}
-	engine.speculation = speculation
+	pipeline.speculation = speculation
 	go func() {
 		defer close(speculation.finished)
 		// A panic is held, not raised here: main would never have run the rules over a load with diagnostics, so
 		// only a clean load's pass may end the process, on the pipeline's goroutine, as main's would.
 		defer func() { speculation.panicked = recover() }()
-		speculation.pass = engine.lintPackages(overlap.Packages, overlap.Rewritten, overlap.Withheld,
+		speculation.pass = pipeline.lintPackages(overlap.Packages, overlap.Rewritten, overlap.Withheld,
 			check.Options{Ready: overlap.Ready, Abandon: speculation.abandon, Reads: overlap.Reads,
 				Bodiless: overlap.Bodiless, WalkSlots: overlap.WalkSlots})
 	}()
@@ -63,28 +66,28 @@ func (engine *pipeline) beginSpeculativeLint(overlap *load.Overlap) {
 
 // abandonSpeculation stops the pass beside the load from starting any more packages and waits for those it started,
 // then drops it whole, so nothing it did outlives this call: the run goes on as main's, which never ran it.
-func (engine *pipeline) abandonSpeculation() {
-	if engine.speculation == nil {
+func (pipeline *pipeline) abandonSpeculation() {
+	if pipeline.speculation == nil {
 		return
 	}
-	close(engine.speculation.abandon)
-	<-engine.speculation.finished
-	engine.speculation = nil
-	engine.watch(preludeLintAbandoned)
+	close(pipeline.speculation.abandon)
+	<-pipeline.speculation.finished
+	pipeline.speculation = nil
+	pipeline.watch(preludeLintAbandoned)
 }
 
 // speculativePass is the pass beside the load, once it has finished, for a clean load, whose lint phase is that
 // pass. Its own time ran beside the types phase, so it counts for nothing here; the lint phase's time is what the run
 // spent in it after the load.
-func (engine *pipeline) speculativePass() lintPass {
-	<-engine.speculation.finished
-	if engine.speculation.panicked != nil {
+func (pipeline *pipeline) speculativePass() lintPass {
+	<-pipeline.speculation.finished
+	if pipeline.speculation.panicked != nil {
 		// Invariant: the pass panicked over a clean load, where main's pass, run on this goroutine, would have ended
 		// the process with the same panic, so this one ends it too.
-		panic(engine.speculation.panicked)
+		panic(pipeline.speculation.panicked)
 	}
-	ran := engine.speculation.pass
+	ran := pipeline.speculation.pass
 	ran.elapsed = 0
-	engine.speculation = nil
+	pipeline.speculation = nil
 	return ran
 }

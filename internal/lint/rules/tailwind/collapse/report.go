@@ -8,7 +8,7 @@ import (
 
 // Report is one differential run: what it covered, what it found, and whether it can be trusted.
 type Report struct {
-	// TailwindVersion is the engine version the fixture was captured against.
+	// TailwindVersion is the Tailwind version the fixture was captured against.
 	TailwindVersion string
 	// GoSideName identifies the Go implementation under test.
 	GoSideName string
@@ -30,7 +30,7 @@ type Report struct {
 // run's population was real. This asks whether the instrument works.
 //
 // Every control must have fired, and they must cover both directions of silence. A harness that can
-// only see Go-side silence reports a clean run for every class where Go invents a reading the engine
+// only see Go-side silence reports a clean run for every class where Go invents a reading Tailwind
 // never produced, and that direction is the one nothing else in the suite is looking at.
 func (report Report) ControlsProven() bool {
 	// Stated explicitly, though the loop below would reach the same answer: with no controls both
@@ -42,7 +42,7 @@ func (report Report) ControlsProven() bool {
 		return false
 	}
 	sawGoSilentDirection := false
-	sawEngineSilentDirection := false
+	sawTailwindSilentDirection := false
 	for _, result := range report.Controls {
 		if !result.Detected {
 			return false
@@ -50,11 +50,11 @@ func (report Report) ControlsProven() bool {
 		switch result.Control.ExpectedOutcome {
 		case OutcomeGoSilent:
 			sawGoSilentDirection = true
-		case OutcomeEngineSilent:
-			sawEngineSilentDirection = true
+		case OutcomeTailwindSilent:
+			sawTailwindSilentDirection = true
 		}
 	}
-	return sawGoSilentDirection && sawEngineSilentDirection
+	return sawGoSilentDirection && sawTailwindSilentDirection
 }
 
 // Trustworthy reports whether this run's population was real, with the reasons it was not.
@@ -84,7 +84,7 @@ func (report Report) Trustworthy() (bool, []string) {
 		}
 		if population.CorpusClasses < minimumPlausibleCorpusClasses {
 			reasons = append(reasons, fmt.Sprintf(
-				"%s: %d corpus classes is below the plausible floor of %d, and the corpus is where the engine's null readings live",
+				"%s: %d corpus classes is below the plausible floor of %d, and the corpus is where Tailwind's null readings live",
 				population.SystemName, population.CorpusClasses, minimumPlausibleCorpusClasses,
 			))
 		}
@@ -110,12 +110,12 @@ func (report Report) Trustworthy() (bool, []string) {
 				population.SystemName, population.UnknownPopulationClasses,
 			))
 		}
-		if population.EngineNullReadings == 0 {
-			// The engine declines classes in both design systems and always has. Zero means the
+		if population.TailwindNullReadings == 0 {
+			// Tailwind declines classes in both design systems and always has. Zero means the
 			// fixture stopped carrying the classes it declines, which removes exactly the population
 			// this harness was built to keep honest, and it removes it invisibly.
 			reasons = append(reasons, fmt.Sprintf(
-				"%s: the engine declined no class at all, so the population that proves silence is not scored has gone missing",
+				"%s: Tailwind declined no class at all, so the population that proves silence is not scored has gone missing",
 				population.SystemName,
 			))
 		}
@@ -154,8 +154,8 @@ func (report Report) Trustworthy() (bool, []string) {
 //
 // The divergence is in *membership*: 462 classes exist in exactly one system, because a
 // `--color-brand-*` token in one repository's `@theme` is what makes `accent-brand` a class at all.
-// A table generated against ahra has no row answering `accent-brand`, so it declines a class the
-// engine compiles. That is a silent-side defect rather than a wrong reading, and it is the sharper
+// A table generated against ahra has no row answering `accent-brand`, so it declines a class
+// Tailwind compiles. That is a silent-side defect rather than a wrong reading, and it is the sharper
 // statement of why a per-repository table is required.
 //
 // Both axes are returned so that a future Tailwind which starts diverging readings shows up as a
@@ -188,10 +188,10 @@ func (report Report) Describe() string {
 			population.SystemName, population.RegistryClasses, population.CorpusClasses, population.Answered(),
 		)
 		fmt.Fprintf(builder,
-			"    agreed %d, disagreed %d, go-silent %d, engine-silent %d, both-silent %d (engine declined %d)\n",
+			"    agreed %d, disagreed %d, go-silent %d, tailwind-silent %d, both-silent %d (Tailwind declined %d)\n",
 			population.ByOutcome[OutcomeAgreed], population.ByOutcome[OutcomeDisagreed],
-			population.ByOutcome[OutcomeGoSilent], population.ByOutcome[OutcomeEngineSilent],
-			population.ByOutcome[OutcomeBothSilent], population.EngineNullReadings,
+			population.ByOutcome[OutcomeGoSilent], population.ByOutcome[OutcomeTailwindSilent],
+			population.ByOutcome[OutcomeBothSilent], population.TailwindNullReadings,
 		)
 		if answered := population.Answered(); answered > 0 {
 			fmt.Fprintf(builder, "    agreement over answered classes: %.4f%%\n",

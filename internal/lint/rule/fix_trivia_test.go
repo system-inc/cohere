@@ -17,12 +17,12 @@ import (
 //
 //	import * as X from 'fs'   ->   import * as X from'node:fs'
 //
-// What makes this worse than cosmetic is that the corrupted output still parses. The edit engine
+// What makes this worse than cosmetic is that the corrupted output still parses. The fix pass
 // refuses a rewrite that breaks syntax, and that guard never fires here, so the damage lands with
 // every downstream check green. A range wider than the rule intended is damage no later validation
 // can detect.
 //
-// Found by @system_cohere_lint_fix running real rules through the engine rather than reasoning
+// Found by @system_cohere_lint_fix running real rules through the linter rather than reasoning
 // about ranges.
 func TestFixHelpersDoNotEatLeadingTrivia(test *testing.T) {
 	test.Parallel()

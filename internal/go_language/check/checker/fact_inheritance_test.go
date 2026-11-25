@@ -15,13 +15,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/vet/printf"
 )
 
-// pushedFactAnalyzers are the analyzers of an engine run whose facts travel along the graph's vertical edges:
+// pushedFactAnalyzers are the analyzers of a cohere-go run whose facts travel along the graph's vertical edges:
 // ctrlflow's on functions and methods that never return, printf's on wrappers, and deprecated's on objects of every
 // kind, types, constants, fields and methods among them, which it lists whole through AllObjectFacts.
 var pushedFactAnalyzers = []*analysis.Analyzer{ctrlflow.Analyzer, printf.Analyzer, deprecated.Analyzer}
 
 // broadStandardLibrary is a package that imports a wide slice of the standard library, so its closure is a few hundred
-// real packages, every one analyzed for its facts alone, as an engine run analyzes a project's dependencies.
+// real packages, every one analyzed for its facts alone, as a cohere-go run analyzes a project's dependencies.
 const broadStandardLibrary = `package broad
 
 import (
@@ -79,7 +79,7 @@ func liveHeap() int64 {
 	return int64(statistics.HeapAlloc)
 }
 
-// BenchmarkFactInheritance analyzes a few hundred standard-library packages with the analyzers whose facts an engine
+// BenchmarkFactInheritance analyzes a few hundred standard-library packages with the analyzers whose facts a child
 // run pushes along its vertical edges (benchmarkFactInheritance).
 func BenchmarkFactInheritance(benchmark *testing.B) {
 	directory := benchmark.TempDir()

@@ -92,10 +92,10 @@ jobs:
 
     release:
         needs: plan
-        # macos-26 for Xcode 26 and Swift 6.3, the oldest stable toolchain the engine's Package.swift
+        # macos-26 for Xcode 26 and Swift 6.3, the oldest stable toolchain cohere-swift's Package.swift
         # (tools 6.2) builds with. Never the xcode-27 preview image: a release is not built on a beta.
         runs-on: macos-26
-        # The module check, then two cold Swift engine builds (16 and 13 minutes on an M-series desk
+        # The module check, then two cold cohere-swift builds (16 and 13 minutes on an M-series desk
         # machine, and a runner is slower), then the proofs. The dry run 37238149770 spent 34 minutes in
         # the module check alone before its tests hit Go's default timeout, so 90 left no room.
         timeout-minutes: 150
@@ -298,8 +298,8 @@ jobs:
                   fi
 
             - name: Prove each Mac package checks Swift with no checkout on the machine
-              # This workspace is the tree the engines were built in, so it is the checkout a released
-              # engine must never read. The x64 package runs under Rosetta here and can only lint, since
+              # This workspace is the tree the cohere-swift binaries were built in, so it is the checkout a released
+              # cohere-swift must never read. The x64 package runs under Rosetta here and can only lint, since
               # Xcode on Apple silicon ships libclang for arm64 only: its types phase is proven by the
               # Intel job below, on an x86_64 Xcode. The script says why each run is shaped as it is.
               run: |
@@ -413,8 +413,8 @@ jobs:
                   retention-days: 14
 
     # The x64 Mac package's types phase, run natively. Rosetta on the release runner cannot load an
-    # arm64-only libclang into an x86_64 engine, so only an Intel Mac with an x86_64 Xcode shows that
-    # phase working. macos-26-intel carries Xcode 26, whose Swift 6.3 reads the engine's tools 6.2.
+    # arm64-only libclang into an x86_64 cohere-swift, so only an Intel Mac with an x86_64 Xcode shows that
+    # phase working. macos-26-intel carries Xcode 26, whose Swift 6.3 reads cohere-swift's tools 6.2.
     swift-on-intel:
         needs: [plan, release]
         runs-on: macos-26-intel
@@ -423,7 +423,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  # The script and nothing else. The engine's own sources are what it must not read,
+                  # The script and nothing else. cohere-swift's own sources are what it must not read,
                   # so they are not put here, and the workspace is made unreadable all the same.
                   sparse-checkout: .github/scripts
 

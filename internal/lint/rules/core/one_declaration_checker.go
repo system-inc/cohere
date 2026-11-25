@@ -235,16 +235,16 @@ func (checker *oneDeclarationChecker) reportNever(statement *ast.Node, list *ast
 // Upstream's fixer is a generator yielding two or three edits: turn the previous statement's
 // terminator into a comma, drop the `using` token when the kind is `await using`, and delete this
 // statement's declaration keyword. They are disjoint spans, and `internal/edit`'s ProposalsFrom
-// flattens a diagnostic's fixes into independent proposals, so the engine judges each separately.
+// flattens a diagnostic's fixes into independent proposals, so the fix pass judges each separately.
 //
-// Measured against the real engine rather than assumed: both halves survive overlap resolution, and
+// Measured against the real linter rather than assumed: both halves survive overlap resolution, and
 // a rival fix spanning the gap between them loses to this pair rather than splitting it, because
 // these sort first and claim their bytes.
 //
 // What that measurement does not buy is safety against the one-byte gap between the two spans. A
 // rival fix landing strictly inside it would take one half and leave the other, and applying only
 // the keyword deletion yields `var bar = true; baz = false;` -- which parses, and silently declares
-// an implicit global. The engine's parse-failure guard cannot see that, so it is the one shape
+// an implicit global. The fix pass's parse-failure guard cannot see that, so it is the one shape
 // worth naming here. It has no live caller today: this is the first shipped rule to report more
 // than one fix on one diagnostic, and `ProposalsFrom`'s own comment says grouping should be built
 // when a rule genuinely needs it rather than warned about. That is a finding for the shelf and it

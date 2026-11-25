@@ -258,7 +258,7 @@ func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(test *testing.T) {
 
 // The typed harness is required, and a revert to the untyped one must fail loudly.
 //
-// The engine hands a rule a nil checker unless it declares NeedsTypeChecker. This rule answers
+// The linter hands a rule a nil checker unless it declares NeedsTypeChecker. This rule answers
 // nothing without one, so under `rule_testing.Run` it goes completely silent: every clean case above
 // would pass vacuously and the whole suite would look green over a rule that reports nothing.
 func TestNoGlobalAssignRequiresTheTypedHarness(test *testing.T) {

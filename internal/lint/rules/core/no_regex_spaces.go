@@ -51,8 +51,8 @@ var messageRegexSpaces = rule.Message{
 // not, and each half is load bearing in a different direction.
 //
 // The parse has to be cooked because that is the string the RegExp constructor receives. In
-// `new RegExp(' \\[   ')` the `\\[` is a JS string escape, so the pattern the engine sees is ` [   `,
-// which opens a character class that never closes. Parsing the raw bytes instead reads `\\[` as a
+// `new RegExp(' \\[   ')` the `\\[` is a JS string escape, so the pattern the regular expression parser sees
+// is ` [   `, which opens a character class that never closes. Parsing the raw bytes instead reads `\\[` as a
 // regex escape, finds no class, and reports three spaces that upstream and ESLint both call clean.
 //
 // The span has to be raw because that is what indexes the file. `new RegExp('\\\\d  ')` has a raw body
@@ -89,7 +89,7 @@ var NoRegexSpaces = rule.Rule[rule.NoOptions]{
 	Name: "no-regex-spaces",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// reportLiteral walks a regex literal's pattern and reports its first unquantified,
-		// unclassed run of two or more spaces. A literal's source text and the pattern the engine
+		// unclassed run of two or more spaces. A literal's source text and the pattern the regular expression parser
 		// receives are the same bytes, so no cooking or offset mapping is involved here; the
 		// constructor path below is where that stops being true.
 		reportLiteral := func(pattern string, flags string, patternStart int) {

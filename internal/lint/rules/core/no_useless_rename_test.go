@@ -476,7 +476,7 @@ func TestNoUselessRenameFixes(test *testing.T) {
 // The cases upstream reports and deliberately declines to repair.
 //
 // Each carries output: null upstream for one of two reasons, and both are ported. A comment in
-// the discarded part would be deleted by a rewrite the engine applies unattended, and a
+// the discarded part would be deleted by a rewrite the fix pass applies unattended, and a
 // parenthesized left side of a default cannot become a shorthand property, because parentheses
 // are not legal there.
 //

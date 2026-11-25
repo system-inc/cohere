@@ -21,9 +21,9 @@ func TestTheReachCarriesANamedArraysLengthIntoEveryBodyThatFoldsIt(test *testing
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "body-reach-array-length"))
-	on, _ := runOverConfigured(test, root, exitClean, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyDifferential = true
+	on, _ := runOverConfigured(test, root, exitClean, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyDifferential = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {

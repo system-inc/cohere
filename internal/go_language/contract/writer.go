@@ -8,8 +8,8 @@ import (
 )
 
 // Writer writes records one per line, and refuses the orderings the front door would refuse, so a stream
-// the engine wrote out of order fails in the engine, with the record that broke it named, rather than at
-// the front door as "the engine is broken".
+// cohere-go wrote out of order fails in cohere-go, with the record that broke it named, rather than at
+// the front door as "cohere-go is broken".
 //
 // A Writer is not safe for concurrent use. The pipeline writes in order, and the contract's order is the
 // pipeline's.
@@ -21,12 +21,12 @@ type Writer struct {
 	// line is the record being written, encoded by encoder, which writes into it, and emptied before the next. One
 	// buffer serves every record, since a run writes thousands of findings and each would otherwise encode into a
 	// buffer of its own and be copied into a line of its own. Its last reader is output's Write, which io.Writer
-	// forbids to keep it: the engine's stdout copies it out to the pipe, and a test's bytes.Buffer into its own bytes.
+	// forbids to keep it: cohere-go's stdout copies it out to the pipe, and a test's bytes.Buffer into its own bytes.
 	line    bytes.Buffer
 	encoder *json.Encoder
 }
 
-// NewWriter is a Writer onto output, which is the engine's stdout outside a test.
+// NewWriter is a Writer onto output, which is cohere-go's stdout outside a test.
 func NewWriter(output io.Writer) *Writer {
 	writer := &Writer{output: output}
 	writer.encoder = json.NewEncoder(&writer.line)

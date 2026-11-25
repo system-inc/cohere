@@ -58,20 +58,20 @@ type runCacheSession struct {
 	extraAbsent []string
 
 	// trackedIgnored is each git index among the inputs that the run read only for what it decides of a walk, the
-	// format walk's or an engine's census. record keys each on gitignore.TrackedIgnoredDigest rather than on its
+	// format walk's or a child's census. record keys each on gitignore.TrackedIgnoredDigest rather than on its
 	// bytes, which git rewrites on a `git status` and on every `git add`, so a run over a tree nothing changed in
 	// replays (#m1daxxk). An index the reader cannot read whole keeps its bytes as its key.
 	trackedIgnored []trackedIgnoredIndex
 
-	// projectRoots is the root, as given and resolved, of a run whose engine declares its inputs, a Go run's; nil
+	// projectRoots is the root, as given and resolved, of a run whose child declares its inputs, a Go run's; nil
 	// for a TypeScript run, whose recorder observes its reads.
 	projectRoots []string
 
 	// recordedWithin is where a directory holding a file the run read is recorded: the project roots and every
-	// directory the engine listed, which lie in the roots it walked. A file outside them, as the git index in a
+	// directory the child listed, which lie in the roots it walked. A file outside them, as the git index in a
 	// worktree's git directory or a file of the toolchain, is decided by its own signature alone (see
 	// program.RecordRunCacheWithin). Nil records every holding directory, as a TypeScript run does; empty records
-	// none, as a Swift run does, whose engine lists every directory whose listing it read (see
+	// none, as a Swift run does, whose child lists every directory whose listing it read (see
 	// declareSwiftRunCacheInputs).
 	recordedWithin []string
 

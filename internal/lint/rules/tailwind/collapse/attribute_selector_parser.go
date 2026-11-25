@@ -2,7 +2,7 @@
 // its attribute, operator, quote, value and case-sensitivity flag, or rejects it.
 //
 // Ported from `src/attribute-selector-parser.ts` at the v4.3.3 tag, read at the tag rather than
-// from the minified bundle, so a disagreement with the engine is a finding rather than version
+// from the minified bundle, so a disagreement with Tailwind is a finding rather than version
 // skew.
 //
 // # Absence is spelled the way upstream spells null

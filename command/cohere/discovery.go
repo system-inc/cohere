@@ -22,7 +22,7 @@ import (
 // Discovery is how one cohere checks a repository that holds more than one project: TypeScript programs,
 // Swift packages and Go workspaces and modules side by side, or nested below one another (#f9nftxz). From
 // the root it walks every directory the repository keeps, and each tsconfig.json, Package.swift, go.work or
-// go.mod it meets is a project, run by its own engine. A directory holding a go.work and a go.mod is one Go
+// go.mod it meets is a project, run by its own child. A directory holding a go.work and a go.mod is one Go
 // project, the workspace, and a go.mod whose directory a workspace's go.work uses is not a project of its
 // own: the workspace's run builds it, as go does.
 //
@@ -44,23 +44,23 @@ import (
 // The walk also notes every .swift file it passes, and each directory that could be an Xcode project's root:
 // one holding a project.yml, an xcodegen spec, or exactly one .xcodeproj, and no Package.swift (#ybspptb).
 // After the walk each directory of Swift files goes to the nearest Swift marker at or above it, a package's
-// directory or such a candidate. A candidate that claims any file is a Swift project, which the engine checks
+// directory or such a candidate. A candidate that claims any file is a Swift project, which the child checks
 // as an Xcode root. One that claims none is not, since project.yml is a weak signal: other tools use the name.
 // So ahraos-presence's CapturePhone, inside the root package's directory, is a project of its own, because its
 // project.yml is nearer to its sources than the root's Package.swift is.
 //
 // Swift with no marker above it was once checked by nothing, and beside a TypeScript program a green run read
 // clean over code nobody looked at. Such files get a Swift project of their own at the root, a scripts-only root
-// with no Package.swift (#wpd36zj): the engine checks each standalone script among them alone, as `swift <file>`
+// with no Package.swift (#wpd36zj): the child checks each standalone script among them alone, as `swift <file>`
 // runs it, and names every other file as not checked, by the same nearest-marker rule this walk claims by, so
 // ahra's four scripts under modules/ are checked rather than named. Inside a repository or not: outside one the
-// engine walks by the tree's own ignore files, as this walk does (#13nbb1s). Files the walk never enters, or that
+// child walks by the tree's own ignore files, as this walk does (#13nbb1s). Files the walk never enters, or that
 // .gitignore or the root's ignorePatterns match, give no root, since nobody expects those checked.
 //
 // A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
-// directory claims it, and the engine knows which files it checks. A standalone script there, one `swift <file>`
+// directory claims it, and the child knows which files it checks. A standalone script there, one `swift <file>`
 // runs, its run checks alone (#13nbb1s). Any other such file its run lists as not checked, and that list, less
-// what the runs of the Swift projects below it account for, is the run's own gap (see engineRun.writeExcluded).
+// what the runs of the Swift projects below it account for, is the run's own gap (see contractRun.writeExcluded).
 
 // neverDescended are the directory names discovery never enters, whatever any ignore file says: the format walk's
 // set, so the Format project never judges what discovery never reads (#fe4vr5s).
@@ -84,7 +84,7 @@ type discoveredProject struct {
 	// Directory is the project's root, relative to the discovery root and slash-separated: "." for the
 	// root itself.
 	Directory string
-	Engine    projectEngine
+	Kind      projectKind
 
 	// ConfigFile is a TypeScript project's tsconfig when it is not the tsconfig.json in Directory: one a
 	// solution root references by another name, such as Vite's tsconfig.app.json. Empty for the rest.
@@ -96,7 +96,7 @@ type discovery struct {
 	// Root is the absolute directory the walk started from.
 	Root string
 
-	// Projects are in walk order, the root's first, and a directory holding more than one engine's marker is
+	// Projects are in walk order, the root's first, and a directory holding more than one language's marker is
 	// a project for each, TypeScript's first, then Swift's, then Go's.
 	Projects []discoveredProject
 
@@ -415,13 +415,13 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		// A go.work found here makes the directory's go.mod part of its project rather than one of its own.
 		workspaceHere := false
 		for _, marker := range []struct {
-			name   string
-			engine projectEngine
+			name string
+			kind projectKind
 		}{
-			{projectMarker, engineTypeScript},
-			{swiftProjectMarker, engineSwift},
-			{goWorkspaceMarker, engineGo},
-			{goModuleMarker, engineGo},
+			{projectMarker, projectKindTypeScriptProgram},
+			{swiftProjectMarker, projectKindSwiftPackage},
+			{goWorkspaceMarker, projectKindGoModule},
+			{goModuleMarker, projectKindGoModule},
 		} {
 			if !names[marker.name] || (marker.name == goModuleMarker && workspaceHere) {
 				continue
@@ -431,7 +431,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				found.Refused = append(found.Refused, markerPath)
 				continue
 			}
-			found.Projects = append(found.Projects, discoveredProject{Directory: relative, Engine: marker.engine})
+			found.Projects = append(found.Projects, discoveredProject{Directory: relative, Kind: marker.kind})
 			if marker.name == goWorkspaceMarker {
 				workspaceHere = true
 				workspaces = append(workspaces, relative)
@@ -489,7 +489,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	// No Swift project is at the root, or it would have claimed every file, so the scripts-only root is the only
 	// Swift project there (see the header).
 	if anyUnclaimed {
-		found.Projects = append(found.Projects, discoveredProject{Directory: ".", Engine: engineSwift})
+		found.Projects = append(found.Projects, discoveredProject{Directory: ".", Kind: projectKindSwiftPackage})
 	}
 	found.sortProjects()
 	sort.Strings(found.Refused)
@@ -643,7 +643,7 @@ func (found *discovery) claimWorkspaceModules(workspaces []string) {
 	}
 	running := found.Projects[:0:0]
 	for _, project := range found.Projects {
-		if project.Engine == engineGo && !isWorkspace[project.Directory] {
+		if project.Kind == projectKindGoModule && !isWorkspace[project.Directory] {
 			// Any workspace that uses a module claims it, the nearest or not: that workspace's run builds the
 			// module through the use, so running the module alone as well would check its files twice. The walk
 			// up from inside such a module can still stop at the module (goModuleRoot), because go standing
@@ -677,12 +677,12 @@ func nearestWorkspace(directory string, workspaces []string) (string, bool) {
 // xcodeProjectSpecification is the xcodegen spec whose directory may be an Xcode project's root.
 const xcodeProjectSpecification = "project.yml"
 
-// xcodeMarker is the entry that makes a directory a candidate Xcode root, by the engine's own rule
+// xcodeMarker is the entry that makes a directory a candidate Xcode root, by the child's own rule
 // (swift/Contract.md): its project.yml, or else its one .xcodeproj, or "" when it is no candidate. A
-// Package.swift wins beside either, and two .xcodeproj, or a workspace and no project, the engine refuses, so
+// Package.swift wins beside either, and two .xcodeproj, or a workspace and no project, the child refuses, so
 // none of those is a candidate. names are the listing's entries that are not directories, as the walk keeps
 // them for its other markers; a .xcodeproj is a bundle, a directory, and is counted whatever its type, as the
-// engine counts it.
+// child counts it.
 func xcodeMarker(entries []os.DirEntry, names map[string]bool) string {
 	if names[swiftProjectMarker] {
 		return ""
@@ -719,7 +719,7 @@ func claimSwiftFiles(
 ) ([]discoveredProject, bool) {
 	packages := map[string]bool{}
 	for _, project := range projects {
-		if project.Engine == engineSwift {
+		if project.Kind == projectKindSwiftPackage {
 			packages[project.Directory] = true
 		}
 	}
@@ -736,7 +736,7 @@ func claimSwiftFiles(
 	}
 	xcodeProjects := make([]discoveredProject, 0, len(claiming))
 	for directory := range claiming {
-		xcodeProjects = append(xcodeProjects, discoveredProject{Directory: directory, Engine: engineSwift})
+		xcodeProjects = append(xcodeProjects, discoveredProject{Directory: directory, Kind: projectKindSwiftPackage})
 	}
 	return xcodeProjects, anyUnclaimed
 }
@@ -773,24 +773,24 @@ func (found *discovery) sortProjects() {
 		if leftProject.Directory != rightProject.Directory {
 			return pathBefore(leftProject.Directory, rightProject.Directory)
 		}
-		if leftProject.Engine != rightProject.Engine {
-			return engineRank(leftProject.Engine) < engineRank(rightProject.Engine)
+		if leftProject.Kind != rightProject.Kind {
+			return kindRank(leftProject.Kind) < kindRank(rightProject.Kind)
 		}
 		return leftProject.ConfigFile < rightProject.ConfigFile
 	})
 }
 
-// engineRank is where an engine's project comes among the projects of one directory, the order engineAt
+// kindRank is where a child's project comes among the projects of one directory, the order kindAt
 // reads the markers in, so the report lists them the way a single run would choose between them.
-func engineRank(engine projectEngine) int {
-	switch engine {
-	case engineTypeScript:
+func kindRank(kind projectKind) int {
+	switch kind {
+	case projectKindTypeScriptProgram:
 		return 0
-	case engineSwift:
+	case projectKindSwiftPackage:
 		return 1
-	case engineGo:
+	case projectKindGoModule:
 		return 2
-	case engineFormat:
+	case projectKindFolder:
 		return 3
 	default:
 		return 4
@@ -838,7 +838,7 @@ func (found discovery) isTheLocatedProject(location projectLocation, locateError
 		return false
 	}
 	project := found.Projects[0]
-	return project.Engine == location.Engine && project.ConfigFile == "" &&
+	return project.Kind == location.Kind && project.ConfigFile == "" &&
 		filepath.Clean(filepath.Join(found.Root, project.Directory)) == filepath.Clean(location.Root)
 }
 
@@ -914,8 +914,8 @@ func (found discovery) notes() []string {
 //
 // A TypeScript project at the root formats every such file in the repository, its JSON and Markdown among
 // them, from its own walk of the disk. A repository whose root is a Go workspace or a Swift package had
-// nothing that did: gofmt and the Swift engine format their own languages, and cohere's own policy/ JSON,
-// read by every engine, landed misformatted and green. So the root gets a project of its own, the format
+// nothing that did: gofmt and cohere-swift format their own languages, and cohere's own policy/ JSON,
+// read by every language, landed misformatted and green. So the root gets a project of its own, the format
 // phase alone over the same walk, leaving each TypeScript project's directory below it to that project's run.
 // The format project joins the projects found holds, which the caller runs.
 //
@@ -924,7 +924,7 @@ func (found discovery) notes() []string {
 func (found *discovery) addRootFormatProject() {
 	typeScriptDirectories := []string{}
 	for _, project := range found.Projects {
-		if project.Engine != engineTypeScript {
+		if project.Kind != projectKindTypeScriptProgram {
 			continue
 		}
 		if project.Directory == "." {
@@ -941,7 +941,7 @@ func (found *discovery) addRootFormatProject() {
 			}
 		}
 		if !formattedElsewhere {
-			found.Projects = append(found.Projects, discoveredProject{Directory: ".", Engine: engineFormat})
+			found.Projects = append(found.Projects, discoveredProject{Directory: ".", Kind: projectKindFolder})
 			found.sortProjects()
 			return
 		}
@@ -964,8 +964,8 @@ func (found *discovery) chooseLanguages(choice languageChoice, formats bool) {
 	}
 	found.Choice = choice
 	present := func(known language) bool {
-		if known.engine != "" && slices.ContainsFunc(found.Projects, func(project discoveredProject) bool {
-			return project.Engine == known.engine
+		if known.kind != "" && slices.ContainsFunc(found.Projects, func(project discoveredProject) bool {
+			return project.Kind == known.kind
 		}) {
 			return true
 		}
@@ -984,23 +984,25 @@ func (found *discovery) chooseLanguages(choice languageChoice, formats bool) {
 	var running []discoveredProject
 	formatsAt := map[string]bool{}
 	for _, project := range found.Projects {
-		if project.Engine == engineFormat {
+		if project.Kind == projectKindFolder {
 			formatsAt[project.Directory] = true
 		}
 	}
 	leftOutExtensions := choice.leftOutExtensions()
 	for _, project := range found.Projects {
 		switch {
-		case project.Engine == engineFormat && !found.formatsAnythingAt(project, leftOutExtensions):
+		case project.Kind == projectKindFolder && !found.formatsAnythingAt(project, leftOutExtensions):
 			found.LeftOut = append(found.LeftOut, project)
-		case project.Engine == engineFormat || choice.namesEngine(project.Engine):
+		case project.Kind == projectKindFolder || choice.namesKind(project.Kind):
 			running = append(running, project)
-		case project.Engine == engineTypeScript && formats && found.formatsAnythingAt(project, leftOutExtensions):
+		case project.Kind == projectKindTypeScriptProgram &&
+			formats &&
+			found.formatsAnythingAt(project, leftOutExtensions):
 			found.LeftOut = append(found.LeftOut, project)
 			// One format project a directory: two programs in one directory share its walk.
 			if !formatsAt[project.Directory] {
 				formatsAt[project.Directory] = true
-				running = append(running, discoveredProject{Directory: project.Directory, Engine: engineFormat})
+				running = append(running, discoveredProject{Directory: project.Directory, Kind: projectKindFolder})
 			}
 		default:
 			found.LeftOut = append(found.LeftOut, project)
@@ -1016,7 +1018,7 @@ func (found *discovery) chooseLanguages(choice languageChoice, formats bool) {
 // from, so every program is still there. A format project with nothing to keep would check nothing, and a run that
 // checks nothing fails.
 func (found discovery) formatsAnythingAt(project discoveredProject, leftOutExtensions []string) bool {
-	yielded := found.formatYield(discoveredProject{Directory: project.Directory, Engine: engineFormat})
+	yielded := found.formatYield(discoveredProject{Directory: project.Directory, Kind: projectKindFolder})
 	for directory, kinds := range found.FormattableKinds {
 		if project.Directory != "." && directory != project.Directory && !isBelow(directory, project.Directory) {
 			continue
@@ -1048,7 +1050,7 @@ func (found discovery) everyProject() []discoveredProject {
 func (found discovery) formatYield(project discoveredProject) projectYield {
 	yield := projectYield{}
 	for _, other := range found.everyProject() {
-		if other.Engine == engineTypeScript && other.Directory != project.Directory &&
+		if other.Kind == projectKindTypeScriptProgram && other.Directory != project.Directory &&
 			(project.Directory == "." || isBelow(other.Directory, project.Directory)) {
 			yield.Directories = append(
 				yield.Directories,
@@ -1074,7 +1076,7 @@ func (found discovery) formatYield(project discoveredProject) projectYield {
 func (found discovery) swiftYield(project discoveredProject) projectYield {
 	yield := projectYield{}
 	for _, other := range found.everyProject() {
-		if other.Engine == engineSwift && isBelow(other.Directory, project.Directory) {
+		if other.Kind == projectKindSwiftPackage && isBelow(other.Directory, project.Directory) {
 			yield.Directories = append(
 				yield.Directories,
 				filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
@@ -1119,7 +1121,7 @@ func (found discovery) projectAt(configurationFile string) (discoveredProject, b
 	if !isRegularFile(configurationFile) {
 		return discoveredProject{}, false
 	}
-	project := discoveredProject{Directory: path.Dir(relative), Engine: engineTypeScript}
+	project := discoveredProject{Directory: path.Dir(relative), Kind: projectKindTypeScriptProgram}
 	if name := path.Base(relative); name != projectMarker {
 		project.ConfigFile = name
 	}

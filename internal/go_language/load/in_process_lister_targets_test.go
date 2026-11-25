@@ -71,9 +71,9 @@ func TestInProcessListingIsGoListsAnswerOnEveryTarget(test *testing.T) {
 	}
 }
 
-// The same holds for each extra build a run checks at cohere's own root, listed as the engine lists it:
-// the builds the engine reads for cohere's census, each under the workspace's environment and the build's own
-// (see the engine's extraBuildRun), so no extra build forks go list.
+// The same holds for each extra build a run checks at cohere's own root, listed as cohere-go lists it:
+// the builds cohere-go reads for cohere's census, each under the workspace's environment and the build's own
+// (see cohere-go's extraBuildRun), so no extra build forks go list.
 func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 	test.Parallel()
 	workspace, builds := coheresBuilds(test)
@@ -90,7 +90,7 @@ func TestInProcessListingIsGoListsAnswerOnCoheresOtherBuilds(test *testing.T) {
 // (`go env -w`).
 var noGoEnvironmentFile = []string{"GOENV=off"}
 
-// coheresBuilds is cohere's own workspace and the builds the engine checks it under, as a run of every build reads
+// coheresBuilds is cohere's own workspace and the builds cohere-go checks it under, as a run of every build reads
 // them for cohere's census, the host's first: its go block's targets matched to the toolchain's ports, read with no go
 // env file.
 func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
@@ -118,7 +118,7 @@ func coheresBuilds(test *testing.T) (project.Workspace, []project.Build) {
 		test.Fatal(environmentError)
 	}
 	buildContext, goFlags := goEnvironment.Target()
-	// The targets cohere's go block adds, as the engine reads them (settings.parseTargets), matched to their ports.
+	// The targets cohere's go block adds, as cohere-go reads them (settings.parseTargets), matched to their ports.
 	contents, readError := os.ReadFile(filepath.Join(workspace.Root, "CohereSettings.json"))
 	if readError != nil {
 		test.Fatal(readError)

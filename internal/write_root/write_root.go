@@ -1,5 +1,5 @@
 // Package write_root is where a fix may write: the run's root, judged by real paths, every symbolic link resolved. Each
-// engine that writes a project's files asks it before it writes one, so a file reached through a link to somewhere
+// program that writes a project's files asks it before it writes one, so a file reached through a link to somewhere
 // outside the root, a linked vendor or shared directory, is read and checked as any other and never written, and a
 // fix of one project never rewrites another (#hwz114g: a linked `TypeScript` led a Go fix to rewrite a shared
 // checkout).

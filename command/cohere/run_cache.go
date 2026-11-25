@@ -40,7 +40,7 @@ import (
 // arguments anyway, so admitting more later is a change to one condition rather than to the proof, plus
 // declaring whatever the new run reads that the graph build does not.
 //
-// At a Go root the same runs are admitted, and the Go engine declares what they read (see go_run_cache.go).
+// At a Go root the same runs are admitted, and cohere-go declares what they read (see go_run_cache.go).
 //
 // # Which exits
 //
@@ -117,10 +117,10 @@ func recordRunSummary(summary runSummary) {
 //
 // `--host-build-only` checks a Go project's host build alone, where a run without it checks every build its files
 // name (#qqyq61s), so it is its own record as well, and neither replays the other. A run without it is replayed only
-// while every build's inputs are unchanged, since the Go engine's inputs record names what every build's load read
+// while every build's inputs are unchanged, since cohere-go's inputs record names what every build's load read
 // (#e4b08k7), and the land gate runs without it (#72n9mq0).
 //
-// `--timing` is never admitted, on any engine, so such a run neither replays nor is recorded. A timing run is a
+// `--timing` is never admitted, on any language, so such a run neither replays nor is recorded. A timing run is a
 // measurement, and a replay would print the last run's CPU as this run's, a table of costs this run never spent.
 // `--timeline` is never admitted either, for the same reason: it changes nothing the run computes, but its table is
 // the run's own clock, and a replay would print when another run's phases began and ended as this one's (#3v2zp7g).
@@ -135,11 +135,11 @@ func runCacheEligible() bool {
 	if cacheOff {
 		return false
 	}
-	return runCacheAdmits(runCacheArguments(os.Args[1:], os.Getenv(projectEngineVariable) != ""))
+	return runCacheAdmits(runCacheArguments(os.Args[1:], os.Getenv(projectKindVariable) != ""))
 }
 
 // runCacheArguments is the part of a command line the run cache judges. For one of discovery's children (child, its
-// engine variable set) that is what its parent was given: the leading `--directory <project>` and `--tsconfig
+// kind variable set) that is what its parent was given: the leading `--directory <project>` and `--tsconfig
 // <file>` runProject prepends and the trailing `--lint-config <absolute path>` childArguments appends are taken off,
 // in exactly those places and nowhere else. Without that, every project of a root holding several, cohere's own
 // among them, ran cold every time, since `--directory` admits no run.
@@ -221,10 +221,10 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	return session.recorder
 }
 
-// beginRunCacheSession is the half of beginning a run cache every engine shares: the key, from this invocation's
-// arguments and the facts its engine names; the recorded run's check, which replays it and exits on a hit; and
+// beginRunCacheSession is the half of beginning a run cache every language shares: the key, from this invocation's
+// arguments and the facts the child names; the recorded run's check, which replays it and exits on a hit; and
 // otherwise the session that records this run, its streams teed. sections are the parts of the table beyond the
-// run that this engine's walk reuses, read only on a miss, since a replay needs nothing else. Nil when no session
+// run that the child's walk reuses, read only on a miss, since a replay needs nothing else. Nil when no session
 // could begin, and then nothing is recorded.
 func beginRunCacheSession(
 	root string,
@@ -252,12 +252,12 @@ func beginRunCacheSession(
 	// This invocation's run first and alone: a replay needs nothing else, and the run is a sixth of the
 	// table's bytes where the whole table was all of them (#45ekc65).
 	//
-	// A child of discovery's is named by its engine too. A Go workspace and the format project at one root are
+	// A child of discovery's is named by the child too. A Go workspace and the format project at one root are
 	// given the same arguments, and they share this directory's table, so one name would hold whichever
 	// recorded last and each would miss the other's run every time.
 	invocationArguments := os.Args[1:]
-	if engine := os.Getenv(projectEngineVariable); engine != "" {
-		invocationArguments = append(slices.Clone(invocationArguments), projectEngineVariable+"="+engine)
+	if kind := os.Getenv(projectKindVariable); kind != "" {
+		invocationArguments = append(slices.Clone(invocationArguments), projectKindVariable+"="+kind)
 	}
 	invocation := program.CacheTableInvocation(invocationArguments)
 	table, readCacheTableError := program.ReadCacheTable(
@@ -353,7 +353,7 @@ var prepareCacheDirectoryOnce sync.Once
 //
 // A run that only answers, given one of answerOnlyFlags, checks nothing, so it makes no cache anywhere: `cohere
 // --version` in a checkout with submodules made each library's `.cache/cohere`, which the quiet bench, running it
-// in its copy to pin the engine, read as the copy's tree changing under it (#spdcohere).
+// in its copy to pin the child, read as the copy's tree changing under it (#spdcohere).
 func startRunCacheClock(location projectLocation, locateError error, given map[string]bool) {
 	eligible := locateError == nil && runCacheEligible()
 	if eligible {
@@ -661,7 +661,7 @@ func replayedSummary(recorded runSummary, elapsed time.Duration) runSummary {
 	// Every file in scope was answered by the cache, so the count says so: --json read 0 here, the number a run
 	// that replayed nothing reads, and a reader took a whole replay for a full check (#547dhjz).
 	replayed.Cache = cacheUse{Replayed: true, FilesReplayed: recorded.FilesInScope}
-	// The engine's cache was not consulted by a replay, which started no engine, so what it did is the recorded run's.
+	// The child's cache was not consulted by a replay, which started no child, so what it did is the recorded run's.
 	replayed.PackageCache = nil
 	// Nor did a replay raise its heap: the raises were the recorded run's (#5shepvt).
 	replayed.MemoryRaisedToBytes = nil

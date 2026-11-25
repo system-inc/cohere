@@ -2,7 +2,7 @@
 // `e || e`, or one value tested against two constants with the equality that makes the chain always true or always
 // false, `x != 1 || x != 2` and `x == 1 && x == 2`. An operand with side effects, a call or a receive, may change
 // what the operands after it read, so the chain is judged in runs of side-effect-free operands, each run on its own.
-// It sits on the engine's syntax dispatcher, hearing each binary expression on the walk the dispatcher makes once for
+// It sits on cohere-go's syntax dispatcher, hearing each binary expression on the walk the dispatcher makes once for
 // every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/bools/bools.go, whose logic it

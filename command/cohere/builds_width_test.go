@@ -11,7 +11,7 @@ import (
 
 // A Go run's --json summary forwards the live heap the extra builds' width was decided from, beside buildsAtOnce, and
 // whether that heap alone decided it at the share gate (#ghb3rcn), so a reader sees why the width was chosen without
-// running the engine alone (#qwb6ns8), and writes none when the lint record carries none.
+// running the child alone (#qwb6ns8), and writes none when the lint record carries none.
 // Not parallel: acceptLint sets the package-level activeSummary.
 func TestASummaryForwardsTheHeapTheBuildsWidthWasDecidedFrom(test *testing.T) {
 	saved := activeSummary
@@ -20,8 +20,8 @@ func TestASummaryForwardsTheHeapTheBuildsWidthWasDecidedFrom(test *testing.T) {
 		test.Helper()
 		activeSummary = runSummary{}
 		var out bytes.Buffer
-		run := newEngineRun(bufio.NewWriter(&out), engineModeCheck, goLanguage("module"), "", time.Now())
-		var record engineLintRecord
+		run := newContractRun(bufio.NewWriter(&out), contractModeCheck, goLanguage("module"), "", time.Now())
+		var record contractLintRecord
 		if decodeError := json.Unmarshal([]byte(lint), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}

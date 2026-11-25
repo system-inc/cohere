@@ -123,7 +123,7 @@ func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (NoDuplicateTypeConsti
 // # One corpus case needs two passes and that is a real property of the fixer
 //
 // `type A = number & string & (number & string);` carries two findings whose repairs overlap in
-// effect: applying both in one pass leaves `(  )`, and the fix engine runs to convergence, at which
+// effect: applying both in one pass leaves `(  )`, and the fix pass runs to convergence, at which
 // point the emptied parenthesis is itself removed. Upstream records that case with an `output`
 // array of two states rather than one string. Our harness applies one pass, so the fixture for that
 // case asserts the first state and says so at the line.

@@ -256,7 +256,7 @@ var NoUnsafeMemberAccess = rule.Rule[NoUnsafeMemberAccessOptions]{
 				ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
 				ast.KindPrefixUnaryExpression, ast.KindPostfixUnaryExpression:
 				// Upstream's own optimization, and it names the reason for the second half: every
-				// update expression is typed `number` regardless of its argument, because the engine
+				// update expression is typed `number` regardless of its argument, because the linter
 				// answers NaN rather than throwing. A literal obviously cannot be `any` either.
 				//
 				// Our parser splits estree's single `Literal` across several kinds and its

@@ -1,6 +1,6 @@
 // Package invisible_character is staticcheck's `ST1018`, a string literal written with a control character or a
 // Unicode format character in it, which a reader cannot see and which may reorder the text around it, where an escape
-// sequence says what is there, ported onto the engine's syntax dispatcher.
+// sequence says what is there, ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1018/st1018.go, whose messages and fixes
 // it reports word for word, over the whole literal, as the original does: for one such character, a fix writing it as
@@ -11,7 +11,7 @@
 // requires only inspect, for its walk over the literals, which the dispatcher's one walk replaces.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package invisible_character
 
 import (

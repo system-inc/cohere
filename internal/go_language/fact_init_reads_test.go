@@ -11,17 +11,17 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
-// runInitReads runs the engine over a copy of the fact-init-reads module named with the registry's rules, under the
+// runInitReads runs cohere-go over a copy of the fact-init-reads module named with the registry's rules, under the
 // body reach census with `--no-cache --no-fix --build-dependence`, with the standing bodies' switch as switched, and
 // returns the pipeline, its stream, normalized, and the copy's root.
 func runInitReads(test *testing.T, module string, switched bool) (*pipeline, string, string) {
 	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", "fact-init-reads", module))
-	engine, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.standingBodies = switched
+	pipeline, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.standingBodies = switched
 	}, "--no-cache", "--no-fix", "--build-dependence")
-	return engine, normalize(stream, root), root
+	return pipeline, normalize(stream, root), root
 }
 
 // An `init` function's body stays a user of what it names (#30dtg3p). The host's side leaves purity's answer about an

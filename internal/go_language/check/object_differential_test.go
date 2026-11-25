@@ -24,7 +24,7 @@ import (
 )
 
 // verdictDifferentialRootVariable names a tree whose packages the object differential judges for each extra build
-// the engine's census needs beside the host's, as the package differential in go_engine judges the same tree's runs.
+// cohere-go's census needs beside the host's, as the package differential in go_language judges the same tree's runs.
 // Unset, the real-tree run is skipped:
 //
 //	COHERE_VERDICT_DIFFERENTIAL_ROOT=<tree> go run ./command/cohere-dev test ./internal/go_language/check/ \
@@ -790,7 +790,7 @@ func TestTheFieldSetLegFailsWhereAPromotedFieldMovesUnderAnUnsetNameBit(test *te
 
 // The same rule over the standard library, loaded from source with cgo off on the host's `GOOS` and under every other
 // `GOOS` a release ships, on the host's `GOARCH` as every extra build is (project.BuildsFor), one build at a time, each
-// against the host's graph with no package of it the workspace's, as the engine's side load judges it. A package the
+// against the host's graph with no package of it the workspace's, as cohere-go's side load judges it. A package the
 // host's load or a build's holds with errors fails that build (reportObjectDifferences). It runs in the ordinary run:
 // on the Mac, the host's load took 2.5 s and each build's load and comparison 1.4 s to 3 s, the test 6.9 s.
 //
@@ -845,10 +845,10 @@ func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T)
 	}
 }
 
-// objectTreeBuilds is the workspace rooted at root and the builds the engine checks of it: the host's build as go env
+// objectTreeBuilds is the workspace rooted at root and the builds cohere-go checks of it: the host's build as go env
 // reads it, then every extra build its census needs beside it, the targets its settings file names among them
-// (project.BuildsFor, asked as the engine's readBuilds asks it). A target go tool dist list does not list is an error,
-// as the engine refuses its run, since a target named and never checked would read as checked.
+// (project.BuildsFor, asked as cohere-go's readBuilds asks it). A target go tool dist list does not list is an error,
+// as cohere-go refuses its run, since a target named and never checked would read as checked.
 func objectTreeBuilds(root string) (project.Workspace, []project.Build, error) {
 	workspace, workspaceError := project.ReadWorkspace(root)
 	if workspaceError != nil {
@@ -866,13 +866,13 @@ func objectTreeBuilds(root string) (project.Workspace, []project.Build, error) {
 	if portsError != nil {
 		return project.Workspace{}, nil, portsError
 	}
-	// The settings file the engine reads with no `--lint-config` named, whose rules this package cannot judge, as it
-	// cannot import the engine that knows every rule, so only the targets are read, as settings.Load reads them.
+	// The settings file cohere-go reads with no `--lint-config` named, whose rules this package cannot judge, as it
+	// cannot import cohere-go that knows every rule, so only the targets are read, as settings.Load reads them.
 	targets, targetsError := settings.ReadTargets(root, "")
 	if targetsError != nil {
 		return project.Workspace{}, nil, targetsError
 	}
-	// Each target as a port, mirroring readBuilds, which this package cannot call, as the engine imports it.
+	// Each target as a port, mirroring readBuilds, which this package cannot call, as cohere-go imports it.
 	var extraTargets []project.Port
 	for _, target := range targets {
 		operatingSystem, architecture, _ := strings.Cut(target, "/")
@@ -881,7 +881,7 @@ func objectTreeBuilds(root string) (project.Workspace, []project.Build, error) {
 		})
 		if index < 0 {
 			return project.Workspace{}, nil, fmt.Errorf("the go block's targets name %s, which go tool dist list "+
-				"does not target, so the engine refuses the run", target)
+				"does not target, so cohere-go refuses the run", target)
 		}
 		extraTargets = append(extraTargets, ports[index])
 	}
@@ -894,7 +894,7 @@ func objectTreeBuilds(root string) (project.Workspace, []project.Build, error) {
 	return workspace, builds, nil
 }
 
-// The object differential checks the targets a tree's settings file names, as the engine does (objectTreeBuilds): a
+// The object differential checks the targets a tree's settings file names, as cohere-go does (objectTreeBuilds): a
 // fixture tree with one file every platform compiles, whose settings name freebsd/arm64, is checked under that build
 // beside the host's, its targets read as settings.Load reads them, and one naming a target go tool dist list does not
 // list is refused, naming it.
@@ -948,7 +948,7 @@ func TestTheObjectDifferentialChecksTheTargetsASettingsFileNames(test *testing.T
 
 		_, builds, buildsError := objectTreeBuilds(tree(test, `["nowhere/none"]`))
 		if buildsError == nil {
-			test.Fatalf("read the builds %v for a target go tool dist list does not list, which the engine refuses",
+			test.Fatalf("read the builds %v for a target go tool dist list does not list, which cohere-go refuses",
 				builds)
 		}
 		if !strings.Contains(buildsError.Error(), "nowhere/none") {
@@ -958,7 +958,7 @@ func TestTheObjectDifferentialChecksTheTargetsASettingsFileNames(test *testing.T
 	})
 }
 
-// The same rule over the tree verdictDifferentialRootVariable names, skipped when it is unset: the builds the engine
+// The same rule over the tree verdictDifferentialRootVariable names, skipped when it is unset: the builds cohere-go
 // checks of it (objectTreeBuilds), the host's and every extra build, the targets its settings file names among them,
 // each loaded with tests under the workspace's environment and the build's own, the packages of the tree's modules
 // the workspace. It logs each build's counts and fails on any object whose bit the rule wants set and finds unset,

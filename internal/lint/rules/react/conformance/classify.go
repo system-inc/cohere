@@ -272,7 +272,7 @@ var statedDivergences = map[string]StatedDivergence{
 	//
 	// This is the narrow, real half of the pragma question. Most pragmas on this corpus restate a
 	// default that is already on (`validateNoSetStateInRender` defaults `true`), which is why the
-	// engine deliberately does not gate on pragmas in general. These three are the exception, and
+	// rule run deliberately does not gate on pragmas in general. These three are the exception, and
 	// they were found by enumerating every wired fixture carrying a pragma measured as
 	// `default(false)`: exactly three across all seven wired rules, all in this one rule.
 	"error.invalid-setstate-unconditional-with-keyed-state.js": {

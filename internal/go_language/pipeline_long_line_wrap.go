@@ -21,62 +21,62 @@ import (
 // failed; a load made for the wrap alone leaves that to the wrap's own held note, since that run asked for no
 // type-check or lint to miss. A package with no file in scope is loaded for what imports it and never analyzed
 // (hasFileInScope). The editor's save loads its file's package alone, with what it imports (stdinPackage).
-func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
-	loaded, loadError := engine.loadWorkspacePackages()
-	engine.noteFailedLoad(loadError, typesRead)
+func (pipeline *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
+	loaded, loadError := pipeline.loadWorkspacePackages()
+	pipeline.noteFailedLoad(loadError, typesRead)
 	return loaded, loadError
 }
 
 // noteFailedLoad says on stderr that the load failed, when a phase reads the types (see loadWorkspace).
-func (engine *pipeline) noteFailedLoad(loadError error, typesRead bool) {
+func (pipeline *pipeline) noteFailedLoad(loadError error, typesRead bool) {
 	if loadError != nil && typesRead {
-		engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
+		pipeline.note("the load failed, so nothing was type-checked or linted: %v", loadError)
 	}
 }
 
 // loadWorkspacePackages is loadWorkspace's load, which says nothing on stderr, so the first load can run beside gofmt's
 // check, whose notes come first (loadBesideFix).
-func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
-	engine.watch(preludeLoadBegan)
-	workspace := engine.described.workspace
+func (pipeline *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
+	pipeline.watch(preludeLoadBegan)
+	workspace := pipeline.described.workspace
 	caching := load.Caching{
-		Held:          engine.held,
-		GoEnvironment: engine.described.goEnvironment,
-		Timing:        engine.timing,
-		Analyzes:      engine.described.hasFileInScope,
-		SharedReads:   engine.reads,
+		Held:          pipeline.held,
+		GoEnvironment: pipeline.described.goEnvironment,
+		Timing:        pipeline.timing,
+		Analyzes:      pipeline.described.hasFileInScope,
+		SharedReads:   pipeline.reads,
 		// The fingerprints the builds share (#t7h2sm4): the host's last load reads the bytes the builds read.
-		Fingerprints: engine.fingerprints,
+		Fingerprints: pipeline.fingerprints,
 		// And the pattern walks (#vnb7btx): the builds take the ones read since the run last changed the bytes it
 		// holds.
-		Walks: engine.walks,
+		Walks: pipeline.walks,
 	}
 	// Under `--timeline` the host's load stamps its listing's end, its restore and its first parse, and its end below,
 	// each in the load's round: 0 for the run's first, 1 for the wrap's load or a reload for a question after it.
-	timelineHook := engine.request.timeline.Hook(nil, int(engine.hostLoads.Add(1)-1), "host.")
+	timelineHook := pipeline.request.timeline.Hook(nil, int(pipeline.hostLoads.Add(1)-1), "host.")
 	caching.Timeline = timelineHook
-	if engine.session != nil {
-		caching.Restorer = engine.session
-		if engine.session.HasStore() {
-			caching.Listings = engine.session
+	if pipeline.session != nil {
+		caching.Restorer = pipeline.session
+		if pipeline.session.HasStore() {
+			caching.Listings = pipeline.session
 		}
 	}
-	if engine.lintOverlaps() {
-		caching.Begin = engine.beginSpeculativeLint
+	if pipeline.lintOverlaps() {
+		caching.Begin = pipeline.beginSpeculativeLint
 	}
-	caching.RecordReads = engine.recordsReadsOf()
+	caching.RecordReads = pipeline.recordsReadsOf()
 	// The body differential compares each build's bodies with the host's as its walk rendered them, each named type
 	// by its name and the digest of its whole lines, in a memo of the host's own.
-	if engine.bodyDifferential && engine.request.judgesDependence() {
+	if pipeline.bodyDifferential && pipeline.request.judgesDependence() {
 		caching.BodyNamedTypes = check.NewReadsBuild().NamedTypesWritten
 	}
 	// The body reach census and the body differential read the host's record of what each declaration uses, and
 	// nothing else does, so a run with neither records none (bodyReachHost).
-	caching.RecordFunctionUses = (engine.bodyReachCensus != "" || engine.bodyDifferential) &&
-		engine.request.judgesDependence()
+	caching.RecordFunctionUses = (pipeline.bodyReachCensus != "" || pipeline.bodyDifferential) &&
+		pipeline.request.judgesDependence()
 	started := time.Now()
-	defer func() { engine.hostLoading.Add(int64(time.Since(started))) }()
-	loaded, loadError := engine.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
+	defer func() { pipeline.hostLoading.Add(int64(time.Since(started))) }()
+	loaded, loadError := pipeline.loadPackages(loadRequest{environment: workspace.Environment(), caching: &caching})
 	timeline.Tell(timelineHook, "load.end")
 	return loaded, loadError
 }
@@ -89,100 +89,103 @@ func (engine *pipeline) loadWorkspacePackages() (*load.Loaded, error) {
 // long-line rule. The editor's save holds each wrap it keeps in place of writing it. When it wrote a file and a phase
 // reads the types (typesRead), it loads again and returns that load, since every phase after it must read the bytes the
 // run holds. It returns the load it was given otherwise: a run that asked for no types reads none, so a second load
-// would feed nothing. A wrap of a file outside the root (engine.writeRoot) is withheld rather than written, and its
+// would feed nothing. A wrap of a file outside the root (pipeline.writeRoot) is withheld rather than written, and its
 // long lines stay findings.
-func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, typesRead bool) (*load.Loaded, error) {
-	if engine.fix == nil || !engine.fix.wraps {
+func (pipeline *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, typesRead bool) (*load.Loaded, error) {
+	if pipeline.fix == nil || !pipeline.fix.wraps {
 		return loaded, loadError
 	}
 	started := time.Now()
 	sources := []format.Source{}
-	for _, file := range engine.fix.formatted {
-		contents, read := engine.described.contents[file]
+	for _, file := range pipeline.fix.formatted {
+		contents, read := pipeline.described.contents[file]
 		if read && consistency_no_long_line.HasLongLine(contents) {
 			sources = append(sources, format.Source{File: file, Contents: contents})
 		}
 	}
-	engine.fix.elapsed += time.Since(started)
+	pipeline.fix.elapsed += time.Since(started)
 	if len(sources) == 0 {
 		return loaded, loadError
 	}
 	if loadError != nil {
-		engine.note("the long-line fix was held, since the load failed and a fix waits for sound types: %v", loadError)
+		pipeline.note(
+			"the long-line fix was held, since the load failed and a fix waits for sound types: %v",
+			loadError,
+		)
 		return loaded, loadError
 	}
 	if len(loaded.Diagnostics) > 0 {
-		engine.note("the long-line fix was held, since the load found type errors and a fix waits for sound types")
+		pipeline.note("the long-line fix was held, since the load found type errors and a fix waits for sound types")
 		return loaded, loadError
 	}
 	started = time.Now()
 	// The editor's save wraps in memory and writes nothing (runStdin).
-	saves := engine.request.stdinPath != ""
+	saves := pipeline.request.stdinPath != ""
 	result := format.RunWrap(sources, format.Options{
 		Write:          !saves,
 		KeepOutput:     saves,
-		Root:           engine.writeRoot,
-		SingleThreaded: engine.request.switches["single-threaded"],
-		Known:          engine.fix.known,
-		Wrap:           engine.longLineWrap(),
+		Root:           pipeline.writeRoot,
+		SingleThreaded: pipeline.request.switches["single-threaded"],
+		Known:          pipeline.fix.known,
+		Wrap:           pipeline.longLineWrap(),
 	})
 	if len(result.Changed) > 0 {
 		// The pass beside the load is of the bytes the wrap replaced, and reads the held bytes reread writes, so it
 		// stops before the first reread, and the load of the wrapped tree starts its own.
-		engine.abandonSpeculation()
+		pipeline.abandonSpeculation()
 	}
-	engine.fix.wrapKnown = result.Known
-	engine.addWrapped(result.Changed)
+	pipeline.fix.wrapKnown = result.Known
+	pipeline.addWrapped(result.Changed)
 	for _, changed := range result.Changed {
-		engine.hold(changed)
+		pipeline.hold(changed)
 	}
 	for _, declined := range result.WrapDeclined {
 		// Not a gap: the file holds gofmt's output, and the lint phase still reports every long line in it.
-		engine.note("%s: its long lines were not wrapped, so they stay findings: %s", declined.File, declined.Reason)
+		pipeline.note("%s: its long lines were not wrapped, so they stay findings: %s", declined.File, declined.Reason)
 	}
 	for _, withheld := range result.Withheld {
 		// A gap, which writeFix names: the wrap was kept and not written, and the lint phase reports its long lines.
-		engine.withhold(withheld.File, withheld.RealPath)
+		pipeline.withhold(withheld.File, withheld.RealPath)
 	}
-	engine.fix.elapsed += time.Since(started)
+	pipeline.fix.elapsed += time.Since(started)
 	if len(result.Changed) == 0 || !typesRead {
 		return loaded, loadError
 	}
 	// The findings cache stays sound across the write: every package's key hashes the bytes of its files as they are on
 	// disk, which now hold the wrap, so this load misses on the packages the wrap wrote and those that import them,
 	// and restores every other one, as the next run would.
-	return engine.loadWorkspace(typesRead)
+	return pipeline.loadWorkspace(typesRead)
 }
 
 // addWrapped adds the files the wrap wrote to the held fix record, each once: a file gofmt also rewrote keeps its entry
 // and gains the wrap's count under the long-line rule, and any other is a file rewritten that gofmt left alone. The
 // entries stay in the order of the files in scope, which is by name, as gofmt's alone were.
-func (engine *pipeline) addWrapped(wrapped []format.ChangedFile) {
+func (pipeline *pipeline) addWrapped(wrapped []format.ChangedFile) {
 	for _, changed := range wrapped {
-		engine.fix.record.FixesApplied += changed.WrappedLines
-		index := slices.IndexFunc(engine.fix.record.ChangedFiles, func(entry contract.ChangedFile) bool {
+		pipeline.fix.record.FixesApplied += changed.WrappedLines
+		index := slices.IndexFunc(pipeline.fix.record.ChangedFiles, func(entry contract.ChangedFile) bool {
 			return entry.File == changed.File
 		})
 		if index >= 0 {
-			engine.fix.record.ChangedFiles[index].FixedBy[consistency_no_long_line.Name] += changed.WrappedLines
+			pipeline.fix.record.ChangedFiles[index].FixedBy[consistency_no_long_line.Name] += changed.WrappedLines
 			continue
 		}
-		engine.fix.record.FilesRewritten++
-		engine.fix.record.ChangedFiles = append(engine.fix.record.ChangedFiles, contract.ChangedFile{
+		pipeline.fix.record.FilesRewritten++
+		pipeline.fix.record.ChangedFiles = append(pipeline.fix.record.ChangedFiles, contract.ChangedFile{
 			File:      changed.File,
 			FixedBy:   map[string]int{consistency_no_long_line.Name: changed.WrappedLines},
 			Formatted: false,
 		})
 	}
-	slices.SortStableFunc(engine.fix.record.ChangedFiles, func(left, right contract.ChangedFile) int {
+	slices.SortStableFunc(pipeline.fix.record.ChangedFiles, func(left, right contract.ChangedFile) int {
 		return cmp.Compare(left.File, right.File)
 	})
 }
 
 // longLineWrap is the hook the wrap asks of each file: wrapLongLines, held to the long-file rule's limit while the
 // settings leave that rule on, so a fix for one rule never creates another's finding.
-func (engine *pipeline) longLineWrap() func(file string, formatted []byte) format.Wrapping {
-	limit, guarded := engine.longFileLimit()
+func (pipeline *pipeline) longLineWrap() func(file string, formatted []byte) format.Wrapping {
+	limit, guarded := pipeline.longFileLimit()
 	return func(file string, formatted []byte) format.Wrapping {
 		if !guarded {
 			return wrapLongLines(formatted)
@@ -193,11 +196,11 @@ func (engine *pipeline) longLineWrap() func(file string, formatted []byte) forma
 
 // longFileLimit is the long-file rule's limit as the settings configure it, read from the registered analyzer's max
 // option as the rule's own run reads it, and false when the registry lacks the rule or the settings turn it off.
-func (engine *pipeline) longFileLimit() (int, bool) {
-	if _, on := engine.severityOf(consistency_no_long_file.Name); !on {
+func (pipeline *pipeline) longFileLimit() (int, bool) {
+	if _, on := pipeline.severityOf(consistency_no_long_file.Name); !on {
 		return 0, false
 	}
-	for _, registered := range engine.registered {
+	for _, registered := range pipeline.registered {
 		if registered.Name == consistency_no_long_file.Name {
 			return consistency_no_long_file.LimitOf(registered.Analyzer), true
 		}

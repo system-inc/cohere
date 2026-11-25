@@ -35,8 +35,8 @@ func TestARestoredCallerOfACalleeThatStopsOnWindowsIsAskedItsFacts(test *testing
 	test.Parallel()
 
 	fixture := filepath.Join("testdata", "restore-no-return")
-	engine := walkDifferential(test, fixture, exitClean)
-	host, windows := engine.buildRuns[0], buildRunOf(test, engine, "windows")
+	pipeline := walkDifferential(test, fixture, exitClean)
+	host, windows := pipeline.buildRuns[0], buildRunOf(test, pipeline, "windows")
 	if !unreadValueInCaller(host) || unreadValueInCaller(windows) {
 		test.Errorf("want SA4006 in r found by the host alone, got the host %t and windows %t",
 			unreadValueInCaller(host), unreadValueInCaller(windows))

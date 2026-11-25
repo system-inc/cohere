@@ -15,7 +15,7 @@ import (
 )
 
 // slotsPerProcessor is how many packages hold a slot at once for each processor the runtime runs goroutines on.
-// Measured on cohere's own root with 16 processors, the engine alone, cold, under its memory cap, three rotated runs
+// Measured on cohere's own root with 16 processors, cohere-go alone, cold, under its memory cap, three rotated runs
 // of each factor at a load average of 25 to 38, the same records in every run:
 //
 //	1:  9.5 to 10.7s wall (mean 10.1), 45.2 to 47.4s user (mean 46.1), lint 6.8 to 7.7s
@@ -117,7 +117,7 @@ type scheduler struct {
 
 // schedule runs every action of groups, the groups Analyze made by package. Upstream's execAll(roots) starts every
 // action at once, about 950 on cohere's own root, so every package's syntax, types and staticcheck IR are live
-// together, and the collector marks all of it on every cycle under the engine's memory cap; and the largest
+// together, and the collector marks all of it on every cycle under cohere-go's memory cap; and the largest
 // packages, started no earlier than the rest, finish last.
 //
 // Here packages are admitted a bounded number at a time. A group waits until every action that any of its actions

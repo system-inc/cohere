@@ -31,7 +31,7 @@ func messageUtilsFolder(folder string) rule.Message {
 
 // ConsistencyNoUtilsFolder bans a folder named `util` or `utils` inside the project, in any casing and
 // with any leading underscores: a folder's name is judged lowercased with its leading underscores
-// removed, the verdict every engine gives in the text rules corpus (#4b337jk, family `utils-folder`).
+// removed, the verdict every language gives in the text rules corpus (#4b337jk, family `utils-folder`).
 // The reading is file_name_words.IsUtils, which nexus/consistency-no-utils-file-name reads too, so a
 // folder and a file are refused the same word.
 //

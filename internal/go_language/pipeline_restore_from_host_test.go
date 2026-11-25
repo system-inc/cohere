@@ -22,14 +22,17 @@ const (
 	restoreLogger = "example.com/restore/logger"
 )
 
-// windowsRun is engine's run of the windows build, failing the test when it has none.
-func windowsRun(test *testing.T, engine *pipeline) buildRun {
+// windowsRun is pipeline's run of the windows build, failing the test when it has none.
+func windowsRun(test *testing.T, pipeline *pipeline) buildRun {
 	test.Helper()
-	at := slices.IndexFunc(engine.buildRuns, func(run buildRun) bool { return run.build.OperatingSystem == "windows" })
+	at := slices.IndexFunc(
+		pipeline.buildRuns,
+		func(run buildRun) bool { return run.build.OperatingSystem == "windows" },
+	)
 	if at < 1 {
-		test.Fatalf("the run checked no windows build beside the host's: %d builds", len(engine.buildRuns))
+		test.Fatalf("the run checked no windows build beside the host's: %d builds", len(pipeline.buildRuns))
 	}
-	return engine.buildRuns[at]
+	return pipeline.buildRuns[at]
 }
 
 // foundIn reports whether run found anything in file.
@@ -50,8 +53,8 @@ func foundIn(run buildRun, file string) bool {
 func TestAnExtraBuildRestoresWhatReadsTheSameAndChecksTheRest(test *testing.T) {
 	test.Parallel()
 
-	engine, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings)
-	host, windows := engine.buildRuns[0], windowsRun(test, engine)
+	pipeline, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings)
+	host, windows := pipeline.buildRuns[0], windowsRun(test, pipeline)
 	fromHost := windows.result.FromHost
 	if !slices.Equal(fromHost.Restored, []string{restoreReader}) {
 		test.Errorf("windows restored %q from the host, want %s alone", fromHost.Restored, restoreReader)
@@ -130,7 +133,7 @@ func TestTheMergeIsTheSameWhetherTheBuildsRestoreFromTheHostOrNot(test *testing.
 	test.Parallel()
 
 	fixture := filepath.Join("testdata", "restore-from-host")
-	restoringNothing := func(engine *pipeline) { engine.keepsHostRestoreOff = true }
+	restoringNothing := func(pipeline *pipeline) { pipeline.keepsHostRestoreOff = true }
 	offRoot := copyFixture(test, fixture)
 	_, offRaw := runOverConfigured(test, offRoot, exitFindings, restoringNothing, "--no-cache",
 		"--no-system-cache")
@@ -164,10 +167,10 @@ func TestAnExtraBuildDeclinesAnInstanceWhoseInferredTypeArgumentDiffers(test *te
 	fixture := filepath.Join("testdata", "restore-instance")
 	offRoot := copyFixture(test, fixture)
 	_, offRaw := runOverConfigured(test, offRoot, exitFindings,
-		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--no-cache")
+		func(pipeline *pipeline) { pipeline.keepsHostRestoreOff = true }, "--no-cache")
 	off := normalize(offRaw, offRoot)
-	engine, on := runOver(test, copyFixture(test, fixture), exitFindings)
-	host, windows := engine.buildRuns[0], windowsRun(test, engine)
+	pipeline, on := runOver(test, copyFixture(test, fixture), exitFindings)
+	host, windows := pipeline.buildRuns[0], windowsRun(test, pipeline)
 	if why := windows.result.FromHost.Declined[restoreInferrer]; !strings.HasPrefix(why,
 		"T object example.com/restoreinstance/platform.Handle renders differently") {
 		test.Errorf("windows declined %s for %q, want by Handle, the type argument inferred and copied whole",
@@ -199,7 +202,7 @@ func TestAnExtraBuildAnswersABodilessFunctionWithoutLoadingAgain(test *testing.T
 	fixture := filepath.Join("testdata", "restore-bodiless")
 	offRoot := copyFixture(test, fixture)
 	_, offRaw := runOverConfigured(test, offRoot, exitClean,
-		func(engine *pipeline) { engine.keepsHostRestoreOff = true }, "--no-cache")
+		func(pipeline *pipeline) { pipeline.keepsHostRestoreOff = true }, "--no-cache")
 	off := normalize(offRaw, offRoot)
 	for name, run := range map[string]func() (*pipeline, string){
 		"without the findings cache": func() (*pipeline, string) {
@@ -209,8 +212,8 @@ func TestAnExtraBuildAnswersABodilessFunctionWithoutLoadingAgain(test *testing.T
 			return runOverWith(test, copyFixture(test, fixture), exitClean)
 		},
 	} {
-		engine, on := run()
-		windows := windowsRun(test, engine)
+		pipeline, on := run()
+		windows := windowsRun(test, pipeline)
 		// Judged and held, or left untouched by the walk (#qbvtkfm), it is restored either way.
 		if !slices.Contains(windows.result.FromHost.Restored, restoreIntrinsic) &&
 			!slices.Contains(windows.result.FromHost.Untouched, restoreIntrinsic) {
@@ -248,8 +251,8 @@ func TestATimedRunWithExtraBuildsSaysTheyRestoredNothing(test *testing.T) {
 	}
 	fixture := filepath.Join("testdata", "restore-from-host")
 	for _, flags := range [][]string{{"--timing"}, {"--timing", "--no-cache"}} {
-		engine, stream := runOverRaw(test, copyFixture(test, fixture), exitFindings, flags...)
-		checkTimedRunRestoredNothing(test, engine, timingLine(stream), strings.Join(flags, " "))
+		pipeline, stream := runOverRaw(test, copyFixture(test, fixture), exitFindings, flags...)
+		checkTimedRunRestoredNothing(test, pipeline, timingLine(stream), strings.Join(flags, " "))
 	}
 
 	_, alone := runOverRaw(test, copyFixture(test, fixture), exitFindings, "--timing", "--host-build-only")
@@ -261,15 +264,15 @@ func TestATimedRunWithExtraBuildsSaysTheyRestoredNothing(test *testing.T) {
 // checkTimedRunRestoredNothing holds a timed run with extra builds, run under flags, to its record's claim: no extra
 // build restored or left untouched anything of the host's run, by its own result, and timingLine, its timing record,
 // counts every one of them as checked from source.
-func checkTimedRunRestoredNothing(test *testing.T, engine *pipeline, timingLine string, flags string) {
+func checkTimedRunRestoredNothing(test *testing.T, pipeline *pipeline, timingLine string, flags string) {
 	test.Helper()
-	if len(engine.buildRuns) < 2 {
+	if len(pipeline.buildRuns) < 2 {
 		test.Fatalf("%s: the run checked %d builds, want the host's and at least one more", flags,
-			len(engine.buildRuns))
+			len(pipeline.buildRuns))
 	}
 	// The sentence's claim itself, read from each build's own result: a change that let a timed build restore turns
 	// this red rather than leave the record saying it checked from source (#4y4qd3z).
-	for _, run := range engine.buildRuns[1:] {
+	for _, run := range pipeline.buildRuns[1:] {
 		if run.result == nil {
 			test.Fatalf("%s: the %s build has no result", flags, run.build)
 		}
@@ -283,7 +286,7 @@ func checkTimedRunRestoredNothing(test *testing.T, engine *pipeline, timingLine 
 	if decodeError := json.Unmarshal([]byte(timingLine), &record); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	if want := len(engine.buildRuns) - 1; record.ExtraBuildsFromSource != want {
+	if want := len(pipeline.buildRuns) - 1; record.ExtraBuildsFromSource != want {
 		test.Errorf("%s: the timing record says %d extra builds checked from source, want %d", flags,
 			record.ExtraBuildsFromSource, want)
 	}
@@ -295,9 +298,9 @@ func checkTimedRunRestoredNothing(test *testing.T, engine *pipeline, timingLine 
 func TestEachBuildsRecordSaysWhereItsTimeWent(test *testing.T) {
 	test.Parallel()
 
-	engine, stream := runOverRaw(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")),
+	pipeline, stream := runOverRaw(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")),
 		exitFindings, "--no-cache")
-	host, windows := engine.buildRuns[0], windowsRun(test, engine)
+	host, windows := pipeline.buildRuns[0], windowsRun(test, pipeline)
 	for name, measured := range map[string]time.Duration{
 		"the host's load":    host.loading,
 		"the host's lint":    host.linting,
@@ -318,10 +321,10 @@ func TestEachBuildsRecordSaysWhereItsTimeWent(test *testing.T) {
 		}
 		builds = record.Builds
 	}
-	if len(builds) != len(engine.buildRuns) {
-		test.Fatalf("the lint record holds %d builds, want %d", len(builds), len(engine.buildRuns))
+	if len(builds) != len(pipeline.buildRuns) {
+		test.Fatalf("the lint record holds %d builds, want %d", len(builds), len(pipeline.buildRuns))
 	}
-	for index, run := range engine.buildRuns {
+	for index, run := range pipeline.buildRuns {
 		var want contract.BuildRecord
 		recordTimes(&want, run)
 		got := builds[index]

@@ -63,7 +63,7 @@ type Summary struct {
 	// and was not, which is a bug in that rule's fix.
 	FilesRefused []RefusedFile
 
-	// FilesFailed names the files the engine could not process at all: unreadable, unwritable, or
+	// FilesFailed names the files the fix pass could not process at all: unreadable, unwritable, or
 	// already unparseable before anything was applied.
 	//
 	// Separate from FilesRefused and FilesNotConverged because the three send a reader somewhere

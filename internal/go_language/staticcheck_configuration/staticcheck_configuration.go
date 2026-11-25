@@ -1,11 +1,11 @@
 //cohere:file-ignore consistency-require-separated-folder-words staticcheck's name, a project's own spelling
 
-// Package staticcheck_configuration is staticcheck's config analyzer as the engine runs it, for the ports that read a
+// Package staticcheck_configuration is staticcheck's config analyzer as cohere-go runs it, for the ports that read a
 // staticcheck.conf (ST1001 and ST1013), and the directory it starts from, which the findings cache keys a package on.
 //
 // It is upstream's (honnef.co/go/tools@v0.8.1 config/config.go, Analyzer, Dir and dirAST) but for which of a package's
 // files it skips to find that directory. Upstream skips every file under os.UserCacheDir(), meant for the files Go's
-// build cache holds, as the cgo tool's outputs, which the engine loads from the cache. That skipped every file of a
+// build cache holds, as the cgo tool's outputs, which cohere-go loads from the cache. That skipped every file of a
 // project kept under the user's cache directory too, `~/.cache` on Linux and `~/Library/Caches` on darwin, so none of
 // its staticcheck.conf files ever applied (#sc5qmy7). This skips only files under a build cache go env named, every
 // `GOCACHE` the process's runs read (AddBuildCache), and never reads the user's cache directory.
@@ -32,7 +32,7 @@ import (
 )
 
 // buildCaches is every build cache go env has named in this process, cleaned and absolute. It is every run's and never
-// one run's: tests run many engines in one process, some under a `GOCACHE` of their own, and a file under any of them
+// one run's: tests run many pipelines in one process, some under a `GOCACHE` of their own, and a file under any of them
 // is a file go wrote to a build cache, never one a person keeps a project in, so a union is right for every run where
 // a single value one run set would be another's at the moment a third read it.
 var buildCaches = struct {
@@ -41,7 +41,7 @@ var buildCaches = struct {
 }{directories: map[string]bool{}}
 
 // AddBuildCache adds directory, a `GOCACHE` go env reported, to the build caches whose files Directory skips. Every
-// go env the engine asks for a run's build adds its own (load.ReadGoEnvironment), before any analyzer runs.
+// go env cohere-go asks for a run's build adds its own (load.ReadGoEnvironment), before any analyzer runs.
 func AddBuildCache(directory string) {
 	// go env reports `GOCACHE` as "off" when the cache is turned off, and go refuses a relative one, so only an
 	// absolute directory can hold the files a load reads.
@@ -94,7 +94,7 @@ func syntaxDirectory(files []*ast.File, fileSet *token.FileSet) string {
 	return Directory(names)
 }
 
-// Analyzer is staticcheck's config analyzer as the engine runs it: the merged staticcheck.conf files from the
+// Analyzer is staticcheck's config analyzer as cohere-go runs it: the merged staticcheck.conf files from the
 // package's directory up, as a *config.Config, read from the directory Directory finds.
 var Analyzer = &analysis.Analyzer{
 	Name:             "staticcheck_configuration",

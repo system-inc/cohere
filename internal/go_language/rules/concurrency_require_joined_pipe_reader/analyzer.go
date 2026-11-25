@@ -1,4 +1,4 @@
-// Package concurrency_require_joined_pipe_reader is the Go engine's rule that a goroutine reading a child's piped
+// Package concurrency_require_joined_pipe_reader is cohere-go's rule that a goroutine reading a child's piped
 // output is joined before the code waits for the child.
 //
 // exec.Cmd's Wait closes the read end of every pipe from StdoutPipe or StderrPipe once the child exits, and os/exec's
@@ -52,7 +52,7 @@ var Analyzer = &analysis.Analyzer{
 	Run:      run,
 }
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 
 var readerUnjoinedAtWaitMessage = policy.MessageOf(Name, "readerUnjoinedAtWait")

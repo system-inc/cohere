@@ -13,7 +13,7 @@ import (
 )
 
 // maximumLinesMessage renders the finding. Upstream's template is
-// `File has too many lines ({{actual}}). Maximum allowed is {{max}}.`, kept first so the two engines
+// `File has too many lines ({{actual}}). Maximum allowed is {{max}}.`, kept first so the two linters
 // say the same thing, with why it matters after it.
 func maximumLinesMessage(actual int, maximum int) rule.Message {
 	return rule.Message{

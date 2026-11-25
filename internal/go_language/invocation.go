@@ -38,7 +38,7 @@ type invocation struct {
 
 	// profilePath is the file `--profile` names, where Main writes this process's CPU profile for `go tool pprof`, as
 	// given, or empty for a run that writes none (#r33n96f). Main's rather than the run's, since a profile is the
-	// whole process's, and a test runs the engine in process beside others.
+	// whole process's, and a test runs cohere-go in process beside others.
 	profilePath string
 
 	// standardLibrary is where the run's standard-library entries come from and go (see lintCache), never read from
@@ -145,7 +145,7 @@ func (request *invocation) resolveRoot() {
 // checkStdin refuses a save's command line that asks more than a save answers: what `--fix` writes for the one file,
 // so `--fix` and no other phase and no paths beside it. The file is checked as the host builds it, since only the lint
 // phase checks another build and a save asks for none, so `--host-build-only` says what a save already does. The front
-// door refuses the same before it starts the engine (errorStdinNeedsFix); this is for a caller that does not.
+// door refuses the same before it starts cohere-go (errorStdinNeedsFix); this is for a caller that does not.
 func (request invocation) checkStdin() error {
 	if request.stdinPath == "" {
 		return nil
@@ -225,7 +225,7 @@ func (request invocation) requests(phase contract.PhaseName) bool {
 	return false
 }
 
-// keysByIdentity reports whether the run may key anything by the engine's identity (cache.ExecutableIdentity), which a
+// keysByIdentity reports whether the run may key anything by cohere-go's identity (cache.ExecutableIdentity), which a
 // run hashes the whole executable for: one that loads its packages, for their types, their lint or a fix's long-line
 // wrap, with a project store or a system cache to key them for. A run with neither, under `--no-cache` and
 // `--no-system-cache` together, keys nothing, and so does one that only formats, which loads nothing. It may say yes

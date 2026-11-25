@@ -414,7 +414,7 @@ func TestAwaitThenableSpans(test *testing.T) {
 // against the output upstream records for it.
 //
 // This is the assertion the brief calls non-optional and the harness does not supply: ExpectFixedSource
-// applies fixes, and every repair this rule offers is a suggestion, which the engine never applies
+// applies fixes, and every repair this rule offers is a suggestion, which the fix pass never applies
 // unattended. So the applier is hand-rolled below over a single suggestion's fix list.
 //
 // It is worth the twenty lines because a suggestion is where this rule can be wrong invisibly. A

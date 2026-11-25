@@ -448,7 +448,7 @@ func TestNoUselessEscapeRepairsSource(test *testing.T) {
 		// Upstream expects `p\a@` here, and the difference is its fixer rather than its rule. oxc
 		// treats boundary-adjacent fixes as overlapping to match ESLint, so of the three fixes this
 		// input produces it applies the first and third and leaves the middle escape standing until a
-		// second pass. Our engine states the opposite policy at internal/fix/apply.go: adjacent edits
+		// second pass. Our fix pass states the opposite policy at internal/fix/apply.go: adjacent edits
 		// compose safely and are admitted. Both agree on the three findings; only the number of passes
 		// needed to land them differs, and one pass is the better answer.
 		{"var foo = '\\p\\a\\@';", "var foo = 'pa@';"},

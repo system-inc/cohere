@@ -65,8 +65,8 @@ func readGoState(goEnvironment *GoEnvironment, collector *timing.Collector) (goS
 	}
 
 	if goVersion := goEnvironment.value("GOVERSION"); goVersion != runtime.Version() {
-		// go/build is the engine's, and go list reads files with the toolchain's own copy of it.
-		return goState{}, fmt.Sprintf("the go command is %s and the engine was built with %s", goVersion,
+		// go/build is cohere-go's, and go list reads files with the toolchain's own copy of it.
+		return goState{}, fmt.Sprintf("the go command is %s and cohere-go was built with %s", goVersion,
 			runtime.Version())
 	}
 	if goEnvironment.value("GODEBUG") != "" {

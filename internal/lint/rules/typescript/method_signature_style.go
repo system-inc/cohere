@@ -185,7 +185,7 @@ func reportMethodSignatureShouldBeProperty(ruleContext rule.Context, node *ast.N
 		//
 		// Upstream attaches the same whole-group rewrite to every signature, so its two findings
 		// carry two overlapping fixes. That works there because ESLint applies one fix per pass and
-		// re-lints, and the second finding is gone by the next pass. Our engine flattens a run's
+		// re-lints, and the second finding is gone by the next pass. Our fix pass flattens a run's
 		// fixes into independent proposals and refuses an overlap outright, so attaching both would
 		// mean neither lands.
 		//
@@ -281,7 +281,7 @@ func methodSignatureOverloadFixes(
 	// two removals, and the fix ESLint actually applies is one replacement of `[19,61)` whose text
 	// ends in the newline and indentation that preceded the closing brace.
 	//
-	// Our engine does not merge, it flattens fixes into independent proposals, so reproducing
+	// Our linter does not merge, it flattens fixes into independent proposals, so reproducing
 	// upstream's shape literally deletes the whitespace between the signatures and leaves the
 	// closing brace indented as if a member were still there. Writing the merged span directly is
 	// the same edit ESLint performs and it cannot half-apply.
@@ -326,7 +326,7 @@ func reportMethodSignaturePropertyShouldBeMethod(ruleContext rule.Context, node 
 
 	// There is no syntax for a readonly method signature, so the conversion drops the modifier and
 	// the member becomes reassignable. That is a behavior change rather than a spelling change, so
-	// upstream offers it as a suggestion a human chooses rather than as a fix the engine applies
+	// upstream offers it as a suggestion a human chooses rather than as a fix the fix pass applies
 	// unattended. Reproducing the distinction is part of the port.
 	if methodSignatureHasModifier(node, ast.KindReadonlyKeyword) {
 		ruleContext.ReportNodeWithSuggestions(node, messageMethodSignatureStyleErrorProperty(),

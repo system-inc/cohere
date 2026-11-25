@@ -14,7 +14,7 @@ import (
 
 // ruleHost is a host's go env answer as modulesSharedWith reads it, every name of goEnvironmentNames answered, and
 // ruleBuild a tag build's beside it that shares its build list: the same answer but its flags, the host's with its own
-// -tags and -pgo=off twice, as the engine makes them (project.Build.Environment, ReadGoEnvironment).
+// -tags and -pgo=off twice, as cohere-go makes them (project.Build.Environment, ReadGoEnvironment).
 func ruleHost() *GoEnvironment {
 	answer := map[string]string{}
 	for _, name := range goEnvironmentNames {
@@ -186,8 +186,8 @@ func writeSharedBuildList(test *testing.T, files map[string]string) (string, []s
 		"GOMODCACHE=" + filepath.Join(directory, "modules"), "GOWORK="}
 }
 
-// sharedBuildListBuilds are the host's build in workspace under environment, as the engine reads it, and builds beside
-// it the engine could make: a tag build, another operating system and architecture, and cgo off.
+// sharedBuildListBuilds are the host's build in workspace under environment, as cohere-go reads it, and builds beside
+// it cohere-go could make: a tag build, another operating system and architecture, and cgo off.
 func sharedBuildListBuilds(test *testing.T, workspace string, environment []string) []project.Build {
 	test.Helper()
 	host := project.HostBuild(goEnvironmentOf(test, workspace, environment).Target())

@@ -1,4 +1,4 @@
-// Package consistency_no_dash_punctuation is the Go engine's rule that the house writes no em-dash or en-dash.
+// Package consistency_no_dash_punctuation is cohere-go's rule that the house writes no em-dash or en-dash.
 //
 // Readers clock the em-dash (U+2014) and the en-dash (U+2013) as generated text and tune out of the words around
 // them, so a comment or a string a person will read uses a comma, a period, or a restructured sentence instead. The
@@ -50,7 +50,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_dash_punctuation", "F
 	"that rewrites it as its escape, keeping the value the same. A dash in a raw string, which cannot hold an "+
 	"escape, or in a comment is reported with no fix.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var dashPunctuationMessage = policy.MessageOf(Name, "dashPunctuation")

@@ -35,19 +35,19 @@ func benchArguments(test *testing.T, function string, arguments ...string) []str
 	return strings.Fields(string(printed))
 }
 
-// A cold run narrowed to the Go engine checks without fixing, since #pff7xhr's bar is a checking run's seconds
+// A cold run narrowed to cohere-go checks without fixing, since #pff7xhr's bar is a checking run's seconds
 // (#jp0cqkk), and reads none of the project's caches; a whole-root cold run reads none of them and fixes, as the
 // baselines it is held to did. Either still reads and writes the standard library's system store (#syscache).
-func TestTheGoEnginesColdRunChecksWithoutFixing(test *testing.T) {
+func TestTheGoModulesColdRunChecksWithoutFixing(test *testing.T) {
 	test.Parallel()
-	for engine, want := range map[string][]string{
-		string(EngineGo): {"--no-cache", "--no-fix"},
-		"":               {"--no-cache"},
+	for kind, want := range map[string][]string{
+		string(ProjectKindGoModule): {"--no-cache", "--no-fix"},
+		"":                          {"--no-cache"},
 	} {
-		test.Run("engine "+engine, func(test *testing.T) {
+		test.Run("project kind "+kind, func(test *testing.T) {
 			test.Parallel()
-			if arguments := benchArguments(test, "cold_arguments", engine); !slices.Equal(arguments, want) {
-				test.Errorf("cold_arguments %q printed %q, want %q", engine, arguments, want)
+			if arguments := benchArguments(test, "cold_arguments", kind); !slices.Equal(arguments, want) {
+				test.Errorf("cold_arguments %q printed %q, want %q", kind, arguments, want)
 			}
 		})
 	}
@@ -75,7 +75,7 @@ func TestAWholeRootColdRunChecksWithoutFixingWhenAsked(test *testing.T) {
 	}
 }
 
-// quiet_machine.sh runs under `set -u` and a whole-root run names no engine, so each function, called with no
+// quiet_machine.sh runs under `set -u` and a whole-root run names no project kind, so each function, called with no
 // argument at all, prints what it prints for an empty one and says nothing on standard error. Until 2026-11-12
 // cold_arguments read $1 bare and failed after printing `--no-cache`, so the cold runs were still cold only because
 // of the order of its two lines, and every bench log opened with the error.

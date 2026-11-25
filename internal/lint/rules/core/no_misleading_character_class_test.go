@@ -533,8 +533,8 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(test *testing.T) {
 //
 // Adding `u` changes how the rest of the pattern parses. `/[👍]\a/` is a legal pattern today and
 // `/[👍]\a/u` is a SyntaxError, because an identity escape of a letter is rejected under the flag.
-// An engine applying that unattended would turn a working file into one that throws, and a fix
-// producing source that parses but does not run is the failure the edit engine structurally cannot
+// A runtime applying that unattended would turn a working file into one that throws, and a fix
+// producing source that parses but does not run is the failure the fix pass structurally cannot
 // refuse.
 //
 // So two things are asserted: the rule never proposes an unattended fix, and it withholds even the

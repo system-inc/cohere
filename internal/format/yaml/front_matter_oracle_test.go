@@ -10,12 +10,14 @@ import (
 // frontMatterOracle formats a markdown file with Prettier and keeps the front matter block of the
 // output: the first line through the first later line that is the end delimiter ("---", or "..." as
 // pandoc allows).
-type frontMatterOracle struct{ engine *prettier.Engine }
+type frontMatterOracle struct{ formatter *prettier.Formatter }
 
-func (oracle frontMatterOracle) Handles(fileName string) bool { return oracle.engine.Handles(fileName) }
+func (oracle frontMatterOracle) Handles(fileName string) bool {
+	return oracle.formatter.Handles(fileName)
+}
 
 func (oracle frontMatterOracle) Format(fileName string, text string) (string, error) {
-	formatted, formatError := oracle.engine.Format(fileName, text)
+	formatted, formatError := oracle.formatter.Format(fileName, text)
 	if formatError != nil {
 		return "", formatError
 	}

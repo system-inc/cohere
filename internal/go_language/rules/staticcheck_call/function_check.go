@@ -1,6 +1,6 @@
 // Package staticcheck_call judges the arguments of calls to named functions, the framework that nineteen of
 // staticcheck's SA1 checks and five others ride: a check is a map from a function's name to a Rule, the Rule reads
-// each call to that function in the engine's own intermediate representation and marks an argument or the call
+// each call to that function in cohere's own intermediate representation and marks an argument or the call
 // itself invalid, and the kit reports each mark where staticcheck would.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/callcheck/callcheck.go, whose walk, argument

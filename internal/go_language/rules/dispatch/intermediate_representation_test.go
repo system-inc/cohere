@@ -15,7 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/build_intermediate_representation"
 )
 
-// The walk over the engine's own intermediate representation calls each listener for what it declares and nothing
+// The walk over cohere's own intermediate representation calls each listener for what it declares and nothing
 // else, in order: for each function in the order SourceFunctions reads them, every listener's Function,
 // in the order they were registered, then each instruction of a listed kind in block order, then FunctionExit; and
 // PackageExit once, after every function. The expected log is built from a probe that reads the same functions in
@@ -98,7 +98,7 @@ func TestTheOwnWalkCallsEachListenerForWhatItDeclaresInOrder(test *testing.T) {
 	}
 }
 
-// A listener of the engine's own walk that panics is a crash under its own rule on the package, spelled as the engine
+// A listener of cohere-go's own walk that panics is a crash under its own rule on the package, spelled as cohere-go
 // spells an analyzer's panic, with none of its findings there, the one it reported before panicking included, and it
 // is called no more on that package, its PackageExit included. The listener beside it still reports every function.
 func TestAPanickingOwnListenerCrashesItsOwnRuleAlone(test *testing.T) {
@@ -171,10 +171,10 @@ func TestAPanickingOwnListenerCrashesItsOwnRuleAlone(test *testing.T) {
 }
 
 // A listener that reads ValueForExpression declares it, and its rule's analyzer then requires the representation and
-// its ExpressionReader mark, so the package records the expression map wherever the rule runs. Under the engine's
+// its ExpressionReader mark, so the package records the expression map wherever the rule runs. Under cohere-go's
 // Dependents, that listener finds the fixture's expressions mapped, and a listener that doesn't declare it, run
 // alone, finds none: nothing in the run reads the map, so the package never records it.
-func TestAReaderOfTheExpressionMapFindsItUnderTheEnginesDependents(test *testing.T) {
+func TestAReaderOfTheExpressionMapFindsItUnderThePipelinesDependents(test *testing.T) {
 	test.Parallel()
 	mapped := func(counted *int) *rule.Listener {
 		return &rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{
@@ -249,7 +249,7 @@ func TestEachDispatcherRefusesAnotherWalksListener(test *testing.T) {
 		{"syntax on IntermediateRepresentation", func() {
 			NewIntermediateRepresentation().RuleAnalyzer("syntax", "syntax", "", syntaxListener)
 		}},
-		{"the engine's own on Syntax", func() { NewSyntax().RuleAnalyzer("own", "own", "", ownListener) }},
+		{"cohere-go's own on Syntax", func() { NewSyntax().RuleAnalyzer("own", "own", "", ownListener) }},
 	}
 	for _, testCase := range cases {
 		panicked := func() (recovered any) {

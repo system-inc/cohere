@@ -17,7 +17,7 @@ import (
 // names a pass can care about: a name some candidate has now, or a name some candidate asks for. The accepted
 // set only shrinks, so a filter made with the first pass's names holds for every later one.
 type verification struct {
-	engine    *engine
+	renaming  *renaming
 	firstPass bool
 
 	occurrences   []lexicalOccurrence
@@ -55,23 +55,23 @@ type selectionSite struct {
 	selection *types.Selection
 }
 
-func newVerification(engine *engine) *verification {
+func newVerification(renaming *renaming) *verification {
 	verification := &verification{
-		engine:        engine,
+		renaming:      renaming,
 		firstPass:     true,
 		scopedObjects: map[*packages.Package][]scopedObject{},
 		ordered:       map[*types.Scope]bool{},
 	}
 	interesting := map[string]bool{}
-	for key, newName := range engine.accepted {
+	for key, newName := range renaming.accepted {
 		interesting[newName] = true
-		interesting[engine.candidates[key].OldName] = true
+		interesting[renaming.candidates[key].OldName] = true
 	}
 	isInteresting := func(object types.Object) bool {
 		if interesting[object.Name()] {
 			return true
 		}
-		_, proposed := engine.accepted[engine.keyer.key(object)]
+		_, proposed := renaming.accepted[renaming.keyer.key(object)]
 		return proposed
 	}
 	verification.collectLexical(isInteresting)
@@ -84,11 +84,11 @@ func newVerification(engine *engine) *verification {
 
 // pass runs every check once against the accepted set and returns the renames found in conflicts.
 func (verification *verification) pass() map[Key]drop {
-	engine := verification.engine
+	renaming := verification.renaming
 	drops := map[Key]drop{}
 	add := func(object types.Object, class string, reason string) {
-		key := engine.keyer.key(object)
-		if _, open := engine.accepted[key]; !open {
+		key := renaming.keyer.key(object)
+		if _, open := renaming.accepted[key]; !open {
 			return
 		}
 		if _, recorded := drops[key]; !recorded {
@@ -96,7 +96,7 @@ func (verification *verification) pass() map[Key]drop {
 		}
 	}
 	relevant := map[string]bool{}
-	for _, newName := range engine.accepted {
+	for _, newName := range renaming.accepted {
 		relevant[newName] = true
 	}
 	verification.checkLexical(relevant, add)
@@ -117,7 +117,7 @@ type addDrop func(object types.Object, class string, reason string)
 // everything in Defs and Uses except selector names, fields and methods (they resolve through types), labels,
 // blanks, dot imports, init functions and the nil entries.
 func (verification *verification) collectLexical(isInteresting func(types.Object) bool) {
-	for _, rootsPackage := range verification.engine.roots {
+	for _, rootsPackage := range verification.renaming.roots {
 		selectorNames := map[*ast.Ident]bool{}
 		for _, file := range rootsPackage.Syntax {
 			ast.Inspect(file, func(node ast.Node) bool {
@@ -212,12 +212,12 @@ func allScopes(packageScope *types.Scope) []scopeEntry {
 // one variant and final names read by key, so one rename covers every copy of its declaration. A type read before
 // the scope of a local of its final name opens is no capture (rename.TypeReadBeforeLocalScope).
 func (verification *verification) checkLexical(relevant map[string]bool, add addDrop) {
-	engine := verification.engine
+	renaming := verification.renaming
 	byPackage := map[*packages.Package]map[*types.Scope]map[string][]types.Object{}
 	for goPackage, entries := range verification.scopedObjects {
 		index := map[*types.Scope]map[string][]types.Object{}
 		for _, entry := range entries {
-			name := engine.finalName(entry.object)
+			name := renaming.finalName(entry.object)
 			if !relevant[name] {
 				continue
 			}
@@ -231,8 +231,8 @@ func (verification *verification) checkLexical(relevant map[string]bool, add add
 	var unresolved []string
 	for _, occurrence := range verification.occurrences {
 		target := occurrence.object
-		name := engine.finalName(target)
-		targetRenamed := engine.renamed(target)
+		name := renaming.finalName(target)
+		targetRenamed := renaming.renamed(target)
 		if !targetRenamed && !relevant[name] {
 			continue
 		}
@@ -266,7 +266,7 @@ func (verification *verification) checkLexical(relevant map[string]bool, add add
 					continue
 				}
 				others = append(others, object)
-				if engine.renamed(object) {
+				if renaming.renamed(object) {
 					othersRenamed = true
 				}
 			}
@@ -286,7 +286,7 @@ func (verification *verification) checkLexical(relevant map[string]bool, add add
 			where := occurrence.goPackage.Fset.Position(position)
 			for _, other := range others {
 				reason := fmt.Sprintf("%q at %s:%d would resolve to %s %q declared at %s instead of %s %q",
-					occurrence.identifier.Name, where.Filename, where.Line, kindOf(other), engine.finalName(other),
+					occurrence.identifier.Name, where.Filename, where.Line, kindOf(other), renaming.finalName(other),
 					occurrence.goPackage.Fset.Position(other.Pos()), kindOf(target), target.Name())
 				add(other, "conflict: scope", reason)
 				if targetRenamed {
@@ -309,7 +309,7 @@ func (verification *verification) checkLexical(relevant map[string]bool, add add
 		}
 	}
 	if verification.firstPass {
-		verification.engine.result.Unresolved = append(verification.engine.result.Unresolved, unresolved...)
+		verification.renaming.result.Unresolved = append(verification.renaming.result.Unresolved, unresolved...)
 	}
 }
 
@@ -325,7 +325,7 @@ func isTypeParameter(object types.Object) bool {
 // collectLabels groups every label by the function body that holds it: a label's scope is its function, not
 // any block, and a function literal has labels of its own.
 func (verification *verification) collectLabels() {
-	for _, rootsPackage := range verification.engine.roots {
+	for _, rootsPackage := range verification.renaming.roots {
 		for _, file := range rootsPackage.Syntax {
 			var stack []ast.Node
 			groups := map[ast.Node][]types.Object{}
@@ -361,11 +361,11 @@ func (verification *verification) collectLabels() {
 
 // checkLabels requires the labels of one function to keep distinct final names.
 func (verification *verification) checkLabels(add addDrop) {
-	engine := verification.engine
+	renaming := verification.renaming
 	for _, group := range verification.labelGroups {
 		byName := map[string][]types.Object{}
 		for _, label := range group {
-			byName[engine.finalName(label)] = append(byName[engine.finalName(label)], label)
+			byName[renaming.finalName(label)] = append(byName[renaming.finalName(label)], label)
 		}
 		for name, labels := range byName {
 			if len(labels) < 2 {
@@ -382,8 +382,8 @@ func (verification *verification) checkLabels(add addDrop) {
 // for, and checks the member lookup against go/types under the old names: a selection the model resolves
 // differently from go/types is a model gap, and every rename it touches is refused.
 func (verification *verification) collectSelections(isInteresting func(types.Object) bool) {
-	engine := verification.engine
-	for _, rootsPackage := range engine.roots {
+	renaming := verification.renaming
+	for _, rootsPackage := range renaming.roots {
 		for selector, selection := range rootsPackage.TypesInfo.Selections {
 			if !isInteresting(selection.Obj()) {
 				continue
@@ -393,17 +393,17 @@ func (verification *verification) collectSelections(isInteresting func(types.Obj
 				selectionSite{goPackage: rootsPackage, selector: selector, selection: selection},
 			)
 			found := lookupMember(selection.Recv(), true, rootsPackage.Types, selection.Obj().Name(), actualName)
-			if found.object == nil || engine.keyer.key(found.object) != engine.keyer.key(selection.Obj()) {
+			if found.object == nil || renaming.keyer.key(found.object) != renaming.keyer.key(selection.Obj()) {
 				description := fmt.Sprintf(
 					"%s: %s in %s resolves to %s by go/types, the model found %v",
 					rootsPackage.Fset.Position(selector.Sel.Pos()),
 					selector.Sel.Name,
 					rootsPackage.ID,
-					engine.keyer.key(selection.Obj()),
+					renaming.keyer.key(selection.Obj()),
 					found.object,
 				)
-				engine.result.SelectionModelMismatches = append(engine.result.SelectionModelMismatches, description)
-				engine.reject(engine.keyer.key(selection.Obj()), "model: selection", description)
+				renaming.result.SelectionModelMismatches = append(renaming.result.SelectionModelMismatches, description)
+				renaming.reject(renaming.keyer.key(selection.Obj()), "model: selection", description)
 			}
 		}
 	}
@@ -413,15 +413,15 @@ func (verification *verification) collectSelections(isInteresting func(types.Obj
 // its selectors find, and a selector of an unrenamed member must not now find a renamed one (a collision at
 // its depth, or a shallower shadow through embedding).
 func (verification *verification) checkSelections(relevant map[string]bool, add addDrop) {
-	engine := verification.engine
+	renaming := verification.renaming
 	for _, entry := range verification.selections {
 		target := entry.selection.Obj()
-		name := engine.finalName(target)
-		if !engine.renamed(target) && !relevant[name] {
+		name := renaming.finalName(target)
+		if !renaming.renamed(target) && !relevant[name] {
 			continue
 		}
-		found := lookupMember(entry.selection.Recv(), true, entry.goPackage.Types, name, engine.finalName)
-		if found.object != nil && engine.keyer.key(found.object) == engine.keyer.key(target) {
+		found := lookupMember(entry.selection.Recv(), true, entry.goPackage.Types, name, renaming.finalName)
+		if found.object != nil && renaming.keyer.key(found.object) == renaming.keyer.key(target) {
 			continue
 		}
 		where := entry.goPackage.Fset.Position(entry.selector.Sel.Pos())
@@ -446,11 +446,11 @@ func (verification *verification) checkSelections(relevant map[string]bool, add 
 // collectDeclarations gathers every named type, struct type and interface type the root packages declare or
 // spell, for the checks that their member names stay distinct.
 func (verification *verification) collectDeclarations() {
-	engine := verification.engine
+	renaming := verification.renaming
 	seenNamed := map[Key]bool{}
 	seenStruct := map[*types.Struct]bool{}
 	seenInterface := map[*types.Interface]bool{}
-	for _, rootsPackage := range engine.roots {
+	for _, rootsPackage := range renaming.roots {
 		for _, object := range rootsPackage.TypesInfo.Defs {
 			typeName, isTypeName := object.(*types.TypeName)
 			if !isTypeName || typeName.IsAlias() {
@@ -460,7 +460,7 @@ func (verification *verification) collectDeclarations() {
 			if !isNamed {
 				continue
 			}
-			key := engine.keyer.key(typeName)
+			key := renaming.keyer.key(typeName)
 			if seenNamed[key] {
 				continue
 			}
@@ -491,21 +491,21 @@ func (verification *verification) collectDeclarations() {
 // checkDeclarations requires a struct's fields, a named type's methods and depth-zero fields, and an
 // interface's methods to keep distinct final names.
 func (verification *verification) checkDeclarations(add addDrop) {
-	engine := verification.engine
+	renaming := verification.renaming
 	report := func(objects []types.Object, what string) {
 		byName := map[string][]types.Object{}
 		for _, object := range objects {
 			if object.Name() == "_" {
 				continue
 			}
-			byName[engine.finalName(object)] = append(byName[engine.finalName(object)], object)
+			byName[renaming.finalName(object)] = append(byName[renaming.finalName(object)], object)
 		}
 		for name, group := range byName {
 			distinct := map[Key]bool{}
 			anyRenamed := false
 			for _, object := range group {
-				distinct[engine.keyer.key(object)] = true
-				if engine.renamed(object) {
+				distinct[renaming.keyer.key(object)] = true
+				if renaming.renamed(object) {
 					anyRenamed = true
 				}
 			}
@@ -549,7 +549,7 @@ func (verification *verification) checkDeclarations(add addDrop) {
 // types are identical, or convertible when named, only while their field names agree, so a rename must move
 // every one of them or none.
 func (verification *verification) groupStructs() {
-	engine := verification.engine
+	renaming := verification.renaming
 	bySignature := map[string][]*types.Struct{}
 	qualifier := func(goPackage *types.Package) string { return goPackage.Path() }
 	for _, structType := range verification.structs {
@@ -573,9 +573,9 @@ func (verification *verification) groupStructs() {
 		declarations := map[Key]bool{}
 		hasCandidate := false
 		for _, structType := range group {
-			declarations[engine.keyer.key(structType.Field(0))] = true
+			declarations[renaming.keyer.key(structType.Field(0))] = true
 			for index := range structType.NumFields() {
-				if _, proposed := engine.candidates[engine.keyer.key(structType.Field(index))]; proposed {
+				if _, proposed := renaming.candidates[renaming.keyer.key(structType.Field(index))]; proposed {
 					hasCandidate = true
 				}
 			}
@@ -588,12 +588,12 @@ func (verification *verification) groupStructs() {
 
 // checkStructGroups requires the struct types of a group to agree on every field's final name.
 func (verification *verification) checkStructGroups(add addDrop) {
-	engine := verification.engine
+	renaming := verification.renaming
 	for _, group := range verification.structGroups {
 		for index := range group[0].NumFields() {
 			names := map[string]bool{}
 			for _, structType := range group {
-				names[engine.finalName(structType.Field(index))] = true
+				names[renaming.finalName(structType.Field(index))] = true
 			}
 			if len(names) < 2 {
 				continue
@@ -635,10 +635,10 @@ type universe struct {
 
 // collectUniverses builds each root's universe, keeping only what can hold an interesting member name.
 func (verification *verification) collectUniverses(interesting map[string]bool) {
-	engine := verification.engine
+	renaming := verification.renaming
 	memberInteresting := map[Key]bool{}
 	memberNamesComputed := map[Key]bool{}
-	initialFinal := engine.finalName
+	initialFinal := renaming.finalName
 	typeIsInteresting := func(key Key, goType types.Type) bool {
 		if memberNamesComputed[key] {
 			return memberInteresting[key]
@@ -670,8 +670,8 @@ func (verification *verification) collectUniverses(interesting map[string]bool) 
 	errorInterface, isErrorInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
 	// A value travels as an interface into packages its type's package never imports, and a type assertion
 	// there against a local or literal interface sees its methods, so every universe holds all of them.
-	localInterfaces := engine.localInterfaces(interfaceIsInteresting)
-	for _, rootsPackage := range engine.roots {
+	localInterfaces := renaming.localInterfaces(interfaceIsInteresting)
+	for _, rootsPackage := range renaming.roots {
 		current := universe{goPackage: rootsPackage}
 		if isErrorInterface && interfaceIsInteresting(errorInterface) {
 			current.interfaces = append(
@@ -682,7 +682,7 @@ func (verification *verification) collectUniverses(interesting map[string]bool) 
 		current.interfaces = append(current.interfaces, localInterfaces...)
 		for _, visible := range importClosure(rootsPackage.Types) {
 			scope := visible.Scope()
-			workspacePackage := engine.workspacePaths[visible.Path()]
+			workspacePackage := renaming.workspacePaths[visible.Path()]
 			for _, name := range scope.Names() {
 				typeName, isTypeName := scope.Lookup(name).(*types.TypeName)
 				if !isTypeName || typeName.IsAlias() {
@@ -692,17 +692,17 @@ func (verification *verification) collectUniverses(interesting map[string]bool) 
 					interfaceIsInteresting(interfaceType) {
 					named, _ := typeName.Type().(*types.Named)
 					current.interfaces = append(current.interfaces, interfaceEntry{
-						identity:      engine.keyer.key(typeName).String(),
+						identity:      renaming.keyer.key(typeName).String(),
 						name:          visible.Path() + "." + name,
 						interfaceType: interfaceType,
 						generic:       named != nil && named.TypeParams().Len() > 0,
 						home:          visible.Path(),
 					})
 				}
-				if workspacePackage && typeIsInteresting(engine.keyer.key(typeName), typeName.Type()) {
+				if workspacePackage && typeIsInteresting(renaming.keyer.key(typeName), typeName.Type()) {
 					current.types = append(
 						current.types,
-						typeEntry{key: engine.keyer.key(typeName), name: name, goType: typeName.Type()},
+						typeEntry{key: renaming.keyer.key(typeName), name: name, goType: typeName.Type()},
 					)
 				}
 			}
@@ -719,7 +719,7 @@ func (verification *verification) collectUniverses(interesting map[string]bool) 
 			if _, isParameter := typeName.Type().(*types.TypeParam); isParameter {
 				continue
 			}
-			key := engine.keyer.key(typeName)
+			key := renaming.keyer.key(typeName)
 			if typeIsInteresting(key, typeName.Type()) {
 				current.types = append(
 					current.types,
@@ -754,7 +754,7 @@ func importClosure(goPackage *types.Package) []*types.Package {
 // otherwise keep satisfying the interface through the embedded method once the interface's is renamed alone,
 // and every call through the interface would stop reaching the override.
 func (verification *verification) checkSatisfaction(add addDrop) {
-	engine := verification.engine
+	renaming := verification.renaming
 	evaluated := map[string]bool{}
 	for _, current := range verification.universes {
 		for _, typeEntry := range current.types {
@@ -774,7 +774,7 @@ func (verification *verification) checkSatisfaction(add addDrop) {
 						test = satisfiesInShape
 					}
 					before := test(implementer, interfaceEntry.interfaceType, actualName)
-					after := test(implementer, interfaceEntry.interfaceType, engine.finalName)
+					after := test(implementer, interfaceEntry.interfaceType, renaming.finalName)
 					involved := verification.involvedMembers(implementer, interfaceEntry.interfaceType)
 					if verification.firstPass &&
 						!interfaceEntry.generic &&
@@ -788,8 +788,8 @@ func (verification *verification) checkSatisfaction(add addDrop) {
 								truth,
 								before,
 							)
-							engine.result.SatisfactionModelMismatches = append(
-								engine.result.SatisfactionModelMismatches,
+							renaming.result.SatisfactionModelMismatches = append(
+								renaming.result.SatisfactionModelMismatches,
 								description,
 							)
 							for _, object := range involved {
@@ -839,12 +839,12 @@ func (verification *verification) changedImplementation(
 	implementer types.Type,
 	interfaceType *types.Interface,
 ) (*types.Func, types.Object, types.Object) {
-	engine := verification.engine
+	renaming := verification.renaming
 	for index := range interfaceType.NumMethods() {
 		wanted := interfaceType.Method(index)
 		before := lookupMember(implementer, false, wanted.Pkg(), wanted.Name(), actualName).object
-		after := lookupMember(implementer, false, wanted.Pkg(), engine.finalName(wanted), engine.finalName).object
-		if before == nil || after == nil || engine.keyer.key(before) == engine.keyer.key(after) {
+		after := lookupMember(implementer, false, wanted.Pkg(), renaming.finalName(wanted), renaming.finalName).object
+		if before == nil || after == nil || renaming.keyer.key(before) == renaming.keyer.key(after) {
 			continue
 		}
 		return wanted, before, after
@@ -871,13 +871,13 @@ func (verification *verification) involvedMembers(
 	implementer types.Type,
 	interfaceType *types.Interface,
 ) []types.Object {
-	engine := verification.engine
+	renaming := verification.renaming
 	var involved []types.Object
 	for index := range interfaceType.NumMethods() {
 		method := interfaceType.Method(index)
 		involved = append(involved, method)
-		for _, name := range []string{method.Name(), engine.finalName(method)} {
-			for _, namer := range []nameOf{actualName, engine.finalName} {
+		for _, name := range []string{method.Name(), renaming.finalName(method)} {
+			for _, namer := range []nameOf{actualName, renaming.finalName} {
 				found := lookupMember(implementer, true, method.Pkg(), name, namer)
 				if found.object != nil {
 					involved = append(involved, found.object)
@@ -892,15 +892,15 @@ func (verification *verification) involvedMembers(
 // checkImports refuses a package-level rename onto a name some file of the package imports: a name may not
 // be declared in both the file block and the package block.
 func (verification *verification) checkImports(add addDrop) {
-	engine := verification.engine
-	for _, rootsPackage := range engine.roots {
+	renaming := verification.renaming
+	for _, rootsPackage := range renaming.roots {
 		packageScope := rootsPackage.Types.Scope()
 		for _, name := range packageScope.Names() {
 			object := packageScope.Lookup(name)
-			if !engine.renamed(object) {
+			if !renaming.renamed(object) {
 				continue
 			}
-			final := engine.finalName(object)
+			final := renaming.finalName(object)
 			for fileScope := range packageScope.Children() {
 				if imported := fileScope.Lookup(final); imported != nil {
 					add(
@@ -919,10 +919,10 @@ func (verification *verification) checkImports(add addDrop) {
 //
 // Mutates: drops the verification's table of refused renames, which each check adds to
 func (verification *verification) checkEditConflicts(drops map[Key]drop) {
-	engine := verification.engine
+	renaming := verification.renaming
 	written := map[rename.EditKey]map[string][]Key{}
-	for key, newName := range engine.accepted {
-		for _, site := range engine.sites[key] {
+	for key, newName := range renaming.accepted {
+		for _, site := range renaming.sites[key] {
 			editKey := rename.EditKey{Filename: site.filename, Offset: site.offset}
 			if written[editKey] == nil {
 				written[editKey] = map[string][]Key{}

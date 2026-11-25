@@ -356,7 +356,7 @@ func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(test *testing.T) {
 //
 // `interface A extends B, C {}` becomes `type A = {...} & B & C`, and the order of the intersection
 // is the order of the `extends` list. Upstream emits one insertion per heritage type and ESLint
-// applies same-position insertions in the order proposed; this tree's edit engine applies fixes back
+// applies same-position insertions in the order proposed; this tree's fix pass applies fixes back
 // to front, so a run of insertions sharing a position comes out reversed. The result is valid
 // TypeScript naming the constraints in the wrong order, which is the "repairs to something that
 // means a different thing" class rather than a broken repair, and no message-id fixture can see it.

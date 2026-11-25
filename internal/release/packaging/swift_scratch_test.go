@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// The Swift engine's build directory is never inside the output, which the release packs and uploads
+// cohere-swift's build directory is never inside the output, which the release packs and uploads
 // whole, and a directory that only shares the output's name as a prefix is not inside it.
 func TestTheSwiftScratchIsNeverInsideTheOutput(test *testing.T) {
 	test.Parallel()

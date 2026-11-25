@@ -26,7 +26,7 @@ import (
 type listeners struct {
 	// analyzer is the dispatcher's own analyzer, which every rule analyzer built on the dispatcher requires. It
 	// requires what the walk reads, staticcheck's generated pass, which every context's IsGenerated reads, and every
-	// registered listener's Requires after them, and its result is a Result. The engine's checker keeps a listener's
+	// registered listener's Requires after them, and its result is a Result. cohere-go's checker keeps a listener's
 	// requirement on a package only where the run holds a rule requiring it there (see ListenerRequirement).
 	analyzer *analysis.Analyzer
 	// walkRequires is what the walk itself reads, the analyzer's requirements before any listener's joined them. One
@@ -106,7 +106,7 @@ func newListeners(
 	}
 }
 
-// IsDispatcher is whether analyzer is a dispatcher's own, which the engine's checker lets run past a failed
+// IsDispatcher is whether analyzer is a dispatcher's own, which cohere-go's checker lets run past a failed
 // requirement on its package (see rule.Failed). Every dispatcher's analyzer, and no other, returns a Result, so this
 // reads it off the analyzer itself, a test's fresh dispatcher included, with no registry of dispatchers to keep.
 func IsDispatcher(analyzer *analysis.Analyzer) bool {
@@ -114,7 +114,7 @@ func IsDispatcher(analyzer *analysis.Analyzer) bool {
 }
 
 // ListenerRequirement reports whether analyzer is a dispatcher's and requires required for its listeners alone,
-// beyond what its walk reads, for the engine's checker under checker.Options.ForDependents. The checker keeps such a
+// beyond what its walk reads, for cohere-go's checker under checker.Options.ForDependents. The checker keeps such a
 // requirement on a package only where an analyzer requiring the dispatcher there requires it too, and every rule
 // analyzer requires what its listener does (see ruleAnalyzer), so an analyzer that only the listeners of rules the run
 // left out require never runs: staticcheck's purity on every dependency, with every rule reading it turned off.
@@ -157,7 +157,7 @@ func (listeners *listeners) Holds(listener *rule.Listener) bool {
 // rule's own action there itself, so the rule's crash is the checker's own sentence, naming each failed requirement
 // as the checker names an action and with its cause, word for word what it was when the rule walked by itself. A
 // crash the dispatcher wrote could do neither: a pass names its package by import path, where the checker names a
-// test variant `p [p.test]`, and the engine's crash sentence finds the cause by walking the failed action's failed
+// test variant `p [p.test]`, and cohere-go's crash sentence finds the cause by walking the failed action's failed
 // prerequisites, which a crash its run returned has none of.
 func (listeners *listeners) ruleAnalyzer(
 	ruleName string,
@@ -249,12 +249,12 @@ func (listeners *listeners) register(
 
 // start is the listeners to call over pass's package, each ready with a context of its own, all judging the package's
 // generated files by one reading of staticcheck's generated pass. They are those of the rules whose analyzers require
-// the dispatcher on this package in this run, the set the engine's checker hands the pass under rule.Dependents, so a
+// the dispatcher on this package in this run, the set cohere-go's checker hands the pass under rule.Dependents, so a
 // rule the run left out, by its settings, a filter, or by being registered from a package the process merely
 // imports, costs no call and no context: its analyzer is not in the graph, and a dispatcher's outcome is read only by
 // the analyzers that require it.
 //
-// A pass without the set comes from a driver that is not the engine's, such as analysistest's or a test calling
+// A pass without the set comes from a driver that is not cohere-go's, such as analysistest's or a test calling
 // checker.Analyze with no Options.Dependents, and there every registered listener starts, as before the set existed.
 // That costs only calls, never output: an outcome no analyzer of the graph requires is never read.
 //
@@ -361,7 +361,7 @@ func (listeners *listeners) walkFailed(pass *analysis.Pass, failed map[*analysis
 }
 
 // requirementsFailed is the crash of registered's listener on pass's package when any of its own Requires is among
-// failed, or nil when none is. The engine never reports it: the rule's own analyzer requires what the listener does
+// failed, or nil when none is. cohere-go never reports it: the rule's own analyzer requires what the listener does
 // (see ruleAnalyzer), so the checker fails the rule's action on the package before its run reads this outcome. It is
 // here so a result never lacks a rule the run counted, and says what happened all the same.
 func requirementsFailed(registered *registeredRule, pass *analysis.Pass, failed map[*analysis.Analyzer]error) error {

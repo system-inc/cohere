@@ -2,7 +2,7 @@
 // says which holes sit where a value's own text becomes SQL: inside a single-quoted string, or bare after a
 // comparison.
 //
-// Two engines ask it the same question. The TypeScript rule nexus/security-no-interpolated-sql-string reads a
+// Two linters ask it the same question. The TypeScript rule nexus/security-no-interpolated-sql-string reads a
 // template literal's texts, and the Go rule cohere-go/security-no-interpolated-sql-string reads a query built with
 // `+` and fmt.Sprintf. It moved out of package nexus so the Go rule reads SQL exactly as the TypeScript one does
 // without linking the TypeScript checker, and it imports only `strings`, so it is a leaf. Swift's twin ports the

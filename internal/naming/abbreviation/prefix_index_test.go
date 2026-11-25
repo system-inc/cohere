@@ -23,7 +23,7 @@ const prefixIndexCorpusVariable = "COHERE_ABBREVIATION_CORPUS"
 // itself, the message id, every value and every spelling. It holds both vocabularies, Policy and NameWords, which
 // internal/file_name_words reads through the same Find.
 //
-// The names are every word of the Go engine rule's fixtures, the corpus find_equivalence_test.go reads for the
+// The names are every word of cohere-go rule's fixtures, the corpus find_equivalence_test.go reads for the
 // vocabulary (this repository's words, the ahra tree's identifiers, and every abbreviation in every form), every word
 // of every Go file under the directories COHERE_ABBREVIATION_CORPUS names, and each prefix entry's abbreviation
 // followed by each allowed segment, as in `dbInnoDbRows`, the one shape that reaches an early prefix's allowed-segment

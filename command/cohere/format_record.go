@@ -316,8 +316,8 @@ func formatRecordSum(contents []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func enumerateFormatUniverse(engine formatEngine, root string) (formatUniverse, error) {
-	rootEnumeration, enumerateFormatTreeError := enumerateFormatTree(engine, root)
+func enumerateFormatUniverse(formatter fileFormatter, root string) (formatUniverse, error) {
+	rootEnumeration, enumerateFormatTreeError := enumerateFormatTree(formatter, root)
 	if enumerateFormatTreeError != nil {
 		return formatUniverse{}, enumerateFormatTreeError
 	}
@@ -326,7 +326,7 @@ func enumerateFormatUniverse(engine formatEngine, root string) (formatUniverse, 
 
 // formatWalkAhead is the format walk begun before the graph build, for the fix phase to take.
 type formatWalkAhead struct {
-	engine           formatEngine
+	formatter        fileFormatter
 	root             string
 	done             chan struct{}
 	enumeration      format_files.Enumeration
@@ -336,45 +336,45 @@ type formatWalkAhead struct {
 // aheadFormatWalk is the walk startFormatWalkAhead began, nil once taken or when none was.
 var aheadFormatWalk *formatWalkAhead
 
-// startFormatWalkAhead begins engine's walk of root on its own goroutine and returns at once. The fix phase
+// startFormatWalkAhead begins formatter's walk of root on its own goroutine and returns at once. The fix phase
 // takes the result through enumerateFormatTree. It is the same call the fix phase would make, on the same
-// engine and root, only earlier, so the enumeration is the one it would have made: the tree is not written
+// formatter and root, only earlier, so the enumeration is the one it would have made: the tree is not written
 // between the two, since nothing writes before the fix phase does.
 //
-// listing, when not nil, is directory listings discovery already read, and an engine that can walk from them
+// listing, when not nil, is directory listings discovery already read, and a child that can walk from them
 // does (#g3046x5): the walk then finishes in tens of milliseconds instead of about 370ms on a cold ahra run,
 // and the early format pass that waits on it starts that much sooner. The listings are a moment older than a
 // walk of the disk would be, which the run cache's clock already covers, since it starts before discovery
 // lists anything (see startRunCacheClock).
-func startFormatWalkAhead(engine formatEngine, root string, listing gitignore.Listing) {
-	ahead := &formatWalkAhead{engine: engine, root: root, done: make(chan struct{})}
+func startFormatWalkAhead(formatter fileFormatter, root string, listing gitignore.Listing) {
+	ahead := &formatWalkAhead{formatter: formatter, root: root, done: make(chan struct{})}
 	go func() {
 		defer close(ahead.done)
-		if listed, ok := engine.(listedEnumerator); ok && listing != nil {
+		if listed, ok := formatter.(listedEnumerator); ok && listing != nil {
 			ahead.enumeration, ahead.enumerationError = listed.EnumerateListed(root, listing)
 		} else {
-			ahead.enumeration, ahead.enumerationError = engine.Enumerate(root)
+			ahead.enumeration, ahead.enumerationError = formatter.Enumerate(root)
 		}
 		ahead.enumeration = withoutYieldedDirectories(ahead.enumeration)
 	}()
 	aheadFormatWalk = ahead
 }
 
-// listedEnumerator is an engine whose walk can read listings already read (native.Resolving).
+// listedEnumerator is a child whose walk can read listings already read (native.Resolving).
 type listedEnumerator interface {
 	EnumerateListed(root string, listing gitignore.Listing) (format_files.Enumeration, error)
 }
 
-// enumerateFormatTree is engine.Enumerate(root), taken from the walk begun ahead when that walk was of the same
-// engine and root. A walk begun ahead is taken once; any other call walks the tree itself.
-func enumerateFormatTree(engine formatEngine, root string) (format_files.Enumeration, error) {
-	if ahead := aheadFormatWalk; ahead != nil && ahead.engine == engine && ahead.root == root {
+// enumerateFormatTree is formatter.Enumerate(root), taken from the walk begun ahead when that walk was of the same
+// formatter and root. A walk begun ahead is taken once; any other call walks the tree itself.
+func enumerateFormatTree(formatter fileFormatter, root string) (format_files.Enumeration, error) {
+	if ahead := aheadFormatWalk; ahead != nil && ahead.formatter == formatter && ahead.root == root {
 		aheadFormatWalk = nil
 		<-ahead.done
 		return ahead.enumeration, ahead.enumerationError
 	}
 	// Less what the projects below this one format, when it is one project of several. See ownership.go.
-	enumeration, enumerateError := engine.Enumerate(root)
+	enumeration, enumerateError := formatter.Enumerate(root)
 	return withoutYieldedDirectories(enumeration), enumerateError
 }
 
@@ -415,8 +415,8 @@ func declaredSubmodules(directory string) (map[string]struct{}, error) {
 
 // unformattedScope is the default format scope: every file in the universe whose bytes are not on record
 // as formatted. It returns the universe's files too, so the record can drop entries outside it.
-func unformattedScope(engine formatEngine, record *formatRecord, root string) (formatScope, []string) {
-	universe, enumerateFormatUniverseError := enumerateFormatUniverse(engine, root)
+func unformattedScope(formatter fileFormatter, record *formatRecord, root string) (formatScope, []string) {
+	universe, enumerateFormatUniverseError := enumerateFormatUniverse(formatter, root)
 	if enumerateFormatUniverseError != nil {
 		// A failed walk withholds formatting and says why, rather than falling back to a universe that
 		// would format the wrong set. Fixing still runs. No universe means nothing is pruned, and nothing
@@ -431,13 +431,13 @@ func unformattedScope(engine formatEngine, record *formatRecord, root string) (f
 
 	declareFormatWalk(universe.root)
 	noteFormatWalkGaps(universe.root)
-	return unformattedScopeOf(engine, record, universe), universe.files
+	return unformattedScopeOf(formatter, record, universe), universe.files
 }
 
 // unformattedScopeOf is unformattedScope's answer for a universe already walked, with no side effect on the run
 // cache, so it can be computed off the main goroutine (startEarlyFormat) and declared there afterwards.
-func unformattedScopeOf(engine formatEngine, record *formatRecord, universe formatUniverse) formatScope {
-	unformatted := record.unformatted(universe.files, engine.OptionsFingerprint)
+func unformattedScopeOf(formatter fileFormatter, record *formatRecord, universe formatUniverse) formatScope {
+	unformatted := record.unformatted(universe.files, formatter.OptionsFingerprint)
 	index := make(map[string]struct{}, len(unformatted))
 	for _, fileName := range unformatted {
 		index[fileName] = struct{}{}
@@ -453,21 +453,21 @@ func unformattedScopeOf(engine formatEngine, record *formatRecord, universe form
 		index:       index,
 		Description: description + " · " + universe.describe(),
 		recorded: func(fileName string, text string) bool {
-			return record.vouches(fileName, text, engine.OptionsFingerprint)
+			return record.vouches(fileName, text, formatter.OptionsFingerprint)
 		},
 		adamic:      universe.root.Adamic,
 		adamicJoins: true,
 		adamicUnrecorded: func(files []string) []string {
-			return record.unformatted(files, engine.OptionsFingerprint)
+			return record.unformatted(files, formatter.OptionsFingerprint)
 		},
 	}
 }
 
 // optionsFingerprintOf is a formatter's options fingerprint, or, with no formatter, a function that
 // refuses: there are no options to fingerprint, and nothing is recorded without one.
-func optionsFingerprintOf(engine formatEngine) func(fileName string) (string, error) {
-	if engine == nil {
+func optionsFingerprintOf(formatter fileFormatter) func(fileName string) (string, error) {
+	if formatter == nil {
 		return func(string) (string, error) { return "", errors.New("no formatter was configured") }
 	}
-	return engine.OptionsFingerprint
+	return formatter.OptionsFingerprint
 }

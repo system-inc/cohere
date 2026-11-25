@@ -1,5 +1,5 @@
 // Package error_variable_name is staticcheck's `ST1012`, a package-level variable holding a new error whose name does
-// not start with err, or Err when it is exported, ported onto the engine's syntax dispatcher.
+// not start with err, or Err when it is exported, ported onto cohere-go's syntax dispatcher.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 stylecheck/st1012/st1012.go, whose message it reports
 // word for word, at the variable's name, over the name's whole range, as the original does, in generated files too,
@@ -8,7 +8,7 @@
 // the walk enters it and reads the same, through the kit's IsCallToAny, staticcheck's code.IsCallToAny.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
-// and the engine runs one configuration, so there is nothing for the port to merge.
+// and cohere-go runs one configuration, so there is nothing for the port to merge.
 package error_variable_name
 
 import (

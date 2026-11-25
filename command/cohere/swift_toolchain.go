@@ -12,29 +12,29 @@ import (
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// The Swift toolchain and engine are asked once per process tree, not once per process (#nkk91tv). A run of
+// The Swift toolchain and cohere-swift are asked once per process tree, not once per process (#nkk91tv). A run of
 // ahraos-presence asked `swift --version` 23 times: the front door once in itself and once in every project's
-// run, each also hashing the engine's sources again, and every engine asked for itself. So the first cohere
+// run, each also hashing the child's sources again, and every language asked for itself. So the first cohere
 // process to need them asks, and publishes the answers in its environment, where every process it starts
-// inherits them: project runs, coverage queries and engines alike.
+// inherits them: project runs, coverage queries and children alike.
 //
-// The answers feed cache keys: the toolchain is in the engine's hash and in the engine's build-input snapshot.
+// The answers feed cache keys: the toolchain is in the child's hash and in the child's build-input snapshot.
 // A value left in a shell from another toolchain would let a run replay results compiled under that one, so an
 // inherited value is trusted only when this process's parent published it: swiftResolvedByVariable names the
 // process that did, and only a process whose parent that is keeps the values. Every other process, a cohere run
 // from a shell above all, drops them before it does anything (see trustInheritedSwiftResolution).
 
-// swiftVersionOutputVariable carries what `swift --version` printed, unchanged. The engine reads it too.
+// swiftVersionOutputVariable carries what `swift --version` printed, unchanged. The child reads it too.
 const swiftVersionOutputVariable = "COHERE_SWIFT_VERSION_OUTPUT"
 
-// swiftExecutableVariable carries the `swift` that `xcrun --find swift` names. The engine reads it too.
+// swiftExecutableVariable carries the `swift` that `xcrun --find swift` names. The child reads it too.
 const swiftExecutableVariable = "COHERE_SWIFT_EXECUTABLE"
 
-// swiftEnginePathVariable carries the engine binary the tree resolved, so a project's run neither hashes the
-// engine's sources nor builds it again.
+// swiftEnginePathVariable carries the child binary the tree resolved, so a project's run neither hashes the
+// child's sources nor builds it again.
 const swiftEnginePathVariable = "COHERE_SWIFT_ENGINE_PATH"
 
-// swiftEngineCommitVariable carries the commit that engine is guaranteed to match, or nothing. See
+// swiftEngineCommitVariable carries the commit that cohere-swift is guaranteed to match, or nothing. See
 // resolveSwiftEngineBinary.
 const swiftEngineCommitVariable = "COHERE_SWIFT_ENGINE_COMMIT"
 
@@ -78,7 +78,7 @@ func publishSwiftResolution(name string, value string) {
 }
 
 // swiftVersionOutput is what `swift --version` printed, asked once per process tree: inherited when a parent
-// asked, and otherwise asked here and published with the `swift` xcrun names, since every engine wants both.
+// asked, and otherwise asked here and published with the `swift` xcrun names, since every language wants both.
 var swiftVersionOutput = sync.OnceValues(func() (string, error) {
 	if inherited := os.Getenv(swiftVersionOutputVariable); inherited != "" {
 		return inherited, nil
@@ -88,7 +88,7 @@ var swiftVersionOutput = sync.OnceValues(func() (string, error) {
 		return "", swiftVersionOutputError
 	}
 	publishSwiftResolution(swiftVersionOutputVariable, output)
-	// Only published when xcrun answers with a path: an engine without it asks xcrun itself, as it always did.
+	// Only published when xcrun answers with a path: a child without it asks xcrun itself, as it always did.
 	if found, findError := exec.Command("xcrun", "--find", "swift").Output(); findError == nil {
 		if executable := strings.TrimSpace(string(found)); filepath.IsAbs(executable) {
 			publishSwiftResolution(swiftExecutableVariable, executable)
@@ -97,8 +97,8 @@ var swiftVersionOutput = sync.OnceValues(func() (string, error) {
 	return output, nil
 })
 
-// resolvedSwiftEngineBinary is resolveSwiftEngineBinary once per process tree: the engine a parent resolved
-// when it published one, and otherwise resolved here and published. An engine the caller named with
+// resolvedSwiftEngineBinary is resolveSwiftEngineBinary once per process tree: the child a parent resolved
+// when it published one, and otherwise resolved here and published. A child the caller named with
 // COHERE_SWIFT_ENGINE is never published, so each run goes on saying it runs a binary no hash vouches for.
 func resolvedSwiftEngineBinary(location projectLocation) (string, string, error) {
 	if inherited := os.Getenv(swiftEnginePathVariable); inherited != "" && isRegularFile(inherited) {

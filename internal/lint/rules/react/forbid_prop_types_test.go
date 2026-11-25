@@ -19,7 +19,7 @@ const forbidPropTypesFile = "/repository/source/PropTypes.tsx"
 // Every case below comes from
 // /tmp/lint-sources/eslint-plugin-react/tests/lib/rules/forbid-prop-types.js, read by stubbing the
 // tester and capturing the object it was handed, so the `[].concat` shapes and the babel-eslint
-// version gate inside it are resolved by the JavaScript engine rather than by a parser written
+// version gate inside it are resolved by the JavaScript runtime rather than by a parser written
 // here. That gate resolves to the modern branch because babel-eslint is not installed in this tree;
 // its legacy branch adds three passing cases, each carrying upstream's own comment that the code is
 // invalid and should not be validated.

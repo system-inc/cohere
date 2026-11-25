@@ -205,7 +205,7 @@ func runJsxNoUselessFragment(test *testing.T, sourceText string, rawOptions stri
 	return rule_testing.RunWithOptions(test, JsxNoUselessFragment, jsxNoUselessFragmentFile, sourceText, decoded)
 }
 
-// applyJsxNoUselessFragmentFixes replays the repair the way the edit engine would.
+// applyJsxNoUselessFragmentFixes replays the repair the way the fix pass would.
 //
 // `rule_testing.ExpectFixedSource` cannot be used directly here for two reasons, and both are
 // correct refusals rather than harness gaps. It fatals when a rule proposed no fix, which is exactly
@@ -214,7 +214,7 @@ func runJsxNoUselessFragment(test *testing.T, sourceText string, rawOptions stri
 // same replacement over the same range, so the overlap is a duplicate rather than a conflict a
 // fixture would have to guess about.
 //
-// So this applies at most one fix per distinct range, back to front, which is what the engine does
+// So this applies at most one fix per distinct range, back to front, which is what the linter does
 // with a duplicate pair, and it returns the source unchanged when there is nothing to apply. Both
 // behaviours were checked against the installed build's own `cohereAndFix` on the same inputs.
 func applyJsxNoUselessFragmentFixes(test *testing.T, result rule_testing.Result) string {

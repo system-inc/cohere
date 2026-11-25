@@ -1,4 +1,4 @@
-// Package consistency_no_use_before_define is the Go engine's rule that a package-level variable or constant is
+// Package consistency_no_use_before_define is cohere-go's rule that a package-level variable or constant is
 // declared above the code in its file that reads it.
 //
 // It is the Go form of no-use-before-define, narrowed to what Go leaves to the writer. Go resolves package-level
@@ -32,7 +32,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_use_before_define", "
 	"var or const that is declared further down the same file, because a reader meets the name before the value it "+
 	"holds. Functions, types and references from other files are not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It resolves each reference to the object it names, so it
+// Rule is this rule's entry in cohere-go's registry. It resolves each reference to the object it names, so it
 // reads types.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 

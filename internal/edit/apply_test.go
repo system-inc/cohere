@@ -92,7 +92,7 @@ func TestNestedFixesDoNotBothApply(test *testing.T) {
 	}
 }
 
-// Adjacent fixes are not overlapping and both must land, or the engine would refuse most of the
+// Adjacent fixes are not overlapping and both must land, or the fix pass would refuse most of the
 // real work: two rules fixing consecutive tokens is the common case, not the exception.
 func TestAdjacentFixesBothApply(test *testing.T) {
 	test.Parallel()

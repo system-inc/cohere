@@ -1,4 +1,4 @@
-// Package security_no_interpolated_shell_command is the Go engine's rule against building a value into the script a
+// Package security_no_interpolated_shell_command is cohere-go's rule against building a value into the script a
 // shell runs.
 //
 // exec.Command("sh", "-c", fmt.Sprintf("cd %s && make", directory)) hands the shell one string, and the shell parses
@@ -57,7 +57,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "security_no_interpolated_shell_comma
 	"value that is not a constant, a number or a boolean, since the shell parses that value as code. A script with "+
 	"<< in it, or one not built at the call or in a local assigned once, is not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var interpolatedShellCommandMessage = policy.MessageOf(Name, "interpolatedShellCommand")

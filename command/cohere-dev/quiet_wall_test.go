@@ -26,7 +26,7 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 	}
 	if code := quietOn(
 		directory,
-		[]string{"--for", "45m", "--through", "engine-pairs", "engine's timing pairs"},
+		[]string{"--for", "45m", "--through", "go-pairs", "cohere-go's timing pairs"},
 		opened,
 		discarded(),
 		discarded(),
@@ -38,9 +38,9 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 		refusal := quietRefusal(directory, inside, "", through, discarded())
 		for _, want := range []string{
 			"holds until 20:50:00",
-			"engine's timing pairs",
+			"cohere-go's timing pairs",
 			"no test, build, vet, exec or land starts",
-			"only the run it is for, --through engine-pairs",
+			"only the run it is for, --through go-pairs",
 			"quiet wait",
 		} {
 			if !strings.Contains(refusal, want) {
@@ -48,7 +48,7 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 			}
 		}
 	}
-	if refusal := quietRefusal(directory, inside, "", "engine-pairs", discarded()); refusal != "" {
+	if refusal := quietRefusal(directory, inside, "", "go-pairs", discarded()); refusal != "" {
 		test.Errorf("the run the window is for was refused: %s", refusal)
 	}
 	if refusal := quietRefusal(directory, inside, "3", "", discarded()); refusal != "" {
@@ -66,7 +66,7 @@ func TestAQuietWindowRefusesEveryJobButTheRunItIsFor(test *testing.T) {
 		unnamed,
 		inside.Add(-5*time.Minute),
 		"",
-		"engine-pairs",
+		"go-pairs",
 		discarded(),
 	); !strings.Contains(refusal, "it lets no run through") {
 		test.Errorf("a window naming no run let a named job through, or did not say it lets none: %q", refusal)
@@ -224,7 +224,7 @@ func TestAQuietWindowIsAWallWhereJobsStart(test *testing.T) {
 			test.Fatal("waited a minute for the job to join the line")
 		}
 	}
-	if output, code := run("quiet", "on", "--for", "10m", "--through", "engine-pairs", "engine's pairs"); code != 0 {
+	if output, code := run("quiet", "on", "--for", "10m", "--through", "go-pairs", "cohere-go's pairs"); code != 0 {
 		held.release()
 		test.Fatalf("quiet on exited %d:\n%s", code, output)
 	}
@@ -254,7 +254,7 @@ func TestAQuietWindowIsAWallWhereJobsStart(test *testing.T) {
 			"named:\n%s", waitError, quietRefusedExitCode, waitingOutput.String())
 	}
 	if !strings.Contains(status, "a gate running when the window opened (running inside the quiet window)") ||
-		!strings.Contains(status, "no job starts but --through engine-pairs") {
+		!strings.Contains(status, "no job starts but --through go-pairs") {
 		test.Errorf("status does not name the job running inside the window, or the run it lets through:\n%s", status)
 	}
 
@@ -268,10 +268,10 @@ func TestAQuietWindowIsAWallWhereJobsStart(test *testing.T) {
 	); code != quietRefusedExitCode {
 		test.Errorf("a job naming another run exited %d, want %d:\n%s", code, quietRefusedExitCode, output)
 	}
-	if output, code := run(append([]string{"exec", "--through", "engine-pairs"}, marking...)...); code != 0 {
+	if output, code := run(append([]string{"exec", "--through", "go-pairs"}, marking...)...); code != 0 {
 		test.Errorf("the run the window is for exited %d:\n%s", code, output)
 	}
-	if marks := string(readMaybeMissing(test, ran)); marks != "through=engine-pairs\n" {
+	if marks := string(readMaybeMissing(test, ran)); marks != "through=go-pairs\n" {
 		test.Errorf("what ran inside the window was %q, want only the run it is for, carrying its name", marks)
 	}
 

@@ -17,8 +17,8 @@ import (
 // Two converters that do almost the same thing is worse than one of the wrong shape, so the
 // difference is stated rather than shared.
 
-// isPascalCase and isCamelCase each refuse a leading underscore, as both casing rules and the Go and
-// Swift engines do: a leading underscore is flagged on every name we declare (Kirk, 2026-11-06,
+// isPascalCase and isCamelCase each refuse a leading underscore, as both casing rules and cohere-go and
+// cohere-swift do: a leading underscore is flagged on every name we declare (Kirk, 2026-11-06,
 // #4b337jk, case us05). It is a convention for private or for unused, and TypeScript says private with
 // `#` or `private`, which the compiler checks, while an unused name is deleted, or written as the bare
 // `_`, which is no name and is never judged. The converters below drop the underscore, so the advice is
@@ -185,7 +185,7 @@ var reservedWords = map[string]bool{
 }
 
 // escapesAReservedWord reports a name that only escapes a keyword, with an underscore after it or before
-// it, `do_` and `_default` alike, so recasing it would produce something unusable. The Go engine leaves
+// it, `do_` and `_default` alike, so recasing it would produce something unusable. cohere-go leaves
 // `type_` alone for the same reason: a suggestion that cannot be typed is worse than none.
 func escapesAReservedWord(name string) bool {
 	return reservedWords[strings.ToLower(strings.Trim(name, "_"))]

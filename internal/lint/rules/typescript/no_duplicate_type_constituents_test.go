@@ -716,11 +716,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 
 			// An empty wantFixed marks the one case whose two repairs overlap, so there is no
 			// single-pass rewrite to assert. Both findings remove the same separator inside the
-			// parentheses; upstream's engine applies one per pass and re-runs, which is why the
+			// parentheses; upstream's fix pass applies one per pass and re-runs, which is why the
 			// corpus records that case with an output array of two states rather than a string.
 			// Measured on the installed build: its two fix ranges are [28,36] and [35,43], which
 			// share index 35. The harness refuses to guess which wins, correctly, so this row
-			// asserts the findings and leaves the rewrite to the engine.
+			// asserts the findings and leaves the rewrite to the linter.
 			if testCase.wantFixed != "" {
 				rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 			}

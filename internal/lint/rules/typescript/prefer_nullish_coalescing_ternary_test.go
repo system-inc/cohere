@@ -202,7 +202,7 @@ func TestPreferNullishCoalescingTernaryAndIfFire(test *testing.T) {
 	}
 }
 
-// preferNullishCoalescingCompiledRows is the table both engines run: each source holds one `if` the
+// preferNullishCoalescingCompiledRows is the table both languages run: each source holds one `if` the
 // check reports with the compiler off, and `compiled` says whether React Compiler compiles the function
 // holding it.
 var preferNullishCoalescingCompiledRows = []struct {
@@ -357,7 +357,7 @@ export const Badge = memo(function(properties: { label: string | null }) {
 // which is ours rather than upstream's, on the if-statement check it gates.
 //
 // The rows are shared verbatim with Nexus's NexusTypeScriptEsLintPlugin.test.ts, whose wrapper draws the
-// same line in ESLint, so one table proves the ruling in both engines (#cn8sthd). Three are the sites
+// same line in ESLint, so one table proves the ruling in both languages (#cn8sthd). Three are the sites
 // the waves rewrote to `??=`, each of which lost its compilation to the rewrite, in their long form:
 // SecretRow, WebSocketViaSharedWorkerProviderInternal and ChatReasoningAndTools' component body. The
 // rest pin where the compiled region ends, from the measurements recorded in the react shelf's

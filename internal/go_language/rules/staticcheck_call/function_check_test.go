@@ -36,9 +36,9 @@ func markEverything(name string) Rule {
 	}
 }
 
-// functionCheckAnalyzer runs check as a plain analyzer named name over every source function of the package in the
-// engine's own intermediate representation, with the context staticcheck_report.PassContext builds around
-// pass.Report, so the test runs the check outside the engine's dispatcher and reads its findings straight off the
+// functionCheckAnalyzer runs check as a plain analyzer named name over every source function of the package in
+// cohere's own intermediate representation, with the context staticcheck_report.PassContext builds around
+// pass.Report, so the test runs the check outside cohere-go's dispatcher and reads its findings straight off the
 // analyzer.
 func functionCheckAnalyzer(
 	name string,

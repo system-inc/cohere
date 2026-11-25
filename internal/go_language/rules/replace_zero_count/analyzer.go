@@ -41,6 +41,6 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1018",
 	"SA1018",
 	"Flags strings.Replace or bytes.Replace called with n == 0, which replaces nothing: staticcheck's SA1018, ported "+
-		"onto the engine's own intermediate representation.",
+		"onto cohere's own intermediate representation.",
 	&Listener,
 )

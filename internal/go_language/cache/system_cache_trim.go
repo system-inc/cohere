@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// The system cache is trimmed as Go's build cache is (cmd/go/internal/cache): every dev rebuild is a new engine
+// The system cache is trimmed as Go's build cache is (cmd/go/internal/cache): every dev rebuild is a new executable
 // identity, and so a new entry of each standard-library package for each target it meets, which nothing reads again
 // once the next rebuild runs.
 const (

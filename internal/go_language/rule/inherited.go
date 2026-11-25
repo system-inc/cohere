@@ -9,7 +9,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Inherited keys, in a pass's ResultOf, the build's Inheritance, which the engine's checker hands every pass when its
+// Inherited keys, in a pass's ResultOf, the build's Inheritance, which cohere-go's checker hands every pass when its
 // checker.Options.Inherited is this key and its Options.Inheritance is set (#y6q1x2j): the host's findings of each
 // syntax-only rule on each file the host checked, which an extra build reports as the rule's own rather than walk the
 // file again. It lives beside Resolved, for Resolved's reasons, and like it is a key and never runs: no analyzer

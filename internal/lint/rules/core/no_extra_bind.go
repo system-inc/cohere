@@ -360,7 +360,7 @@ func bindRemovalFixes(ruleContext rule.Context, bound boundCall) []rule.Fix {
 	// the closing bracket of a computed access. Upstream takes "the property name or the `]` token",
 	// which is one token in the dotted case and a different one in the subscript case; here the
 	// access node's own end is both. Ending at the property leaves a stray `]` behind, and the
-	// rewritten file still parses in some positions, which is exactly the damage the fix engine's
+	// rewritten file still parses in some positions, which is exactly the damage the fix pass's
 	// parse guard cannot catch.
 	firstRemoval := core.NewTextRange(
 		scanner.SkipTrivia(sourceText, receiverOf(bound.access).End()),

@@ -11,7 +11,7 @@ import (
 )
 
 // The cohere binary carries no part of staticcheck's intermediate representation (#7cv09fg): every rule reads the
-// engine's own, and TestNoCodeImportsStaticchecksIntermediateRepresentation holds that no file of ours imports go/ir,
+// language's own, and TestNoCodeImportsStaticchecksIntermediateRepresentation holds that no file of ours imports go/ir,
 // but a file of ours can still reach it through something it imports, as the registry did through staticcheck's
 // suites, so this reads the whole of what the binary links, from go list. The same listing over staticcheck's own
 // suite names every one of the paths, so a listing that read nothing, or a path the list spells otherwise, fails here

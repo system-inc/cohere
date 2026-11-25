@@ -11,19 +11,19 @@
 // The one change in behaviour is the load. Upstream loads with go/packages,
 // which always asks go list for -compiled, -test, -export and -pgo, and a
 // runner of prebuilt tests, as Loom's is, refuses every one of them, so every
-// rule's test failed there. Here loadPackages loads through the engine's own
+// rule's test failed there. Here loadPackages loads through cohere-go's own
 // load from source (internal/go_language/load), which runs only go env and
 // go list -deps -json -e, in both of upstream's modes, GOPATH and module, under
 // the same environment. It returns the packages packages.Load returned with
 // Tests set, each pattern's package and its test variants, less one: go test's
-// synthesized main, "p.test", which the engine never analyzes either. It is
+// synthesized main, "p.test", which cohere-go never analyzes either. It is
 // generated, holds no want comment, and a rule that reported in it would have
 // failed the test upstream, so dropping it changes no test's outcome.
 //
 // What else differs, because this module cannot import x/tools' internal
 // packages:
 //   - checker is the copy in check/checker, so the tests run the analyzers
-//     exactly as the engine does.
+//     exactly as cohere-go does.
 //   - internal, driverutil and diff are copies too, of go/analysis/internal,
 //     internal/analysis/driverutil's fix.go, and internal/diff.
 //   - Run no longer calls internal/testenv's NeedsGoPackages, which skips a
@@ -64,7 +64,7 @@ import (
 	// no longer imported (see Run).
 	"golang.org/x/tools/txtar"
 
-	// cohere: the copies of x/tools' packages this copy calls, and the engine's load.
+	// cohere: the copies of x/tools' packages this copy calls, and cohere-go's load.
 	"github.com/system-inc/cohere/internal/go_language/check/checker"
 	"github.com/system-inc/cohere/internal/go_language/check/checker/driverutil"
 	"github.com/system-inc/cohere/internal/go_language/check/diff"
@@ -539,7 +539,7 @@ func loadPackages(dir string, patterns ...string) ([]*packages.Package, error) {
 	// a list of packages we generate and then do the parsing and
 	// typechecking, though this feature seems to be a recurring need.
 
-	// cohere: loaded through the engine's load from source, whose Roots are
+	// cohere: loaded through cohere-go's load from source, whose Roots are
 	// what packages.Load returned with Tests set, less go test's synthesized
 	// main (see the header). It runs under os.Environ() and env, as upstream's
 	// Config.Env, and with no census, since no test accounts for its files.

@@ -100,7 +100,7 @@ func TestAListenerReadsWhatItRequiresAndItsOwnOptions(test *testing.T) {
 }
 
 // unheardFunction is the walk's callback for a listener that judges only at PackageExit, which a listener of the walk
-// over the engine's own intermediate representation declares to hear that walk at all.
+// over cohere's own intermediate representation declares to hear that walk at all.
 func unheardFunction(*rule.Context, *intermediate_representation.Function) {
 	// Judges nothing: the listener's PackageExit does its work.
 }

@@ -15,7 +15,7 @@
 //            must leave the file as typed.
 //   go       in a Go module, with cohere reached through a stand-in that logs each command line: a Go
 //            file's save must reach cohere and come back as gofmt prints it (#qtna8m4), and a TypeScript
-//            file's, which the Go engine declines there, must leave the file as typed.
+//            file's, which cohere-go declines there, must leave the file as typed.
 //   schema   when the fourth argument is given, a project with @system-inc/cohere installed from its npm
 //            package: a CohereSettings.json naming the installed schema must have a misspelled key flagged.
 //

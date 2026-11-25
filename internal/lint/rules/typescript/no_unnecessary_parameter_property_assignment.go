@@ -94,7 +94,7 @@ var suggestionNoUnnecessaryParameterPropertyAssignment = rule.Message{
 // on the release binary, `this.foo = foo` with no semicolon has its newline eaten and the next line
 // joined, and `this.foo = foo, bar();` has its comma eaten, leaving ` bar();`. Reproduced exactly,
 // as a suggestion, because a suggestion is the vehicle upstream chose and a human sees it before it
-// lands. Shipping this as a fix would let the engine apply those two rewrites unattended.
+// lands. Shipping this as a fix would let the fix pass apply those two rewrites unattended.
 var NoUnnecessaryParameterPropertyAssignment = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-parameter-property-assignment",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {

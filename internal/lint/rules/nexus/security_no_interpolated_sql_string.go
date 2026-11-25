@@ -145,7 +145,7 @@ var (
 // Every other escape is reported, on purpose:
 //
 //   - `'` doubled alone is the `AhraOsTriggers.ts` bug: correct for SQLite, open on MySQL, and the
-//     text does not say which engine runs it.
+//     text does not say which database runs it.
 //   - `'` turned into `\'` is the reverse: correct on MySQL, and on SQLite the backslash is an
 //     ordinary character and the quote still closes the string.
 //   - A call to an escaping function (`escapeSqlString(value)`) is a `string` whose body this rule
@@ -264,7 +264,7 @@ func securityNoInterpolatedSqlStringLeadingWord(head string) string {
 // securityNoInterpolatedSqlStringReadStatement reads a template's texts as one SQL statement, with each
 // interpolation an opaque value between two texts, and returns the indexes of the interpolations that
 // sit inside a single-quoted string in a value position, and of those bare after a comparison. The
-// reading is package sql_text's, shared with the Go engine's twin. It returns nothing when the reading is
+// reading is package sql_text's, shared with cohere-go's twin. It returns nothing when the reading is
 // uncertain anywhere (see the doc comment), or when the text is not confirmed as SQL: a second uppercase
 // keyword outside its strings and comments, or a leading `WHERE` or `HAVING`.
 func securityNoInterpolatedSqlStringReadStatement(texts []string) ([]int, []int) {

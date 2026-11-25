@@ -10,7 +10,7 @@
                 "endLine": 1,
                 "endColumn": 25,
                 "messageId": "noCaller",
-                "message": "This uses `arguments.callee`. Both properties throw in strict mode, which every module and class body already is, and they prevent engines from optimizing functions whose callers would otherwise be statically known. Name the function and refer to it by name instead."
+                "message": "This uses `arguments.callee`. Both properties throw in strict mode, which every module and class body already is, and they prevent runtimes from optimizing functions whose callers would otherwise be statically known. Name the function and refer to it by name instead."
             }
         ]
     },

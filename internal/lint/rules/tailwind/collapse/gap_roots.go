@@ -15,14 +15,14 @@
 // namespace lists in sequence, infer a type instead of reading the theme, and accept a modifier on
 // one path while refusing it on another.
 //
-// # Read at the tag, verified against the engine
+// # Read at the tag, verified against Tailwind
 //
 // Every entry was read from `utilities.ts` at the v4.3.3 tag rather than inferred from the descriptor
 // rows, which cannot supply it: a row records only the namespaces whose reading differs, so
 // `outline`'s row carries `--color` and not `--outline-width`, and a description built from rows
 // reports `outline-2` as unknown.
 //
-// Each family was then scored against `candidatesToCss` on a live design system, which is the engine
+// Each family was then scored against `candidatesToCss` on a live design system, which is Tailwind
 // answering whether a class compiles. The measurements are in gaproots_test.go, per family, and the
 // pairs that carry them are the ones a careful reader gets wrong: `border-2/50` against
 // `border-red-500/50`, `stroke-2/50` against both, `mask-x-from-1.5` against `mask-x-from-3.7`.
@@ -292,7 +292,7 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 	},
 }
 
-// ClassValueResolvesIn reports whether a parsed class resolves to a value the engine would compile.
+// ClassValueResolvesIn reports whether a parsed class resolves to a value Tailwind would compile.
 //
 // The parser answers a different question and answers it correctly: it decides where a root ends and
 // whether the variants read, which is structure. `text-ss` parses as root `text` with the named value
@@ -332,8 +332,8 @@ func ClassValueResolvesIn(candidate *ParsedCandidate, system *LoadedDesignSystem
 	// theme never declares (it has `content-0` through `content-4` and `content--1` through
 	// `content--3`), so it emits nothing and Prettier's Tailwind plugin ranks it null, while
 	// no-unknown-classes reported nothing on the two Structure sites that carried it (#1hmzh0z).
-	// The evaluator compiles the block, so its answer is the engine's, and a candidate it cannot
-	// compile is one the engine cannot either.
+	// The evaluator compiles the block, so its answer is Tailwind's, and a candidate it cannot
+	// compile is one Tailwind cannot either.
 	//
 	// The comment this replaces cited `shadow--3` as a repository class. It is not: as the
 	// repository's root it needs `--shadow-3`, which does not exist, and it renders through the
@@ -385,7 +385,7 @@ func descriptionForRoot(root string) *FunctionalUtilityDescription {
 		// This caller has no reading to short-circuit and asks resolution directly, so the keywords
 		// have to be visible to it or every one reads as an unresolvable value. Measured with them
 		// absent: 335 corpus classes reported, `flex-1`, `rounded-full`, `transition-colors` and
-		// `aspect-square` among them, every one a class the engine compiles.
+		// `aspect-square` among them, every one a class Tailwind compiles.
 		if len(utility.LiteralReadings) > 0 {
 			if description.StaticValueNames == nil {
 				description.StaticValueNames = make(map[string]bool, len(utility.LiteralReadings))

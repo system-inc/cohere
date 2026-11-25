@@ -809,7 +809,7 @@ func (walk *useWalk) value(valueType types.Type, context useContext) {
 // Every move copies, a fresh composite literal's or call's result too: copylocks lets those two pass, but no rule has
 // been shown to read nothing more of a fresh value than of a copied one, so telling them apart would narrow the read
 // on no proof. A non-empty interface is its method set alone because no rule that walks a type's fields walks a
-// value handed to one, which go_engine's fieldWalkRows prove by their non-empty interface row: a rule that did would
+// value handed to one, which go_language's fieldWalkRows prove by their non-empty interface row: a rule that did would
 // make these moves whole.
 func (walk *useWalk) movedTo(moved types.Type, destination types.Type) {
 	walk.byValue(moved)

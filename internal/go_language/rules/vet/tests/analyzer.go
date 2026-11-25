@@ -9,7 +9,7 @@
 // calls from x/tools' internal packages, typesinternal.IsTypeNamed, translated beside it, and it reports the
 // original's messages word for word, at the same position and over the same range. Like the original it requires no
 // other analyzer: it reads each test file's top-level declarations in order and walks a Fuzz function's body with
-// ast.Inspect, whose pruning the fuzz checks rely on. It sits on the engine's syntax dispatcher, hearing each file as
+// ast.Inspect, whose pruning the fuzz checks rely on. It sits on cohere-go's syntax dispatcher, hearing each file as
 // the walk the dispatcher makes once for every syntax rule enters it, and no node within. The registry runs the port
 // in the original's place, and the original stays the oracle: the parity tests beside this file run both over the
 // same packages.

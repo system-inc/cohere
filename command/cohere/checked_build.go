@@ -86,8 +86,8 @@ type checkedBuild struct {
 	FilesAlone      int      `json:"filesAlone,omitempty"`
 	NotLinted       []string `json:"notLinted,omitempty"`
 	NotLintedReason string   `json:"notLintedReason,omitempty"`
-	// Dependence is another build's dependence counts under the engine's `--build-dependence` (#qkq4gx5), carried as
-	// the engine wrote it, since nothing here reads it, absent unless the engine wrote it.
+	// Dependence is another build's dependence counts under the child's `--build-dependence` (#qkq4gx5), carried as
+	// the child wrote it, since nothing here reads it, absent unless the child wrote it.
 	Dependence json.RawMessage `json:"dependence,omitempty"`
 }
 

@@ -7,8 +7,8 @@ import (
 	"syscall"
 )
 
-// startInOwnGroup does nothing where there are no Unix process groups. The tool it would group is the
-// Swift engine's build, which runs only on macOS.
+// startInOwnGroup does nothing where there are no Unix process groups. The tool it would group is
+// cohere-swift's build, which runs only on macOS.
 func startInOwnGroup(*exec.Cmd) {
 	// There are no process groups here, so the tool starts as any child does.
 }

@@ -6,16 +6,16 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/react/conformance"
 )
 
-// engineImplementation runs whichever wired rule owns a fixture, and declines the rest.
+// ruleImplementation runs whichever wired rule owns a fixture, and declines the rest.
 //
 // This is the `react_conformance.Implementation` the harness was written against and never had. A
 // fixture whose attributed rule has no wired entry returns UnsupportedError rather than an empty
 // Result, which is the whole distinction `score.go` draws: an empty Result claims "I looked and
 // found nothing", and on a corpus where every fixture expects at least one error that claim is a
 // wrong answer rather than an absent one.
-type engineImplementation struct{ test *testing.T }
+type ruleImplementation struct{ test *testing.T }
 
-func (implementation engineImplementation) Analyze(
+func (implementation ruleImplementation) Analyze(
 	fixture react_conformance.Fixture,
 ) (react_conformance.Result, error) {
 	rules, complete := fixture.Rules()
@@ -36,23 +36,23 @@ func (implementation engineImplementation) Analyze(
 	subject, wired := Rules[rules[0]]
 	if !wired {
 		return react_conformance.Result{}, &react_conformance.UnsupportedError{
-			Reason: "no rule engine wired for upstream rule " + rules[0],
+			Reason: "no rule run wired for upstream rule " + rules[0],
 		}
 	}
 	return Analyze(subject, fixture, implementation.test.TempDir())
 }
 
-// TestAggregateWithTheRuleEngineWired is the whole-corpus score with real rules running.
+// TestAggregateWithTheRulesWired is the whole-corpus score with real rules running.
 //
 // The sibling package's `TestAggregatedScoreAgainstReactsOwnFixtures` reports the same partition
-// with `NothingImplemented`, so every addressable fixture lands in `not scored: no rule engine run`.
-// This is that report with the engine supplied, and the difference between the two is the entire
+// with `NothingImplemented`, so every addressable fixture lands in `not scored: no rule run run`.
+// This is that report with the rule run supplied, and the difference between the two is the entire
 // contribution of this file.
 //
 // The assertions are two-sided on purpose. A pass floor alone is satisfied by a harness that cannot
 // see, and a failure count alone is satisfied by one that is broken; requiring both to be non-zero,
 // plus the partition check, is what makes the number a measurement.
-func TestAggregateWithTheRuleEngineWired(test *testing.T) {
+func TestAggregateWithTheRulesWired(test *testing.T) {
 	test.Parallel()
 	if testing.Short() {
 		test.Skip("builds a TypeScript program per fixture")
@@ -62,7 +62,7 @@ func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
-	report, aggregateError := react_conformance.Aggregate(fixtures, engineImplementation{test: test})
+	report, aggregateError := react_conformance.Aggregate(fixtures, ruleImplementation{test: test})
 	if aggregateError != nil {
 		test.Fatalf("aggregating: %v", aggregateError)
 	}
@@ -76,7 +76,7 @@ func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 	}
 
 	if report.Counts[react_conformance.VerdictPassed] == 0 {
-		test.Error("nothing passed, so the engine is not reaching any rule")
+		test.Error("nothing passed, so the rule run is not reaching any rule")
 	}
 	if report.Counts[react_conformance.VerdictFailed] == 0 {
 		test.Error("nothing failed; a harness that cannot produce a failure is not measuring anything")
@@ -105,7 +105,7 @@ func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 	}
 
 	// Nothing addressable may remain unscored. This is the assertion that would have failed before
-	// this file existed, when all 178 sat in `not scored`, and it is the one that stops the engine
+	// this file existed, when all 178 sat in `not scored`, and it is the one that stops the rule run
 	// quietly ceasing to run.
 	for _, upstream := range UpstreamNames() {
 		for _, verdict := range report.Fixtures {

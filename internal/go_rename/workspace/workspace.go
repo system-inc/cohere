@@ -1,6 +1,6 @@
 // Package workspace is one type-checked load of a Go workspace with its tests, made here from a cohere worktree's
 // go.work or taken from a load made elsewhere, and decides which variants and files a rename may read and edit. The
-// rename codemods under tools/go_codemods load through Load; a caller with a load of its own, as the Go engine has,
+// rename codemods under tools/go_codemods load through Load; a caller with a load of its own, as cohere-go has,
 // wraps it with FromLoaded.
 package workspace
 
@@ -93,10 +93,10 @@ func LoadWithOverlay(root string, skips []string, overlay map[string][]byte) (*W
 	return newWorkspace(resolvedRoot, skips, loaded), nil
 }
 
-// FromLoaded is a Workspace over packages loaded elsewhere, as the Go engine's load gives them: roots, every root
+// FromLoaded is a Workspace over packages loaded elsewhere, as cohere-go's load gives them: roots, every root
 // package less go test's synthesized main, and analyzed, the variant of each package to read, `p [p.test]` in place
 // of `p` and `p_test [p.test]`. root is spelled as the loaded files' names spell it, since Relative compares them.
-// No file is skipped by prefix; writable, when set, says which files a rename may write, as the engine's scope does,
+// No file is skipped by prefix; writable, when set, says which files a rename may write, as global_rename's scope does,
 // on top of what Editable already refuses. Unlike Load it requires nothing of the packages: whether they type-check
 // is the caller's to have decided.
 func FromLoaded(
@@ -213,7 +213,7 @@ func (workspace *Workspace) Uneditable(goPackage *packages.Package, file *ast.Fi
 	return ""
 }
 
-// RenamePackage is pkg as the rename engine sees it, with only its editable files.
+// RenamePackage is pkg as global_rename sees it, with only its editable files.
 func (workspace *Workspace) RenamePackage(goPackage *packages.Package) rename.Package {
 	var files []*ast.File
 	for _, file := range goPackage.Syntax {
@@ -244,7 +244,7 @@ func (workspace *Workspace) LoadPlatform(platform Platform, overlay map[string][
 // PlatformLoadOf is loaded, the root packages of a load of the tree as platform builds it, sorted into what
 // type-checks and what does not: Clean holds each package with no error that imports none, and is the workspace's
 // own, its skips and writable kept, and Failed names every other one with its first error or the import that
-// failed. It reads nothing, so a caller that loads a platform its own way, as the Go engine does, sorts it alike.
+// failed. It reads nothing, so a caller that loads a platform its own way, as cohere-go does, sorts it alike.
 func (workspace *Workspace) PlatformLoadOf(platform Platform, loaded []*packages.Package) *PlatformLoad {
 	result := &PlatformLoad{Platform: platform, Failed: map[string]string{}}
 	clean := map[*packages.Package]bool{}

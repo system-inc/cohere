@@ -1,4 +1,4 @@
-// Package consistency_no_stuttering_name is the Go engine's rule that a placeholder name does not stutter against
+// Package consistency_no_stuttering_name is cohere-go's rule that a placeholder name does not stutter against
 // its own field or method: result.Result, outcome.Outcome.
 //
 // A name is read where it is used, not where it is declared, so the question is never whether a word is generic but
@@ -46,7 +46,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_stuttering_name", "Fl
 	"outcome.Outcome(). The variable must be one this package declares, so an imported package, a type's method "+
 	"expression, a dot-imported variable and a variable a generated file declares are left alone.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var stutteringNameMessage = policy.MessageOf(Name, "stutteringName")

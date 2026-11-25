@@ -23,9 +23,9 @@ func TestTheBodyDifferentialReadsEachSidesFindingsByThePairedPackage(test *testi
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "body-reach-lint-package"))
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyDifferential = true
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyDifferential = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))
@@ -51,9 +51,9 @@ func TestTheBodyDifferentialReadsEachSidesFindingsByThePairedPackage(test *testi
 	var found [2][]string
 	for index, switched := range []bool{false, true} {
 		standing, _ := runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "body-reach-lint-package")),
-			exitFindings, func(engine *pipeline) {
-				engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-				engine.standingBodies = switched
+			exitFindings, func(pipeline *pipeline) {
+				pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+				pipeline.standingBodies = switched
 			}, "--no-cache", "--no-fix", "--build-dependence")
 		if len(standing.buildRuns) != 2 || standing.buildRuns[1].build.OperatingSystem != "windows" {
 			test.Fatalf("want the host's build and windows's, got %d runs", len(standing.buildRuns))
@@ -79,9 +79,9 @@ func TestACensusRunLeavesNoPackageUntouched(test *testing.T) {
 	test.Parallel()
 
 	root := copyFixture(test, filepath.Join("testdata", "body-reach-lint-package"))
-	on, _ := runOverConfigured(test, root, exitFindings, func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyDifferential = true
+	on, _ := runOverConfigured(test, root, exitFindings, func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyDifferential = true
 	}, "--no-fix", "--build-dependence")
 	if len(on.buildRuns) != 2 || on.buildRuns[1].build.OperatingSystem != "windows" {
 		test.Fatalf("want the host's build and windows's, got %d runs", len(on.buildRuns))

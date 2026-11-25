@@ -14,10 +14,10 @@ import (
 //
 // Measured rather than transcribed, because the two are different claims and the custom-property
 // branch is where they part. Reading `css-parser.ts` suggests a `--foo` declaration is normalized
-// like any other; asking the engine says its value keeps the literal newlines and indentation of
+// like any other; asking Tailwind says its value keeps the literal newlines and indentation of
 // the source, because that branch slices the input directly instead of routing bytes through the
 // whitespace-collapsing buffer. A hand-written expectation set would have encoded the plausible
-// version and agreed with the engine on every single-line theme entry, which is most of them.
+// version and agreed with Tailwind on every single-line theme entry, which is most of them.
 
 type cssParserCorpus struct {
 	TailwindVersion string `json:"tailwindVersion"`
@@ -28,7 +28,7 @@ type cssParserCorpus struct {
 	// by name. A false here would mean the corpus was captured from something unverified.
 	ParseResolvedByIdentity bool `json:"parseResolvedByIdentity"`
 
-	// The counts the exit criterion asks to be reported, measured by the engine over the real
+	// The counts the exit criterion asks to be reported, measured by Tailwind over the real
 	// stylesheets rather than by this port.
 	StylesheetCount    int `json:"stylesheetCount"`
 	ThemeEntryCount    int `json:"themeEntryCount"`
@@ -39,7 +39,7 @@ type cssParserCorpus struct {
 	ErrorCases []cssParserErrorCase `json:"errorCases"`
 }
 
-// cssParserCase is one stylesheet and the tree the engine built from it.
+// cssParserCase is one stylesheet and the tree Tailwind built from it.
 type cssParserCase struct {
 	Name   string            `json:"name"`
 	Source string            `json:"source"`
@@ -47,10 +47,10 @@ type cssParserCase struct {
 	Nodes  []*cssFixtureNode `json:"nodes"`
 }
 
-// cssParserErrorCase is a stylesheet the engine rejected. A parser that accepts these is not
-// more permissive, it is wrong: any tree it invented is one the engine never produces.
+// cssParserErrorCase is a stylesheet Tailwind rejected. A parser that accepts these is not
+// more permissive, it is wrong: any tree it invented is one Tailwind never produces.
 //
-// Message is null when the engine unexpectedly accepted the input, in which case
+// Message is null when Tailwind unexpectedly accepted the input, in which case
 // UnexpectedlyParsed holds what it built. That combination is a finding about the corpus rather
 // than about the port, so the test reports it rather than asserting on it.
 type cssParserErrorCase struct {
@@ -61,7 +61,7 @@ type cssParserErrorCase struct {
 	UnexpectedlyParsed []*cssFixtureNode `json:"unexpectedlyParsed"`
 }
 
-// cssFixtureNode mirrors the engine's node shape as JSON, so converting it to a Node is an explicit
+// cssFixtureNode mirrors Tailwind's node shape as JSON, so converting it to a Node is an explicit
 // step this test controls rather than something struct tags do invisibly.
 type cssFixtureNode struct {
 	Kind         string            `json:"kind"`
@@ -153,7 +153,7 @@ func quoteForDiff(value string) string {
 	return quoted + "\""
 }
 
-// nodesFromFixture converts the engine's serialized tree into the port's Node type.
+// nodesFromFixture converts Tailwind's serialized tree into the port's Node type.
 func nodesFromFixture(fixtures []*cssFixtureNode) []*Node {
 	if fixtures == nil {
 		return nil
@@ -178,12 +178,12 @@ func nodesFromFixture(fixtures []*cssFixtureNode) []*Node {
 	return nodes
 }
 
-// TestParseCssMatchesEngine is the whole contract: for every stylesheet in the corpus, the tree
-// this port builds is the tree the engine built.
+// TestParseCssMatchesTailwind is the whole contract: for every stylesheet in the corpus, the tree
+// this port builds is the tree Tailwind built.
 //
 // The count is printed on success rather than only on failure, because a suite that ran six cases
 // and a suite that ran ninety are indistinguishable from a green line.
-func TestParseCssMatchesEngine(test *testing.T) {
+func TestParseCssMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	corpus := loadCssParserCorpus(test)
 
@@ -201,14 +201,14 @@ func TestParseCssMatchesEngine(test *testing.T) {
 			test.Parallel()
 			parsed, parseCssError := ParseCss(testCase.Input)
 			if parseCssError != nil {
-				test.Fatalf("ParseCSS returned %v; the engine parsed this input successfully", parseCssError)
+				test.Fatalf("ParseCSS returned %v; Tailwind parsed this input successfully", parseCssError)
 			}
 
 			expected := nodesFromFixture(testCase.Nodes)
 			got := describeNodes(parsed, "")
 			want := describeNodes(expected, "")
 			if got != want {
-				test.Errorf("tree mismatch for %q\n--- input ---\n%s\n--- got ---\n%s\n--- want (engine) ---\n%s",
+				test.Errorf("tree mismatch for %q\n--- input ---\n%s\n--- got ---\n%s\n--- want (tailwind) ---\n%s",
 					testCase.Name, testCase.Input, got, want)
 			}
 			countNodes(parsed)
@@ -216,18 +216,18 @@ func TestParseCssMatchesEngine(test *testing.T) {
 	}
 
 	test.Logf(
-		"tailwind %s: compared %d stylesheets and %d nodes against the engine's parser (found by identity as %s)",
+		"tailwind %s: compared %d stylesheets and %d nodes against Tailwind's parser (found by identity as %s)",
 		corpus.TailwindVersion, len(corpus.Cases), comparedNodes, corpus.ParseExportName,
 	)
 }
 
-// TestParseCssRejectsWhatTheEngineRejects pins the error behaviour.
+// TestParseCssRejectsWhatTailwindRejects pins the error behaviour.
 //
 // A parser that quietly accepts malformed input is the failure mode that hides: it builds a
-// plausible tree from a stylesheet the engine refuses, and every reading taken from that tree is
+// plausible tree from a stylesheet Tailwind refuses, and every reading taken from that tree is
 // invented. Only the fact of rejection is asserted, not the message text, because the messages
 // carry a source location upstream that this port deliberately does not reproduce.
-func TestParseCssRejectsWhatTheEngineRejects(test *testing.T) {
+func TestParseCssRejectsWhatTailwindRejects(test *testing.T) {
 	test.Parallel()
 	corpus := loadCssParserCorpus(test)
 
@@ -237,12 +237,12 @@ func TestParseCssRejectsWhatTheEngineRejects(test *testing.T) {
 		// only after the test had returned, so the check would pass on nothing.
 		test.Run(testCase.Name, func(test *testing.T) {
 			if testCase.Message == nil {
-				test.Skipf("the engine accepted this input, so it pins nothing about rejection")
+				test.Skipf("Tailwind accepted this input, so it pins nothing about rejection")
 			}
 
 			_, parseCssError := ParseCss(testCase.Input)
 			if parseCssError == nil {
-				test.Fatalf("ParseCSS accepted %q; the engine rejected it with %q", testCase.Input, *testCase.Message)
+				test.Fatalf("ParseCSS accepted %q; Tailwind rejected it with %q", testCase.Input, *testCase.Message)
 			}
 
 			var syntaxError *CssSyntaxError
@@ -253,7 +253,7 @@ func TestParseCssRejectsWhatTheEngineRejects(test *testing.T) {
 		})
 	}
 
-	test.Logf("rejected %d malformed stylesheets that the engine also rejects", rejected)
+	test.Logf("rejected %d malformed stylesheets that Tailwind also rejects", rejected)
 }
 
 // TestParseCssCustomPropertyWhitespaceIsRaw states, on its own, the behaviour this component exists
@@ -293,9 +293,9 @@ func TestParseCssCustomPropertyWhitespaceIsRaw(test *testing.T) {
 }
 
 // TestParseCssReadsRealStylesheets states the exit criterion as a test: the port reproduces what
-// the engine sees across a real repository's theme and its whole @import graph.
+// Tailwind sees across a real repository's theme and its whole @import graph.
 //
-// The counts are the engine's, recorded at generation time, and are recomputed here from this
+// The counts are Tailwind's, recorded at generation time, and are recomputed here from this
 // port's own trees. Asserting they agree is what makes "it parsed without erroring" mean something.
 func TestParseCssReadsRealStylesheets(test *testing.T) {
 	test.Parallel()
@@ -338,17 +338,17 @@ func TestParseCssReadsRealStylesheets(test *testing.T) {
 		test.Errorf("read %d stylesheets, corpus holds %d", stylesheets, corpus.StylesheetCount)
 	}
 	if themeEntries != corpus.ThemeEntryCount {
-		test.Errorf("found %d @theme entries, the engine found %d", themeEntries, corpus.ThemeEntryCount)
+		test.Errorf("found %d @theme entries, Tailwind found %d", themeEntries, corpus.ThemeEntryCount)
 	}
 	if utilityBlocks != corpus.UtilityBlockCount {
-		test.Errorf("found %d @utility blocks, the engine found %d", utilityBlocks, corpus.UtilityBlockCount)
+		test.Errorf("found %d @utility blocks, Tailwind found %d", utilityBlocks, corpus.UtilityBlockCount)
 	}
 	if customVariants != corpus.CustomVariantCount {
-		test.Errorf("found %d @custom-variant rules, the engine found %d", customVariants, corpus.CustomVariantCount)
+		test.Errorf("found %d @custom-variant rules, Tailwind found %d", customVariants, corpus.CustomVariantCount)
 	}
 
 	test.Logf(
-		"across %d real stylesheets: %d @theme entries, %d @utility blocks, %d @custom-variant rules, each matching the engine",
+		"across %d real stylesheets: %d @theme entries, %d @utility blocks, %d @custom-variant rules, each matching Tailwind",
 		stylesheets, themeEntries, utilityBlocks, customVariants,
 	)
 }

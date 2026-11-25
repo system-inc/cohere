@@ -250,7 +250,7 @@ var NoRedeclare = rule.Rule[NoRedeclareOptions]{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				// The engine hands every rule a nil checker when the program could not be built.
+				// The linter hands every rule a nil checker when the program could not be built.
 				// This rule reads the binder's scope tables, which only exist on a bound program,
 				// so without one there is nothing to group and the honest answer is silence.
 				if ruleContext.TypeChecker == nil {

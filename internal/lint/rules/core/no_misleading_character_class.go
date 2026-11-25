@@ -27,7 +27,7 @@ var messageMisleadingSurrogatePair = rule.Message{
 var messageMisleadingSurrogatePairWithoutUnicodeFlag = rule.Message{
 	Id: "surrogatePairWithoutUFlag",
 	Description: "This character class holds an astral character while the pattern has neither the " +
-		"u nor the v flag, so the engine reads it as its two UTF-16 halves and the class matches " +
+		"u nor the v flag, so the runtime reads it as its two UTF-16 halves and the class matches " +
 		"either half alone. `/[👍]/` matches the two lone surrogates that spell it and never the " +
 		"emoji; adding the flag is what makes the class mean the character it looks like.",
 }
@@ -139,9 +139,9 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 //
 // A pattern written as a string carries one more layer of escaping than a literal does, and that
 // layer is the rule's sharpest edge upstream. `new RegExp("[\\uD83D\\uDC4D]")` passes the regex
-// engine the six characters `\uD83D`, so the regex sees an escape; `new RegExp("[👍]")`
+// runtime the six characters `\uD83D`, so the regex sees an escape; `new RegExp("[👍]")`
 // passes it the astral character itself. Both report, and they report for different reasons. This
-// port reads the string's cooked value, which is what the engine receives, so both land on the same
+// port reads the string's cooked value, which is what the runtime receives, so both land on the same
 // path and the distinction upstream draws between them does not need to be redrawn here.
 //
 // # allowEscape
@@ -295,10 +295,10 @@ func checkRegExpConstructorCall(
 }
 
 // checkRegexPatternInStringLiteral checks a pattern that reached the constructor as a string, where
-// the text the engine sees and the text on disk are two different strings.
+// the text the runtime sees and the text on disk are two different strings.
 //
 // The pattern checked is the literal's cooked value, because that is what the RegExp constructor
-// receives: `"[\\uD83D\\uDC4D]"` hands the engine a backslash and the letters, and `"[👍]"` hands it
+// receives: `"[\\uD83D\\uDC4D]"` hands the runtime a backslash and the letters, and `"[👍]"` hands it
 // the character. Both are correct inputs to the class scanner.
 //
 // But a finding has to point at the file, and cooked offsets are not file offsets. `"[á]"` is
@@ -406,7 +406,7 @@ func checkRegexPattern(
 // reporter, which decides where in the file it lands.
 //
 // The two callers differ only in that translation: a regex literal's pattern offsets are file
-// offsets plus a constant, and a string literal's are not, because the text the engine sees was
+// offsets plus a constant, and a string literal's are not, because the text the runtime sees was
 // decoded from the text on disk. Keeping the search in one place is what stops the two from drifting
 // into two slightly different rules.
 func checkRegexPatternWithReporter(
@@ -501,7 +501,7 @@ type misleadingCharacter struct {
 //   - the class itself ending. Two classes side by side are two runs, which is why
 //     `/[‌][‍][a]/` is clean while `/[‌‍]/` is not.
 //
-// Under no unicode flag an astral character occupies two UTF-16 code units and the engine treats
+// Under no unicode flag an astral character occupies two UTF-16 code units and the runtime treats
 // each as its own class member, so it is expanded here into its surrogate halves. That expansion is
 // the entire without-flag surrogate finding, and it is done in the rule rather than in the shared
 // scanner because it is a question about what this rule means by adjacency rather than about how the
@@ -527,7 +527,7 @@ func characterSequences(
 
 	appendCharacter := func(value uint32, start int, end int, isCodePointEscape bool) {
 		escaped := source != nil && isAcceptableEscape(source(start, end), value)
-		// Under no unicode flag the engine sees UTF-16 code units, so an astral character is two
+		// Under no unicode flag the runtime sees UTF-16 code units, so an astral character is two
 		// members rather than one. Neither half has source text of its own, and where each points is
 		// ESLint's UTF-16 span moved onto bytes: the high half is the empty place where the character
 		// starts and the low half is the whole character. So a pair of halves points at the whole
@@ -712,7 +712,7 @@ func misleadingSequenceFindings(sequence []misleadingCharacter) []pendingMislead
 // changes what the rest of the pattern means. Under `u` an identity escape like `\a` is a syntax
 // error, a lone `{` is a syntax error, and `\p{L}` stops being the letters `p{L}` and becomes a
 // property escape. So the edit can turn a working pattern into one that throws at parse time, and a
-// rewrite that can break the file is a thing a human chooses rather than a thing the engine applies
+// rewrite that can break the file is a thing a human chooses rather than a thing the runtime applies
 // while nobody is looking.
 //
 // Upstream reaches the same conclusion and declares the rule `suggestion` rather than `fix`. It also

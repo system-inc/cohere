@@ -1,4 +1,4 @@
-// Command generate_statics turns the engine's own static-utility registrations into Go.
+// Command generate_statics turns Tailwind's own static-utility registrations into Go.
 //
 // Usage:
 //
@@ -99,11 +99,11 @@ func main() {
 		systems = append(systems, file)
 	}
 
-	// One Tailwind, or the comparison is between two different engines and proves nothing.
+	// One Tailwind, or the comparison is between two different Tailwind versions and proves nothing.
 	for index := 1; index < len(systems); index++ {
 		if systems[index].TailwindVersion != systems[0].TailwindVersion {
 			fail(
-				"inputs were generated against different Tailwind versions (%s and %s); a check run against a different engine than the table came from cannot detect a difference in the table",
+				"inputs were generated against different Tailwind versions (%s and %s); a check run against a different Tailwind than the table came from cannot detect a difference in the table",
 				systems[0].TailwindVersion,
 				systems[index].TailwindVersion,
 			)
@@ -266,7 +266,7 @@ package tailwind
 // FrameworkStaticDeclarations is the compiled body of every static utility the framework registers.
 //
 // Keyed by class name. The value is the declaration sequence in the order PropertySort visits it,
-// which is the order the engine emitted, so a consumer walks it rather than re-deriving one.
+// which is the order Tailwind emitted, so a consumer walks it rather than re-deriving one.
 var FrameworkStaticDeclarations = map[string][]StaticDeclaration{
 `, systems[0].TailwindVersion, len(systems), strings.Join(sources, ", "),
 		len(shared), len(dropped), strings.Join(firstFew(dropped, 3), ", "))

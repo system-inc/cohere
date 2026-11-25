@@ -10,11 +10,11 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// Inputs are the paths a load read to decide what it returned, which the engine writes as its inputs record so the
-// front door can replay a verdict without starting the engine when none of them has moved. The front door cannot see
+// Inputs are the paths a load read to decide what it returned, which cohere-go writes as its inputs record so the
+// front door can replay a verdict without starting cohere-go when none of them has moved. The front door cannot see
 // these reads: `go list` runs in a subprocess, and the load parses in this one.
 //
-// The standing rule: whatever the load reads to decide a verdict, and whatever a later cache of the engine's reads,
+// The standing rule: whatever the load reads to decide a verdict, and whatever a later cache of cohere-go's reads,
 // is named here. A read left out is a replay that goes stale without a word, and a path named that did not matter
 // only costs a miss, so when in doubt a path is named. TestInputsHoldEveryFileTheLoadListed holds Files to the
 // load's own package lists, so a loader that reads more fails it rather than going stale.
@@ -148,7 +148,7 @@ func collectInputs(
 // listable reports whether a directory's listing may be an input: a walked root or inside one, above no module root,
 // which a replacement by a parent directory would be, and outside the build cache, which `GOCACHE` can put inside a
 // module and go writes during the run. The walk never enters a directory whose name starts with `.`, so the root's
-// `.cache`, where the front door and the engine write, is never one.
+// `.cache`, where the front door and cohere-go write, is never one.
 func listable(directory string, moduleRoots map[string]bool, walked []string, buildCache string) bool {
 	for root := range moduleRoots {
 		if inside(directory, root) {

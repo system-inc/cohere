@@ -1,10 +1,10 @@
 // Package build_dependence computes which of the host's package-level declarations an extra build (linux, windows, a
-// tag build) can change, so the engine can judge each declaration once and redo only the build-dependent ones per build
+// tag build) can change, so cohere-go can judge each declaration once and redo only the build-dependent ones per build
 // (#ewgh523, #qkq4gx5). A unit is a FuncDecl, a TypeSpec or a ValueSpec, several names of one spec making one unit. It
 // is build-dependent in a build when its file is not one both builds compile, or it hangs on the C side of a package
 // the host's cgo tool or the build's translated (cgo_files.go), when an object it declares reaches a build-dependent
 // object, or when its body uses one by a kind of use the change can reach: a type whose only change is its underlying
-// type counts only where the use touches the underlying, as the engine's reads already judge (#mjdf7ah).
+// type counts only where the use touches the underlying, as cohere-go's reads already judge (#mjdf7ah).
 //
 // Each named type has two bits, its name bit and its underlying bit; every other object has one, its name bit. The
 // graph is built from the host's packages while their syntax and type information are live, and keeps only what a
@@ -164,7 +164,7 @@ func NewDeclarationsGraph() *Graph {
 }
 
 // AddPackage records loaded's units and their edges. It is called while loaded's syntax and TypesInfo are live, since
-// the engine releases them when the package's rules end, and once it returns the graph holds no syntax node and no type
+// cohere-go releases them when the package's rules end, and once it returns the graph holds no syntax node and no type
 // maps of it. workspace says whether loaded belongs to the checked modules, its test variants included, or is a
 // dependency, which only the counts tell apart. withheld are the positions, "file:line:column" as the load gives them
 // (load.PackageWithheld.Declarations), of the declarations the load gave the analyzers without their bodies or initial
@@ -358,7 +358,7 @@ func (graph *Graph) Seal() {
 // that unlocks in a defer, so the panic leaves the lock free.
 func (graph *Graph) refuseSealed(tried string) {
 	if graph.sealed {
-		// Invariant: the engine adds every package and writes every record the store keeps before it seals the graphs
+		// Invariant: cohere-go adds every package and writes every record the store keeps before it seals the graphs
 		// (otherBuilds seals them after awaitStandardLibrary), so a call after Seal is the caller's ordering bug.
 		panic("build_dependence: a caller tried to " + tried + " after the graph was sealed (Graph.Seal), which " +
 			"let go of what resolving and encoding read, so the caller's order is wrong: every package is added " +
@@ -372,7 +372,7 @@ func (graph *Graph) refuseSealed(tried string) {
 func refuseDeclarationsOnly(declarationsOnly bool, tried string, wrong string) {
 	if declarationsOnly {
 		// Invariant: a declarations-only graph is made for its objects' bits alone, which stage 2 of the
-		// declaration-grain checker joins with its typed uses (#w72zxtq), and the engine's verdicts, counts and call
+		// declaration-grain checker joins with its typed uses (#w72zxtq), and cohere-go's verdicts, counts and call
 		// index all come from the whole graphs it makes (pipeline_build_dependence.go), so a caller that asks one for
 		// any of them is the caller's bug, and a quiet answer would be a wrong one.
 		panic("build_dependence: a caller tried to " + tried + " a declarations-only graph " +

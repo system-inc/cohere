@@ -7,7 +7,7 @@ import (
 )
 
 // consistencyNoLabelText is the rule's message, whose wording lives in `policy/messages/consistency-no-label.json`,
-// shared with the Go engine's twin.
+// shared with cohere-go's twin.
 var consistencyNoLabelText = policy.MessageOf("nexus/consistency-no-label", "label")
 
 // ConsistencyNoLabel bans labels: every labeled statement is reported once, on its label.
@@ -22,14 +22,14 @@ var consistencyNoLabelText = policy.MessageOf("nexus/consistency-no-label", "lab
 // boolean the loop tests.
 //
 // Labels are banned in every language, with one finding per label, at the label's declaration (Kirk, 2026-11-06,
-// #4b337jk), which is the Go engine's cohere-go/consistency-no-label judgment, so the two report the same thing in
+// #4b337jk), which is cohere-go's cohere-go/consistency-no-label judgment, so the two report the same thing in
 // the same place with the same message. ESLint's `no-labels`, which this replaces in the style set, covered the whole
 // labeled statement, the loop included, and reported each `break` and `continue` naming the label as well, so one
 // label read as three findings. The jumps are not findings here: removing the label is the one repair, and it
 // removes them with it.
 //
 // Every labeled statement is reported, whatever it labels and wherever it sits, nested functions included, so there
-// is no `allowLoop` or `allowSwitch`: an option exempting one kind would let a project's engines disagree.
+// is no `allowLoop` or `allowSwitch`: an option exempting one kind would let a project's languages disagree.
 //
 // No fix: removing a label means restructuring the control flow it names, which is a rewrite rather than a spelling
 // change.

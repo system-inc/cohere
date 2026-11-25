@@ -38,7 +38,7 @@ var messageNoEval = rule.Message{
 		"A direct call also runs that code with full access to the surrounding scope, so any part " +
 		"of the string an attacker controls becomes an injection into this function's locals. It " +
 		"defeats every static tool that would otherwise see what the program does, and it is slow " +
-		"because the engine cannot optimize a scope it may rewrite. For JSON use JSON.parse; for " +
+		"because the runtime cannot optimize a scope it may rewrite. For JSON use JSON.parse; for " +
 		"dynamic property access use bracket notation; otherwise restructure so nothing is " +
 		"evaluated from a string.",
 }
@@ -87,7 +87,7 @@ var messageNoEval = rule.Message{
 //
 // The direct-call arm is deliberately *not* gated on resolution, matching upstream: `function
 // foo(eval) { eval('foo') }` is a fail case in the corpus. A call whose callee is spelled `eval` is
-// a direct eval to the engine's own grammar regardless of what the name binds to, so the syntactic
+// a direct eval to the runtime's own grammar regardless of what the name binds to, so the syntactic
 // test is the correct one there and the resolution test would be wrong.
 //
 // # Divergence from upstream, stated rather than silent

@@ -123,7 +123,7 @@ func TestWriterWritesOneLinePerRecordWithKindFirst(test *testing.T) {
 	}
 }
 
-// TestFixRecordListsNoChangedFilesAsAnEmptyList keeps an engine that wrote nothing from reading, at the
+// TestFixRecordListsNoChangedFilesAsAnEmptyList keeps a child that wrote nothing from reading, at the
 // front door, as one that did not say what it wrote.
 func TestFixRecordListsNoChangedFilesAsAnEmptyList(test *testing.T) {
 	test.Parallel()

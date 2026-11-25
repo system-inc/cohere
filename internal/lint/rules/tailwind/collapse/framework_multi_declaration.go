@@ -13,8 +13,8 @@
 // The earlier waves emit one declaration, so naming its property is enough and PropertySort computes
 // the rest. These do not, and the source cannot be read to find out how many. Twenty-one of them
 // match one pattern in `utilities.ts` (a properties wrapper, a `--tw-*` declaration, a final
-// declaration), and extracting that pattern predicts they all read alike. Measured against the
-// engine, they do not:
+// declaration), and extracting that pattern predicts they all read alike. Measured against
+// Tailwind, they do not:
 //
 //	grayscale     [334,339]#2      one --tw- variable plus filter
 //	skew-3        [69,70,71]#3     writes both --tw-skew-x and --tw-skew-y

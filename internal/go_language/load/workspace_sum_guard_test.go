@@ -95,7 +95,7 @@ func TestEveryGoCommandOfALoadLeavesAStaleGoWorkSumAsItWas(test *testing.T) {
 	}
 }
 
-// loadUnderTest loads the stale workspace's patterns under goEnvironment, as the engine's load does.
+// loadUnderTest loads the stale workspace's patterns under goEnvironment, as cohere-go's load does.
 func loadUnderTest(test *testing.T, goEnvironment *GoEnvironment, workspace string) {
 	test.Helper()
 	if _, loadError := PackagesCached(workspace, stalePatterns, goEnvironment.environment, nil,

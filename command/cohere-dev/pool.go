@@ -377,7 +377,7 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 // One cost, found by @system_cohere_go on 2026-11-05: under -trimpath the cache key for a main-module package
 // leaves out its directory, so a cgo translation cached from one worktree comes back in another carrying the
 // first one's `//line` paths, which may name files that are gone. cohere has no cgo outside fixtures. A
-// package that adds some should be tested with -trimpath=false, as the Go engine's load does.
+// package that adds some should be tested with -trimpath=false, as cohere-go's load does.
 func budgetEnvironment(base []string, token int, shape poolShape) []string {
 	environment := make([]string, 0, len(base)+3)
 	flags := []string{}

@@ -178,7 +178,7 @@ func TestRequireDescriptionReadsTheSeparatorAsEsLintDoes(test *testing.T) {
 }
 
 // TestRequireDescriptionMatchesUpstreamOnCommentShapes is every other shape the oracle was asked
-// about where upstream's parser decides, so both engines agree.
+// about where upstream's parser decides, so both linters agree.
 func TestRequireDescriptionMatchesUpstreamOnCommentShapes(test *testing.T) {
 	test.Parallel()
 	runRequireDescriptionCases(test, []requireDescriptionCase{
@@ -202,7 +202,7 @@ func TestRequireDescriptionMatchesUpstreamOnCommentShapes(test *testing.T) {
 			sourceText: "/* eslint-disable */\nfoo();\n// eslint-disable-next-line -- why\nbar();\n/* eslint-enable */",
 			wantSpans:  []string{"/* eslint-disable */", "/* eslint-enable */"},
 		},
-		// Not directives in either engine.
+		// Not directives in either linter.
 		{sourceText: "/** eslint-disable */"},
 		{sourceText: "/* eslint-disabled */"},
 		{sourceText: "const s = '/* eslint-disable */';"},
@@ -289,7 +289,7 @@ func TestRequireDescriptionCoversWhatCohereHonors(test *testing.T) {
 		{sourceText: "/*\n * eslint-disable\n */", wantSpans: []string{"/*\n * eslint-disable\n */"}},
 		{sourceText: "/* eslint-disable-line\n */", wantSpans: []string{"/* eslint-disable-line\n */"}},
 		// A scope word must end at whitespace or the end of the comment, as in ESLint, so this is not a
-		// directive to either engine.
+		// directive to either linter.
 		{sourceText: "/* eslint-disable-next-line, foo */"},
 		{sourceText: "// eslint-disable -- generated", options: ``},
 		{sourceText: "// eslint-disable", options: `{"ignore":["eslint-disable"]}`},

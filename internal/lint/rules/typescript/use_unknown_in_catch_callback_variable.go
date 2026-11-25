@@ -104,7 +104,7 @@ import (
 //
 // Upstream declares `hasSuggestions` and no `fixable`, so every repair here needs a human. That is
 // right: rewriting a callback's error type changes what the body is allowed to do with it, and the
-// body will usually stop compiling until the author narrows. The engine must not do that unattended.
+// body will usually stop compiling until the author narrows. The linter must not do that unattended.
 //
 // The annotation-replacement span is the one piece of arithmetic that is not a node. Our type node
 // starts after the colon and carries leading trivia, so replacing it would produce `err:: unknown`

@@ -388,7 +388,7 @@ func reportPreferIncludesRegexTest(ruleContext rule.Context, node *ast.Node) {
 // Upstream emits four edits that together delete everything outside the argument, optionally wrap
 // the argument in parentheses, and append the `includes` call. One replacement over the same span
 // writes the identical text and cannot leave a half-applied pair behind, which matters because the
-// fix engine flattens a diagnostic's fixes into independent proposals and may admit one and refuse
+// fix pass flattens a diagnostic's fixes into independent proposals and may admit one and refuse
 // another.
 //
 // Nothing type-bearing lives in the replaced span. The span is the whole call expression, and every

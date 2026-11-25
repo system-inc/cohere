@@ -11,7 +11,7 @@ import (
 )
 
 // The Tailwind fixers compose: a shuffled, duplicated, badly spaced literal reaches the plugin's text
-// through the real edit engine, in a bounded number of passes, with nothing refused.
+// through the real edit Tailwind, in a bounded number of passes, with nothing refused.
 //
 // Each fixer used to rewrite the whole literal, so on one literal only one of them landed per pass and
 // the rest were refused as overlapping: 6,847 refusals on the perturbed ahra corpus and 8,517 on
@@ -126,11 +126,11 @@ func proposeFromTailwindFixers(test *testing.T) edit.Propose {
 		diagnostics = append(diagnostics, whitespace.Diagnostics...)
 		diagnostics = append(diagnostics, deprecated.Diagnostics...)
 
-		// The typed fixture writes the file trimmed, with one newline after it, so its offsets are the
-		// engine's only while the text has no leading whitespace. Asserted rather than assumed: a
+		// The typed fixture writes the file trimmed, with one newline after it, so its offsets are
+		// Tailwind's only while the text has no leading whitespace. Asserted rather than assumed: a
 		// mismatch would move every order fix.
 		if ordered.SourceFile == nil || !strings.HasPrefix(ordered.SourceFile.Text(), text) {
-			test.Fatalf("the order rule read different text from the engine's")
+			test.Fatalf("the order rule read different text from Tailwind's")
 		}
 		return edit.ProposalsFrom(diagnostics), nil
 	}

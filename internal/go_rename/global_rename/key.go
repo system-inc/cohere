@@ -2,7 +2,7 @@
 // types, constants and variables, struct fields, methods, type parameters and labels, across every package
 // and test variant of a loaded workspace. It refuses any rename that would change what some identifier or
 // selector resolves to, change which interfaces a type satisfies, change a key an encoder writes, or touch a
-// file it may not edit. Locals go through the rename package's engine first and are then verified here
+// file it may not edit. Locals go through the rename package first and are then verified here
 // together with everything else, since a renamed local and a renamed package-level name can meet.
 package global_rename
 

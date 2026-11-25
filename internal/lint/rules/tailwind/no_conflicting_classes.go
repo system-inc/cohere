@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 func messageConflictingClasses(className string, conflicting []string, properties []string) rule.Message {
@@ -67,7 +67,7 @@ type NoConflictingClassesOptions struct {
 // each class. A port emitting one finding per pair under-reports by half.
 //
 // The fix is a Suggestion rather than a Fix, deliberately. Removing either class changes what
-// renders, and only the author knows which one was meant. The edit engine never applies
+// renders, and only the author knows which one was meant. The edit Tailwind never applies
 // suggestions, so this is the difference between a repair a human chooses and one that silently
 // picks for them.
 var NoConflictingClasses = rule.Rule[NoConflictingClassesOptions]{
@@ -286,7 +286,7 @@ func conflictFindingsIn(distinct []string, designSystem DesignSystemResult) []co
 // wrapper. A nested selector written inside one compiles to a rule node carrying no top-level
 // declaration, which `repositoryClassFacts` declines before this is consulted.
 func selectorShapeOf(rootOrName string) string {
-	return tailwindengine.SelectorShapeForRoot(rootOrName)
+	return tailwindcollapse.SelectorShapeForRoot(rootOrName)
 }
 
 // looksLikeLength reports whether an arbitrary value is a measurement rather than a color.

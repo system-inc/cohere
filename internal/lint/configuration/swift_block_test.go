@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// The `swift` block is the Swift engine's (RuleConfiguration.swift): one settings file configures every
-// engine, so this loader accepts the block, leaves its insides to that engine, and refuses a block no Swift
+// The `swift` block is cohere-swift's (RuleConfiguration.swift): one settings file configures every
+// linter, so this loader accepts the block, leaves its insides to that engine, and refuses a block no Swift
 // run reads, naming the file.
 
 const swiftBlock = `"swift": {"rules": {"cohere-swift/file-length": ["error", {"max": 1}]}}`
@@ -39,7 +39,7 @@ func TestASwiftBlockLoadsAndAnUnknownKeyBesideItIsStillRefused(test *testing.T) 
 	)
 }
 
-// The Swift engine reads one file and never follows extends, so a swift block in a base configures nothing
+// cohere-swift reads one file and never follows extends, so a swift block in a base configures nothing
 // and is refused naming the base and the file extending it, on discovery's read as on Load's.
 func TestASwiftBlockInAnExtendedBaseIsRefusedNamingIt(test *testing.T) {
 	test.Parallel()
@@ -74,7 +74,7 @@ func TestASwiftBlockInASetIsRefused(test *testing.T) {
 	refusedWith(test, filepath.Join(directory, "CohereSettings.json"), `rule set cohere:swifty declares "swift"`)
 }
 
-// A swift block is read only beside a Swift project, by the engine's own rule: a regular Package.swift, a
+// A swift block is read only beside a Swift project, by the linter's own rule: a regular Package.swift, a
 // regular project.yml, or exactly one .xcodeproj. Anywhere else it is refused naming the file and its
 // directory, and a file with no swift block, or one that does not parse, is not this check's to refuse.
 func TestASwiftBlockBesideNoSwiftProjectIsRefused(test *testing.T) {

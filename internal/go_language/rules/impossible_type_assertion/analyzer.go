@@ -1,6 +1,6 @@
 // Package impossible_type_assertion is staticcheck's SA5010, an assertion from one interface to another that can
 // never hold, since both have a method of one name with signatures that contradict each other, ported onto
-// the engine's own intermediate representation (#tey4xje).
+// cohere's own intermediate representation (#tey4xje).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5010/sa5010.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the assertion's syntax, where staticcheck's
@@ -41,7 +41,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA5010",
 	"SA5010",
 	"Flags an assertion from one interface to another whose methods contradict each other: staticcheck's SA5010, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/corpus"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// The acceptance suite for the live class-order sort, measured against the engine's own answers.
+// The acceptance suite for the live class-order sort, measured against Tailwind's own answers.
 //
 // Every helper here is prefixed `classOrderLive` for the reason design_system_test.go states: several
 // agents work in this package at once, and a helper whose name does not say which component owns it
@@ -35,7 +35,7 @@ import (
 //
 // `internal/lint/rules/tailwind/collapse/testdata/variant_fixtures.json` holds 2,400 class lists captured from
 // `designSystem.getClassOrder(classes)` on the two corpus repositories, plus 37 synthetic cases built
-// to separate rules that agree on ordinary input. `sorted` is what the engine returned. Nothing here
+// to separate rules that agree on ordinary input. `sorted` is what Tailwind returned. Nothing here
 // asserts against what the Go code produces; the fixture is the authority and the Go side is the
 // thing under test.
 
@@ -59,7 +59,7 @@ type classOrderLiveCorpus struct {
 	} `json:"cases"`
 }
 
-// classOrderLiveList is one engine-sorted class list, with the design system it was captured against:
+// classOrderLiveList is one Tailwind-sorted class list, with the design system it was captured against:
 // a repository's stylesheet for a corpus case, or the stylesheet a synthetic case carries as text.
 type classOrderLiveList struct {
 	name      string
@@ -155,7 +155,7 @@ func classOrderLiveSystems(test *testing.T, lists []classOrderLiveList) map[stri
 			}
 			continue
 		}
-		system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 			EntryPoint:          entryPoint,
 			TailwindPackageRoot: packageRoot,
 		})
@@ -165,7 +165,7 @@ func classOrderLiveSystems(test *testing.T, lists []classOrderLiveList) map[stri
 		}
 		systems[list.entryPath] = DesignSystemResult{
 			System: system,
-			Table:  tailwindengine.NewTable(system),
+			Table:  tailwindcollapse.NewTable(system),
 		}
 	}
 	return systems
@@ -186,7 +186,7 @@ type classOrderLiveMeasurement struct {
 	// comparedPairs is every ordered pair within a sorted list, which is what a disagreement is
 	// counted against.
 	comparedPairs int
-	// disagreeingPairs is the pairs the rule ordered the other way from the engine.
+	// disagreeingPairs is the pairs the rule ordered the other way from Tailwind.
 	disagreeingPairs int
 	// disagreeingLists is how many lists held at least one such pair.
 	disagreeingLists int
@@ -194,7 +194,7 @@ type classOrderLiveMeasurement struct {
 	examples []string
 }
 
-// classOrderLiveMeasure sorts every corpus list with the live rule and scores it against the engine.
+// classOrderLiveMeasure sorts every corpus list with the live rule and scores it against Tailwind.
 //
 // The list is shuffled into reverse before sorting rather than being handed to the rule already
 // correct. A sort fed its own output is a sort that only has to be stable to pass, which would let a
@@ -228,7 +228,7 @@ func classOrderLiveMeasure(
 		for index, className := range ordered {
 			position[className] = index
 		}
-		// Two nulls keep source order, and the source here is the reversal, so the engine's order
+		// Two nulls keep source order, and the source here is the reversal, so Tailwind's order
 		// between them is no answer at all. Every other pair, a null against a ranked class
 		// included, is scored.
 		isUnranked := make(map[string]bool, len(unranked))
@@ -236,7 +236,7 @@ func classOrderLiveMeasure(
 			isUnranked[className] = true
 		}
 
-		// Scored pairwise against the engine's own sequence rather than by string equality, so a
+		// Scored pairwise against Tailwind's own sequence rather than by string equality, so a
 		// single misplaced class is one disagreement rather than a whole list, and the number stays
 		// comparable to the 15-of-4,265 baseline, which was also counted in pairs.
 		listDisagrees := false
@@ -249,13 +249,13 @@ func classOrderLiveMeasure(
 					continue
 				}
 				measurement.comparedPairs++
-				// The engine put leftClass first, by construction of `sorted`.
+				// Tailwind put leftClass first, by construction of `sorted`.
 				if leftPosition > rightPosition {
 					measurement.disagreeingPairs++
 					listDisagrees = true
 					if len(measurement.examples) < 8 {
 						measurement.examples = append(measurement.examples, fmt.Sprintf(
-							"%s: engine puts %q before %q; the rule reverses them",
+							"%s: Tailwind puts %q before %q; the rule reverses them",
 							list.name, leftClass, rightClass,
 						))
 					}
@@ -269,13 +269,13 @@ func classOrderLiveMeasure(
 	return measurement
 }
 
-// TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases is the half of the acceptance test the corpus
+// TestClassOrderLiveMatchesTailwindOverTheSyntheticCases is the half of the acceptance test the corpus
 // never ran (#f598zk0). The synthetic cases are the ones built to separate the depth-first rule from the
 // mask, and they carry their design system as stylesheet text rather than an entry path, so the corpus
 // test, which loads systems by entry path, dropped every one of them: they were captured and never
 // compared. Each is loaded here from its own stylesheet over the vendored tailwindcss, so they run on
 // every machine.
-func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
+func TestClassOrderLiveMatchesTailwindOverTheSyntheticCases(test *testing.T) {
 	test.Parallel()
 	var synthetic []classOrderLiveList
 	for _, list := range classOrderLiveLoadCorpus(test) {
@@ -302,7 +302,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 		if writeError := os.WriteFile(entryPoint, []byte(list.input), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}
-		system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 			EntryPoint:          entryPoint,
 			TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 		})
@@ -314,7 +314,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 
 	measurement := classOrderLiveMeasure(test, synthetic, systems)
 	test.Logf(
-		"synthetic cases vs the engine: %d disagreeing pairs of %d compared pairs across %d lists on %d stylesheets (%d classes placed, %d lists declined)",
+		"synthetic cases vs Tailwind: %d disagreeing pairs of %d compared pairs across %d lists on %d stylesheets (%d classes placed, %d lists declined)",
 		measurement.disagreeingPairs,
 		measurement.comparedPairs,
 		measurement.lists,
@@ -332,7 +332,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 			measurement.lists, len(synthetic), measurement.listsSkipped)
 	}
 	if measurement.disagreeingPairs != 0 {
-		test.Errorf("the live rule disagrees with the engine on %d of %d pairs across %d synthetic lists",
+		test.Errorf("the live rule disagrees with Tailwind on %d of %d pairs across %d synthetic lists",
 			measurement.disagreeingPairs, measurement.comparedPairs, measurement.disagreeingLists)
 	}
 }
@@ -341,7 +341,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 //
 // Reversing rather than shuffling, because a shuffle needs a seed to be reproducible and a reversal
 // is the one permutation guaranteed to disagree with the target on every separable pair. A sort that
-// recovers the engine's order from its exact opposite has been asked the question properly.
+// recovers Tailwind's order from its exact opposite has been asked the question properly.
 func classOrderLiveReversed(classes []string) []string {
 	reversed := make([]string, len(classes))
 	for index, className := range classes {
@@ -350,24 +350,24 @@ func classOrderLiveReversed(classes []string) []string {
 	return reversed
 }
 
-// TestClassOrderLiveMatchesTheEngineOverTheCorpus is the acceptance test for the swap.
+// TestClassOrderLiveMatchesTailwindOverTheCorpus is the acceptance test for the swap.
 //
-// The shipped depth-first rule disagreed with the engine on 15 of 4,265 separable pairs across 7
-// class lists, measured by `TestDepthFirstDisagreesWithTheEngineOnTheCorpus` in `internal/tailwind`.
+// The shipped depth-first rule disagreed with Tailwind on 15 of 4,265 separable pairs across 7
+// class lists, measured by `TestDepthFirstDisagreesWithTailwindOnTheCorpus` in `internal/tailwind`.
 // After the swap that must be zero, and it must be zero over a population that did not shrink, which
 // is what the placed-class floor below is for.
 //
 // The floor is a floor rather than an equality so that a fixture gaining or losing a handful of classes
 // does not fail it. Both corpora, ahra and connected, must be set for this to run, and it skips naming
 // the variable when either is not.
-func TestClassOrderLiveMatchesTheEngineOverTheCorpus(test *testing.T) {
+func TestClassOrderLiveMatchesTailwindOverTheCorpus(test *testing.T) {
 	test.Parallel()
 	lists := classOrderLiveLoadCorpus(test)
 	systems := classOrderLiveSystems(test, lists)
 	measurement := classOrderLiveMeasure(test, lists, systems)
 
 	test.Logf(
-		"live rule vs the engine: %d disagreeing pairs of %d compared pairs across %d lists "+
+		"live rule vs Tailwind: %d disagreeing pairs of %d compared pairs across %d lists "+
 			"(%d classes placed, %d lists declined)",
 		measurement.disagreeingPairs, measurement.comparedPairs, measurement.lists,
 		measurement.placedClasses, measurement.listsSkipped,
@@ -417,7 +417,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheCorpus(test *testing.T) {
 
 	if measurement.disagreeingPairs != 0 {
 		test.Errorf(
-			"the live rule disagrees with the engine on %d of %d pairs across %d lists; the swap was "+
+			"the live rule disagrees with Tailwind on %d of %d pairs across %d lists; the swap was "+
 				"supposed to take this to zero",
 			measurement.disagreeingPairs, measurement.comparedPairs, measurement.disagreeingLists,
 		)
@@ -427,13 +427,13 @@ func TestClassOrderLiveMatchesTheEngineOverTheCorpus(test *testing.T) {
 // TestClassOrderLiveStackedVariantsSortByMaskNotByDepth is the known-dirty control.
 //
 // This is the bug the swap exists to fix, stated as the smallest input that shows it. The shipped
-// rule asserted "every single variant precedes every stacked one, whatever they start with", and the
-// engine implements nothing of the kind: it ORs one bit per variant into a mask and compares masks
+// rule asserted "every single variant precedes every stacked one, whatever they start with", and
+// Tailwind implements nothing of the kind: it ORs one bit per variant into a mask and compares masks
 // numerically, so a class's position is decided by its highest-ranked variant.
 //
 // `group-hover:disabled:flex` carries two variants and mask 5. `dark:flex` carries one and mask 8.
-// The engine sorts the stacked class first, and the depth-first rule reversed it. Both fixtures are
-// the engine's own answers, quoted from variant_fixtures.json, not this port's output.
+// Tailwind sorts the stacked class first, and the depth-first rule reversed it. Both fixtures are
+// Tailwind's own answers, quoted from variant_fixtures.json, not this port's output.
 //
 // The pairs are asserted rather than merely counted so that a corpus that lost its stacked-variant
 // cases could not turn this suite green by having nothing left to disagree about.
@@ -456,7 +456,7 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(test *testing.T) {
 			name:     "and it lands between the singles rather than after them",
 			input:    []string{"dark:flex", "group-hover:disabled:flex", "hover:flex", "group-hover:flex"},
 			expected: []string{"group-hover:flex", "hover:flex", "group-hover:disabled:flex", "dark:flex"},
-			why:      "depth-first would put the two-variant class last; the engine puts it third",
+			why:      "depth-first would put the two-variant class last; Tailwind puts it third",
 		},
 		{
 			name:     "an arbitrary variant sorts after a stacked registered one",
@@ -472,7 +472,7 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(test *testing.T) {
 		},
 	}
 
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 		for _, testCase := range testCases {
 			test.Run(testCase.name, func(test *testing.T) {
 				test.Parallel()
@@ -483,7 +483,7 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(test *testing.T) {
 				}
 				ordered := append(unranked, sortClassesByKey(placeable, keys)...)
 				if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
-					test.Errorf("got %v, engine says %v: %s", ordered, testCase.expected, testCase.why)
+					test.Errorf("got %v, Tailwind says %v: %s", ordered, testCase.expected, testCase.why)
 				}
 			})
 		}
@@ -507,7 +507,7 @@ func TestClassOrderLiveReadsTheRepositoryRatherThanATable(test *testing.T) {
 	// exists nowhere in Tailwind. Asserted through HasUtility first, so a repository that renames the
 	// block fails here with a readable reason rather than further down with a confusing one.
 	const repositoryClass = "markdown-content"
-	if !designSystem.System.HasUtility(repositoryClass, tailwindengine.UtilityKindStatic) {
+	if !designSystem.System.HasUtility(repositoryClass, tailwindcollapse.UtilityKindStatic) {
 		test.Skipf("this repository no longer declares `@utility %s`, so there is nothing only it knows",
 			repositoryClass)
 	}
@@ -537,7 +537,7 @@ func classOrderLiveRepositorySystem(test *testing.T) DesignSystemResult {
 	if packageRoot == "" {
 		test.Fatalf("%s is set, but there is no installed tailwindcss beside %s", corpus.Ahra.Variable, entryPoint)
 	}
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
@@ -551,10 +551,10 @@ func classOrderLiveRepositorySystem(test *testing.T) DesignSystemResult {
 //
 // A class the design system cannot place must stop the whole literal, not be sorted around. Sorting
 // the classes that resolved would reorder correct code on the strength of a lookup that failed, and
-// the author would be asked to make a change the engine does not agree with.
+// the author would be asked to make a change Tailwind does not agree with.
 func TestClassOrderLiveDeclinesRatherThanPartiallySorting(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		_, unplaceable, resolved := classOrderKeys(
 			[]string{"items-center", "flex", "ahralia-splash"}, designSystem.System, designSystem.Table)
@@ -576,7 +576,7 @@ func TestClassOrderLiveDeclinesRatherThanPartiallySorting(test *testing.T) {
 // computed for one list is meaningless in another.
 func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		maskOf := func(classes []string, target string) string {
 			keys, unplaceable, resolved := classOrderKeys(classes, designSystem.System, designSystem.Table)
@@ -608,7 +608,7 @@ func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(test *testing.T) {
 	})
 }
 
-// TestClassOrderLiveUnrankedLeadInSourceOrder pins the one dimension the engine has no opinion on.
+// TestClassOrderLiveUnrankedLeadInSourceOrder pins the one dimension Tailwind has no opinion on.
 //
 // `getClassOrder` returns null for `group` and `peer` and for every class that compiles to nothing,
 // so the corpus agreement above says nothing about where they belong. The convention is Tailwind's
@@ -620,7 +620,7 @@ func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(test *testing.T) {
 // and must not quietly turn into a test about two ranked classes.
 func TestClassOrderLiveUnrankedLeadInSourceOrder(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
 			if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
@@ -661,7 +661,7 @@ func TestClassOrderLiveUnrankedLeadInSourceOrder(test *testing.T) {
 
 // TestClassOrderLiveDeclinesNoList pins that the rule orders every corpus list.
 //
-// `TestClassOrderLiveMatchesTheEngineOverTheCorpus` reports how many lists it declined, and a decline is
+// `TestClassOrderLiveMatchesTailwindOverTheCorpus` reports how many lists it declined, and a decline is
 // how classes leave the population, so an unexplained one is exactly the thing that would let a future
 // silence hide. This test used to name the one list the rule could not order, `ahra/list-179` on
 // `data-[show=false]:fade-out`: sixteen roots in ahra are declared both as a static `@utility` and as a
@@ -734,7 +734,7 @@ func TestClassOrderRanksByTheReadingThatCompiles(test *testing.T) {
 	} {
 		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
 		if !decided {
-			test.Errorf("%v was declined; every class in it has an engine answer", testCase.input)
+			test.Errorf("%v was declined; every class in it has Tailwind answer", testCase.input)
 			continue
 		}
 		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {

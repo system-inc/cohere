@@ -80,7 +80,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1030",
 	"SA1030",
 	"Flags a constant bit size, number base or float format given to a strconv function that the function does not "+
-		"accept: staticcheck's SA1030, ported onto the engine's own intermediate representation.",
+		"accept: staticcheck's SA1030, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

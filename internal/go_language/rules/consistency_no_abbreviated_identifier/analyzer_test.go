@@ -28,7 +28,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on full words,
 // uses, imported package names, embedded fields, and methods another package's interface or type fixes.
 //
-// flagged.go.golden is flagged.go with every offered rename applied to its declaring identifier, the engine's
+// flagged.go.golden is flagged.go with every offered rename applied to its declaring identifier, cohere-go's
 // part, renaming each reference, left out. So it shows exactly which findings offer a rename and to what: a whole
 // word, a prefix, a suffix, the millisecond word and a segment in both cases, each to its one spelling, and `ctx`, a
 // context parameter, to its caller's name. `err`, a named result, and `str`, whose advice asks for a descriptive name,
@@ -150,7 +150,7 @@ func TestAKeywordTermReadsAsAWord(test *testing.T) {
 	}
 }
 
-// renameExports is the engine's to read, so turning it on changes no finding and no rename the rule offers: the
+// renameExports is cohere-go's to read, so turning it on changes no finding and no rename the rule offers: the
 // same fixtures, wants and golden pass with it set.
 func TestRenameExportsChangesNoFinding(test *testing.T) {
 	test.Parallel()

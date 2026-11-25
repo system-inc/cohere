@@ -188,7 +188,7 @@ func TestRequireAwaitNamesTheFunction(test *testing.T) {
 // What each suggestion writes, which is the repair half of this rule.
 //
 // Every finding carries exactly one suggestion and none carries a fix, so a rule that offered its
-// repair as a fix would rewrite source the engine should only have offered to rewrite. Both halves
+// repair as a fix would rewrite source the linter should only have offered to rewrite. Both halves
 // are asserted: the count and kind of repair, and the text it writes.
 //
 // The semicolon rows are the ones to read. Removing `async` can let automatic semicolon insertion

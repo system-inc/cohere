@@ -367,7 +367,7 @@ func (lister *inProcessLister) matchLocal() ([]string, string) {
 // matchDirectory is what a local pattern naming one directory, `.` or `./sub`, names: the package in that directory,
 // by its import path in the main module the directory is in, as go list names it. A directory in no main module is a
 // doubt, and one holding no package matches nothing, which match leaves to go list. The editor's save lists its
-// file's package so (see the engine's stdinPackage).
+// file's package so (see cohere-go's stdinPackage).
 func (lister *inProcessLister) matchDirectory(pattern string) ([]string, string) {
 	directory := filepath.Join(lister.workspace, filepath.FromSlash(pattern))
 	owner := lister.moduleRootOf(directory)

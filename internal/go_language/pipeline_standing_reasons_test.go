@@ -50,29 +50,29 @@ var standingReasons = []standingReason{
 	{module: "callee-recursion", factsReach: "no-return"},
 }
 
-// runStandingReason runs the engine over a copy of the standing reasons module named with the registry's rules, under
+// runStandingReason runs cohere-go over a copy of the standing reasons module named with the registry's rules, under
 // the body reach census with `--no-cache --no-fix --build-dependence`, with the standing bodies' switch as switched,
 // and returns the pipeline, its stream, normalized, and the copy's root.
 func runStandingReason(test *testing.T, module string, switched bool) (*pipeline, string, string) {
 	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", "standing-reasons", module))
-	engine, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.standingBodies = switched
+	pipeline, stream, _ := runOverRegistered(test, root, exitFindings, rules.All(), func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.standingBodies = switched
 	}, "--no-cache", "--no-fix", "--build-dependence")
-	return engine, normalize(stream, root), root
+	return pipeline, normalize(stream, root), root
 }
 
-// taggedRun is engine's build tagged audit_b, which fails the test when the run checked none.
-func taggedRun(test *testing.T, engine *pipeline) buildRun {
+// taggedRun is pipeline's build tagged audit_b, which fails the test when the run checked none.
+func taggedRun(test *testing.T, pipeline *pipeline) buildRun {
 	test.Helper()
-	at := slices.IndexFunc(engine.buildRuns, func(run buildRun) bool {
+	at := slices.IndexFunc(pipeline.buildRuns, func(run buildRun) bool {
 		return slices.Contains(run.build.Tags, "audit_b")
 	})
 	if at < 0 {
-		test.Fatalf("the run checked no build tagged audit_b among its %d", len(engine.buildRuns))
+		test.Fatalf("the run checked no build tagged audit_b among its %d", len(pipeline.buildRuns))
 	}
-	return engine.buildRuns[at]
+	return pipeline.buildRuns[at]
 }
 
 // unrecordedOf is how many functions of the bodies run lints the facts' reach named for holding no record of each

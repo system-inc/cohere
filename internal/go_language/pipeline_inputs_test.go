@@ -45,7 +45,7 @@ func TestTheInputsRecordNamesWhatDescribingTheProjectRead(test *testing.T) {
 		}
 	}
 	unreadable := filepath.Join(root, "sub", "unreadable.go")
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request: invocation{root: root},
 		described: &describedProject{
 			workspace:  project.Workspace{Root: root},
@@ -62,7 +62,7 @@ func TestTheInputsRecordNamesWhatDescribingTheProjectRead(test *testing.T) {
 		},
 	}
 
-	record := engine.inputsRecord(loaded)
+	record := pipeline.inputsRecord(loaded)
 
 	for _, want := range []string{
 		filepath.Join(repository, ".gitignore"),
@@ -121,11 +121,11 @@ func TestTheInputsRecordNamesNoTrackedIgnoredIndexThatIsNotThere(test *testing.T
 	if makeError := os.MkdirAll(filepath.Join(root, ".git"), 0o755); makeError != nil {
 		test.Fatal(makeError)
 	}
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request:   invocation{root: root},
 		described: &describedProject{workspace: project.Workspace{Root: root}},
 	}
-	record := engine.inputsRecord(&load.Loaded{Inputs: func() load.Inputs { return load.Inputs{} }})
+	record := pipeline.inputsRecord(&load.Loaded{Inputs: func() load.Inputs { return load.Inputs{} }})
 	if !slices.Contains(record.Absent, filepath.Join(root, ".git", "index")) {
 		test.Errorf("the absent paths do not name the missing index: %q", record.Absent)
 	}
@@ -157,11 +157,11 @@ func TestTheInputsRecordNamesAWorktreesSharedExclude(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	engine := &pipeline{
+	pipeline := &pipeline{
 		request:   invocation{root: root},
 		described: &describedProject{workspace: project.Workspace{Root: root}},
 	}
-	record := engine.inputsRecord(&load.Loaded{Inputs: func() load.Inputs { return load.Inputs{} }})
+	record := pipeline.inputsRecord(&load.Loaded{Inputs: func() load.Inputs { return load.Inputs{} }})
 	shared := filepath.Join(main, ".git", "info", "exclude")
 	if !slices.Contains(record.Absent, shared) {
 		test.Errorf("the absent paths do not name the shared exclude %s: %q", shared, record.Absent)

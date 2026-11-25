@@ -8,7 +8,7 @@
 // # Why a list and not a comparator
 //
 // The shipped rule sorted with `sort.SliceStable(ordered, func(left, right int) bool { … })` over a
-// pairwise `classSortsBefore`, and that shape cannot express what the engine does. It is not a
+// pairwise `classSortsBefore`, and that shape cannot express what Tailwind does. It is not a
 // stylistic difference and it is the whole reason this file replaces a function rather than editing
 // one.
 //
@@ -24,28 +24,28 @@
 //   - **The index is a rank within a population, not a fact about a variant.** `dark` is index 3 in
 //     one list and index 1 in another, depending on what else is present. A comparator handed two
 //     classes has no population to rank within, so it has to invent one, and any per-pair population
-//     is a different population from the one the engine used.
+//     is a different population from the one Tailwind used.
 //   - **Ties collapse to a shared index.** `BuildVariantOrder` advances the index only when Compare
 //     says the next variant differs, so two variants that compare equal carry the *same bit* and
 //     their classes interleave by property rather than separating. A pairwise comparator that
 //     resolved the tie either way would separate them.
 //
 // So the population is built once over the whole literal, every class is keyed against it, and the
-// sort reads the keys. `internal/lint/rules/tailwind/tools/generate_variant/enumerate.mjs` says the same thing from the
-// engine's side: "The design system is fresh per call, because the order map is a function of
+// sort reads the keys. `internal/lint/rules/tailwind/tools/generate_variant/enumerate.mjs` says the same thing from
+// Tailwind's side: "The design system is fresh per call, because the order map is a function of
 // exactly which variants have been parsed into the design system's cache."
 //
 // # The bug this removes, measured before it was fixed
 //
 // `#nr3wtj1`. The shipped comparator asserted, at what was enforce_consistent_class_order.go:447,
-// that "every single variant precedes every stacked one, whatever they start with." The engine
+// that "every single variant precedes every stacked one, whatever they start with." Tailwind
 // implements nothing of the kind. It ORs one bit per variant into a mask and compares masks
 // numerically, so a class's position is decided by its *highest-ranked* variant and only ties on
 // that are broken by the next bit down. A stacked variant therefore sorts first whenever its
 // outermost variant is outranked by the other class's.
 //
 // Measured on the corpus before this file existed: 15 disagreeing pairs of 4,265 separable pairs
-// across 7 class lists. `ahra/list-99` is a real literal in this repository where the engine keeps
+// across 7 class lists. `ahra/list-99` is a real literal in this repository where Tailwind keeps
 // `dark:hover:bg-light-50` (mask 5, two variants) ahead of `[&_svg]:me-3` (mask 8, one variant) and
 // the shipped rule reversed them, so the rule reported a finding on correctly ordered code and
 // asked the author to break it.
@@ -64,18 +64,18 @@ import (
 	"math/big"
 	"sort"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 // classOrderKey is everything the sort needs about one class, resolved against a live design system.
 //
 // The variant half is a mask rather than a position, which is the correction this file carries. See
-// the file comment: a position implies a total order on variants that the engine does not have.
+// the file comment: a position implies a total order on variants that Tailwind does not have.
 type classOrderKey struct {
 	// mask is the variant bitmask, nil for a class carrying no variants.
 	//
 	// nil rather than a zero big.Int so that "no variants" and "variants that all ranked zero" stay
-	// distinguishable while debugging; both compare as zero, which is what the engine does.
+	// distinguishable while debugging; both compare as zero, which is what Tailwind does.
 	mask *big.Int
 	// order is the class's property indices, ascending, from the design system's own reading.
 	order []int
@@ -94,8 +94,8 @@ type classOrderKey struct {
 // can say which class caused it rather than that something did.
 func classOrderKeys(
 	classes []string,
-	system *tailwindengine.LoadedDesignSystem,
-	table *tailwindengine.Table,
+	system *tailwindcollapse.LoadedDesignSystem,
+	table *tailwindcollapse.Table,
 ) (keys map[string]classOrderKey, unplaceable string, ok bool) {
 	if system == nil || table == nil {
 		return nil, "", false
@@ -104,18 +104,18 @@ func classOrderKeys(
 	// Parse once and keep the candidates. Parsing is the expensive half and the population below
 	// needs every class's variants, so a second parse per class would double the cost of the rule's
 	// hot path to recover something already in hand.
-	candidates := make(map[string]tailwindengine.ParsedCandidate, len(classes))
-	readings := make(map[string]tailwindengine.Reading, len(classes))
-	population := make([]tailwindengine.ParsedVariant, 0, len(classes))
+	candidates := make(map[string]tailwindcollapse.ParsedCandidate, len(classes))
+	readings := make(map[string]tailwindcollapse.Reading, len(classes))
+	population := make([]tailwindcollapse.ParsedVariant, 0, len(classes))
 	for _, className := range classes {
-		parsed := tailwindengine.ParseCandidate(className, system)
+		parsed := tailwindcollapse.ParseCandidate(className, system)
 		if len(parsed) == 0 {
 			// Not a utility at all. `group` and `peer` reach here and are handled by the caller,
 			// which knows they are markers; anything else is a class outside the design system and
 			// `no-unknown-classes` is the rule with something to say about it.
 			return nil, className, false
 		}
-		// The first candidate that compiles. The engine compiles every reading of a class and ranks
+		// The first candidate that compiles. Tailwind compiles every reading of a class and ranks
 		// it by what came out, so a reading that emits nothing has no say. This took parsed[0] until
 		// #vf1hd6j's acceptance: `shadow--0` parses first as the repository's `@utility shadow--*`
 		// with value `0`, which needs a `--shadow-0` nobody declared, and second as the framework's
@@ -173,21 +173,21 @@ func classOrderKeys(
 // a present-but-declining descriptor, so `Lookup` returns false for "this table is not what answers
 // it" rather than false for "this root does not exist", and the two are otherwise identical.
 func readingFor(
-	candidate *tailwindengine.ParsedCandidate,
-	system *tailwindengine.LoadedDesignSystem,
-	table *tailwindengine.Table,
-) (tailwindengine.Reading, bool) {
+	candidate *tailwindcollapse.ParsedCandidate,
+	system *tailwindcollapse.LoadedDesignSystem,
+	table *tailwindcollapse.Table,
+) (tailwindcollapse.Reading, bool) {
 	if reading, found := table.Lookup(candidate); found {
 		return reading, true
 	}
 	return system.Utilities().Reading(candidate)
 }
 
-// sortClassesByKey orders a class list the way the engine's sort does.
+// sortClassesByKey orders a class list the way Tailwind's sort does.
 //
 // Upstream's comparator in `compile.ts`, in its own order: the variant mask, then the first
 // differing index into the property order, then more declarations first, then the class name. Each
-// step is the engine's and none of them is this port's invention.
+// step is Tailwind's and none of them is this port's invention.
 //
 // `SliceStable` rather than `Slice` because the final tiebreak is the class name and two distinct
 // classes cannot tie on it, so stability is not load-bearing for the result. It is here so that a
@@ -209,7 +209,7 @@ func sortClassesByKey(classes []string, keys map[string]classOrderKey) []string 
 		}
 
 		// The first position where the two property lists differ decides. Both are ascending, so
-		// this walks them in lockstep exactly as the engine does.
+		// this walks them in lockstep exactly as Tailwind does.
 		offset := 0
 		for offset < len(leftKey.order) &&
 			offset < len(rightKey.order) &&
@@ -235,7 +235,7 @@ func sortClassesByKey(classes []string, keys map[string]classOrderKey) []string 
 
 // compareVariantMasks orders two masks, treating a nil mask as zero.
 //
-// nil is how a class with no variants is spelled here, and zero is what the engine's `0n` gives it,
+// nil is how a class with no variants is spelled here, and zero is what Tailwind's `0n` gives it,
 // so the two must compare identically. Written out rather than allocating a zero big.Int per
 // comparison, on a path that runs once per pair of classes in every class attribute in the tree.
 func compareVariantMasks(left *big.Int, right *big.Int) int {
@@ -247,13 +247,13 @@ func compareVariantMasks(left *big.Int, right *big.Int) int {
 	case right == nil:
 		return left.Sign()
 	default:
-		return tailwindengine.CompareVariantBitmasks(left, right)
+		return tailwindcollapse.CompareVariantBitmasks(left, right)
 	}
 }
 
 // propertyIndexBeyond returns the index at a position, or a value past every real one.
 //
-// The engine uses Infinity here, so a class that ran out of properties sorts after one that still
+// Tailwind uses Infinity here, so a class that ran out of properties sorts after one that still
 // has more. A class declaring nothing at all therefore sorts last among its variant group rather
 // than first, which a control in Phase 0 got backwards and reported 365,174 spurious mismatches for
 // while the model underneath was fine.

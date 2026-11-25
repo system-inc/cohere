@@ -10,8 +10,8 @@ import (
 )
 
 // Finding is one finding as the comparison sees it: where it starts and ends, its message, the positions it relates,
-// and the fixes it suggests. The engine writes every one of them into the finding's record, so a port that differs in
-// any of them differs in what the engine prints, and two findings are the same only when all of them are.
+// and the fixes it suggests. cohere-go writes every one of them into the finding's record, so a port that differs in
+// any of them differs in what cohere-go prints, and two findings are the same only when all of them are.
 //
 // File, and every file a related entry or an edit names, is named in the fixtures by its path below their root, as
 // fixtureLoad.fileName names it, and is the path in Analyze's outcomes, since two packages can each hold a file of
@@ -48,7 +48,7 @@ type Fix struct {
 	Edits   []Edit `json:",omitempty"`
 }
 
-// Edit is one text edit of a fix, by byte offsets in its file, as the engine records one. A token.Pos would differ
+// Edit is one text edit of a fix, by byte offsets in its file, as cohere-go records one. A token.Pos would differ
 // between two loads of the same file, and an offset does not.
 type Edit struct {
 	File    string

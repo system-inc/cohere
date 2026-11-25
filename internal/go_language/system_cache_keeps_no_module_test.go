@@ -23,7 +23,7 @@ const thirdPartyModulePath = "example.com/dependency"
 func writeThirdPartyModuleProject(test *testing.T) string {
 	test.Helper()
 	// Resolved, so the module cache go env reports and the replace's directory name the files as the root's resolved
-	// path does, the engine's root being resolved (resolveRoot).
+	// path does, cohere-go's root being resolved (resolveRoot).
 	moduleCache, resolveError := filepath.EvalSymlinks(test.TempDir())
 	if resolveError != nil {
 		test.Fatal(resolveError)
@@ -87,9 +87,9 @@ func filesNaming(test *testing.T, root string, text string) []string {
 // Not parallel: it sets the go environment of the process, which every go command of the run in it reads
 func TestTheSystemCacheKeepsNoThirdPartyModule(test *testing.T) {
 	root := writeThirdPartyModuleProject(test)
-	source := standardLibrarySource{stamp: engineTestsStamp, systemCacheRoot: test.TempDir()}
-	first := runEngineWith(test, root, source, rules.All(), "--no-cache")
-	second := runEngineWith(test, root, source, rules.All(), "--no-cache")
+	source := standardLibrarySource{stamp: testsStamp, systemCacheRoot: test.TempDir()}
+	first := runWith(test, root, source, rules.All(), "--no-cache")
+	second := runWith(test, root, source, rules.All(), "--no-cache")
 	if first.counts.SystemCacheWritten == 0 || second.counts.SystemCacheWritten != 0 ||
 		second.counts.FromSystemCache != first.counts.SystemCacheWritten {
 		test.Errorf("want every entry the first run wrote a standard-library package's the second restored, and "+

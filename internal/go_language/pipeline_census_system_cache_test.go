@@ -30,21 +30,21 @@ func censusOverSystemCache(test *testing.T, filled standardLibrarySource) (censu
 	reading := readingSystemCache(filled, "")
 	censusFile := filepath.Join(test.TempDir(), "reach.txt")
 	fromSource := test.TempDir()
-	engine, stream, _ := runOverNoted(test, copyFixture(test, standardLibraryRecordsFixture), exitClean,
-		func(engine *pipeline) {
-			reading(engine)
-			engine.bodyReachCensus = censusFile
-			engine.bodyReachFromSourceRecord = fromSource
+	pipeline, stream, _ := runOverNoted(test, copyFixture(test, standardLibraryRecordsFixture), exitClean,
+		func(pipeline *pipeline) {
+			reading(pipeline)
+			pipeline.bodyReachCensus = censusFile
+			pipeline.bodyReachFromSourceRecord = fromSource
 		}, recordsSwitches...)
 	records := lintRecordOf(test, stream).Builds
-	if len(engine.buildRuns) != 2 || len(records) != 2 || engine.buildRuns[1].build.OperatingSystem != "windows" {
-		test.Fatalf("want the host's build and windows's, got %d runs and the records %+v", len(engine.buildRuns),
+	if len(pipeline.buildRuns) != 2 || len(records) != 2 || pipeline.buildRuns[1].build.OperatingSystem != "windows" {
+		test.Fatalf("want the host's build and windows's, got %d runs and the records %+v", len(pipeline.buildRuns),
 			records)
 	}
-	if engine.buildRuns[1].bodyReach == nil {
+	if pipeline.buildRuns[1].bodyReach == nil {
 		test.Fatal("windows's run has no census")
 	}
-	return censusBuild{run: engine.buildRuns[1], record: records[1]}, records[0]
+	return censusBuild{run: pipeline.buildRuns[1], record: records[1]}, records[0]
 }
 
 // reachedByLoadMode are the bodies of census the load mode rule reached first, in a signature or a body, each as the
@@ -77,7 +77,7 @@ func factsCompared(census *contract.DependenceFacts) int {
 func TestACensusBuildRestoresTheStandardLibraryAPlainRunWrote(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	_, plainStream, _ := runOverNoted(test, copyFixture(test, standardLibraryRecordsFixture), exitClean,
 		readingSystemCache(filled, ""))
 	plain := lintRecordOf(test, plainStream).Builds
@@ -140,12 +140,12 @@ func TestAPlainRunRestoresTheStandardLibraryACensusBuildWrote(test *testing.T) {
 	// served are a plain run's windows build's own findings and its stream's, over a system cache whose windows
 	// entries the run named writer wrote, under switches and configured by configure when it is not nil.
 	served := func(writer string, configure func(*pipeline), switches ...string) ([]string, []string) {
-		filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+		filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 		writerReading := readingSystemCache(filled, "")
-		_, writerStream, _ := runOverNoted(test, fixture(), exitFindings, func(engine *pipeline) {
-			writerReading(engine)
+		_, writerStream, _ := runOverNoted(test, fixture(), exitFindings, func(pipeline *pipeline) {
+			writerReading(pipeline)
 			if configure != nil {
-				configure(engine)
+				configure(pipeline)
 			}
 		}, switches...)
 		wrote := lintRecordOf(test, writerStream).Builds
@@ -154,25 +154,25 @@ func TestAPlainRunRestoresTheStandardLibraryACensusBuildWrote(test *testing.T) {
 				"standard library, got the records %+v", writer, wrote)
 		}
 		root := fixture()
-		engine, stream, _ := runOverNoted(test, root, exitFindings, readingSystemCache(filled, ""), "--no-cache")
+		pipeline, stream, _ := runOverNoted(test, root, exitFindings, readingSystemCache(filled, ""), "--no-cache")
 		restored := lintRecordOf(test, stream).Builds
-		if len(engine.buildRuns) != 2 || len(restored) != 2 ||
-			engine.buildRuns[1].build.OperatingSystem != "windows" {
+		if len(pipeline.buildRuns) != 2 || len(restored) != 2 ||
+			pipeline.buildRuns[1].build.OperatingSystem != "windows" {
 			test.Fatalf("after the %s run, want the host's build and windows's, got %d runs and the records %+v",
-				writer, len(engine.buildRuns), restored)
+				writer, len(pipeline.buildRuns), restored)
 		}
 		if restored[1].SystemCacheRestored != wrote[1].SystemCacheWritten || restored[1].SystemCacheWritten != 0 {
 			test.Errorf("after the %s run, the plain run's windows build restored %d standard-library packages from "+
 				"the system cache and wrote %d, want the %d that run's build wrote restored and none written", writer,
 				restored[1].SystemCacheRestored, restored[1].SystemCacheWritten, wrote[1].SystemCacheWritten)
 		}
-		return rawFindings(engine.buildRuns[1], root), findingLines(normalize(stream, root))
+		return rawFindings(pipeline.buildRuns[1], root), findingLines(normalize(stream, root))
 	}
 	plainOwn, plainStream := served("plain", nil, "--no-cache")
-	censusOwn, censusStream := served("census", func(engine *pipeline) {
-		engine.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
-		engine.bodyDifferential = true
-		engine.standingBodies = true
+	censusOwn, censusStream := served("census", func(pipeline *pipeline) {
+		pipeline.bodyReachCensus = filepath.Join(test.TempDir(), "reach.txt")
+		pipeline.bodyDifferential = true
+		pipeline.standingBodies = true
 	}, "--no-cache", "--no-fix", "--build-dependence")
 	if !slices.ContainsFunc(plainStream, func(line string) bool {
 		return strings.Contains(line, `"rule":"cohere-go/printf"`)
@@ -199,7 +199,7 @@ func TestAPlainRunRestoresTheStandardLibraryACensusBuildWrote(test *testing.T) {
 func TestACensusBuildThatMissesTheSystemCacheIsReachedByTheLoadMode(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	windows, host := censusOverSystemCache(test, filled)
 	if host.SystemCacheRestored == 0 || host.SystemCacheWritten != 0 {
 		test.Errorf("the host restored %d standard-library packages from the system cache and wrote %d, want it to "+
@@ -245,7 +245,7 @@ func TestACensusBuildThatMissesTheSystemCacheIsReachedByTheLoadMode(test *testin
 func TestTheFactsCensusOfABuildThatRestoredSaysWhatItLeftOut(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	fromSource, _ := censusOverSystemCache(test, filled)
 	restored, _ := censusOverSystemCache(test, filled)
 	if fromSource.record.Dependence == nil || fromSource.record.Dependence.Facts == nil ||
@@ -319,8 +319,8 @@ func TestTheFactsCensusCountsEachFactOfAPackageWithoutSyntax(test *testing.T) {
 	census := func(judged *buildJudgment, hosted map[factKey]check.ExportedFact,
 		facts []check.ExportedFact) [3]int {
 		judged.dependence, judged.shared = dependence, shared
-		engine := &pipeline{dependence: &hostDependence{graph: graph, facts: hosted}}
-		counted := engine.compareFacts(judged, facts)
+		pipeline := &pipeline{dependence: &hostDependence{graph: graph, facts: hosted}}
+		counted := pipeline.compareFacts(judged, facts)
 		return [3]int{factsCompared(counted), counted.WithoutSyntax, counted.CompiledInOne}
 	}
 	fromSource := func() *buildJudgment { return &buildJudgment{sharedPackages: map[string]bool{host.ID: true}} }

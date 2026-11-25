@@ -89,7 +89,7 @@ var messageSortVariablesSortVariables = rule.Message{
 //
 // `fixed` allows at most one repair per declaration block. Upstream reports every out-of-order
 // declarator but attaches a fix only to the first, because the first fix already sorts the whole
-// block and a second edit over the same span would be refused by the engine anyway.
+// block and a second edit over the same span would be refused by the linter anyway.
 //
 // # Sorting is by the raw comparison upstream uses, not by a locale collation
 //

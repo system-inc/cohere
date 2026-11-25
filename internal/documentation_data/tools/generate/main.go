@@ -1,5 +1,5 @@
 // Command generate writes the website's data (internal/documentation_data) into the module's documentation/data/
-// directory, and every engine's rule names into internal/rule_names. Run it from the module root:
+// directory, and every language's rule names into internal/rule_names. Run it from the module root:
 //
 //	go run ./internal/documentation_data/tools/generate                   write the files, examples read back
 //	go run ./internal/documentation_data/tools/generate -capture          write the files, examples recaptured

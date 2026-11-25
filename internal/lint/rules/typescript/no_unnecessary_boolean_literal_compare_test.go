@@ -177,7 +177,7 @@ func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(test *
 // Three things are asserted per row and each catches a different defect. The ids say which of the
 // five arms ran, and they differ only in wording. The spans say where the finding points, which is
 // the whole comparison rather than the compared expression. And the applied source says what the
-// edit engine will write unattended, which no message-id assertion can see.
+// fix pass will write unattended, which no message-id assertion can see.
 func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()
 

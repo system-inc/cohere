@@ -22,12 +22,12 @@ const (
 // back about 150ms of a prelude of about 600ms (#9wfsmqv). gofmt writes nothing, so the disk the load lists and reads
 // is the disk it found; holds no new bytes, so described.contents, which the load and the lint pass beside it read
 // (held), is never written; and resolves no root (writeRoot). What runFix does write the load never reads: the held fix
-// record and gofmt's verdicts (engine.fix), the records and the counts behind the summary (write), incomplete, and
+// record and gofmt's verdicts (pipeline.fix), the records and the counts behind the summary (write), incomplete, and
 // stderr, which the load leaves to the join (loadBesideFix). It reads the findings cache's session only through its
 // store, which keeps each entry in a file of its own. A run that writes keeps its load after gofmt, since the load must
 // read what gofmt wrote, and the editor's save formats its buffer in memory, into the bytes the load reads.
-func (engine *pipeline) loadsBesideFix() bool {
-	return engine.request.switches["no-fix"] && engine.request.stdinPath == ""
+func (pipeline *pipeline) loadsBesideFix() bool {
+	return pipeline.request.switches["no-fix"] && pipeline.request.stdinPath == ""
 }
 
 // loadBesideFix runs gofmt's check (runFix) on a goroutine of its own and the run's first load on the pipeline's, as
@@ -41,7 +41,7 @@ func (engine *pipeline) loadsBesideFix() bool {
 // long as gofmt outlasts the load, starting packages main never lints, which in
 // TestATestFunctionGoTestRefusesStopsTheLintBesideTheLoad is a 200,000-statement function whose build took a run under
 // `-race` from 17s to past 8 minutes.
-func (engine *pipeline) loadBesideFix(wraps bool, typesRead bool) (*load.Loaded, error) {
+func (pipeline *pipeline) loadBesideFix(wraps bool, typesRead bool) (*load.Loaded, error) {
 	finished := make(chan struct{})
 	var panicked any
 	go func() {
@@ -49,11 +49,11 @@ func (engine *pipeline) loadBesideFix(wraps bool, typesRead bool) (*load.Loaded,
 		// A panic is held, not raised here, so the process ends on the pipeline's goroutine, as a gofmt run there
 		// would have ended it, before any record of the load's.
 		defer func() { panicked = recover() }()
-		engine.runFix(wraps)
+		pipeline.runFix(wraps)
 	}()
-	loaded, loadError := engine.loadWorkspacePackages()
+	loaded, loadError := pipeline.loadWorkspacePackages()
 	if loadError != nil || len(loaded.Diagnostics) > 0 {
-		engine.abandonSpeculation()
+		pipeline.abandonSpeculation()
 	}
 	<-finished
 	if panicked != nil {
@@ -61,13 +61,13 @@ func (engine *pipeline) loadBesideFix(wraps bool, typesRead bool) (*load.Loaded,
 		// panic, so this one ends it too.
 		panic(panicked)
 	}
-	engine.noteFailedLoad(loadError, typesRead)
+	pipeline.noteFailedLoad(loadError, typesRead)
 	return loaded, loadError
 }
 
 // watch tells a test watching the prelude (watchPrelude) of step.
-func (engine *pipeline) watch(step preludeStep) {
-	if engine.watchPrelude != nil {
-		engine.watchPrelude(step)
+func (pipeline *pipeline) watch(step preludeStep) {
+	if pipeline.watchPrelude != nil {
+		pipeline.watchPrelude(step)
 	}
 }

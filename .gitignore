@@ -43,8 +43,8 @@
 /vendor_fixtures
 /dist/
 
-# Local caches: the graph snapshot and the rebuild cache at the root, and the Swift engine's build
-# scratch in swift/.cache, written when the engine checks itself
+# Local caches: the graph snapshot and the rebuild cache at the root, and cohere-swift's build
+# scratch in swift/.cache, written when cohere-swift checks itself
 .cache/
 
 # Operating systems and editors

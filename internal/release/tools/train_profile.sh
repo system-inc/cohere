@@ -23,9 +23,9 @@
 #   recipe  B2's, on each tree: a --no-cache run that fills the system store, then two profiled --no-cache runs over
 #           every build (the bar row), then one profiled run over an empty project store (a cold run). Each is the
 #           front door, `cohere --directory <tree>` narrowed to the Go project, checking without fixing, with
-#           `--profile <run>/front-door.pprof`: the front door writes its own profile there and each engine child's
-#           beside it, named by the engine. Only the Go engine's is kept, since its work is what the profile guides
-#   merge   `go tool pprof -proto` over the six Go engine profiles into command/cohere/default.pgo in this checkout,
+#           `--profile <run>/front-door.pprof`: the front door writes its own profile there and each binary child's
+#           beside it, named by the cohere binary. Only cohere-go's is kept, since its work is what the profile guides
+#   merge   `go tool pprof -proto` over the six cohere-go profiles into command/cohere/default.pgo in this checkout,
 #           then what it merged: each profile's samples, and the result's sha256, whose prefix `cohere --version`
 #           prints
 #
@@ -117,7 +117,7 @@ lay "$adamic" "$work/trees/adamic" "$adamicCommit"
 lay "$loom" "$work/trees/loom" "$loomCommit"
 
 # Every go command and run reads none of the caller's Go or cohere settings that change what is compiled or checked.
-clean=(env -u GOFLAGS -u GOGC -u GOMEMLIMIT -u GOARM64 -u GOWORK -u COHERE_SYSTEM_CACHE -u COHERE_PROJECT_ENGINE
+clean=(env -u GOFLAGS -u GOGC -u GOMEMLIMIT -u GOARM64 -u GOWORK -u COHERE_SYSTEM_CACHE -u COHERE_PROJECT_KIND
   GOTOOLCHAIN=local)
 
 (cd "$work/source" && "${clean[@]}" CGO_ENABLED=0 go build -trimpath -buildvcs=false -pgo=off -ldflags='-s -w' \
@@ -134,18 +134,18 @@ for tree in adamic loom; do
     fail "go mod verify failed at $tree: $(echo "$verified" | tail -n 1)"
 done
 
-# engineProfile prints the Go engine's profile among the files the run whose directory is $1 wrote beside the front
+# goProfile prints cohere-go's profile among the files the run whose directory is $1 wrote beside the front
 # door's: the one whose name holds "go" as a word of its own, as the front door names each child's file for its
-# engine. None, or more than one, prints nothing.
-engineProfile() {
-  engineProfileFound=$(ls -A "$1" | grep -v '^front-door\.pprof$' | grep -E -i '(^|[^a-z])go([^a-z]|$)')
-  [ "$(echo "$engineProfileFound" | grep -c .)" = 1 ] && echo "$1/$engineProfileFound"
+# binary. None, or more than one, prints nothing.
+goProfile() {
+  goProfileFound=$(ls -A "$1" | grep -v '^front-door\.pprof$' | grep -E -i '(^|[^a-z])go([^a-z]|$)')
+  [ "$(echo "$goProfileFound" | grep -c .)" = 1 ] && echo "$1/$goProfileFound"
 }
 
 # run runs the front door once at the tree $1 as the run named $2, narrowed to the Go project, with --profile in a
-# directory of its own and the flags after, and keeps the Go engine's profile when $3 is "keep". A run that exits 2 or
+# directory of its own and the flags after, and keeps cohere-go's profile when $3 is "keep". A run that exits 2 or
 # more checked nothing, so it refuses: a profile of that is a profile of a run nobody makes. So does a run whose
-# directory holds no Go engine profile, which is every run until the front door forwards --profile to its children.
+# directory holds no cohere-go profile, which is every run until the front door forwards --profile to its children.
 run() {
   runTree=$1
   runName=$2
@@ -155,19 +155,19 @@ run() {
   runDirectory=$work/runs/$runTree-$runName
   mkdir -p "$runDirectory" || fail "making $runDirectory"
   (cd "$runWhere" && "${clean[@]}" GOPROXY=off PWD="$runWhere" COHERE_SYSTEM_CACHE="$work/system" \
-    COHERE_PROJECT_ENGINE=Go "$work/cohere" --directory "$runWhere" --no-fix --json \
+    COHERE_PROJECT_KIND=GoModule "$work/cohere" --directory "$runWhere" --no-fix --json \
     --profile "$runDirectory/front-door.pprof" "$@" > "$runDirectory.json" 2> "$runDirectory.err")
   runCode=$?
   [ "$runCode" -le 1 ] || fail "the $runName run at $runTree exited $runCode: $(tail -n 1 "$runDirectory.err")"
-  runProfile=$(engineProfile "$runDirectory")
+  runProfile=$(goProfile "$runDirectory")
   [ -n "$runProfile" ] && [ -s "$runProfile" ] ||
-    fail "the $runName run at $runTree left no Go engine profile beside the front door's in $runDirectory (it holds:" \
-      "$(ls -A "$runDirectory" | tr '\n' ' ')). The front door doesn't forward --profile to its engine children" \
-      "yet, one file per child named by its engine, and this trains on the Go engine's alone (#r6sqd2c)"
+    fail "the $runName run at $runTree left no cohere-go profile beside the front door's in $runDirectory (it holds:" \
+      "$(ls -A "$runDirectory" | tr '\n' ' ')). The front door doesn't forward --profile to its binary children" \
+      "yet, one file per child named by its binary, and this trains on cohere-go's alone (#r6sqd2c)"
   if [ "$runKeep" = keep ]; then
     kept+=("$runProfile")
   fi
-  echo "ran $runTree $runName ($*): exit $runCode, the Go engine's profile $(basename "$runProfile")"
+  echo "ran $runTree $runName ($*): exit $runCode, cohere-go's profile $(basename "$runProfile")"
 }
 
 kept=()

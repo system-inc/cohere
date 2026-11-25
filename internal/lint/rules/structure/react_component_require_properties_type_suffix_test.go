@@ -158,7 +158,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(test *testing.T) {
 //
 //	dangling.ts(2,34): error TS2304: Cannot find name 'CardProperties'
 //
-// A fix engine's parse guard structurally cannot refuse that, because the output is syntactically
+// A fix pass's parse guard structurally cannot refuse that, because the output is syntactically
 // valid. And declaration-first is the conventional ordering, so it was the common case.
 //
 // The trade was priced as "a second finding about the same rename" when what it actually bought was
@@ -204,7 +204,7 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(test *testin
 //
 // The failure was silent and it produced uncompilable source. The usage still got its fix, so
 // `CardProps` became `CardProperties` at the call site while the declaration kept its old name, and
-// the result parses. A fix engine's parse guard structurally cannot refuse that.
+// the result parses. A fix pass's parse guard structurally cannot refuse that.
 //
 // Declaration-first is the conventional ordering, so this was the common case rather than an edge,
 // and the existing fixtures passed because on that ordering the rule emits one finding rather than
@@ -266,7 +266,7 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(test *testi
 //	TS2456: Type alias 'MenuItemProperties' circularly references itself
 //
 // Both parse. Same class as the ordering defect this rule shipped an hour earlier: valid syntax,
-// broken program, and a fix engine's refusal guard has nothing to catch.
+// broken program, and a fix pass's refusal guard has nothing to catch.
 //
 // The rule renames toward a fixed convention, so a collision is not an exotic case. Any file
 // holding both spellings has one, and holding both spellings is exactly what migrating looks like.
@@ -394,7 +394,7 @@ func TestReactComponentRequirePropertiesTypeSuffixLeavesADependencysTypeAlone(te
 
 // The fix used to rename Next's global at the parameter, and the program stopped type checking.
 //
-// `PageProps<'/x'>` became `PageProperties<'/x'>`, which parses and names nothing, so the fix engine's
+// `PageProps<'/x'>` became `PageProperties<'/x'>`, which parses and names nothing, so the fix pass's
 // parse guard had nothing to refuse. The rule now reports nothing there, so there is no fix to apply,
 // while a component of ours in the same file keeps both its findings and both its fixes: skipping the
 // dependency's type is not a silencer for the file.

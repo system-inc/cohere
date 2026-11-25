@@ -34,8 +34,8 @@ func TestRunOutputReadsRealRuns(test *testing.T) {
 			if parseRunOutputError != nil {
 				test.Fatal(parseRunOutputError)
 			}
-			if run.EngineSeconds <= 0 {
-				test.Errorf("engine seconds read %g", run.EngineSeconds)
+			if run.SummarySeconds <= 0 {
+				test.Errorf("summary seconds read %g", run.SummarySeconds)
 			}
 			if !strings.HasPrefix(run.Cache, want.cache) {
 				test.Errorf("cache read %q, want %q", run.Cache, want.cache)
@@ -54,13 +54,13 @@ func TestRunOutputReadsRealRuns(test *testing.T) {
 }
 
 // A run that did less than a developer's is refused, never timed (#7z52pqf). Both logs are real. On cohere's
-// root, a benchmark copy with no git: the Go engine refused to run and the Swift engine read no input, and
+// root, a benchmark copy with no git: cohere-go refused to run and cohere-swift read no input, and
 // only the format project between them checked anything, so a reader of the last summary alone saw the
 // Swift error but would have timed a pass had the projects printed in another order. On ahra, a copy without
 // the route types Next's dev server generates: 161 type errors, fixes held, and no rule run. And the cohere
 // root's log again with the reasons taken out of its failed projects (`error` and `phasesNotRun`), so a
 // refusal that forgets to say why is still never timed. And ahra's October tree on today's dependencies under
-// main's engine, whose 2 type errors kept lint from running though no gap says so.
+// main's cohere, whose 2 type errors kept lint from running though no gap says so.
 func TestRunOutputRefusesARunThatCheckedLess(test *testing.T) {
 	test.Parallel()
 	for name, wantReason := range map[string]string{
@@ -105,7 +105,7 @@ func TestRunOutputRefusesEachGapThatChecksLess(test *testing.T) {
 		line    string
 		refused bool
 	}{
-		"an error":                 {line: summary(`,"error":"no engine"`, ""), refused: true},
+		"an error":                 {line: summary(`,"error":"no cohere"`, ""), refused: true},
 		"phases not run":           {line: summary("", `,"phasesNotRun":["lint"]`), refused: true},
 		"a crashed file":           {line: summary("", `,"crashedFiles":1`), refused: true},
 		"a rule crash":             {line: summary("", `,"ruleCrashes":1`), refused: true},
@@ -144,7 +144,7 @@ func TestRunOutputRefusesEachGapThatChecksLess(test *testing.T) {
 	}
 }
 
-// A root of several projects is all of them, which run side by side: the longest engine time, every
+// A root of several projects is all of them, which run side by side: the longest summary time, every
 // finding, and the files every project took from the cache. The longest project is printed first here, so
 // a reader of the last summary alone reads 1.5s and 1 finding.
 func TestRunOutputReadsEveryProjectOfARoot(test *testing.T) {
@@ -156,7 +156,7 @@ func TestRunOutputReadsEveryProjectOfARoot(test *testing.T) {
 	if parseRunOutputError != nil {
 		test.Fatal(parseRunOutputError)
 	}
-	if run.EngineSeconds != 3.25 || run.Findings != 4 || run.Cache != "files 9/15" {
+	if run.SummarySeconds != 3.25 || run.Findings != 4 || run.Cache != "files 9/15" {
 		test.Fatalf("read %+v, want 3.25s, 4 findings and files 9/15", run)
 	}
 }
@@ -180,7 +180,7 @@ func TestRunOutputRefusesWhatItCannotRead(test *testing.T) {
 }
 
 // A Go project's summary names the builds it checked, and the reader keeps them in order, the host's first, for the
-// record (#ccqee0e). A summary that names none, a host-only run's or another engine's, adds none.
+// record (#ccqee0e). A summary that names none, a host-only run's or another language's, adds none.
 func TestRunOutputReadsTheBuildsAGoRunChecked(test *testing.T) {
 	test.Parallel()
 	summary := func(label string, builds string) string {

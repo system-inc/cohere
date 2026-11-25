@@ -22,11 +22,11 @@ import (
 // set it puts in scope, name by name. "Some files were in scope" is what a record that skips the wrong
 // ones also produces.
 
-// recordFixture is a project on disk with a declared submodule and an undeclared clone, and an engine
+// recordFixture is a project on disk with a declared submodule and an undeclared clone, and a child
 // that walks it for real. The record lives in the real cache table, under a home of the test's own.
 type recordFixture struct {
-	root   string
-	engine *fakeEngine
+	root      string
+	formatter *fakeFormatter
 }
 
 func newRecordFixture(test *testing.T) recordFixture {
@@ -48,11 +48,11 @@ func newRecordFixture(test *testing.T) recordFixture {
 		"projects/clone/.git/HEAD": "ref: refs/heads/main\n",
 		"projects/clone/Outer.ts":  "export const outer = 5;\n",
 	})
-	engine := &fakeEngine{handled: []string{".ts"}}
-	engine.enumerate = func(directory string) (format_files.Enumeration, error) {
-		return format_files.Enumerate(directory, engine.Handles)
+	formatter := &fakeFormatter{handled: []string{".ts"}}
+	formatter.enumerate = func(directory string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(directory, formatter.Handles)
 	}
-	return recordFixture{root: root, engine: engine}
+	return recordFixture{root: root, formatter: formatter}
 }
 
 func (fixture recordFixture) path(name string) string {
@@ -64,7 +64,7 @@ func (fixture recordFixture) path(name string) string {
 func (fixture recordFixture) scope(test *testing.T) ([]string, []string, *formatRecord, string) {
 	test.Helper()
 	record := loadFormatRecord(fixture.root)
-	scope, universe := unformattedScope(fixture.engine, record, fixture.root)
+	scope, universe := unformattedScope(fixture.formatter, record, fixture.root)
 	return fixture.relative(test, scope.FileNames), universe, record, scope.Description
 }
 
@@ -86,8 +86,8 @@ func (fixture recordFixture) relative(test *testing.T, files []string) []string 
 func (fixture recordFixture) formatEverything(test *testing.T) {
 	test.Helper()
 	record := loadFormatRecord(fixture.root)
-	scope, universe := unformattedScope(fixture.engine, record, fixture.root)
-	transform := record.observe(formatTransform(fixture.engine), fixture.engine.OptionsFingerprint)
+	scope, universe := unformattedScope(fixture.formatter, record, fixture.root)
+	transform := record.observe(formatTransform(fixture.formatter), fixture.formatter.OptionsFingerprint)
 	for _, fileName := range scope.FileNames {
 		if _, transformError := transform(fileName, readForTest(test, fileName), nil); transformError != nil {
 			test.Fatal(transformError)
@@ -207,7 +207,7 @@ func TestADeletedFileLeavesTheScopeAndTheRecord(test *testing.T) {
 // not
 func TestAnUnformattedFileStaysInScopeUntilItIsWritten(test *testing.T) {
 	fixture := newRecordFixture(test)
-	fixture.engine.format = func(fileName string, text string) (string, error) {
+	fixture.formatter.format = func(fileName string, text string) (string, error) {
 		return strings.ReplaceAll(text, "  ", " "), nil
 	}
 	writeTree(test, fixture.root, map[string]string{"A.ts": "export const a  = 1;\n"})
@@ -227,7 +227,7 @@ func TestAnUnformattedFileStaysInScopeUntilItIsWritten(test *testing.T) {
 func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
-	fixture.engine.options = func(fileName string) (string, error) {
+	fixture.formatter.options = func(fileName string) (string, error) {
 		if strings.HasSuffix(fileName, "B.ts") {
 			return "printWidth 80", nil
 		}

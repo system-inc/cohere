@@ -90,7 +90,7 @@
         },
         {
             "name": "no-system-cache",
-            "usage": "in a Go project, neither read nor write the Go engine's system cache, the standard library's entries it keeps in the user's cache directory for every project, so the standard library is computed; changes nothing in TypeScript and Swift projects yet"
+            "usage": "in a Go project, neither read nor write cohere-go's system cache, the standard library's entries it keeps in the user's cache directory for every project, so the standard library is computed; changes nothing in TypeScript and Swift projects yet"
         },
         {
             "name": "open",
@@ -107,7 +107,7 @@
         {
             "name": "profile",
             "argument": "file",
-            "usage": "write a Go CPU profile of the run to file, for go tool pprof, and the Go engine's beside it, named go"
+            "usage": "write a Go CPU profile of the run to file, for go tool pprof, and cohere-go's beside it, named go"
         },
         {
             "name": "rules",

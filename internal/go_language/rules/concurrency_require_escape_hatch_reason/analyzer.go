@@ -1,4 +1,4 @@
-// Package concurrency_require_escape_hatch_reason is the Go engine's rule that every escape hatch from Go's checks
+// Package concurrency_require_escape_hatch_reason is cohere-go's rule that every escape hatch from Go's checks
 // says why it is safe, the twin of cohere-swift/concurrency-require-escape-hatch-reason.
 //
 // Go checks that memory is reached through types and that a package's unexported names stay its own. Converting to or
@@ -48,7 +48,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "concurrency_require_escape_hatch_rea
 	"for a directive, directly above it. unsafe.Sizeof, unsafe.Alignof and unsafe.Offsetof are not judged, since "+
 	"they only measure a type.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var escapeHatchWithoutReasonMessage = policy.MessageOf(Name, "escapeHatchWithoutReason")
@@ -89,7 +89,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 		}
 		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 		if !isIndexes {
-			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// Invariant: marker's result is always its Indexes, so another is a mistake in cohere-go, and the
 			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}

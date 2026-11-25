@@ -16,7 +16,7 @@ type commandWatches struct {
 var goEnvironmentWatches = commandWatches{byWorkspace: map[string]*atomic.Int64{}}
 
 // WatchGoEnvironmentAsks counts every go env askGoEnvironment runs in workspace, absolute, until stop is called, for a
-// test holding a whole run to one ask per build. Only a test calls it; it is exported for the engine's tests, which
+// test holding a whole run to one ask per build. Only a test calls it; it is exported for cohere-go's tests, which
 // run the whole pipeline over a fixture, and keyed by workspace, since tests in one process run many workspaces at
 // once.
 func WatchGoEnvironmentAsks(workspace string) (asks *atomic.Int64, stop func()) {
@@ -32,7 +32,7 @@ var listerCommandWatches = [len(listerCommands)]commandWatches{
 
 // WatchBuildLists counts every `go list -m -json all` the lister's state runs in workspace, absolute, until stop is
 // called, for a test holding a run to one build list for every build that shares the host's (ShareModulesOf). Only a
-// test calls it; it is exported for the engine's tests, as WatchGoEnvironmentAsks is.
+// test calls it; it is exported for cohere-go's tests, as WatchGoEnvironmentAsks is.
 func WatchBuildLists(workspace string) (lists *atomic.Int64, stop func()) {
 	return listerCommandWatches[buildList].watch(workspace)
 }

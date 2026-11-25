@@ -269,9 +269,9 @@ func TestSingularWord(test *testing.T) {
 	}
 }
 
-// TestCollisionIsRejectedByTheEngine proposes index for a range key whose loop body already declares index
-// and then reads the key, and confirms the engine refuses it while a sibling loop's key is accepted.
-func TestCollisionIsRejectedByTheEngine(test *testing.T) {
+// TestCollisionIsRejectedByTheRenaming proposes index for a range key whose loop body already declares index
+// and then reads the key, and confirms global_rename refuses it while a sibling loop's key is accepted.
+func TestCollisionIsRejectedByTheRenaming(test *testing.T) {
 	test.Parallel()
 	source := `package fixture
 

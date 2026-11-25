@@ -77,7 +77,7 @@ func inputsFixtureCensus() []string {
 func loadedInputsFixture(test *testing.T) {
 	test.Helper()
 	inputsFixture.once.Do(func() {
-		inputsFixture.root, inputsFixture.failure = os.MkdirTemp("", "cohere-go-engine-inputs-")
+		inputsFixture.root, inputsFixture.failure = os.MkdirTemp("", "cohere-go-language-inputs-")
 		if inputsFixture.failure != nil {
 			return
 		}

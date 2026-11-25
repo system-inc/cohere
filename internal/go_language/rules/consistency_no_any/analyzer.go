@@ -1,4 +1,4 @@
-// Package consistency_no_any is the Go engine's rule that a declaration states the type of what it holds.
+// Package consistency_no_any is cohere-go's rule that a declaration states the type of what it holds.
 //
 // `any`, and the empty interface it names, says a value could be anything, so the compiler checks nothing about it
 // and the next reader has to find every place it is set to learn what it really is. The house states a value's type:
@@ -58,7 +58,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_any", "Flags any or i
 	"another package in the import graph, a value handed to a place whose type is no interface or taken from another "+
 	"package's declaration of the same type, a constraint, and a type written inside an expression.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry. It reads the types to tell whose a type is.
+// Rule is this rule's entry in cohere-go's registry. It reads the types to tell whose a type is.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var anyTypeMessage = policy.MessageOf(Name, "anyType")

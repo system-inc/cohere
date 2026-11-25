@@ -9,7 +9,7 @@ import (
 // walkRecord is each analyzed package's files' walk, taken as the checker finishes the package, before it lets go
 // of the package's syntax and type information (checker.Options.Finished), so the packages a run judges leave the
 // live heap as early as their dependencies do, rather than all at once when the run ends. The collector marks the
-// live heap on every cycle, and under the engine's memory cap a cold run cycles whenever the heap reaches the
+// live heap on every cycle, and under cohere-go's memory cap a cold run cycles whenever the heap reaches the
 // limit, so what stays live is what each cycle costs.
 type walkRecord struct {
 	lock  sync.Mutex

@@ -1,4 +1,4 @@
-// Package correctness_require_handled_error is the Go engine's rule that an error a call returns is handled, or
+// Package correctness_require_handled_error is cohere-go's rule that an error a call returns is handled, or
 // dropped with a reason.
 //
 // An error dropped without a word is a failure nobody will see: the file that never closed, the write that never
@@ -46,7 +46,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_handled_error", 
 	"whose error is documented never to be non-nil, such as those to a *strings.Builder, or to be kept for a later "+
 	"checked call, a *bufio.Writer's Flush, are exempt by type.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var unhandledErrorMessage = policy.MessageOf(Name, "unhandledError")
@@ -113,7 +113,7 @@ const hashPackagePath = "hash"
 var errorInterface = func() *types.Interface {
 	predeclared, isInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
 	if !isInterface {
-		// Invariant: the predeclared error is an interface in every Go this engine is built with.
+		// Invariant: the predeclared error is an interface in every Go cohere-go is built with.
 		panic("the predeclared error is not an interface")
 	}
 	return predeclared
@@ -136,7 +136,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 	if state.indexes == nil {
 		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 		if !isIndexes {
-			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// Invariant: marker's result is always its Indexes, so another is a mistake in cohere-go, and the
 			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
 			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}

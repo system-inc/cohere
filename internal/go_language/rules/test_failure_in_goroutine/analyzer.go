@@ -1,6 +1,6 @@
 // Package test_failure_in_goroutine is staticcheck's SA2002, a goroutine that calls a method of testing's T, B or F
 // that stops the test, FailNow, SkipNow or one of the methods built on them, which must be called in the test's own
-// goroutine, ported onto the engine's own intermediate representation (#tf4cb8g).
+// goroutine, ported onto cohere's own intermediate representation (#tf4cb8g).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa2002/sa2002.go, whose logic it keeps and
 // whose messages it reports word for word, from the start to the end of the go statement, where staticcheck's report
@@ -15,7 +15,7 @@
 // is another declaration, so the port asks the run's fact resolver which of its calls stop the test
 // (StoppingCallsAnalyzer, in result.go), which builds that function when first asked and keeps the answer. Judging a
 // function so needs no other declaration built before it, and what a finding rests on in another declaration's body is
-// an answer the engine holds. A function another package declares is neither read nor asked about, since the original
+// an answer cohere-go holds. A function another package declares is neither read nor asked about, since the original
 // builds no body for it.
 //
 // The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
@@ -57,7 +57,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA2002",
 	"SA2002",
 	"Flags a goroutine that calls testing.T.FailNow, SkipNow or a method built on them, which must be called in the "+
-		"test's own goroutine: staticcheck's SA2002, ported onto the engine's own intermediate representation.",
+		"test's own goroutine: staticcheck's SA2002, ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

@@ -1,5 +1,5 @@
 // cohere:copied example.com/upstream@v1.0.0 report/report.go
-// cohere:until never: a planted copy, which the copied-rules-withheld case runs the engine over.
+// cohere:until never: a planted copy, which the copied-rules-withheld case runs cohere-go over.
 
 // Package copied is a copy of upstream source. The house rule the case runs reports on every file, and its finding
 // here is withheld and counted; vet's printf finding below still reports, since a vet finding in a copy is still a

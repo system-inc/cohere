@@ -362,7 +362,7 @@ func TestBuildsForCoheresOwnCensus(test *testing.T) {
 	}
 }
 
-// hostAt is the host's build in root as the engine's loader reads it: the target, cgo and `GOFLAGS` from go env, as
+// hostAt is the host's build in root as cohere-go's loader reads it: the target, cgo and `GOFLAGS` from go env, as
 // load's constraintContext asks, with `GOFLAGS`' `-tags` as the context's tags. go env reads no package, so the
 // test's cache key needs nothing recorded for it, and the test reads no `GOFLAGS` of its own.
 func hostAt(test *testing.T, root string) Build {

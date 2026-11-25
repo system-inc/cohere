@@ -91,7 +91,7 @@ func TestTheGateFindsEveryPlantedConversion(test *testing.T) {
 
 // loadForGate loads the packages the patterns name from directory, each with the test variants go test builds of
 // it, and fails on any error, since a package that did not type-check would hide its conversions. It loads through
-// the Go engine's load from source, which runs only go env and go list -deps -json -e, so the gate runs where a
+// cohere-go's load from source, which runs only go env and go list -deps -json -e, so the gate runs where a
 // runner of prebuilt tests refuses go/packages' compiling queries; go test's synthesized main, generated and none
 // of format's own, is the one package go/packages gave that it does not.
 func loadForGate(test *testing.T, directory string, patterns ...string) []*packages.Package {

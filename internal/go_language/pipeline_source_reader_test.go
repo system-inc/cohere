@@ -88,7 +88,7 @@ func (recorder *sourceRecorder) rule() rule.Rule {
 	}
 }
 
-// runRecorded runs the engine over root with extra after `--contract 3 --root <root>`, failing the test when it
+// runRecorded runs cohere-go over root with extra after `--contract 3 --root <root>`, failing the test when it
 // refuses the run, and returns its stream and its stderr.
 func runRecorded(test *testing.T, root string, registered []rule.Rule, extra ...string) (string, string) {
 	test.Helper()
@@ -97,7 +97,7 @@ func runRecorded(test *testing.T, root string, registered []rule.Rule, extra ...
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	if exitCode := runIsolated(test, arguments, &standardOutput, &standardError, registered,
 		nil); exitCode == exitRefused {
-		test.Fatalf("the engine refused the run; stderr:\n%s", standardError.String())
+		test.Fatalf("cohere-go refused the run; stderr:\n%s", standardError.String())
 	}
 	return standardOutput.String(), standardError.String()
 }
@@ -225,11 +225,11 @@ func TestSourceReaderServesTheOverlayThenTheHeldBytesThenTheDisk(test *testing.T
 			test.Fatalf("writing %s: %v", path, writeError)
 		}
 	}
-	engine := &pipeline{described: &describedProject{contents: map[string][]byte{
+	pipeline := &pipeline{described: &describedProject{contents: map[string][]byte{
 		overlaid: []byte("package held\n"),
 		held:     []byte("package held\n"),
 	}}}
-	read := engine.sourceReader(map[string][]byte{overlaid: []byte("package overlay\n")}, nil)
+	read := pipeline.sourceReader(map[string][]byte{overlaid: []byte("package overlay\n")}, nil)
 	for path, expected := range map[string]string{
 		overlaid: "package overlay\n",
 		held:     "package held\n",

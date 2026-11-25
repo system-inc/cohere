@@ -26,7 +26,7 @@
 #            tree with a fix pending was rewritten under the bench on 2026-11-12, losing the night (#8sqsgee); the
 #            guard moved its baseline to the first quiet checking night (internal/bench_results/tools/guard)
 #   guard    the record against the baseline (Pass, Regressed, Faster or Unmeasured), or the lost night
-#   timing   one more cold run of the bench's pinned engine in the bench's copy, outside the timed runs,
+#   timing   one more cold run of the bench's pinned binary in the bench's copy, outside the timed runs,
 #            with --timing, whose rule table says which rules a slower night spent its time in: on a
 #            regressed night the ten rules whose CPU grew most against the baseline's timing
 #   tonight  <state>/tonight-<project>.json: the guard's result, the commits between the baseline and tonight
@@ -53,7 +53,7 @@
 # usage: nightly.zsh [options]
 #   --state DIR          where the baselines, verdicts, records, logs and timings live
 #                        (default ~/Library/Application Support/cohere/speed-guard)
-#   --cohere PATH        the cohere launcher, or an engine binary, the bench runs (default: `cohere` on PATH)
+#   --cohere PATH        the cohere launcher, or a cohere binary, the bench runs (default: `cohere` on PATH)
 #   --idle-floor PERCENT the share of all cores idle before and after a quiet run (default 90)
 #   --projects LIST      the projects to measure, comma-separated, from the table below (default ahra,cohere)
 #   --isolation on|off   whether the night runs the isolation tier after the benches (default on)
@@ -63,7 +63,7 @@
 # Each default can also come from the environment, COHERE_SPEED_GUARD_STATE, _COHERE, _IDLE_FLOOR, _PROJECTS,
 # _ISOLATION, _LANDING and _LIVE,
 # so a test fire of the AhraOS nerve that runs this script with no arguments (runCohereSpeedGuard) can point
-# it at a scratch state and a planted engine, never the real guard's. A flag still wins over its variable.
+# it at a scratch state and a planted binary, never the real guard's. A flag still wins over its variable.
 #
 # Exit status: 0 when every project got its tonight file, whatever its verdict, and a failing isolation tier was
 # posted, 1 otherwise. A regressed night is the guard's answer, not the script's failure, and is read from the tonight
@@ -144,7 +144,7 @@ trap 'exit 143' TERM
 # parse_timing prints a --timing output's rule table as rule and CPU milliseconds, tab-separated, sorted by
 # rule: the rows after each header whose first fields are `rule` and `cpu`, up to the blank line that ends the
 # table. A row whose CPU is not a duration (the Go analyzers' `shared:` lines) is not a rule's. A rule in two
-# tables, one per engine, is the sum of its rows.
+# tables, one per binary, is the sum of its rows.
 parse_timing() {
   awk '
     table && /^[ \t]*$/ { table = 0; next }
@@ -206,7 +206,7 @@ measure_project() {
   local bench_arguments=($reply)
   checkout=${bench_arguments[2]}
   local log=$state/logs/$night-$project.log
-  # A directory of its own for each run's record: a record's file name is its date, its engine's commit and
+  # A directory of its own for each run's record: a record's file name is its date, its binary's commit and
   # its machine, and not its project, so the projects of one night, or a night run twice, would otherwise
   # collide, and the record tool refuses to overwrite one.
   local records=$state/records/$project/$(date +%Y%m%d-%H%M%S)
@@ -244,8 +244,8 @@ measure_project() {
   fi
   local verdict=$(jq -r .verdict <<< $guard_output)
 
-  # The timing run, in the bench's copy with its pinned engine, read from the bench's log: the header names the
-  # copy and the summary names the logs directory the engine was copied into.
+  # The timing run, in the bench's copy with its pinned binary, read from the bench's log: the header names the
+  # copy and the summary names the logs directory the cohere binary was copied into.
   local timing=$state/timing/$night-$project.txt
   local timing_table=$state/timing/$night-$project.tsv
   local baseline_timing=$state/timing/baseline-$project.tsv
@@ -261,14 +261,14 @@ measure_project() {
   fi
   if [[ -z $record ]]; then
     timing_note="no timing: the night left no record to time against"
-  elif [[ ! -d $copy || ! -x $logs/cohere-engine ]]; then
-    timing_note="no timing: the bench's log names no copy or pinned engine"
+  elif [[ ! -d $copy || ! -x $logs/cohere-pinned ]]; then
+    timing_note="no timing: the bench's log names no copy or pinned binary"
   else
     (
       cd $copy || exit 1
       unset COHERE_SWIFT_ENGINE
       [[ -x $logs/cohere-swift ]] && export COHERE_SWIFT_ENGINE=$logs/cohere-swift
-      $logs/cohere-engine --json --no-fix --no-cache --timing
+      $logs/cohere-pinned --json --no-fix --no-cache --timing
     ) > $timing 2>&1
     parse_timing $timing > $timing_table
     if [[ ! -s $timing_table ]]; then

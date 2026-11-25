@@ -245,19 +245,19 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "declares no callback",
 		},
 		{
-			name: "a listener that declares the engine's own walk and the syntax walk",
+			name: "a listener that declares cohere-go's own walk and the syntax walk",
 			rule: listening(Listener{FileEnter: plantedFile,
 				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedFunction}}),
-			saying: "declares both the engine's own intermediate representation's walk and the syntax walk",
+			saying: "declares both cohere's own intermediate representation's walk and the syntax walk",
 		},
 		{
-			name: "the engine's own walk with none of its callbacks",
+			name: "cohere-go's own walk with none of its callbacks",
 			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{},
 				PackageExit: plantedPackageExit}),
 			saying: "with none of its callbacks",
 		},
 		{
-			name: "the engine's own instruction kinds with no callback",
+			name: "cohere-go's own instruction kinds with no callback",
 			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{
 				Function:     plantedFunction,
 				Instructions: []intermediate_representation.Instruction{(*intermediate_representation.Call)(nil)},
@@ -265,7 +265,7 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "has no IntermediateRepresentation.Instruction to call for them",
 		},
 		{
-			name: "the engine's own instruction kind listed twice",
+			name: "cohere-go's own instruction kind listed twice",
 			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{
 				Instruction: plantedInstruction,
 				Instructions: []intermediate_representation.Instruction{
@@ -289,7 +289,7 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "is marked SyntaxOnly and is not FileLocal",
 		},
 		{
-			name: "a syntax-only listener of the engine's own walk",
+			name: "a syntax-only listener of cohere-go's own walk",
 			rule: listening(Listener{FileLocal: true, SyntaxOnly: true,
 				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedFunction}}),
 			saying: "is marked SyntaxOnly and hears no syntax walk",

@@ -42,7 +42,7 @@ var methodLookupRules = []string{
 	"rules/consistency_no_uppercase_initialism",
 }
 
-// methodLookupRecorders are the packages under root, the go_engine directory, outside build_reads, which declares the
+// methodLookupRecorders are the packages under root, the go_language directory, outside build_reads, which declares the
 // queries, and check, which judges them, whose non-test files build a build_reads.Lookup of the Method or Interface
 // query, or of a query the source does not spell out, which could be either, each with where it does.
 func methodLookupRecorders(test *testing.T, root string) map[string][]string {

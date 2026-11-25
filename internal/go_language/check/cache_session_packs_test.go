@@ -678,10 +678,11 @@ func TestAKeyThePackHeldStaleIsServedOnAReloadAsTheRunReadIt(test *testing.T) {
 	}
 }
 
-// The project's first pack write of a run removes every pack of another engine identity, file by file and then its
-// directory, a pack's temporary file left behind among them, and keeps every pack of its own engine, another build's
-// included: each new engine would otherwise leave every pack of the one before where no run reads it (#b2t9xmf).
-func TestAPackOfAnotherEngineIsRemovedAtTheSave(test *testing.T) {
+// The project's first pack write of a run removes every pack of another executable identity, file by file and then its
+// directory, a pack's temporary file left behind among them, and keeps every pack of its own executable, another
+// build's included: each new executable would otherwise leave every pack of the one before where no run reads it
+// (#b2t9xmf).
+func TestAPackOfAnotherIdentityIsRemovedAtTheSave(test *testing.T) {
 	test.Parallel()
 
 	root := test.TempDir()
@@ -690,9 +691,12 @@ func TestAPackOfAnotherEngineIsRemovedAtTheSave(test *testing.T) {
 	if putError := store.Put(key, []byte("a record")); putError != nil {
 		test.Fatal(putError)
 	}
-	// The session's engine identity is its context's, as a session opening its pack finds it.
+	// The session's executable identity is its context's, as a session opening its pack finds it.
 	identity := packedSession(runStore(root, laterClock)).packs.byStore[0].place.Identity
-	other := cache.PackPlace{Identity: cache.PackIdentity("another engine"), Name: cache.PackName([]string{"other"})}
+	other := cache.PackPlace{
+		Identity: cache.PackIdentity("another executable"),
+		Name:     cache.PackName([]string{"other"}),
+	}
 	ours := cache.PackPlace{Identity: identity, Name: cache.PackName([]string{"another build"})}
 	for _, place := range []cache.PackPlace{other, ours} {
 		if writeError := store.WritePack(place, nil, nil); writeError != nil {
@@ -707,11 +711,11 @@ func TestAPackOfAnotherEngineIsRemovedAtTheSave(test *testing.T) {
 	}
 	written := packedOnce(test, runStore(root, laterClock), key, "a record")
 	if _, statError := os.Stat(otherDirectory); !os.IsNotExist(statError) {
-		test.Errorf("want another engine's packs and their directory removed, got %v", statError)
+		test.Errorf("want another executable's packs and their directory removed, got %v", statError)
 	}
 	for _, place := range []cache.PackPlace{ours, written} {
 		if _, refused := store.ReadPack(place); refused != "" {
-			test.Errorf("want this engine's pack %x kept, got it %s", place.Name[:2], refused)
+			test.Errorf("want cohere-go's pack %x kept, got it %s", place.Name[:2], refused)
 		}
 	}
 }
@@ -723,18 +727,18 @@ func TestEveryFieldOfTheSystemContextNamesItsPackApart(test *testing.T) {
 	test.Parallel()
 
 	context := cache.StandardLibraryContext{
-		FormatVersion: "1", EngineIdentity: "engine", Build: []string{"GOOS=linux"}, Facts: []string{"nilness"},
+		FormatVersion: "1", ExecutableIdentity: "executable", Build: []string{"GOOS=linux"}, Facts: []string{"nilness"},
 		Loader: load.LoaderSource, CgoToolchain: []string{"CC=clang"}, Goroot: "/go",
 	}
 	place := systemPackPlace(context, "project")
 	changes := map[string]func(*cache.StandardLibraryContext){
-		"FormatVersion":  func(changed *cache.StandardLibraryContext) { changed.FormatVersion += "+" },
-		"EngineIdentity": func(changed *cache.StandardLibraryContext) { changed.EngineIdentity += "+" },
-		"Build":          func(changed *cache.StandardLibraryContext) { changed.Build = []string{"GOOS=darwin"} },
-		"Facts":          func(changed *cache.StandardLibraryContext) { changed.Facts = []string{"printf"} },
-		"Loader":         func(changed *cache.StandardLibraryContext) { changed.Loader = load.LoaderCgoTranslated },
-		"CgoToolchain":   func(changed *cache.StandardLibraryContext) { changed.CgoToolchain = []string{"CC=gcc"} },
-		"Goroot":         func(changed *cache.StandardLibraryContext) { changed.Goroot = "/other/go" },
+		"FormatVersion":      func(changed *cache.StandardLibraryContext) { changed.FormatVersion += "+" },
+		"ExecutableIdentity": func(changed *cache.StandardLibraryContext) { changed.ExecutableIdentity += "+" },
+		"Build":              func(changed *cache.StandardLibraryContext) { changed.Build = []string{"GOOS=darwin"} },
+		"Facts":              func(changed *cache.StandardLibraryContext) { changed.Facts = []string{"printf"} },
+		"Loader":             func(changed *cache.StandardLibraryContext) { changed.Loader = load.LoaderCgoTranslated },
+		"CgoToolchain":       func(changed *cache.StandardLibraryContext) { changed.CgoToolchain = []string{"CC=gcc"} },
+		"Goroot":             func(changed *cache.StandardLibraryContext) { changed.Goroot = "/other/go" },
 	}
 	fields := reflect.TypeFor[cache.StandardLibraryContext]()
 	for index := range fields.NumField() {

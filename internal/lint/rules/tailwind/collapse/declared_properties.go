@@ -251,7 +251,7 @@ const (
 // property came out the same both times.
 //
 // This is upstream's own definition rather than a proxy for it. The generator that produced the
-// deleted `ComposingRoots` compiled two values through the real engine and compared declaration
+// deleted `ComposingRoots` compiled two values through the real Tailwind and compared declaration
 // text, and this is the same comparison with the same inputs.
 //
 // # The limit, and it is structural rather than a gap to fill later

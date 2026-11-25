@@ -3,7 +3,7 @@
 //
 // Nothing here is typed in. Each output reads one source the build already trusts: the rule registry
 // and what each registration declares, the rule sets cohere carries as the loader resolves them, the
-// Swift registry and verdict catalog, the Go engine's registry, the settings schemas
+// Swift registry and verdict catalog, cohere-go's registry, the settings schemas
 // internal/settings_schema renders, CHANGELOG.md, the flag set as the binary prints it, the cases the rule
 // tests assert, recorded by the capture hook in internal/lint/testing, and the benchmark runs
 // bench/quiet_machine.sh recorded in bench/results. A field no source holds yet is left out rather than
@@ -27,7 +27,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/bench_results"
 	"github.com/system-inc/cohere/internal/format/native"
-	goenginerule "github.com/system-inc/cohere/internal/go_language/rule"
+	golanguagerule "github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -60,16 +60,16 @@ type Inputs struct {
 	// SwiftVerdicts is swift/HouseRuleVerdicts.json.
 	SwiftVerdicts []byte
 
-	// SwiftRules is swift/Rules.json, the Swift engine's registry as data, which a Swift test holds to
+	// SwiftRules is swift/Rules.json, cohere-swift's registry as data, which a Swift test holds to
 	// the registry in both directions.
 	SwiftRules []byte
 
-	// GoRules is the Go engine's registry, read in process rather than from a data file, since that
-	// engine is Go and compiled into the same binary as this package.
-	GoRules []goenginerule.Rule
+	// GoRules is cohere-go's registry, read in process rather than from a data file, since that
+	// language is Go and compiled into the same binary as this package.
+	GoRules []golanguagerule.Rule
 
-	// GoFixingRules are the names of the Go rules whose findings a run without --no-fix fixes, as the engine
-	// reports them (go_engine.FixingRules), each of which must name a rule GoRules holds.
+	// GoFixingRules are the names of the Go rules whose findings a run without --no-fix fixes, as the language
+	// reports them (go_language.FixingRules), each of which must name a rule GoRules holds.
 	GoFixingRules []string
 
 	// SettingsSchemas is what internal/settings_schema renders, keyed by its path relative to the module

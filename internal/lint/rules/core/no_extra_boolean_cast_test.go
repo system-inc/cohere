@@ -1707,7 +1707,7 @@ func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(test *tes
 // character begins the `in` operator with no space in front of it, so without the trailing pad the
 // repair writes `truein x`. That parses, as a reference to an identifier named `truein`, and then
 // fails to compile against a name that does not exist. A fix producing source that parses and does
-// not compile is the one failure the edit engine structurally cannot refuse, which is what makes
+// not compile is the one failure the fix pass structurally cannot refuse, which is what makes
 // this worth a fixture rather than a comment.
 func TestNoExtraBooleanCastPadsTheTrailingTokenBoundary(test *testing.T) {
 	test.Parallel()

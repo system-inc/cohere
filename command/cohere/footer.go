@@ -154,14 +154,14 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	if summary.PackageCache != nil && (summary.PackageCache.Problems > 0 || summary.PackageCache.WriteFailed > 0) {
 		line += " • ⚠ " + summary.PackageCache.problemsSegment()
 	}
-	// A Go run that could not keep its system cache says why where people look, in one line, as the engine says it on
+	// A Go run that could not keep its system cache says why where people look, in one line, as the child says it on
 	// stderr: the run computed what the cache would have held, so the next run pays for it too, and a finding never
 	// changes for it.
 	if summary.PackageCache != nil && summary.PackageCache.SystemCacheNotKept != "" {
 		line += " • ⚠ system cache not kept: " + summary.PackageCache.SystemCacheNotKept
 	}
 	// Said apart from the time, which leaves them out, so a build is never read as checking (#ket0hrp).
-	for _, segment := range engineBuildSegments(summary.EngineBuilds) {
+	for _, segment := range programBuildSegments(summary.ProgramBuilds) {
 		line += " • " + segment
 	}
 	if segment := summary.Adamic.segment(); segment != "" {
@@ -333,7 +333,7 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ "+
 			counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
 	}
-	markers = append(markers, uncheckedEngineFileMarkers(gaps.Unchecked)...)
+	markers = append(markers, uncheckedContractFileMarkers(gaps.Unchecked)...)
 	if len(gaps.NotWritten) > 0 {
 		markers = append(markers, "⚠ not written: "+counted(len(gaps.NotWritten),
 			"file reached through a link outside the root", "files reached through a link outside the root"))
@@ -358,10 +358,10 @@ func uncheckedMarkers(summary runSummary) []string {
 	return markers
 }
 
-// uncheckedEngineFileMarkers counts a run's unchecked files in its language's noun, one marker per language in the
-// order the files first name it, "⚠ 3 Swift files not checked" or "⚠ 1 Go file not checked". A run is one engine's,
+// uncheckedContractFileMarkers counts a run's unchecked files in its language's noun, one marker per language in the
+// order the files first name it, "⚠ 3 Swift files not checked" or "⚠ 1 Go file not checked". A run is one language's,
 // so there is one marker; the noun is each file's own, so no file is ever counted in another language's words.
-func uncheckedEngineFileMarkers(files []uncheckedEngineFile) []string {
+func uncheckedContractFileMarkers(files []uncheckedContractFile) []string {
 	var languages []string
 	countByLanguage := map[string]int{}
 	for _, file := range files {
@@ -382,8 +382,8 @@ func uncheckedEngineFileMarkers(files []uncheckedEngineFile) []string {
 // for the one verdict line printed after them all.
 type overallFacts struct {
 	Total time.Duration
-	// ProjectsByEngine counts the projects checked, by the engine that checked them.
-	ProjectsByEngine map[string]int
+	// ProjectsByKind counts the projects checked, by the child that checked them.
+	ProjectsByKind map[string]int
 	// Failed is each project that found something, as its label with its exit code.
 	Failed []string
 	// Unfinished is the projects whose run did not finish, which checked nothing anyone can rely on.
@@ -395,9 +395,9 @@ type overallFacts struct {
 	// its own project too, so some files may be counted twice, and that is said here rather than only in
 	// `--verbose`'s notes (#sxs26s3).
 	CoverageUnknown int
-	// EngineBuilds are the engines this run built before its projects ran, as a coverage query does: their
+	// ProgramBuilds are the programs this run built before its projects ran, as a coverage query does: their
 	// time is in Total, and said apart from it.
-	EngineBuilds []engineBuild
+	ProgramBuilds []programBuild
 	// FolderFindings is the folders discovery's folder check reported, and FolderWarnings how many of them are
 	// warnings, which never fail the run (see folder_names.go).
 	FolderFindings int
@@ -415,15 +415,15 @@ type overallFacts struct {
 // The run is green only when every project is, and a project that did not finish is a gap, never a pass.
 func overallFooter(facts overallFacts, style textStyle) string {
 	total := 0
-	engines := make([]string, 0, len(facts.ProjectsByEngine))
-	for engine, count := range facts.ProjectsByEngine {
+	kinds := make([]string, 0, len(facts.ProjectsByKind))
+	for kind, count := range facts.ProjectsByKind {
 		total += count
-		engines = append(engines, engine)
+		kinds = append(kinds, kind)
 	}
-	sort.Strings(engines)
-	byEngine := make([]string, 0, len(engines))
-	for _, engine := range engines {
-		byEngine = append(byEngine, fmt.Sprintf("%d %s", facts.ProjectsByEngine[engine], engine))
+	sort.Strings(kinds)
+	byKind := make([]string, 0, len(kinds))
+	for _, kind := range kinds {
+		byKind = append(byKind, fmt.Sprintf("%d %s", facts.ProjectsByKind[kind], kind))
 	}
 
 	verdict := "✓ 💎 "
@@ -432,8 +432,8 @@ func overallFooter(facts overallFacts, style textStyle) string {
 		verdict = "✗ ☠️ "
 	}
 	line := style.bold(verdict+footerSeconds(facts.Total)) + " • " + counted(total, "project", "projects")
-	if len(byEngine) > 1 {
-		line += ": " + strings.Join(byEngine, ", ")
+	if len(byKind) > 1 {
+		line += ": " + strings.Join(byKind, ", ")
 	}
 	if facts.UnusedIgnores > 0 {
 		line += " • " + style.red(counted(facts.UnusedIgnores, "unused ignore pattern", "unused ignore patterns"))
@@ -455,7 +455,7 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	if segment := leftOutSegment(facts.LeftOut); segment != "" {
 		line += " • " + segment
 	}
-	for _, segment := range engineBuildSegments(facts.EngineBuilds) {
+	for _, segment := range programBuildSegments(facts.ProgramBuilds) {
 		line += " • " + segment
 	}
 	return line

@@ -107,7 +107,7 @@ func TestReportRangeWithSuggestionsCarriesBoth(test *testing.T) {
 
 // The other direction: it offers no fixes.
 //
-// A suggestion needs a human to choose it and a fix does not, and the fix engine applies only the
+// A suggestion needs a human to choose it and a fix does not, and the fix pass applies only the
 // second. A helper that quietly populated Fixes would make every suggestion an automatic rewrite,
 // which is the one distinction this whole API exists to hold.
 func TestReportRangeWithSuggestionsProposesNoFixes(test *testing.T) {

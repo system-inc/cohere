@@ -542,7 +542,7 @@ func TestNoUnescapedEntitiesLeavesEscapedEntitiesAlone(test *testing.T) {
 // applyOneSuggestion rewrites the source with one suggestion's fixes and returns the result.
 //
 // `rule_testing` applies fixes and has no equivalent for suggestions, so this exists rather than being
-// imported. Back to front, the same order the fix engine uses, so an earlier edit cannot move the
+// imported. Back to front, the same order the fix pass uses, so an earlier edit cannot move the
 // offsets a later one was computed against.
 func applyOneSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()
@@ -569,10 +569,10 @@ func applyOneSuggestion(test *testing.T, source string, suggestion rule.Suggesti
 // fix to the character survived the entire suite for exactly that reason.
 //
 // The difference is overlap. Upstream replaces the whole JsxText node, so two findings inside one
-// node carry the same range and the engine sees them as mutually exclusive. Measured on the
+// node carry the same range and the fix pass sees them as mutually exclusive. Measured on the
 // installed rule: `<div>a'b"c</div>` yields two findings whose first suggestions both carry
 // range [13,18], the node's own span. Character-scoped fixes would be disjoint and independently
-// applicable, which is a different proposal to an engine that reasons about overlap.
+// applicable, which is a different proposal to a linter that reasons about overlap.
 //
 // So this asserts the range rather than the output, because the output cannot see it.
 func TestNoUnescapedEntitiesRepairsCoverTheWholeNode(test *testing.T) {

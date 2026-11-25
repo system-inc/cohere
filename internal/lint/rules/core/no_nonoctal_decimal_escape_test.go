@@ -113,7 +113,7 @@ func TestNoNonoctalDecimalEscapeReportsEachEscape(test *testing.T) {
 //
 // An ordinary violation offers two repairs because two things could have been meant: the digit, or
 // a literal backslash before it. They are not interchangeable, which is why these are suggestions
-// rather than fixes. An engine picking one unattended would silently change the string every time
+// rather than fixes. A linter picking one unattended would silently change the string every time
 // the other was intended.
 func TestNoNonoctalDecimalEscapeOffersBothReadings(test *testing.T) {
 	test.Parallel()
@@ -141,7 +141,7 @@ func TestNoNonoctalDecimalEscapeOffersBothReadings(test *testing.T) {
 //
 // This is asserted separately from the suggestion contents because it fails in the opposite
 // direction: a rule that populated Fixes alongside Suggestions would still pass every assertion
-// above, and the engine applies Fixes unattended. That would turn a repair only the author can
+// above, and the fix pass applies Fixes unattended. That would turn a repair only the author can
 // choose into a silent rewrite of their string.
 func TestNoNonoctalDecimalEscapeProposesNoAutomaticFix(test *testing.T) {
 	test.Parallel()

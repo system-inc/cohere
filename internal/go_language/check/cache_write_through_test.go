@@ -55,7 +55,7 @@ func throughRules() []rule.Rule {
 }
 
 // throughHost is the host's run over root, with its store in storeDirectory, keeping its packages for the builds as
-// the engine's host does, once every read of them is whole.
+// cohere-go's host does, once every read of them is whole.
 func throughHost(test *testing.T, root string, storeDirectory string) *HostRun {
 	test.Helper()
 	host, _ := throughHostSession(test, root, storeDirectory)
@@ -105,9 +105,9 @@ func hostSessionWith(
 	if len(result.Crashes) > 0 {
 		test.Fatalf("running the host's build: %+v", result.Crashes)
 	}
-	// The builds judge the host's reads, which are whole only once their walks end, as the engine waits for them.
+	// The builds judge the host's reads, which are whole only once their walks end, as cohere-go waits for them.
 	result.ReadWalks.Wait()
-	// And they start only once the host's dependence sets are in, as the engine joins them before its first build
+	// And they start only once the host's dependence sets are in, as cohere-go joins them before its first build
 	// (#ybjbqm2), so a test that changes a kept entry before its build changes nothing a set is still being computed
 	// from.
 	result.Host.DependenceComputed()
@@ -115,7 +115,7 @@ func hostSessionWith(
 }
 
 // throughBuild is windows's run over root, with its store in storeDirectory, restoring from host when it is not nil,
-// and loaded again as the engine loads an extra build, until no reload is asked, with its session.
+// and loaded again as cohere-go loads an extra build, until no reload is asked, with its session.
 func throughBuild(test *testing.T, root string, storeDirectory string, host *HostRun) (*Result, *CacheSession) {
 	test.Helper()
 	return buildOf(test, root, storeDirectory, host, throughRules())
@@ -136,7 +136,7 @@ func buildOf(
 // windowsCachingAt is windows's cache in storeDirectory, keyed for rules.
 func windowsCachingAt(storeDirectory string, rules []rule.Rule) *Caching {
 	caching := cachingAt(storeDirectory, rules)
-	// The build's keys hold its target, as the engine's do, so they never meet the host's.
+	// The build's keys hold its target, as cohere-go's do, so they never meet the host's.
 	caching.Context.Build = append(caching.Context.Build, "GOOS=windows")
 	return caching
 }

@@ -229,7 +229,7 @@ func safelyShadowsUndefined(ruleContext rule.Context, name *ast.Node) bool {
 		return false
 	}
 
-	// The engine hands every rule a nil checker when the program could not be built. Without one
+	// The linter hands every rule a nil checker when the program could not be built. Without one
 	// this cannot tell a write to this binding from a write to another, and the safe direction is
 	// to decline the carve-out and report, which is what a missing checker gets here.
 	if ruleContext.TypeChecker == nil {

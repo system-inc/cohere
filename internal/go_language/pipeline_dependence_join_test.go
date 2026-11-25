@@ -35,8 +35,8 @@ func TestTheBuildsStartOnlyOnceTheHostsSetsAreComputed(test *testing.T) {
 	// A failure below still lets the held set go, so the run's pass ends.
 	defer release("the test's end")
 	runOverConfigured(test, copyFixture(test, filepath.Join("testdata", "restore-from-host")), exitFindings,
-		func(engine *pipeline) {
-			engine.keptDependence = func(*packages.Package, check.Restoring) {
+		func(pipeline *pipeline) {
+			pipeline.keptDependence = func(*packages.Package, check.Restoring) {
 				lock.Lock()
 				first := !held
 				held = true
@@ -45,8 +45,8 @@ func TestTheBuildsStartOnlyOnceTheHostsSetsAreComputed(test *testing.T) {
 					<-hold
 				}
 			}
-			engine.dependenceJoining = func() { release("the join") }
-			engine.extraBuildEnds = func(project.Build, io.Writer) error {
+			pipeline.dependenceJoining = func() { release("the join") }
+			pipeline.extraBuildEnds = func(project.Build, io.Writer) error {
 				release("a build's end")
 				return nil
 			}

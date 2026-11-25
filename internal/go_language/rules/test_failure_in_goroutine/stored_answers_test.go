@@ -36,7 +36,7 @@ func (handedAnswers) Reloaded(*types.Package) bool {
 	return false
 }
 
-// storedRun is one run of the rule over the fixtures as the engine runs it, with a store: its findings, each rendered
+// storedRun is one run of the rule over the fixtures as cohere-go runs it, with a store: its findings, each rendered
 // with its related entries, sorted, its resolver, and its hand on the answers.
 type storedRun struct {
 	roots    []*packages.Package

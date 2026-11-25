@@ -1,0 +1,155 @@
+package global_rename
+
+import (
+	"fmt"
+	"go/token"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
+
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
+)
+
+// ProvePlatform proves a plan's rewrite, overlay, under one of its Platforms, through options.LoadPlatform as the plan
+// read it: every root package that type-checks there before the rewrite must after, and every identifier in it must
+// resolve to the same declaration under its expected name, as Compare requires of the host. A load that fails is a
+// PlatformLoad mismatch, so the rewrite is never taken as proven under a platform nothing was compared under. The
+// load before the rewrite is the plan's own, fingerprinted while the plan read it and kept as its difference from the
+// host's, so only the rewrite is loaded; a platform the plan did not read, or an expectation of a workspace other
+// than the plan's, which carries no difference (Expect), loads the platform before the rewrite too.
+func ProvePlatform(
+	loaded *workspace.Workspace,
+	expectation *Expectation,
+	platform workspace.Platform,
+	overlay map[string][]byte,
+	options Options,
+) Verification {
+	loadPlatform := options.LoadPlatform
+	if loadPlatform == nil {
+		loadPlatform = loaded.LoadPlatform
+	}
+	var stored *platformDifference
+	if difference, read := expectation.platformDifferences[platform]; read {
+		stored = &difference
+	}
+	verification, proveError := provePlatform(loadPlatform, platform, overlay, expectation, stored)
+	if proveError != nil {
+		return Verification{Mismatches: []Mismatch{{
+			Kind: MismatchKindPlatformLoad, Platform: platform.String(), Reason: proveError.Error(),
+		}}}
+	}
+	return verification
+}
+
+// loadPlatform is the tree as platform builds it, through options.LoadPlatform when the caller gives one.
+func (renaming *renaming) loadPlatform(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad,
+	error) {
+	if renaming.options.LoadPlatform != nil {
+		return renaming.options.LoadPlatform(platform, overlay)
+	}
+	return renaming.workspace.LoadPlatform(platform, overlay)
+}
+
+// reachedDirectories are the directories of the packages a candidate reaches, each with the candidates that reach
+// it: every directory one of its sites is in, and, for a name another package can name, every root package that
+// imports its package, since a file of that package the host does not build may name it with no site the host sees.
+// Only a platform a reached directory's files need is loaded, so a plan whose renames reach no such package loads
+// none.
+func (renaming *renaming) reachedDirectories() map[string]map[Key]bool {
+	reached := map[string]map[Key]bool{}
+	reach := func(directory string, key Key) {
+		if reached[directory] == nil {
+			reached[directory] = map[Key]bool{}
+		}
+		reached[directory][key] = true
+	}
+	directoryOf := map[string]string{}
+	for _, rootsPackage := range renaming.roots {
+		for _, filename := range append(slices.Clone(rootsPackage.GoFiles), rootsPackage.IgnoredFiles...) {
+			directoryOf[rootsPackage.PkgPath] = filepath.Dir(filepath.Clean(filename))
+			break
+		}
+	}
+	for key, candidate := range renaming.candidates {
+		for _, site := range renaming.sites[key] {
+			reach(filepath.Dir(filepath.Clean(site.filename)), key)
+		}
+		if candidate.local || !token.IsExported(candidate.OldName) {
+			continue
+		}
+		for _, rootsPackage := range renaming.roots {
+			if _, imports := rootsPackage.Imports[candidate.Key.PackagePath]; imports {
+				if directory, known := directoryOf[rootsPackage.PkgPath]; known {
+					reach(directory, key)
+				}
+			}
+		}
+	}
+	return reached
+}
+
+// platformFailure is why a platform cannot prove a rename that reaches a directory: its whole load failed, or the
+// package in that directory does not type-check under it.
+type platformFailure struct {
+	load     string
+	packages map[string]string
+}
+
+// platformLoadRefusal is why a plan with RequireSoundPlatforms refuses a candidate, or "": a site of it is in the
+// directory of a package holding a file only some platform builds, and that platform's load failed, or the package
+// does not type-check under it, so nothing there can prove the rename. The reason names the platform.
+func (renaming *renaming) platformLoadRefusal(key Key) string {
+	if !renaming.options.RequireSoundPlatforms {
+		return ""
+	}
+	for _, site := range renaming.sites[key] {
+		directory := filepath.Dir(filepath.Clean(site.filename))
+		for _, unbuilt := range renaming.unbuiltFiles[directory] {
+			failure, failed := renaming.platformFailures[unbuilt.platform]
+			if !failed {
+				continue
+			}
+			if failure.load != "" {
+				return fmt.Sprintf("it reaches %s, which only %s builds, and the tree does not load as %s: %s",
+					unbuilt.relative, unbuilt.platform, unbuilt.platform, failure.load)
+			}
+			if reason, broken := failure.packages[directory]; broken {
+				return fmt.Sprintf("it reaches %s, which only %s builds, and its package does not type-check as %s: %s",
+					unbuilt.relative, unbuilt.platform, unbuilt.platform, reason)
+			}
+		}
+	}
+	return ""
+}
+
+// unbuiltFile is a Go file under the root that the host's build leaves out and a platform builds.
+type unbuiltFile struct {
+	relative string
+	platform workspace.Platform
+}
+
+// sortedUnbuilt sorts each directory's unbuilt files by name, so a refusal names the same one every run.
+func sortedUnbuilt(files map[string][]unbuiltFile) {
+	for _, list := range files {
+		sort.Slice(list, func(left, right int) bool { return list[left].relative < list[right].relative })
+	}
+}
+
+// packageDirectory is the directory of the root package with ID, read from its files, empty when no root has it.
+func (renaming *renaming) packageDirectory(id string) string {
+	for _, rootsPackage := range renaming.roots {
+		if rootsPackage.ID != id {
+			continue
+		}
+		for _, filename := range append(slices.Clone(rootsPackage.GoFiles), rootsPackage.IgnoredFiles...) {
+			return filepath.Dir(filepath.Clean(filename))
+		}
+	}
+	return ""
+}
+
+// isTypeScript reports whether a name relative to the root is under the TypeScript submodule.
+func isTypeScript(relative string) bool {
+	return relative == "TypeScript" || strings.HasPrefix(relative, "TypeScript/")
+}

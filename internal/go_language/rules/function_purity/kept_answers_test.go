@@ -33,7 +33,7 @@ type keptAnswers struct {
 
 // askOnce runs a probe on the fixture package named fixture that asks the resolver the purity of its function named
 // asked, and of nothing else, and is what the resolver recorded and holds for the package. The run has a store, which
-// answers nothing, since only a run with a store records its answers (fact_resolver.Recorded), as every engine run
+// answers nothing, since only a run with a store records its answers (fact_resolver.Recorded), as every real run
 // with the findings cache does; the fixtures import nothing, so the store is asked of no package restored.
 func askOnce(test *testing.T, fixture string, asked string) keptAnswers {
 	test.Helper()

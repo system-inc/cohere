@@ -8,7 +8,7 @@
 // helpers it calls from x/tools' internal packages (typesinternal.NoEffects, astutil.Format and refactor.DeleteStmt)
 // translated beside it, and it reports the original's messages word for word, at the same position, with the same
 // suggested fix, edit for edit. The original walks cursors, not nodes, because the fix that removes a whole statement
-// reads its parent and siblings, which only a cursor reaches. The port sits on the engine's syntax dispatcher, hearing
+// reads its parent and siblings, which only a cursor reaches. The port sits on cohere-go's syntax dispatcher, hearing
 // each assignment on the walk the dispatcher makes once for every syntax rule, and reads the assignment's cursor from
 // its context, so its cursor helpers read what the original's do. The registry runs the port in the original's place,
 // and the original stays the oracle: the parity tests beside this file run both over the same packages and compare

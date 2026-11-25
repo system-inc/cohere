@@ -6,7 +6,7 @@
 // file (two structs each with a field `err`). A line that names no declaration, or two, proposes nothing and is
 // reported. The -reviewed-literals file clears string literals a person read and judged unable to name a renamed
 // declaration, a literal and its file a line, with the reason. Every proposal goes through the
-// global rename engine, which refuses any rename that could change what the program means, and the rewrite is
+// global global_rename, which refuses any rename that could change what the program means, and the rewrite is
 // reloaded in memory and every identifier's resolution compared before anything is written.
 package main
 
@@ -96,7 +96,7 @@ func runCommandLine() int {
 	return run(*root, skips, chosen, *dryRun, options)
 }
 
-// planOptions are the engine's options the flags give: the pinned libraries, and the reviewed literals read from
+// planOptions are global_rename's options the flags give: the pinned libraries, and the reviewed literals read from
 // their file when one is named.
 func planOptions(pinned pinnedFlags, reviewedLiteralsPath string) (global_rename.Options, error) {
 	options := global_rename.Options{PinnedLibraries: pinned}
@@ -111,7 +111,7 @@ func planOptions(pinned pinnedFlags, reviewedLiteralsPath string) (global_rename
 	return options, nil
 }
 
-// readReviewedLiterals reads the reviewed literals file into the engine's shape, by literal, then by file, the
+// readReviewedLiterals reads the reviewed literals file into global_rename's shape, by literal, then by file, the
 // reason, refusing a line that is not three tab-separated fields.
 func readReviewedLiterals(path string) (map[string]map[string]string, error) {
 	file, openError := os.Open(path)
@@ -236,7 +236,7 @@ func run(root string, skips []string, chosen []chosenRename, dryRun bool, option
 
 // findProposals finds, for each chosen line, the one declaration of that name in that file, across every
 // analyzed variant; a line naming none, or two declarations (a local and a package-level name alike), is
-// unmatched, since the engine renames an object and the line would have to say which.
+// unmatched, since global_rename renames an object and the line would have to say which.
 func findProposals(loaded *workspace.Workspace, chosen []chosenRename) ([]global_rename.Proposal, []string) {
 	type declaration struct {
 		position token.Position

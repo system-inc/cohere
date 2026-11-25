@@ -16,8 +16,8 @@ import (
 )
 
 // duplicatesRequested is `--duplicates`.
-func (engine *pipeline) duplicatesRequested() bool {
-	return engine.request.switches["duplicates"]
+func (pipeline *pipeline) duplicatesRequested() bool {
+	return pipeline.request.switches["duplicates"]
 }
 
 // duplicatesReport groups what the lint pass hashed into the duplicates report (#jfvhbj7), over the functions in the
@@ -27,7 +27,7 @@ func (engine *pipeline) duplicatesRequested() bool {
 // line and name; the two readings of one function agree, the type checker giving both the same types. A suppression
 // naming duplicate_functions.GoRuleName keeps a function in its shape, and one that keeps no member of a group at the
 // floor is listed as dead, never a finding: the report never moves the verdict.
-func (engine *pipeline) duplicatesReport(result *check.Result) *duplicate_functions.Report {
+func (pipeline *pipeline) duplicatesReport(result *check.Result) *duplicate_functions.Report {
 	started := time.Now()
 	report := &duplicate_functions.Report{
 		Ran: true,
@@ -42,7 +42,7 @@ func (engine *pipeline) duplicatesReport(result *check.Result) *duplicate_functi
 	seen := map[place]bool{}
 	first := func(file string, line int, name string) bool {
 		key := place{file, line, name}
-		if seen[key] || !engine.described.inScopeSet[file] {
+		if seen[key] || !pipeline.described.inScopeSet[file] {
 			return false
 		}
 		seen[key] = true
@@ -72,14 +72,14 @@ func (engine *pipeline) duplicatesReport(result *check.Result) *duplicate_functi
 	}
 	for _, crash := range result.ReportCrashes {
 		report.Crashes = append(report.Crashes, duplicate_functions.Crash{File: crash.File, Error: crash.Error})
-		engine.note("the duplicates report could not read %s: %s", crash.File, crash.Error)
+		pipeline.note("the duplicates report could not read %s: %s", crash.File, crash.Error)
 	}
 	report.Files = len(files)
 
 	var keepings []suppression.Keeping
-	for _, file := range engine.described.readable() {
-		if engine.described.inScopeSet[file] {
-			keepings = append(keepings, suppression.Build(file, engine.described.contents[file]).Keepings(
+	for _, file := range pipeline.described.readable() {
+		if pipeline.described.inScopeSet[file] {
+			keepings = append(keepings, suppression.Build(file, pipeline.described.contents[file]).Keepings(
 				duplicate_functions.GoRuleName)...)
 		}
 	}
@@ -138,17 +138,17 @@ func sortedReports(reports map[*packages.Package]any) []*canonical_function_hash
 
 // writeDuplicates writes the duplicates record under `--duplicates`, after the unused phase's: what the lint phase
 // grouped, or why it grouped nothing.
-func (engine *pipeline) writeDuplicates() {
-	if !engine.duplicatesRequested() {
+func (pipeline *pipeline) writeDuplicates() {
+	if !pipeline.duplicatesRequested() {
 		return
 	}
-	report := engine.duplicates
+	report := pipeline.duplicates
 	if report == nil {
-		notRun := engine.duplicatesNotRun
+		notRun := pipeline.duplicatesNotRun
 		if notRun == "" {
 			notRun = "the lint phase never read the functions"
 		}
 		report = &duplicate_functions.Report{NotRun: notRun, Floor: duplicate_functions.Floor}
 	}
-	engine.write(contract.DuplicatesRecord{Report: *report})
+	pipeline.write(contract.DuplicatesRecord{Report: *report})
 }

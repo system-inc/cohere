@@ -10,7 +10,7 @@ import (
 //
 // classLiteralFrom took the node's Loc, whose start includes leading whitespace, so for a literal on
 // its own line or after a comma the "strip the quotes" step cut one character too early: the fix
-// replaced the opening quote, the file stopped parsing, and the edit engine refused that file's
+// replaced the opening quote, the file stopped parsing, and the edit Tailwind refused that file's
 // whole batch, every other rule's fixes included. Measured by @system_cohere_format_markdown on
 // perturbed input: 174 files in ahra and 175 in www-phi-health (1,755 and 1,932 refused fixes).
 func TestClassLiteralFixesKeepTheirQuotesAfterTrivia(test *testing.T) {

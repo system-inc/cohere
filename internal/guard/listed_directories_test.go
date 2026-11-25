@@ -15,7 +15,7 @@ import (
 // listedDirectoriesChildVariable names the loader and the fixture module TestListedDirectoriesChild loads.
 const listedDirectoriesChildVariable = "COHERE_LISTED_DIRECTORIES_CHILD"
 
-// Both loaders a test reaches packages through, the engine's load and the tests' go_types, open in the test's own
+// Both loaders a test reaches packages through, the language's load and the tests' go_types, open in the test's own
 // process every directory their go list read, so Go's test cache keys a test's result on its fixtures (#cmpsz8p).
 // Before, go list read them in its own process and nothing was keyed: a rule's planted fixture file, which fails the
 // rule's test when run uncached, read `ok (cached)` after it was added.

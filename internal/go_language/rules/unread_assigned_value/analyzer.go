@@ -1,5 +1,5 @@
 // Package unread_assigned_value is staticcheck's SA4006, a value assigned to a variable, or produced by an increment
-// or decrement, that nothing ever reads, ported onto the engine's own intermediate representation, reporting through
+// or decrement, that nothing ever reads, ported onto cohere's own intermediate representation, reporting through
 // the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4006/sa4006.go, whose logic it keeps and
@@ -35,7 +35,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own with the generator lookup of the package. It requires
 // staticcheck's generated pass, whose map of generators it reads. Check reads the value of each assignment, increment
 // and switch tag from the function's expression map, so the listener says so, and the package records that map
@@ -57,7 +57,7 @@ var Listener = rule.Listener{
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4006",
 	"SA4006",
-	"Flags a value assigned to a variable that is never read: staticcheck's SA4006, ported onto the engine's own "+
+	"Flags a value assigned to a variable that is never read: staticcheck's SA4006, ported onto cohere-go's own "+
 		"intermediate representation.",
 	&Listener,
 )

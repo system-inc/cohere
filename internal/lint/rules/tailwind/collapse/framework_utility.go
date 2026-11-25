@@ -7,7 +7,7 @@
 // Four of the wave-2a roots spell their handler as `handle(value) { if (!value) return }` rather than
 // as an arrow, and that guard needs no representation here. `ResolveFunctionalUtilityValue` already
 // refuses a resolved empty value for every root, so a `RequiresValue` field was written, measured
-// against the engine, found to change no answer, and removed. `bg-size`, `bg-position`, `mask-size`
+// against Tailwind, found to change no answer, and removed. `bg-size`, `bg-position`, `mask-size`
 // and `mask-position` are ordinary rows carrying only a property. 25 of them, and they are a table rather than
 // 25 ported functions because there is nothing per-root to port: the property name, the theme
 // namespaces, and which shared bare-value predicate applies are the entire difference between them.
@@ -368,7 +368,7 @@ func bareValueHandler(kind BareValueKind, suffix string) func(*ParsedValue) (str
 	if kind == BareValueFraction {
 		// The one kind reading Fraction rather than Value. `aspect-16/9` resolves and `aspect-16`
 		// does not, because the parser sets Fraction only when a slash was written, so testing Value
-		// here would accept a bare number the engine rejects.
+		// here would accept a bare number Tailwind rejects.
 		//
 		// The `Fraction == ""` half is an early exit rather than a guard, and mutating it away does
 		// not fail the suite. That is measured rather than assumed: `segment("", '/')` returns one

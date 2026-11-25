@@ -5,8 +5,8 @@
 // (`context`, `json`, ...), or itself an abbreviation, the last two words are taken instead (`n *nodeType`
 // becomes `nodeType`). A negation word just before the chosen words joins them (`NotAllowedError` falls back
 // to `notAllowedError`), and an override table names the types whose computed name reads badly. All receivers of one
-// type move together: if the engine refuses any of them, the whole type tries the two-word name, and if that is refused
-// too, the type is left for the waves and reported. Every rename goes through the rename engine; after writing, the
+// type move together: if global_rename refuses any of them, the whole type tries the two-word name, and if that is
+// refused too, the type is left for the waves and reported. Every rename goes through global_rename; after writing, the
 // tree is reloaded and every identifier's resolution compared.
 package main
 
@@ -364,7 +364,7 @@ func (group *receiverGroup) drop(class string, reason string) {
 	group.dropReason = reason
 }
 
-// planReceivers proposes receiver names for every type of one package variant and runs the engine until every
+// planReceivers proposes receiver names for every type of one package variant and runs global_rename until every
 // type's receivers either all moved or all stayed. renamePackage.Files are the editable files; allFiles is
 // every file of the variant, so a type with a receiver to rename in a skipped file can be left whole.
 func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabulary map[string]bool) receiverPlan {
@@ -433,9 +433,9 @@ func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabular
 	}
 
 	// Fixpoint: a type with any rejected receiver falls back one step for all its receivers (one word, then
-	// two words, then left alone), and the engine judges the whole set again, until a pass rejects nothing.
+	// two words, then left alone), and global_rename judges the whole set again, until a pass rejects nothing.
 	// Each type only moves forward, so this ends.
-	var engineResult rename.Plan
+	var renamingPlan rename.Plan
 	for {
 		var proposals []rename.Proposal
 		groupOf := map[types.Object]*receiverGroup{}
@@ -450,9 +450,9 @@ func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabular
 				}
 			}
 		}
-		engineResult = rename.Check(renamePackage, proposals)
+		renamingPlan = rename.Check(renamePackage, proposals)
 		firstRejection := map[*receiverGroup]string{}
-		for _, rejection := range engineResult.Rejections {
+		for _, rejection := range renamingPlan.Rejections {
 			group := groupOf[rejection.Object]
 			if _, recorded := firstRejection[group]; !recorded {
 				firstRejection[group] = fmt.Sprintf(
@@ -478,19 +478,19 @@ func planReceivers(renamePackage rename.Package, allFiles []*ast.File, vocabular
 				group.state = twoWordsState
 				continue
 			}
-			class := "engine rejected every candidate"
+			class := "global_rename rejected every candidate"
 			switch {
 			case group.override:
-				class = "engine rejected the override"
+				class = "global_rename rejected the override"
 			case group.state == oneWordState:
-				class = "engine rejected the one-word name, no two-word name"
+				class = "global_rename rejected the one-word name, no two-word name"
 			}
 			group.drop(class, strings.Join(group.notes, "; "))
 		}
 	}
 
-	plan.accepted = engineResult.Accepted
-	plan.unresolved = engineResult.Unresolved
+	plan.accepted = renamingPlan.Accepted
+	plan.unresolved = renamingPlan.Unresolved
 	editsByFile := rename.GroupByFile(rename.Edits(renamePackage, plan.accepted))
 	for _, group := range order {
 		groupPosition := renamePackage.FileSet.Position(group.typeName.Pos())

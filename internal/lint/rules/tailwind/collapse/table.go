@@ -12,7 +12,7 @@ import "strings"
 // namespace that reads informatively on 20 roots. The structure is framework-invariant; which
 // namespaces exist is not.
 type Table struct {
-	// TailwindVersion is the engine version the table was generated against, so a mismatch is a
+	// TailwindVersion is the Tailwind version the table was generated against, so a mismatch is a
 	// loud failure rather than a subtly wrong sort.
 	TailwindVersion string
 	// Descriptors is every functional root, keyed by root.
@@ -22,7 +22,7 @@ type Table struct {
 	Statics map[string]Reading
 	// Namespaces is every theme namespace in the design system, longest first.
 	//
-	// The order is the precedence the engine applies and is part of the contract: `--drop-shadow`
+	// The order is the precedence Tailwind applies and is part of the contract: `--drop-shadow`
 	// must be tested before `--shadow`, or `drop-shadow-lg` resolves through the wrong namespace.
 	Namespaces []string
 	// KeysByNamespace is the set of keys in each namespace, which is what decides whether a bare
@@ -43,7 +43,7 @@ type Table struct {
 //
 // This is the whole descriptor model as executable code, and it is deliberately the same five steps
 // the extractor's `predictReading` runs, in the same order, because that function is what was
-// measured against the engine. A restructuring that is equivalent on the corpus and different in
+// measured against Tailwind. A restructuring that is equivalent on the corpus and different in
 // some untested corner would be a right answer for a wrong reason.
 //
 // It returns false rather than a guess in five situations, each of which the caller must escalate
@@ -104,7 +104,7 @@ func (table *Table) Lookup(candidate *ParsedCandidate) (Reading, bool) {
 
 	if candidate.Value.Kind == ParsedValueKindArbitrary {
 		// An arbitrary value carries its own type when the author wrote one, as in
-		// `bg-[color:var(--x)]`. The engine trusts that annotation rather than inferring, and the
+		// `bg-[color:var(--x)]`. Tailwind trusts that annotation rather than inferring, and the
 		// parser has already removed it from Value, so inference below never sees it.
 		if candidate.Value.DataType != "" {
 			return axis.readingForType(DataType(candidate.Value.DataType)), true

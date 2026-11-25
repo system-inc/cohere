@@ -16,7 +16,7 @@ const noLonelyIfFile = "/repository/source/NoLonelyIf.ts"
 // This rule is fixable, so each reporting case carries upstream's own `output`, and five of them
 // carry `output: null`, which is a decision to reproduce rather than an omission: the case reports
 // and the repair is deliberately withheld. Those five are the port's hard half, since a wrong fix
-// here parses and the edit engine applies it unattended.
+// here parses and the fix pass applies it unattended.
 //
 // Every case string was built from a list rather than typed, so nothing could cook a newline or an
 // escape on the way in, and every verdict and every output was reproduced by driving the installed
@@ -161,7 +161,7 @@ func TestNoLonelyIfStaysSilent(test *testing.T) {
 //
 // Upstream's fixer prepends a space when the `else` keyword ends exactly where the opening brace
 // begins. Without it, `else{ ... }` rewrites to `elseif (b)`, which is one identifier rather than
-// two tokens. The edit engine would refuse that as unparseable, so the visible cost is a fix
+// two tokens. The fix pass would refuse that as unparseable, so the visible cost is a fix
 // silently lost rather than bad code shipped, but the branch is real and no imported fixture can
 // see it: a mutation removing the space survived the entire corpus.
 //

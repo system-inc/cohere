@@ -23,7 +23,7 @@ func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node
 }
 
 // ParseTypeScriptFrom is ParseTypeScript given a tree someone already parsed, so the file is not parsed a
-// second time: the fix engine's guard parses every TypeScript file it is handed, and the formatter parsed
+// second time: the fix pass's guard parses every TypeScript file it is handed, and the formatter parsed
 // the same bytes again, 0.18 GB a cold ahra run (#dk2502g).
 //
 // The tree is taken only where ParseSourceFile would have built the same one: the same bytes, no hashbang
@@ -42,7 +42,7 @@ func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node
 // forced, and the commonjs one is ParseSourceFile's, TypeScript's detection unforced. A file that fails
 // both is refused with the module reading's error, the one Prettier reports.
 //
-// The tree handed in is parsed with TypeScript's detection, as the fix engine's guard parses, and is taken
+// The tree handed in is parsed with TypeScript's detection, as the fix pass's guard parses, and is taken
 // for the module reading only where forcing could not change it: see readsAlikeAsModule.
 func ParseTypeScriptFrom(
 	fileName string,

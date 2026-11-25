@@ -10,7 +10,7 @@ import (
 )
 
 // rootOf is the WriteRoot of the directory fileName sits in, the root every test here that is not about roots writes
-// under, so a test of the engine's fixing reads as it always did.
+// under, so a test of the fix pass's fixing reads as it always did.
 func rootOf(test testing.TB, fileName string) write_root.WriteRoot {
 	test.Helper()
 	root, rootError := write_root.New(filepath.Dir(fileName))
@@ -21,8 +21,8 @@ func rootOf(test testing.TB, fileName string) write_root.WriteRoot {
 }
 
 // linkTree is a run's root beside a directory outside it, the shapes codebase's probe on #hwz114g found the
-// edit engine writing through (#td3zta2). Every file holds `let unchanged = 1;\n`, which renamingProposal
-// rewrites, so a file the engine wrote reads differently and one it left reads exactly so.
+// fix pass writing through (#td3zta2). Every file holds `let unchanged = 1;\n`, which renamingProposal
+// rewrites, so a file the fix pass wrote reads differently and one it left reads exactly so.
 type linkTree struct {
 	root    string
 	outside string
@@ -104,7 +104,7 @@ func assertIsLink(test *testing.T, name string, target string) {
 	}
 }
 
-// realPathOf is file's real path, every link resolved, as the engine reports it.
+// realPathOf is file's real path, every link resolved, as the fix pass reports it.
 func realPathOf(test *testing.T, file string) string {
 	test.Helper()
 	resolved, resolveError := filepath.EvalSymlinks(file)
@@ -237,7 +237,7 @@ func TestAPlainFileIsWrittenUnderARootReachedThroughALink(test *testing.T) {
 }
 
 // WriteAtomically itself refuses a file outside the root with an *OutsideRootError naming both paths, and
-// creates nothing beside it, so no caller can write past the root by going around the engine. The zero
+// creates nothing beside it, so no caller can write past the root by going around the fix pass. The zero
 // WriteRoot refuses every file, so a caller that never said where it may write writes nothing.
 func TestWriteAtomicallyRefusesOutsideTheRootAndCreatesNothing(test *testing.T) {
 	test.Parallel()

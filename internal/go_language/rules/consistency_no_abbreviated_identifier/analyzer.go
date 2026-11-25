@@ -1,10 +1,10 @@
-// Package consistency_no_abbreviated_identifier is the Go engine's rule that a name we declare is spelled in full
+// Package consistency_no_abbreviated_identifier is cohere-go's rule that a name we declare is spelled in full
 // words, judged by the same vocabulary as the TypeScript and Swift rules.
 //
 // A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call
 // site by a reader who has to expand the abbreviation and hope they expanded it the way the author meant. The words
 // and the forms they are judged in are policy/Abbreviations.json, read through internal/naming/abbreviation, so the
-// house keeps one vocabulary across every engine.
+// house keeps one vocabulary across every language.
 //
 // Only names this package declares are judged. A name that is someone else's, a use, an imported package's name, an
 // embedded field named for its type, a method whose name another package's interface fixes, is not ours to rename,
@@ -50,10 +50,10 @@ var listener = rule.Listener{
 const (
 	analyzerName = "consistency_no_abbreviated_identifier"
 	doc          = "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the " +
-		"house vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded " +
+		"house vocabulary every language shares, and suggests the full word. Uses, imported package names, embedded " +
 		"fields, and a method whose name and signature another package's interface or type fixes are not judged, " +
 		"since those names are someone else's. Where the vocabulary names exactly one full spelling for the whole " +
-		"name, the finding offers it as a rename, which the engine applies at every reference. A local error " +
+		"name, the finding offers it as a rename, which cohere-go applies at every reference. A local error " +
 		"written once by a single call is named for that call instead, and a context.Context for its caller when " +
 		"it is a parameter or for the call that made it, the name the finding gives and offers. The " +
 		"renameExports option lets a rename reach an exported name of an importable package, and never changes a " +
@@ -68,7 +68,7 @@ func NewAnalyzer() *analysis.Analyzer {
 }
 
 // newAnalyzer registers the rule's listener on dispatcher and gives the analyzer it returns its renameExports flag,
-// which the engine sets from the rule's settings and the context's Option reads off this analyzer.
+// which cohere-go sets from the rule's settings and the context's Option reads off this analyzer.
 func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 	analyzer := dispatcher.RuleAnalyzer(Name, analyzerName, doc, &listener)
 	rule.AddRenameExportsOption(analyzer)
@@ -78,7 +78,7 @@ func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
 // Analyzer runs the rule over one package, reporting what the shared syntax dispatcher's walk found for it.
 var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 // messages are the four shapes a finding takes, by the id the vocabulary names, from the message file this rule

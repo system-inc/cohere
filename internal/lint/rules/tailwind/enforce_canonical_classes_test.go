@@ -150,7 +150,7 @@ func TestEnforceCanonicalClassesReportsCollapses(test *testing.T) {
 			wantIds:  []string{"canonicalCollapse"},
 		},
 		{
-			// Recursion: three merges to reach `m-1`, reported as three steps. The engine reports one
+			// Recursion: three merges to reach `m-1`, reported as three steps. Tailwind reports one
 			// finding for the whole set; reporting each step is more actionable and does not change
 			// what the author has to do.
 			name:     "four margins collapse through three steps",
@@ -361,7 +361,7 @@ func TestPreconditionsAreCheckedNotAssumed(test *testing.T) {
 // real code: the walk read it as root `bg` with value `linear-to-b`, and `bg-linear` is a root.
 func TestLongestRootWinsInCollapse(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 		system := designSystem.System
 
 		parts, canParse := splitCandidateIn("border-l", system)
@@ -410,7 +410,7 @@ func TestLongestRootWinsInCollapse(test *testing.T) {
 // modifier was dropped.
 func TestSplitValueCarriesEverythingAfterTheRoot(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 		system := designSystem.System
 
 		testCases := []struct {
@@ -474,7 +474,7 @@ func TestSplitValueCarriesEverythingAfterTheRoot(test *testing.T) {
 // from what was written, every one an arbitrary value carrying `_` or the `(--x)` shorthand.
 func TestRebuiltClassIsWritable(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 		system := designSystem.System
 
 		for _, className := range []string{

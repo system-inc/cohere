@@ -26,8 +26,9 @@ import (
 //   - The gate's packages are listed here, `go list` of the module's patterns at the commit in the gate's environment,
 //     and each half is handed its packages as import paths in place of the patterns, with its share of the race tokens.
 //     The split is the Square's starting one, internal/go_language alone on one half and everything else on the other.
-//     A package's Elapsed is its test binary's wall, not its CPU, and the box is CPU-bound: go_engine fills every core
-//     while most binaries use one or two, so balancing summed Elapsed would load go_engine's half with more. The
+//     A package's Elapsed is its test binary's wall, not its CPU, and the box is CPU-bound: go_language fills every
+// core
+//     while most binaries use one or two, so balancing summed Elapsed would load go_language's half with more. The
 //     halves' times are still kept (gateTimesFile), for a balancer built from the halves' own walls.
 //   - Coverage is proven, never assumed: each half's report names exactly the packages it was given, its -race run
 //     exactly its race tokens' packages, and across both every listed package and every race token appears once. A
@@ -268,7 +269,7 @@ func readGateTimes() (*gateTimes, string) {
 // splitGate splits the listing's packages and the race tokens into two halves. With a package at
 // gateSplitStartingDirectory it is the Square's starting split, times or none: that package alone on the first half,
 // every other package and every race token on the second, since Elapsed is a binary's wall rather than its CPU, and
-// balancing walls on a CPU-bound box would put more beside go_engine, which already fills every core. With no package
+// balancing walls on a CPU-bound box would put more beside go_language, which already fills every core. With no package
 // there, each package and token goes, heaviest first, onto the lighter half, weighing its last time or
 // gateSplitUnweighed, and a half left with no package takes the other's lightest, since a go test handed no package
 // tests the directory it runs in. The listing holds two packages at least.

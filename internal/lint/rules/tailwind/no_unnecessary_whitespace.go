@@ -84,7 +84,7 @@ var NoUnnecessaryWhitespace = rule.Rule[NoUnnecessaryWhitespaceOptions]{
 
 				// A segment whose source is not its decoded value is reported without a fix. Writing the
 				// decoded text back over the source would turn an escaped quote or backtick into a
-				// bare one, the file would stop parsing, and the engine would refuse every fix in it.
+				// bare one, the file would stop parsing, and Tailwind would refuse every fix in it.
 				fixes, scoped := whitespaceFixes(ruleContext.SourceFile.Text(), segment, allowMultiline)
 				if !scoped {
 					fixes = nil

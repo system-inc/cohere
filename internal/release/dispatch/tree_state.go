@@ -5,16 +5,16 @@ import (
 	"strings"
 )
 
-// A binary built from the working tree says whether that tree had uncommitted changes: the Swift engine
+// A binary built from the working tree says whether that tree had uncommitted changes: cohere-swift
 // through its manifest, the `--dev` cohere through its stamps. Both are cached, and a cache keyed on the
-// sources alone serves a binary built in one state to a tree in the other (#50wtb2s). A clean tree got an
-// engine built while an unrelated file was dirty and was refused at land, and a dirty tree could get one
+// sources alone serves a binary built in one state to a tree in the other (#50wtb2s). A clean tree got a
+// language built while an unrelated file was dirty and was refused at land, and a dirty tree could get one
 // built clean and claim a clean build that never happened. So the state is read fresh on every resolve,
 // keyed into the binary's name, and handed to the build, and the binary reports what its name holds.
 
-// SwiftEngineTreeModified reports whether the Swift engine's own inputs, swiftEngineInputs, have uncommitted changes in
-// the checkout at moduleDirectory: the state an engine built from that working tree is built and stamped with, and
-// reports as `sourceTreeModified`. The one call site of that meaning, so the resolver that builds the engine and the
+// SwiftEngineTreeModified reports whether cohere-swift's own inputs, swiftEngineInputs, have uncommitted changes in
+// the checkout at moduleDirectory: the state a binary built from that working tree is built and stamped with, and
+// reports as `sourceTreeModified`. The one call site of that meaning, so the resolver that builds cohere-swift and the
 // run cache that keys a replay on it ask the same question (#s5z3n30).
 func SwiftEngineTreeModified(moduleDirectory string) bool {
 	return workingTreeModified(moduleDirectory, swiftEngineInputs...)
@@ -24,8 +24,8 @@ func SwiftEngineTreeModified(moduleDirectory string) bool {
 // files never counting, under pathspecs when any are given and in the whole repository otherwise.
 //
 // Each binary's bit covers its own inputs, the files its hash reads. The `--dev` cohere's are the whole
-// module, as Go's `vcs.modified` was, so it asks with no pathspec. The Swift engine's are swiftEngineInputs,
-// so a member's edit elsewhere in the repository never marks the engine modified (#50wtb2s).
+// module, as Go's `vcs.modified` was, so it asks with no pathspec. cohere-swift's are swiftEngineInputs,
+// so a member's edit elsewhere in the repository never marks cohere-swift modified (#50wtb2s).
 //
 // Submodules are left out, for the reason land.go gives: most of the house's worktrees have TypeScript as
 // a symlink to another checkout's, and git status refuses that tree outright. A caller whose binary holds
@@ -35,7 +35,7 @@ func SwiftEngineTreeModified(moduleDirectory string) bool {
 // the manifest gives a package with no git context at all.
 //
 // Measured on 2026-11-12, median of five on a warm index: the whole repository took 116 ms on cohere's
-// checkout and 72 ms on ahra's, and the Swift engine's inputs 14 ms on cohere's.
+// checkout and 72 ms on ahra's, and cohere-swift's inputs 14 ms on cohere's.
 //
 // No optional locks, so a run never takes the index lock from a member staging a commit beside it.
 func workingTreeModified(repository string, pathspecs ...string) bool {

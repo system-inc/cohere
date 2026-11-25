@@ -61,7 +61,7 @@ func Settings(newLine string) format.FormatCodeSettings {
 //
 // The changes come back in source order, and each one's range is stated against the original text,
 // so they are applied back-to-front. Applying forward would invalidate every range after the first
-// edit that changed a length, which is the same reason the edit engine sorts before it writes.
+// edit that changed a length, which is the same reason the fix pass sorts before it writes.
 func Apply(text string, changes []core.TextChange) string {
 	ordered := make([]core.TextChange, len(changes))
 	copy(ordered, changes)

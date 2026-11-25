@@ -1,4 +1,4 @@
-// Package consistency_require_octal_prefix is the Go engine's rule that an octal integer says it is octal.
+// Package consistency_require_octal_prefix is cohere-go's rule that an octal integer says it is octal.
 //
 // Go reads an integer literal that opens with a zero followed by more digits, `0755`, as octal, a grammar it keeps
 // from C. Nothing on the line says so but the zero, and a reader who misses it reads the decimal number the digits
@@ -33,7 +33,7 @@ var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_octal_prefix", "
 	"legacy octal, a leading zero followed by digits like 0755, and offers 0o755 in its place, because only the zero "+
 	"says the number is not decimal. Floats and imaginary literals are not judged.", &listener)
 
-// Rule is this rule's entry in the Go engine's registry.
+// Rule is this rule's entry in cohere-go's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var legacyOctalMessage = policy.MessageOf(Name, "legacyOctal")

@@ -25,7 +25,7 @@ import (
 //
 // This test is the fix: it evaluates every value against the live registry. It lives in the registry
 // rather than beside the map because `react_conformance` deliberately depends on nothing in cohere's rule
-// engine, and importing `registry` there would couple the instrument to the thing it measures. It left
+// registry, and importing `registry` there would couple the instrument to the thing it measures. It left
 // `react_conformance_score` because that was the only reason score's test binary linked the whole rule
 // set, so every rule edit relinked it and reran its 5s of tests (#6gct10n).
 //

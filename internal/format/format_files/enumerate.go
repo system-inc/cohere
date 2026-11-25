@@ -25,7 +25,7 @@ import (
 //
 // So every number here is a subtraction someone can check: Walked minus the ignore counts minus
 // Unhandled minus SymbolicLinks should equal len(Files) plus len(Adamic), and DeclinedExtensions names
-// what the engine refused rather than leaving it to be inferred from a smaller total.
+// what the formatter refused rather than leaving it to be inferred from a smaller total.
 type Enumeration struct {
 	// Root is the directory that was walked. A count means nothing without the root it was taken
 	// against, which is how a corpus silently measures half a tree.
@@ -37,7 +37,7 @@ type Enumeration struct {
 	// IgnoredByLayer is how many files each ignore layer removed, in the order they were applied.
 	IgnoredByLayer map[string]int
 
-	// Unhandled is how many surviving files the engine does not format.
+	// Unhandled is how many surviving files the formatter does not format.
 	Unhandled int
 
 	// SymbolicLinks is how many surviving entries were symbolic links, which the walk never follows or
@@ -51,7 +51,7 @@ type Enumeration struct {
 	// may want to argue with and a number is not.
 	NestedRepositories []string
 
-	// DeclinedExtensions is the distinct extensions the engine refused, with counts. Named rather
+	// DeclinedExtensions is the distinct extensions the formatter refused, with counts. Named rather
 	// than summed, because "we skipped 57 files" is not actionable and ".json 57" is.
 	DeclinedExtensions map[string]int
 
@@ -118,7 +118,7 @@ var NeverEntered = map[string]bool{
 
 // Enumerate walks a project root and returns the files handles accepts.
 //
-// The walk is a function of the ignore layers and a file-type predicate, not of any engine, so the
+// The walk is a function of the ignore layers and a file-type predicate, not of any formatter, so the
 // native formatter enumerates without building a goja runtime it would never run.
 //
 // The layers, in order: git's ignore rules, read as git reads them (every `.gitignore` from the root down,
@@ -312,7 +312,7 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 				enumeration.IgnoredByLayer[info.Name()]++
 				return filepath.SkipDir
 			}
-			// A directory named Vendor at any depth holds someone else's code, as the Swift engine reads it
+			// A directory named Vendor at any depth holds someone else's code, as cohere-swift reads it
 			// (swift/Sources/CohereSwift/Project/FileSet.swift, "vendored under Vendor/"), so the Format project
 			// at the same root never judges what the Swift run there calls not ours (#fe4vr5s).
 			if info.Name() == VendoredLayer {
@@ -320,7 +320,7 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 				return filepath.SkipDir
 			}
 			// A vendor directory beside a go.mod or go.work is what `go mod vendor` or `go work vendor` copied in
-			// byte for byte, third-party code the Go engine never checks, so the walk never formats it either: Loom's
+			// byte for byte, third-party code cohere-go never checks, so the walk never formats it either: Loom's
 			// run read vendor/golang.org/x/sys/unix/README.md as a file --fix would rewrite (#366nf1f). A vendor
 			// directory with no Go module beside it is entered, since a JavaScript project may keep its own code
 			// in one.

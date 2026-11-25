@@ -15,7 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
-// standardLibraryRecordsFixture reaches errors, fmt, strings and unicode/utf8, which the engine tests' table holds, and
+// standardLibraryRecordsFixture reaches errors, fmt, strings and unicode/utf8, which cohere-go tests' table holds, and
 // has a file only windows builds, so a run of every build judges a windows build.
 var standardLibraryRecordsFixture = filepath.Join("testdata", "std-records")
 
@@ -24,19 +24,19 @@ var standardLibraryRecordsFixture = filepath.Join("testdata", "std-records")
 func readingSystemCache(filled standardLibrarySource, toolchain string) func(*pipeline) {
 	reading := filled
 	reading.toolchain = toolchain
-	return func(engine *pipeline) {
-		engine.request.standardLibrary = reading
+	return func(pipeline *pipeline) {
+		pipeline.request.standardLibrary = reading
 		// The pipeline found its system cache before this ran, from the request it was made with.
-		engine.systemCache = openSystemCache(engine.request, engine.shardStamps)
+		pipeline.systemCache = openSystemCache(pipeline.request, pipeline.shardStamps)
 	}
 }
 
 // everyGraphVerdict are every unit of every build's judgment, of the host's graph and the standard library's, by
 // build, graph, package, file and start, and whether the build makes it dependent.
-func everyGraphVerdict(test *testing.T, engine *pipeline) map[string]bool {
+func everyGraphVerdict(test *testing.T, pipeline *pipeline) map[string]bool {
 	test.Helper()
 	verdicts := map[string]bool{}
-	for _, run := range engine.buildRuns {
+	for _, run := range pipeline.buildRuns {
 		if run.judged == nil || run.judged.dependence == nil {
 			continue
 		}
@@ -71,13 +71,13 @@ func restoredOf(test *testing.T, stream string) contract.RestoredDependence {
 }
 
 // The standard library's records come from the project's store once a run has side-loaded it (#6a3kjvz piece 3):
-// over the engine tests' table, a cold run under `--build-dependence` loads the standard library it restored from the
+// over cohere-go tests' table, a cold run under `--build-dependence` loads the standard library it restored from the
 // table beside the host's lint and writes each package's record into the store; the warm run reads every one back,
 // loads nothing, and judges every unit of both graphs, in every build, as the cold run did.
 func TestTheStandardLibrarysRecordsComeFromTheStore(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	reading := readingSystemCache(filled, "")
 	cold, coldStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
@@ -104,7 +104,7 @@ func TestTheStandardLibrarysRecordsComeFromTheStore(test *testing.T) {
 func TestAStandardLibraryRecordOfAnotherToolchainIsNeverRead(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	_, firstStream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, "go1.0 /one"),
 		recordsSwitches...)
@@ -123,7 +123,7 @@ func TestAStandardLibraryRecordOfAnotherToolchainIsNeverRead(test *testing.T) {
 func TestANoCacheRunSideLoadsTheStandardLibrary(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	reading := readingSystemCache(filled, "")
 	runOverNoted(test, root, exitClean, reading, recordsSwitches...)
@@ -144,13 +144,13 @@ func TestANoCacheRunSideLoadsTheStandardLibrary(test *testing.T) {
 // its importers miss the system cache's table, whose keys hold each file's bytes, and so does each record keyed from
 // one.
 //
-// Not parallel: it sets the process's own `GOROOT`, which every go command the engine runs reads.
+// Not parallel: it sets the process's own `GOROOT`, which every go command cohere-go runs reads.
 func TestAStandardLibraryRecordOfAnEditedFileIsNeverRead(test *testing.T) {
 	root := copyFixture(test, standardLibraryRecordsFixture)
 	mirror := mirroredGoRoot(test, goEnvironmentIn(test, root, nil)["GOROOT"], "src/unicode/utf8/utf8.go", "")
 	test.Setenv("GOROOT", mirror)
 	// Filled under the mirror, since every standard-library key holds `GOROOT`.
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	reading := readingSystemCache(filled, "")
 	_, coldStream, _ := runOverNoted(test, root, exitClean, reading, recordsSwitches...)
 	if written := recordCounts(test, coldStream).StandardLibraryWritten; written == 0 {
@@ -265,7 +265,7 @@ func expectSameCensus(test *testing.T, want string, got string) map[string]contr
 func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	// Copied before any run adds a build's entries to it.
 	besideStored := filled
 	besideStored.systemCacheRoot = copyFixture(test, filled.systemCacheRoot)
@@ -351,7 +351,7 @@ func TestTheStandardLibrarysStoredRecordsKeepTheFactsCensus(test *testing.T) {
 func TestAWarmBuildDependenceRunWritesNoEntryToTheSystemCache(test *testing.T) {
 	test.Parallel()
 
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, nil)
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, nil)
 	held := systemCacheListing(test, filled.systemCacheRoot)
 	_, fillingStream, _ := runOverNoted(test, copyFixture(test, standardLibraryRecordsFixture), exitClean,
 		readingSystemCache(filled, ""), recordsSwitches...)
@@ -425,7 +425,7 @@ func TestTheStandardLibrarysSideGraphSeedsWhatItsLoadWithheld(test *testing.T) {
 
 	pluginFile := "package library\n\nimport \"plugin\"\n\n// Load opens the plugin at path.\n" +
 		"func Load(path string) (*plugin.Plugin, error) { return plugin.Open(path) }\n"
-	filled, _ := filledSystemCache(test, rules.All(), engineTestsStamp, func(root string) {
+	filled, _ := filledSystemCache(test, rules.All(), testsStamp, func(root string) {
 		if writeError := os.WriteFile(filepath.Join(root, "plugin.go"), []byte(pluginFile), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}
@@ -439,12 +439,12 @@ func TestTheStandardLibrarysSideGraphSeedsWhatItsLoadWithheld(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	engine, stream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, ""), recordsSwitches...)
+	pipeline, stream, _ := runOverNoted(test, root, exitClean, readingSystemCache(filled, ""), recordsSwitches...)
 	if restored := restoredOf(test, stream); restored.StandardLibrarySideLoaded == 0 {
 		test.Fatalf("want the standard library side-loaded, got %+v", restored)
 	}
 	judgedTagged := false
-	for _, run := range engine.buildRuns {
+	for _, run := range pipeline.buildRuns {
 		if run.build.OperatingSystem != runtime.GOOS || !slices.Contains(run.build.Tags, "extra") {
 			continue
 		}
@@ -461,6 +461,6 @@ func TestTheStandardLibrarysSideGraphSeedsWhatItsLoadWithheld(test *testing.T) {
 		}
 	}
 	if !judgedTagged {
-		test.Fatalf("want a build on %s under the tag extra among %d builds", runtime.GOOS, len(engine.buildRuns))
+		test.Fatalf("want a build on %s under the tag extra among %d builds", runtime.GOOS, len(pipeline.buildRuns))
 	}
 }

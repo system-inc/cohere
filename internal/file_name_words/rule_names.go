@@ -5,11 +5,11 @@ import (
 	"strings"
 )
 
-// RuleNames are the names of the rules an engine has registered, each held as the words a file name spelling it holds:
+// RuleNames are the names of the rules a language has registered, each held as the words a file name spelling it holds:
 // its last slash-separated part, lowercased, with a space for each hyphen, so `@typescript-eslint/no-unused-vars` is
 // `no unused vars` and `max-classes-per-file` is `max classes per file`. A rule's name is the registry's, upstream's
 // for a port (policy/RuleNaming.json keeps a ported rule's upstream name), so a file named for a rule is named for what
-// it holds, in words that are not its author's to spell out. Each engine hands in the registry it holds, never a list
+// it holds, in words that are not its author's to spell out. Each language hands in the registry it holds, never a list
 // kept here.
 type RuleNames map[string]bool
 

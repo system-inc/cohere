@@ -255,7 +255,7 @@ func hasExactlyOneCountedParameter(parameters []*ast.Node) bool {
 // suggestionsFor builds the repairs, in upstream's order: remove the wrapper first where it is
 // offered at all, then add the parameter.
 //
-// Order is load-bearing rather than cosmetic. An engine applying "the suggestion" without a human
+// Order is load-bearing rather than cosmetic. A fix pass applying "the suggestion" without a human
 // choosing takes the first, and upstream's is the removal, so reversing them would silently change
 // what an unattended run writes.
 func suggestionsFor(

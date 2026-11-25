@@ -129,7 +129,7 @@ type Graph[F any, B comparable, P any] interface {
 	// A run of throwable instructions before one throw edge is right under neither answer: the handler can
 	// be reached after any prefix of the run, so its true value is a join over every prefix. A lowering
 	// that builds one should split the run into one throwing instruction per block and answer yes; until
-	// then, no is a lint engine's approximation.
+	// then, no is a linter's approximation.
 	ThrowsAtLastInstruction(function F, block B) bool
 
 	// InstructionCount is how many instructions a block holds.

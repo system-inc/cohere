@@ -107,7 +107,7 @@ type yamlCorpus struct {
 	options       format_options.Options
 }
 
-// yamlCorpora enumerates each root the way TestCorpora does: through the engine's ignore layers, and
+// yamlCorpora enumerates each root the way TestCorpora does: through the formatter's ignore layers, and
 // into each nested repository as a corpus of its own, with its own config. So the files measured are
 // the ones the formatter would be given, and not, say, the debug-symbol YAML a Swift build leaves in
 // .build, which no repository formats and the oracle's goja runtime overflows its stack on.
@@ -227,7 +227,7 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 	var report strings.Builder
 	for _, corpus := range yamlCorpora(test, roots) {
 		options := corpus.options
-		newEngine := func() (*prettier.Engine, error) { return prettier.New(options) }
+		newFormatter := func() (*prettier.Formatter, error) { return prettier.New(options) }
 
 		// The YAML files.
 		candidate := yamlCandidate{options: options, texts: map[string]string{}, trees: map[string]parsed{}}
@@ -262,14 +262,14 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 			Identity:  digest + "|" + string(bundles.Origin) + "|filepath|" + fmt.Sprintf("%+v", options),
 		}
 		yamlReport, compareError := differential.Compare(corpus.root, yamlFiles,
-			func() (differential.Formatter, error) { return newEngine() },
+			func() (differential.Formatter, error) { return newFormatter() },
 			func() (differential.Formatter, error) { return candidate, nil },
 			runtime.NumCPU(), yamlCache)
 		if compareError != nil {
 			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
 		yamlFullStackReport, compareError := differential.Compare(corpus.root, yamlFiles,
-			func() (differential.Formatter, error) { return newEngine() },
+			func() (differential.Formatter, error) { return newFormatter() },
 			func() (differential.Formatter, error) { return fullStack, nil },
 			runtime.NumCPU(), yamlCache)
 		if compareError != nil {
@@ -340,8 +340,8 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 				fmt.Sprintf("%+v", options),
 		}
 		newFrontMatterOracle := func() (differential.Formatter, error) {
-			engine, newEngineError := newEngine()
-			return frontMatterOracle{engine: engine}, newEngineError
+			formatter, newFormatterError := newFormatter()
+			return frontMatterOracle{formatter: formatter}, newFormatterError
 		}
 		frontMatterReport, compareError := differential.Compare(
 			corpus.root,

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// The public twins of the engine assertions that needed a shape only a repository's own stylesheet had
+// The public twins of Tailwind assertions that needed a shape only a repository's own stylesheet had
 // (#f598zk0, tiers B and C). Each live original stays where it is, opt-in through its corpus; the twin asks the
 // same question of collapse/testdata/public_theme, which declares the shape on purpose, so it runs on
 // every machine and fails where the original would have skipped.
@@ -22,7 +22,7 @@ func publicThemeSystem(test *testing.T) DesignSystemResult {
 	if absolutePathError != nil {
 		test.Fatalf("resolving the public theme: %v", absolutePathError)
 	}
-	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 	})
@@ -35,7 +35,7 @@ func publicThemeSystem(test *testing.T) DesignSystemResult {
 // themeSystems are the public theme and ahra's, for an assertion whose expectations were measured on
 // both and agree (#f598zk0, tier C): it runs the same expectations on each, the public one everywhere and
 // ahra's opt-in through its corpus.
-var themeSystems = []engineSystem{
+var themeSystems = []tailwindSystem{
 	{name: "public", load: publicThemeSystem},
 	{name: "ahra", load: classOrderLiveRepositorySystem},
 }
@@ -57,7 +57,7 @@ func TestClassOrderReadsTheRepositoryOnThePublicTheme(test *testing.T) {
 	test.Parallel()
 	designSystem := publicThemeSystem(test)
 	const ownClass = "surface-card"
-	if !designSystem.System.HasUtility(ownClass, tailwindengine.UtilityKindStatic) {
+	if !designSystem.System.HasUtility(ownClass, tailwindcollapse.UtilityKindStatic) {
 		test.Fatalf("the public theme declares `@utility %s` and the design system does not know it", ownClass)
 	}
 	keys, unplaceable, resolved := classOrderKeys([]string{ownClass, "flex"}, designSystem.System, designSystem.Table)
@@ -175,7 +175,7 @@ func TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme(test *testing.T
 	} {
 		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
 		if !decided {
-			test.Errorf("%v was declined; every class in it has an engine answer", testCase.input)
+			test.Errorf("%v was declined; every class in it has Tailwind answer", testCase.input)
 			continue
 		}
 		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {
@@ -185,7 +185,7 @@ func TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme(test *testing.T
 }
 
 // TestClassExistenceAsksTheEvaluatorForRepositoryRootsOnThePublicTheme is
-// TestClassExistenceAsksTheEvaluatorForRepositoryRoots' twin. The answers are the engine's
+// TestClassExistenceAsksTheEvaluatorForRepositoryRoots' twin. The answers are Tailwind's
 // `candidatesToCss` over the public theme: `tone--0-4` has no `--color-tone-0-4`, `surface--2/50` puts a
 // modifier on a utility that takes none, `shadow--0` is reached only by its second reading, and
 // `prose-flow` declares nothing at its own level and still generates CSS.
@@ -214,7 +214,7 @@ func TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme(test *testing.T)
 	system := publicThemeSystem(test).System
 
 	for _, className := range []string{"shadow--3", "tone--1", "edge--1", "surface--2"} {
-		candidates := tailwindengine.ParseCandidate(className, system)
+		candidates := tailwindcollapse.ParseCandidate(className, system)
 		if len(candidates) == 0 {
 			test.Errorf("%s does not parse, so it checks nothing", className)
 			continue

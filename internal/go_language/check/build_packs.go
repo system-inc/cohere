@@ -43,7 +43,7 @@ func (packs *buildPacks) open(store *cache.Store, system bool, place cache.PackP
 			store.MarkPackUsed(place)
 		}
 	case cache.PackMissing:
-		// No refusal: a first run, or a new engine's, has none to read.
+		// No refusal: a first run, or a new executable's, has none to read.
 		packs.counts.Missing++
 	default:
 		packs.counts.RefusedBy[refused]++

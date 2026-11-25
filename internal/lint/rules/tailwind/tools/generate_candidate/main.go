@@ -138,7 +138,7 @@ func main() {
 
 // enumerate runs the Node side and returns its JSON.
 //
-// The engine is JavaScript and there is no faithful way to ask it these questions from Go. The
+// Tailwind is JavaScript and there is no faithful way to ask it these questions from Go. The
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot, corpusRoot, themeEntry string) ([]byte, error) {

@@ -4,12 +4,12 @@
 // # Why this is a verb and not a fix
 //
 // Every other write in this tool is reactive. A rule finds something wrong and proposes a repair,
-// the blast radius is one file, and the engine's parse guard is a sufficient backstop because the
+// the blast radius is one file, and the fix pass's parse guard is a sufficient backstop because the
 // rule already decided the edit was safe. A rename is the opposite shape: the user asserts an
 // intention, nothing is wrong with the code, and the blast radius is wherever the symbol lives,
 // which is a program-wide answer no rule is in a position to give. `internal/rule/rule.go` states
 // the consequence at length and from experience: a rename that updates a usage and misses its
-// declaration produces a file that parses and does not compile, and the engine's guard has no
+// declaration produces a file that parses and does not compile, and the fix pass's guard has no
 // reason to fire. So this gets its own verb, its own confirmation, and its own dry-run default,
 // rather than being smuggled in under `--fix` where the safety argument for autofix does not reach.
 //

@@ -320,7 +320,7 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 // # The rule is `hasSuggestions`, not `fixable`, and the difference is the whole repair story
 //
 // `meta.fixable` is absent and `meta.hasSuggestions` is true. Every repair upstream offers is a
-// suggestion, which a human chooses, rather than a fix, which the edit engine applies unattended.
+// suggestion, which a human chooses, rather than a fix, which the fix pass applies unattended.
 // 75 of the corpus's 78 reporting cases carry one.
 //
 // This port ships the findings and not the suggestions, and that is a stated decline rather than an

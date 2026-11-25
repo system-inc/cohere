@@ -198,7 +198,7 @@ NodeTest.test(
         NodeAssert.deepEqual(savedGo, { text: 'package probe\n\nfunc Value() int { return 1 }\n' });
         NodeAssert.equal(NodeFileSystem.readFileSync(goFile, 'utf8'), onDisk, 'the save wrote to disk');
 
-        // No Go package holds a TypeScript file, so the Go engine declines it.
+        // No Go package holds a TypeScript file, so cohere-go declines it.
         const buffer = 'export const value   = 1\n';
         NodeAssert.deepEqual(await formatWithCohere(binary, NodePath.join(root, 'Probe.ts'), buffer), { text: buffer });
     },

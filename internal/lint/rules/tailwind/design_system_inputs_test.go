@@ -18,7 +18,7 @@ import (
 //
 // The fixture's entry is the second candidate, `app/globals.css`, so the first,
 // `app/_theme/styles/theme.css`, is probed and missed and must be recorded absent: creating it would
-// change which stylesheet is the entry. The entry imports `extra.css`, which only the engine reads,
+// change which stylesheet is the entry. The entry imports `extra.css`, which only Tailwind reads,
 // and which must be recorded present.
 func TestDesignSystemReadsAreRunCacheInputs(test *testing.T) {
 	test.Parallel()

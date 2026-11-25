@@ -1,5 +1,5 @@
 // The candidate parser: the function that turns a class string into the structured readings the
-// rest of the engine compiles.
+// rest of Tailwind compiles.
 //
 // Ported from `src/candidate.ts` at Tailwind 4.3.3, read at the pinned tag rather than from the
 // minified bundle, so a disagreement is a finding rather than version skew.
@@ -8,7 +8,7 @@
 //
 // `parseCandidate` is a generator, and a class can have more than one reading. `border-b` is both
 // the functional root `border-b` with no value and the root `border` with the named value `b`, in
-// that order, and the engine compiles them in order and keeps the first that produces CSS. 178 of
+// that order, and Tailwind compiles them in order and keeps the first that produces CSS. 178 of
 // the 1,229 classes this repository actually writes read more than one way, and 2,760 of the 5,056
 // classes in the fixture do.
 //
@@ -215,8 +215,8 @@ const (
 // DesignSystem is the four questions the candidate parser asks about the repository.
 //
 // An interface rather than a struct because the answers come from the theme, which is a separate
-// component with its own owner, and because the differential test answers them from the tables the
-// engine itself reported. Keeping the surface to four methods is deliberate: every one of them is a
+// component with its own owner, and because the differential test answers them from the tables
+// Tailwind itself reported. Keeping the surface to four methods is deliberate: every one of them is a
 // lookup the parser genuinely cannot avoid, and anything wider would let this file start depending
 // on theme internals it has no business reading.
 type DesignSystem interface {
@@ -270,7 +270,7 @@ func isBlank(value string) bool {
 	return strings.TrimFunc(value, isJavaScriptSpace) == ""
 }
 
-// ParseCandidate returns every reading of a class, in the engine's order.
+// ParseCandidate returns every reading of a class, in Tailwind's order.
 //
 // The order is the contract. See the file comment: the caller keeps the first reading that
 // compiles, so returning the right readings in the wrong order is a silent wrong answer.
@@ -897,7 +897,7 @@ func findRoots(input string, exists func(string) bool) []rootCandidate {
 //
 // The at-rule test is `strings.HasPrefix`, matching upstream, which means `@mediaquery` also counts
 // as `@media`. That is upstream's behaviour and is not tightened here; a selector spelled that way
-// is not valid CSS anyway, so the only effect of "fixing" it would be to disagree with the engine.
+// is not valid CSS anyway, so the only effect of "fixing" it would be to disagree with Tailwind.
 func compoundsForSelectors(selectors []string) VariantCompounds {
 	compounds := VariantCompoundsNever
 

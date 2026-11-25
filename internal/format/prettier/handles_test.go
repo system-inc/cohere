@@ -5,7 +5,7 @@ import "testing"
 // TestParserForMatchesPrettierInference pins the parser table against what Prettier's own
 // getFileInfo reports for each name. Every expectation here was read out of Prettier rather than
 // written from memory, because a hand-written mapping is exactly where a silent divergence enters:
-// the probe that preceded this engine keyed package.json off its extension and rewrote npm's array
+// the probe that preceded the formatter keyed package.json off its extension and rewrote npm's array
 // formatting on every run, which was the single disagreement in a 1,556-file corpus.
 func TestParserForMatchesPrettierInference(test *testing.T) {
 	test.Parallel()
@@ -44,7 +44,7 @@ func TestPackageJsonIsNotKeyedByExtension(test *testing.T) {
 }
 
 // TestUnhandledTypesAreRefused is the control that proves Handles can say no. A table that answered
-// yes to everything would be indistinguishable from one that works, and an engine that silently
+// yes to everything would be indistinguishable from one that works, and a formatter that silently
 // skips an unhandled type reports a tree as formatted when it never looked at it.
 func TestUnhandledTypesAreRefused(test *testing.T) {
 	test.Parallel()

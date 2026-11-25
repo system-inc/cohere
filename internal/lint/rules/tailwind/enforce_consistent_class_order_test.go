@@ -10,7 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// Expectations measured by diffing the rule against the engine's own sort over the whole corpus,
+// Expectations measured by diffing the rule against Tailwind's own sort over the whole corpus,
 // not by reading upstream: upstream delegates the entire question to `getClassOrder` in three
 // lines, so its source says nothing about how the order is built.
 //
@@ -79,7 +79,7 @@ const classOrderFixtureStylesheetPath = "app/_theme/styles/theme.css"
 
 // classOrderFixturePackageRoot is the installed tailwindcss the fixture stylesheets import: the vendored
 // snapshot of 4.3.3, the version the class-order corpus in collapse/testdata was captured against, so the
-// fixtures and the corpus agree on which engine they mean, on any machine (#sycrdr6).
+// fixtures and the corpus agree on which Tailwind they mean, on any machine (#sycrdr6).
 func classOrderFixturePackageRoot(test *testing.T) string {
 	test.Helper()
 	return vendored.TailwindPackageRootForTest(test)
@@ -137,7 +137,7 @@ func TestEnforceConsistentClassOrderReportsMisordering(test *testing.T) {
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 		{
-			// A variant class before its unprefixed counterpart. The engine groups by variant first,
+			// A variant class before its unprefixed counterpart. Tailwind groups by variant first,
 			// so every bare class precedes every prefixed one.
 			name:     "variant before base",
 			fileName: "Component.tsx",
@@ -162,7 +162,7 @@ func TestEnforceConsistentClassOrderReportsMisordering(test *testing.T) {
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 		{
-			// Every class the engine ranks null leads, not only the markers. This literal was declined
+			// Every class Tailwind ranks null leads, not only the markers. This literal was declined
 			// until #vf1hd6j measured the plugin hoisting classes like `text-dark`.
 			name:     "unknown class written last",
 			fileName: "Component.tsx",
@@ -219,7 +219,7 @@ func TestEnforceConsistentClassOrderStaysSilent(test *testing.T) {
 		},
 		{
 			// Variants group together, and within a group the classes order among themselves. An
-			// earlier comparator interleaved them with the bare classes and agreed with the engine on
+			// earlier comparator interleaved them with the bare classes and agreed with Tailwind on
 			// only 51% of the corpus.
 			name:     "variant group kept together",
 			fileName: "Component.tsx",
@@ -233,8 +233,8 @@ func TestEnforceConsistentClassOrderStaysSilent(test *testing.T) {
 		{
 			// A root whose own prefix is also a root. `ring-offset` exists in the ordering table
 			// and not in the conflict table, so resolving it through the latter answered with
-			// `ring`'s properties and made `ring-offset-1` indistinguishable from `ring-1`. The
-			// engine accepts this literal as written; the rule reported it until the lookup was
+			// `ring`'s properties and made `ring-offset-1` indistinguishable from `ring-1`.
+			// Tailwind accepts this literal as written; the rule reported it until the lookup was
 			// pointed at the table it reads.
 			name:     "ring-offset resolves to its own root, not to ring",
 			fileName: "Component.tsx",
@@ -275,7 +275,7 @@ func TestEnforceConsistentClassOrderStaysSilent(test *testing.T) {
 			source:   `const element = <div className="items-center flex flex" />;`,
 		},
 		{
-			// A class the engine ranks null leads, in source order, so this is already in order. It
+			// A class Tailwind ranks null leads, in source order, so this is already in order. It
 			// is `no-unknown-classes` that has something to say about `ahralia-splash`.
 			name:     "unknown class written first",
 			fileName: "Component.tsx",
@@ -401,7 +401,7 @@ func TestClassOrderReportsWithoutAFixItCannotPlace(test *testing.T) {
 // Each one asserted a real property and asserted it through `classSortsBefore`, `compareVariants`,
 // `declaredPropertiesForOrdering` or `orderingRootOf`, all of which were the pairwise-comparator path
 // that #4q5dsn3 removed. The properties survive; what changed is that they are now asked of the live
-// design system and their expected answers are quoted from the engine rather than from the port.
+// design system and their expected answers are quoted from Tailwind rather than from the port.
 //
 // Two of them asserted something that is simply false, and those are corrected rather than
 // translated. See TestClassOrderDepthIsNotADimension.
@@ -409,7 +409,7 @@ func TestClassOrderReportsWithoutAFixItCannotPlace(test *testing.T) {
 // TestClassOrderDimensionsAreAllUsed is the known-dirty control, on the live path.
 //
 // Replaces TestComparatorDimensionsAreAllUsed. Three simpler orderings each looked right and each was
-// measured wrong against the engine: ordering by root alone agreed on 51% of the corpus, adding
+// measured wrong against Tailwind: ordering by root alone agreed on 51% of the corpus, adding
 // variants took it to 58% while representatives still carried their own prefixes, and unprefixing
 // them took it to 91%. The last 9% was the markers being given a position instead of being separated
 // out entirely.
@@ -418,7 +418,7 @@ func TestClassOrderReportsWithoutAFixItCannotPlace(test *testing.T) {
 // the test this replaces; the mechanism asked is the live sort rather than the pairwise comparator.
 func TestClassOrderDimensionsAreAllUsed(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		testCases := []struct {
 			name      string
@@ -467,7 +467,7 @@ func TestClassOrderDimensionsAreAllUsed(test *testing.T) {
 	})
 }
 
-// TestClassOrderVariantDimensions pins the variant dimensions, with the engine's answers.
+// TestClassOrderVariantDimensions pins the variant dimensions, with Tailwind's answers.
 //
 // Replaces TestVariantComparisonDimensions. Three of its five cases asserted properties that hold and
 // are kept; the expected orders here are quoted from `variant_fixtures.json`, which recorded what
@@ -476,7 +476,7 @@ func TestClassOrderDimensionsAreAllUsed(test *testing.T) {
 // The two dropped cases are the subject of TestClassOrderDepthIsNotADimension below.
 func TestClassOrderVariantDimensions(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		testCases := []struct {
 			name     string
@@ -523,7 +523,7 @@ func TestClassOrderVariantDimensions(test *testing.T) {
 
 // TestClassOrderDepthIsNotADimension is the correction, and it is the point of this task.
 //
-// Two cases in the test this replaces asserted the opposite of what the engine does, and they passed
+// Two cases in the test this replaces asserted the opposite of what Tailwind does, and they passed
 // because the code under test asserted the same wrong thing. Quoted from the deleted
 // TestVariantComparisonDimensions:
 //
@@ -532,15 +532,15 @@ func TestClassOrderVariantDimensions(test *testing.T) {
 //	{ before: "disabled:",     after: "group-hover:disabled:",
 //	  why: "every single variant precedes every stacked one, whatever it starts with" }
 //
-// The second is false as stated, and the first is true only by coincidence. The engine ORs one bit
+// The second is false as stated, and the first is true only by coincidence. Tailwind ORs one bit
 // per variant into a mask and compares masks numerically, so a class's position is decided by its
 // highest-ranked variant. A stacked variant sorts first whenever the class it is compared against
 // carries a higher bit.
 //
-// The evidence is the engine's own, from `class-order/stacked-against-single` and
+// The evidence is Tailwind's own, from `class-order/stacked-against-single` and
 // `class-order/stacked-between-singles` in variant_fixtures.json: `group-hover:disabled:flex` (mask 5)
 // precedes `dark:flex` (mask 8), and in a four-class list it lands third rather than last. That is
-// the same divergence `#nr3wtj1` filed and `TestDepthFirstDisagreesWithTheEngineOnTheCorpus` measured
+// the same divergence `#nr3wtj1` filed and `TestDepthFirstDisagreesWithTailwindOnTheCorpus` measured
 // at 15 pairs of 4,265.
 //
 // The first case is kept, with its reason corrected: `group-hover:` does precede
@@ -548,7 +548,7 @@ func TestClassOrderVariantDimensions(test *testing.T) {
 // and the stacked one carries `disabled` on top of it, so its mask is strictly larger.
 func TestClassOrderDepthIsNotADimension(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		test.Run("a superset mask sorts after the subset it extends", func(test *testing.T) {
 			test.Parallel()
@@ -568,7 +568,7 @@ func TestClassOrderDepthIsNotADimension(test *testing.T) {
 			expected := []string{"group-hover:disabled:flex", "dark:flex"}
 			if strings.Join(ordered, " ") != strings.Join(expected, " ") {
 				test.Errorf("got %v, class-order/stacked-against-single says %v; the deleted rule asserted "+
-					"'every single variant precedes every stacked one' and the engine does no such thing",
+					"'every single variant precedes every stacked one' and Tailwind does no such thing",
 					ordered, expected)
 			}
 		})
@@ -581,7 +581,7 @@ func TestClassOrderDepthIsNotADimension(test *testing.T) {
 // translated, because the original was right about the property and wrong about where it shows.
 //
 // The original asserted that `shadow-lg` and `ring-1` "lead with the same property" is the defect.
-// The engine says otherwise. From classorder_fixtures.json, the readings it captured on this
+// Tailwind says otherwise. From classorder_fixtures.json, the readings it captured on this
 // repository:
 //
 //	shadow-lg   {order: [315, 316], count: 2}
@@ -594,12 +594,12 @@ func TestClassOrderDepthIsNotADimension(test *testing.T) {
 // they would tie completely. Ten real class lists came out wrong when a previous version read the
 // conflict tables here.
 //
-// Asserting on `order[0]` differing, as the original did, is an assertion the engine fails. It passed
+// Asserting on `order[0]` differing, as the original did, is an assertion Tailwind fails. It passed
 // only because the deleted `declaredPropertiesForOrdering` returned property names from a different
 // table with a different shape, so the two tests were never asking the same question.
 func TestClassOrderReadingsKeepCustomProperties(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		keys, unplaceable, resolved := classOrderKeys(
 			[]string{"shadow-lg", "ring-1"}, designSystem.System, designSystem.Table)
@@ -617,9 +617,9 @@ func TestClassOrderReadingsKeepCustomProperties(test *testing.T) {
 		// And they must still differ somewhere, which for these two is the second index.
 		if shadow.order[0] == ring.order[0] && shadow.order[1] == ring.order[1] {
 			test.Errorf("shadow-lg %v and ring-1 %v are identical readings, so the sort cannot separate "+
-				"them and the engine does", shadow.order, ring.order)
+				"them and Tailwind does", shadow.order, ring.order)
 		}
-		// The engine's own numbers, quoted so a drift in either reading fails here rather than silently
+		// Tailwind's own numbers, quoted so a drift in either reading fails here rather than silently
 		// changing every class list that holds a shadow and a ring.
 		if shadow.order[0] != 315 || shadow.order[1] != 316 {
 			test.Errorf("shadow-lg reads %v; classorder_fixtures.json recorded [315 316]", shadow.order)
@@ -635,14 +635,14 @@ func TestClassOrderReadingsKeepCustomProperties(test *testing.T) {
 // Replaces TestOrderingRootsResolveInTheOrderingTable. That bug was a lookup resolving an ordering
 // question through the conflict table, where `ring-offset` does not exist, so the longest-wins walk
 // found `ring` and answered with ring's properties; `ring-offset-1` then read identically to `ring-1`
-// and two classes the engine separates collapsed onto one key.
+// and two classes Tailwind separates collapsed onto one key.
 //
 // The live path cannot make that mistake in the same way, because `ParseCandidate` resolves the root
 // against the design system's own registrations rather than by walking a table of names. The property
 // is still worth pinning, and it is pinned the same way: the two classes must not share a reading.
 func TestClassOrderRootsResolveAgainstTheDesignSystem(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		keys, unplaceable, resolved := classOrderKeys(
 			[]string{"ring-offset-1", "ring-1"}, designSystem.System, designSystem.Table)
@@ -656,7 +656,7 @@ func TestClassOrderRootsResolveAgainstTheDesignSystem(test *testing.T) {
 		}
 		if offset.order[0] == ring.order[0] {
 			test.Errorf("ring-offset-1 and ring-1 lead with the same property index %d, so the sort cannot "+
-				"separate them and the engine does", offset.order[0])
+				"separate them and Tailwind does", offset.order[0])
 		}
 	})
 }
@@ -669,7 +669,7 @@ func TestClassOrderRootsResolveAgainstTheDesignSystem(test *testing.T) {
 // partition would put `group` in the middle of the list. It belongs at the front, ahead of both.
 func TestClassOrderMarkersLeadRegardlessOfVariant(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		ordered := classOrderLiveSort(test, designSystem, []string{"hover:px-8", "group", "flex"})
 		if ordered[0] != "group" {
@@ -686,7 +686,7 @@ func TestClassOrderMarkersLeadRegardlessOfVariant(test *testing.T) {
 // accepts both, and an alphabetical tiebreak would rewrite the first.
 func TestClassOrderMarkersKeepSourceOrder(test *testing.T) {
 	test.Parallel()
-	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		for _, input := range [][]string{{"group", "peer", "flex"}, {"peer", "group", "flex"}} {
 			ordered := classOrderLiveSort(test, designSystem, input)

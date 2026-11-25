@@ -55,7 +55,7 @@ func messageRenameToProperties() rule.Message {
 // guesses at references fails quietly and in the wrong place.
 //
 // **But a deliberate visible break only works if somebody sees it.** This shipped as
-// `ReportNodeWithFixes`, which the engine applies unattended, so the entire argument above rested on
+// `ReportNodeWithFixes`, which the fix pass applies unattended, so the entire argument above rested on
 // a human reading a diff that nothing showed them. The reasoning was right and the verb was wrong:
 // a fix preserves what the code means, and this changes it by design.
 //

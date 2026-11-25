@@ -9,7 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rule"
 )
 
-// PassContext adapts a plain analyzer's pass to rule.Context, for a check run outside the engine's dispatcher, as
+// PassContext adapts a plain analyzer's pass to rule.Context, for a check run outside cohere-go's dispatcher, as
 // the kits' own tests run theirs: the context the dispatcher would build for the check, built over the pass instead,
 // named rule.Namespace followed by the analyzer's name, reading the results and flags of the analyzer itself, its
 // findings handed to pass.Report. A rule in the registry never comes through here; the dispatcher builds its context.

@@ -2,7 +2,7 @@
 // A defer evaluates its function value and its arguments where it stands, and only the outermost call waits, so
 // `defer recordLatency(time.Since(start))` measures nothing: time.Since runs at once, and the latency recorded is the
 // moment between start and the defer. Calls inside a function literal run when the literal does, so they are left
-// alone. It sits on the engine's syntax dispatcher, hearing each defer statement on the walk the dispatcher makes once
+// alone. It sits on cohere-go's syntax dispatcher, hearing each defer statement on the walk the dispatcher makes once
 // for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/defers/defers.go, whose logic it

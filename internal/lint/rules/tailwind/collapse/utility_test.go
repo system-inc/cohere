@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// The fixture is what the shipped Tailwind 4.3.3 engine did with this repository's own `@utility`
+// The fixture is what the shipped Tailwind 4.3.3 did with this repository's own `@utility`
 // blocks, captured by internal/lint/rules/tailwind/tools/generate_utility and checked in next to this test.
 //
 // The population is chosen so that a clean result is evidence rather than a coincidence. The
@@ -34,7 +34,7 @@ type utilityCorpus struct {
 	EntryPath string `json:"entryPoint"`
 	// UtilityBlocks is every `@utility` block in the graph, as CSS text.
 	UtilityBlocks []utilityBlockFixture `json:"utilityBlocks"`
-	// PerDeclarationRoots is the set of roots the engine resolves per declaration, measured rather
+	// PerDeclarationRoots is the set of roots Tailwind resolves per declaration, measured rather
 	// than named. See TestUtilityFindsThePerDeclarationRoots.
 	PerDeclarationRoots []string `json:"perDeclarationRoots"`
 	// KnownExceptions is the 18 registry classes the descriptor model mispredicts, as reported by
@@ -45,7 +45,7 @@ type utilityCorpus struct {
 	// them. See TestUtilityDoesNotClaimTheShadowQuirk.
 	ShadowQuirkProbes []utilityQuirkFixture `json:"shadowQuirkProbes"`
 	// SyntheticCases are standalone design systems whose `@utility` blocks reach the branches this
-	// repository's own blocks never do. See TestUtilitySyntheticCasesMatchEngine.
+	// repository's own blocks never do. See TestUtilitySyntheticCasesMatchTailwind.
 	SyntheticCases []utilitySyntheticCase `json:"syntheticCases"`
 	Cases          []utilityCase          `json:"cases"`
 }
@@ -58,9 +58,9 @@ type utilityCorpus struct {
 // after it was measured.
 type utilitySyntheticCase struct {
 	Name string `json:"name"`
-	// Stylesheet is the source the engine was given, kept so a failure can be read against it.
+	// Stylesheet is the source Tailwind was given, kept so a failure can be read against it.
 	Stylesheet string `json:"stylesheet"`
-	// RejectionOnly marks a case whose every probe the engine rejects, which for one case is the
+	// RejectionOnly marks a case whose every probe Tailwind rejects, which for one case is the
 	// point rather than a gap: a block using `--modifier(…)` and no `--value(…)` never compiles,
 	// because post-condition 1 reads `usedValueFunction`, which only `--value(…)` sets. The flag is
 	// on the case rather than inferred from the readings, so a case that stopped compiling anything
@@ -94,7 +94,7 @@ type utilityQuirkFixture struct {
 	Actual    string `json:"actual"`
 }
 
-// utilityCase is one class and the reading the engine gave it.
+// utilityCase is one class and the reading Tailwind gave it.
 //
 // The parsed candidate's fields are carried alongside the reading so a disagreement can be read as
 // "the candidate parsed differently" rather than only as "the reading differed". The evaluator
@@ -110,7 +110,7 @@ type utilityCase struct {
 	Fraction      string `json:"fraction"`
 	ModifierKind  string `json:"modifierKind"`
 	Modifier      string `json:"modifier"`
-	// Reading is null when the engine rejected the class, which is a different answer than `[]#0`
+	// Reading is null when Tailwind rejected the class, which is a different answer than `[]#0`
 	// and must never be scored as agreement: an empty order sorts last, not first.
 	Reading *utilityReadingFixture `json:"reading"`
 }
@@ -215,13 +215,13 @@ func utilityParseDefinitions(test *testing.T, fixture utilityCorpus) []*UtilityD
 	return definitions
 }
 
-// utilityCandidateFromCase rebuilds the ParsedCandidate the engine parsed, from the fixture's record
+// utilityCandidateFromCase rebuilds the ParsedCandidate Tailwind parsed, from the fixture's record
 // of it.
 //
 // Rebuilt from the fixture rather than re-parsed with ParseCandidate, deliberately. This test is
 // about the evaluator, and feeding it a candidate the Go parser produced would make every failure
 // ambiguous between the two components. The candidate parser has its own differential
-// (candidate_test.go) against the same engine; TestUtilityAgreesThroughTheGoCandidateParser below
+// (candidate_test.go) against the same Tailwind; TestUtilityAgreesThroughTheGoCandidateParser below
 // closes the loop by running the whole chain.
 func utilityCandidateFromCase(aCase utilityCase) *ParsedCandidate {
 	candidate := &ParsedCandidate{
@@ -246,18 +246,18 @@ func utilityCandidateFromCase(aCase utilityCase) *ParsedCandidate {
 	return candidate
 }
 
-// TestUtilityMatchesEngine is the differential: every reading the evaluator gives, against the
-// reading the engine gave for the same class.
+// TestUtilityMatchesTailwind is the differential: every reading the evaluator gives, against the
+// reading Tailwind gave for the same class.
 //
 // Only functional candidates on roots this evaluator defines are scored. A static candidate is the
 // descriptor table's job and a candidate on an unknown root is nobody's, so counting either here
 // would inflate the agreement figure with answers this component did not produce.
 //
-// A null reading in the fixture is a class the engine rejected, and it is compared as a rejection
+// A null reading in the fixture is a class Tailwind rejected, and it is compared as a rejection
 // rather than skipped. That direction is where a port fails silently: an evaluator that accepted
 // everything would agree on every class that compiles and be wrong on the 6,000-odd that do not,
 // while looking identical in a summary that only counted matches.
-func TestUtilityMatchesEngine(test *testing.T) {
+func TestUtilityMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	forEachUtilityOracle(test, func(
 		test *testing.T,
@@ -283,7 +283,7 @@ func TestUtilityMatchesEngine(test *testing.T) {
 				if compiled {
 					if len(disagreements) < 40 {
 						disagreements = append(disagreements, fmt.Sprintf(
-							"%s: evaluator read %s, engine rejected the class",
+							"%s: evaluator read %s, Tailwind rejected the class",
 							aCase.ClassName, utilityDescribeReading(reading),
 						))
 					}
@@ -296,7 +296,7 @@ func TestUtilityMatchesEngine(test *testing.T) {
 			if !compiled {
 				if len(disagreements) < 40 {
 					disagreements = append(disagreements, fmt.Sprintf(
-						"%s: evaluator rejected the class, engine read %s",
+						"%s: evaluator rejected the class, Tailwind read %s",
 						aCase.ClassName,
 						utilityDescribeReading(Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}),
 					))
@@ -308,7 +308,7 @@ func TestUtilityMatchesEngine(test *testing.T) {
 			if !reading.Equal(want) {
 				if len(disagreements) < 40 {
 					disagreements = append(disagreements, fmt.Sprintf(
-						"%s: evaluator read %s, engine read %s",
+						"%s: evaluator read %s, Tailwind read %s",
 						aCase.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want),
 					))
 				}
@@ -319,7 +319,7 @@ func TestUtilityMatchesEngine(test *testing.T) {
 
 		if len(disagreements) > 0 {
 			test.Errorf(
-				"%d of %d classes disagreed with the engine:\n  %s",
+				"%d of %d classes disagreed with Tailwind:\n  %s",
 				compared-agreedCompiling-agreedRejecting,
 				compared,
 				strings.Join(disagreements, "\n  "),
@@ -402,7 +402,7 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 			reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
 			if !compiled {
 				test.Errorf(
-					"%s: evaluator rejected the class, engine read %s",
+					"%s: evaluator rejected the class, Tailwind read %s",
 					exception.ClassName,
 					utilityDescribeReading(Reading{Order: exception.Order, Count: exception.Count}),
 				)
@@ -411,7 +411,7 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 			want := Reading{Order: exception.Order, Count: exception.Count}
 			if !reading.Equal(want) {
 				test.Errorf(
-					"%s: evaluator read %s, engine read %s (the descriptor table predicted %s)",
+					"%s: evaluator read %s, Tailwind read %s (the descriptor table predicted %s)",
 					exception.ClassName,
 					utilityDescribeReading(reading),
 					utilityDescribeReading(want),
@@ -423,7 +423,7 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 			// agree, this class stopped needing the evaluator and the fixture is stale.
 			if utilityDescribeReading(want) == exception.PredictedByDescriptorModel {
 				test.Errorf(
-					"%s: the descriptor table predicted %s, which is what the engine says; this class is no longer an exception and the fixture is stale",
+					"%s: the descriptor table predicted %s, which is what Tailwind says; this class is no longer an exception and the fixture is stale",
 					exception.ClassName, exception.PredictedByDescriptorModel,
 				)
 				continue
@@ -442,7 +442,7 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 }
 
 // TestUtilityFindsThePerDeclarationRoots asserts the mechanism is detectable from the evaluator's own
-// answers, on the roots the engine resolves per declaration.
+// answers, on the roots Tailwind resolves per declaration.
 //
 // The property is the one that makes these roots impossible to table: a value satisfying two
 // resolution paths produces a higher count than one satisfying a single path, on the same root. It is
@@ -511,7 +511,7 @@ func TestUtilityFindsThePerDeclarationRoots(test *testing.T) {
 // TestUtilityDropIsNotDefault is the first mutation, and it targets the rule the whole component is.
 //
 // A declaration whose `--value()` fails to resolve is dropped. The plausible wrong port leaves it in
-// place, which agrees with the engine on every class where every declaration resolves, and that is
+// place, which agrees with Tailwind on every class where every declaration resolves, and that is
 // most of them. This mutates exactly that rule, by keeping every dropped declaration, and asserts the
 // differential catches it.
 //
@@ -556,7 +556,7 @@ func TestUtilityDropIsNotDefault(test *testing.T) {
 				continue
 			}
 			test.Errorf(
-				"%s: keeping dropped declarations still reads %s, which is what the engine says; the drop rule is not what decides this class's arity and the test is not testing it",
+				"%s: keeping dropped declarations still reads %s, which is what Tailwind says; the drop rule is not what decides this class's arity and the test is not testing it",
 				exception.ClassName, utilityDescribeReading(want),
 			)
 		}
@@ -679,7 +679,7 @@ func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
 			if aCase.Reading == nil {
 				if compiled && len(disagreements) < 20 {
 					disagreements = append(disagreements, fmt.Sprintf(
-						"%s: read %s through the Go parser, engine rejected it",
+						"%s: read %s through the Go parser, Tailwind rejected it",
 						aCase.ClassName,
 						utilityDescribeReading(reading),
 					))
@@ -693,7 +693,7 @@ func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
 			if !compiled || !reading.Equal(want) {
 				if len(disagreements) < 20 {
 					disagreements = append(disagreements, fmt.Sprintf(
-						"%s: read %s through the Go parser (compiled=%v), engine read %s",
+						"%s: read %s through the Go parser (compiled=%v), Tailwind read %s",
 						aCase.ClassName, utilityDescribeReading(reading), compiled, utilityDescribeReading(want),
 					))
 				}
@@ -740,8 +740,8 @@ func TestUtilityDoesNotClaimTheShadowQuirk(test *testing.T) {
 	) {
 
 		// Measured per copy. Ahra's are the four `[16/9]` probes. The public theme's sweep also carries the
-		// five `max-w-screen-*`, which extract.mjs's own model predicts as nothing and the engine reads as
-		// `max-width`; the Go table reads them as the engine does, so they are the generator's model
+		// five `max-w-screen-*`, which extract.mjs's own model predicts as nothing and Tailwind reads as
+		// `max-width`; the Go table reads them as Tailwind does, so they are the generator's model
 		// disagreeing, and outside this component like the rest.
 		measured := map[string]int{"utility_fixtures.json": 4, "utility_fixtures_public.json": 9}[fixtureName]
 		if len(fixture.ShadowQuirkProbes) != measured {
@@ -824,7 +824,7 @@ func TestUtilityNormalizesValueArguments(test *testing.T) {
 	test.Logf("%d argument spellings normalize as upstream documents", len(cases))
 }
 
-// TestUtilitySyntheticCasesMatchEngine covers the branches the repository's own `@utility` blocks
+// TestUtilitySyntheticCasesMatchTailwind covers the branches the repository's own `@utility` blocks
 // cannot reach.
 //
 // The repository half is the exit criterion and it is not sufficient. Its blocks use `integer`,
@@ -839,7 +839,7 @@ func TestUtilityNormalizesValueArguments(test *testing.T) {
 // The theme is rebuilt from the fixture's entries rather than from a stylesheet, so these cases stay
 // self-contained: the generator writes each synthetic stylesheet next to the repository's own entry
 // point so `@import "tailwindcss"` resolves, measures it, and deletes it.
-func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
+func TestUtilitySyntheticCasesMatchTailwind(test *testing.T) {
 	test.Parallel()
 	fixture := utilityLoadCorpus(test, "utility_fixtures.json")
 
@@ -886,7 +886,7 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 			compiling, rejecting := 0, 0
 			for _, aCase := range syntheticCase.Cases {
 				if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
-					// A probe the engine did not parse as a functional candidate on one of these
+					// A probe Tailwind did not parse as a functional candidate on one of these
 					// roots is not this evaluator's answer to give. `pct` bare parses as a static
 					// candidate, and counting it here would score this component on the candidate
 					// parser's behaviour.
@@ -898,7 +898,7 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 				if aCase.Reading == nil {
 					if compiled {
 						test.Errorf(
-							"%s: evaluator read %s, engine rejected the class",
+							"%s: evaluator read %s, Tailwind rejected the class",
 							aCase.ClassName,
 							utilityDescribeReading(reading),
 						)
@@ -910,7 +910,7 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 				want := Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}
 				if !compiled {
 					test.Errorf(
-						"%s: evaluator rejected the class, engine read %s",
+						"%s: evaluator rejected the class, Tailwind read %s",
 						aCase.ClassName,
 						utilityDescribeReading(want),
 					)
@@ -918,7 +918,7 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 				}
 				if !reading.Equal(want) {
 					test.Errorf(
-						"%s: evaluator read %s, engine read %s",
+						"%s: evaluator read %s, Tailwind read %s",
 						aCase.ClassName,
 						utilityDescribeReading(reading),
 						utilityDescribeReading(want),

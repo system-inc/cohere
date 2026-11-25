@@ -1,5 +1,5 @@
 // Package discarded_pure_call is staticcheck's SA4017, a call to a function without side effects whose results are
-// all discarded, so the call does nothing, ported onto the engine's own intermediate representation with the purity
+// all discarded, so the call does nothing, ported onto cohere's own intermediate representation with the purity
 // function_purity judges, reporting through the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4017/sa4017.go, whose logic it keeps and
@@ -9,8 +9,8 @@
 // nothing from one function to the next: each call is judged by its own callee and readers. So Check judges one
 // function at a time and finds what the original finds.
 //
-// It asks which functions have no side effects of function_purity, staticcheck's purity pass ported onto the
-// engine's own intermediate representation, which judges a function only when asked and answers as the original's
+// It asks which functions have no side effects of function_purity, staticcheck's purity pass ported onto
+// cohere's own intermediate representation, which judges a function only when asked and answers as the original's
 // facts do, fact for fact (#w7zmvat). The listener requires it and reads its result through the context, handing
 // Check its IsPure.
 //
@@ -39,7 +39,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// Listener is what the port hears of each package from the dispatcher over cohere-go's own intermediate
 // representation: every function, each judged on its own with the purity judgment of the package. It requires
 // function_purity, whose result it reads.
 var Listener = rule.Listener{
@@ -59,7 +59,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4017",
 	"SA4017",
 	"Flags a call to a function without side effects whose results are discarded: staticcheck's SA4017, "+
-		"ported onto the engine's own intermediate representation.",
+		"ported onto cohere's own intermediate representation.",
 	&Listener,
 )
 

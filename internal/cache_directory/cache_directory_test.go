@@ -132,8 +132,8 @@ func TestAFileWhereTheDirectoryGoesIsAnError(test *testing.T) {
 	}
 }
 
-// TestTheSwiftEngineWritesTheSameBytes: the Swift engine makes the directory with its own CacheDirectory, which must
-// write exactly IgnoreFileContents, so whichever engine creates the directory leaves the same file.
+// TestTheSwiftEngineWritesTheSameBytes: cohere-swift makes the directory with its own CacheDirectory, which must
+// write exactly IgnoreFileContents, so whichever language creates the directory leaves the same file.
 func TestTheSwiftEngineWritesTheSameBytes(test *testing.T) {
 	test.Parallel()
 	source, readError := os.ReadFile(filepath.Join(

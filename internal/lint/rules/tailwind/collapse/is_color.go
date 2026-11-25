@@ -4,7 +4,7 @@
 // first: it starts with `#`, it starts with a known color function, or it is a named color.
 //
 // What is *not* here is any validation. `#zzzz` is a color, `rgb(` with nothing after it is a color,
-// and `color-mix(anything)` is a color. The engine is deciding which utility a value selects, not
+// and `color-mix(anything)` is a color. Tailwind is deciding which utility a value selects, not
 // whether the CSS is valid, and a browser that rejects the declaration is the layer that catches
 // the rest. Tightening this would change which utility gets picked.
 package tailwind
@@ -28,7 +28,7 @@ var colorFunctions = []string{
 //
 // Callers should reach for InferDataType with a type list rather than this directly, unless they
 // genuinely mean "is this a color" without the `var(` short-circuit. `IsColor("var(--color-red)")`
-// is false, and that is correct for this predicate and wrong as a reading of the value: the engine
+// is false, and that is correct for this predicate and wrong as a reading of the value: Tailwind
 // declines to type `var()` at all, one level up.
 func IsColor(value string) bool {
 	if strings.HasPrefix(value, "#") {

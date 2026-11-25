@@ -7,7 +7,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -84,7 +84,7 @@ const liveWalkMeasuredBuildCost = 1660 * time.Microsecond
 // So the claim is a counter read across a real walk of a real repository, which is the only form of
 // it that cannot decay into a sentence someone believes.
 // Not parallel: it resets the package designSystemCache and asserts the process-wide
-// tailwindengine.BuildsSoFar moved by exactly one across the walk, which any parallel test building a
+// tailwindcollapse.BuildsSoFar moved by exactly one across the walk, which any parallel test building a
 // design system or evicting the cache's one slot would inflate.
 //
 // The tree is ahra, the corpus the rest of the live suites in this package read. Without it the test
@@ -118,11 +118,11 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
 	}
 
 	rules := liveWalkRules(test)
-	before := tailwindengine.BuildsSoFar()
+	before := tailwindcollapse.BuildsSoFar()
 	if _, walkError := graph.Walk(context.Background(), files, rules); walkError != nil {
 		test.Fatalf("walking %s: %v", liveWalkRepository, walkError)
 	}
-	built := tailwindengine.BuildsSoFar() - before
+	built := tailwindcollapse.BuildsSoFar() - before
 
 	if built != 1 {
 		// The counterfactual is stated in the failure rather than left for the reader to compute,

@@ -1,4 +1,4 @@
-// Package consistency_no_long_file is the Go engine's rule that a file holds at most 2,000 lines.
+// Package consistency_no_long_file is cohere-go's rule that a file holds at most 2,000 lines.
 //
 // The size of a file is what a reader pays for: a file past the limit is one no reader can hold whole, and it has
 // seams in it to split along. The limit is the house max-lines and cohere-swift's file-length, and lines are counted
@@ -9,11 +9,11 @@
 // The finding covers the lines past the limit, from the start of the first one over to the end of the file, which is
 // what a split has to move out. A file whose base name has the `*.generated.*` shape, such as SecretKey.generated.ts
 // or schema.generated.go, gets no finding whatever its length or header: the name is the house's mark of a file a
-// generator writes, and its size is the generator's to keep, not a reader's to split. The engine's separate drop of a
+// generator writes, and its size is the generator's to keep, not a reader's to split. cohere-go's separate drop of a
 // file go/ast.IsGenerated accepts still applies on top of this.
 //
-// The max option moves the limit either way, as every engine's long-file rule takes it (#phdc7aa). A stricter limit
-// is a project's own business. A looser one departs from the ruling, so the engine runs it only where the settings'
+// The max option moves the limit either way, as every language's long-file rule takes it (#phdc7aa). A stricter limit
+// is a project's own business. A looser one departs from the ruling, so cohere-go runs it only where the settings'
 // go block states a departure for this rule with a reason, and refuses the run where they don't.
 package consistency_no_long_file
 
@@ -33,7 +33,7 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-long-file"
 
-// maximumOption is the option naming the most lines a file may hold, `max`, as every engine's long-file rule
+// maximumOption is the option naming the most lines a file may hold, `max`, as every language's long-file rule
 // spells it.
 const maximumOption = "max"
 
@@ -58,7 +58,7 @@ func NewAnalyzer() *analysis.Analyzer {
 		Run: run,
 	}
 	// A repository may hold its files to fewer lines than the house does, or to more, so the limit is the max option.
-	// A looser limit departs from a ruling, so the engine runs it only where the settings state a departure with a
+	// A looser limit departs from a ruling, so cohere-go runs it only where the settings state a departure with a
 	// reason, which it learns from the value's Loosens. The value is refused below one when it is set, so a bad
 	// setting fails the run's configuration rather than this rule.
 	limit := lineLimit(defaultLimit)
@@ -70,7 +70,7 @@ func NewAnalyzer() *analysis.Analyzer {
 // Analyzer runs the rule over one package.
 var Analyzer = NewAnalyzer()
 
-// Rule is this rule's entry in the Go engine's registry. It reads the files' line tables, never the types.
+// Rule is this rule's entry in cohere-go's registry. It reads the files' line tables, never the types.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
 var tooManyLinesMessage = policy.MessageOf(Name, "tooManyLines")
