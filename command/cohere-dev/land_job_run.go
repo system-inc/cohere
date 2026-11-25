@@ -179,7 +179,15 @@ func landJob(arguments []string) int {
 	job.mirrors = filepath.Join(job.scratch, "mirrors")
 	job.repository = filepath.Join(job.mirrors, "cohere.git")
 	job.tree = filepath.Join(job.scratch, "tree")
-	if code := job.land(); code != 0 {
+	if makeError := os.MkdirAll(job.scratch, 0o755); makeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: making the land job's scratch: %v\n", makeError)
+		return 1
+	}
+	job.sayDisk("before")
+	code := job.land()
+	job.say("step total %s", landJobSeconds(time.Since(job.started)))
+	job.sayDisk("after")
+	if code != 0 {
 		fmt.Fprintf(streams.Errors, "cohere-dev: land-job refused after %s, so nothing lands\n",
 			landJobSeconds(time.Since(job.started)))
 		return code
@@ -241,6 +249,7 @@ func (job *landJobRun) step(name string, work func() (string, int)) int {
 	started := time.Now()
 	said, code := work()
 	spent := landJobSeconds(time.Since(started))
+	job.say("step %s %s", name, spent)
 	if code != 0 {
 		fmt.Fprintf(streams.Errors, "cohere-dev: land-job step %s refused in %s\n", name, spent)
 		streams.Show(streams.Errors)
@@ -614,6 +623,9 @@ func (job *landJobRun) measure() (string, int) {
 	said, measurable, code := cohereToMeasure(job.repository, job.merge)
 	if !measurable {
 		job.landedTree, job.measured = job.mergeTree, said
+		if code == 0 {
+			job.say("measure skipped: %s", said)
+		}
 		return said, code
 	}
 	// A main whose file is missing or doesn't read has no binary to compare, so the script measures, and the note says
@@ -640,6 +652,9 @@ func (job *landJobRun) measure() (string, int) {
 		return "", measureCode
 	}
 	job.landedTree, job.measured = tree, measured
+	if mainBinary != "" && tree != "" && strings.HasPrefix(measured, "Not measured: ") {
+		job.say("measure skipped: %s", measured)
+	}
 	return measured, 0
 }
 
@@ -681,8 +696,19 @@ func (job *landJobRun) tests(share func(string) []string) (string, int) {
 	fmt.Fprintf(streams.Errors, "cohere-dev: testing %s here, %d packages, %s\n", shortCommit(job.merge),
 		len(listing.packages), job.cacheSaid())
 	streams.Show(streams.Errors)
+	before := job.readCache()
 	output, runError := runLandJobScript(job.scratch, script, arguments)
+	job.sayCache(before, job.readCache())
+	job.sayPackages(output)
 	verdict, unavailable := readBoxRun(output, runError, landJobBox, job.merge, races)
+	for _, step := range verdict.steps {
+		job.say("step box %s", step)
+	}
+	if verdict.race != nil {
+		for _, step := range verdict.race.steps {
+			job.say("step box -race %s", step)
+		}
+	}
 	if unavailable == "" {
 		unavailable = verdict.shardRefusal()
 	}
@@ -752,49 +778,55 @@ func (job *landJobRun) checks(share func(string) []string) (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: reading the modules to vet: %v\n", readGatedWorkspaceError)
 		return "", 1
 	}
-	checked := []string{"go vet"}
-	if code := goVet(job.tree, covered.Patterns(), gateEnvironment(share("go vet"))); code != 0 {
-		return "", code
+	// timed runs one check, the account saying its seconds, and returns its exit code and what the gate's account
+	// says of it, empty when it checked nothing.
+	timed := func(name string, check func() (int, string)) (int, string) {
+		started := time.Now()
+		code, said := check()
+		job.say("step %s %s", name, landJobSeconds(time.Since(started)))
+		return code, said
 	}
-	code, ruleCpuChecked := checkRuleCpu(job.tree,
-		func() []string { return gateEnvironment(share("the rule CPU budget check")) })
-	if code != 0 {
-		return "", code
-	}
-	if ruleCpuChecked {
-		checked = append(checked, "the rule CPU budget")
-	}
-	code, isolated, said := checkUnitIsolation(job.tree, job.merge,
-		func() []string { return gateEnvironment(share("the unit isolation")) })
-	if code != 0 {
-		return "", code
-	}
-	if isolated {
-		checked = append(checked, said)
-	}
-	code, docsSaid := landJobReplay{directory: job.cache}.run("docs-data", docsDataPlaceholderKey, job.tree,
-		func() (int, string) {
-			docsCode, docsChecked := checkDocsData(job.tree,
-				func() []string { return gateEnvironment(share("the docs data check")) })
-			if !docsChecked {
-				return docsCode, ""
-			}
-			return docsCode, "the docs data"
-		})
-	if code != 0 {
-		return "", code
-	}
-	if docsSaid != "" {
-		checked = append(checked, docsSaid)
-	}
-	code, cohereChecked := checkCohere(job.tree,
-		func() []string { return gateEnvironment(share("building cohere")) },
-		func() []string { return gateEnvironment(share("cohere on the tree")) })
-	if code != 0 {
-		return "", code
-	}
-	if cohereChecked {
-		checked = append(checked, "cohere on the tree, 0 findings and no gaps")
+	checked := []string{}
+	for _, check := range []struct {
+		name string
+		run  func() (int, string)
+	}{
+		{"vet", func() (int, string) {
+			return goVet(job.tree, covered.Patterns(), gateEnvironment(share("go vet"))), "go vet"
+		}},
+		{"rule-cpu", func() (int, string) {
+			code, ran := checkRuleCpu(job.tree,
+				func() []string { return gateEnvironment(share("the rule CPU budget check")) })
+			return code, map[bool]string{true: "the rule CPU budget"}[ran]
+		}},
+		{"isolation", func() (int, string) {
+			code, ran, said := checkUnitIsolation(job.tree, job.merge,
+				func() []string { return gateEnvironment(share("the unit isolation")) })
+			return code, map[bool]string{true: said}[ran]
+		}},
+		{"docs-data", func() (int, string) {
+			say := func(line string) { job.say("%s", line) }
+			return landJobReplay{directory: job.cache, by: job.merge, say: say}.run("docs-data",
+				docsDataPlaceholderKey, job.tree, func() (int, string) {
+					docsCode, docsChecked := checkDocsData(job.tree,
+						func() []string { return gateEnvironment(share("the docs data check")) })
+					return docsCode, map[bool]string{true: "the docs data"}[docsChecked]
+				})
+		}},
+		{"self-check", func() (int, string) {
+			code, ran := checkCohere(job.tree,
+				func() []string { return gateEnvironment(share("building cohere")) },
+				func() []string { return gateEnvironment(share("cohere on the tree")) })
+			return code, map[bool]string{true: "cohere on the tree, 0 findings and no gaps"}[ran]
+		}},
+	} {
+		code, said := timed(check.name, check.run)
+		if code != 0 {
+			return "", code
+		}
+		if said != "" {
+			checked = append(checked, said)
+		}
 	}
 	job.ran = append(job.ran, checked...)
 	return strings.Join(checked, ", "), 0
