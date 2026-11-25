@@ -295,8 +295,7 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		if outputError != nil {
 			test.Fatalf("cohere-dev test %v: %v\n%s", arguments, outputError, output)
 		}
-		// The stand-in's own line; the wrapper's notes, such as the corpora a private home leaves uncovered,
-		// are around it.
+		// The stand-in's own line; the wrapper's notes are around it.
 		line := ""
 		for _, candidate := range strings.Split(string(output), "\n") {
 			if strings.HasPrefix(candidate, "nice=") {

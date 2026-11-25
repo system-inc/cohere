@@ -156,7 +156,7 @@ func (context *TokenizeContext) main() {
 // goCode deals with one code. Upstream's go.
 //
 // Upstream's development build asserts that the previous code was consumed. The production build, which
-// the oracle runs, does not, and the fork's liquid construct depends on that: its mayClose returns a
+// the bundle carries, does not, and the fork's liquid construct depends on that: its mayClose returns a
 // state without consuming, so the same code is fed again to the state it returned. So neither consume
 // check is ported; the remaining panics guard invariants whose failure is a porting bug.
 func (context *TokenizeContext) goCode(code Code) {

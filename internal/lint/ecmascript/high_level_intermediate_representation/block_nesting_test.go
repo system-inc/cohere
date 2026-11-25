@@ -1,64 +1,11 @@
 package high_level_intermediate_representation
 
 import (
-	"path/filepath"
 	"sort"
-	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/modules/mutation_aliasing"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
-
-// forEachCorpusFunction lowers every outermost function-like in the corpus and hands it to visit,
-// already constructed with its ranges, disjoint set and scopes.
-//
-// Typed, and the checker is asserted present, for the reason `lower_corpus_test.go` records: a
-// checker-less lowering never emits `StoreContext`, so every count taken through one is a fact about
-// the harness rather than about the code.
-//
-// Note that `forEachFunctionLike` visits only outermost function-likes, so nested functions are not
-// walked. That is the same denominator every measurement in this package uses, and it is stated here
-// because a number taken from a different walk is not comparable to the ones in these comments.
-func forEachCorpusFunction(test *testing.T, limit int,
-	visit func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes)) {
-	test.Helper()
-
-	// Frozen, so a count asserted over it moves only when the analysis does. See pinnedCorpusFiles.
-	files, contentsOf := pinnedCorpusFiles(test, limit)
-
-	for _, path := range files {
-		contents := contentsOf[path]
-		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule[rule.NoOptions]{
-			Name:             "merge-corpus",
-			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-				return rule.Listeners{
-					ast.KindSourceFile: func(node *ast.Node) {
-						if ruleContext.TypeChecker == nil {
-							test.Fatal("the typed harness handed this probe a nil checker, so every " +
-								"count below would be a fact about the harness rather than the code")
-						}
-						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ruleContext.TypeChecker)
-							if function == nil {
-								return
-							}
-							Construct(function)
-							ranges := InferMutableRanges(function)
-							set := FindDisjointMutableValuesWithRanges(function, ranges)
-							visit(function, ranges, AssignReactiveScopesWithSets(function, ranges, set))
-						})
-					},
-				}
-			},
-		}
-		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: contents}, fileName)
-	}
-}
 
 // nestingItem is one entry in upstream's `assertValidBlockNesting` item list.
 type nestingItem struct {

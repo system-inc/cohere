@@ -1,20 +1,20 @@
 package registry
 
 import (
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
-// The live config, which is the only thing that decides whether a registered rule ever runs.
-// liveConfigPath is ahra's config, which is private, so the test that reads it skips where the ahra corpus
-// is not set, and the gate names it as not covered (#sycrdr6).
-func liveConfigPath(test testing.TB) string {
-	test.Helper()
-	return corpus.Ahra.Path(test, "CohereSettings.json")
+// projectConfigurationPath is the configuration package's project fixture: the sets cohere carries that a
+// Structure app extends, with the app's own rules and an override on top. The sets decide whether a
+// registered rule ever runs, and this reads them through the chain a real project extends. It is read from
+// that package's testdata rather than copied here, so the two tests that read it can't drift apart.
+func projectConfigurationPath() string {
+	return filepath.Join("..", "configuration", "testdata", "project", "CohereSettings.json")
 }
 
 // A rule's fixture proves it works. The config decides whether it runs, and nothing else connects
@@ -26,18 +26,18 @@ func liveConfigPath(test testing.TB) string {
 // `no-assign-module-variable`. The names did not match, the rule ran on nothing, and its tests were
 // green. Only the coverage line caught it, and only because a second sentence happened to print.
 //
-// This is the mechanical version: every registered rule must be a name the live config can resolve,
-// or be listed below as deliberately not enabled.
-func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T) {
+// This is the mechanical version: every registered rule must be a name the project's chain of sets can
+// resolve, or be listed below as deliberately not enabled.
+func TestEveryRegisteredRuleIsReachableFromTheSets(test *testing.T) {
 	test.Parallel()
 
-	loaded, loadError := configuration.Load(liveConfigPath(test))
+	loaded, loadError := configuration.Load(projectConfigurationPath())
 	if loadError != nil {
-		test.Fatalf("loading the live config: %v", loadError)
+		test.Fatalf("loading the project config: %v", loadError)
 	}
 	resolved := loaded.Resolve("app/Probe.tsx")
 
-	// Rules cohere implements that the live config deliberately leaves unconfigured. Each needs a reason,
+	// Rules cohere implements that the sets deliberately leave unconfigured. Each needs a reason,
 	// because an entry here silences the guard for that rule permanently, and the reverse check below
 	// fails an entry the config has since configured or that names no rule.
 	//
@@ -73,8 +73,8 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T)
 	}
 
 	// An exemption is a claim about the world, and the world moves, so each is checked rather than trusted.
-	// One that names no registered rule matches nothing and silences nothing it says it does; one the live
-	// config now configures is a decision the config has already made. Either way the entry outlived its
+	// One that names no registered rule matches nothing and silences nothing it says it does; one the sets
+	// now configure is a decision the sets have already made. Either way the entry outlived its
 	// premise. The last one found was import-require-path-alias: keyed by a name no rule has had since the
 	// naming scheme, its reason checked against an oxlint plugin that left with the gate, and the check
 	// skipped silently once the plugin was gone (#sycrdr6).
@@ -89,7 +89,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T)
 			continue
 		}
 		if status, _ := resolved.StatusOf(name); status != configuration.StatusUnconfigured {
-			staleExemptions = append(staleExemptions, name+": the live config configures it")
+			staleExemptions = append(staleExemptions, name+": the sets configure it")
 		}
 	}
 	sort.Strings(staleExemptions)
@@ -100,8 +100,8 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T)
 
 	if len(unreachable) > 0 {
 		test.Errorf(
-			"%d registered rules are not mentioned by the live config, so they run on nothing and "+
-				"nobody has said whether they should: %v\n"+
+			"%d registered rules are not mentioned by the project config or any set it extends, so they run on "+
+				"nothing and nobody has said whether they should: %v\n"+
 				"a rule whose name the config cannot resolve passes its own fixtures and lints no "+
 				"files. A rule the config explicitly turns off is not this: that is a decision, and "+
 				"it is reported separately by the run itself as scoped off",

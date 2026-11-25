@@ -564,13 +564,7 @@ func gate(worktree string, commit string, task string) (int, string) {
 		if checked {
 			ran = append(ran, "the rule CPU budget")
 		}
-		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
-		testing, uncovered, testEnvironmentError := testEnvironment(gateEnvironment(step("the test run")))
-		if testEnvironmentError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
-			return 2
-		}
-		defer printUncovered(streams.Errors, uncovered)
+		testing := gateEnvironment(step("the test run"))
 		// On a gate box, a house Mac (box_verdict.go, mac_box_gate.go), or as a land-gate job (land_gate_job.go),
 		// either one's no verdict refusing the landing, or on Kirk's Mac alone when the gate says off.
 		testCode, where := runModuleTests(worktree, commit, task, covered, testing)

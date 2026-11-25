@@ -69,7 +69,7 @@ func (fixture *macBoxFixture) remoteArguments(box string) (string, string) {
 	if found == nil {
 		fixture.test.Fatalf("%s's remote is not the encoded script and its arguments:\n%s", box, remote)
 	}
-	return string(found[6]), string(found[4])
+	return string(found[5]), string(found[4])
 }
 
 // The fixture's race tokens, as racePatterns writes them for its tree.

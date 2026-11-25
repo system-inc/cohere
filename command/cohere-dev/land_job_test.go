@@ -14,7 +14,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/testing/corpus"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
 )
@@ -56,7 +55,7 @@ fi
 fails=$(cat "$replies/tests.fails" 2>/dev/null || true)
 echo "` + boxMarker + `$commit on $LAND_JOB_PLATFORM"
 races="$3"
-shift 4
+shift 3
 failed=0
 for package in "$@"; do
   if [ "$package" = "$fails" ]; then
@@ -267,10 +266,10 @@ func TestALandJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 					"of main's", measured)
 			}
 			tested := fixture.arguments("tests")
-			if len(tested) < 5 || tested[0] != merge || tested[1] != "" || tested[3] != "-" ||
-				!slices.Contains(tested[4:], "example.com/fixture/alpha") {
-				test.Errorf("the tests' script was handed %q, want the merge, no pin, no corpora for a tree that "+
-					"isn't cohere's, and the packages the laid tree lists", tested)
+			if len(tested) < 4 || tested[0] != merge || tested[1] != "" ||
+				!slices.Contains(tested[3:], "example.com/fixture/alpha") {
+				test.Errorf("the tests' script was handed %q, want the merge, no pin, and the packages the laid tree "+
+					"lists", tested)
 			}
 			script := string(readMaybeMissing(test, filepath.Join(fixture.replies, "tests.script")))
 			mirrors := filepath.Join(fixture.home, landJobScratch, "mirrors")
@@ -545,7 +544,7 @@ func TestTheLandJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	noGo := filepath.Join(directory, "no-go")
 	script = strings.Replace(script, `goroot="`+macBoxGoroot+`"`, `goroot="`+noGo+`"`, 1)
 	home := filepath.Join(directory, "home")
-	bash := exec.Command("bash", "-s", "--", merge, pin, "", "-", "./...")
+	bash := exec.Command("bash", "-s", "--", merge, pin, "", "./...")
 	bash.Dir, bash.Stdin = test.TempDir(), strings.NewReader(script)
 	bash.Env = append(environment, "HOME="+home)
 	output, bashError := bash.CombinedOutput()
@@ -562,163 +561,5 @@ func TestTheLandJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	if objects := git(filepath.Join(mirrors, "cohere.git"), "count-objects", "-v"); !strings.Contains(objects,
 		"count: 0\n") || !strings.Contains(objects, "in-pack: 0\n") {
 		test.Errorf("the land job's cohere mirror copied objects:\n%s", objects)
-	}
-	// A tree that isn't cohere's pins no corpus, so none is laid and no corpus mirror is asked for.
-	if _, _, refusal := layLandJobCorpora(filepath.Join(mirrors, "cohere.git"), merge, filepath.Join(directory,
-		"no-corpora"), filepath.Join(directory, "no-corpora"), mirrors); refusal != "" {
-		test.Errorf("a tree that isn't cohere's, pinning nothing, refused its corpora: %s", refusal)
-	}
-	// A cohere tree pins every corpus, and a source that is absent refuses the job, naming the corpus and its path,
-	// never a skip (#3kpxrdt).
-	pinned := "package corpus\n\nconst (\n"
-	for _, each := range corpus.All {
-		pinned += "\t" + each.Identifier + "Pin = \"" + strings.Repeat("1", 40) + "\"\n"
-	}
-	writeFixtureFile(test, filepath.Join(checkout, "go.mod"), "module "+cohereModule+"\n\ngo 1.27\n")
-	writeFixtureFile(test, filepath.Join(checkout, filepath.FromSlash(corpus.PinnedFile)), pinned+")\n")
-	git(checkout, "add", ".")
-	git(checkout, "commit", "-q", "-m", "a cohere tree pinning its corpora")
-	git(checkout, "push", "-q", filepath.Join(house, "cohere.git"), "HEAD:refs/heads/cohere")
-	_, _, refusal := layLandJobCorpora(filepath.Join(mirrors, "cohere.git"), git(checkout, "rev-parse", "HEAD"),
-		filepath.Join(directory, "no-corpora"), filepath.Join(directory, "no-corpora"), mirrors)
-	if want := "ahra's source " + filepath.Join(directory, "no-corpora", "ahra-"+strings.Repeat("1", 40)) +
-		" isn't on this box"; !strings.HasPrefix(refusal, want) {
-		test.Errorf("an absent corpus source refused as %q, want %q", refusal, want)
-	}
-}
-
-// Each corpus's source on Shackler (landJobCorpusSources): every source holding its pin is laid from; ahra's directory,
-// Structure's mirror or connected's directory missing refuses the job, naming the corpus and the path; and the Prettier
-// fork's mirror refuses when absent or holding commits but not the pin, while one holding no commit at all is the named
-// gap `run nowhere: prettier-fork not on Shackler`, which closes once the pin is pushed (the Square's ruling).
-func TestTheLandJobsCorpusSourcesRefuseOrNameTheForksGap(test *testing.T) {
-	test.Parallel()
-	directory := test.TempDir()
-	environment := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
-		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@example.com")
-	git := func(where string, arguments ...string) string {
-		test.Helper()
-		command := exec.Command("git", arguments...)
-		command.Dir, command.Env = where, environment
-		output, gitError := command.CombinedOutput()
-		if gitError != nil {
-			test.Fatalf("git %v in %s: %v\n%s", arguments, where, gitError, output)
-		}
-		return strings.TrimSpace(string(output))
-	}
-	source := filepath.Join(directory, "source")
-	writeFixtureFile(test, filepath.Join(source, "README.md"), "a corpus\n")
-	git(directory, "init", "-q", "-b", "main", source)
-	git(source, "add", ".")
-	git(source, "commit", "-q", "-m", "the pin")
-	pin := git(source, "rev-parse", "HEAD")
-	writeFixtureFile(test, filepath.Join(source, "README.md"), "another commit\n")
-	git(source, "commit", "-q", "-a", "-m", "not the pin")
-	// A commit with no parent, so a mirror holding it holds nothing of the pin.
-	other := git(source, "commit-tree", git(source, "rev-parse", "HEAD^{tree}"), "-m", "not the pin")
-	pins := map[string]corpus.Pins{}
-	for _, each := range corpus.All {
-		pins[each.Name] = corpus.Pins{Checkout: pin, Held: []string{pin}}
-	}
-	for _, row := range []struct {
-		name string
-		// fork is the fork's mirror: "absent", "empty", "other" holding another commit, or "pinned".
-		fork    string
-		lacking string
-		laid    int
-		gap     string
-		refusal string
-	}{
-		{name: "every source holds its pin", fork: "pinned", laid: 4},
-		{name: "the fork's mirror holds no commit", fork: "empty", laid: 3,
-			gap: "run nowhere: prettier-fork not on Shackler"},
-		{name: "the fork's mirror lacks the pin", fork: "other", refusal: "prettier-fork's mirror "},
-		{name: "the fork's mirror is absent", fork: "absent", refusal: "prettier-fork's mirror "},
-		{name: "ahra's directory is absent", fork: "pinned", lacking: "ahra", refusal: "ahra's source "},
-		{name: "structure's mirror is absent", fork: "pinned", lacking: "structure", refusal: "structure's mirror "},
-		{name: "connected's directory is absent", fork: "pinned", lacking: "connected", refusal: "connected's source "},
-	} {
-		test.Run(row.name, func(test *testing.T) {
-			test.Parallel()
-			mirrors, corpora := test.TempDir(), test.TempDir()
-			for _, each := range corpus.All {
-				where := landJobCorpusSources[each.Name]
-				switch {
-				case each.Name == row.lacking:
-				case where.archive != "":
-					writeFixtureFile(test, filepath.Join(corpora, where.archive+pin, "README.md"), "a corpus\n")
-				case where.emptyIsGap && row.fork == "absent":
-				case where.emptyIsGap && row.fork == "empty":
-					git(directory, "init", "-q", "--bare", filepath.Join(mirrors, where.mirror))
-				case where.emptyIsGap && row.fork == "other":
-					git(directory, "init", "-q", "--bare", filepath.Join(mirrors, where.mirror))
-					git(source, "push", "-q", filepath.Join(mirrors, where.mirror), other+":refs/heads/other")
-				default:
-					git(directory, "init", "-q", "--bare", filepath.Join(mirrors, where.mirror))
-					git(source, "push", "-q", filepath.Join(mirrors, where.mirror), pin+":refs/heads/pin")
-				}
-			}
-			laid, gap, refusal := landJobCorpusChecked(pins, mirrors, corpora)
-			if len(laid) != row.laid || gap != row.gap || (row.refusal == "") != (refusal == "") ||
-				!strings.HasPrefix(refusal, row.refusal) {
-				test.Errorf("laid %d, gap %q, refusal %q; want %d, %q, %q", len(laid), gap, refusal, row.laid,
-					row.gap, row.refusal)
-			}
-		})
-	}
-}
-
-// The land job's carry from its sources: ahra's directory goes whole, at its place, but for what its recipe leaves
-// out, and a bare mirror whose tree records a submodule refuses, naming it, since it has no working tree to fill it
-// from.
-func TestTheLandJobsCarryTakesADirectoryAndRefusesABareSubmodule(test *testing.T) {
-	test.Parallel()
-	directory := test.TempDir()
-	ahra := filepath.Join(directory, "ahra-"+strings.Repeat("1", 40))
-	writeFixtureFile(test, filepath.Join(ahra, "package.json"), "{}\n")
-	writeFixtureFile(test, filepath.Join(ahra, "data", "conversation"), "left out\n")
-	carry := filepath.Join(directory, "carry.tar.gz")
-	laid := gateCorpus{corpus: corpus.Ahra, pins: corpus.Pins{Checkout: strings.Repeat("1", 40)}, checkout: ahra,
-		directory: true}
-	if _, carryError := writeCorpusCarry(carry, directory, []gateCorpus{laid}); carryError != nil {
-		test.Fatal(carryError)
-	}
-	listing, listError := exec.Command("tar", "-t", "-z", "-f", carry).CombinedOutput()
-	if listError != nil {
-		test.Fatalf("tar: %v\n%s", listError, listing)
-	}
-	if !strings.Contains(string(listing), laid.place()+"/package.json\n") || strings.Contains(string(listing),
-		"conversation") {
-		test.Errorf("the carry holds:\n%s\nwant %s/package.json and nothing of data", listing, laid.place())
-	}
-	environment := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
-		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@example.com")
-	git := func(where string, arguments ...string) string {
-		test.Helper()
-		command := exec.Command("git", arguments...)
-		command.Dir, command.Env = where, environment
-		output, gitError := command.CombinedOutput()
-		if gitError != nil {
-			test.Fatalf("git %v in %s: %v\n%s", arguments, where, gitError, output)
-		}
-		return strings.TrimSpace(string(output))
-	}
-	source := filepath.Join(directory, "prettier")
-	writeFixtureFile(test, filepath.Join(source, "package.json"), "{}\n")
-	git(directory, "init", "-q", "-b", "main", source)
-	git(source, "add", ".")
-	git(source, "update-index", "--add", "--cacheinfo", "160000,"+strings.Repeat("2", 40)+",vendored")
-	git(source, "commit", "-q", "-m", "a tree recording a submodule")
-	pin := git(source, "rev-parse", "HEAD")
-	mirror := filepath.Join(directory, "prettier.git")
-	git(directory, "init", "-q", "--bare", mirror)
-	git(source, "push", "-q", mirror, "HEAD:refs/heads/main")
-	bare := gateCorpus{corpus: corpus.PrettierFork, pins: corpus.Pins{Checkout: pin}, checkout: mirror, bare: true}
-	_, carryError := writeCorpusCarry(filepath.Join(directory, "bare.tar.gz"), directory, []gateCorpus{bare})
-	if carryError == nil || !strings.Contains(carryError.Error(), "records the submodule vendored, which its bare "+
-		"mirror "+mirror+" can't fill") {
-		test.Errorf("a bare mirror's submodule carried as %v, want a refusal naming it", carryError)
 	}
 }
