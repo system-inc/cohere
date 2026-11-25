@@ -48,9 +48,6 @@ type runSummary struct {
 	Cache cacheUse
 	// PackageCache is what cohere-go's per-package findings cache did, nil for every other run.
 	PackageCache *packageCacheUse
-	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, in order, nil when it raised
-	// none and for every other run (#5shepvt). A replay raised nothing, so it carries none.
-	MemoryRaisedToBytes []int64
 	// HeadersUnshared is why a Go run's listings did not share each Go file's header (#fnsk1jv), empty when they
 	// shared them and for every other run. A replay started no child, so it carries none.
 	HeadersUnshared string

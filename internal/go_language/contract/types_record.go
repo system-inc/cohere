@@ -58,12 +58,11 @@ const (
 	// MemorySourceEnvironment is a `GOGC` or `GOMEMLIMIT` the user set, which decides the collector, so cohere-go
 	// sets nothing.
 	MemorySourceEnvironment MemorySource = "Environment"
-	// MemorySourceCap is cohere-go's cap, lower than half the memory available.
-	MemorySourceCap MemorySource = "Cap"
-	// MemorySourceAvailable is half the memory available when the run started, lower than the cap.
+	// MemorySourceAvailable is half the memory available when the run started, the ceiling the front door's policy
+	// set.
 	MemorySourceAvailable MemorySource = "Available"
-	// MemorySourceUnreadable is the cap, set as a bound alone, since available memory could not be read and the
-	// collector runs at Go's default.
+	// MemorySourceUnreadable is cohere-go's bound for memory it could not read, set as a bound alone, with the
+	// collector at Go's default.
 	MemorySourceUnreadable MemorySource = "Unreadable"
 )
 
@@ -71,7 +70,6 @@ const (
 // the environment can decide.
 type Memory struct {
 	LimitBytes int64        `json:"limitBytes"`
-	CapBytes   int64        `json:"capBytes"`
 	Source     MemorySource `json:"source"`
 	// AvailableBytes is the memory available when the run started, 0 when it could not be read or did not matter.
 	AvailableBytes uint64 `json:"availableBytes"`

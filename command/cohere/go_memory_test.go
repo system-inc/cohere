@@ -8,30 +8,43 @@ import (
 func TestGoMemoryLine(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		name   string
-		record string
-		want   string
+		name         string
+		record       string
+		buildsAtOnce int
+		want         string
 	}{
 		{
-			name:   "the cap",
-			record: `{"limitBytes":8589934592,"capBytes":8589934592,"source":"Cap","availableBytes":44023414784}`,
-			want:   "cohere-go's limit is its 8.6 GB cap, under half of the 44 GB available",
+			name:         "half of what is available on Monkee, with the builds it ran at once",
+			record:       `{"limitBytes":5750000000,"source":"Available","availableBytes":11500000000}`,
+			buildsAtOnce: 3,
+			want:         "memory limit 5.4 GiB, half of the 11.5 GB available: 3 builds at once",
 		},
 		{
-			name:   "half of what is available",
-			record: `{"limitBytes":6000000000,"capBytes":8589934592,"source":"Available","availableBytes":12000000000}`,
-			want:   "cohere-go's limit is 6.0 GB, half of the 12 GB available, under its 8.6 GB cap",
+			name:   "half of what is available on a run of one build",
+			record: `{"limitBytes":125000000000,"source":"Available","availableBytes":250000000000}`,
+			want:   "memory limit 116.4 GiB, half of the 250.0 GB available",
 		},
 		{
-			name: "the user's environment",
-			record: `{"limitBytes":0,"capBytes":8589934592,"source":"Environment","availableBytes":0,` +
+			name:         "one build at once",
+			record:       `{"limitBytes":2000000000,"source":"Available","availableBytes":4000000000}`,
+			buildsAtOnce: 1,
+			want:         "memory limit 1.9 GiB, half of the 4.0 GB available: 1 build at once",
+		},
+		{
+			name: "the user's environment with a limit",
+			record: `{"limitBytes":21474836480,"source":"Environment","availableBytes":0,` +
 				`"environment":"GOMEMLIMIT=20GiB"}`,
-			want: "the environment sets cohere-go's collector (GOMEMLIMIT=20GiB), so its 8.6 GB cap does not apply",
+			want: "memory limit 20.0 GiB, set by the environment (GOMEMLIMIT=20GiB)",
+		},
+		{
+			name:   "the user's environment without one",
+			record: `{"limitBytes":0,"source":"Environment","availableBytes":0,"environment":"GOGC=100"}`,
+			want:   "memory limit none, since the environment sets cohere-go's collector (GOGC=100)",
 		},
 		{
 			name:   "available memory unreadable",
-			record: `{"limitBytes":8589934592,"capBytes":8589934592,"source":"Unreadable","availableBytes":0}`,
-			want: "cohere-go's limit is its 8.6 GB cap, with the collector at Go's default, since available " +
+			record: `{"limitBytes":8589934592,"source":"Unreadable","availableBytes":0}`,
+			want: "memory limit 8.0 GiB as a bound alone, with the collector at Go's default, since available " +
 				"memory could not be read",
 		},
 	}
@@ -42,8 +55,8 @@ func TestGoMemoryLine(test *testing.T) {
 			if decodeError := json.Unmarshal([]byte(described.record), &memory); decodeError != nil {
 				test.Fatalf("decoding %s: %v", described.record, decodeError)
 			}
-			if got := memory.line(); got != described.want {
-				test.Errorf("line() = %q, want %q", got, described.want)
+			if got := memory.line(described.buildsAtOnce); got != described.want {
+				test.Errorf("line(%d) = %q, want %q", described.buildsAtOnce, got, described.want)
 			}
 		})
 	}

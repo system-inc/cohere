@@ -1,31 +1,21 @@
 package go_language
 
 import (
-	"bytes"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
-	"runtime"
-	"runtime/debug"
-	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/go_language/contract"
-	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
 // loadPackagesPath is package load's import path, whose loads only loadPackages may call.
 const loadPackagesPath = "github.com/system-inc/cohere/internal/go_language/load"
 
-// Every load of the workspace goes through loadPackages, which returns the limit to the cap before it and arms the
-// raise around it, so a load added anywhere else in cohere-go would run under whatever limit the last load's raise
-// left. Read from the package's source, not its tests.
+// Every load of the workspace goes through loadPackages, which marks the go commands started from its start as late and
+// gives a cached load the run's pool, account and walks, so a load added anywhere else in cohere-go would start its go
+// commands unmarked and take none of them. Read from the package's source, not its tests.
 func TestOnlyLoadPackagesLoads(test *testing.T) {
 	test.Parallel()
 	files, globError := filepath.Glob("*.go")
@@ -63,8 +53,8 @@ func TestOnlyLoadPackagesLoads(test *testing.T) {
 				}
 				calls++
 				if !allowed {
-					test.Errorf("%s calls load.%s outside loadPackages, so that load skips the memory limit's reset "+
-						"and its late raise; load through pipeline.loadPackages", fileSet.Position(call.Pos()),
+					test.Errorf("%s calls load.%s outside loadPackages, so that load skips what every load of the "+
+						"run shares; load through pipeline.loadPackages", fileSet.Position(call.Pos()),
 						selector.Sel.Name)
 				}
 				return true
@@ -89,129 +79,4 @@ func importedAs(file *ast.File, path string) string {
 		return filepath.Base(path)
 	}
 	return ""
-}
-
-// memoryWatch is a fake memory limit and collector reader for a run in process: it keeps the limit set, and at each
-// load's end, when the raise reads the collector, the limit the load ran to its end under.
-type memoryWatch struct {
-	lock    sync.Mutex
-	current int64
-	set     []int64
-	// raised is whether a raise has lifted the limit past the cap, and endedUnder the limit at each load's end.
-	raised     bool
-	endedUnder []int64
-	// duringAfterRaise is the limit at each look inside a load that came after a raise: inside a reload.
-	duringAfterRaise []int64
-}
-
-// duringLoad is called inside a load, as package load reads a file the run holds.
-func (watch *memoryWatch) duringLoad() {
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	if watch.raised {
-		watch.duringAfterRaise = append(watch.duringAfterRaise, watch.current)
-	}
-}
-
-func (watch *memoryWatch) setMemoryLimit(limit int64) int64 {
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	previous := watch.current
-	watch.current = limit
-	watch.set = append(watch.set, limit)
-	if limit > memoryCap {
-		watch.raised = true
-	}
-	return previous
-}
-
-// setLimits is every limit set, in order.
-func (watch *memoryWatch) setLimits() []int64 {
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	return slices.Clone(watch.set)
-}
-
-// collecting is read at each load's end, and says no collection is in flight, so each raise lands at once.
-func (watch *memoryWatch) collecting() bool {
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	watch.endedUnder = append(watch.endedUnder, watch.current)
-	return false
-}
-
-// A run whose long-line wrap writes loads again, and the reload runs under the cap: the first load's raise lifted the
-// limit, and the reload set it back before it started, so the limit read inside the reload, as package load asks for a
-// file's held bytes, is the cap, as it is at every load's end.
-func TestAReloadAfterTheRaiseRunsUnderTheCap(test *testing.T) {
-	test.Parallel()
-	root := copyFixture(test, filepath.Join("testdata", "long-lines"))
-	file := filepath.Join(root, "long_lines.go")
-	original, readError := os.ReadFile(file)
-	if readError != nil {
-		test.Fatalf("reading %s: %v", file, readError)
-	}
-	watch := &memoryWatch{current: memoryCap}
-	memory := capMemoryWatched(watch, watch.collecting)
-	memory.duringLoad = watch.duringLoad
-	var standardOutput bytes.Buffer
-	var standardError bytes.Buffer
-
-	exitCode := runIsolated(test, []string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
-		&standardOutput, &standardError, rules.All(), memory)
-
-	if exitCode != exitFindings && exitCode != exitClean {
-		test.Fatalf("exit %d; stderr:\n%s", exitCode, standardError.String())
-	}
-	wrapped, readError := os.ReadFile(file)
-	if readError != nil || bytes.Equal(wrapped, original) {
-		test.Fatalf("the run left %s as it was (%v), so it never loaded again", file, readError)
-	}
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	if len(watch.endedUnder) < 2 || !watch.raised {
-		test.Fatalf("the run ended %d loads and raised %t, want a reload after a raise", len(watch.endedUnder),
-			watch.raised)
-	}
-	for index, limit := range watch.endedUnder {
-		if limit != memoryCap {
-			test.Errorf("load %d of %d ended under a limit of %d, want the cap, %d", index+1, len(watch.endedUnder),
-				limit, memoryCap)
-		}
-	}
-	if len(watch.duringAfterRaise) == 0 {
-		test.Fatal("no look inside a load came after the raise, so the reload's limit went unread")
-	}
-	for _, limit := range watch.duringAfterRaise {
-		if limit != memoryCap {
-			test.Fatalf("a reload ran under a limit of %d, want the cap, %d, from its start", limit, memoryCap)
-		}
-	}
-}
-
-// Not parallel: it turns the collector's automatic collections off for the whole process and counts collections, so
-// only its own runtime.GC call may complete one, which a test running beside it would not leave alone.
-func TestALastLoadsRaiseLiftsNothingDuringTheNext(test *testing.T) {
-	previousPercent := debug.SetGCPercent(-1)
-	test.Cleanup(func() { debug.SetGCPercent(previousPercent) })
-	watch := &memoryWatch{current: memoryCap}
-	// Every load ends with a collection in flight, so each raise waits on its sentinel's finalizer.
-	loads := newLoadMemory(capMemoryWatched(watch, func() bool { return true }), false)
-	loads.begin()
-	first := loads.current
-	if first == nil {
-		test.Fatal("the first load armed no raise")
-	}
-	loads.end()
-
-	loads.begin()
-	runtime.GC()
-	waitFor(test, "the first load's sentinel", func() bool { return first.collections.Load() >= 1 })
-
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	if watch.current != memoryCap || watch.raised {
-		test.Errorf("the first load's collection completing during the next load left the limit at %d (raised %t), "+
-			"want the cap, %d", watch.current, watch.raised, memoryCap)
-	}
 }

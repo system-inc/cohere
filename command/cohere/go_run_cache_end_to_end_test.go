@@ -239,7 +239,7 @@ func goVerdict(cold string) string {
 		"  lint: build ",
 		"phases: ",
 		"  total ",
-		"  memory: ",
+		"  memory",
 		"  cache: off, by --no-cache",
 		"cache: not replayed whole",
 		"✓ 💎 ",
@@ -284,7 +284,7 @@ func goReplayBody(replay string) string {
 		"phases: replayed ",
 		goReplayLintPrefix,
 		"  this run: ",
-		"  memory: ",
+		"  memory",
 		"✓ 💎 ",
 		"✗ ☠️ ",
 	), "$1: ")
@@ -311,7 +311,7 @@ func goSummaryVerdict(test *testing.T, output string) map[string]json.RawMessage
 	}
 	for _, invocation := range []string{
 		"seconds", "graphSeconds", "formattingSeconds", "phases", "cache", "packageCache", "checked", "cached", "nodes",
-		"memoryRaisedToBytes", "builds", "buildsAtOnce", "buildsWidthLiveBytes", "buildsWidthFromHostLive",
+		"builds", "buildsAtOnce", "buildsWidthLiveBytes", "buildsWidthFromHostLive",
 	} {
 		delete(summary, invocation)
 	}
@@ -438,9 +438,8 @@ func replayedAsCold(test *testing.T, everyBuild bool, view string) {
 		if replayLines != coldLines {
 			test.Fatalf("the replay's records differ:\n--- replay\n%s\n--- cold\n%s", replayLines, coldLines)
 		}
-		// A replay started no child, so it says nothing of the child's package cache, nor of a memory raise
-		// (#5shepvt).
-		for _, invocationOnly := range []string{`"packageCache"`, `"memoryRaisedToBytes"`} {
+		// A replay started no child, so it says nothing of the child's package cache.
+		for _, invocationOnly := range []string{`"packageCache"`} {
 			if strings.Contains(summaryJsonOf(test, replayed.stdout), invocationOnly) {
 				test.Errorf("the replay's summary claims the child's %s:\n%s", invocationOnly, replayed.stdout)
 			}

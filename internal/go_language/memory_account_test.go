@@ -1,81 +1,106 @@
 package go_language
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"math"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
 )
 
-func TestCapMemory(test *testing.T) {
+// monkeeAvailableBytes is the memory Monkee, 16 GB, read as available in #jrr6a5x's rows, and monkeeLimitBytes the half
+// of it the front door's policy sets as the limit.
+const (
+	monkeeAvailableBytes uint64 = 11_500_000_000
+	monkeeLimitBytes     int64  = 5_750_000_000
+)
+
+// largeAvailableBytes is a 250 GB machine's available memory, and largeLimitBytes the half of it the policy sets.
+const (
+	largeAvailableBytes uint64 = 250_000_000_000
+	largeLimitBytes     int64  = 125_000_000_000
+)
+
+// eightGibibytes is the limit the width's heaps were measured under, on machines whose half of available passed it.
+const eightGibibytes int64 = 8 << 30
+
+// halfOfAvailable is a decision whose limit, limitBytes, is half the memory available, as the policy sets it.
+func halfOfAvailable(limitBytes int64) *contract.Memory {
+	return &contract.Memory{
+		LimitBytes:     limitBytes,
+		Source:         contract.MemorySourceAvailable,
+		AvailableBytes: uint64(limitBytes) * 2,
+	}
+}
+
+func TestDecideMemory(test *testing.T) {
 	test.Parallel()
-	const available uint64 = 41 << 30
 	cases := []struct {
 		name        string
 		environment map[string]string
 		current     int64
-		// set is every limit capMemory set, the read with -1 left out.
+		available   uint64
+		// set is every limit decideMemory set, the read with -1 left out.
 		set  []int64
 		want contract.Memory
 	}{
 		{
-			name: "a ceiling above the cap is lowered to the cap", current: 20 << 30, set: []int64{memoryCap},
+			name:    "Monkee's half of available is the limit, set by the policy and left alone",
+			current: monkeeLimitBytes, available: monkeeAvailableBytes,
 			want: contract.Memory{
-				LimitBytes: memoryCap, CapBytes: memoryCap, Source: contract.MemorySourceCap,
-				AvailableBytes: available,
+				LimitBytes: monkeeLimitBytes, Source: contract.MemorySourceAvailable,
+				AvailableBytes: monkeeAvailableBytes,
 			},
 		},
 		{
-			name: "the cap itself is left alone and named the cap", current: memoryCap,
+			name:    "a 250 GB machine's half of available is the limit, never lowered",
+			current: largeLimitBytes, available: largeAvailableBytes,
 			want: contract.Memory{
-				LimitBytes: memoryCap, CapBytes: memoryCap, Source: contract.MemorySourceCap,
-				AvailableBytes: available,
+				LimitBytes: largeLimitBytes, Source: contract.MemorySourceAvailable,
+				AvailableBytes: largeAvailableBytes,
 			},
 		},
 		{
-			name: "a ceiling below the cap is never raised", current: 4 << 30,
+			name: "no limit, from memory the policy could not read, gets the bound", current: math.MaxInt64,
+			set: []int64{unreadableMemoryBound},
 			want: contract.Memory{
-				LimitBytes: 4 << 30, CapBytes: memoryCap, Source: contract.MemorySourceAvailable,
-				AvailableBytes: available,
-			},
-		},
-		{
-			name: "no limit, from memory the policy could not read, gets the cap as a bound", current: math.MaxInt64,
-			set: []int64{memoryCap},
-			want: contract.Memory{
-				LimitBytes: memoryCap, CapBytes: memoryCap, Source: contract.MemorySourceUnreadable,
+				LimitBytes: unreadableMemoryBound, Source: contract.MemorySourceUnreadable,
 			},
 		},
 		{
 			name: "GOGC in the environment wins", environment: map[string]string{"GOGC": "100"}, current: math.MaxInt64,
+			available: largeAvailableBytes,
 			want: contract.Memory{
-				CapBytes: memoryCap, Source: contract.MemorySourceEnvironment, Environment: "GOGC=100",
+				Source: contract.MemorySourceEnvironment, Environment: "GOGC=100",
 			},
 		},
 		{
 			name: "GOMEMLIMIT in the environment wins", environment: map[string]string{"GOMEMLIMIT": "20GiB"},
-			current: 20 << 30,
+			current: 20 << 30, available: largeAvailableBytes,
 			want: contract.Memory{
-				LimitBytes: 20 << 30, CapBytes: memoryCap, Source: contract.MemorySourceEnvironment,
-				Environment: "GOMEMLIMIT=20GiB",
+				LimitBytes: 20 << 30, Source: contract.MemorySourceEnvironment, Environment: "GOMEMLIMIT=20GiB",
 			},
 		},
 		{
 			name: "a variable set empty still wins", environment: map[string]string{"GOGC": ""}, current: math.MaxInt64,
 			want: contract.Memory{
-				CapBytes: memoryCap, Source: contract.MemorySourceEnvironment, Environment: "GOGC=",
+				Source: contract.MemorySourceEnvironment, Environment: "GOGC=",
 			},
 		},
 	}
-	for _, capped := range cases {
-		test.Run(capped.name, func(test *testing.T) {
+	for _, decided := range cases {
+		test.Run(decided.name, func(test *testing.T) {
 			test.Parallel()
 			lookupEnvironment := func(name string) (string, bool) {
-				value, set := capped.environment[name]
+				value, set := decided.environment[name]
 				return value, set
 			}
-			limit := capped.current
+			limit := decided.current
 			var set []int64
 			setMemoryLimit := func(requested int64) int64 {
 				previous := limit
@@ -86,79 +111,67 @@ func TestCapMemory(test *testing.T) {
 				return previous
 			}
 
-			availableBytes := available
-			if capped.want.Source == contract.MemorySourceUnreadable {
-				availableBytes = 0
-			}
-			decided := capMemory(lookupEnvironment, setMemoryLimit, availableBytes)
+			memory := decideMemory(lookupEnvironment, setMemoryLimit, decided.available)
 
-			if !slices.Equal(set, capped.set) {
-				test.Errorf("set the limit to %v, want %v", set, capped.set)
+			if !slices.Equal(set, decided.set) {
+				test.Errorf("set the limit to %v, want %v", set, decided.set)
 			}
-			if decided != capped.want {
-				test.Errorf("decided %+v, want %+v", decided, capped.want)
+			if memory != decided.want {
+				test.Errorf("decided %+v, want %+v", memory, decided.want)
 			}
 		})
 	}
 }
 
-func TestLateLimit(test *testing.T) {
+// runtimeDebugPath is runtime/debug's import path, whose SetMemoryLimit only Main may name.
+const runtimeDebugPath = "runtime/debug"
+
+// The limit is set once, in Main, before the run starts, and nothing in cohere-go sets it after: the limit is the
+// ceiling the front door's policy set, half the memory available, and a raise past it is never allowed (#jrr6a5x).
+// decideMemory, which Main hands debug.SetMemoryLimit, sets one only where the policy set none (TestDecideMemory).
+// Read from the package's source, not its tests.
+func TestOnlyMainSetsTheMemoryLimit(test *testing.T) {
 	test.Parallel()
-	const raised = memoryCap + lateMemoryAllowance
-	cases := []struct {
-		name           string
-		source         contract.MemorySource
-		inheritedBytes int64
-		singleThreaded bool
-		want           int64
-		wantRaises     bool
-	}{
-		{
-			name: "the cap under a high ceiling is raised by the allowance", source: contract.MemorySourceCap,
-			inheritedBytes: 32 << 30, want: raised, wantRaises: true,
-		},
-		{
-			name: "the raise stops at the ceiling the policy set", source: contract.MemorySourceCap,
-			inheritedBytes: memoryCap + 512<<20, want: memoryCap + 512<<20, wantRaises: true,
-		},
-		{
-			name: "a ceiling at the cap leaves no room to raise", source: contract.MemorySourceCap,
-			inheritedBytes: memoryCap,
-		},
-		{
-			name: "a single-threaded run is never raised", source: contract.MemorySourceCap, inheritedBytes: 32 << 30,
-			singleThreaded: true,
-		},
-		{
-			name: "the environment's collector is never raised", source: contract.MemorySourceEnvironment,
-			inheritedBytes: 32 << 30,
-		},
-		// The policy's ceiling is above the cap here, which a run never holds under source Available, so it is the
-		// source alone that refuses.
-		{
-			name: "half the memory available is never raised", source: contract.MemorySourceAvailable,
-			inheritedBytes: 32 << 30,
-		},
-		{
-			name: "memory that could not be read is never raised", source: contract.MemorySourceUnreadable,
-			inheritedBytes: math.MaxInt64,
-		},
+	files, globError := filepath.Glob("*.go")
+	if globError != nil {
+		test.Fatalf("listing the package's files: %v", globError)
 	}
-	for _, late := range cases {
-		test.Run(late.name, func(test *testing.T) {
-			test.Parallel()
-			memory := memoryAccount{
-				record: contract.Memory{
-					LimitBytes: memoryCap, CapBytes: memoryCap, Source: late.source,
-				},
-				inheritedBytes: late.inheritedBytes,
-			}
-
-			limit, raises := lateLimit(memory, late.singleThreaded)
-
-			if limit != late.want || raises != late.wantRaises {
-				test.Errorf("lateLimit gave %d, %t, want %d, %t", limit, raises, late.want, late.wantRaises)
-			}
-		})
+	fileSet := token.NewFileSet()
+	named := 0
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		parsed, parseError := parser.ParseFile(fileSet, file, nil, parser.SkipObjectResolution)
+		if parseError != nil {
+			test.Fatalf("parsing %s: %v", file, parseError)
+		}
+		name := importedAs(parsed, runtimeDebugPath)
+		if name == "" {
+			continue
+		}
+		for _, declaration := range parsed.Decls {
+			function, isFunction := declaration.(*ast.FuncDecl)
+			allowed := isFunction && function.Name.Name == "Main" && function.Recv == nil
+			ast.Inspect(declaration, func(node ast.Node) bool {
+				selector, isSelector := node.(*ast.SelectorExpr)
+				if !isSelector || selector.Sel.Name != "SetMemoryLimit" {
+					return true
+				}
+				if identifier, isIdentifier := selector.X.(*ast.Ident); !isIdentifier || identifier.Name != name {
+					return true
+				}
+				named++
+				if !allowed {
+					test.Errorf("%s names debug.SetMemoryLimit outside Main, so the run's limit could move after it "+
+						"started; the limit is the policy's ceiling, decided once (decideMemory)",
+						fileSet.Position(selector.Pos()))
+				}
+				return true
+			})
+		}
+	}
+	if named != 1 {
+		test.Errorf("debug.SetMemoryLimit is named %d times in the package, want once, in Main", named)
 	}
 }

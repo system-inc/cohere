@@ -593,12 +593,14 @@ census holds every file its load reached never writes it.
 
 cohere-go's types record also carries `memory`, additive within contract 3: the memory limit its process
 held its heap under and where it came from, as
-`{"limitBytes":8589934592,"capBytes":8589934592,"source":"Cap","availableBytes":44023414784}`. The limit is the
-smaller of the child's cap and half the memory available when the run started. `source` is `Cap` or
-`Available`, whichever was smaller; `Environment` when the user's `GOGC` or `GOMEMLIMIT` decided, with
-`environment` naming them and `limitBytes` the limit they left, `0` for none; or `Unreadable` when available
-memory could not be read, and the cap was set as a bound alone. The front door prints it in the account
-`--verbose` prints. It is left out of a run the child was not started for as a process of its own.
+`{"limitBytes":5750000000,"source":"Available","availableBytes":11500000000}`. The limit is half the memory
+available when the run started, the ceiling the front door's policy set, held from the first allocation and never
+raised (#jrr6a5x). `source` is `Available` then; `Environment` when the user's `GOGC` or
+`GOMEMLIMIT` decided, with `environment` naming them and `limitBytes` the limit they left, `0` for none; or
+`Unreadable` when available memory could not be read, and the child set 8 GiB as a bound alone. The front door prints
+it in the account `--verbose` prints, once the lint record says how many builds ran at once under it, as
+`memory limit 5.4 GiB, half of the 11.5 GB available: 3 builds at once`. It is left out of a run the child was not
+started for as a process of its own.
 
 cohere-go's types record also carries `headersUnshared`, additive within contract 3 (#tb538na), only when its
 listings did not share each Go file's header. Every build of a run lists its packages in process through go/build's
@@ -754,29 +756,6 @@ still real; the front door then leaves the CPU columns out rather than print zer
 The front door prints the record as TypeScript's timing table under the lint line, and under `--json` writes it
 through as a `timing` line before the summary (schema/CohereOutput.schema.json). A run under `--timing` is a
 measurement, so the run cache never replays it and never records it.
-
-### `memory`, cohere-go's, just before `inputs`
-
-```json
-{ "kind": "memory", "raisedToBytes": [9663676416] }
-```
-
-Additive within contract 3, and cohere-go's alone (#5shepvt): the memory limits the run raised its heap to.
-Every load runs under the limit the types record's `memory` names, and when that limit is the child's cap, once a
-load ends with no collection in flight the child may raise it once, by at most 1 GiB, until the next load starts
-(#44n0vap). A fixing run loads up to six times. The types record is written after the first load, before any raise
-lands, so its `memory` stays the limit the run started under, and this record says each limit the run went above it
-to.
-
-`raisedToBytes` holds one entry for each raise that landed, the limit it set, in the order raised. It is `[]` when
-nothing raised, never left out and never `null`. The record is written once, in every check run whose load ran, as
-`inputs` is: after the last phase record, and after `duplicates` and `timing` when they were asked for, and just
-before `inputs`. A check run whose load failed, or that asked for no load, writes none. cohere-swift writes none.
-
-The front door accepts one, in that place, and refuses a second, one before a phase's record or after `inputs`, and
-one with no `raisedToBytes`, as a broken stream. A raise is said under `--verbose`, below the types phase's `memory:`
-line, as `memory: raised to 9.7 GB after the load` (each raise in order, joined by `then`), and under `--json` as the
-summary's `memoryRaisedToBytes`. Neither is in the footer, and a replay says neither, since it raised nothing.
 
 ### `inputs`, just before `summary`
 
@@ -1241,19 +1220,19 @@ hold `"buildsWidthPeakFactor":3.5` times its holding at its lint's peak in a run
 under `--no-cache` (#hv090f4), each the largest ratio measured in its mode across 14 builds of two trees rounded up
 to the next half, and the width is
 `floor((limit - live) / (holding * factor))`, no more than the builds and at least one, and one at a time under
-`--single-threaded` or a limit other than the cap. The slack adds one build past that, never two, when it is fewer than
-the builds and one more fits by the largest ratio measured unrounded, 3.22 with a store and 2.16 without one, with 512
-MiB to spare: `live + (width + 1) * holding * measured + 536870912 <= limit` (#ewkp7w0); `"buildsWidthSlack":true`
-says it did, absent when it did not. Beside it, `"buildsWidthLiveBytes":2147483648` is the host's live
-heap and `"buildsWidthBuildBytes":536870912` the holding budgeted each build, so a reader redoes the arithmetic with the
-memory record's limit, and two runs of one workspace are given the same width; all three are absent when the decision
-needed none, because nothing could make the builds more than one at a time. `"buildsPoolSize":16` is how many slots the
-run's one pool holds, which every load and check of the run shares, the host's and every extra build's, so however many
-builds run side by side the run never runs more of that work at once (#ckm0hsp): one per core, one under
-`--single-threaded`. Each build notes into its own buffer, and once every build has ended their results are taken in
-build order and their notes in the order they started, up to and including the first that failed in that order, so the
-records and stderr are those of a run one build at a time, byte for byte, but these seven fields, which no key and no
-verdict reads. All seven are absent when `builds` is.
+`--single-threaded` or a limit not read from the memory available. The slack adds one build past that, never two,
+when it is fewer than the builds and one more fits by the largest ratio measured unrounded, 3.22 with a store and 2.16
+without one, with 512 MiB to spare: `live + (width + 1) * holding * measured + 536870912 <= limit` (#ewkp7w0);
+`"buildsWidthSlack":true` says it did, absent when it did not. Beside it, `"buildsWidthLiveBytes":2147483648` is the
+host's live heap and `"buildsWidthBuildBytes":536870912` the holding budgeted each build, so a reader redoes the
+arithmetic with the types record's `memory` limit, and two runs of one workspace are given the same width; all three are
+absent when the decision needed none, because nothing could make the builds more than one at a time.
+`"buildsPoolSize":16` is how many slots the run's one pool holds, which every load and check of the run shares, the
+host's and every extra build's, so however many builds run side by side the run never runs more of that work at once
+(#ckm0hsp): one per core, one under `--single-threaded`. Each build notes into its own buffer, and once every build has
+ended their results are taken in build order and their notes in the order they started, up to and including the first
+that failed in that order, so the records and stderr are those of a run one build at a time, byte for byte, but these
+seven fields, which no key and no verdict reads. All seven are absent when `builds` is.
 
 Under `--timing`, whose builds run one at a time, each extra build's record writes `"heldAtLoadEndBytes":1170372464`,
 what it held beyond the host's live heap as its load ended, measured by a forced collection, and

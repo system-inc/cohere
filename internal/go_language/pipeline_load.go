@@ -26,14 +26,13 @@ type loadRequest struct {
 }
 
 // loadPackages is every load of the workspace cohere-go makes, the only caller of package load's loads in it (a test
-// holds it to that), so the memory limit is the same story for each (loadMemory): the last load's late raise is
-// retired, the limit goes back to the cap, and this load's raise is armed before it starts, then told its end after
-// it (#44n0vap). Every load, the first, the long-line wrap's, the rename's and its proofs, a lint reload and an extra
-// build's, runs under the cap, and the raise may lift the limit at most once after each.
+// holds it to that), so each is the same story: every go command started from its start is late (#sktb2y8), a cached
+// load takes the run's pool, account and walks (runCaching), and a go.work.sum it ran go list beside unguarded is the
+// run's to say (unguardedWorkspaceSums). Every load is one: the first, the long-line wrap's, the rename's and its
+// proofs, a lint reload and an extra build's.
 func (pipeline *pipeline) loadPackages(request loadRequest) (*load.Loaded, error) {
 	// Every go command started from here on is late (#sktb2y8).
 	pipeline.described.children.LoadBegins()
-	pipeline.loads.begin()
 	workspace := pipeline.described.workspace
 	// The workspace, unless this is the editor's save, which loads its file's package alone (stdinPackage).
 	patterns, census := workspace.Patterns(), pipeline.described.readableOurs
@@ -54,11 +53,10 @@ func (pipeline *pipeline) loadPackages(request loadRequest) (*load.Loaded, error
 			request.overlay)
 	case request.caching != nil:
 		loaded, loadError = load.PackagesCached(workspace.Root, patterns, request.environment, census,
-			pipeline.watchedCaching(*request.caching))
+			pipeline.runCaching(*request.caching))
 	default:
 		loaded, loadError = load.Packages(workspace.Root, patterns, request.environment, census)
 	}
-	pipeline.loads.end()
 	if loaded != nil && loaded.UnguardedWorkspaceSum != "" {
 		pipeline.unguardedSumsLock.Lock()
 		if pipeline.unguardedSums == nil {
@@ -81,9 +79,8 @@ func (pipeline *pipeline) unguardedWorkspaceSums() []string {
 	return slices.Sorted(maps.Keys(pipeline.unguardedSums))
 }
 
-// watchedCaching is caching as it is, unless a test watches inside its loads (memoryAccount.duringLoad): then its held
-// reader calls the watch before each lookup, which is during the load.
-func (pipeline *pipeline) watchedCaching(caching load.Caching) load.Caching {
+// runCaching is caching with what every cached load of the run shares set on it.
+func (pipeline *pipeline) runCaching(caching load.Caching) load.Caching {
 	// Every cached load of the run, the host's and every extra build's, takes its slots from the run's one pool,
 	// records the go commands it starts in the run's account, and names the directories of its roots from the run's
 	// walks of them.
@@ -94,16 +91,5 @@ func (pipeline *pipeline) watchedCaching(caching load.Caching) load.Caching {
 	// (withFindingsStore, the host's session), the same for every load of the run: warm, beside wins, and cold, under
 	// `--no-cache`, every core is busy to the end and inline wins (load.Caching.InputsBeside).
 	caching.InputsBeside = pipeline.withFindingsStore()
-	if pipeline.memory == nil || pipeline.memory.duringLoad == nil {
-		return caching
-	}
-	held, during := caching.Held, pipeline.memory.duringLoad
-	caching.Held = func(file string) ([]byte, bool) {
-		during()
-		if held == nil {
-			return nil, false
-		}
-		return held(file)
-	}
 	return caching
 }

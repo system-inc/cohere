@@ -37,7 +37,7 @@ const markPollInterval = time.Millisecond
 // it is (extraBuildRuns).
 //
 // Builds that restore nothing each check every package, about what the host's did: two of those side by side under
-// the cap drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
+// the limit drive the collector, and at cohere's root made the run 6 to 8 s slower and cost about 70 user-s more, while
 // builds that restore most of their packages from the host ran 22% faster side by side. The guard reads the entries
 // the host kept, and those say what the builds check only when the host had to check its packages itself. Three runs
 // keep none:
@@ -263,7 +263,7 @@ const (
 	buildPeakOverLoadEndMeasuredWithoutStore = 2.16
 )
 
-// buildsWidthSlackMarginBytes is what the width's slack leaves free under the cap beyond every build at the largest
+// buildsWidthSlackMarginBytes is what the width's slack leaves free under the limit beyond every build at the largest
 // ratio measured in its mode (buildsWidth): 512 MiB, which at deeafbf4, three builds each holding about 1.07 GB as
 // their loads end, leaves room for each to pass the largest ratio measured by about 0.16 (#ewkp7w0).
 const buildsWidthSlackMarginBytes = 512 << 20
@@ -297,53 +297,54 @@ func (pipeline *pipeline) buildPeakFactor() float64 {
 	return buildPeakOverLoadEnd(pipeline.withFindingsStore())
 }
 
-// buildsWidth is how many of extras extra builds run side by side: as many as the memory cap holds beside the host's
+// buildsWidth is how many of extras extra builds run side by side: as many as the memory limit holds beside the host's
 // live heap, each build taken at its lint's peak, holding times the factor of the run's mode, with a findings store
-// when withStore is true (buildPeakOverLoadEnd), floor((cap - hostLive) / (holding * factor)), with no more than the
+// when withStore is true (buildPeakOverLoadEnd), floor((limit - hostLive) / (holding * factor)), with no more than the
 // builds and at least one (#rmzehfg). Cores are no measure of it: the run's one pool bounds every build's work to them
 // (#ckm0hsp). It returns too whether the slack added the last build.
 //
 // The slack is one build past that width, and never more, when it is fewer than the builds and one more fits by the
 // largest ratio measured in the mode (buildPeakOverLoadEndMeasured) with buildsWidthSlackMarginBytes to spare:
-// hostLive + (width + 1) * holding * measured + margin <= cap (#ewkp7w0). The factor's rounding up to the next half
+// hostLive + (width + 1) * holding * measured + margin <= limit (#ewkp7w0). The factor's rounding up to the next half
 // is a margin taken in units of a whole build's holding, about 0.36 GB at deeafbf4, whose `--no-cache` width sat at
 // 3.00 and flipped to 2 about one run in four; the slack spends that margin only where the worst peak measured still
-// fits with 512 MiB free, so the worst peak it permits is under the cap by construction, and passes it only for a tree
-// whose ratio passes the largest measured, which a timed run names (recordBuildsPeakProblems).
+// fits with 512 MiB free, so the worst peak it permits is under the limit by construction, and passes it only for a
+// tree whose ratio passes the largest measured, which a timed run names (recordBuildsPeakProblems).
 //
 // hostLiveBytes is the host's live heap as the builds start, which stays live until the last build ends (otherBuilds),
 // and holdingBytes what each build is budgeted to hold beyond it as its load ends (budgetedHolding): the host's live
 // heap when every share at the share gate is low, and otherwise what the heaviest build holds, the bound taken for each
 // build, since an extra build loads the same workspace under another environment, restoring from the host what holds
-// there, so none holds more than the heaviest does. The cap is the limit cohere-go holds its heap under,
-// memoryCap, read from memory, which Main decided (capMemory).
+// there, so none holds more than the heaviest does. The limit is the one cohere-go holds its heap under, half the
+// memory available when the run started, read from memory, which Main decided (decideMemory). A machine whose half is
+// small runs as many builds as that half holds and no more, which on Monkee's 16 GB read 3 at once under 5.4 GiB
+// (#jrr6a5x).
 //
 // It is one at a time when:
 //   - the run is single-threaded (`--single-threaded`), which asks for one thing at a time;
 //   - memory is nil, a test that decided nothing, or hostLiveBytes or holdingBytes is 0, nothing measured, since then
-//     neither the cap nor the heap is known;
-//   - the run is under a limit other than the cap: half the memory available (source Available), whose ceiling is
-//     what keeps runs side by side safe and a width sized against the cap would pass; one the environment set
-//     (source Environment), whose owner decided the collector; or none it could read (source Unreadable), where the
-//     collector runs at Go's default percent and no limit bounds the builds.
+//     neither the limit nor the heap is known;
+//   - the limit is not half the memory available: one the environment set (source Environment), whose owner decided
+//     the collector, or the bound for memory that could not be read (source Unreadable), where the collector runs at
+//     Go's default percent and how much the machine holds is not known.
 func buildsWidth(
 	extras int,
 	singleThreaded bool,
-	memory *memoryAccount,
+	memory *contract.Memory,
 	hostLiveBytes uint64,
 	holdingBytes uint64,
 	withStore bool,
 ) (int, bool) {
-	if singleThreaded || memory == nil || memory.record.Source != contract.MemorySourceCap || hostLiveBytes == 0 ||
+	if singleThreaded || memory == nil || memory.Source != contract.MemorySourceAvailable || hostLiveBytes == 0 ||
 		holdingBytes == 0 {
 		return 1, false
 	}
-	capBytes := uint64(max(memory.record.LimitBytes, 0))
-	if capBytes <= hostLiveBytes {
+	limitBytes := uint64(max(memory.LimitBytes, 0))
+	if limitBytes <= hostLiveBytes {
 		return 1, false
 	}
-	room := capBytes - hostLiveBytes
-	// A peak past what a uint64 holds is past any cap, which the division reads as no room.
+	room := limitBytes - hostLiveBytes
+	// A peak past what a uint64 holds is past any limit, which the division reads as no room.
 	peak := math.Ceil(float64(holdingBytes) * buildPeakOverLoadEnd(withStore))
 	if peak >= math.MaxUint64 {
 		return 1, false
@@ -443,8 +444,8 @@ func lintPeakOverLoadEnd(heldAtLoadEnd uint64, heldAtLintPeak uint64) float64 {
 // recordBuildsPeakProblems names, in record's BuildsPeakProblems and on stderr, each build whose ratio
 // (lintPeakOverLoadEnd) passes the largest measured in the run's mode (buildPeakOverLoadEndMeasured), which the
 // width's slack spends its margin to: a tree that breaks the measured maximum is caught the first time a timed run
-// measures it, rather than running its builds past the cap unseen (#ewkp7w0). A timed run has no session, so its builds
-// are checked against the maximum measured without a store, the mode they ran in.
+// measures it, rather than running its builds past the limit unseen (#ewkp7w0). A timed run has no session, so its
+// builds are checked against the maximum measured without a store, the mode they ran in.
 //
 // Mutates: record gains BuildsPeakProblems
 func (pipeline *pipeline) recordBuildsPeakProblems(record *contract.LintRecord) {

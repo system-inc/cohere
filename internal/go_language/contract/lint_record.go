@@ -47,24 +47,24 @@ type LintRecord struct {
 	// (#72n9mq0). It is absent for a run of one build, so such a run writes the record it always has.
 	Builds []BuildRecord `json:"builds,omitempty"`
 	// BuildsAtOnce is additive within contract 3, and cohere-go's alone: how many of the extra builds ran side by
-	// side, decided once from the memory cap, the host's live heap and what the heaviest build holds as its load ends
+	// side, decided once from the memory limit, the host's live heap and what the heaviest build holds as its load ends
 	// (#b2t9xmf, #rmzehfg). It changes no finding, no note and no key: a run one build at a time writes the same
 	// records but this one. Absent when Builds is.
 	BuildsAtOnce int `json:"buildsAtOnce,omitempty"`
 	// BuildsWidthLiveBytes is additive within contract 3, and cohere-go's alone: the host's live heap that decision
 	// was given, measured by a collection as the extra builds started with nothing else running, so a reader sees why a
-	// width was chosen. Absent when the decision needed none: under `--single-threaded`, a limit other than the cap,
-	// builds that restore nothing from the host for any reason but the facts census (#f9br7sg), or one build alone,
-	// which no heap can widen.
+	// width was chosen. Absent when the decision needed none: under `--single-threaded`, a limit not read from the
+	// memory available, builds that restore nothing from the host for any reason but the facts census (#f9br7sg), or
+	// one build alone, which no heap can widen.
 	BuildsWidthLiveBytes uint64 `json:"buildsWidthLiveBytes,omitempty"`
 	// BuildsWidthBuildBytes is additive within contract 3, and cohere-go's alone: the holding each extra build was
 	// budgeted beyond that heap as its load ends: what the first build to start, the heaviest, held then, measured the
 	// same way, in a run with a findings store, and in a run without one 1.2 times that, or 1.2 times that heap when
 	// BuildsWidthFromHostLive (#ghb3rcn). With
 	// BuildsWidthPeakFactor, the times that holding a build is taken to reach at its lint's peak, 3.5 in a run with a
-	// findings store and 2.5 without one (#hv090f4), and the memory record's limit, a reader redoes the arithmetic:
-	// floor((limit - live) / (holding * factor)), no more than the builds and at least one (#rmzehfg). Both are absent
-	// when BuildsWidthLiveBytes is.
+	// findings store and 2.5 without one (#hv090f4), and the types record's memory limit, a reader redoes the
+	// arithmetic: floor((limit - live) / (holding * factor)), no more than the builds and at least one (#rmzehfg). Both
+	// are absent when BuildsWidthLiveBytes is.
 	BuildsWidthBuildBytes uint64  `json:"buildsWidthBuildBytes,omitempty"`
 	BuildsWidthPeakFactor float64 `json:"buildsWidthPeakFactor,omitempty"`
 	// BuildsWidthSlack is additive within contract 3, and cohere-go's alone: whether the width's slack added
