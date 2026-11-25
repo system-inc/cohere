@@ -1,4 +1,4 @@
-// Package contract is the record stream cohere-go prints on stdout, swift_language/Contract.md's contract 4,
+// Package contract is the record stream cohere-go prints on stdout, documentation/contract/Contract.md's contract 4,
 // which the front door already renders for cohere-swift.
 //
 // The JSON names here are the contract's and the front door's (command/cohere/swift_records.go), spelled
@@ -7,7 +7,7 @@
 // written twice.
 package contract
 
-// Version is the version of swift_language/Contract.md cohere-go speaks, written in the provenance record and
+// Version is the version of documentation/contract/Contract.md cohere-go speaks, written in the provenance record and
 // checked against the front door's `--contract`.
 const Version = 4
 
@@ -67,8 +67,8 @@ type ExcludedFile struct {
 	File   string `json:"file"`
 	Reason string `json:"reason"`
 
-	// Source is additive within contract 3 (swift_language/Contract.md): the rule that decided, as `path:line` relative
-	// to the root, such as `.gitignore:1`, and left out where no rule of a file and line decided.
+	// Source is additive within contract 3 (documentation/contract/Contract.md): the rule that decided, as `path:line`
+	// relative to the root, such as `.gitignore:1`, and left out where no rule of a file and line decided.
 	Source string `json:"source,omitempty"`
 }
 

@@ -1,19 +1,22 @@
 # The contract
 
-What a child prints and how the Go front door renders it. cohere-swift is the first
-child; TypeScript stays in process and never speaks this. The contract exists
-so a Swift run reads exactly like a TypeScript run: same finding lines, same phase line, same
-coverage notes, same accounting, same exit code. Someone who knows how to read one already knows
-how to read the other.
+What a child prints and how the Go front door renders it. Two children speak it, cohere-swift
+(`swift_language/`) and cohere-go (`internal/go_language/`), so it lives here in `documentation/`,
+beside neither; TypeScript stays in process and never speaks this. The contract exists so a Swift
+or Go run reads exactly like a TypeScript run: same finding lines, same phase line, same coverage
+notes, same accounting, same exit code. Someone who knows how to read one already knows how to
+read the others.
 
-cohere-go speaks it too. It is the cohere binary itself in a hidden mode, `cohere go-language
---contract 4 --root <dir>`, which the front door runs as a child exactly as it runs cohere-swift, so a
-crash or an out-of-memory in a Go load ends that child and prints as nothing checked rather than taking
-the front door down with it. One renderer serves both children; only its words differ (`contractLanguage`
-in command/cohere: "cohere-go", "Go files", a `go` label on a compiler finding with no rule).
+cohere-swift was the first child. cohere-go is the cohere binary itself in a hidden mode, `cohere
+go-language --contract 4 --root <dir>`, which the front door runs as a child exactly as it runs
+cohere-swift, so a crash or an out-of-memory in a Go load ends that child and prints as nothing
+checked rather than taking the front door down with it. One renderer serves both children; only its
+words differ (`contractLanguage` in command/cohere: "cohere-go", "Go files", a `go` label on a
+compiler finding with no rule).
 
-The fixtures in `Contract/` are the agreement made executable. The Go renderer's tests and the Swift
-encoder's tests both read them, so neither side can drift without the other's test failing.
+The fixtures in `fixtures/` are the agreement made executable. The Go renderer's tests, cohere-go's
+record tests and the Swift encoder's tests all read them, so no side can drift without another's
+test failing.
 
 | Fixture                     | What it pins                                                                                                                                                                                                                                                                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

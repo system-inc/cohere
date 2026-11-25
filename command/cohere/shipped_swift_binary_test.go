@@ -81,7 +81,7 @@ func stampedCohere(test *testing.T, version string) string {
 // and streams a clean run, and returns the file it records into.
 func placeSiblingSwiftBinary(test *testing.T, binary string) string {
 	test.Helper()
-	clean, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift_language", "Contract", "Clean.jsonl"))
+	clean, absolutePathError := filepath.Abs(filepath.Join(contractFixtureDirectory, "Clean.jsonl"))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}

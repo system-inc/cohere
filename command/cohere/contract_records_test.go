@@ -14,11 +14,14 @@ import (
 	"time"
 )
 
-// contractFixture reads one of the fixtures swift_language/Contract.md defines, from the same files the Swift
+// contractFixtureDirectory holds the fixtures documentation/contract/Contract.md defines, relative to this package.
+var contractFixtureDirectory = filepath.Join("..", "..", "documentation", "contract", "fixtures")
+
+// contractFixture reads one of the fixtures documentation/contract/Contract.md defines, from the same files the Swift
 // encoder's tests read, so neither side can drift without the other's test failing.
 func contractFixture(test *testing.T, name string) []string {
 	test.Helper()
-	contents, readError := os.ReadFile(filepath.Join("..", "..", "swift_language", "Contract", name))
+	contents, readError := os.ReadFile(filepath.Join(contractFixtureDirectory, name))
 	if readError != nil {
 		test.Fatal(readError)
 	}

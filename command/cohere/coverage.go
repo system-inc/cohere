@@ -611,8 +611,8 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	printCrashGroups(out, crashes)
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
-	// The dash is escaped, not changed: internal/differential finds this line by it, and swift_language/Contract.md
-	// names it as the line both languages print.
+	// The dash is escaped, not changed: internal/differential finds this line by it, and
+	// documentation/contract/Contract.md names it as the line both languages print.
 	printInvocation(
 		accountOutput(out),
 		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited%s, %s%s\n",
