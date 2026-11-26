@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -519,9 +520,14 @@ func landJobPreflight(
 
 // landJobSwiftRefusal is why the land job refuses merge, read from repository, for what it changes against its first
 // parent that only Swift's checks judge, empty when it changes none of it: any path under swift_language/, the Swift
-// package, and command/cohere's Swift files, swift_*.go, which run cohere-swift or build it. Until Machines lays Swift
-// on Shackler (#je1r32a) no land job checks them, so a change to them is never landed unchecked. Renames are read as a
+// package, and the Swift files of the packages that run cohere-swift or build it, swift.go and swift_*.go in
+// landJobSwiftDirectories, whose tests that build it skip in a land job (needs.SwiftLaid). Until Machines lays Swift on
+// Shackler (#je1r32a) no land job checks them, so a change to them is never landed unchecked. Renames are read as a
 // removal and an addition, so a file moved out of the package is still the package's change.
+// landJobSwiftDirectories are the packages whose Swift files landJobSwiftRefusal refuses: command/cohere runs
+// cohere-swift, and release's dispatch and packaging build it.
+var landJobSwiftDirectories = []string{"command/cohere/", "internal/release/dispatch/", "internal/release/packaging/"}
+
 func landJobSwiftRefusal(repository string, merge string) (string, error) {
 	changed, diffError := gitOutput(repository, "diff", "--name-only", "--no-renames", merge+"^1", merge)
 	if diffError != nil {
@@ -530,8 +536,9 @@ func landJobSwiftRefusal(repository string, merge string) (string, error) {
 	swift := []string{}
 	for _, changedPath := range strings.Split(changed, "\n") {
 		directory, name := path.Split(changedPath)
-		if strings.HasPrefix(changedPath, "swift_language/") || (directory == "command/cohere/" &&
-			strings.HasPrefix(name, "swift_") && strings.HasSuffix(name, ".go")) {
+		swiftFile := (name == "swift.go" || strings.HasPrefix(name, "swift_")) && strings.HasSuffix(name, ".go")
+		if strings.HasPrefix(changedPath, "swift_language/") ||
+			(swiftFile && slices.Contains(landJobSwiftDirectories, directory)) {
 			swift = append(swift, changedPath)
 		}
 	}
