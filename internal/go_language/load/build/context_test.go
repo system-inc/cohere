@@ -8,14 +8,15 @@ import (
 	"go/token"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/copied"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // copiedSources are the sha256 of each upstream file the copies are of, at CopiedToolchain, by its path below the
@@ -32,18 +33,13 @@ var copiedSources = map[string]string{
 // move fails too until its release is added, so the list says what the toolchains ship.
 func TestTheToolchainsGoBuildIsTheCopys(test *testing.T) {
 	test.Parallel()
-	output, goError := exec.Command("go", "env", "GOROOT", "GOVERSION").Output()
-	if goError != nil {
-		test.Fatalf("asking go env for GOROOT and GOVERSION: %v", goError)
-	}
-	// One line each, split on the line alone, since a root's path may hold a space.
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) != 2 {
-		test.Fatalf("go env printed %q, want the root and the release", output)
-	}
+	root := go_root.GoRoot(test)
+	// The release go env's `GOVERSION` names, since go test runs the test binary its own toolchain built, its
+	// experiment suffix cut as Sharing cuts it.
+	release, _, _ := strings.Cut(runtime.Version(), " ")
 	moved := false
 	for path, copiedSum := range copiedSources {
-		contents, readError := os.ReadFile(filepath.Join(lines[0], "src", filepath.FromSlash(path)))
+		contents, readError := os.ReadFile(filepath.Join(root, "src", filepath.FromSlash(path)))
 		if readError != nil {
 			test.Fatal(readError)
 		}
@@ -51,11 +47,11 @@ func TestTheToolchainsGoBuildIsTheCopys(test *testing.T) {
 		if hex.EncodeToString(sum[:]) != copiedSum {
 			moved = true
 			test.Errorf("%s's %s is not %s's, which the copy is of: diff the copy against it and bump the copy",
-				lines[1], path, CopiedToolchain)
+				release, path, CopiedToolchain)
 		}
 	}
-	if !moved && !sharedReleases[lines[1]] {
-		test.Errorf("%s's go/build is %s's, which the copy is of: add it to sharedReleases", lines[1],
+	if !moved && !sharedReleases[release] {
+		test.Errorf("%s's go/build is %s's, which the copy is of: add it to sharedReleases", release,
 			CopiedToolchain)
 	}
 }
