@@ -1,0 +1,439 @@
+{
+    "about": "The inputs of TestParseAgreesWithGraphqlJs (parse_oracle_test.go). graphql-js 17.0.2's answers for them are recorded in parse_answers.json.gz by record-graphql-js.mjs, attached to #bahm7k3; a changed or added input is re-recorded there. malformed says which way graphql-js must go on an input.",
+    "inputs": [
+        {
+            "name": "shorthand query",
+            "text": "{ a }"
+        },
+        {
+            "name": "operations of every type",
+            "text": "query { a } mutation M { b } subscription S @live { c } query Q($a: Int, $b: [String!]! = [\"x\"] @d) @e { f }"
+        },
+        {
+            "name": "fields",
+            "text": "{ alias: field(a: 1, b: \"two\", c: THREE, d: null, e: true, f: false, g: 1.5e3, h: $v, i: [1, 2], j: {k: 1, l: {m: 2}}) @include(if: $x) @skip(if: false) { nested { deeper } } }"
+        },
+        {
+            "name": "fragments",
+            "text": "{ ...Spread @defer ... on Type { x } ... @include(if: true) { y } ... { z } }\nfragment Spread on Type @dir { a }"
+        },
+        {
+            "name": "fragment arguments",
+            "text": "fragment F($a: Int = 1, $b: String @deprecated) on T @dir { f(a: $a) ...G(x: $a, y: {z: [$b]}) }\nquery { ...F(a: 2, b: \"x\") @skip(if: false) ...F }"
+        },
+        {
+            "name": "descriptions on executable definitions and variables",
+            "text": "\"operation\" query Q(\"variable\" $a: Int, \"\"\"block variable\"\"\" $b: Int) { a }\n\"\"\"fragment\"\"\" fragment F on T { a }"
+        },
+        {
+            "name": "values",
+            "text": "{ a(l: [], o: {}, n: {a: [{b: 1}], c: {}}, m: [[1], []], neg: -0, f1: 0.0, f2: 1E-3, f3: -12.5e+10, i: 1234567890123456789012) }"
+        },
+        {
+            "name": "types",
+            "text": "query($a: [[Int!]!]!, $b: T, $c: [T]) { a }"
+        },
+        {
+            "name": "commas and whitespace are ignored",
+            "text": ",,,{\ta,,b\t,c}\t,"
+        },
+        {
+            "name": "schema definition",
+            "text": "\"schema description\" schema @a { query: Query mutation: Mutation subscription: Subscription }"
+        },
+        {
+            "name": "scalar",
+            "text": "\"\"\"scalar\"\"\" scalar Date @specifiedBy(url: \"https://example.com\")"
+        },
+        {
+            "name": "object type",
+            "text": "type Query implements A & B @key(fields: \"id\") { \"field\" field(\"argument\" a: Int = 1 @d, b: [String!]!): String! @deprecated(reason: \"no\") other: Int }\ntype Empty\ntype Leading implements & A & B { a: Int }"
+        },
+        {
+            "name": "interface implementing interfaces",
+            "text": "interface I implements J & K @d { a: Int }\ninterface Bare"
+        },
+        {
+            "name": "union",
+            "text": "union U = | A | B\nunion V @d = A\nunion Lone"
+        },
+        {
+            "name": "enum",
+            "text": "enum E { \"value\" A @h B C_D }\nenum Bare"
+        },
+        {
+            "name": "input",
+            "text": "input In { a: Int = 1 b: In2! @f c: [In] = [{a: 1}] }"
+        },
+        {
+            "name": "directive definition",
+            "text": "\"\"\"directive\"\"\" directive @dir(a: Int = 1, b: String) repeatable on | FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT\ndirective @plain on QUERY\ndirective @all @meta on FRAGMENT_VARIABLE_DEFINITION | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION | DIRECTIVE_DEFINITION | MUTATION | SUBSCRIPTION | FRAGMENT_DEFINITION"
+        },
+        {
+            "name": "every extension",
+            "text": "extend schema @b\nextend schema { query: Q }\nextend scalar Date @c\nextend type Query implements C { added: Int }\nextend type Query @e\nextend type Query implements D\nextend interface I @g { b: Int }\nextend interface I implements J\nextend union U = C\nextend union U @u\nextend enum E { C }\nextend enum E @x\nextend input In { c: String }\nextend input In @y\nextend directive @dir @i"
+        },
+        {
+            "name": "keywords as names",
+            "text": "type type { query: query fragment(on: on): extend schema: scalar }\n{ on: on query mutation }"
+        },
+        {
+            "name": "string escapes",
+            "text": "{ a(s: \"quote\\\" backslash\\\\ slash\\/ b\\b f\\f n\\n r\\r t\\t\") }"
+        },
+        {
+            "name": "unicode escapes",
+            "text": "{ a(fixed: \"\\u00e9\\u0041\\uFFFF\", variable: \"\\u{1F600}\\u{0}\\u{10FFFF}\\u{000041}\", pair: \"\\uD83D\\uDE00\", lower: \"\\ud83d\\ude00\", mixed: \"x\\u{1f600}y\") }"
+        },
+        {
+            "name": "literal non-ASCII",
+            "text": "\"descripción ✓ 😀 日本語\" type T { \"emoji 😀 then more\" a(x: String = \"😀😀\"): Int } # comment 😀 after\n{ a(b: \"é\") }"
+        },
+        {
+            "name": "block string indentation",
+            "text": "type T {\n  \"\"\"\n    first\n      indented\n\n    last\n  \"\"\"\n  a: Int\n}"
+        },
+        {
+            "name": "block string first line kept",
+            "text": "{ a(s: \"\"\"  first line\n      second\n    third\n  \"\"\") }"
+        },
+        {
+            "name": "block string escaped triple quote",
+            "text": "{ a(s: \"\"\"has \\\"\"\" triple and \\\"\"\"\"\"\") b(s: \"\"\"\\\"\"\"\"\"\") }"
+        },
+        {
+            "name": "block string blank lines and tabs",
+            "text": "{ a(s: \"\"\"\n\n\t\tx\n\t  \n\t\ty\n\n   \n\"\"\") b(s: \"\"\"   \"\"\") c(s: \"\"\"\"\"\") d(s: \"\"\"\n\"\"\") }"
+        },
+        {
+            "name": "block string with CRLF and CR",
+            "text": "{ a(s: \"\"\"\r\n  one\r\n  two\r  three\r\n\"\"\") }\r\n# comment\r\n{ b }"
+        },
+        {
+            "name": "block string backslashes stay raw",
+            "text": "{ a(s: \"\"\"\\n \\u0041 \\\\ \\\"\"\" \"\"\") }"
+        },
+        {
+            "name": "block string with non-ASCII",
+            "text": "\"\"\"\n  😀 first\n    é second\n\"\"\" scalar S"
+        },
+        {
+            "name": "comments everywhere",
+            "text": "# leading\nquery # after keyword\nQ # after name\n( # in variables\n$a # after variable\n: # after colon\nInt # after type\n) # after variables\n{ # in selection\na # after field\n( # in arguments\nb: # after argument name\n1 # after value\n) # after arguments\n} # trailing\n# last"
+        },
+        {
+            "name": "comments in type system",
+            "text": "# schema\ntype T # name\n{ # open\n  # before field\n  a: Int # after field\n  # before close\n} # after\nenum E { # e\n A # a\n}"
+        },
+        {
+            "name": "comment at end of file without newline",
+            "text": "{ a } #end"
+        },
+        {
+            "name": "empty comment and comment only lines",
+            "text": "#\n{ a }\n#\n#\n"
+        },
+        {
+            "name": "comment with a carriage return",
+            "text": "# one\r{ a }\r# two\r"
+        },
+        {
+            "name": "leading byte order mark",
+            "text": "\ufeff{ a }"
+        },
+        {
+            "name": "byte order mark between tokens",
+            "text": "{ a \ufeff b }"
+        },
+        {
+            "name": "empty document",
+            "text": "",
+            "malformed": true
+        },
+        {
+            "name": "only a comment",
+            "text": "# nothing",
+            "malformed": true
+        },
+        {
+            "name": "unclosed selection set",
+            "text": "{ a",
+            "malformed": true
+        },
+        {
+            "name": "empty selection set",
+            "text": "query { }",
+            "malformed": true
+        },
+        {
+            "name": "unterminated block string",
+            "text": "{ a(s: \"\"\"never closed) }",
+            "malformed": true
+        },
+        {
+            "name": "unterminated string",
+            "text": "{ a(s: \"never closed) }",
+            "malformed": true
+        },
+        {
+            "name": "newline in string",
+            "text": "{ a(s: \"line\nbreak\") }",
+            "malformed": true
+        },
+        {
+            "name": "unicode escape out of range",
+            "text": "{ a(s: \"\\u{110000}\") }",
+            "malformed": true
+        },
+        {
+            "name": "unicode escape too long",
+            "text": "{ a(s: \"\\u{FFFFFFFFF}\") }",
+            "malformed": true
+        },
+        {
+            "name": "unicode escape empty",
+            "text": "{ a(s: \"\\u{}\") }",
+            "malformed": true
+        },
+        {
+            "name": "unicode escape surrogate in braces",
+            "text": "{ a(s: \"\\u{D800}\") }",
+            "malformed": true
+        },
+        {
+            "name": "lone leading surrogate escape",
+            "text": "{ a(s: \"\\uD83D\") }",
+            "malformed": true
+        },
+        {
+            "name": "lone trailing surrogate escape",
+            "text": "{ a(s: \"\\uDE00\") }",
+            "malformed": true
+        },
+        {
+            "name": "leading surrogate then a non-surrogate",
+            "text": "{ a(s: \"\\uD83D\\u0041\") }",
+            "malformed": true
+        },
+        {
+            "name": "short fixed escape",
+            "text": "{ a(s: \"\\u12\") }",
+            "malformed": true
+        },
+        {
+            "name": "fixed escape cut by non-ASCII",
+            "text": "{ a(s: \"\\u12é4\") }",
+            "malformed": true
+        },
+        {
+            "name": "variable escape cut by non-ASCII",
+            "text": "{ a(s: \"\\u{1é}\") }",
+            "malformed": true
+        },
+        {
+            "name": "variable escape cut by an emoji",
+            "text": "{ a(s: \"\\u{1😀}\") }",
+            "malformed": true
+        },
+        {
+            "name": "bad escape character",
+            "text": "{ a(s: \"\\x\") }",
+            "malformed": true
+        },
+        {
+            "name": "bad escape of a non-ASCII character",
+            "text": "{ a(s: \"\\é\") }",
+            "malformed": true
+        },
+        {
+            "name": "two dots",
+            "text": "{ ..a }",
+            "malformed": true
+        },
+        {
+            "name": "leading dot number",
+            "text": "{ a(b: .5) }",
+            "malformed": true
+        },
+        {
+            "name": "leading zero",
+            "text": "{ a(b: 00) }",
+            "malformed": true
+        },
+        {
+            "name": "dangling decimal point",
+            "text": "{ a(b: 1.) }",
+            "malformed": true
+        },
+        {
+            "name": "dangling exponent",
+            "text": "{ a(b: 1e) }",
+            "malformed": true
+        },
+        {
+            "name": "number then name",
+            "text": "{ a(b: 1a) }",
+            "malformed": true
+        },
+        {
+            "name": "number then dot",
+            "text": "{ a(b: 1.5.) }",
+            "malformed": true
+        },
+        {
+            "name": "number then non-ASCII",
+            "text": "{ a(b: 1é) }",
+            "malformed": true
+        },
+        {
+            "name": "lone minus",
+            "text": "{ a(b: -) }",
+            "malformed": true
+        },
+        {
+            "name": "single quote",
+            "text": "{ a(b: 'x') }",
+            "malformed": true
+        },
+        {
+            "name": "unexpected punctuation",
+            "text": "{ a ? }",
+            "malformed": true
+        },
+        {
+            "name": "unexpected emoji",
+            "text": "{ a 😀 }",
+            "malformed": true
+        },
+        {
+            "name": "unexpected non-ASCII after non-ASCII on the line",
+            "text": "{ a(b: \"日本語\") é }",
+            "malformed": true
+        },
+        {
+            "name": "error on a later line after CRLF",
+            "text": "{\r\n  a(b: \"😀\")\r\n  ?\r\n}",
+            "malformed": true
+        },
+        {
+            "name": "extension with nothing",
+            "text": "extend type Foo",
+            "malformed": true
+        },
+        {
+            "name": "scalar extension without directives",
+            "text": "extend scalar X",
+            "malformed": true
+        },
+        {
+            "name": "schema extension with nothing",
+            "text": "extend schema",
+            "malformed": true
+        },
+        {
+            "name": "directive extension without directives",
+            "text": "extend directive @d",
+            "malformed": true
+        },
+        {
+            "name": "extend an unknown kind",
+            "text": "extend thing X @d",
+            "malformed": true
+        },
+        {
+            "name": "reserved enum value",
+            "text": "enum E { true }",
+            "malformed": true
+        },
+        {
+            "name": "reserved enum value null",
+            "text": "enum E { A null }",
+            "malformed": true
+        },
+        {
+            "name": "fragment named on",
+            "text": "fragment on on T { a }",
+            "malformed": true
+        },
+        {
+            "name": "spread of a fragment named on",
+            "text": "{ ...on }",
+            "malformed": true
+        },
+        {
+            "name": "variable in a constant",
+            "text": "type T { f(a: Int = $v): Int }",
+            "malformed": true
+        },
+        {
+            "name": "dollar in a constant",
+            "text": "query($a: Int = $) { a }",
+            "malformed": true
+        },
+        {
+            "name": "unknown directive location",
+            "text": "directive @d on FOO",
+            "malformed": true
+        },
+        {
+            "name": "description on shorthand query",
+            "text": "\"desc\" { a }",
+            "malformed": true
+        },
+        {
+            "name": "description on an extension",
+            "text": "\"desc\" extend type T @d",
+            "malformed": true
+        },
+        {
+            "name": "unknown definition",
+            "text": "notakeyword X",
+            "malformed": true
+        },
+        {
+            "name": "operation type unknown in schema",
+            "text": "schema { other: Q }",
+            "malformed": true
+        },
+        {
+            "name": "missing type condition",
+            "text": "fragment F { a }",
+            "malformed": true
+        },
+        {
+            "name": "empty arguments",
+            "text": "{ a() }",
+            "malformed": true
+        },
+        {
+            "name": "empty fragment arguments",
+            "text": "{ ...F() }",
+            "malformed": true
+        },
+        {
+            "name": "value missing",
+            "text": "{ a(b: ) }",
+            "malformed": true
+        },
+        {
+            "name": "list type unclosed",
+            "text": "query($a: [Int) { a }",
+            "malformed": true
+        },
+        {
+            "name": "repeatable after on",
+            "text": "directive @d on FIELD repeatable",
+            "malformed": true
+        },
+        {
+            "name": "string where a name goes",
+            "text": "{ \"a\" }",
+            "malformed": true
+        },
+        {
+            "name": "error positioned at end of file",
+            "text": "query Q(",
+            "malformed": true
+        }
+    ]
+}
