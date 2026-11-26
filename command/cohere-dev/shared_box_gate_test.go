@@ -36,7 +36,7 @@ mod)
   [ "$2" = verify ] && echo "all modules verified"; exit 0 ;;
 test)
   empty=no; [ -z "$(ls -A "$GOCACHE")" ] && empty=yes
-  echo "test $* | cache $GOCACHE empty $empty | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
+  echo "test $* | cache $GOCACHE empty $empty | cache program ${GOCACHEPROG:-none} | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
   if [ -n "$GATE_RACE_FAILS" ]; then case " $* " in *" -race"*" $GATE_RACE_FAILS "*)
     echo '{"Action":"fail","Package":"example.com/module"}'; exit 1 ;; esac; fi
   echo '{"Action":"pass","Package":"example.com/module"}' ;;
