@@ -59,7 +59,7 @@ Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a 
 cohere's fix differs from ESLint's where ESLint's breaks the build. TypeScript narrows a reference
 through `!!x` and through a comparison, aliased into a const or not, and never through a call, so
 `Boolean(x)` can turn compiling code into TS18048. Two of the sites counted in the table above are that shape:
-`!!propertiesTaskId && propertiesTaskId.length` and `!!value && /.../.test(value)`. So cohere writes
+`!!label && label.length` and `!!value && /.../.test(value)`. So cohere writes
 `x !== undefined`, `x !== null`, or both when the type is nullish plus values that are never falsy
 (the hand repair www-phi-health made in `AppSidebarEnergyBalance.tsx`), keeps `Boolean(x)` where
 narrowing changes nothing (a call, a `string`, an object), and declines the fix, reporting with a
