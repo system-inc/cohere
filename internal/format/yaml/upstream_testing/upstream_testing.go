@@ -1,54 +1,61 @@
-// Package upstream_testing reads the upstream answers the YAML parser tests compare against (#jddr94a):
-// eemeli/yaml's composer and CST and yaml-unist-parser's trees, recorded by node once and committed, so the
-// tests run no process and read nothing outside the repository.
+// Package upstream_testing holds the shapes of the yaml packages' recorded comparisons (#jddr94a): the
+// inputs files, the yaml-test-suite's part files under internal/format/yaml/testdata/yaml_test_suite, the
+// corpus under internal/format/yaml/testdata/prettier_tests, and the answers files eemeli/yaml's composer
+// and CST and yaml-unist-parser's trees were recorded into. Reading and pairing are internal/testing/recorded's;
+// this package names the files, fails the test, and says how to record again.
 //
-// A test's inputs live in a plain JSON file, or in the yaml-test-suite's part files under
-// internal/format/yaml/testdata/yaml_test_suite, and upstream's answers in a gzipped file beside them, each
-// answer carrying the text it was recorded for. The recorder is record-yaml.mjs, attached to #jddr94a,
-// usage in its header. An edited input, an input with no answer, or an answer with no input fails the test
-// naming the recorder, so no answer is ever compared against a text it was not recorded for.
+// The recorder is record-yaml.mjs, attached to #jddr94a, usage in its header. An answer carries its input's
+// name and the text it was recorded for, or, for a vendored input (a suite case or a corpus file), the
+// text's SHA-256, so the tree holds one copy of each vendored text. An edited input, an input with no
+// answer, or an answer with no input fails the test naming the recorder, so no answer is ever compared
+// against a text it was not recorded for.
 package upstream_testing
 
 import (
-	"compress/gzip"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
-	"sort"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // RecordAgain is what every mismatch between inputs and answers tells the reader to do.
 const RecordAgain = "record them again with record-yaml.mjs, attached to #jddr94a"
 
-// Input is one text a recording was made for, under a name unique in its file.
+// Input is one text a recording was made for, under a name unique in its file. Vendored says its answer
+// records the text's digest rather than the text.
 type Input struct {
-	Name string `json:"name"`
-	Text string `json:"text"`
+	Name     string `json:"name"`
+	Text     string `json:"text"`
+	Vendored bool   `json:"-"`
 }
 
-// inputsFile is an inputs file: where its texts came from, and the texts.
+// inputsFile is an inputs file: where its texts came from, whether they are vendored, and the texts.
 type inputsFile struct {
-	Source string  `json:"source"`
-	Inputs []Input `json:"inputs"`
+	Source   string  `json:"source"`
+	Vendored bool    `json:"vendored"`
+	Inputs   []Input `json:"inputs"`
+}
+
+// readJson is recorded.ReadJson, failing the test on an error.
+func readJson[Contents any](test testing.TB, path string) Contents {
+	test.Helper()
+	contents, readError := recorded.ReadJson[Contents](path)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	return contents
 }
 
 // ReadInputs reads an inputs file, refusing one that holds no inputs.
 func ReadInputs(test testing.TB, path string) []Input {
 	test.Helper()
-	contents, readError := os.ReadFile(path)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	var file inputsFile
-	if decodeError := json.Unmarshal(contents, &file); decodeError != nil {
-		test.Fatalf("%s: %v", path, decodeError)
-	}
+	file := readJson[inputsFile](test, path)
 	if len(file.Inputs) == 0 {
 		test.Fatalf("%s holds no inputs", path)
+	}
+	for index := range file.Inputs {
+		file.Inputs[index].Vendored = file.Vendored
 	}
 	return file.Inputs
 }
@@ -84,14 +91,7 @@ func SuitePartPath(directory string, part int) string {
 func ReadSuitePart(test testing.TB, directory string, part int) []SuiteCase {
 	test.Helper()
 	path := SuitePartPath(directory, part)
-	contents, readError := os.ReadFile(path)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	var file suitePart
-	if decodeError := json.Unmarshal(contents, &file); decodeError != nil {
-		test.Fatalf("%s: %v", path, decodeError)
-	}
+	file := readJson[suitePart](test, path)
 	if len(file.Cases) == 0 {
 		test.Fatalf("%s holds no cases", path)
 	}
@@ -99,13 +99,13 @@ func ReadSuitePart(test testing.TB, directory string, part int) []SuiteCase {
 }
 
 // SuiteInputs are a part's cases as inputs, the recorder's way: each case's YAML under its name and, when
-// withDumps, its dump under its name and " dump".
+// withDumps, its dump under its name and " dump". Every one is vendored.
 func SuiteInputs(cases []SuiteCase, withDumps bool) []Input {
 	inputs := make([]Input, 0, 2*len(cases))
 	for _, suiteCase := range cases {
-		inputs = append(inputs, Input{Name: suiteCase.Name, Text: suiteCase.Yaml})
+		inputs = append(inputs, Input{Name: suiteCase.Name, Text: suiteCase.Yaml, Vendored: true})
 		if withDumps && suiteCase.Dump != nil {
-			inputs = append(inputs, Input{Name: suiteCase.Name + " dump", Text: *suiteCase.Dump})
+			inputs = append(inputs, Input{Name: suiteCase.Name + " dump", Text: *suiteCase.Dump, Vendored: true})
 		}
 	}
 	return inputs
@@ -113,7 +113,9 @@ func SuiteInputs(cases []SuiteCase, withDumps bool) []Input {
 
 // CorpusHalfCount is how many halves the corpus's YAML files are split into, in path order, so every
 // answers file recorded for one stays under 50 KB. The corpus is Prettier's own format fixtures, under
-// internal/format/yaml/testdata/prettier_tests with Prettier's MIT notice.
+// internal/format/yaml/testdata/prettier_tests with Prettier's MIT notice: tests/format/yaml but its
+// yaml-test-suite directory and the spec examples the yaml-test-suite holds, so each text is in the tree
+// once, and the markdown fixtures' YAML front matter.
 const CorpusHalfCount = 2
 
 // ReadCorpusHalf reads one half (1 to CorpusHalfCount) of the corpus's YAML files under directory, the
@@ -137,15 +139,13 @@ type FrontMatterInput struct {
 func ReadFrontMatter(test testing.TB, directory string) []FrontMatterInput {
 	test.Helper()
 	path := filepath.Join(directory, "front_matter_inputs.json")
-	contents, readError := os.ReadFile(path)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	var file struct {
-		Inputs []FrontMatterInput `json:"inputs"`
-	}
-	if decodeError := json.Unmarshal(contents, &file); decodeError != nil {
-		test.Fatalf("%s: %v", path, decodeError)
+	file := readJson[struct {
+		Source   string             `json:"source"`
+		Vendored bool               `json:"vendored"`
+		Inputs   []FrontMatterInput `json:"inputs"`
+	}](test, path)
+	if !file.Vendored {
+		test.Fatalf("%s does not say its texts are vendored", path)
 	}
 	if len(file.Inputs) == 0 {
 		test.Fatalf("%s holds no inputs", path)
@@ -154,11 +154,11 @@ func ReadFrontMatter(test testing.TB, directory string) []FrontMatterInput {
 }
 
 // FrontMatterValues are the front matter values as inputs, the recorder's way: each under its file's
-// name and " (front matter)".
+// name and " (front matter)", vendored.
 func FrontMatterValues(inputs []FrontMatterInput) []Input {
 	values := make([]Input, len(inputs))
 	for index, input := range inputs {
-		values[index] = Input{Name: input.Name + " (front matter)", Text: input.Value}
+		values[index] = Input{Name: input.Name + " (front matter)", Text: input.Value, Vendored: true}
 	}
 	return values
 }
@@ -171,41 +171,29 @@ type Answers[Answer any] struct {
 	Answers  []Answer `json:"answers"`
 }
 
-// ReadAnswers reads a gzipped answers file, refusing one whose gzip or JSON does not read whole.
+// ReadAnswers reads an answers file, refusing one that does not say where or when it was recorded.
 func ReadAnswers[Answer any](test testing.TB, path string) Answers[Answer] {
 	test.Helper()
-	file, openError := os.Open(path)
-	if openError != nil {
-		test.Fatal(openError)
-	}
-	// Ignored: the file is only read, so a failed close loses nothing already decoded.
-	defer file.Close()
-	unzipped, gzipError := gzip.NewReader(file)
-	if gzipError != nil {
-		test.Fatalf("%s: %v", path, gzipError)
-	}
-	var answers Answers[Answer]
-	decoder := json.NewDecoder(unzipped)
-	if decodeError := decoder.Decode(&answers); decodeError != nil {
-		test.Fatalf("%s: %v", path, decodeError)
-	}
-	// The decoder stops at the end of the object; reading on to the end of the stream is what checks the
-	// gzip trailer's checksum, so a corrupt file cannot pass as long as its first object decodes.
-	var trailing json.RawMessage
-	if trailingError := decoder.Decode(&trailing); trailingError == nil {
-		test.Fatalf("%s holds more than one JSON value", path)
-	} else if !errors.Is(trailingError, io.EOF) {
-		test.Fatalf("%s: %v", path, trailingError)
-	}
+	answers := readJson[Answers[Answer]](test, path)
 	if answers.Source == "" || answers.Recorded == "" {
 		test.Fatalf("%s does not say where or when it was recorded", path)
 	}
 	return answers
 }
 
-// Match pairs every input with its answer, by name, and returns the answers by name. identify reads an
-// answer's name and the text it was recorded for. Every input must have exactly one answer, recorded for
-// its text, and every answer its input; anything else fails the test, naming the recorder.
+// RecordedFor is what an answer was recorded for, as its file holds it: the input's digest when the answer
+// has one, else its text.
+func RecordedFor(text string, sha256 string) string {
+	if sha256 != "" {
+		return sha256
+	}
+	return text
+}
+
+// Match pairs every input with its answer by name (recorded.Match), and returns the answers by name.
+// identify reads an answer's name and what it was recorded for (RecordedFor): an input's text, or a vendored
+// input's digest. Every input must have exactly one answer, recorded for its text, and every answer its
+// input; anything else fails the test, naming the recorder.
 func Match[Answer any](
 	test testing.TB,
 	path string,
@@ -214,37 +202,24 @@ func Match[Answer any](
 	identify func(Answer) (string, string),
 ) map[string]Answer {
 	test.Helper()
-	byName := make(map[string]Answer, len(answers))
-	for _, answer := range answers {
-		name, _ := identify(answer)
-		if _, repeated := byName[name]; repeated {
-			test.Fatalf("%s answers %q twice: %s", path, name, RecordAgain)
-		}
-		byName[name] = answer
-	}
-	inputNames := make(map[string]bool, len(inputs))
-	for _, input := range inputs {
-		if inputNames[input.Name] {
-			test.Fatalf("the inputs of %s name %q twice", path, input.Name)
-		}
-		inputNames[input.Name] = true
-		answer, answered := byName[input.Name]
-		if !answered {
-			test.Fatalf("%q has no answer in %s: %s", input.Name, path, RecordAgain)
-		}
-		if _, text := identify(answer); text != input.Text {
-			test.Fatalf("%q was recorded in %s for another text, %q: %s", input.Name, path, text, RecordAgain)
+	inputEntries := make([]recorded.Entry, len(inputs))
+	for index, input := range inputs {
+		inputEntries[index] = recorded.Entry{Name: input.Name, Input: input.Text}
+		if input.Vendored {
+			inputEntries[index].Input = recorded.Digest([]byte(input.Text))
 		}
 	}
-	var orphans []string
-	for name := range byName {
-		if !inputNames[name] {
-			orphans = append(orphans, name)
-		}
+	answerEntries := make([]recorded.Entry, len(answers))
+	for index, answer := range answers {
+		answerEntries[index].Name, answerEntries[index].Input = identify(answer)
 	}
-	if len(orphans) > 0 {
-		sort.Strings(orphans)
-		test.Fatalf("%s answers %q, which no input names any more: %s", path, orphans, RecordAgain)
+	indexes, matchError := recorded.Match(inputEntries, answerEntries)
+	if matchError != nil {
+		test.Fatalf("%s: %v: %s", path, matchError, RecordAgain)
+	}
+	byName := make(map[string]Answer, len(inputs))
+	for position, input := range inputs {
+		byName[input.Name] = answers[indexes[position]]
 	}
 	return byName
 }

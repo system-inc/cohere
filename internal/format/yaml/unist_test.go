@@ -56,13 +56,14 @@ type jsonNode struct {
 	Parameters          []string    `json:"parameters"`
 }
 
-// loaderAnswer is one recorded tree: the input's name and text, and the tree, or the parser's message
-// when it threw.
+// loaderAnswer is one recorded tree: the input's name, its text or, for a vendored input, the text's
+// digest, and the tree, or the parser's message when it threw.
 type loaderAnswer struct {
-	Name  string          `json:"name"`
-	Text  string          `json:"text"`
-	Root  json.RawMessage `json:"root"`
-	Error *string         `json:"error"`
+	Name   string          `json:"name"`
+	Text   string          `json:"text"`
+	Sha256 string          `json:"sha256"`
+	Root   json.RawMessage `json:"root"`
+	Error  *string         `json:"error"`
 }
 
 // parsed is one input's tree, or the parser's error.
@@ -87,7 +88,7 @@ func recordedTrees(test testing.TB, answersFile string, inputs []upstream_testin
 	path := filepath.Join(yamlUnistParserDirectory, answersFile)
 	answers := upstream_testing.ReadAnswers[loaderAnswer](test, path)
 	byName := upstream_testing.Match(test, path, inputs, answers.Answers, func(answer loaderAnswer) (string, string) {
-		return answer.Name, answer.Text
+		return answer.Name, upstream_testing.RecordedFor(answer.Text, answer.Sha256)
 	})
 	results := make([]parsed, len(inputs))
 	for index, input := range inputs {

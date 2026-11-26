@@ -37,17 +37,20 @@ type oracleInput struct {
 	Name  string
 	Text  string
 	Chunk int
+	// Vendored says the parse's answer records its text's digest (see upstream_testing).
+	Vendored bool
 }
 
 // parseKey is a parse's name in an answers file: its input's name and its chunk size.
 func parseKey(name string, chunk int) string { return fmt.Sprintf("%s, chunk %d", name, chunk) }
 
-// tokensAnswer is one recorded answer: the input's name, the chunk size, the text, and the string
-// upstream's serializer wrote for it, or "throw" when parsing threw.
+// tokensAnswer is one recorded answer: the input's name, the chunk size, the text or, for a vendored input,
+// the text's digest, and the string upstream's serializer wrote for it, or "throw" when parsing threw.
 type tokensAnswer struct {
 	Name   string `json:"name"`
 	Chunk  int    `json:"chunk"`
 	Text   string `json:"text"`
+	Sha256 string `json:"sha256"`
 	Output string `json:"output"`
 }
 
@@ -56,7 +59,10 @@ func inputsAt(inputs []upstream_testing.Input, chunks ...int) []oracleInput {
 	parses := make([]oracleInput, 0, len(inputs)*len(chunks))
 	for _, input := range inputs {
 		for _, chunk := range chunks {
-			parses = append(parses, oracleInput{Name: input.Name, Text: input.Text, Chunk: chunk})
+			parses = append(
+				parses,
+				oracleInput{Name: input.Name, Text: input.Text, Chunk: chunk, Vendored: input.Vendored},
+			)
 		}
 	}
 	return parses
@@ -70,10 +76,14 @@ func recordedOutputs(test *testing.T, answersFile string, parses []oracleInput) 
 	answers := upstream_testing.ReadAnswers[tokensAnswer](test, path)
 	keyed := make([]upstream_testing.Input, len(parses))
 	for index, parse := range parses {
-		keyed[index] = upstream_testing.Input{Name: parseKey(parse.Name, parse.Chunk), Text: parse.Text}
+		keyed[index] = upstream_testing.Input{
+			Name:     parseKey(parse.Name, parse.Chunk),
+			Text:     parse.Text,
+			Vendored: parse.Vendored,
+		}
 	}
 	byKey := upstream_testing.Match(test, path, keyed, answers.Answers, func(answer tokensAnswer) (string, string) {
-		return parseKey(answer.Name, answer.Chunk), answer.Text
+		return parseKey(answer.Name, answer.Chunk), upstream_testing.RecordedFor(answer.Text, answer.Sha256)
 	})
 	outputs := make([]string, len(parses))
 	for index, parse := range parses {

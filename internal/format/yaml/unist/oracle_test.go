@@ -84,12 +84,14 @@ type oracleResult struct {
 	Error *jsonError      `json:"error"`
 }
 
-// parseAnswer is one recorded answer: the input's name and text, and upstream's tree or its error.
+// parseAnswer is one recorded answer: the input's name, its text or, for a vendored input, the text's
+// digest, and upstream's tree or its error.
 type parseAnswer struct {
-	Name  string          `json:"name"`
-	Text  string          `json:"text"`
-	Root  json.RawMessage `json:"root"`
-	Error *jsonError      `json:"error"`
+	Name   string          `json:"name"`
+	Text   string          `json:"text"`
+	Sha256 string          `json:"sha256"`
+	Root   json.RawMessage `json:"root"`
+	Error  *jsonError      `json:"error"`
 }
 
 // recordedParses reads an answers file and pairs it with the inputs, returning upstream's result for each
@@ -99,7 +101,7 @@ func recordedParses(test *testing.T, answersFile string, inputs []upstream_testi
 	path := filepath.Join(yamlUnistParserDirectory, answersFile)
 	answers := upstream_testing.ReadAnswers[parseAnswer](test, path)
 	byName := upstream_testing.Match(test, path, inputs, answers.Answers, func(answer parseAnswer) (string, string) {
-		return answer.Name, answer.Text
+		return answer.Name, upstream_testing.RecordedFor(answer.Text, answer.Sha256)
 	})
 	results := make([]oracleResult, len(inputs))
 	for index, input := range inputs {

@@ -1,5 +1,6 @@
 {
  "source": "Prettier's format fixtures with YAML front matter, tests/format/**/*.md, in the Prettier fork (system-inc/prettier, at 54c8b90ae), MIT, see LICENSE; normalized as Prettier's core normalizes a file, each value read by src/main/front-matter/parse.js and trimmed",
+ "vendored": true,
  "inputs": [
   {"name":"markdown/front-matter/unicode.md","text":"---\ntitle: \"ABC 漢字 🇯🇵\"\n---\n\n## Retrospective\n","value":"title: \"ABC 漢字 🇯🇵\""},
   {"name":"markdown/yaml/complex.md","text":"---\n- hello:    world\n-         123\n---\n\n# something\n","value":"- hello:    world\n-         123"},

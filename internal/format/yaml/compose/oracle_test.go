@@ -37,11 +37,12 @@ var eemeliYamlDirectory = filepath.Join("testdata", "eemeli_yaml")
 // suiteDirectory holds the yaml-test-suite's cases, shared with the other YAML packages.
 var suiteDirectory = filepath.Join("..", "testdata", "yaml_test_suite")
 
-// composeAnswer is one recorded answer: the input's name and text, and the string upstream's serializer
-// wrote for it, or "throw " and the error when composing threw.
+// composeAnswer is one recorded answer: the input's name, its text or, for a vendored input, the text's
+// digest, and the string upstream's serializer wrote for it, or "throw " and the error when composing threw.
 type composeAnswer struct {
 	Name   string `json:"name"`
 	Text   string `json:"text"`
+	Sha256 string `json:"sha256"`
 	Output string `json:"output"`
 }
 
@@ -52,7 +53,7 @@ func recordedOutputs(test *testing.T, answersFile string, inputs []upstream_test
 	path := filepath.Join(eemeliYamlDirectory, answersFile)
 	answers := upstream_testing.ReadAnswers[composeAnswer](test, path)
 	byName := upstream_testing.Match(test, path, inputs, answers.Answers, func(answer composeAnswer) (string, string) {
-		return answer.Name, answer.Text
+		return answer.Name, upstream_testing.RecordedFor(answer.Text, answer.Sha256)
 	})
 	outputs := make([]string, len(inputs))
 	for index, input := range inputs {
