@@ -1,6 +1,8 @@
 package yaml
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
+	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
 )
 
 // formatFixtures reach the printer's branches: every node type, comments in every slot they attach to,
@@ -509,5 +512,33 @@ func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
 	}
 	if strings.Contains(printed, "\r") {
 		test.Fatal("a doc has no line endings of its own")
+	}
+}
+
+// suiteDirectory holds the yaml-test-suite's cases, recorded from the package in the Prettier fork's
+// node_modules (see upstream_testing), with the suite's MIT notices beside them.
+var suiteDirectory = filepath.Join("testdata", "yaml_test_suite")
+
+// suiteInputs is every input of one part of the yaml-test-suite, and each case's canonical dump.
+func suiteInputs(test *testing.T, part int) []string {
+	test.Helper()
+	var inputs []string
+	cases := upstream_testing.ReadSuitePart(test, suiteDirectory, part)
+	for _, input := range upstream_testing.SuiteInputs(cases, true) {
+		inputs = append(inputs, input.Text)
+	}
+	return inputs
+}
+
+// TestYamlTestSuiteMatchesOracle runs the suite through both sides under every option set. Inputs the
+// oracle cannot format (the suite's error cases) must fail in the parser too. Each of the suite's parts
+// is a subtest with a golden of its own, which keeps every golden under 50 KB.
+func TestYamlTestSuiteMatchesOracle(test *testing.T) {
+	test.Parallel()
+	for part := 1; part <= upstream_testing.SuitePartCount; part++ {
+		test.Run(fmt.Sprintf("part_%d", part), func(test *testing.T) {
+			test.Parallel()
+			compareFormat(test, suiteInputs(test, part))
+		})
 	}
 }
