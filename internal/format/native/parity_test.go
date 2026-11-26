@@ -71,6 +71,11 @@ func TestEmptyTextAndNumericSeparatorsMatchTheFork(test *testing.T) {
 			compared++
 			if actual != expected {
 				test.Errorf("%s %q: the fork prints %q and Formatter %q", each.fileName, each.text, expected, actual)
+			} else if again, againError := formatter.Format(each.fileName, expected); againError != nil ||
+				again != expected {
+				// Formatted output formats to itself, or every run rewrites what the last one wrote.
+				test.Errorf("%s %q: formatted again, %q prints %q (%v)", each.fileName, each.text, expected, again,
+					againError)
 			}
 		}
 	}
@@ -110,6 +115,9 @@ func TestModuleAndCommonJsTypeScriptMatchTheFork(test *testing.T) {
 		}
 		if nativeError != nil || actual != expected {
 			test.Errorf("%s: the fork prints %q and Formatter %q, %v", fileName, expected, actual, nativeError)
+		} else if again, againError := formatter.Format(fileName, expected); againError != nil || again != expected {
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			test.Errorf("%s: formatted again, %q prints %q (%v)", fileName, expected, again, againError)
 		}
 		printed[fileName] = actual
 

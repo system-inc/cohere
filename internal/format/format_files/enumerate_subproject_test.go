@@ -2,7 +2,6 @@ package format_files
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,12 +13,15 @@ import (
 // offered, a `.gitignore` above the project still applies, and an index the walk cannot read is named, never silent.
 
 // subprojectRepository is a repository whose root ignores `*.generated.ts`, holding a project in app/ whose own
-// `.gitignore` ignores `scratch.ts`. app/kept.generated.ts and app/scratch.ts are force-added, so git tracks both;
-// app/other.generated.ts and app/stray/scratch.ts are not.
-func subprojectRepository(test *testing.T) (repository string, project string) {
+// `.gitignore` ignores `scratch.ts`. Its `.git/index` is the recorded index named, one of testdata/index's, which git
+// wrote for this tree with app/kept.generated.ts and app/scratch.ts added by force, so it tracks both and leaves
+// app/other.generated.ts and app/stray/scratch.ts untracked. Recorded rather than made by a git child, so the test
+// reads only the repository (testdata/index/README.md says how the bytes were made).
+func subprojectRepository(test *testing.T, index string) (repository string, project string) {
 	test.Helper()
-	if _, lookPathError := exec.LookPath("git"); lookPathError != nil {
-		test.Skip("no git on PATH")
+	recorded, readError := os.ReadFile(filepath.Join("testdata", "index", index))
+	if readError != nil {
+		test.Fatalf("reading the recorded index %s: %v", index, readError)
 	}
 	repository = settingsTree(test, `[]`, `[]`, map[string]string{
 		".gitignore":              "*.generated.ts\n",
@@ -30,27 +32,17 @@ func subprojectRepository(test *testing.T) (repository string, project string) {
 		"app/scratch.ts":          "export const scratch = 1;\n",
 		"app/stray/scratch.ts":    "export const stray = 1;\n",
 		"app/CohereSettings.json": `{"extends": "../nexus/NexusCohereSettings.json", "rules": {}}`,
+		// The index alone makes the tree a repository to the walk: it finds the repository by its `.git`, and of the
+		// rest reads only the config and info/exclude, either of which may be absent. With no config the object
+		// format is SHA-1's, which these were recorded in.
+		".git/index": string(recorded),
 	})
-	git := func(arguments ...string) {
-		test.Helper()
-		command := exec.Command("git", append([]string{"-c", "user.email=fixture@example.com", "-c",
-			"user.name=fixture", "-c", "core.excludesFile=/dev/null"}, arguments...)...)
-		command.Dir = repository
-		command.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
-		if output, runError := command.CombinedOutput(); runError != nil {
-			test.Fatalf("git %v: %v\n%s", arguments, runError, output)
-		}
-	}
-	git("init", "--quiet")
-	git("add", "-A")
-	git("add", "-f", "app/kept.generated.ts", "app/scratch.ts")
-	git("commit", "--quiet", "-m", "fixture")
 	return repository, filepath.Join(repository, "app")
 }
 
 func TestASubprojectWalkReadsItsRepositorysIndexAndIgnoreFiles(test *testing.T) {
 	test.Parallel()
-	repository, project := subprojectRepository(test)
+	repository, project := subprojectRepository(test, "subproject.index")
 	enumeration, enumerateError := Enumerate(project, handlesEveryLanguage)
 	if enumerateError != nil {
 		test.Fatal(enumerateError)
@@ -78,12 +70,7 @@ func TestASubprojectWalkReadsItsRepositorysIndexAndIgnoreFiles(test *testing.T) 
 // deciding by the ignore files alone, so the tracked kept.generated.ts is counted ignored, and the walk says why.
 func TestASubprojectWalkWhoseIndexCannotBeReadSaysSo(test *testing.T) {
 	test.Parallel()
-	repository, project := subprojectRepository(test)
-	command := exec.Command("git", "update-index", "--split-index")
-	command.Dir = repository
-	if output, runError := command.CombinedOutput(); runError != nil {
-		test.Fatalf("git update-index --split-index: %v\n%s", runError, output)
-	}
+	_, project := subprojectRepository(test, "subproject-split.index")
 	enumeration, enumerateError := Enumerate(project, handlesEveryLanguage)
 	if enumerateError != nil {
 		test.Fatal(enumerateError)

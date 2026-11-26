@@ -214,10 +214,21 @@ func formatOptionSets() map[string]format_options.Options {
 	}
 }
 
+// unsettledCases are the cases whose fork output the fork itself would rewrite, so Format, which prints as the fork
+// does, rewrites it on a second pass too: each named with why. One listed here that settles fails, so the list only
+// shrinks.
+var unsettledCases = map[string]string{
+	"selectors: combinators, pseudo-classes, pseudo-elements, attributes, namespaces, lists": "`|b`, a type in no " +
+		"namespace, prints as `,|b`, and each pass adds a line holding a lone comma before it",
+	"long comma lists and space lists break at the print width": "a grid property keeps the line breaks of its " +
+		"source, so the second pass keeps the breaks the first chose and lays the value out again",
+}
+
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
+	unsettled := map[string]bool{}
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Formatter(options)
 		for _, testCase := range formatCases {
@@ -252,7 +263,22 @@ func TestFormatMatchesTheFork(test *testing.T) {
 			}
 			if actual != expected {
 				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				continue
 			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			again, againError := Format(expected, options, nil)
+			settled := againError == nil && again == expected
+			if _, listed := unsettledCases[testCase.name]; listed {
+				unsettled[testCase.name] = unsettled[testCase.name] || !settled
+			} else if !settled {
+				test.Errorf("%s (%s): formatted again (%v):\n%s", testCase.name, optionsName, againError,
+					firstDifference(expected, again))
+			}
+		}
+	}
+	for name := range unsettledCases {
+		if !unsettled[name] {
+			test.Errorf("%s formats to itself on a second pass now, so take it out of unsettledCases", name)
 		}
 	}
 }
@@ -351,6 +377,12 @@ func TestCoreNormalizedInputMatchesTheFork(test *testing.T) {
 			if formatError != nil || actual != expected {
 				test.Errorf("%q as %s (%s):\n--- fork\n%q\n--- native (%v)\n%q", testCase.source, testCase.fileName,
 					optionsName, expected, formatError, actual)
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := format(expected, options, nil); againError != nil || again != expected {
+				test.Errorf("%q as %s (%s): formatted again, %q (%v)", testCase.source, testCase.fileName, optionsName,
+					again, againError)
 			}
 		}
 	}
@@ -542,6 +574,10 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 						optionsName,
 						firstDifference(expected, actual),
 					)
+				} else if again, againError := Format(expected, options, nil); againError != nil || again != expected {
+					// Formatted output formats to itself, or every run rewrites what the last one wrote.
+					test.Errorf("%s (%s): formatted again (%v):\n%s", file, optionsName, againError,
+						firstDifference(expected, again))
 				}
 			}
 		}
@@ -707,6 +743,12 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 			}
 			if actual != expected {
 				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := FormatScss(expected, options, nil); againError != nil || again != expected {
+				test.Errorf("%s (%s): formatted again (%v):\n%s", testCase.name, optionsName, againError,
+					firstDifference(expected, again))
 			}
 		}
 	}
@@ -737,6 +779,10 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 		actualScss, formatScssError := FormatScss(source, format_options.Default(), nil)
 		if formatScssError != nil || actualScss != asScss {
 			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asScss, formatScssError, actualScss)
+		} else if again, againError := FormatScss(asScss, format_options.Default(), nil); againError != nil ||
+			again != asScss {
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			test.Errorf("%q as scss: formatted again (%v):\n%s", source, againError, firstDifference(asScss, again))
 		}
 		actualCss, formatError := Format(source, format_options.Default(), nil)
 		if (formatError == nil) != (cssError == nil) || actualCss != asCss {
@@ -748,6 +794,10 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 				formatError,
 				actualCss,
 			)
+		} else if cssError == nil {
+			if again, againError := Format(asCss, format_options.Default(), nil); againError != nil || again != asCss {
+				test.Errorf("%q as css: formatted again (%v):\n%s", source, againError, firstDifference(asCss, again))
+			}
 		}
 	}
 }
@@ -840,6 +890,11 @@ func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 				}
 				if actual == expected {
 					matched++
+					// Formatted output formats to itself, or every run rewrites what the last one wrote.
+					if again, againError := FormatScss(expected, options, nil); againError != nil || again != expected {
+						test.Errorf("%s (%s): formatted again (%v):\n%s", file, optionsName, againError,
+							firstDifference(expected, again))
+					}
 				} else {
 					test.Errorf(
 						"%s (%s): differs from the fork\n%s",
