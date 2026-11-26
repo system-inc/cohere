@@ -330,12 +330,13 @@ func TestTheGatesMacScriptNamesTheCorporaItLacks(test *testing.T) {
 	// The toolchain's refusal names the variable, so the test sees what the script set before it.
 	script = strings.Replace(script, `refuse "there is no go at $goroot"`,
 		`refuse "there is no go at $goroot, ahra at ${COHERE_CORPUS_AHRA:-none}, temporary at $TMPDIR"`, 1)
-	home := test.TempDir()
+	home, temporaryRoot := test.TempDir(), test.TempDir()
 	run := func(corpora string) string {
 		test.Helper()
 		bash := exec.Command("bash", "-s", "--", commit, "", "", corpora, "./...")
 		bash.Dir, bash.Stdin = test.TempDir(), strings.NewReader(script)
-		bash.Env = append(os.Environ(), "HOME="+home, "GIT_CONFIG_NOSYSTEM=1", "COHERE_CORPUS_AHRA=/elsewhere")
+		bash.Env = append(os.Environ(), "HOME="+home, "TMPDIR="+temporaryRoot, "GIT_CONFIG_NOSYSTEM=1",
+			"COHERE_CORPUS_AHRA=/elsewhere")
 		// Ignored: what the script did is read from what it said.
 		output, _ := bash.CombinedOutput()
 		return string(output)
@@ -355,10 +356,10 @@ func TestTheGatesMacScriptNamesTheCorporaItLacks(test *testing.T) {
 	if !strings.Contains(said, "ahra at none") || strings.Contains(said, corpusUnlaidMarker) {
 		test.Errorf("a landing pinning no corpus wasn't tested with none set:\n%s", said)
 	}
-	// The tests' temporary directory is under /tmp, which macOS reaches through a link, and it goes with the run.
+	// The tests' temporary directory is under the account's `TMPDIR`, never a fixed /tmp, and it goes with the run.
 	_, temporary, found := strings.Cut(strings.TrimSpace(said), "temporary at ")
-	if !found || !strings.HasPrefix(temporary, "/tmp/cohere-gate.") {
-		test.Fatalf("the tests' temporary directory wasn't made under /tmp:\n%s", said)
+	if !found || !strings.HasPrefix(temporary, temporaryRoot+"/cohere-gate.") {
+		test.Fatalf("the tests' temporary directory wasn't made under %s:\n%s", temporaryRoot, said)
 	}
 	if _, statError := os.Stat(temporary); !os.IsNotExist(statError) {
 		test.Errorf("the tests' temporary directory %s outlived the run: %v", temporary, statError)

@@ -66,16 +66,26 @@ const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 // cache there. The land job on Shackler alone replaces it with its own setting (land_job_run.go).
 const macBoxLandCacheLine = `landCache=""`
 
-// macBoxTemporaryBlock makes gatetemp, the tests' temporary directory under /tmp: a new one each run on a gate box, and
-// on Shackler, with landCache set, one path every land job, made empty first. go test's cache keys a test on the
-// `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job would miss every package that makes one.
-// The land job is serial (land_job_run.go), so no two runs share the path.
+// landJobLine is the line of macBoxScript, landGateScript and performanceScript saying the script runs in no land job:
+// set in the script itself, so no variable in an account's environment can make it one. The land job alone replaces it
+// with landJobSetting (land_job_run.go), which is what lets each script read the module set Loom laid for the job, with
+// a kept cache or without one (sharedBoxGate, land_performance.go).
+const (
+	landJobLine    = `landJob=""`
+	landJobSetting = `landJob=1`
+)
+
+// macBoxTemporaryBlock makes gatetemp, the tests' temporary directory: a new one each run on a gate box, under the
+// account's `TMPDIR`, and with landCache set, one path every land job, inside the kept cache, made empty first. go
+// test's cache keys a test on the `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job would
+// miss every package that makes one. Never a fixed /tmp: a land job in Shackler's sandbox may write its own tmp and its
+// kept cache, and /tmp refused it (J-7dhfcty). The land job is serial (land_job_run.go), so no two runs share the path.
 const macBoxTemporaryBlock = `if [ -n "$landCache" ]; then
-  gatetemp="/tmp/cohere-land-gate.$(id -u)"
+  gatetemp="$landCache/temporary"
   { chmod -R u+w "$gatetemp" 2>/dev/null || true; rm -rf "$gatetemp"; } || refuse "$gatetemp couldn't be emptied"
-  mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
+  mkdir -p "$landCache" && mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
 else
-  gatetemp=$(mktemp -d /tmp/cohere-gate.XXXXXX)
+  gatetemp=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate.XXXXXX") || refuse "no temporary directory could be made"
 fi
 `
 
@@ -123,11 +133,13 @@ held() {
 // path. It waits for the box's mirror to hold the commit, refusing once it has waited 3 minutes, fetches the commit and
 // the pin, checks them out, and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the mirrors
 // through macBoxMirrorReads, and removes the configuration file naming them safe before any test runs. On a gate box it
-// keeps no Go cache (macBoxLandCacheLine); the land job runs it on Shackler with its mirrors and its cache.
+// keeps no Go cache (macBoxLandCacheLine) and is no land job (landJobLine); the land job runs it on Shackler with its
+// mirrors, its cache when one is kept, and its own setting.
 const macBoxScript = `set -euo pipefail
 commit="$1"; pin="$2"; races="$3"; corpora="$4"; shift 4
 ` + macBoxMirrorLine + `
 ` + macBoxLandCacheLine + `
+` + landJobLine + `
 base=` + macBoxScratch + `
 mkdir -p "$base"; cd "$base"
 refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
@@ -157,8 +169,8 @@ for laid in $(echo "$corpora" | tr , ' '); do
   if [ -e "$base/corpora/$place" ]; then export "$variable=$base/corpora/$place"; else unlaid="$unlaid $place"; fi
 done
 [ -z "$unlaid" ] || { echo "` + corpusUnlaidMarker + `${unlaid# }"; exit 0; }
-# The tests' temporary directory is reached through a link, /tmp to /private/tmp, as a developer's Mac reaches its own
-# through /var, so a test of what such a path does runs here too; the gap's own is reached through none (#5r0vrte).
+# The tests' temporary directory, made anew under the account's TMPDIR, or one path inside the land job's kept cache,
+# and never under a fixed /tmp, which a land job in Shackler's sandbox may not write (J-7dhfcty).
 ` + macBoxTemporaryBlock + `trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
 export TMPDIR="$gatetemp"
 cd tree

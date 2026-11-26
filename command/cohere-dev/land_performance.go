@@ -84,13 +84,9 @@ const (
 	performanceSameBinaryMarker = performanceMarker + "the same binary as main's"
 )
 
-// performanceLandJobLine is performanceScript's line saying it runs in no land job: set in the script itself, so no
-// variable in an account's environment can make it one. The land job alone replaces it with performanceLandJobSetting
-// (land_job_run.go), which is what lets the script read the module set Loom laid for the job.
-const (
-	performanceLandJobLine    = `landJob=""`
-	performanceLandJobSetting = `landJob=1`
-)
+// performancePathLine is performanceScript's line setting the path its build and runs read. The land job alone puts the
+// real git's directory first on it (withLandJobGit), so nothing it runs reaches macOS's /usr/bin/git and its xcrun.
+const performancePathLine = `export PATH="$goroot/bin:` + sharedBoxSystemPath + `"`
 
 // The runs the script makes: performanceFills untimed runs before each cold row's rounds fill the binary's system
 // store, the cold rows at the root and at deeafbf4 are timed performanceColdRounds and performanceReferenceRounds
@@ -128,7 +124,7 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 //     them: clones sharing the mirrors' objects, kept across landings.
 //   - It checks the Go toolchain against its digest (sharedBoxToolchainCheck) and the module cache against go.sum, and
 //     builds the binary with them on a Go cache it keeps under the scratch across landings, so a build compiles only
-//     what changed. The module cache is, in a land job (performanceLandJobLine), the set the box laid for it when
+//     what changed. The module cache is, in a land job (landJobLine), the set the box laid for it when
 //     `GOMODCACHE` names one, read with `GOPROXY=off` and `GOSUMDB=off`, and otherwise a cache of the measurement's
 //     own, filled from the proxy. A binary that is main's, by the sha256 it was handed, says
 //     performanceSameBinaryMarker and stops.
@@ -141,7 +137,7 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 // Each phase says its milliseconds, so what costs what can be read.
 const performanceScript = `set -euo pipefail
 commit="$1"; reference="$2"; fills="$3"; coldRounds="$4"; referenceRounds="$5"; warmRounds="$6"; mainBinary="${7:-}"
-` + performanceLandJobLine + `
+` + landJobLine + `
 ` + macBoxMirrorLine + `
 base=` + performanceScratch + `
 mkdir -p "$base"; cd "$base"
@@ -187,7 +183,7 @@ fi
 rm -f "$safe"; trap - EXIT; unset GIT_CONFIG_GLOBAL
 phase lay
 goroot="` + macBoxGoroot + `"; digest="` + macBoxToolchainDigest + `"
-export PATH="$goroot/bin:` + sharedBoxSystemPath + `"
+` + performancePathLine + `
 ` + sharedBoxToolchainCheck + `# The module set the box laid for a land job, kept before the account's Go settings go.
 # Anywhere else a GOMODCACHE is the account's own, never read.
 laidModules=""

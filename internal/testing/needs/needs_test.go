@@ -13,9 +13,10 @@ import (
 // needsChildVariable makes this test binary the child that asks for a missing tool or another platform.
 const needsChildVariable = "COHERE_NEEDS_CHILD"
 
-// A test missing its tool or its platform, or one that can't run under -race in a binary built with it, is
-// reported skipped, naming what it lacks and why, never failed and never passed. Shown through a child test binary
-// run with an empty path, since a skip ends the test it is in.
+// A test missing its tool or its platform, one that can't run under -race in a binary built with it, or one that
+// builds cohere-swift in a land job, where it can't be built, is reported skipped, naming what it lacks and why, never
+// failed and never passed. Shown through a child test binary run with an empty path, since a skip ends the test it is
+// in.
 func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 	test.Parallel()
 	switch os.Getenv(needsChildVariable) {
@@ -32,6 +33,10 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 	case "opt-in":
 		value := OptIn(test, "COHERE_NEEDS_OPT_IN", "it measures a tree of the asker's choosing")
 		test.Logf("opted in with %s", value)
+		return
+	case "swift":
+		SwiftLaid(test)
+		test.Log("Swift is laid here")
 		return
 	case "race":
 		NoRace(test, "it bounds CPU time")
@@ -73,10 +78,12 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 			nil,
 		},
 		{"opt-in", []string{"--- PASS", "opted in with a tree"}, []string{"COHERE_NEEDS_OPT_IN=a tree"}},
+		{"swift", []string{"--- SKIP", SwiftUnlaid}, []string{SwiftUnlaidVariable + "=" + SwiftUnlaidSetting}},
+		{"swift", []string{"--- PASS", "Swift is laid here"}, nil},
 	} {
 		command := exec.Command(executable, "-test.run=^TestAMissingToolOrPlatformIsANamedSkip$", "-test.v")
-		command.Env = append(append(os.Environ(), needsChildVariable+"="+row.child, "PATH=", "COHERE_NEEDS_OPT_IN="),
-			row.environment...)
+		command.Env = append(append(os.Environ(), needsChildVariable+"="+row.child, "PATH=", "COHERE_NEEDS_OPT_IN=",
+			SwiftUnlaidVariable+"="), row.environment...)
 		output, runError := command.CombinedOutput()
 		if runError != nil {
 			test.Errorf("the %s child failed rather than skipped: %v\n%s", row.child, runError, output)

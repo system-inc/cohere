@@ -802,12 +802,12 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		}
 	}
 
-	// The modules both trees' runs read: in a land job (performanceLandJobSetting) with a set laid and named in
+	// The modules both trees' runs read: in a land job (landJobSetting) with a set laid and named in
 	// `GOMODCACHE`, as Loom names one, that set with the proxy and the checksum database off, go mod download only
 	// confirming each module is there; anywhere else, as on main, a cache of the measurement's own under the scratch,
 	// filled from the proxy as Go sets it, an account's `GOMODCACHE` never read, and so in a land job with no set
 	// named.
-	landJobScript, landJobError := replacedOnce(script, performanceLandJobLine, performanceLandJobSetting)
+	landJobScript, landJobError := replacedOnce(script, landJobLine, landJobSetting)
 	if landJobError != nil {
 		test.Fatal(landJobError)
 	}

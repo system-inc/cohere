@@ -304,6 +304,42 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 	}
 }
 
+// A shared box's gate handed a path that holds nothing but the toolchain's own directory, as a land job's sandbox hands
+// it one without /sbin, still digests the toolchain and runs the tests: the system's directories go last on the path
+// before the first check (sharedBoxSystemPathAfter), so sha256sum, find and sort are found, and set -e never ends the
+// script before it says a word (#5wj23dd).
+func TestASharedBoxGateDigestsOnAPathWithoutTheSystemsDirectories(test *testing.T) {
+	test.Parallel()
+	bash := needs.Tool(test, "bash", "the gate is a bash script")
+	needs.Tool(test, "sha256sum", "the gate digests the toolchain with it, as the boxes do")
+	goroot := filepath.Join(test.TempDir(), "go")
+	writeFixtureFile(test, filepath.Join(goroot, "src", "fmt", "print.go"), "package fmt\n")
+	if makeError := os.MkdirAll(filepath.Join(goroot, "bin"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	if writeError := executable_testing.WriteFile(filepath.Join(goroot, "bin", "go"), []byte(plantedGo),
+		0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	tree := test.TempDir()
+	writeFixtureFile(test, filepath.Join(tree, "go.mod"), "module example.com/module\n\ngo 1.27\n")
+	log := filepath.Join(test.TempDir(), "asked")
+	script := "set -euo pipefail\n" + `goroot="$1"; digest="$2"; node="$3"; nodeDigest="$4"; races="$5"; shift 5` +
+		"\n" + sharedBoxGate
+	gate := exec.Command(bash, "-c", script, "gate", goroot, toolchainDigest(test, goroot),
+		filepath.Join(tree, "no-node"), strings.Repeat("0", 64), "", "./...")
+	gate.Dir = tree
+	gate.Env = append(withoutModuleCache(os.Environ()), "PATH="+filepath.Join(goroot, "bin"), "GATE_LOG="+log,
+		"TMPDIR="+test.TempDir())
+	output, gateError := gate.CombinedOutput()
+	if gateError != nil || !strings.Contains(string(output), boxStepMarker+"toolchain ") {
+		test.Fatalf("on a path of the toolchain alone the gate didn't digest it (%v):\n%s", gateError, output)
+	}
+	if asked := string(readMaybeMissing(test, log)); !strings.Contains(asked, "test test -count=1 ") {
+		test.Errorf("on a path of the toolchain alone the gate ran no tests:\n%s", asked)
+	}
+}
+
 // Kirk's Mac's runs keep Go's test cache, which is keyed honestly there: the exception is for shared boxes alone, so no
 // go test Kirk's Mac runs carries -count. Shown through a landing with the gate off, module and -race run, whose go
 // records its arguments: since no box's skips run again on Kirk's Mac, the escape is the one road that runs tests

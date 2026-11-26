@@ -48,6 +48,25 @@ func NoRace(test testing.TB, why string) {
 	}
 }
 
+// SwiftUnlaidVariable is set to SwiftUnlaidSetting by `cohere-dev land-job` for the tests it runs, on Shackler, where
+// cohere-swift can't be built: its build fetches packages from github.com, writes Swift's caches and starts SwiftPM's
+// own sandbox, none of which a land job's sandbox allows (#5wj23dd). It stays until Machines lays Swift there
+// (#je1r32a). SwiftUnlaid is what the skip, the land job's refusal and its account all say.
+const (
+	SwiftUnlaidVariable = "COHERE_DEV_LAND_JOB_SWIFT"
+	SwiftUnlaidSetting  = "unlaid"
+	SwiftUnlaid         = "Swift checked nowhere: cohere-swift isn't laid on Shackler (#je1r32a)"
+)
+
+// SwiftLaid skips a test that builds cohere-swift in a run where it can't be built, SwiftUnlaidVariable set to
+// SwiftUnlaidSetting, saying SwiftUnlaid. Anywhere else the test runs.
+func SwiftLaid(test testing.TB) {
+	test.Helper()
+	if os.Getenv(SwiftUnlaidVariable) == SwiftUnlaidSetting {
+		test.Skip(SwiftUnlaid)
+	}
+}
+
 // Platform skips the test unless it runs on the operating system named, as Go names it, saying why the test needs it.
 func Platform(test testing.TB, operatingSystem string, why string) {
 	test.Helper()
