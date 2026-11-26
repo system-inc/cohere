@@ -77,6 +77,21 @@ func ownChild(test testing.TB, role ownChildRole, arguments ...string) *exec.Cmd
 	return command
 }
 
+// ownChildShellCommand is ownChildCommand as a line a /bin/sh stand-in can run: the variable set for the one
+// command, and every word quoted. A path a test makes holds no single quote.
+func ownChildShellCommand(test testing.TB, role ownChildRole, arguments ...string) string {
+	test.Helper()
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		test.Fatalf("finding this test binary: %v", executableError)
+	}
+	line := ownChildVariable + "=" + string(role) + " '" + executable + "'"
+	for _, argument := range arguments {
+		line += " '" + argument + "'"
+	}
+	return line
+}
+
 // ownChildLifeline is a file whose removal ends every Sleep child handed it, removed when the test ends. A child a
 // test did not start itself, one a stand-in script started, is ended this way, since the test holds no command of
 // its own to kill it by.
