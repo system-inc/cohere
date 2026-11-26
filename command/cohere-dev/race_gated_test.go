@@ -180,8 +180,8 @@ func raceRunRefusal(run string, tests []string) string {
 }
 
 // An entry of the -race list that runs only some of its package's tests runs every one the guard calls concurrent,
-// by its name, its file or its own body, so a test that says it runs code at once is caught by the race detector at the gate however
-// its package's entry narrows the run (#e8w514b), and its run is one the gate's scripts carry whole.
+// by its name, its file or its own body, so a test that says it runs code at once is caught by the race detector at
+// the gate however its package's entry narrows the run (#e8w514b), and its run is one the gate's scripts carry whole.
 func TestEveryRaceRunSelectsItsPackagesConcurrencyTests(test *testing.T) {
 	test.Parallel()
 	root := filepath.Join("..", "..")
@@ -602,7 +602,7 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 		change  func(kept *raceKept)
 		refusal string
 	}{
-		"whole": {func(*raceKept) {}, ""},
+		"whole": {func(*raceKept) { /* The whole list, unchanged, which nothing refuses. */ }, ""},
 		"a claimed test dropped": {func(kept *raceKept) { kept.sites[2].claims = kept.sites[2].claims[:1] },
 			"sites.go:pool.run#1 has 1 kept tests"},
 		"a claim one goroutine wide": {func(kept *raceKept) { kept.sites[0].claims[0].width = 1 },

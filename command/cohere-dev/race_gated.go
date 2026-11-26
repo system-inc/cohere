@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
@@ -346,80 +345,6 @@ var raceGated = []raceEntry{
 	{directory: "internal/types/program", reason: "programs check, parse libraries and record their run cache at " +
 		"once, and every rule walks a file while a checker and a reader read its tree (checker_concurrency_test.go, " +
 		"library_parses_test.go, run_cache_test.go, rule_walk_concurrency_test.go, #qb5xxj1)"},
-}
-
-// raceEntry is one package the gate runs under -race, by its directory under the module root, and why. Its run is a
-// go test -run pattern selecting the tests of the package the -race run runs, empty for all of them, and an entry
-// with kept tests runs exactly those instead (keptRun).
-type raceEntry struct {
-	directory string
-	run       string
-	// kept, when it isn't nil, is the whole of the package's -race run, each test with why it is kept: every test
-	// the guard calls concurrent by its name, its file or its own body, and two for each place the package's own code
-	// starts goroutines (TestEveryNarrowedRaceRunKeepsItsPackagesConcurrency).
-	kept   *raceKept
-	reason string
-}
-
-// raceKept is the tests a narrowed -race run keeps. A race that only a test left out reaches leaves the race gate:
-// that test still runs in the plain test step, so what it checks still holds, and only race detection over its
-// scenario is lost (#q1v0ern, the Go Square's ruling).
-type raceKept struct {
-	// census is the Loom job that counted each claim's width, so the widths can be read back.
-	census string
-	// concurrent is every test the guard calls concurrent, by name, file or body, with why it runs at once.
-	concurrent []raceKeptTest
-	// sites is every place the package's own code starts goroutines, each with the tests that drive it.
-	sites []raceSite
-}
-
-// raceKeptTest is a test a narrowed -race run keeps, and why.
-type raceKeptTest struct {
-	test   string
-	reason string
-}
-
-// raceSite is a place a package's own code starts goroutines, as the guard reads it (concurrencySites):
-// `<file>:<function>#<ordinal>`, the ordinal counting the function's sites in source order from 1. Each claim is a
-// test that drives it at least two goroutines wide.
-type raceSite struct {
-	site   string
-	claims []raceClaim
-}
-
-// raceClaim is a kept test that drives a site, and the most goroutines the census saw live there at once while it ran.
-type raceClaim struct {
-	test  string
-	width int
-}
-
-// minimumSiteClaims is how many kept tests each site of a narrowed package needs, so one test renamed or changed
-// never leaves a site without a race run.
-const minimumSiteClaims = 2
-
-// keptRun is the go test -run pattern that selects exactly the entry's kept tests, built from the list so the pattern
-// and the list can't drift apart, or the entry's own run when it keeps no list.
-func (entry raceEntry) keptRun() string {
-	if entry.kept == nil {
-		return entry.run
-	}
-	names := entry.kept.tests()
-	return "^(" + strings.Join(names, "|") + ")$"
-}
-
-// tests is every test the list keeps, each once, sorted.
-func (kept *raceKept) tests() []string {
-	names := []string{}
-	for _, test := range kept.concurrent {
-		names = append(names, test.test)
-	}
-	for _, site := range kept.sites {
-		for _, claim := range site.claims {
-			names = append(names, claim.test)
-		}
-	}
-	slices.Sort(names)
-	return slices.Compact(names)
 }
 
 // raceRunSeparator divides a race token's directory from its run, as racePatterns writes it and the gate's scripts

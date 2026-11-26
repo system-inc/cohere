@@ -1,0 +1,54 @@
+package main
+
+import "slices"
+
+// raceKept is the tests a narrowed -race run keeps. A race that only a test left out reaches leaves the race gate:
+// that test still runs in the plain test step, so what it checks still holds, and only race detection over its
+// scenario is lost (#q1v0ern, the Go Square's ruling).
+type raceKept struct {
+	// census is the Loom job that counted each claim's width, so the widths can be read back.
+	census string
+	// concurrent is every test the guard calls concurrent, by name, file or body, with why it runs at once.
+	concurrent []raceKeptTest
+	// sites is every place the package's own code starts goroutines, each with the tests that drive it.
+	sites []raceSite
+}
+
+// raceKeptTest is a test a narrowed -race run keeps, and why.
+type raceKeptTest struct {
+	test   string
+	reason string
+}
+
+// raceSite is a place a package's own code starts goroutines, as the guard reads it (concurrencySites):
+// `<file>:<function>#<ordinal>`, the ordinal counting the function's sites in source order from 1. Each claim is a
+// test that drives it at least two goroutines wide.
+type raceSite struct {
+	site   string
+	claims []raceClaim
+}
+
+// raceClaim is a kept test that drives a site, and the most goroutines the census saw live there at once while it ran.
+type raceClaim struct {
+	test  string
+	width int
+}
+
+// minimumSiteClaims is how many kept tests each site of a narrowed package needs, so one test renamed or changed
+// never leaves a site without a race run.
+const minimumSiteClaims = 2
+
+// tests is every test the list keeps, each once, sorted.
+func (kept *raceKept) tests() []string {
+	names := []string{}
+	for _, test := range kept.concurrent {
+		names = append(names, test.test)
+	}
+	for _, site := range kept.sites {
+		for _, claim := range site.claims {
+			names = append(names, claim.test)
+		}
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
