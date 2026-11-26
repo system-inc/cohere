@@ -1,0 +1,3 @@
+::	keep/trail /star*
+::	keep/trail /star*/br[ack]et
+::	keep/trail /star*/trail 

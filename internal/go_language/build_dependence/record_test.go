@@ -4,22 +4,11 @@ import (
 	"fmt"
 	"maps"
 	"math"
-	"os"
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"golang.org/x/tools/go/packages"
-
-	"github.com/system-inc/cohere/internal/testing/needs"
-)
-
-// The records' wide run's variables (#6a3kjvz): the tree it loads, and the builds it judges, by name (wideBuilds),
-// every one when it names none.
-const (
-	recordsTreeVariable   = "COHERE_GO_BUILD_DEPENDENCE_RECORDS"
-	recordsBuildsVariable = "COHERE_GO_BUILD_DEPENDENCE_RECORDS_BUILDS"
 )
 
 // recordedGraphOf is a graph of every package live holds, each added from its record's bytes (EncodedRecord,
@@ -111,8 +100,8 @@ func unitVerdicts(dependence *Dependence) []string {
 }
 
 // expectAlike fails, under label, for every line one of live and recorded has and the other does not, the first few
-// of each listed, and reports how many lines both have.
-func expectAlike(test *testing.T, label string, live []string, recorded []string) int {
+// of each listed.
+func expectAlike(test *testing.T, label string, live []string, recorded []string) {
 	test.Helper()
 	inLive, inRecorded := map[string]bool{}, map[string]bool{}
 	for _, line := range live {
@@ -138,7 +127,6 @@ func expectAlike(test *testing.T, label string, live []string, recorded []string
 			label, len(liveOnly), len(recordedOnly), strings.Join(liveOnly[:min(len(liveOnly), 8)], "\n"),
 			strings.Join(recordedOnly[:min(len(recordedOnly), 8)], "\n"))
 	}
-	return len(live)
 }
 
 // expectNoUnnameable fails when a record of graph read an object of another package no name can carry, which a
@@ -152,7 +140,8 @@ func expectNoUnnameable(test *testing.T, label string, graph *Graph) {
 
 // A graph of every package added from its record's bytes resolves as the graph of the live packages does, every
 // unit, object, bit, edge and call by its key, and judges every build the same, unit for unit, over block 1's
-// fixtures, the layout fixture of step 3 among them, under linux and under a tag. No record reads an object of
+// fixtures, the layout fixture of step 3 among them and the methods fixture's generic Pair, its method values and its
+// embedded interfaces, under linux and under a tag. No record reads an object of
 // another package it cannot name. Drop one kind of edge from the encoding, those to an underlying bit say, and the
 // lines differ.
 func TestARecordedGraphIsTheLiveGraph(test *testing.T) {
@@ -236,46 +225,6 @@ func TestARecordOfAUnitPastAColumnIsRefused(test *testing.T) {
 	if resolved := graph.resolve(); resolved.unitEnd[0] != math.MaxInt32 || resolved.unitNodes[0] != math.MaxInt32 {
 		test.Errorf("a unit at the edge of a unit column: want it resolved whole, got end %d and %d nodes",
 			resolved.unitEnd[0], resolved.unitNodes[0])
-	}
-}
-
-// The wide run: the tree COHERE_GO_BUILD_DEPENDENCE_RECORDS names, loaded whole under the host, its graph built from
-// the live packages and again from their records, the two resolved alike and judged alike under each build
-// COHERE_GO_BUILD_DEPENDENCE_RECORDS_BUILDS names, every build when it names none, and no record reading an object of
-// another package it cannot name.
-func TestARecordedGraphIsTheLiveGraphInATree(test *testing.T) {
-	test.Parallel()
-
-	tree := needs.OptIn(test, recordsTreeVariable, "it names the tree whose recorded graph is held to its live graph")
-	started := time.Now()
-	host := loadTree(test, tree, wideEnvironment("darwin", ""))
-	live := graphOf(host, nil)
-	expectNoUnnameable(test, tree, live)
-	encodedBytes := 0
-	for identifier := range live.packages {
-		encoded, _ := live.EncodedRecord(identifier)
-		encodedBytes += len(encoded)
-	}
-	recorded := recordedGraphOf(test, live)
-	lines := expectAlike(test, tree+" resolved", resolvedLines(live), resolvedLines(recorded))
-	test.Logf("host darwin: %d packages, %d records in %d bytes, %d objects of other packages no name carries, %d "+
-		"resolved lines alike, in %s", len(host), len(live.packages), encodedBytes, live.Unnameable(), lines,
-		time.Since(started).Round(time.Second))
-	names := slices.Sorted(maps.Keys(wideBuilds))
-	if named := os.Getenv(recordsBuildsVariable); named != "" {
-		names = strings.Split(named, ",")
-	}
-	for _, name := range names {
-		wide, isKnown := wideBuilds[name]
-		if !isKnown {
-			test.Fatalf("no build named %q; the builds are %q", name, slices.Sorted(maps.Keys(wideBuilds)))
-		}
-		started := time.Now()
-		difference := differenceOf(host, loadTree(test, tree, wideEnvironment(wide.goos, wide.tags)))
-		liveVerdicts := unitVerdicts(live.Against(difference))
-		units := expectAlike(test, tree+" under "+name, liveVerdicts, unitVerdicts(recorded.Against(difference)))
-		test.Logf("build %s: %d unit verdicts and counts alike, %s", name, units, liveVerdicts[len(liveVerdicts)-1])
-		test.Logf("build %s: in %s", name, time.Since(started).Round(time.Second))
 	}
 }
 

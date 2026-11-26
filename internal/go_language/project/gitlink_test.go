@@ -4,37 +4,28 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/git_tree"
+	"github.com/system-inc/cohere/internal/testing/written_repository"
 )
 
 // gitlinkRepository is a repository in a test's temporary directory holding go.work and go.mod, so
-// ReadWorkspace reads it, committed once.
-func gitlinkRepository(test *testing.T) string {
+// ReadWorkspace reads it, both tracked, with tracked beside them in its index, written without git.
+func gitlinkRepository(test *testing.T, tracked ...git_tree.IndexEntry) string {
 	test.Helper()
 	repository := test.TempDir()
 	files := map[string]string{
 		"go.work": "go 1.25\n\nuse .\n",
 		"go.mod":  "module example.com/root\n\ngo 1.25\n",
-		"file":    "base\n",
 	}
 	if writeError := writeFiles(repository, files); writeError != nil {
 		test.Fatal(writeError)
 	}
-	for _, arguments := range [][]string{{"init", "-q", "-b", "main"}, {"add", "."}, {"commit", "-q", "-m", "base"}} {
-		if gitError := runGit(repository, arguments...); gitError != nil {
-			test.Fatal(gitError)
-		}
+	index := append([]git_tree.IndexEntry{trackedFile("go.work"), trackedFile("go.mod")}, tracked...)
+	if writeError := written_repository.Write(repository, index...); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return repository
-}
-
-// pinGitlink records path in repository's index as a gitlink pinned at a commit of digit repeated, one
-// no repository holds: GitlinksOf reads the index alone, as git merges a gitlink by its id alone.
-func pinGitlink(test *testing.T, repository string, path string, digit string) {
-	test.Helper()
-	cacheInfo := "160000," + strings.Repeat(digit, 40) + "," + path
-	if gitError := runGit(repository, "update-index", "--add", "--cacheinfo", cacheInfo); gitError != nil {
-		test.Fatal(gitError)
-	}
 }
 
 // A submodule's path is read as git records it: one holding a tab, which git's plain listing quotes,
@@ -42,9 +33,8 @@ func pinGitlink(test *testing.T, repository string, path string, digit string) {
 // path exactly, with its pin.
 func TestGitlinksOfReadsAPathWithATabOrTwoSpaces(test *testing.T) {
 	test.Parallel()
-	repository := gitlinkRepository(test)
-	pinGitlink(test, repository, "tab\tmodule", "1")
-	pinGitlink(test, repository, "two  spaces", "2")
+	repository := gitlinkRepository(test,
+		gitlink("tab\tmodule", strings.Repeat("1", 40)), gitlink("two  spaces", strings.Repeat("2", 40)))
 	links, linksError := GitlinksOf(repository)
 	if linksError != nil {
 		test.Fatal(linksError)
@@ -61,49 +51,30 @@ func TestGitlinksOfReadsAPathWithATabOrTwoSpaces(test *testing.T) {
 // A worktree mid-merge still reads. The merge left a file in conflict, a submodule both sides moved (a
 // gitlink at stages 1, 2 and 3) and a submodule ours removed and theirs moved (1 and 3 only). Each
 // submodule is listed once: the first pinned at ours, the second, which ours no longer holds, at theirs.
-// ReadWorkspace, which reads the gitlinks to leave a submodule's modules out, reads the workspace.
+// ReadWorkspace, which reads the gitlinks to leave a submodule's modules out, reads the workspace. The index is
+// the one git 2.54's merge left, entry for entry as `git ls-files --stage` listed it: a file committed as "base"
+// and then as "theirs" on one branch and "ours" on the other, module pinned at 1s and then at 3s and 2s, and
+// removed pinned at 1s, then at 3s by theirs and removed by ours.
 func TestGitlinksOfReadsAMergeLeftInConflict(test *testing.T) {
 	test.Parallel()
-	repository := gitlinkRepository(test)
-	// Committed without -a, which would stage each gitlink, whose directory isn't on disk, as removed.
-	commit := func(message string) {
-		test.Helper()
-		for _, arguments := range [][]string{{"add", "file"}, {"commit", "-q", "-m", message}} {
-			if gitError := runGit(repository, arguments...); gitError != nil {
-				test.Fatal(gitError)
-			}
-		}
+	atStage := func(entry git_tree.IndexEntry, stage int) git_tree.IndexEntry {
+		entry.Stage = stage
+		return entry
 	}
-	write := func(content string) {
-		test.Helper()
-		if writeError := writeFiles(repository, map[string]string{"file": content}); writeError != nil {
-			test.Fatal(writeError)
-		}
+	conflictedFile := func(object string, stage int) git_tree.IndexEntry {
+		return git_tree.IndexEntry{Entry: git_tree.Entry{Mode: git_tree.ModeRegular, Object: object, Path: "file"},
+			Stage: stage}
 	}
-	checkout := func(arguments ...string) {
-		test.Helper()
-		if gitError := runGit(repository, append([]string{"checkout", "-q"}, arguments...)...); gitError != nil {
-			test.Fatal(gitError)
-		}
-	}
-	pinGitlink(test, repository, "module", "1")
-	pinGitlink(test, repository, "removed", "1")
-	commit("submodules")
-	checkout("-b", "theirs")
-	write("theirs\n")
-	pinGitlink(test, repository, "module", "3")
-	pinGitlink(test, repository, "removed", "3")
-	commit("theirs")
-	checkout("main")
-	write("ours\n")
-	pinGitlink(test, repository, "module", "2")
-	if gitError := runGit(repository, "update-index", "--force-remove", "removed"); gitError != nil {
-		test.Fatal(gitError)
-	}
-	commit("ours")
-	if gitError := runGit(repository, "merge", "-q", "theirs"); gitError == nil {
-		test.Fatal("the merge succeeded, and the fixture means it to stop in conflict")
-	}
+	repository := gitlinkRepository(test,
+		conflictedFile("df967b96a579e45a18b8251732d16804b2e56a55", 1),
+		conflictedFile("b19a1e93bec1317dc6097229e12afaffbfa74dc2", 2),
+		conflictedFile("950b81b7eee953d050aa05a641f8e056c85dd1bd", 3),
+		atStage(gitlink("module", strings.Repeat("1", 40)), 1),
+		atStage(gitlink("module", strings.Repeat("2", 40)), 2),
+		atStage(gitlink("module", strings.Repeat("3", 40)), 3),
+		atStage(gitlink("removed", strings.Repeat("1", 40)), 1),
+		atStage(gitlink("removed", strings.Repeat("3", 40)), 3),
+	)
 
 	links, linksError := GitlinksOf(repository)
 	if linksError != nil {

@@ -1,0 +1,51 @@
+Every path's deciding source, line and pattern, from a `.gitignore`, a nested one, or info/exclude, and
+none for a path no rule matches.
+
+repository .
+	.gitignore
+	plain.txt
+	sub/.gitignore
+	sub/inner/.gitignore
+-- #literal --
+-- .git/info/exclude --
+# repository-wide
+per-repository
+kept-by-gitignore
+-- .gitignore --
+# comments and blank lines count as lines
+
+*.log
+!keep.log
+/anchored
+docs/generated
+**/deep/x
+\#literal
+escaped\ 
+trailing   
+!kept-by-gitignore
+-- a/b/deep/x --
+-- anchored --
+-- app.log --
+-- docs/generated --
+-- docs/written --
+-- "escaped " --
+-- keep.log --
+-- kept-by-gitignore --
+-- per-repository --
+-- plain.txt --
+-- sub/.gitignore --
+!*.log
+local
+/rooted
+-- sub/anchored --
+-- sub/app.log --
+-- sub/docs/generated --
+-- sub/inner/.gitignore --
+*.txt
+-- sub/inner/local --
+-- sub/inner/plain.txt --
+-- sub/inner/rooted --
+-- sub/local --
+-- sub/per-repository --
+-- sub/rooted --
+-- trailing --

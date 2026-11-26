@@ -8,23 +8,23 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/origin_names"
 	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
 // baked in, and the importer finds the standard library through go/build.
 func TestMain(main *testing.M) {
-	output, goEnvironmentError := exec.Command("go", "env", "GOROOT").Output()
-	if goEnvironmentError != nil {
-		panic(goEnvironmentError)
+	root, findError := go_root.Find()
+	if findError != nil {
+		panic(findError)
 	}
-	build.Default.GOROOT = strings.TrimSpace(string(output))
+	build.Default.GOROOT = root
 	os.Exit(main.Run())
 }
 

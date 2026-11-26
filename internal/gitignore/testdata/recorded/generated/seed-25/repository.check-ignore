@@ -1,0 +1,14 @@
+.git/info/exclude:3:*	!bang
+::	ab
+::	y.tmp
+.git/info/exclude:3:*	y.tmp/Dot.go
+.git/info/exclude:3:*	y.tmp/ab
+.git/info/exclude:3:*	y.tmp/sp ace
+.git/info/exclude:3:*	y.tmp/trail 
+::	y.tmp/x.log
+::	y.tmp/x.log/.gitignore
+::	y.tmp/x.log/.hidden
+.git/info/exclude:3:*	y.tmp/x.log/b
+.git/info/exclude:3:*	y.tmp/x.log/trail 
+.git/info/exclude:3:*	y.tmp/x.log/trail /.gitignore
+.git/info/exclude:3:*	y.tmp/x.log/trail /b
