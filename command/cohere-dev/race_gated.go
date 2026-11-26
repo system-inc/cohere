@@ -114,10 +114,6 @@ var raceGated = []raceEntry{
 					reason: "its name or file says it runs code at once and it starts goroutines itself (dependence_concurrency_test.go)",
 				},
 				{
-					test:   "TestEveryObjectOfARealTreeWhoseLinesDifferHasItsBitSet",
-					reason: "it starts goroutines itself (object_differential_test.go)",
-				},
-				{
 					test:   "TestEveryObjectWhoseLinesDifferByArchitectureHasItsBitSet",
 					reason: "it starts goroutines itself (object_architecture_test.go)",
 				},
