@@ -260,7 +260,7 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 // reaches the binary, it does not count as a modification, and it is gone afterwards.
 func TestSwiftBinaryBuildReadsTheTreeAsItIsNow(test *testing.T) {
 	test.Parallel()
-	// An integrate job, where cohere-swift can't be built, skips it by name.
+	// A land job, where cohere-swift can't be built, skips it by name.
 	needs.SwiftLaid(test)
 
 	if runtime.GOOS != "darwin" {

@@ -191,8 +191,39 @@ type integrateJobRan struct {
 // environment names another commit.
 func (fixture *integrateJobFixture) integrateJob(merge string, environment ...string) integrateJobRan {
 	fixture.test.Helper()
-	job := exec.Command(fixture.wrapper, "integrate-job", "--merge", merge, "--task", fixtureTask, "--message",
-		"a module measured and gated")
+	return fixture.runJob([]string{"--merge", merge, "--task", fixtureTask, "--message", "a module measured and gated"},
+		environment...)
+}
+
+// fill runs integrate-job --fill in the job's own tree, as Loom's cold fill runs it, at main unless environment names
+// another commit.
+func (fixture *integrateJobFixture) fill(environment ...string) integrateJobRan {
+	fixture.test.Helper()
+	return fixture.runJob([]string{"--fill", "--task", fixtureTask}, environment...)
+}
+
+// landedMain makes the merge Loom makes, of worktree a's head onto main, moves main to it, as a landing does, and puts
+// that main in the history, as Loom's runner lays a cold fill's own commit there, so a fill runs at a main whose tip is
+// a landing. It returns it.
+func (fixture *integrateJobFixture) landedMain() string {
+	fixture.test.Helper()
+	merge := fixture.mergedOntoMain()
+	fixture.git(fixture.repository, "update-ref", "refs/heads/main", merge)
+	fixture.historyHolds(merge)
+	return merge
+}
+
+// historyHolds puts commit in the history at refs/heads/merge, where Loom's runner lays what a job judges.
+func (fixture *integrateJobFixture) historyHolds(commit string) {
+	fixture.test.Helper()
+	fixture.git(fixture.repository, "push", "-q", "--force", fixture.historyRepository(), commit+":refs/heads/merge")
+}
+
+// runJob runs integrate-job with arguments in the job's own tree, which has no history, at main unless environment
+// names another commit.
+func (fixture *integrateJobFixture) runJob(arguments []string, environment ...string) integrateJobRan {
+	fixture.test.Helper()
+	job := exec.Command(fixture.wrapper, append([]string{"integrate-job"}, arguments...)...)
 	job.Dir = fixture.job
 	job.Env = append(append(fixture.environment, integrateJobCommitVariable+"="+fixture.git(fixture.repository,
 		"rev-parse", "main")), environment...)
@@ -1110,6 +1141,112 @@ func TestAnIntegrateJobsAccountLinesParse(test *testing.T) {
 		if !want.MatchString(ran.errors) {
 			test.Errorf("the account doesn't match %s:\n%s", want, ran.errors)
 		}
+	}
+}
+
+// accountSteps are the names of the steps an integrate job's account says, in order: each `step <name> ...` line's
+// name, a box step's `box`.
+func accountSteps(errors string) []string {
+	steps := []string{}
+	for _, line := range strings.Split(errors, "\n") {
+		if rest, found := strings.CutPrefix(line, integrateJobMarker+"step "); found {
+			steps = append(steps, strings.Fields(rest)[0])
+		}
+	}
+	return steps
+}
+
+// A fill judges the commit it runs at, so it takes no merge, and no message, since it lands nothing (#fnrchck): either
+// is refused at the option parse, in words, exiting 2 as the options' errors do, before anything is laid or run.
+func TestAFillRefusesAMergeOrAMessage(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct{ name, value string }{{"merge", ""}, {"message", "a module filled"}} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newIntegrateJobFixture(test)
+			value := row.value
+			if value == "" {
+				value = fixture.merged()
+			}
+			ran := fixture.runJob([]string{"--fill", "--" + row.name, value, "--task", fixtureTask})
+			want := "integrate-job --fill judges the commit it runs at and lands nothing, so it takes no --" + row.name
+			if ran.exit != 2 || !strings.Contains(ran.errors, want) {
+				test.Fatalf("a fill handed --%s exited %d, want 2 saying %q:\n%s", row.name, ran.exit, want, ran.errors)
+			}
+			if _, statError := os.Stat(filepath.Join(fixture.home, integrateJobScratch)); statError == nil {
+				test.Errorf("a fill handed --%s made its scratch before it refused", row.name)
+			}
+			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
+				test.Errorf("a fill handed --%s ran %q", row.name, calls)
+			}
+		})
+	}
+}
+
+// A green fill at main's tip, a landing, says the tree it laid, main's own, as its one line of output, `filled <tree>`
+// (#fnrchck): none of the finisher's lines, and never `integrated` or `landed`. Its tests are handed main's commit.
+func TestAFillPassesMainsTipAndSaysFilled(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	tip := fixture.landedMain()
+	ran := fixture.fill()
+	if ran.exit != 0 {
+		test.Fatalf("the fill exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+	}
+	tree := fixture.git(fixture.repository, "rev-parse", tip+"^{tree}")
+	if ran.output != "filled "+tree+"\n" || ran.integrated != "" {
+		test.Errorf("the fill printed %q, want only `filled %s`", ran.output, tree)
+	}
+	for _, refused := range []string{"integrated ", "landed", integrateJobMarker + "performance ",
+		integrateJobMarker + "tree ", integrateJobMarker + "message "} {
+		if strings.Contains(ran.output, refused) || strings.Contains(ran.errors, refused) {
+			test.Errorf("the fill says %q:\n%s\n%s", refused, ran.output, ran.errors)
+		}
+	}
+	if tested := fixture.arguments("tests"); len(tested) == 0 || tested[0] != tip {
+		test.Errorf("the fill's tests were handed %q, want main's tip %s first", tested, tip)
+	}
+}
+
+// A fill measures nothing (#fnrchck): performanceScript never runs, so the stand-in bash is called for the tests
+// alone, and the account says once that the measurement was skipped, never a measure step's seconds.
+func TestAFillRunsNoMeasurement(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.landedMain()
+	ran := fixture.fill()
+	if ran.exit != 0 {
+		test.Fatalf("the fill exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+	}
+	if calls := string(readMaybeMissing(test, filepath.Join(fixture.replies, "calls"))); calls != "tests\n" {
+		test.Errorf("the fill's scripts ran %q, want the tests alone", calls)
+	}
+	want := integrateJobMarker + "measure skipped: a fill measures nothing\n"
+	if strings.Count(ran.errors, want) != 1 || slices.Contains(accountSteps(ran.errors), "measure") {
+		test.Errorf("the account doesn't say %q once, or says a measure step:\n%s", want, ran.errors)
+	}
+}
+
+// A fill's account says the steps an integration's does at the same tree, in the same order, but the measurement
+// (#fnrchck), so the two compare step by step: the lay, the tests and their box's steps, and each check.
+func TestAFillSaysTheStepsAnIntegrationDoes(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	merge := fixture.merged()
+	integrated := fixture.integrateJob(merge)
+	if integrated.exit != 0 {
+		test.Fatalf("the integration exited %d:\n%s", integrated.exit, integrated.errors)
+	}
+	fixture.git(fixture.repository, "update-ref", "refs/heads/main", merge)
+	fixture.historyHolds(merge)
+	filled := fixture.fill()
+	if filled.exit != 0 {
+		test.Fatalf("the fill exited %d:\n%s", filled.exit, filled.errors)
+	}
+	want := slices.DeleteFunc(accountSteps(integrated.errors), func(step string) bool { return step == "measure" })
+	if got := accountSteps(filled.errors); !slices.Equal(got, want) || !slices.Contains(got, "self-check") {
+		test.Errorf("the fill's steps are %q, want the integration's but the measurement, %q", got, want)
 	}
 }
 

@@ -17,7 +17,7 @@ import (
 // package's product prints the flag its manifest read, and the real build runs twice, clean then edited.
 func TestASwiftBinaryRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
 	test.Parallel()
-	// An integrate job, where cohere-swift can't be built, skips it by name.
+	// A land job, where cohere-swift can't be built, skips it by name.
 	needs.SwiftLaid(test)
 
 	if runtime.GOOS != "darwin" {

@@ -29,7 +29,7 @@ import (
 // `git status` rewrites.
 //
 // It builds the child when this checkout's Swift sources changed since the last build, which takes minutes, so -short
-// leaves it out, and an integrate job, where the child can't be built, skips it by name (needs.SwiftLaid).
+// leaves it out, and a land job, where the child can't be built, skips it by name (needs.SwiftLaid).
 func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testing.T) {
 	test.Parallel()
 	needs.SwiftLaid(test)
