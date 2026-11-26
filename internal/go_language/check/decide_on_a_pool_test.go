@@ -19,9 +19,9 @@ func unaskedWideFiles() map[string]string {
 	files := map[string]string{
 		"go.mod": "module example.com/unaskedwide\n\ngo 1.24\n",
 		// The rest of the module is unaskedFiles' own, under this module's path.
-		"lower/lower.go":               unaskedFiles["lower/lower.go"],
-		"platform/platform.go":         unaskedFiles["platform/platform.go"],
-		"platform/platform_other.go":   unaskedFiles["platform/platform_other.go"],
+		"lower/lower.go":             unaskedFiles["lower/lower.go"],
+		"platform/platform.go":       unaskedFiles["platform/platform.go"],
+		"platform/platform_other.go": unaskedFiles["platform/platform_other.go"],
 		"platform/platform_windows.go": "package platform\n\nimport \"example.com/unaskedwide/lower\"\n\n" +
 			"// Counted is thrice value, as lower triples it.\nfunc Counted(value int) int {\n" +
 			"\treturn lower.Triple(value)\n}\n",
@@ -98,7 +98,7 @@ func holdingBuild(test *testing.T, root string, host *HostRun, slots int) (HostR
 	caching.Pool = bounded.NewPool(slots)
 	result, session := buildWith(test, root, caching, host, rules)
 	if result.Cache.WrittenThrough != poolReaders {
-		test.Errorf("on %d slots windows wrote %d entries through, want every hold package's, %d: %+v", slots,
+		test.Errorf("on a pool of %d windows wrote %d entries through, want every hold package's, %d: %+v", slots,
 			result.Cache.WrittenThrough, poolReaders, result.Cache)
 	}
 	fromHost := result.FromHost

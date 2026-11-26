@@ -22,7 +22,8 @@ const wideSlots = 4
 // file is bottomFile under the package name bottom, and top, whose Use sums every bottom's Double of argument.
 func wideModule(modulePath string, bottomFile string, argument int) map[string]string {
 	files := map[string]string{"go.mod": "module " + modulePath + "\n\ngo 1.24\n"}
-	var imports, calls []string
+	var imports []string
+	var calls []string
 	for index := range wideBottoms {
 		name := fmt.Sprintf("bottom%02d", index)
 		files[name+"/bottom.go"] = bottomFile

@@ -3,6 +3,7 @@ package check
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -18,27 +19,28 @@ import (
 // the load, so with runtime/cgo itself several of them are handed on at once.
 const unreachedCgoPackages = 4
 
-// unreachedEnvironment is what the unreached fixture loads under: linux/amd64 with cgo on, which go list reads without a
-// C compiler, as load's cgo fixtures load, so runtime/cgo has cgo files on every host.
+// unreachedEnvironment is what the unreached fixture loads under: linux/amd64 with cgo on, which go list reads without
+// a C compiler, as load's cgo fixtures load, so runtime/cgo has cgo files on every host.
 var unreachedEnvironment = []string{"GOWORK=off", "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1"}
 
 // unreachedFiles are a module of unreachedCgoPackages packages, cgo00 on, each importing runtime/cgo, so the load marks
 // each never, as it marks runtime/cgo for its cgo files, and top, which imports every one when importsCgo is set.
 func unreachedFiles(importsCgo bool) map[string]string {
 	files := map[string]string{"go.mod": "module example.com/unreached\n\ngo 1.24\n"}
-	top := "package top\n\n"
+	var imports []string
+	var indexes []string
 	for index := range unreachedCgoPackages {
 		name := fmt.Sprintf("cgo%02d", index)
 		files[name+"/"+name+".go"] = "package " + name + "\n\nimport _ \"runtime/cgo\"\n\n" +
 			fmt.Sprintf("// Index is %d.\nconst Index = %[1]d\n", index)
-		if importsCgo {
-			top += fmt.Sprintf("import %q\n\n", "example.com/unreached/"+name)
-		}
+		imports = append(imports, fmt.Sprintf("import %q\n\n", "example.com/unreached/"+name))
+		indexes = append(indexes, name+".Index")
 	}
+	files["top/top.go"] = "package top\n\n"
 	if importsCgo {
-		top += "// Sum is every cgo package's Index.\nconst Sum = cgo00.Index + cgo01.Index + cgo02.Index + cgo03.Index\n"
+		files["top/top.go"] += strings.Join(imports, "") + "// Sum is every cgo package's Index.\nconst Sum = " +
+			strings.Join(indexes, " + ") + "\n"
 	}
-	files["top/top.go"] = top
 	return files
 }
 
