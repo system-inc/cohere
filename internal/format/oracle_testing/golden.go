@@ -57,6 +57,10 @@ type Golden struct {
 	update  bool
 	mutex   sync.Mutex
 	answers map[string]Answer
+	// unfinished is set when a recording's compute never returned: it panicked or called runtime.Goexit. A
+	// panic reaches Cleanup before the test is marked failed, so without this write would save a golden
+	// missing every answer after the panic, and the next plain run would read it as the fork's word.
+	unfinished bool
 }
 
 // Open reads the golden at testdata/oracle/<name>.json.gz for the bundles this build embeds. When recording,
@@ -146,6 +150,13 @@ func (golden *Golden) write() {
 		golden.test.Logf("not recording %s, since the test failed", golden.path)
 		return
 	}
+	golden.mutex.Lock()
+	unfinished := golden.unfinished
+	golden.mutex.Unlock()
+	if unfinished {
+		golden.test.Errorf("not recording %s, since an oracle answer's compute never returned", golden.path)
+		return
+	}
 	if createDirectoryError := os.MkdirAll(filepath.Dir(golden.path), 0o755); createDirectoryError != nil {
 		golden.test.Errorf("recording %s: %v", golden.path, createDirectoryError)
 		return
@@ -193,7 +204,17 @@ func Key(parts ...string) string {
 // error and all. An answer the golden never recorded fails the test and returns ErrNotRecorded.
 func (golden *Golden) Answer(key string, compute func() (string, error)) (string, error) {
 	if golden.update {
+		// Set only once compute returns, so a panic or a Goexit inside it leaves the golden unwritten.
+		finished := false
+		defer func() {
+			if !finished {
+				golden.mutex.Lock()
+				golden.unfinished = true
+				golden.mutex.Unlock()
+			}
+		}()
 		output, computeError := compute()
+		finished = true
 		answer := Answer{Output: output}
 		if computeError != nil {
 			answer = Answer{Error: computeError.Error()}

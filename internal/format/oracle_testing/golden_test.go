@@ -1,8 +1,10 @@
 package oracle_testing
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,5 +94,78 @@ func TestTheBundlesHaveADigest(test *testing.T) {
 	digest, bundlesDigestError := BundlesDigest()
 	if bundlesDigestError != nil || len(digest) != 64 {
 		test.Fatalf("no digest for the embedded bundles: %q, %v", digest, bundlesDigestError)
+	}
+}
+
+// recordingTest is a testing.TB whose errors are kept rather than failing the test that holds it, so a
+// recording's own refusal can be asserted. Failed reads false until one arrives, as a real test's does while
+// a panic unwinds toward its Cleanup.
+type recordingTest struct {
+	testing.TB
+	errors []string
+}
+
+func (recording *recordingTest) Errorf(format string, arguments ...any) {
+	recording.errors = append(recording.errors, fmt.Sprintf(format, arguments...))
+}
+
+func (recording *recordingTest) Failed() bool {
+	return len(recording.errors) > 0
+}
+
+// TestARecordingThatPanicsWritesNoGolden: a recording whose engine panicked mid-run leaves the golden it
+// would have replaced untouched. The panic reaches Cleanup before the test is marked failed, so a write there
+// saved a golden holding only the answers given before it, which the next plain run read as the fork's word.
+func TestARecordingThatPanicsWritesNoGolden(test *testing.T) {
+	test.Parallel()
+	path := writeGolden(test, record{Digest: "embedded", Answers: map[string]Answer{"k": {Output: "x"}}})
+	before, readFileError := os.ReadFile(path)
+	if readFileError != nil {
+		test.Fatal(readFileError)
+	}
+	recording := &recordingTest{TB: test}
+	golden := &Golden{test: recording, path: path, digest: "embedded", update: true, answers: map[string]Answer{}}
+	given := func() (string, error) { return "given", nil }
+	if _, answerError := golden.Answer(Key("given"), given); answerError != nil {
+		test.Fatal(answerError)
+	}
+	func() {
+		defer func() {
+			if recover() == nil {
+				test.Fatal("the compute's panic never reached the caller")
+			}
+		}()
+		// Ignored: the call never returns, since its compute panics.
+		_, _ = golden.Answer(Key("panicked"), func() (string, error) { panic("the engine fell over") })
+	}()
+	// What Cleanup runs when the test ends.
+	golden.write()
+	after, readFileError := os.ReadFile(path)
+	if readFileError != nil {
+		test.Fatal(readFileError)
+	}
+	if !bytes.Equal(before, after) {
+		test.Fatalf("a recording whose compute panicked rewrote %s", path)
+	}
+	if len(recording.errors) == 0 {
+		test.Error("the golden went unwritten without a word, so a recovered panic would read as a recording")
+	}
+
+	// The control: a recording whose every compute returned writes the golden, so the check above is not a
+	// write that never happens.
+	control := &Golden{
+		test:    &recordingTest{TB: test},
+		path:    path,
+		digest:  "embedded",
+		update:  true,
+		answers: map[string]Answer{},
+	}
+	if _, answerError := control.Answer(Key("given"), given); answerError != nil {
+		test.Fatal(answerError)
+	}
+	control.write()
+	answers, readError := read(path, "embedded")
+	if readError != nil || len(answers) != 1 || answers[Key("given")].Output != "given" {
+		test.Fatalf("a recording that finished wrote %v, %v", answers, readError)
 	}
 }
