@@ -39,3 +39,7 @@ report whose constrained type carries no Void flag (Nexus 4e3395d), so the linte
 ## Why this recommendation
 
 Catches a defect rather than a preference. The cleanup is real but bounded.
+
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.

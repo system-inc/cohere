@@ -15,3 +15,7 @@ Require the use of `===` and `!==`
 ## Why this recommendation
 
 Catches a defect rather than a preference. The cleanup is real but bounded.
+
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.

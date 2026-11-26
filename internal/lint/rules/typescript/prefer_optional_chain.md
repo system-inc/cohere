@@ -16,6 +16,10 @@ Enforce using concise optional chain expressions instead of chained logical ands
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
 
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
+
 ## Sized and declined 2026-09-06, with the decomposition premise measured and rejected
 
 This rule was dispatched twice: once whole, once as "port the judgment, decline the fixer" on the

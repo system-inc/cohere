@@ -67,3 +67,10 @@ by file, line and column:
 | ahra | 55      | 9    | 64 of 64              |
 | www  | 33      | 5    | 38 of 38              |
 | api  | 21      | 1    | 22 of 22              |
+
+## What fixing looks like
+
+Not auto-fixable. Every finding carries a suggestion, `accountQueryData.emailAddress ?? this.emailAddress`
+and `cookies[name] ??= value;` among them. It is a suggestion because a truthiness ternary (`a ? a : b`)
+changes meaning for a falsy non-nullish `a`, and the `if` form accepts any assignment operator in its
+body, as upstream's does, so `if (!a) a += b` suggests `a ??= b`. Each site needs a reader.

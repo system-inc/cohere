@@ -20,3 +20,7 @@ Prettier does not add or strip JSX curly braces around string literals, so there
 > which moved this from **Strong No** to **Maybe**. The first pass classified rules by
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
+
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.

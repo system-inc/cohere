@@ -16,6 +16,10 @@ Enforce type definitions to consistently use either `interface` or `type`
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
 
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
+
 ## Status: ported 2026-09-06, registered and NOT enabled
 
 The audit's 872 and the port's 872 agree exactly, across 42 files including three generated ones that

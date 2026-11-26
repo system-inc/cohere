@@ -45,3 +45,7 @@ installed builds and the shape is pinned by a fixture.
 So adopting this means choosing which of the two rules the tree wants, and turning the other off.
 Adding a key without removing the other leaves both enabled, which reports the thirteen the extension
 exists to suppress.
+
+## What fixing looks like
+
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

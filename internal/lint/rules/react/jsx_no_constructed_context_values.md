@@ -21,6 +21,10 @@ The 18 hits are genuine perf defects in shared primitives such as DialogRoot.tsx
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
+## What fixing looks like
+
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.
+
 ## Deliberate divergence: a memoized value is only stable if every input is
 
 Kirk's ruling on the 2026-10-01 rule review: "go for C right out of the gate". cohere reports

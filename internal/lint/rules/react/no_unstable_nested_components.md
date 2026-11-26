@@ -20,3 +20,7 @@ Components defined during render remount their whole subtree and lose state ever
 > which moved this from **Maybe** to **Yes**. The first pass classified rules by
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
+
+## What fixing looks like
+
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.
