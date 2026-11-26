@@ -15,22 +15,19 @@ import (
 	"github.com/system-inc/cohere/modules/strace_events"
 )
 
-// The differential holds this package against both consumers' parsers (loom_copy_test.go and
-// adamic_copy_test.go), line by line. Each line is read three ways into a reading: the call it
-// finishes, if any, field by field, and what a consumer keys on in its arguments, walked argument by
-// argument (a descriptor and its decoded path, then a quoted path, then the next argument), each path
-// as that consumer keys it. Where a consumer's reading differs from this package's, the difference must
-// be one of the known classes below, and on the in-repo corpus it must be on that consumer's ledger
-// (ledger_test.go) with its class and what it changes for the consumer.
+// The differential holds this package against Adamic's parser (adamic_copy_test.go), line by line.
+// Each line is read both ways into a reading: the call it finishes, if any, field by field, and what
+// the consumer keys on in its arguments, walked argument by argument (a descriptor and its decoded
+// path, then a quoted path, then the next argument), each path as that consumer keys it. Where the
+// consumer's reading differs from this package's, the difference must be one of the known classes
+// below, and on the in-repo corpus it must be on the consumer's ledger (ledger_test.go) with its class
+// and what it changes for the consumer.
 
 // A differenceClass is why a consumer reads a line otherwise than strace wrote it.
 type differenceClass int
 
 const (
 	unclassified differenceClass = iota
-	// unknownResult is a call strace printed with `= ?`, a result it never saw: a consumer that reads
-	// only numbers drops the call.
-	unknownResult
 	// quotedArguments is a call whose arguments a consumer ends inside a quoted string, at a `) = 1` in
 	// a shell's command line, or reads past a quote that never closes.
 	quotedArguments
@@ -43,23 +40,18 @@ const (
 	// whitespace around the line, or a call whose name holds a capital, and the resumption of a call
 	// whose unfinished half was such a line.
 	lineForm
-	// negativeDescriptor is a descriptor printed as a negative number, -100 for AT_FDCWD under
-	// strace's raw printing, which a consumer reads as no descriptor.
-	negativeDescriptor
 	// malformedText is a path holding what strace never writes, which this package marks Malformed:
 	// a consumer that refuses the trace there reads it otherwise, and so does one that keys it.
 	malformedText
 )
 
 var differenceClassNames = map[differenceClass]string{
-	unclassified:       "unclassified",
-	unknownResult:      "unknownResult",
-	quotedArguments:    "quotedArguments",
-	escapedPath:        "escapedPath",
-	resumedSpace:       "resumedSpace",
-	lineForm:           "lineForm",
-	negativeDescriptor: "negativeDescriptor",
-	malformedText:      "malformedText",
+	unclassified:    "unclassified",
+	quotedArguments: "quotedArguments",
+	escapedPath:     "escapedPath",
+	resumedSpace:    "resumedSpace",
+	lineForm:        "lineForm",
+	malformedText:   "malformedText",
 }
 
 func (class differenceClass) String() string {
@@ -97,35 +89,6 @@ type difference struct {
 	class                differenceClass
 }
 
-// newLoomOracle is Loom's parser, keying a decoded descriptor path through ebpftrace's
-// UnquoteDescriptor and a quoted one through its Unquote, as planner/trace.go does.
-func newLoomOracle() consumer {
-	parser := &loomParser{}
-	return consumer{
-		name: "loom",
-		read: func(text string) (string, string, bool) {
-			event, isEvent := parser.line(text)
-			if !isEvent {
-				return "no call", "", false
-			}
-			opened := ""
-			if match := loomOpenedPath.FindStringSubmatch(event.line); match != nil {
-				opened = loomDecoded(match[1])
-			}
-			return fmt.Sprintf(
-				"%s pid %q result %d opened %q arguments %q %s",
-				event.call, event.pid, event.result, opened, event.arguments, loomWalk(event.arguments),
-			), event.arguments, true
-		},
-		module: func(line strace_events.Line, call strace_events.Call, isCall bool) string {
-			return moduleReadingForLoom(call, isCall, unescaped, unescaped)
-		},
-		spelled: func(line strace_events.Line, call strace_events.Call, isCall bool) string {
-			return moduleReadingForLoom(call, isCall, loomDecodedText, loomUnquotedText)
-		},
-	}
-}
-
 // unescaped is a path as this package hands it to be keyed, or "malformed" where it marks the text
 // as holding what strace never writes, which the consumer then keys or refuses.
 func unescaped(text strace_events.Text) string {
@@ -135,128 +98,24 @@ func unescaped(text strace_events.Text) string {
 	return text.Unescaped
 }
 
-// loomDecoded is a decoded descriptor path as Loom keys it, through ebpftrace.UnquoteDescriptor, or
-// "undecodable" where that refuses it and Loom refuses the trace.
-func loomDecoded(raw string) string {
-	decoded, unquoteError := loomUnquoteDescriptor(raw)
-	if unquoteError != nil {
-		return "undecodable"
-	}
-	return decoded
-}
-
-// loomDecodedText is loomDecoded over a Text strace spelled.
-func loomDecodedText(text strace_events.Text) string {
-	return loomDecoded(text.Raw)
-}
-
-// loomUnquotedText is a quoted path as Loom's quoted reads it, through ebpftrace.Unquote.
-func loomUnquotedText(text strace_events.Text) string {
-	unquoted, unquoteError := loomUnquote(`"` + text.Raw + `"`)
-	if unquoteError != nil {
-		return "undecodable"
-	}
-	return unquoted
-}
-
-// moduleReadingForLoom is this package's reading of a call in Loom's terms, each decoded descriptor
-// path through decoded and each quoted path through quoted. Loom reads an opened path only after a
-// result of zero or more, and a result only as a number.
-func moduleReadingForLoom(
-	call strace_events.Call,
-	isCall bool,
-	decoded func(strace_events.Text) string,
-	quoted func(strace_events.Text) string,
-) string {
-	if !isCall {
-		return "no call"
-	}
-	if call.Result.Kind != strace_events.NumberResult {
-		return fmt.Sprintf(
-			"%s pid %q result %s arguments %q",
-			call.Name, call.Pid, call.Result.Raw, call.Arguments,
-		)
-	}
-	opened := ""
-	if call.Result.Number >= 0 {
-		opened = decoded(call.Result.Opened)
-	}
-	return fmt.Sprintf(
-		"%s pid %q result %d opened %q arguments %q %s",
-		call.Name, call.Pid, call.Result.Number, opened, call.Arguments,
-		moduleWalk(call.Arguments, decoded, quoted, false),
-	)
-}
-
-// loomWalk is a call's arguments as Loom's helpers read them: descriptor (with Loom's `+ ", "`, so a
-// descriptor that ends the arguments reads, as its fchdir and listings read it), then quoted, then
-// nextArgument.
-func loomWalk(arguments string) string {
-	pieces := []string{}
-	rest := arguments
-	for step := 0; step < 4 && rest != ""; step++ {
-		after, isDescriptor := rest, false
-		if match := loomDescriptor.FindStringSubmatch(rest + ", "); match != nil {
-			name := "AT_FDCWD"
-			if !strings.HasPrefix(match[0], name) {
-				name = match[0][:strings.IndexFunc(match[0], isNotDigit)]
-			}
-			pieces = append(pieces, fmt.Sprintf("descriptor %s %q", name, loomDecoded(match[1])))
-			after, isDescriptor = "", true
-			if len(match[0]) <= len(rest) {
-				after = rest[len(match[0]):]
-			}
-		}
-		name, quotedRest, quotedError := loomQuoted(after)
-		if quotedError == nil {
-			pieces = append(pieces, fmt.Sprintf("path %q", name))
-			rest = loomNextArgument(quotedRest)
-			continue
-		}
-		if strings.HasPrefix(quotedError.Error(), "path ") {
-			pieces = append(pieces, fmt.Sprintf("path %q", "undecodable"))
-			break
-		}
-		if !isDescriptor {
-			break
-		}
-		rest = after
-	}
-	return "[" + strings.Join(pieces, "; ") + "]"
-}
-
-func isNotDigit(character rune) bool {
-	return character < '0' || character > '9'
-}
-
-// moduleWalk is a call's arguments as this package's helpers read them, each decoded path through
-// decoded and each quoted one through quoted. endNeedsPath is whether a descriptor that ends the
-// arguments reads only when it names a path, as Adamic's descriptorPath reads one.
-func moduleWalk(
-	arguments string,
-	decoded func(strace_events.Text) string,
-	quoted func(strace_events.Text) string,
-	endNeedsPath bool,
-) string {
+// moduleWalk is a call's arguments as this package's helpers read them, each decoded descriptor path
+// and each quoted path through decoded. A descriptor that ends the arguments reads only when it names
+// a path, as Adamic's descriptorPath reads one.
+func moduleWalk(arguments string, decoded func(strace_events.Text) string) string {
 	pieces := []string{}
 	rest := arguments
 	for step := 0; step < 4 && rest != ""; step++ {
 		after, isDescriptor := rest, false
 		if descriptor, descriptorRest, found := strace_events.DescriptorArgument(rest); found &&
-			!(endNeedsPath && rest == descriptor.Name) {
+			rest != descriptor.Name {
 			pieces = append(
 				pieces,
 				fmt.Sprintf("descriptor %s %q", descriptor.Name, decoded(descriptor.Path)),
 			)
 			after, isDescriptor = descriptorRest, true
 		}
-		text, quotedRest, isQuoted := strace_events.QuotedArgument(after)
-		if isQuoted {
-			unquoted := quoted(text)
-			pieces = append(pieces, fmt.Sprintf("path %q", unquoted))
-			if unquoted == "undecodable" {
-				break
-			}
+		if text, quotedRest, isQuoted := strace_events.QuotedArgument(after); isQuoted {
+			pieces = append(pieces, fmt.Sprintf("path %q", decoded(text)))
 			rest = strace_events.NextArgument(quotedRest)
 			continue
 		}
@@ -319,7 +178,7 @@ func moduleReadingForAdamic(
 	return fmt.Sprintf(
 		"%s pid %q result %s opened %q errno %q arguments %q %s",
 		call.Name, call.Pid, call.Result.Raw, decoded(call.Result.Opened), call.Result.Errno,
-		call.Arguments, moduleWalk(call.Arguments, decoded, decoded, true),
+		call.Arguments, moduleWalk(call.Arguments, decoded),
 	)
 }
 
@@ -359,7 +218,7 @@ func compareTrace(
 	found func(consumer consumer, difference difference),
 ) (int, error) {
 	scanner := bufio.NewScanner(trace)
-	// strace's lines run as long as an execve's argv, so the buffer is the larger of the two consumers'.
+	// strace's lines run as long as an execve's argv, so the buffer holds a line of up to 64 MiB.
 	scanner.Buffer(make([]byte, 1<<20), 1<<26)
 	joiner := &strace_events.Joiner{}
 	lines := 0
@@ -405,8 +264,6 @@ func classify(
 			return quotedArguments
 		}
 		return unclassified
-	case isCall && !oracleIsCall && call.Result.Kind == strace_events.UnknownResult:
-		return unknownResult
 	case (isCall != oracleIsCall || line.Kind == strace_events.ExitLine) && strangeForm(text, line):
 		return lineForm
 	case isCall && !oracleIsCall && line.Kind == strace_events.ResumedLine:
@@ -415,8 +272,6 @@ func classify(
 		return lineForm
 	case !isCall && oracleIsCall && insideQuote(oracleArguments, len(oracleArguments)):
 		return quotedArguments
-	case isCall && oracleIsCall && negativeDescriptorIn(call.Arguments):
-		return negativeDescriptor
 	}
 	return unclassified
 }
@@ -442,34 +297,20 @@ func insideQuote(text string, length int) bool {
 	return quoted
 }
 
-// negativeDescriptorIn is whether any argument reads as a descriptor printed as a negative number.
-func negativeDescriptorIn(arguments string) bool {
-	for _, argument := range strings.Split(arguments, ",") {
-		descriptor, _, found := strace_events.DescriptorArgument(strings.TrimSpace(argument))
-		if found && strings.HasPrefix(descriptor.Name, "-") {
-			return true
-		}
-	}
-	return false
-}
-
 // inRepositoryCorpus is every trace in testdata, then the long lines longLines makes, by name. Each
 // file is one trace:
-//   - loom-strace-6.8-review.txt and loom-adam-gate-6-strace.txt are real strace 6.8 traces, from
-//     loom's planner/testdata and ebpftrace/testdata at origin/release-0.8.1184 (9352c88758ab), and
-//     loom-ebpf-rendered-trace.txt is its BPF tracer's rendering of strace's format, from the same ref.
-//   - loom-fixtures.txt is every strace line in that ref's test files' string literals, and
-//     adamic-fixtures.txt every one in adamic's internal/buildcache tests at a23ba096388c, its
-//     straceLines first. A fixture line a test prefixes with its pid where it uses it is given one
-//     (9 for Loom's, 12 for Adamic's), and Adamic's format verbs are filled; Loom's are left as text.
+//   - adamic-fixtures.txt is every strace line in adamic's internal/buildcache tests at a23ba096388c,
+//     its straceLines first. A fixture line a test prefixes with its pid where it uses it is given
+//     one, 12, and its format verbs are filled.
 //   - adamic-synthetic.txt is adamic's syntheticTrace, 200 lines of its mix.
 //   - edge-cases.txt is written by hand: every pid form, splits across pids, escapes, descriptors,
 //     results of each kind, cut strings and garbage.
+//   - public-traces.txt is written by hand in strace 6.8's format, as `strace -f -y -o` writes it for
+//     a `go build` in /home/user/project: decoded descriptors, calls split around another process's
+//     and joined, a signal, an exit, and a trace cut short right after a resumption's marker, whose
+//     call never finishes.
 //
-// The traces taken from real machines name a home directory and cgroup sessions, which this public
-// repository doesn't publish, so each is replaced with a stand-in of the same length: the home is
-// /home/user and the sessions are session-1000 and session-2000. Same length keeps every column and
-// every cut string where strace put it, so each line still reads as it did.
+// None is a trace taken from a machine, so none names a home directory but the stand-in /home/user.
 func inRepositoryCorpus(test testing.TB) map[string]string {
 	test.Helper()
 	corpus := map[string]string{}
@@ -536,11 +377,10 @@ func TestEveryDifferenceFromEachConsumerIsOnItsLedger(test *testing.T) {
 	test.Parallel()
 	corpus := inRepositoryCorpus(test)
 	ledgers := map[string]map[string]ledgerRow{
-		"loom":   keyedRows(test, loomLedger),
 		"adamic": keyedRows(test, adamicLedger),
 	}
-	seen := map[string]map[string]bool{"loom": {}, "adamic": {}}
-	counts := map[string]map[differenceClass]int{"loom": {}, "adamic": {}}
+	seen := map[string]map[string]bool{"adamic": {}}
+	counts := map[string]map[differenceClass]int{"adamic": {}}
 	names := make([]string, 0, len(corpus))
 	for name := range corpus {
 		names = append(names, name)
@@ -549,7 +389,7 @@ func TestEveryDifferenceFromEachConsumerIsOnItsLedger(test *testing.T) {
 	for _, name := range names {
 		_, compareError := compareTrace(
 			strings.NewReader(corpus[name]),
-			[]consumer{newLoomOracle(), newAdamicOracle()},
+			[]consumer{newAdamicOracle()},
 			func(consumer consumer, difference difference) {
 				counts[consumer.name][difference.class]++
 				key := ledgerKey(difference.line, difference.oracle, difference.module)
@@ -615,9 +455,9 @@ func classCounts(counts map[differenceClass]int) string {
 	return strings.Join(pieces, ", ")
 }
 
-// The large corpus: every file under COHERE_STRACE_CORPUS is a trace, compared against both consumers.
-// It prints how many lines differ in each class and fails on any difference no class explains. Loom
-// runs it on a box against real traces; unset, it reads nothing and says so.
+// The large corpus: every file under COHERE_STRACE_CORPUS is a trace, compared against each consumer.
+// It prints how many lines differ in each class and fails on any difference no class explains. It is
+// for a box that holds real traces; unset, it reads nothing and says so.
 func TestALargeCorpusDiffersFromEachConsumerOnlyInKnownClasses(test *testing.T) {
 	test.Parallel()
 	root := os.Getenv("COHERE_STRACE_CORPUS")
@@ -629,7 +469,7 @@ func TestALargeCorpusDiffersFromEachConsumerOnlyInKnownClasses(test *testing.T) 
 				"so nothing here was checked against real traces",
 		)
 	}
-	counts := map[string]map[differenceClass]int{"loom": {}, "adamic": {}}
+	counts := map[string]map[differenceClass]int{"adamic": {}}
 	unexplained, traces, lines := []string{}, 0, 0
 	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, entryError error) error {
 		if entryError != nil || !entry.Type().IsRegular() {
@@ -641,7 +481,7 @@ func TestALargeCorpusDiffersFromEachConsumerOnlyInKnownClasses(test *testing.T) 
 		}
 		// Ignored: the trace is only read, so a failed close loses nothing.
 		defer file.Close()
-		consumers := []consumer{newLoomOracle(), newAdamicOracle()}
+		consumers := []consumer{newAdamicOracle()}
 		read, compareError := compareTrace(file, consumers, func(consumer consumer, difference difference) {
 			counts[consumer.name][difference.class]++
 			if difference.class == unclassified && len(unexplained) < 20 {
@@ -661,7 +501,7 @@ func TestALargeCorpusDiffersFromEachConsumerOnlyInKnownClasses(test *testing.T) 
 		test.Fatalf("COHERE_STRACE_CORPUS (%s) holds no lines, so nothing was checked", root)
 	}
 	test.Logf("%s: %d traces, %d lines", root, traces, lines)
-	for _, consumerName := range []string{"loom", "adamic"} {
+	for _, consumerName := range []string{"adamic"} {
 		test.Logf("%s: %s", consumerName, classCounts(counts[consumerName]))
 	}
 	for _, line := range unexplained {
