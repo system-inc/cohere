@@ -1,6 +1,7 @@
 package yaml
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -412,16 +413,87 @@ func parseFixture(test testing.TB, text string) *unist.Node {
 	return root
 }
 
+// unsettledFixtures are the inputs whose fork output the fork itself rewrites, so Format, which prints as the fork
+// does, rewrites it on a second pass too. Their second pass is held to the fork's own, recorded beside the first in
+// <test>SecondPass.json.gz, so a change to it in either direction fails, settling included. One whose recorded
+// second pass settles everywhere fails too, so the list only shrinks.
+var unsettledFixtures = map[string]bool{
+	// The mapping is indented anew but the block scalar keeps its indentation indicator, so its text no longer sits
+	// where `|2` says and the output does not parse.
+	"a:\n  b: |2\n     x\n    y": true,
+	// The ignored item keeps the indentation of its source and its sibling takes the new one, so the two no longer
+	// start at one column and the output does not parse.
+	"a:\n  # prettier-ignore\n  b:   {c:   d}\n  e:   {f:   g}": true,
+	// A comment alone in an empty flow sequence prints after a lone comma, which does not parse.
+	"a: [\n  # c\n]": true,
+	// A comment alone in an empty flow mapping prints after a lone comma, which does not parse.
+	"a: {\n  # c\n}": true,
+}
+
+// secondPass is what is wrong with expected, the fork's output for input, formatted again under options and
+// proseWrap, or "" when nothing is: formatted output formats to itself, or every run rewrites what the last one
+// wrote. An input in unsettledList is held instead to the fork's own second pass, which forkAgain answers from its
+// recording: the same text, or a refusal on both sides, Format's a syntax error. unsettledAsListed says the fork's
+// second pass did not settle.
+func secondPass(
+	unsettledList map[string]bool,
+	input string,
+	expected string,
+	options format_options.Options,
+	proseWrap string,
+	forkAgain func() (string, error),
+) (wrong string, unsettledAsListed bool) {
+	again, againError := formatFullStack("fixture.yaml", expected, options, proseWrap, nil)
+	if !unsettledList[input] {
+		if againError != nil || again != expected {
+			return fmt.Sprintf("formatted again (%v): %s", againError, differential.FirstDifference(expected, again)),
+				false
+		}
+		return "", false
+	}
+	want, wantError := forkAgain()
+	unsettledAsListed = wantError != nil || want != expected
+	switch {
+	case wantError != nil && againError != nil:
+		if !printing.IsSyntax(againError) {
+			return fmt.Sprintf("formatted again, refused as the fork refuses it, but not as syntax: %v", againError),
+				unsettledAsListed
+		}
+	case (wantError != nil) != (againError != nil) || again != want:
+		return fmt.Sprintf("formatted again, not as the fork formats it again (%v, the fork %v): %s", againError,
+			wantError, differential.FirstDifference(want, again)), unsettledAsListed
+	}
+	return "", unsettledAsListed
+}
+
+// requireUnsettled fails for each input of unsettledList the comparison asked about whose recorded second pass in
+// the fork settled every time, so a fix upstream shrinks the list rather than leaving an entry that no longer holds.
+func requireUnsettled(test *testing.T, unsettledList map[string]bool, inputs []string, unsettled map[string]bool) {
+	test.Helper()
+	// Only a clean run judges the list: an input whose first pass differed never reached its second.
+	if test.Failed() {
+		return
+	}
+	for _, input := range inputs {
+		if unsettledList[input] && !unsettled[input] {
+			test.Errorf("the fork formats %q to itself on a second pass, so take it out of the unsettled list", input)
+		}
+	}
+}
+
 // compareFormat formats every input with Prettier and with the port, Format from the text, under every
 // variant, and reports each difference. Where Prettier fails, Format must fail too, with an error
 // printing.IsSyntax recognizes.
 func compareFormat(test *testing.T, inputs []string) int {
 	test.Helper()
 	failures, compared, oracleFailures := 0, 0, 0
+	unsettled := map[string]bool{}
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
+	forkAgainGolden := oracle_testing.Open(test, test.Name()+"SecondPass")
 	for variantIndex, options := range formatVariants {
 		formatter := golden.Formatter(options)
+		forkAgain := forkAgainGolden.Formatter(options)
 		for _, input := range inputs {
 			expected, oracleError := formatter.Format("fixture.yaml", input)
 			fullStack, fullStackError := formatFullStack("fixture.yaml", input, options, "preserve", nil)
@@ -453,9 +525,22 @@ func compareFormat(test *testing.T, inputs []string) int {
 					input,
 					differential.FirstDifference(expected, fullStack),
 				)
+			} else if wrong, unsettledAsListed := secondPass(
+				unsettledFixtures,
+				input,
+				expected,
+				options,
+				"preserve",
+				func() (string, error) { return forkAgain.Format("fixture.yaml", expected) },
+			); wrong != "" {
+				failures++
+				test.Errorf("variant %d, %q: %s", variantIndex, input, wrong)
+			} else if unsettledAsListed {
+				unsettled[input] = true
 			}
 		}
 	}
+	requireUnsettled(test, unsettledFixtures, inputs, unsettled)
 	test.Logf(
 		"%d comparisons over %d fixtures and %d option sets: %d differ; %d oracle failures (syntax errors)",
 		compared,

@@ -273,6 +273,13 @@ func compareFormat(test *testing.T, inputs []string) int {
 			if actual != expected {
 				failures++
 				test.Errorf("variant %d, %q: %s", variantIndex, input, differential.FirstDifference(expected, actual))
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := Format(expected, options, nil); againError != nil || again != expected {
+				failures++
+				test.Errorf("variant %d, %q: formatted again (%v): %s", variantIndex, input, againError,
+					differential.FirstDifference(expected, again))
 			}
 		}
 	}

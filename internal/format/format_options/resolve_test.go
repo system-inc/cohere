@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 func writeFile(test *testing.T, path string, contents string) {
@@ -581,65 +580,185 @@ func resolveUnremembered(directory string) (Resolution, error) {
 	}
 }
 
-// TestAResolverAnswersAsResolveDidOnOurTrees: one Resolver, shared across every directory of a real
-// tree as a format run shares it, answers each directory exactly as the unremembered walk does:
-// options, source, both ignore lists, and every refusal word for word (ahra's projects/www-ahra-ai,
-// with its prettier key, is one). Reads files as text only.
-//
-// Off unless COHERE_RESOLVE_TREES lists the trees, separated as PATH is: the reference walks every
-// directory afresh, and on 2026-10-04 ahra's 90,798 directories, www's 1,075 and api's 835 took 317s,
-// all identical, 437 of them refusals.
-func TestAResolverAnswersAsResolveDidOnOurTrees(test *testing.T) {
+// resolveWant is what the planted tree's files say one directory resolves to: options from a settings file, or a
+// refusal holding each of its substrings. ignorePatternsFromSet is a chain whose ignorePatterns are the system-inc
+// set's own, which the test does not restate: it asks only that the set gave some and the outer settings none.
+type resolveWant struct {
+	options               Options
+	source                string
+	houseIgnore           []string
+	ignorePatterns        []string
+	ignorePatternsFromSet bool
+	refusal               []string
+	leftover              bool
+}
+
+// TestAResolverAnswersAsResolveDidOverAPlantedTree: one Resolver, shared across every directory of a tree as a
+// format run shares it, answers each directory exactly as the unremembered walk does, whichever order the directories
+// come in, and each answer is the one the tree's files say. The tree is planted rather than read from a real one, and
+// holds what a real one does: settings nested below settings, a base whose block the nearer settings replace rather
+// than merge, our tiers below an outsider, a lint override whose `files` glob names a directory, an `.editorconfig`
+// beside a settings file, a format block asking for Prettier's `overrides`, and a package.json with a `prettier` key
+// above a directory of its own.
+func TestAResolverAnswersAsResolveDidOverAPlantedTree(test *testing.T) {
 	test.Parallel()
-	trees := filepath.SplitList(needs.OptIn(test, "COHERE_RESOLVE_TREES",
-		"a differential of one shared resolver against a fresh walk over every directory of the trees it lists"))
-	skipped := map[string]bool{
-		".git":         true,
-		"node_modules": true,
-		".cache":       true,
-		".next":        true,
-		"data":         true,
-		"dist":         true,
+	root := test.TempDir()
+	for file, contents := range map[string]string{
+		SettingsFileName: `{"format": {"printWidth": 100, "ignore": ["generated/"]}, "ignorePatterns": ["data/**"], ` +
+			`"overrides": [{"files": ["source/generated/**"], "rules": {"no-var": "off"}}]}`,
+		// cohere reads format options from its settings alone, so an `.editorconfig` saying otherwise changes nothing.
+		".editorconfig":             "root = true\n\n[*]\nindent_style = tab\nindent_size = 8\nmax_line_length = 60\n",
+		"source/index.ts":           "",
+		"source/generated/types.ts": "",
+		"shared/Shared.json":        `{"format": {"semi": false, "tabWidth": 2}}`,
+		"packages/web/" + SettingsFileName: `{"extends": "../../shared/Shared.json", "format": {"tabWidth": 8}, ` +
+			`"ignorePatterns": ["dist/**"]}`,
+		"packages/web/.editorconfig":          "[*.ts]\nindent_size = 2\n",
+		"packages/web/components/Button.tsx":  "",
+		"packages/house/" + SettingsFileName:  `{"extends": "cohere:system-inc/structure"}`,
+		"packages/house/source/main.ts":       "",
+		"packages/house/inner/source/main.ts": "",
+		"packages/house/inner/" + SettingsFileName: `{"extends": "cohere:system-inc/structure", ` +
+			`"format": {"printWidth": 80}}`,
+		"packages/legacy/package.json":   `{"name": "legacy", "prettier": {"tabWidth": 2}}`,
+		"packages/legacy/source/main.ts": "",
+		"packages/plain/package.json":    `{"name": "plain"}`,
+		"packages/plain/source/main.ts":  "",
+		"packages/overridden/" + SettingsFileName: `{"format": {"overrides": ` +
+			`[{"files": "*.md", "options": {"printWidth": 80}}]}}`,
+		"packages/overridden/notes.md": "",
+	} {
+		writeFile(test, filepath.Join(root, filepath.FromSlash(file)), contents)
 	}
-	for _, root := range trees {
-		test.Run(root, func(test *testing.T) {
-			test.Parallel()
-			resolver := NewResolver()
-			directories, refusals := 0, 0
-			walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
-				if pathError != nil || !entry.IsDir() {
-					return nil
-				}
-				if skipped[entry.Name()] {
-					return filepath.SkipDir
-				}
-				directories++
-				remembered, rememberedError := resolver.Resolve(path)
-				reference, referenceError := resolveUnremembered(path)
-				if fmt.Sprint(rememberedError) != fmt.Sprint(referenceError) {
-					test.Fatalf("%s: the Resolver answered %v, the walk %v", path, rememberedError, referenceError)
-				}
-				if referenceError != nil {
-					refusals++
-					return nil
-				}
-				if fmt.Sprintf("%+v", remembered) != fmt.Sprintf("%+v", reference) {
-					test.Fatalf("%s: the Resolver answered %+v, the walk %+v", path, remembered, reference)
-				}
-				return nil
-			})
-			if walkError != nil {
-				test.Fatal(walkError)
+
+	house, houseResolutionError := houseResolution()
+	if houseResolutionError != nil {
+		test.Fatal(houseResolutionError)
+	}
+	outsider := PrettierDefaults()
+	outsider.PrintWidth = 100
+	rootWant := resolveWant{
+		options:        outsider,
+		source:         filepath.Join(root, SettingsFileName),
+		houseIgnore:    []string{"generated/"},
+		ignorePatterns: []string{"data/**"},
+	}
+	// The nearer settings' own block decides, over Prettier's defaults: its base's `semi: false` is not merged in.
+	web := PrettierDefaults()
+	web.TabWidth = 8
+	webWant := resolveWant{
+		options:        web,
+		source:         filepath.Join(root, "packages", "web", SettingsFileName),
+		houseIgnore:    house.HouseIgnore,
+		ignorePatterns: []string{"dist/**"},
+	}
+	houseWant := resolveWant{
+		options:               house.Options,
+		source:                filepath.Join(root, "packages", "house", SettingsFileName),
+		houseIgnore:           house.HouseIgnore,
+		ignorePatternsFromSet: true,
+	}
+	innerWant := resolveWant{refusal: []string{
+		filepath.Join(root, "packages", "house", "inner", SettingsFileName),
+		"only the Nexus tier",
+	}}
+	legacyWant := resolveWant{
+		refusal:  []string{filepath.Join(root, "packages", "legacy", "package.json")},
+		leftover: true,
+	}
+	wants := map[string]resolveWant{
+		".":                           rootWant,
+		"source":                      rootWant,
+		"source/generated":            rootWant,
+		"shared":                      rootWant,
+		"packages":                    rootWant,
+		"packages/plain":              rootWant,
+		"packages/plain/source":       rootWant,
+		"packages/web":                webWant,
+		"packages/web/components":     webWant,
+		"packages/house":              houseWant,
+		"packages/house/source":       houseWant,
+		"packages/house/inner":        innerWant,
+		"packages/house/inner/source": innerWant,
+		"packages/legacy":             legacyWant,
+		"packages/legacy/source":      legacyWant,
+		"packages/overridden": {refusal: []string{
+			filepath.Join(root, "packages", "overridden", SettingsFileName),
+			`format option "overrides" is not one cohere applies`,
+		}},
+	}
+
+	var directories []string
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
+		}
+		if entry.IsDir() {
+			directories = append(directories, path)
+		}
+		return nil
+	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
+	if len(directories) != len(wants) {
+		test.Fatalf("the tree has %d directories and %d answers are written down: %v", len(directories), len(wants),
+			directories)
+	}
+
+	// Parents before children, as a walk down meets them, then children before parents, so an answer remembered
+	// for a parent and one remembered for a child are each asked of the other.
+	reversed := slices.Clone(directories)
+	slices.Reverse(reversed)
+	for orderName, order := range map[string][]string{"parents first": directories, "children first": reversed} {
+		resolver := NewResolver()
+		for _, directory := range order {
+			relative, relativeError := filepath.Rel(root, directory)
+			if relativeError != nil {
+				test.Fatal(relativeError)
 			}
-			if directories < 50 {
-				test.Fatalf(
-					"compared only %d directories under %s, so the comparison measured nothing",
-					directories,
-					root,
-				)
+			remembered, rememberedError := resolver.Resolve(directory)
+			reference, referenceError := resolveUnremembered(directory)
+			if fmt.Sprint(rememberedError) != fmt.Sprint(referenceError) ||
+				fmt.Sprintf("%+v", remembered) != fmt.Sprintf("%+v", reference) {
+				test.Errorf("%s, %s: the Resolver answered %+v, %v; the walk %+v, %v", orderName, relative, remembered,
+					rememberedError, reference, referenceError)
 			}
-			test.Logf("%d directories identical, %d of them refusals", directories, refusals)
-		})
+			want, written := wants[filepath.ToSlash(relative)]
+			if !written {
+				test.Errorf("%s: no answer is written down for this directory", relative)
+				continue
+			}
+			if want.refusal != nil {
+				if rememberedError == nil || errors.Is(rememberedError, ErrPrettierConfigRemains) != want.leftover {
+					test.Errorf("%s: resolved %+v, %v; want a refusal, leftover %v", relative, remembered,
+						rememberedError, want.leftover)
+					continue
+				}
+				for _, substring := range want.refusal {
+					if !strings.Contains(rememberedError.Error(), substring) {
+						test.Errorf("%s: the refusal %v does not say %q", relative, rememberedError, substring)
+					}
+				}
+				continue
+			}
+			if rememberedError != nil {
+				test.Errorf("%s: refused, %v", relative, rememberedError)
+				continue
+			}
+			ignorePatternsAsWritten := slices.Equal(remembered.IgnorePatterns, want.ignorePatterns)
+			if want.ignorePatternsFromSet {
+				ignorePatternsAsWritten = len(remembered.IgnorePatterns) > 0 &&
+					!slices.Contains(remembered.IgnorePatterns, "data/**")
+			}
+			if remembered.Options != want.options ||
+				remembered.Source != want.source ||
+				!slices.Equal(remembered.HouseIgnore, want.houseIgnore) ||
+				!remembered.HouseIgnoreDeclared ||
+				!ignorePatternsAsWritten {
+				test.Errorf("%s: resolved %+v, want %+v", relative, remembered, want)
+			}
+		}
 	}
 }
 

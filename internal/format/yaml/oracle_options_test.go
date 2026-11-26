@@ -3,6 +3,7 @@ package yaml
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 
@@ -110,11 +111,23 @@ var proseWrapFixtures = []string{
 	"a: plain\u00a0 b\n  c",
 }
 
+// unsettledProseWrapFixtures are unsettledFixtures and the inputs whose fork output only a proseWrap other than
+// preserve leaves unsettled, held to the fork's recorded second pass as unsettledFixtures are.
+var unsettledProseWrapFixtures = func() map[string]bool {
+	union := maps.Clone(unsettledFixtures)
+	// Under proseWrap never, the trailing lines a `>+` scalar keeps print once more, so each pass adds one.
+	union["a: >+\n  x\n\n"] = true
+	union["a:\n  - |-\n    x\n  - >+\n    y\n\nb: c"] = true
+	return union
+}()
+
 func TestProseWrapMatchesOracle(test *testing.T) {
 	test.Parallel()
 	oracle := newOptionsOracle(test)
+	forkAgain := &optionsOracle{golden: oracle_testing.Open(test, test.Name()+"SecondPass")}
 	inputs := append(append([]string{}, proseWrapFixtures...), formatFixtures...)
 	failures, compared := 0, 0
+	unsettled := map[string]bool{}
 	for _, proseWrap := range []string{"always", "never"} {
 		for variantIndex, options := range formatVariants[:3] {
 			for _, input := range inputs {
@@ -136,10 +149,25 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 						input,
 						differential.FirstDifference(expected, fullStack),
 					)
+				} else if wrong, unsettledAsListed := secondPass(
+					unsettledProseWrapFixtures,
+					input,
+					expected,
+					options,
+					proseWrap,
+					func() (string, error) {
+						return forkAgain.format(expected, "fixture.yaml", "yaml", options, proseWrap)
+					},
+				); wrong != "" {
+					failures++
+					test.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, wrong)
+				} else if unsettledAsListed {
+					unsettled[input] = true
 				}
 			}
 		}
 	}
+	requireUnsettled(test, unsettledProseWrapFixtures, inputs, unsettled)
 	test.Logf("%d proseWrap comparisons: %d differ", compared, failures)
 }
 
