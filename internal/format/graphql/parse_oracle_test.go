@@ -1,12 +1,8 @@
 package graphql
 
 import (
-	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,6 +12,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // graphqlJsDirectory holds the comparison's inputs and graphql-js's recorded answers for them.
@@ -25,6 +22,7 @@ var graphqlJsDirectory = filepath.Join("testdata", "graphql_js")
 // graphql-js must go on it, so a recording that refuses a valid input, or accepts a malformed one, fails
 // the test rather than quietly agreeing.
 type parseInputs struct {
+	About  string `json:"about"`
 	Inputs []struct {
 		Name      string `json:"name"`
 		Text      string `json:"text"`
@@ -62,55 +60,33 @@ type parseAnswers struct {
 // is attached to #bahm7k3 (record-graphql-js.mjs, its usage in its header): it reads the inputs, runs
 // graphql-js from the fork's node_modules under a sandbox with no network, and prints the answers to gzip
 // into parse_answers.json.gz. An answer recorded for another text than its input's fails here, naming the
-// recorder.
+// recorder (see package recorded).
 func TestParseAgreesWithGraphqlJs(test *testing.T) {
 	test.Parallel()
-	inputsBytes, readInputsError := os.ReadFile(filepath.Join(graphqlJsDirectory, "parse_inputs.json"))
+	inputsPath := filepath.Join(graphqlJsDirectory, "parse_inputs.json")
+	inputs, readInputsError := recorded.ReadJson[parseInputs](inputsPath)
 	if readInputsError != nil {
 		test.Fatal(readInputsError)
 	}
-	var inputs parseInputs
-	if decodeError := json.Unmarshal(inputsBytes, &inputs); decodeError != nil {
-		test.Fatalf("parse_inputs.json: %v", decodeError)
+	answersPath := filepath.Join(graphqlJsDirectory, "parse_answers.json.gz")
+	answers, readAnswersError := recorded.ReadJson[parseAnswers](answersPath)
+	if readAnswersError != nil {
+		test.Fatal(readAnswersError)
 	}
-	answers := readParseAnswers(test)
 	if len(inputs.Inputs) == 0 {
 		test.Fatal("parse_inputs.json holds no inputs")
 	}
-
-	// Every input has exactly one answer, recorded for its text, and every answer has its input.
-	answerIndex := map[string]int{}
+	inputEntries := make([]recorded.Entry, len(inputs.Inputs))
+	for index, input := range inputs.Inputs {
+		inputEntries[index] = recorded.Entry{Name: input.Name, Input: input.Text}
+	}
+	answerEntries := make([]recorded.Entry, len(answers.Answers))
 	for index, answer := range answers.Answers {
-		if _, repeated := answerIndex[answer.Name]; repeated {
-			test.Fatalf("parse_answers.json.gz answers %q twice", answer.Name)
-		}
-		answerIndex[answer.Name] = index
+		answerEntries[index] = recorded.Entry{Name: answer.Name, Input: answer.Text}
 	}
-	inputNames := map[string]bool{}
-	for _, input := range inputs.Inputs {
-		if inputNames[input.Name] {
-			test.Fatalf("parse_inputs.json names %q twice", input.Name)
-		}
-		inputNames[input.Name] = true
-		index, answered := answerIndex[input.Name]
-		if !answered {
-			test.Fatalf(
-				"%q has no recorded answer: record them again with the recorder attached to #bahm7k3",
-				input.Name,
-			)
-		}
-		if answers.Answers[index].Text != input.Text {
-			test.Fatalf(
-				"%q was recorded for another text, %q: record them again with the recorder attached to #bahm7k3",
-				input.Name,
-				answers.Answers[index].Text,
-			)
-		}
-	}
-	for _, answer := range answers.Answers {
-		if !inputNames[answer.Name] {
-			test.Fatalf("parse_answers.json.gz answers %q, which parse_inputs.json no longer holds", answer.Name)
-		}
+	answerIndexes, matchError := recorded.Match(inputEntries, answerEntries)
+	if matchError != nil {
+		test.Fatalf("%s: %v: record them again with the recorder attached to #bahm7k3", answersPath, matchError)
 	}
 
 	identical, refusedByBoth, different := 0, 0, 0
@@ -120,8 +96,8 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			test.Errorf(format, arguments...)
 		}
 	}
-	for _, input := range inputs.Inputs {
-		want := answers.Answers[answerIndex[input.Name]]
+	for position, input := range inputs.Inputs {
+		want := answers.Answers[answerIndexes[position]]
 		recordedRefused := want.Error != nil
 		if input.Malformed != recordedRefused {
 			described := "it parses it to " + string(want.Ast)
@@ -173,35 +149,6 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 		refusedByBoth,
 		different,
 	)
-}
-
-// readParseAnswers reads the recorded answers, refusing a file whose gzip or JSON does not read whole.
-func readParseAnswers(test *testing.T) parseAnswers {
-	test.Helper()
-	file, openError := os.Open(filepath.Join(graphqlJsDirectory, "parse_answers.json.gz"))
-	if openError != nil {
-		test.Fatal(openError)
-	}
-	// Ignored: the file is only read, so a failed close loses nothing already decoded.
-	defer file.Close()
-	unzipped, gzipError := gzip.NewReader(file)
-	if gzipError != nil {
-		test.Fatalf("parse_answers.json.gz: %v", gzipError)
-	}
-	var answers parseAnswers
-	decoder := json.NewDecoder(unzipped)
-	if decodeError := decoder.Decode(&answers); decodeError != nil {
-		test.Fatalf("parse_answers.json.gz: %v", decodeError)
-	}
-	// The decoder stops at the end of the object; reading on to the end of the stream is what checks the
-	// gzip trailer's checksum, so a corrupt file cannot pass as long as its first object decodes.
-	var trailing json.RawMessage
-	if trailingError := decoder.Decode(&trailing); trailingError == nil {
-		test.Fatal("parse_answers.json.gz holds more than one JSON value")
-	} else if !errors.Is(trailingError, io.EOF) {
-		test.Fatalf("parse_answers.json.gz: %v", trailingError)
-	}
-	return answers
 }
 
 // dumpParse parses one text and renders its tree and its comment list the way the oracle script does,
