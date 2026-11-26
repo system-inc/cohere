@@ -63,15 +63,21 @@ func writeTrackedIgnoredFiles(test *testing.T, directory string) {
 	}
 }
 
-// lay puts the recorded index named name in place of the tree's index the way git does, written to index.lock and
-// renamed over it. The rename gives the index a new inode, so a run keyed on its stat sees it moved even where the
-// clock is too coarse to move its modification time, and two recordings of one size cannot read as one file.
+// lay puts the recorded index named name in place of the tree's index.
 func (tree *trackedIgnoredTree) lay(name string) {
 	tree.test.Helper()
 	contents, readError := os.ReadFile(filepath.Join(trackedIgnoredIndexes, name))
 	if readError != nil {
 		tree.test.Fatal(readError)
 	}
+	tree.layBytes(contents)
+}
+
+// layBytes puts contents in place of the tree's index the way git does, written to index.lock and renamed over it.
+// The rename gives the index a new inode, so a run keyed on its stat sees it moved even where the clock is too coarse
+// to move its modification time, and two indexes of one size cannot read as one file.
+func (tree *trackedIgnoredTree) layBytes(contents []byte) {
+	tree.test.Helper()
 	if makeError := os.MkdirAll(filepath.Dir(tree.index), 0o755); makeError != nil {
 		tree.test.Fatal(makeError)
 	}
@@ -179,9 +185,7 @@ func TestAKeyedIndexThatCannotBeReadAgainMisses(test *testing.T) {
 		test.Fatal(readError)
 	}
 	contents[len(contents)-1] ^= 0xff
-	if writeError := os.WriteFile(tree.index, contents, 0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
+	tree.layBytes(contents)
 	checkError := keyed.Check("key")
 	if !errors.Is(checkError, program.ErrRunCacheMiss) || !errors.Is(checkError, gitignore.ErrNoTrackedIgnoredDigest) {
 		test.Errorf("a keyed run replays, or misses for another reason, over an index the reader refuses: %v",
