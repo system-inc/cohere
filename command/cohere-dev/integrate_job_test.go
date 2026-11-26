@@ -519,6 +519,86 @@ func TestAnIntegrateJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T
 	}
 }
 
+// A merge group's commit names its pull request and carries its title (#hq61wfg, Jobs' road as Loom ruled it), and the
+// title becomes what landed: its `(#<task>)` dropped once it names the job's task, held to one line of letters, digits,
+// spaces and pullRequestTitleAllowed, and cut at a word to fit the landing's subject. One that breaks a rule is refused
+// naming the pull request's number and the rule, never the title's words, and a merge that isn't a group's is no title.
+func TestAPullRequestsTitleIsWhatLandedHeldToTheSet(test *testing.T) {
+	test.Parallel()
+	merged := func(title string) string { return "Merge pull request #12 from system-inc/branch\n\n" + title + "\n" }
+	long := strings.Repeat("words ", 20) + "end"
+	for _, row := range []struct {
+		name, message, want, refusal string
+	}{
+		{name: "a title naming the task", message: merged("Test audit: cohere's tests read only its own tree (#t1)"),
+			want: "Test audit: cohere's tests read only its own tree"},
+		{name: "letters beyond English", message: merged("Größe, naïve (1/2) a+b_c-d; e."),
+			want: "Größe, naïve (1/2) a+b_c-d; e."},
+		{name: "no merge group", message: "Merge a onto main\n"},
+		{name: "a long title", message: merged(long + " (#t1)"), want: strings.TrimSpace(strings.Repeat("words ", 10))},
+		{name: "another task", message: merged("a title (#t2)"),
+			refusal: "pull request #12's title names a task that isn't #t1, the one this job judges"},
+		{name: "a hash inside", message: merged("a title #t1 here"), refusal: "pull request #12's title holds a " +
+			"character outside letters, digits, spaces and " + pullRequestTitleAllowed + " at byte 8, so it's " +
+			"refused and its words aren't repeated"},
+		{name: "a shell's expansion", message: merged("a $(title)"), refusal: "pull request #12's title holds a " +
+			"character outside letters, digits, spaces and " + pullRequestTitleAllowed + " at byte 2, so it's " +
+			"refused and its words aren't repeated"},
+		{name: "a zero width space", message: merged("a\u200btitle"), refusal: "pull request #12's title holds a " +
+			"character outside letters, digits, spaces and " + pullRequestTitleAllowed + " at byte 1, so it's " +
+			"refused and its words aren't repeated"},
+		{name: "a second line", message: merged("a title\nrm everything"),
+			refusal: "pull request #12's merge carries 4 lines, not its subject, a blank line and its title, so its " +
+				"title can't be read"},
+		{name: "a task alone", message: merged("(#t1)"),
+			refusal: "pull request #12's title says nothing beside its task"},
+		{name: "a word too long", message: merged(strings.Repeat("w", 70)), refusal: "pull request #12's title " +
+			"opens with a word too long for the landing's subject's 72 characters"},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			title, refusal := pullRequestTitle(row.message, "t1")
+			if title != row.want || refusal != row.refusal {
+				test.Errorf("read %q refusing %q, want %q refusing %q", title, refusal, row.want, row.refusal)
+			}
+			if subject := "Land #t1: " + title; len([]rune(subject)) > subjectLimit {
+				test.Errorf("the subject %q is %d characters, over %d", subject, len([]rune(subject)), subjectLimit)
+			}
+		})
+	}
+}
+
+// A merge group's commit judged with no --message, as the PR road asks it, of a branch that brings several commits,
+// lands with the pull request's title as what landed, where the branch's commits alone could say nothing.
+func TestAnIntegrateJobWithNoMessageTakesThePullRequestsTitle(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	worktree := fixture.worktree("a")
+	writeFixtureFile(test, filepath.Join(worktree, "alpha", "second.go"), "package alpha\n")
+	fixture.git(worktree, "add", ".")
+	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a second commit"))
+	candidate := fixture.git(worktree, "rev-parse", "HEAD")
+	tree := strings.Fields(fixture.git(fixture.repository, "merge-tree", "--write-tree", "main", candidate))[0]
+	merge := fixture.git(fixture.repository, "commit-tree", tree, "-p", "main", "-p", candidate, "-m",
+		"Merge pull request #7 from system-inc/branch", "-m", "the census train, read whole (#"+fixtureTask+")")
+	fixture.git(fixture.repository, "push", "-q", fixture.mirror, "main:refs/heads/main", merge+":refs/heads/merge")
+	job := exec.Command(fixture.wrapper, "integrate-job", "--merge", merge, "--task", fixtureTask)
+	job.Dir = fixture.job
+	job.Env = append(fixture.environment, integrateJobCommitVariable+"="+fixture.git(fixture.repository, "rev-parse",
+		"main"))
+	var output bytes.Buffer
+	var errorOutput bytes.Buffer
+	job.Stdout, job.Stderr = &output, &errorOutput
+	if runError := job.Run(); runError != nil {
+		test.Fatalf("the integrate job failed: %v\n%s", runError, errorOutput.String())
+	}
+	subject := strings.SplitN(readLanding(test, output.String()).message, "\n", 2)[0]
+	if want := "Land #" + fixtureTask + ": the census train, read whole"; subject != want {
+		test.Errorf("the landing's subject is %q, want %q", subject, want)
+	}
+}
+
 // A merge whose first parent isn't the commit the job runs at refuses before anything is laid, measured or tested:
 // its code wouldn't be the main it judges.
 func TestAnIntegrateJobRefusesAMergeOntoAnotherMain(test *testing.T) {
