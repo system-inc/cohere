@@ -24,11 +24,12 @@ import (
 // (#etpnnw1, Kirk's design; its units #s50bcnr, a warm cache, #6ex523f, measurement first, and the seam with Loom,
 // #hnbb5vr). It runs in the job's own tree, main's tip laid with no history, so its code is main's, and Loom runs one
 // at a time, so it takes no land lock. It runs one git throughout, the developer tools' own (integrateJobGit), never
-// macOS's shim. It reads the merge from the mirror integrateJobMirrorVariable names, refuses one whose first parent
-// isn't the commit it runs at, and lays the merge's tree under its scratch. Each step says one line with its seconds,
-// and the first refusal stops it:
+// macOS's shim. It reads the merge from the history Loom's runner lays for the job, which integrateJobHistoryVariable
+// names, refuses one whose first parent isn't the commit it runs at, and lays the merge's tree under its scratch. Each
+// step says one line with its seconds, and the first refusal stops it:
 //
-//  1. Preflight: what no gate needs to run for, refused in seconds (integrateJobPreflight).
+//  1. Preflight: the job's own mirrors laid, borrowing the history, and what no gate needs to run for, refused in
+//     seconds (integrateJobPreflight).
 //  2. Lay: the merge's tree and its TypeScript pin under the scratch.
 //  3. Measure: performanceScript run here with bash, before any test, handed main's binary's sha256, so a merge that
 //     builds main's binary keeps main's file and times nothing.
@@ -52,24 +53,22 @@ const integrateJobShellVariable = "COHERE_DEV_INTEGRATE_JOB_SHELL"
 // job finds it.
 const integrateJobGitVariable = "COHERE_DEV_INTEGRATE_JOB_GIT"
 
-// integrateJobMirrorVariable is the cohere mirror the integrate job reads the merge from, where Loom's bridge puts it;
-// unset, it is integrateJobMirrorDefault. The TypeScript mirror beside it, TypeScript.git, holds every pin.
+// integrateJobHistoryVariable names the directory Loom's runner lays the job's history in before the job runs, root's
+// and read-only to the job (#tbtmxpd, Machines' layout): cohere.git, a bare repository at the merge, shallow at main,
+// holding the merge, the commits it brings, its tree and its first parent's commit; and beside it TypeScript.git, only
+// when the merge moves the TypeScript pin, holding the moved pin. A pin that didn't move is the one the job's own tree
+// laid in its TypeScript (laidTypeScriptObjects). The history is laid before the job starts, so a merge it lacks is
+// refused at once, never waited for.
+const integrateJobHistoryVariable = "LOOM_JOB_HISTORY"
+
+// integrateJobHouseMirrors are the house's mirrors, which the integrate job's own borrow from after the history for one
+// thing alone: the measurement's reference commit, deeafbf4 (performanceReference), and its TypeScript pin, which the
+// history doesn't hold until the runner lays it there at `refs/heads/measure/<sha>` (#tbtmxpd). The merge is never
+// read from them. integrateJobHouseMirrorsVariable names others in their place, for a test.
 const (
-	integrateJobMirrorVariable = "COHERE_INTEGRATE_MIRROR"
-	integrateJobMirrorDefault  = macBoxMirrors + "/cohere.git"
+	integrateJobHouseMirrors         = macBoxMirrors
+	integrateJobHouseMirrorsVariable = "COHERE_DEV_INTEGRATE_JOB_HOUSE_MIRRORS"
 )
-
-// integrateJobMergeWaitVariable shortens, for a test, how long the integrate job waits for its merge to reach the
-// mirror, as a Go duration. Unset, it waits integrateJobMergeWait.
-const integrateJobMergeWaitVariable = "COHERE_DEV_INTEGRATE_JOB_MERGE_WAIT"
-
-// integrateJobMergeWait is how long the integrate job waits for its --merge to appear in the mirror before it refuses:
-// Loom's bridge may carry the merge a minute after the job starts, until the node's start waits on it (#hcae6f4).
-// Loom's condition 2 on #hq61wfg sets it at 5 minutes.
-const integrateJobMergeWait = 5 * time.Minute
-
-// integrateJobMergePoll is how often the integrate job looks for its merge while it waits.
-const integrateJobMergePoll = 5 * time.Second
 
 // integrateJobCommitVariable is the commit the Loom job runs at, which Loom's runner sets in every job's environment.
 // Unset, as in a plain checkout, the commit is the working directory's `HEAD`.
@@ -141,9 +140,11 @@ type integrateJobRun struct {
 	running   string
 	candidate string
 	merge     string
-	// mirror is the cohere mirror the merge is read from, and scratch the integrate job's own: its mirrors, borrowing
-	// the house's, of which repository is cohere's, and tree, the merge's tree laid.
-	mirror     string
+	// history is the directory Loom's runner laid the job's history in (integrateJobHistoryVariable), directory the
+	// job's own working directory, holding the TypeScript its tree laid, and scratch the integrate job's own: its
+	// mirrors, borrowing the history, of which repository is cohere's, and tree, the merge's tree laid.
+	history    string
+	directory  string
 	scratch    string
 	mirrors    string
 	repository string
@@ -189,8 +190,8 @@ func integrateJob(arguments []string) int {
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job runs the git at %s\n", git)
 	job := &integrateJobRun{options: options, started: time.Now(), merge: options.Merge, git: git,
-		cache:  strings.TrimSpace(os.Getenv(integrateJobCacheVariable)),
-		mirror: settingOr(integrateJobMirrorVariable, integrateJobMirrorDefault)}
+		cache:   strings.TrimSpace(os.Getenv(integrateJobCacheVariable)),
+		history: strings.TrimSpace(os.Getenv(integrateJobHistoryVariable))}
 	if job.cache != "" && !filepath.IsAbs(job.cache) {
 		fmt.Fprintf(
 			streams.Errors,
@@ -200,6 +201,26 @@ func integrateJob(arguments []string) int {
 		)
 		return 2
 	}
+	// The history is refused before anything is laid: with none, the job has no merge of its runner's to judge, and
+	// its mirrors borrow it by its whole path.
+	if job.history == "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job reads its merge from the history Loom's runner lays "+
+			"for the job, and %s is unset, so nothing is laid\n", integrateJobHistoryVariable)
+		return 1
+	}
+	if information, statError := os.Stat(filepath.Join(job.history, "cohere.git", "objects")); !filepath.IsAbs(
+		job.history) || statError != nil || !information.IsDir() {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s=%q is no directory's whole path holding cohere.git, so "+
+			"integrate-job has no history to read its merge from, and nothing is laid\n", integrateJobHistoryVariable,
+			job.history)
+		return 1
+	}
+	directory, directoryError := os.Getwd()
+	if directoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading the integrate job's working directory: %v\n", directoryError)
+		return 1
+	}
+	job.directory = directory
 	job.running = strings.TrimSpace(os.Getenv(integrateJobCommitVariable))
 	if job.running == "" {
 		// Ignored: a working directory with no history has no `HEAD`, which the refusal below says.
@@ -430,66 +451,46 @@ func (job *integrateJobRun) step(name string, work func() (string, int)) int {
 	return 0
 }
 
-// awaitMerge waits, up to integrateJobMergeWait, for the merge to reach the job's repository, which borrows the mirror,
-// and refuses once it hasn't, saying the mirror held no merge: the bridge's carry is the road's, so the refusal names
-// it and never reads as a red of the merge. A merge already there costs one look.
-func (job *integrateJobRun) awaitMerge() int {
-	wait := integrateJobMergeWait
-	if setting := strings.TrimSpace(os.Getenv(integrateJobMergeWaitVariable)); setting != "" {
-		parsed, parseError := time.ParseDuration(setting)
-		if parseError != nil || parsed <= 0 {
-			fmt.Fprintf(
-				streams.Errors,
-				"cohere-dev: %s=%q is no positive duration\n",
-				integrateJobMergeWaitVariable,
-				setting,
-			)
-			return 2
-		}
-		wait = parsed
-	}
-	poll := min(integrateJobMergePoll, wait/10)
-	started := time.Now()
-	for said := false; ; said = true {
-		if _, lookError := gitOutput(job.repository, "cat-file", "-e", job.merge+"^{commit}"); lookError == nil {
-			return 0
-		}
-		if time.Since(started) >= wait {
-			fmt.Fprintf(streams.Errors, "cohere-dev: %s held no merge %s after %s of waiting: Loom's bridge hasn't "+
-				"carried it there, which is the road's to fix and never a red of this merge (#hq61wfg)\n", job.mirror,
-				job.merge, wait)
-			return 1
-		}
-		if !said {
-			fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job waits up to %s for the merge %s to reach %s\n", wait,
-				shortCommit(job.merge), job.mirror)
-			streams.Show(streams.Errors)
-		}
-		time.Sleep(poll)
-	}
-}
-
 // integrateJobSeconds is a step's time as its line says it, in seconds to a tenth.
 func integrateJobSeconds(spent time.Duration) string {
 	return fmt.Sprintf("%.1fs", spent.Seconds())
 }
 
-// preflight lays the integrate job's mirrors, borrowing the house's, waits for the merge to reach them (awaitMerge),
-// reads it, refuses one whose first parent isn't the commit the job runs at, and runs integrateJobPreflight on its
+// preflight lays the integrate job's mirrors, borrowing the history (layIntegrateJobMirrors), reads the merge from the
+// history alone, refuses one whose first parent isn't the commit the job runs at, and runs integrateJobPreflight on its
 // parents.
 func (job *integrateJobRun) preflight() (string, int) {
-	if layError := layIntegrateJobMirrors(filepath.Join(job.mirror, "objects"), job.mirrors,
-		[]string{filepath.Join(filepath.Dir(job.mirror), "TypeScript.git", "objects")}); layError != nil {
+	// TypeScript borrows the history's moved pin and the job's own laid TypeScript, main's pin, and only when the job's
+	// own can't be found the house's mirror, for deeafbf4's pin (integrateJobHouseMirrors).
+	house := settingOr(integrateJobHouseMirrorsVariable, integrateJobHouseMirrors)
+	typeScriptObjects := []string{filepath.Join(job.history, "TypeScript.git", "objects")}
+	laid, laidError := laidTypeScriptObjects(job.directory)
+	if laidError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading the job's own laid TypeScript: %v\n", laidError)
+		return "", 1
+	}
+	if laid == "" {
+		laid = filepath.Join(house, "TypeScript.git", "objects")
+	}
+	typeScriptObjects = append(typeScriptObjects, laid)
+	if layError := layIntegrateJobMirrors(job.mirrors, []string{filepath.Join(job.history, "cohere.git", "objects"),
+		filepath.Join(house, "cohere.git", "objects")}, typeScriptObjects); layError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: laying the integrate job's mirrors in %s: %v\n", job.mirrors, layError)
 		return "", 1
 	}
-	if code := job.awaitMerge(); code != 0 {
-		return "", code
+	// The merge is read from the history itself, never through the job's repository, whose house objects could vouch
+	// for a merge the runner never laid. The history is root's, and git refuses another owner's repository unless
+	// safe.directory names it, as it is named here for this one read, symlinks resolved as git resolves the path.
+	history := filepath.Join(job.history, "cohere.git")
+	trusted := history
+	if resolved, resolveError := filepath.EvalSymlinks(history); resolveError == nil {
+		trusted = resolved
 	}
-	parents, parentsError := gitOutput(job.repository, "rev-list", "--parents", "-n", "1", job.merge)
+	parents, parentsError := gitOutput(history, "-c", "safe.directory="+trusted, "rev-list", "--parents", "-n", "1",
+		job.merge)
 	fields := strings.Fields(parents)
 	if parentsError != nil || len(fields) != 3 {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s holds no merge %s of two parents (%v)\n", job.mirror,
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s holds no merge %s of two parents (%v)\n", history,
 			job.merge, parentsError)
 		return "", 1
 	}
@@ -710,8 +711,8 @@ func integrateJobSwiftRefusal(repository string, merge string) (string, error) {
 	), nil
 }
 
-// lay checks the merge's tree out under the integrate job's scratch, a worktree of its mirror kept across jobs, with
-// its TypeScript at the pin it records.
+// lay checks the merge's tree out under the integrate job's scratch, a worktree of its own cohere.git, borrowing the
+// history, kept across jobs, with its TypeScript at the pin it records.
 func (job *integrateJobRun) lay() (string, int) {
 	if _, statError := os.Stat(filepath.Join(job.tree, ".git")); statError != nil {
 		// Ignored: a prune with nothing to prune says nothing, and the add below says why it failed if it does.
@@ -769,11 +770,12 @@ func layTypeScript(mirror string, tree string, pin string) error {
 }
 
 // layIntegrateJobMirrors makes the mirrors the integrate job's scripts read in place of the house's (macBoxMirrors), in
-// directory: cohere.git, a bare repository borrowing cohereObjects, the cohere mirror's, through git's alternates, and
-// TypeScript.git, borrowing each of typeScriptObjects that exists. Nothing is copied. Both are kept across jobs, and
-// each job writes their borrowing anew.
-func layIntegrateJobMirrors(cohereObjects string, directory string, typeScriptObjects []string) error {
-	for name, objects := range map[string][]string{"cohere.git": {cohereObjects}, "TypeScript.git": typeScriptObjects} {
+// directory: cohere.git, a bare repository borrowing each of cohereObjects that exists, in order, through git's
+// alternates, and TypeScript.git, borrowing each of typeScriptObjects that exists. Nothing is copied. Both are kept
+// across jobs, and each job writes their borrowing anew. The history is the job's and read-only to it, so the scripts
+// fetch and lay from these, which the job owns, and never from the history itself.
+func layIntegrateJobMirrors(directory string, cohereObjects []string, typeScriptObjects []string) error {
+	for name, objects := range map[string][]string{"cohere.git": cohereObjects, "TypeScript.git": typeScriptObjects} {
 		repository := filepath.Join(directory, name)
 		if _, statError := os.Stat(filepath.Join(repository, "HEAD")); statError != nil {
 			if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
@@ -790,7 +792,7 @@ func layIntegrateJobMirrors(cohereObjects string, directory string, typeScriptOb
 			}
 		}
 		if name == "cohere.git" && len(existing) == 0 {
-			return fmt.Errorf("there is no cohere mirror at %s", filepath.Dir(cohereObjects))
+			return fmt.Errorf("there are no cohere objects to borrow at %s", strings.Join(cohereObjects, " or "))
 		}
 		alternates := filepath.Join(repository, "objects", "info", "alternates")
 		if makeError := os.MkdirAll(filepath.Dir(alternates), 0o755); makeError != nil {
@@ -805,6 +807,50 @@ func layIntegrateJobMirrors(cohereObjects string, directory string, typeScriptOb
 		}
 	}
 	return nil
+}
+
+// laidTypeScriptObjects is the objects directory of the TypeScript the runner laid in the job's own tree, directory,
+// at main's pin, or empty when it laid none there. Its `.git` is read as git reads it, a directory or a file naming
+// one (`gitdir: <path>`, relative to the checkout), and the common directory a `commondir` names, without running a
+// git there: the checkout may be another account's, which git would refuse as dubious.
+func laidTypeScriptObjects(directory string) (string, error) {
+	checkout := filepath.Join(directory, "TypeScript")
+	dotGit := filepath.Join(checkout, ".git")
+	information, statError := os.Stat(dotGit)
+	if errors.Is(statError, os.ErrNotExist) {
+		return "", nil
+	}
+	if statError != nil {
+		return "", statError
+	}
+	gitDirectory := dotGit
+	if !information.IsDir() {
+		contents, readError := os.ReadFile(dotGit)
+		if readError != nil {
+			return "", readError
+		}
+		named, found := strings.CutPrefix(strings.TrimSpace(string(contents)), "gitdir: ")
+		if !found || named == "" {
+			return "", fmt.Errorf("%s names no git directory", dotGit)
+		}
+		gitDirectory = named
+		if !filepath.IsAbs(gitDirectory) {
+			gitDirectory = filepath.Join(checkout, gitDirectory)
+		}
+	}
+	common := gitDirectory
+	// Ignored: a git directory with no commondir is its own common directory.
+	if named, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir")); readError == nil {
+		common = strings.TrimSpace(string(named))
+		if !filepath.IsAbs(common) {
+			common = filepath.Join(gitDirectory, common)
+		}
+	}
+	objects := filepath.Clean(filepath.Join(common, "objects"))
+	if objectsInformation, objectsError := os.Stat(objects); objectsError != nil || !objectsInformation.IsDir() {
+		return "", fmt.Errorf("%s's git directory holds no objects at %s", checkout, objects)
+	}
+	return objects, nil
 }
 
 // measure measures the merge here, before any test runs (#6ex523f): performanceScript, handed main's binary's sha256
