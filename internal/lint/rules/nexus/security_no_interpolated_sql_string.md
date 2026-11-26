@@ -5,7 +5,7 @@
 | **Recommendation**     | **Yes**, at `error` once ahra's 33 findings are fixed. Register it `off` until then: six are real bugs, and the other 27 need a narrower type or a bound parameter each, a per-site call                        |
 | Findings               | **ahra 33, www-phi-health 0, www-connected-app 0**; also **api-phi-health 14**, **api-connected-app 0** (measured 2026-10-02)                                                                                   |
 | Measured precision     | 47 of 47 true: every finding is a `string`-typed value between the single quotes of a SQL string. 6 real bugs, 41 true-but-harmless (the value cannot carry a quote today, but its type says it could), 0 false |
-| Research count         | 33 sites in 10 files (`#tevhg3f`, `research_js_catalogs.md` entry 3); cohere finds the same 33 sites in the same 10 files                                                                                       |
+| Research count         | 33 sites in 10 files (the `#tevhg3f` sweep); cohere finds the same 33 sites in the same 10 files                                                                                                                |
 | Plugin                 | cohere-native, `nexus`                                                                                                                                                                                          |
 | Auto-fixable           | no                                                                                                                                                                                                              |
 | Needs type information | yes, to tell a `string` from a number or a literal union; without a checker the rule registers nothing                                                                                                          |
@@ -20,17 +20,17 @@ types that count as quote-capable, and the one escape it accepts.
 
 ## Where it came from
 
-`modules/apple/contacts/ContactsApi.ts:62` in ahra, the contact search: `LIKE '%${word}%'` with each
-search word, so a name with an apostrophe returns nothing. And
-`modules/os/sensation/AhraOsTriggers.ts:1589`, which doubles quotes but not backslashes in a query that
-runs on MySQL. Found by the new-rules sweep (`#tevhg3f`), built as `#3nvwzjs`.
+Two shapes in one tree. A contact search that splices each searched word into a `LIKE '%${term}%'`
+pattern, so a name with an apostrophe returns nothing. And a query that doubles quotes but not
+backslashes, on MySQL, where a trailing `\` escapes the closing quote. Found by the new-rules sweep
+(`#tevhg3f`), built as `#3nvwzjs`.
 
 ## Reconciling with the research count
 
 The research probe and the rule agree site for site: 33 in the same 10 files, the line numbers shifted
 by edits since the probe ran. The first build found 32: it asked every statement for a second uppercase
-keyword, and `AdsRegistry.ts:186` is `WHERE campaign.status = '${...}'` with only one. An uppercase
-`WHERE` or `HAVING` now confirms itself, and the 33rd site came back.
+keyword, and one site was a `WHERE` comparison against a quoted interpolation with no other keyword. An
+uppercase `WHERE` or `HAVING` now confirms itself, and the 33rd site came back.
 
 The two definitions are not the same, and they land on the same set only because ahra's SQL is written
 in the shapes both accept. The probe's SQL test was any of seven keywords anywhere in the template, and
@@ -43,34 +43,27 @@ strings, not inside one. Where they differ, the rule is the exact one.
 
 **Real bugs (6)**
 
-| Site                                               | Shape                                                                                    | Reading                                                                                                                            |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `modules/apple/contacts/ContactsApi.ts:62` (×3)    | `LIKE '%${word}%'`, one per name column                                                  | **Bug.** `word` is the user's search text; `O'Brien` ends the string, the query fails inside a `try`, and the search finds nothing |
-| `modules/os/sensation/AhraOsTriggers.ts:1589` (×2) | `viewIdentifier = '${viewIdentifier}' OR ... LIKE '${viewIdentifier}?%'`, quotes doubled | **Bug.** The query runs on MySQL, where a trailing `\` escapes the closing quote. The identifier comes from a trigger's parameters |
-| `modules/phi/commerce/PhiCustomerApi.ts:282`       | `emailAddress = '${escapedEmail}'`, quotes doubled                                       | **Bug**, the same one: a PlanetScale (MySQL) query with only quotes doubled, on an email the operator types                        |
+| Shape                                                                    | Count | Reading                                                                                                   |
+| ------------------------------------------------------------------------ | ----- | --------------------------------------------------------------------------------------------------------- |
+| `LIKE '%${term}%'` on a person's search text, one per name column        | 3     | **Bug.** An apostrophe ends the string, the query fails inside a `try`, and the search finds nothing      |
+| A value with quotes doubled but backslashes left alone, in a MySQL query | 3     | **Bug.** A trailing `\` escapes the closing quote; the values come from parameters or an operator's input |
 
 **True but harmless today (27 in ahra)**: the value is a `string` that cannot hold a quote as the code
 stands, and narrowing its type (or binding it) silences the finding.
 
-| Site                                                                                                   | Value                                          | Why it cannot hold a quote                                                             |
-| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `modules/apple/contacts/ContactsApi.ts:227`                                                            | `digits`                                       | `phoneNumber.replace(/\D/g, '')`                                                       |
-| `modules/apple/imessage/iMessageApi.ts:749`, `:832`, `:1189`                                           | the phone number, inside a Python script's SQL | `replace(/[^0-9+]/g, '')`                                                              |
-| `modules/phi/commerce/PhiCustomerApi.ts:298`, `:365`                                                   | `accountId`                                    | read back from the `Account` row the previous query found                              |
-| `modules/data/DataTrimmedRowsDelete.ts:294` (×2), `:335`                                               | `cutoff`, `ceiling`                            | timestamps the module computes                                                         |
-| `modules/data/DataTrimmedRowsDelete.ts:569`, `:596`                                                    | the table name, quotes doubled                 | MySQL, so the escape is incomplete, but the value is the operator's `--table`          |
-| `modules/finance/connections/QuickBooksAdapter.ts:245`, `:277`, `:452`                                 | `sinceDate`                                    | a date string; QuickBooks queries take no parameters, so the fix is a date-shaped type |
-| `modules/finance/connections/QuickBooksAdapter.ts:330`                                                 | `accountType`                                  | every caller passes a constant; the fix is a literal union                             |
-| `modules/google/ads/GoogleAdsKeywordApi.ts:127`, `GoogleAdsReportingApi.ts:52`, `:113`, `:159`, `:208` | `date`                                         | a date string; GAQL takes no parameters                                                |
-| `modules/ads/AdsRegistry.ts:186`                                                                       | `mapUniversalToGoogleStatus(...)`              | returns one of three constants, declared `string`                                      |
-| `modules/ads/AdsRegistry.ts:255` (×2)                                                                  | `start`, `end`                                 | `resolveDateRange` dates                                                               |
-| `modules/planetscale/reports/i18n-conversion.ts:355` (×2), `:367` (×2)                                 | `window.start`, `window.end`                   | dates from `addDays`                                                                   |
+| Value                                                      | Count | Why it cannot hold a quote                                                                       |
+| ---------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------ |
+| A phone number stripped to digits by a `replace`           | 4     | The `replace` leaves only digits (and `+`)                                                       |
+| An id read back from the row a previous query found        | 2     | It came from the database                                                                        |
+| Timestamps and dates the code computes                     | 9     | Computed, never read from input                                                                  |
+| A table name, quotes doubled, on MySQL                     | 2     | The escape is incomplete, but the value is the operator's own flag                               |
+| A date string in a query language that takes no parameters | 8     | A date; the fix is a date-shaped type                                                            |
+| A value from a fixed set, declared `string`                | 2     | Every caller passes a constant, or the function returns one of three; the fix is a literal union |
 
-**api-phi-health (14), true but harmless**:
-`workers/chat/internal/service/metrics/ChatMetricsRpcService.ts:70`, `:76`, `:84`, `:107`, `:115`,
-`:125`, `:218`, two each, `createdAt >= '${start}' AND createdAt <= '${end}'`, where both are
-`new Date(...).toISOString()`. The `${ChatMessageStatusKind.Active}`-style enum values beside them in
-the same queries are literal types and stay silent, which is the type gate working on a real tree.
+**api-phi-health (14), true but harmless**: seven metrics queries, two findings each, a range like
+`>= '${start}' AND ... <= '${end}'` where both bounds are `new Date(...).toISOString()`. The enum values
+beside them in the same queries are literal types and stay silent, which is the type gate working on a
+real tree.
 
 **www-phi-health, www-connected-app, api-connected-app: 0.** The control: neither front end has a
 line with an uppercase `SELECT`, `WHERE`, `LIKE`, `INSERT`, `UPDATE` or `DELETE` and a `'${` (the same
@@ -79,8 +72,8 @@ interpolation in them.
 
 ## Declined, by decision
 
-- **Lowercase SQL.** Every lowercase keyword before `'${` in ahra is English (`delete refused:
-'${name}' has ...`, `Could not update floor designation for '${accountName}'`).
+- **Lowercase SQL.** Every lowercase keyword before `'${` in ahra is English, in messages like
+  `could not update '${name}'`.
 - **Escaping functions by name.** `escapeSqlString(value)` is reported; only the visible
   backslash-and-quote `replace` chain is accepted. The doc comment gives the reasoning.
 - **A fixer.** The fix is a bound parameter, which spans the query and the driver call.
@@ -97,11 +90,11 @@ a table or column name.
 
 Measured on 2026-10-03 before the fixes: **ahra 25, www 0, api 0**, all 25 true.
 
-- 23 were GAQL ids typed `string` from the command line, across 7 files in `modules/google/ads`. They
-  were fixed by typing the ids as numbers at the entry points (`#kx29bm3`, ahra 0269aa0).
-- 2 were `sqlLiteral(...)` in `modules/data/DataMirrorReconcile.ts`, a helper that doubled only the
-  quote, in a query that runs on MySQL. That is the `AhraOsTriggers` bug class, which the quoted branch
-  can't see because the quotes are added inside the helper. It was fixed in ahra 7d88414.
+- 23 were GAQL ids typed `string` from the command line, across 7 files. They were fixed by typing the
+  ids as numbers at the entry points.
+- 2 were a helper that doubled only the quote, in a query that runs on MySQL. That is the same bug class
+  as the quote-doubling sites above, which the quoted branch can't see because the quotes are added
+  inside the helper. It was fixed.
 
 After both fixes, ahra reads 0 with a planted string id firing.
 
@@ -113,8 +106,8 @@ id.
 
 ## Verification
 
-- Fixtures both ways from the real sites: `ContactsApi.ts` before (4 findings: the three search
-  words and the phone digits) and after (bound parameters, silent); `AhraOsTriggers.ts` with quotes
+- Fixtures both ways from the originating sites: the contact search before (4 findings: the three
+  search words and the phone digits) and after (bound parameters, silent); the MySQL query with quotes
   doubled (2 findings) and with backslashes doubled as well (silent). Then 25 firing shapes and 36
   silent ones, and the no-checker decline.
 - Mutation check, 31 mutants, each through `go test -overlay` against a mutated copy, each killed:
