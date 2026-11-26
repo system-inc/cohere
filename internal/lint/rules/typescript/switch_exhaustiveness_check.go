@@ -3,6 +3,7 @@ package typescript
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -218,6 +219,9 @@ var SwitchExhaustivenessCheck = rule.Rule[SwitchExhaustivenessCheckOptions]{
 		if settings.DefaultCaseCommentPattern != nil {
 			// Ignored: an invalid pattern compiles to nil, and a nil pattern matches no comment, as above.
 			commentPattern, _ = esregexp.Compile(*settings.DefaultCaseCommentPattern, "u")
+			if commentPattern != nil && settings.matchTimeout > 0 {
+				commentPattern.Unwrap().MatchTimeout = settings.matchTimeout
+			}
 		}
 
 		isLiteralLikeType := func(subjectType *checker.Type) bool {
@@ -444,6 +448,11 @@ type SwitchExhaustivenessCheckOptions struct {
 	ConsiderDefaultExhaustiveForUnions  *bool   `json:"considerDefaultExhaustiveForUnions"`
 	DefaultCaseCommentPattern           *string `json:"defaultCaseCommentPattern"`
 	RequireDefaultForNonUnion           *bool   `json:"requireDefaultForNonUnion"`
+
+	// matchTimeout bounds a match of DefaultCaseCommentPattern in place of esregexp.MatchTimeout when it is set,
+	// which only a test does, so a pattern it shows overrunning stops at regexp2's first tick rather than after
+	// ten seconds. No config can reach it.
+	matchTimeout time.Duration
 }
 
 // buildDangerousDefaultCaseMessage is upstream's message, text unchanged.
