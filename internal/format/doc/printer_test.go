@@ -369,7 +369,7 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 	specs = append(specs, boundarySpecs...)
 	options = append(options, boundaryOptions...)
 
-	oracle := newBundleOracle(test)
+	golden := oracle_testing.Open(test, test.Name())
 	mismatches, upstreamErrors, rewrites := 0, 0, 0
 	for index, each := range specs {
 		input, marshalError := json.Marshal(struct {
@@ -379,7 +379,7 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 		if marshalError != nil {
 			test.Fatalf("encoding case %d: %v", index, marshalError)
 		}
-		expected, upstreamError := oracle.answer(
+		expected, upstreamError := golden.Evaluate(
 			oracle_testing.Key("printDocToString", string(input)),
 			printUpstreamScript,
 			string(input),

@@ -41,10 +41,10 @@ var widthCases = []string{
 // differs from node's is left out (see widthCases).
 func TestStringWidthAgreesWithUpstream(test *testing.T) {
 	test.Parallel()
-	oracle := newBundleOracle(test)
+	golden := oracle_testing.Open(test, test.Name())
 	wide := 0
 	for _, input := range widthCases {
-		answer, answerError := oracle.answer(
+		answer, answerError := golden.Evaluate(
 			oracle_testing.Key("getStringWidth", input),
 			"String(prettier.util.getStringWidth(__input))",
 			input,

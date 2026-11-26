@@ -141,7 +141,7 @@ export = value;
 // COHERE_ESTREE_CORPORA; these fixtures hold what that corpus reached.
 func TestConvertAgreesWithPrettier(test *testing.T) {
 	test.Parallel()
-	oracle := newBundleOracle(test)
+	golden := oracle_testing.Open(test, test.Name())
 	for _, fixture := range convertFixtures {
 		input, marshalError := json.Marshal(struct {
 			FileName string `json:"fileName"`
@@ -150,7 +150,7 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 		if marshalError != nil {
 			test.Fatalf("%s: %v", fixture.fileName, marshalError)
 		}
-		answer, upstreamError := oracle.answer(
+		answer, upstreamError := golden.Evaluate(
 			oracle_testing.Key("typescriptParse", string(input)),
 			prettierParseScript,
 			string(input),

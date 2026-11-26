@@ -121,7 +121,7 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 		originals = append(originals, pending{text: text, byteStart: start, unitStart: byteToUnit[start]})
 	}
 
-	oracle := newBundleOracle(test)
+	golden := oracle_testing.Open(test, test.Name())
 	mismatches, unmapped, nonAscii := 0, 0, 0
 	for index, original := range originals {
 		text, start := original.text, original.byteStart
@@ -136,7 +136,7 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 		if marshalError != nil {
 			test.Fatalf("encoding case %d: %v", index, marshalError)
 		}
-		answer, upstreamError := oracle.answer(
+		answer, upstreamError := golden.Evaluate(
 			oracle_testing.Key("textUtilities", string(input)),
 			textUpstreamScript,
 			string(input),
