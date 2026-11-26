@@ -59,6 +59,18 @@ const (
 	integrateJobMirrorDefault  = macBoxMirrors + "/cohere.git"
 )
 
+// integrateJobMergeWaitVariable shortens, for a test, how long the integrate job waits for its merge to reach the
+// mirror, as a Go duration. Unset, it waits integrateJobMergeWait.
+const integrateJobMergeWaitVariable = "COHERE_DEV_INTEGRATE_JOB_MERGE_WAIT"
+
+// integrateJobMergeWait is how long the integrate job waits for its --merge to appear in the mirror before it refuses:
+// Loom's bridge may carry the merge a minute after the job starts, until the node's start waits on it (#hcae6f4).
+// Loom's condition 2 on #hq61wfg sets it at 5 minutes.
+const integrateJobMergeWait = 5 * time.Minute
+
+// integrateJobMergePoll is how often the integrate job looks for its merge while it waits.
+const integrateJobMergePoll = 5 * time.Second
+
 // integrateJobCommitVariable is the commit the Loom job runs at, which Loom's runner sets in every job's environment.
 // Unset, as in a plain checkout, the commit is the working directory's `HEAD`.
 const integrateJobCommitVariable = "LOOM_JOB_COMMIT"
@@ -418,18 +430,61 @@ func (job *integrateJobRun) step(name string, work func() (string, int)) int {
 	return 0
 }
 
+// awaitMerge waits, up to integrateJobMergeWait, for the merge to reach the job's repository, which borrows the mirror,
+// and refuses once it hasn't, saying the mirror held no merge: the bridge's carry is the road's, so the refusal names
+// it and never reads as a red of the merge. A merge already there costs one look.
+func (job *integrateJobRun) awaitMerge() int {
+	wait := integrateJobMergeWait
+	if setting := strings.TrimSpace(os.Getenv(integrateJobMergeWaitVariable)); setting != "" {
+		parsed, parseError := time.ParseDuration(setting)
+		if parseError != nil || parsed <= 0 {
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: %s=%q is no positive duration\n",
+				integrateJobMergeWaitVariable,
+				setting,
+			)
+			return 2
+		}
+		wait = parsed
+	}
+	poll := min(integrateJobMergePoll, wait/10)
+	started := time.Now()
+	for said := false; ; said = true {
+		if _, lookError := gitOutput(job.repository, "cat-file", "-e", job.merge+"^{commit}"); lookError == nil {
+			return 0
+		}
+		if time.Since(started) >= wait {
+			fmt.Fprintf(streams.Errors, "cohere-dev: %s held no merge %s after %s of waiting: Loom's bridge hasn't "+
+				"carried it there, which is the road's to fix and never a red of this merge (#hq61wfg)\n", job.mirror,
+				job.merge, wait)
+			return 1
+		}
+		if !said {
+			fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job waits up to %s for the merge %s to reach %s\n", wait,
+				shortCommit(job.merge), job.mirror)
+			streams.Show(streams.Errors)
+		}
+		time.Sleep(poll)
+	}
+}
+
 // integrateJobSeconds is a step's time as its line says it, in seconds to a tenth.
 func integrateJobSeconds(spent time.Duration) string {
 	return fmt.Sprintf("%.1fs", spent.Seconds())
 }
 
-// preflight lays the integrate job's mirrors, borrowing the house's, reads the merge from them, refuses one whose first
-// parent isn't the commit the job runs at, and runs integrateJobPreflight on its parents.
+// preflight lays the integrate job's mirrors, borrowing the house's, waits for the merge to reach them (awaitMerge),
+// reads it, refuses one whose first parent isn't the commit the job runs at, and runs integrateJobPreflight on its
+// parents.
 func (job *integrateJobRun) preflight() (string, int) {
 	if layError := layIntegrateJobMirrors(filepath.Join(job.mirror, "objects"), job.mirrors,
 		[]string{filepath.Join(filepath.Dir(job.mirror), "TypeScript.git", "objects")}); layError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: laying the integrate job's mirrors in %s: %v\n", job.mirrors, layError)
 		return "", 1
+	}
+	if code := job.awaitMerge(); code != 0 {
+		return "", code
 	}
 	parents, parentsError := gitOutput(job.repository, "rev-list", "--parents", "-n", "1", job.merge)
 	fields := strings.Fields(parents)
