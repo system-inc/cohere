@@ -54,7 +54,8 @@ func swiftArchitecture(goArchitecture string) (string, error) {
 // the executable it should be.
 //
 // It resolves first and then builds with automatic resolution off, so cohere-swift is built from exactly
-// the dependency versions Package.resolved records. It asks SwiftPM where the product went rather than
+// the dependency versions Package.resolved records, from the laid set SwiftResolvedVariable names when
+// one is, with no network (SwiftResolvedArguments). It asks SwiftPM where the product went rather than
 // assuming a path, because Swift 6.3 and 6.4 put it in different places.
 //
 // cohere-swift names commit as what it was built from. Swift has no `-ldflags -X`, so the commit goes
@@ -81,14 +82,22 @@ func buildSwiftBinary(
 	// manifest cache answers from an earlier evaluation of the same commit. Measured: a tracked file
 	// edited after a clean build still built a binary that said its tree was clean, and with the
 	// cache off the same build said modified.
+	scratchDirectory := filepath.Join(scratchRoot, architecture)
 	location := []string{
 		"--package-path",
 		packageDirectory,
 		"--scratch-path",
-		filepath.Join(scratchRoot, architecture),
+		scratchDirectory,
 		"--manifest-cache",
 		"none",
 	}
+	// A laid resolved set, when one is named, rides on the location, so the resolve, the build and its
+	// `--show-bin-path` all build offline from it alike.
+	offline, swiftResolvedArgumentsError := SwiftResolvedArguments(scratchDirectory)
+	if swiftResolvedArgumentsError != nil {
+		return swiftResolvedArgumentsError
+	}
+	location = append(location, offline...)
 
 	stamp := filepath.Join(packageDirectory, "Sources", "CohereSwift", "Command", SwiftReleaseStampFileName)
 	stampSource := "#if COHERE_RELEASE_STAMP\n    enum ReleaseStamp { static let commit = \"" +

@@ -5,7 +5,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"os"
 	"os/exec"
@@ -16,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	release "github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
 )
@@ -23,7 +26,8 @@ import (
 // integrateJobFixture is an integrate job ready to judge a merge in a mirror: a candidate, worktree a's head, bringing
 // a module with one package and a command/cohere, so there is a cohere to measure; the mirror, a bare repository the
 // merge is put in; the job's own tree, a directory with no history; go stood in for by one that records each call and
-// lists the module's packages; cohere on the tree by a clean run, keeping its arguments one a line in cohereArguments;
+// lists the module's packages; cohere on the tree by a clean run, keeping its arguments one a line in cohereArguments
+// and the laid Swift set it was named in cohereSwiftResolved;
 // bash, for the integrate job's two scripts, by integrateJobShell, answering from replies; and the integrate job's git
 // by gitStandIn, in a directory whose name a shell has to quote, which records each call in gitCalls and runs the
 // test's own git.
@@ -33,21 +37,23 @@ type integrateJobFixture struct {
 	goCalls    string
 	gitStandIn string
 	gitCalls   string
-	// cohereArguments is what cohere on the tree was handed, one a line.
-	cohereArguments string
-	home            string
-	mirror          string
-	job             string
+	// cohereArguments is what cohere on the tree was handed, one a line, and cohereSwiftResolved the laid Swift set
+	// release.SwiftResolvedVariable named for it.
+	cohereArguments     string
+	cohereSwiftResolved string
+	home                string
+	mirror              string
+	job                 string
 }
 
 // integrateJobShell stands in for bash in the integrate job's scripts. It keeps the script it was handed in
 // `<kind>.script` and its arguments, one a line, in `<kind>.arguments`, the kind `measure` for performanceScript and
-// `tests` for macBoxScript, writes each kind to `calls`, and keeps the setting of needs.SwiftUnlaidVariable it ran
-// under in `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`; with no
-// `tests.run` it prints where its modules came from, as an integrate job's gate says it, then a passing run of every
-// package it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and then,
-// unless one failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at the
-// path it names, as a run that compiles grows the cache.
+// `tests` for macBoxScript, writes each kind to `calls`, and keeps the laid Swift set release.SwiftResolvedVariable
+// named for it in `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`;
+// with no `tests.run` it prints where its modules came from, as an integrate job's gate says it, then a passing run of
+// every package it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and
+// then, unless one failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at
+// the path it names, as a run that compiles grows the cache.
 const integrateJobShell = `#!/bin/sh
 replies="$INTEGRATE_JOB_REPLIES"
 staged="$replies/stdin.$$"
@@ -57,7 +63,7 @@ mv "$staged" "$replies/$kind.script"
 shift 2
 printf '%s\n' "$@" > "$replies/$kind.arguments"
 echo "$kind" >> "$replies/calls"
-printf '%s' "${` + needs.SwiftUnlaidVariable + `:-}" > "$replies/$kind.swift"
+printf '%s' "${` + release.SwiftResolvedVariable + `:-}" > "$replies/$kind.swift"
 commit="$1"
 if [ -e "$replies/$kind.run" ]; then
   sed "s/COMMIT/$commit/g" "$replies/$kind.run"
@@ -113,8 +119,10 @@ func newIntegrateJobFixture(test *testing.T) *integrateJobFixture {
 	}
 	cohere := filepath.Join(stand, "cohere")
 	fixture.cohereArguments = filepath.Join(stand, "cohere-arguments")
+	fixture.cohereSwiftResolved = filepath.Join(stand, "cohere-swift-resolved")
 	if writeError := executable_testing.WriteFile(cohere, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+
-		shellQuoted(fixture.cohereArguments)+"\necho '"+performanceCleanSummary+"'\n"), 0o755); writeError != nil {
+		shellQuoted(fixture.cohereArguments)+"\nprintf '%s' \"${"+release.SwiftResolvedVariable+":-}\" > "+
+		shellQuoted(fixture.cohereSwiftResolved)+"\necho '"+performanceCleanSummary+"'\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	testGit, lookError := exec.LookPath("git")
@@ -130,7 +138,10 @@ func newIntegrateJobFixture(test *testing.T) *integrateJobFixture {
 		shellQuoted(fixture.gitCalls)+"\nexec "+shellQuoted(testGit)+" \"$@\"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	fixture.environment = append(fixture.environment, "HOME="+fixture.home, integrateJobShellVariable+"="+shell,
+	// A laid Swift set the test itself runs under, as in an integrate job, is never the fixture's: each test names its
+	// own.
+	fixture.environment = append(release.WithoutVariable(fixture.environment, release.SwiftResolvedVariable),
+		"HOME="+fixture.home, integrateJobShellVariable+"="+shell,
 		"INTEGRATE_JOB_REPLIES="+fixture.replies, "INTEGRATE_JOB_PLATFORM="+runtime.GOOS+"/"+runtime.GOARCH,
 		gateCohereVariable+"="+cohere, integrateJobMirrorVariable+"="+fixture.mirror,
 		integrateJobGitVariable+"="+fixture.gitStandIn)
@@ -371,18 +382,10 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 				strings.Contains(script, "\n"+integrateJobLine+"\n") {
 				test.Errorf("the tests' script doesn't say it is the integrate job's:\n%.600s", script)
 			}
-			// The tests skip what builds cohere-swift, which can't be built in an integrate job's sandbox, and cohere
-			// on the tree checks every language and format but Swift.
-			if unlaid := string(readMaybeMissing(test, filepath.Join(fixture.replies, "tests.swift"))); unlaid !=
-				needs.SwiftUnlaidSetting {
-				test.Errorf("the tests ran with %s=%q, want %q", needs.SwiftUnlaidVariable, unlaid,
-					needs.SwiftUnlaidSetting)
-			}
-			checked := string(readMaybeMissing(test, fixture.cohereArguments))
-			if checked != strings.Join(integrateJobCohereArguments, "\n")+"\n" || strings.Contains(checked, "swift") ||
-				!strings.Contains(checked, "--languages\ngo,typescript\n") {
-				test.Errorf("cohere on the tree was handed %q, want every language but swift:\n%s",
-					integrateJobCohereArguments, checked)
+			// cohere on the tree runs as the gate's does, every language, Swift among them.
+			if checked := string(readMaybeMissing(test, fixture.cohereArguments)); checked !=
+				strings.Join(gateCohereArguments, "\n")+"\n" {
+				test.Errorf("cohere on the tree was handed %q, want the gate's %q", checked, gateCohereArguments)
 			}
 			// The measurement runs as the integrate job's, so it reads the module set Loom laid for the job.
 			measuring := string(readMaybeMissing(test, filepath.Join(fixture.replies, "measure.script")))
@@ -439,7 +442,7 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 				", go vet, cohere on the tree, 0 findings and no gaps.",
 				"Measured on Shackler for " + performanceFileName + ": the first measurement, so nothing to compare.",
 				"Steps: preflight ",
-				"0 findings and no gaps. " + needs.SwiftUnlaid + ".\n",
+				"0 findings and no gaps.\n",
 			} {
 				if !strings.Contains(said.message, want) {
 					test.Errorf("the landing's message lacks %q:\n%s", want, said.message)
@@ -506,61 +509,103 @@ func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 	}
 }
 
-// A merge that changes what only Swift's checks judge refuses in the preflight, before anything is laid, measured or
-// tested (#5wj23dd): cohere-swift can't be built in an integrate job's sandbox, so nothing there would check the
-// change, and the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and the Swift
-// files of command/cohere and release's dispatch and packaging are each refused, named.
-func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
+// swiftResolvedFixture is the bytes the fixture's candidate commits as its swiftResolvedFile, and
+// swiftResolvedFixtureSha their sha256, which names the laid set a job looks for.
+const (
+	swiftResolvedFixture    = "{\n  \"pins\" : [ ],\n  \"version\" : 3\n}\n"
+	swiftResolvedFixtureSha = "9766d84082ec78efaad906c00fe34f499624de4a0e84650a870798aa1b20dcad"
+)
+
+// withSwiftPackage commits a swiftResolvedFile, swiftResolvedFixture, on worktree a's head, so what the job judges has
+// a Swift package to build, and returns a root of laid sets, holding the one it names when laid, which the job is
+// pointed at.
+func (fixture *integrateJobFixture) withSwiftPackage(laid bool) string {
+	fixture.test.Helper()
+	worktree := fixture.worktree("a")
+	writeFixtureFile(fixture.test, filepath.Join(worktree, filepath.FromSlash(swiftResolvedFile)), swiftResolvedFixture)
+	fixture.git(worktree, "add", ".")
+	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a Swift package"))
+	root := fixture.test.TempDir()
+	if laid {
+		if makeError := os.MkdirAll(filepath.Join(root, swiftResolvedFixtureSha, "scratch", "checkouts"),
+			0o755); makeError != nil {
+			fixture.test.Fatal(makeError)
+		}
+	}
+	fixture.environment = append(fixture.environment, integrateJobSwiftResolvedVariable+"="+root)
+	return root
+}
+
+// An integrate job whose tree holds a Swift package names the set laid for its Package.resolved, by that file's
+// sha256, to every child it starts (#je1r32a): the measurement, the tests' script and cohere on the tree each run with
+// release.SwiftResolvedVariable naming it, so each SwiftPM build of theirs builds offline from it. A fill names it as
+// an integration does, since its tests build cohere-swift too. The fixture's own file is hashed here, so the sha it is
+// laid under is the one the bytes hash to.
+func TestAnIntegrateJobNamesTheLaidSwiftSetToItsChildren(test *testing.T) {
 	test.Parallel()
-	for _, changed := range []string{"swift_language/Package.swift", "command/cohere/swift_binary.go",
-		"internal/release/dispatch/swift.go", "internal/release/dispatch/swift_tree_state_test.go",
-		"internal/release/packaging/swift_package.go"} {
-		test.Run(changed, func(test *testing.T) {
+	digest := sha256.Sum256([]byte(swiftResolvedFixture))
+	if sha := hex.EncodeToString(digest[:]); sha != swiftResolvedFixtureSha {
+		test.Fatalf("the fixture's %s hashes to %s, and swiftResolvedFixtureSha says %s", swiftResolvedFile, sha,
+			swiftResolvedFixtureSha)
+	}
+	for _, fill := range []bool{false, true} {
+		test.Run(map[bool]string{false: "a merge", true: "a fill"}[fill], func(test *testing.T) {
 			test.Parallel()
 			fixture := newIntegrateJobFixture(test)
-			worktree := fixture.worktree("a")
-			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a Swift change\n")
-			fixture.git(worktree, "add", ".")
-			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a Swift change"))
-			ran := fixture.integrateJob(fixture.merged())
-			if ran.exit != 1 || ran.integrated != "" {
-				test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit,
-					ran.lastLine, ran.errors)
+			fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+			set := filepath.Join(fixture.withSwiftPackage(true), swiftResolvedFixtureSha)
+			children := map[string]string{"the tests' script": filepath.Join(fixture.replies, "tests.swift"),
+				"cohere on the tree": fixture.cohereSwiftResolved}
+			var ran integrateJobRan
+			if fill {
+				fixture.landedMain()
+				ran = fixture.fill()
+			} else {
+				ran = fixture.integrateJob(fixture.merged())
+				children["the measurement"] = filepath.Join(fixture.replies, "measure.swift")
 			}
-			for _, want := range []string{needs.SwiftUnlaid + ", so the merge's change to " + changed,
-				"integrate-job step preflight refused in "} {
-				if !strings.Contains(ran.errors, want) {
-					test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
+			if ran.exit != 0 {
+				test.Fatalf("the job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+			}
+			for child, recorded := range children {
+				if named := string(readMaybeMissing(test, recorded)); named != set {
+					test.Errorf("%s ran with %s=%q, want the laid set %s", child, release.SwiftResolvedVariable, named,
+						set)
 				}
 			}
-			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
-				test.Errorf("a merge changing %s ran %q", changed, calls)
+			if want := "integrate-job builds cohere-swift from the laid set " +
+				set +
+				"\n"; !strings.Contains(ran.errors,
+				want) {
+				test.Errorf("the job doesn't say %q:\n%s", want, ran.errors)
 			}
 		})
 	}
 }
 
-// A merge that changes a file beside the Swift ones, in a package whose Swift files the preflight refuses, isn't
-// refused: the guard names Swift's files, never their packages whole.
-func TestAnIntegrateJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
+// An integrate job whose tree's Package.resolved has no set laid for it refuses in the preflight, naming the file's
+// sha256 and the place it looked, as Machines' lay owed and never a red of the merge (#je1r32a), before anything is
+// laid, measured or tested: with no set, SwiftPM would reach for a network the job doesn't have.
+func TestAnIntegrateJobRefusesATreeWithNoLaidSwiftSet(test *testing.T) {
 	test.Parallel()
-	for _, changed := range []string{"command/cohere/discovery.go", "internal/release/dispatch/progress.go",
-		"internal/release/packaging/checksums.go", "internal/release/dispatch/swiftly.go"} {
-		test.Run(changed, func(test *testing.T) {
-			test.Parallel()
-			fixture := newIntegrateJobFixture(test)
-			worktree := fixture.worktree("a")
-			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a change Go judges\n")
-			fixture.git(worktree, "add", ".")
-			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a change Go judges"))
-			// The fixture scripts no measurement, so the job stops there: what matters is that it got past the
-			// preflight and laid the merge.
-			ran := fixture.integrateJob(fixture.merged())
-			if strings.Contains(ran.errors, "preflight refused") || strings.Contains(ran.errors, "can't be judged") ||
-				!strings.Contains(ran.errors, "integrate-job step lay ") {
-				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
-			}
-		})
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	root := fixture.withSwiftPackage(false)
+	ran := fixture.integrateJob(fixture.merged())
+	if ran.exit != 1 || ran.integrated != "" {
+		test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit, ran.lastLine,
+			ran.errors)
+	}
+	for _, want := range []string{"no resolved set of cohere-swift's packages is laid at " +
+		filepath.Join(root, swiftResolvedFixtureSha) + " for the merge's " + swiftResolvedFile + ", sha256 " +
+		swiftResolvedFixtureSha, "Machines' lay owes it (#je1r32a)", "never a red of this merge",
+		"integrate-job step preflight refused in "} {
+		if !strings.Contains(ran.errors, want) {
+			test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
+		}
+	}
+	if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
+		test.Errorf("a tree with no laid Swift set ran %q", calls)
 	}
 }
 
