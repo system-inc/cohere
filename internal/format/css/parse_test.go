@@ -9,8 +9,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// The always-run checks on the parser glue, without node: the shapes the printer relies on and byte
-// offsets worked out by hand. parse_oracle_test.go is the full comparison against the fork.
+// The checks on the parser glue, run without node: the shapes the printer relies on and byte offsets
+// worked out by hand.
 
 func mustParse(test *testing.T, text string) *estree.Node {
 	test.Helper()

@@ -4,42 +4,12 @@ import (
 	"testing"
 )
 
-// The guard must not change which comments are found, only how fast the scan gets there.
+// The guard must not change which comments are found, only how fast the scan gets there, so each case
+// compares the guarded scan's ranges with the ungated scan's as well as counting them.
 //
-// This compares the actual ranges rather than a count, deliberately. A guard that dropped one
-// trailing comment per file and gained one elsewhere would hold any count stable, and a rule that
-// stops receiving a comment reports nothing for it while every fixture still passes. The comparison
-// has to be of the thing itself.
-func TestCommentGuardFindsTheSameComments(test *testing.T) {
-	test.Parallel()
-	files := realSourceFiles(test, 1200)
-
-	for _, file := range files {
-		guarded := All(file.sourceFile)
-		reference := AllWithoutGuard(file.sourceFile)
-
-		if len(guarded) != len(reference) {
-			test.Fatalf("%s: guard found %d comments, ungated scan found %d",
-				file.name, len(guarded), len(reference))
-		}
-		for index := range guarded {
-			if guarded[index].Range != reference[index].Range {
-				test.Fatalf("%s: comment %d differs, guard %v against ungated %v",
-					file.name, index, guarded[index].Range, reference[index].Range)
-			}
-			if guarded[index].Text != reference[index].Text {
-				test.Fatalf("%s: comment %d text differs", file.name, index)
-			}
-		}
-	}
-	test.Logf("guard preserves every comment range across %d real files", len(files))
-}
-
-// The cases a corpus cannot be relied on to contain.
-//
-// A differential test over 800 files recently passed a gate that would have broken `s\tc`, because
-// no file happened to hold the multi-space form. Absence from a corpus is not absence in general, so
-// the separators and the near-miss shapes are written out by hand as well as measured.
+// A comparison over 800 real files once passed a gate that would have broken `s\tc`, because no file
+// happened to hold the multi-space form. Absence from a sample is not absence in general, so the
+// separators and the near-miss shapes are written out by hand.
 func TestCommentGuardHandlesEverySeparator(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
@@ -58,7 +28,7 @@ func TestCommentGuardHandlesEverySeparator(test *testing.T) {
 		{"no comments at all", "const a = 1;\nconst b = 2;\n", 0},
 
 		// A shebang is trivia the comment scanner walks past, and it is the one non-whitespace thing
-		// a comment can sit behind. The corpus caught this and the hand-written cases did not: a
+		// a comment can sit behind. A real file caught this before the hand-written cases did: a
 		// real executable script lost its module comment and its first import comment, because the
 		// guard stopped at the `#`. Pinned here so it cannot regress quietly.
 		{"comment after a shebang", "#!/usr/bin/env -S pnpm tsx\n\n/* module comment */\nconst a = 1;\n", 1},
@@ -95,8 +65,8 @@ func TestCommentGuardHandlesEverySeparator(test *testing.T) {
 	}
 }
 
-// A guard that never skips is pure overhead, and a guard that skips everything is a bug that the
-// differential test alone would not catch on a corpus with few comments.
+// A guard that never skips is pure overhead, and a guard that skips everything is a bug that comparing
+// against the ungated scan alone would not catch on input with few comments.
 func TestCommentGuardActuallySkips(test *testing.T) {
 	test.Parallel()
 	// A run of whitespace with no slash cannot begin a comment.

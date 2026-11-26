@@ -95,8 +95,8 @@ type EnforceCanonicalClassesOptions struct {
 // Canonicalizer runs bgGradientToLinear and deprecatedUtilities; of its four variant passes,
 // modernizeArbitraryValuesVariant.
 // A class only an unported pass rewrites, such as `z-[1]` (arbitraryUtilities) or `flex-grow`
-// (bareValueUtilities), is not reported, and canonical_unported.json lists every such class on the
-// public theme and ahra by pass. The direction is the one this rule holds everywhere: a missing pass is
+// (bareValueUtilities), is not reported, and canonical_unported_public.json lists every such class on the
+// public theme by pass. The direction is the one this rule holds everywhere: a missing pass is
 // a finding that does not appear.
 //
 // # Why the preconditions are the whole rule

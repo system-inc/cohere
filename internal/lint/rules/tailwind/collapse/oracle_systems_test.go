@@ -5,35 +5,36 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
-	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/repository"
 )
 
 // oracleCopies are the copies of Tailwind oracle a test compares against (#f598zk0): the public theme's,
-// generated on testdata/public_theme and run on every machine and on CI, and ahra's, the live one the
-// test was written against, opt-in through its corpus. A fixture named name.json has its public copy at
-// name_public.json.
+// generated on testdata/public_theme and run on every machine and on CI. A fixture named name.json has its
+// public copy at name_public.json; the unsuffixed copies were captured on a consumer's theme, which cohere's
+// tests no longer read (#5wj23dd).
 //
 // The public copies are regenerated from the repository root whenever the public theme changes, since
 // every one of them records what that theme compiles to. Node has no tailwindcss of its own here, so the
-// install is borrowed from the ahra corpus, which records nothing of ahra's in the output:
+// install is borrowed from R, any directory whose node_modules holds tailwindcss 4.3.3, which records
+// nothing of its own in the output:
 //
+//	R=/path/to/a/checkout/with/tailwindcss
 //	P=internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css
 //	D=internal/lint/rules/tailwind/collapse/testdata
 //	T=internal/lint/rules/tailwind/tools
 //	for w in wave1 wave2b wave2c wave3 wave4 wave5; do
-//	    node $T/generate_functional/$w.mjs $P --resolve-root ahra: > $D/${w}_fixtures_public.json
+//	    node $T/generate_functional/$w.mjs $P --resolve-root $R > $D/${w}_fixtures_public.json
 //	done
-//	node $T/generate_descriptor_table/fixtures.mjs $P --resolve-root ahra: > $D/descriptor_fixtures_public.json
-//	node $T/generate_descriptors/extract.mjs $P --json $D/descriptor_table_public.json --resolve-root ahra: \
+//	node $T/generate_descriptor_table/fixtures.mjs $P --resolve-root $R > $D/descriptor_fixtures_public.json
+//	node $T/generate_descriptors/extract.mjs $P --json $D/descriptor_table_public.json --resolve-root $R \
 //	    --no-corpus > /dev/null
-//	node $T/generate_descriptor_table/context.mjs $P --resolve-root ahra: > $D/descriptor_context_public.json
-//	node $T/generate_utility/enumerate.mjs $P --resolve-root ahra: > $D/utility_fixtures_public.json
+//	node $T/generate_descriptor_table/context.mjs $P --resolve-root $R > $D/descriptor_context_public.json
+//	node $T/generate_utility/enumerate.mjs $P --resolve-root $R > $D/utility_fixtures_public.json
 var oracleCopies = []struct {
 	name   string
 	suffix string
 }{
 	{name: "public", suffix: "_public"},
-	{name: "ahra", suffix: ""},
 }
 
 // forEachOracleCopy runs an oracle assertion once per copy, each as its own subtest, handing it the
@@ -53,8 +54,8 @@ func forEachOracleCopy(test *testing.T, base string, run func(test *testing.T, f
 }
 
 // oracleSibling is the copy of the oracle named base that belongs with fixtureName, the copy
-// forEachOracleCopy handed a test: base itself for ahra's, base_public.json for the public theme's. A test
-// whose oracle is several files reads each through this, so its copies never mix.
+// forEachOracleCopy handed a test: base_public.json for the public theme's, and base itself for a copy with
+// no suffix. A test whose oracle is several files reads each through this, so its copies never mix.
 func oracleSibling(test *testing.T, fixtureName, base string) string {
 	test.Helper()
 	stem, isJson := strings.CutSuffix(base, ".json")
@@ -70,17 +71,17 @@ func oracleSibling(test *testing.T, fixtureName, base string) string {
 }
 
 // oracleSystem is the design system an oracle was captured from, by the entry point its fixture
-// recorded, over the vendored tailwindcss. A repository path, such as the public theme's, loads on any
-// machine; a corpus spelling skips naming its variable when the corpus is unset. Loading what the
-// fixture names, rather than a system the test picks, is what keeps an oracle from being compared
-// against a design system it never measured.
+// recorded, over the vendored tailwindcss. The entry point is a path inside this repository, such as
+// the public theme's, so it loads on any machine. Loading what the fixture names, rather than a system
+// the test picks, is what keeps an oracle from being compared against a design system it never
+// measured.
 func oracleSystem(test *testing.T, entryPoint string) *LoadedDesignSystem {
 	test.Helper()
 	if entryPoint == "" {
 		test.Fatal("the fixture records no entry point, so nothing says which design system it measured")
 	}
 	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
-		EntryPoint:          corpus.Resolve(test, entryPoint),
+		EntryPoint:          repository.Path(test, entryPoint),
 		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 	})
 	if loadDesignSystemError != nil {

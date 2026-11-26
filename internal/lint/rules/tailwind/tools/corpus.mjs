@@ -1,38 +1,24 @@
 /*
- * Paths inside a corpus, for the generators (#sycrdr6).
- *
- * A fixture that records a path inside a private checkout spells it "<corpus>:<path in it>", as in
- * "ahra:app/_theme/styles/theme.css", so the committed file reads the same on every machine and the
- * tests resolve it through internal/testing/corpus. A generator takes the same spelling as input and records it
- * as given, so a regenerated fixture stays portable. This is internal/testing/corpus's Locate for the Node
- * side: the corpus's variable, or else the user's corpora file, gives its root.
+ * The paths a generator is given, and how a fixture records them (#sycrdr6).
  *
  * A path inside this repository, such as a public design system under testdata, is recorded relative to
- * the repository's root, which internal/testing/corpus's Resolve reads the same way (#f598zk0). Only a path
- * outside both is recorded absolute, and Resolve refuses that one.
+ * the repository's root, which internal/testing/repository's Path reads the same way (#f598zk0), so the
+ * committed file reads the same on every machine. A path outside it is recorded absolute, and Path refuses
+ * that one, since cohere's tests read only this repository (#5wj23dd).
+ *
+ * A checkout outside this repository, which a generator may still read from, is given by its path. The
+ * "<name>:<path in it>" spelling that once named such a checkout is refused with a message that says so.
  */
 
 import * as NodeFileSystem from 'node:fs';
-import * as NodeOs from 'node:os';
 import * as NodePath from 'node:path';
 import * as NodeUrl from 'node:url';
 
-/*
- * Each corpus's name and the variable that holds its root, a copy of internal/testing/corpus's All, held to it
- * by that package's TestTheGeneratorsNameTheSameCorpora.
- */
-const corpusVariables = {
-    ahra: 'COHERE_CORPUS_AHRA',
-    structure: 'COHERE_CORPUS_STRUCTURE',
-    connected: 'COHERE_CORPUS_CONNECTED',
-    'prettier-fork': 'COHERE_PRETTIER_FORK',
-};
-
-const spellingPattern = /^([a-z][a-z0-9-]+):(.*)$/;
+const spellingPattern = /^[a-z][a-z0-9-]+:/;
 
 /*
  * This repository's root: the nearest directory above this file whose go.mod declares the module, as
- * internal/testing/corpus's RepositoryRoot finds it from a test's directory.
+ * internal/testing/repository's Root finds it from a test's directory.
  */
 const repositoryRoot = (function() {
     let directory = NodePath.dirname(NodeUrl.fileURLToPath(import.meta.url));
@@ -53,8 +39,8 @@ const repositoryRoot = (function() {
 })();
 
 /*
- * How a fixture records a path that is no spelling: relative to this repository when it lies inside it,
- * with forward slashes, and otherwise as the path itself.
+ * How a fixture records a path: relative to this repository when it lies inside it, with forward slashes,
+ * and otherwise as the path itself.
  */
 function recordPath(path) {
     const inside = NodePath.relative(repositoryRoot, path);
@@ -64,58 +50,34 @@ function recordPath(path) {
     return inside.split(NodePath.sep).join('/');
 }
 
-function corporaFilePath() {
-    return process.env.COHERE_CORPORA_CONFIG || NodePath.join(NodeOs.homedir(), '.config', 'cohere', 'corpora.json');
-}
-
-function corpusRoot(name, spelling) {
-    if(!Object.hasOwn(corpusVariables, name)) {
+/*
+ * Refuses a "<name>:<path>" spelling, which named a checkout outside this repository by a name the user's
+ * environment mapped to its root. Nothing maps those names now, so the checkout is given by its path.
+ */
+function refuseSpelling(argument) {
+    if(spellingPattern.test(argument)) {
         throw new Error(
-            `${spelling} names the corpus "${name}", which is no corpus; the corpora are ${Object.keys(corpusVariables).join(', ')}`,
+            `${argument} names a checkout by a name, which nothing resolves now: give the checkout's path, ` +
+                'absolute or relative to the working directory',
         );
     }
-    const variable = corpusVariables[name];
-    if(process.env[variable]) {
-        return NodePath.resolve(process.env[variable]);
-    }
-    const configPath = corporaFilePath();
-    const config = NodeFileSystem.existsSync(configPath)
-        ? JSON.parse(NodeFileSystem.readFileSync(configPath, 'utf8'))
-        : {};
-    if(!config[name]) {
-        throw new Error(`${spelling} needs the ${name} corpus: set ${variable}, or name "${name}" in ${configPath}`);
-    }
-    return NodePath.resolve(config[name]);
 }
 
 /*
- * The path a generator's argument names, and how a fixture records it. A spelling is recorded as given.
- * Anything else is a path, resolved against the working directory, and recorded relative to this
- * repository when it lies inside it.
+ * The path a generator's argument names, and how a fixture records it. The argument is a path, resolved
+ * against the working directory, and recorded relative to this repository when it lies inside it.
  */
 export function locate(argument) {
-    const match = spellingPattern.exec(argument);
-    if(!match) {
-        const path = NodePath.resolve(argument);
-        return { path, recorded: recordPath(path) };
-    }
-    const [, name, inside] = match;
-    return { path: NodePath.resolve(corpusRoot(name, argument), inside), recorded: argument };
+    refuseSpelling(argument);
+    const path = NodePath.resolve(argument);
+    return { path, recorded: recordPath(path) };
 }
 
 /*
- * How a fixture records `path`, found inside what `argument` named: in the same corpus when `argument`
- * is a spelling and `path` lies inside that corpus, and otherwise as locate records a path.
+ * How a fixture records `path`, found inside what `argument` named: as locate records a path, once
+ * `argument` is known to be a path rather than a spelling.
  */
 export function recordBeside(argument, path) {
-    const match = spellingPattern.exec(argument);
-    if(!match) {
-        return recordPath(path);
-    }
-    const [, name] = match;
-    const inside = NodePath.relative(corpusRoot(name, argument), path);
-    if(inside.startsWith('..') || NodePath.isAbsolute(inside)) {
-        return recordPath(path);
-    }
-    return `${name}:${inside.split(NodePath.sep).join('/')}`;
+    refuseSpelling(argument);
+    return recordPath(path);
 }

@@ -1,9 +1,6 @@
 package micromark
 
-import (
-	"strings"
-	"testing"
-)
+import "strings"
 
 // autolinkFixtures avoid the constructs still pending, outside a matched autolink (inside one, the autolink
 // consumes the characters and nothing else is tried): attention (`*`, `_`), code text, character
@@ -139,9 +136,4 @@ var autolinkFixtures = []string{
 	"a\\\n<ab:c>",
 	"    <ab:c>",
 	"***\n<ab:c>",
-}
-
-func TestAutolinkEvents(test *testing.T) {
-	test.Parallel()
-	compareEvents(test, autolinkFixtures)
 }

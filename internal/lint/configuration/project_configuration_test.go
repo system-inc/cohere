@@ -3,36 +3,38 @@ package configuration
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
-// liveConfigPath is the real config cohere must agree with: ahra's, which is private, so a test that reads
-// it skips where the ahra corpus is not set, and the gate names it as not covered (#sycrdr6).
-func liveConfigPath(test testing.TB) string {
-	test.Helper()
-	return corpus.Ahra.Path(test, "CohereSettings.json")
+// projectConfigurationPath is a project's config composed the way a Structure app's is: the sets cohere
+// carries that such an app extends, with an overlay of its own rules, ignores and an override on top. It
+// is committed under testdata, so every machine reads the same bytes, and the sets it extends are the
+// ones cohere embeds, so a change to a set shows up here rather than at the next full run. The registry's
+// wiring test reads it too (internal/lint/registry).
+func projectConfigurationPath() string {
+	return filepath.Join("testdata", "project", "CohereSettings.json")
 }
 
-// TestAgainstTheLiveConfiguration loads the actual file rather than a hand-written model of it.
+// TestAgainstAProjectOnTheSets loads a project's file through the sets cohere carries rather than a
+// hand-written model of them.
 //
-// A test that models a config can drift from the configuration. This one reads the bytes that are actually
-// gating the codebase, so a change there shows up here rather than at the next full run.
-func TestAgainstTheLiveConfiguration(test *testing.T) {
+// A test that models a set can drift from the set. This one reads the sets' own bytes through the chain a
+// project extends, so a set whose override stops applying fails here.
+func TestAgainstAProjectOnTheSets(test *testing.T) {
 	test.Parallel()
 
-	loaded, loadError := Load(liveConfigPath(test))
+	loaded, loadError := Load(projectConfigurationPath())
 	if loadError != nil {
-		test.Fatalf("loading the live config: %v", loadError)
+		test.Fatalf("loading the project config: %v", loadError)
 	}
 
 	// Prove the input is real before asserting anything about it. A config that parsed to zero rules
 	// would make every assertion below pass vacuously, which is the failure mode this project keeps
 	// finding.
 	if len(loaded.Rules) < 100 {
-		test.Fatalf("only %d rules loaded from the live config, which is not a real corpus", len(loaded.Rules))
+		test.Fatalf("only %d rules loaded from the project config, so its sets did not load", len(loaded.Rules))
 	}
 	if len(loaded.Overrides) == 0 || len(loaded.IgnorePatterns) == 0 {
 		test.Fatalf(
@@ -76,7 +78,7 @@ func TestAgainstTheLiveConfiguration(test *testing.T) {
 		test.Error("consistency-require-type-suffix stopped running on authored source")
 	}
 
-	// The other two live override blocks.
+	// The other two override blocks: a set's, for next-env.d.ts, and the project's own, for modules/**.
 	if loaded.Resolve("next-env.d.ts").Enabled("structure/consistency-require-organized-imports") {
 		test.Error("the next-env.d.ts override did not apply")
 	}
@@ -98,7 +100,7 @@ func TestAgainstTheLiveConfiguration(test *testing.T) {
 
 // TestBothPathsAgreeOnEveryPluginDefault is the gate on removing the hand-written lines.
 //
-// The live config names all forty plugin-default rules by hand, which reproduces oxlint's behaviour
+// The sets name all forty plugin-default rules by hand, which reproduces oxlint's behaviour
 // in the wrong layer. Removing those lines is only safe if the plugin declaration resolves the same
 // forty, and this is what shows it: the config is loaded as written, then loaded again with every
 // plugin-default line stripped, and the two results are compared rule by rule.
@@ -129,15 +131,15 @@ func TestAgainstTheLiveConfiguration(test *testing.T) {
 // match, so the difference is visible instead of blocking or being smoothed away.
 func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
 	test.Parallel()
-	asWritten, loadError := Load(liveConfigPath(test))
+	asWritten, loadError := Load(projectConfigurationPath())
 	if loadError != nil {
-		test.Fatalf("loading the live config: %v", loadError)
+		test.Fatalf("loading the project config: %v", loadError)
 	}
 
 	// Every plugin-default rule must be reachable through the declaration alone.
 	fromPlugins := RulesFromPlugins(asWritten.Plugins, map[string]RuleSetting{})
 	if len(fromPlugins) != len(PluginDefaultRules) {
-		test.Fatalf("the live config's plugins resolve %d of %d plugin-default rules; a rule whose "+
+		test.Fatalf("the project config's plugins resolve %d of %d plugin-default rules; a rule whose "+
 			"plugin is not declared would be lost the moment its hand-written line came out",
 			len(fromPlugins), len(PluginDefaultRules))
 	}
@@ -146,7 +148,7 @@ func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
 	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
 	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
 	// merged map made this guard pass on a config with three lines deliberately removed.
-	namedInFile, ruleNamesInChainError := ruleNamesInChain(liveConfigPath(test))
+	namedInFile, ruleNamesInChainError := ruleNamesInChain(projectConfigurationPath())
 	if ruleNamesInChainError != nil {
 		test.Fatalf("reading the rules block: %v", ruleNamesInChainError)
 	}
@@ -196,9 +198,9 @@ func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
 // Separate from `Load` on purpose. `Load` returns the resolved result, which is the right answer for
 // every consumer and the wrong one for a test asking which of two paths a rule arrived by.
 //
-// The whole chain rather than the one file, since ahra's config became an overlay on the house tiers
+// The whole chain rather than the one file, since a project's config is an overlay on the house tiers
 // (#rkm5a31), now the sets cohere carries (#njhfftt): the forty lines moved into the Nexus tier, so
-// reading ahra's file alone reported all forty dropped to warn while every one still ran at error.
+// reading a project's file alone reported all forty dropped to warn while every one still ran at error.
 func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
 	sources, sourcesOfError := SourcesOf(path)
 	if sourcesOfError != nil {
@@ -224,7 +226,7 @@ func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
 // ruleNamesInContents is the same read, over bytes rather than a path.
 //
 // Split out so the guard above can be exercised against a modified config without writing one. That
-// matters more than it looks: the config this guards is untracked and shared, so any check needing a
+// matters more than it looks: the lines this guards are the sets cohere embeds, so any check needing a
 // mutated copy on disk would have to mutate the artifact it guards, or write one somewhere and hope
 // the two stay comparable.
 //
@@ -261,18 +263,18 @@ func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
 // `TestBothPathsAgreeOnEveryPluginDefault` is the condition on removing the forty `error` lines, and
 // an earlier version of it could not fail: it read `Load`'s result, where the two paths have already
 // been merged, so a rule arriving only through the declaration was indistinguishable from one named
-// by hand. Three lines were deleted from a copy of the live config and it passed, reporting all
+// by hand. Three lines were deleted from a copy of the config and it passed, reporting all
 // forty still named.
 //
 // Running a guard and seeing green is not verifying a guard. This verifies it, by reproducing the
 // removal in-process and asserting the count moves.
 //
-// It writes nothing. The config being guarded is untracked and shared, so a check that needed a
+// It writes nothing. The lines being guarded are the sets cohere embeds, so a check that needed a
 // mutated copy on disk would either touch the artifact it guards or drift from it; `ruleNamesInContents`
 // exists so this one does neither.
 func TestTheGuardCatchesARemovedLine(test *testing.T) {
 	test.Parallel()
-	intact, ruleNamesInChainError := ruleNamesInChain(liveConfigPath(test))
+	intact, ruleNamesInChainError := ruleNamesInChain(projectConfigurationPath())
 	if ruleNamesInChainError != nil {
 		test.Fatalf("reading the rules blocks: %v", ruleNamesInChainError)
 	}
@@ -301,7 +303,7 @@ func TestTheGuardCatchesARemovedLine(test *testing.T) {
 	}
 	for _, name := range removed {
 		if _, present := stripped[name]; !present {
-			test.Fatalf("%q is not named in the live config, so removing it models nothing; pick a "+
+			test.Fatalf("%q is not named in the project config's chain, so removing it models nothing; pick a "+
 				"rule the config actually carries", name)
 		}
 		delete(stripped, name)

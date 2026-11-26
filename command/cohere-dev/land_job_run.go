@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
@@ -29,7 +28,7 @@ import (
 // stops it:
 //
 //  1. Preflight: what no gate needs to run for, refused in seconds (landJobPreflight).
-//  2. Lay: the merge's tree and its TypeScript pin under the scratch, and every corpus it pins from the corpus mirrors.
+//  2. Lay: the merge's tree and its TypeScript pin under the scratch.
 //  3. Measure: performanceScript run here with bash, before any test, handed main's binary's sha256, so a merge that
 //     builds main's binary keeps main's file and times nothing.
 //  4. Tests: macBoxScript run here with bash and read by readBoxRun, so coverage, the shards, -race and the verdict
@@ -56,10 +55,6 @@ const (
 	landJobMirrorVariable = "COHERE_LAND_MIRROR"
 	landJobMirrorDefault  = macBoxMirrors + "/cohere.git"
 )
-
-// landJobCorpusMirrorsVariable is the directory of the corpora's bare mirrors (landJobCorpusSources); unset, it is the
-// house's mirrors, macBoxMirrors (#3djwr33).
-const landJobCorpusMirrorsVariable = "COHERE_LAND_CORPUS_MIRRORS"
 
 // landJobCommitVariable is the commit the Loom job runs at, which Loom's runner sets in every job's environment. Unset,
 // as in a plain checkout, the commit is the working directory's `HEAD`.
@@ -125,14 +120,13 @@ type landJobRun struct {
 	running   string
 	candidate string
 	merge     string
-	// mirror is the cohere mirror the merge is read from, corpusMirrors the corpora's, and scratch the land job's own:
-	// its mirrors, borrowing theirs, of which repository is cohere's, and tree, the merge's tree laid.
-	mirror        string
-	corpusMirrors string
-	scratch       string
-	mirrors       string
-	repository    string
-	tree          string
+	// mirror is the cohere mirror the merge is read from, and scratch the land job's own: its mirrors, borrowing the
+	// house's, of which repository is cohere's, and tree, the merge's tree laid.
+	mirror     string
+	scratch    string
+	mirrors    string
+	repository string
+	tree       string
 	// commits are what the candidate brings to main, and subject the landing's, both read by the preflight.
 	commits []branchCommit
 	subject string
@@ -140,9 +134,6 @@ type landJobRun struct {
 	// measurement wrote or kept.
 	mergeTree  string
 	landedTree string
-	// corpora are the corpora the merge pins, laid, and corpusGap the one a fork not yet on the box names.
-	corpora   []gateCorpus
-	corpusGap string
 	// measured is what the measurement says in the landing's body, and ran what the gate ran, as its account says it.
 	measured string
 	ran      []string
@@ -177,9 +168,8 @@ func landJob(arguments []string) int {
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: land-job runs the git at %s\n", git)
 	job := &landJobRun{options: options, started: time.Now(), merge: options.Merge, git: git,
-		cache:         strings.TrimSpace(os.Getenv(landJobCacheVariable)),
-		mirror:        settingOr(landJobMirrorVariable, landJobMirrorDefault),
-		corpusMirrors: settingOr(landJobCorpusMirrorsVariable, macBoxMirrors)}
+		cache:  strings.TrimSpace(os.Getenv(landJobCacheVariable)),
+		mirror: settingOr(landJobMirrorVariable, landJobMirrorDefault)}
 	if job.cache != "" && !filepath.IsAbs(job.cache) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s=%q is no directory's whole path\n", landJobCacheVariable, job.cache)
 		return 2
@@ -470,8 +460,7 @@ func (job *landJobRun) preflight() (string, int) {
 // The preflight's call site (#mf8t6se): land --preflight's preflight is being built beside this, and once it lands this
 // body is `preflight(repository, mainCommit, head, options)`, its reading's Commits and Subject returned. Until then it
 // runs today's checks as land runs them before its line: main already holding head; the subjects of the commits it
-// brings; its task and the landing's subject; the merge recording each submodule as a gitlink; and its corpus pins,
-// found by name (pinnedFileIn).
+// brings; its task and the landing's subject; and the merge recording each submodule as a gitlink.
 func landJobPreflight(
 	repository string,
 	mainCommit string,
@@ -512,9 +501,6 @@ func landJobPreflight(
 	if checkGitlinksError := checkGitlinks(repository, merge); checkGitlinksError != nil {
 		return nil, "", checkGitlinksError.Error(), nil
 	}
-	if _, _, pinnedError := pinnedFileIn(repository, merge); pinnedError != nil {
-		return nil, "", pinnedError.Error(), nil
-	}
 	return commits, subject, "", nil
 }
 
@@ -550,7 +536,7 @@ func landJobSwiftRefusal(repository string, merge string) (string, error) {
 }
 
 // lay checks the merge's tree out under the land job's scratch, a worktree of its mirror kept across jobs, with its
-// TypeScript at the pin it records, and lays every corpus the merge pins (layLandJobCorpora).
+// TypeScript at the pin it records.
 func (job *landJobRun) lay() (string, int) {
 	if _, statError := os.Stat(filepath.Join(job.tree, ".git")); statError != nil {
 		// Ignored: a prune with nothing to prune says nothing, and the add below says why it failed if it does.
@@ -584,10 +570,7 @@ func (job *landJobRun) lay() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkSubmodulesError)
 		return "", 1
 	}
-	// No corpus is laid: cohere's tests read no snapshot of another repository (Kirk, Nov 25, #5wj23dd), so a test
-	// that still reads one skips by name until its deletion lands.
-	laid := "no corpus, since cohere's tests read no snapshot of another repository"
-	return shortCommit(job.merge) + " at " + job.tree + ", " + laid, 0
+	return shortCommit(job.merge) + " at " + job.tree, 0
 }
 
 // layTypeScript checks tree's TypeScript out at pin, a worktree of the land job's TypeScript mirror kept across jobs.
@@ -605,151 +588,6 @@ func layTypeScript(mirror string, tree string, pin string) error {
 	if output, checkoutError := gitCombined(place, "checkout", "--quiet", "--detach", "--force",
 		pin); checkoutError != nil {
 		return fmt.Errorf("%w: %s", checkoutError, output)
-	}
-	return nil
-}
-
-// landJobCorpusSource is where a corpus comes from on Shackler (#3djwr33): a bare mirror under the mirrors root holding
-// its pins, or an extracted archive under the corpora root, a directory of files named for its full pin, its submodules
-// filled, as ahra and connected are laid (connected's tree records two, which no bare mirror can fill). emptyIsGap
-// marks the one corpus whose empty mirror is a named gap rather than a refusal (the Square's ruling on the Prettier
-// fork): an empty mirror is one Operations laid before the pin arrived.
-type landJobCorpusSource struct {
-	mirror     string
-	archive    string
-	emptyIsGap bool
-}
-
-// landJobCorpusSources is each corpus's source by its name, each relative to its root.
-var landJobCorpusSources = map[string]landJobCorpusSource{
-	corpus.Ahra.Name:         {archive: "ahra-"},
-	corpus.Structure.Name:    {mirror: "structure-next.git"},
-	corpus.Connected.Name:    {archive: "connected-"},
-	corpus.PrettierFork.Name: {mirror: "prettier.git", emptyIsGap: true},
-}
-
-// layLandJobCorpora lays every corpus merge pins, read from repository, from its source (landJobCorpusSources) under
-// mirrorsRoot or corporaRoot, with the gate's own lay script and installs (corpusLayScript), where macBoxScript reads
-// them. It returns them laid, the gap a fork not yet on the box names, and why not, which refuses the job, never a
-// skip (#3kpxrdt): a source that is absent or lacks a pin names the corpus and the path. A merge that is no cohere
-// tree pins none.
-func layLandJobCorpora(
-	repository string,
-	merge string,
-	mirrorsRoot string,
-	corporaRoot string,
-	scratch string,
-) ([]gateCorpus, string, string) {
-	pinned, found, pinnedError := pinnedFileIn(repository, merge)
-	if pinnedError != nil {
-		return nil, "", pinnedError.Error()
-	}
-	if !found {
-		return nil, "", ""
-	}
-	source, showError := gitOutput(repository, "show", merge+":"+pinned)
-	if showError != nil {
-		return nil, "", showError.Error()
-	}
-	pins, pinsError := corpus.PinsIn([]byte(source))
-	if pinsError != nil {
-		return nil, "", pinsError.Error()
-	}
-	corpora, gap, refusal := landJobCorpusChecked(pins, mirrorsRoot, corporaRoot)
-	if refusal != "" {
-		return nil, gap, refusal
-	}
-	home, homeError := os.UserHomeDir()
-	if homeError != nil {
-		return nil, gap, homeError.Error()
-	}
-	laidUnder := filepath.Join(home, strings.TrimPrefix(macBoxScratch, "~/"), "corpora")
-	laying := []gateCorpus{}
-	for _, laid := range corpora {
-		if _, statError := os.Stat(filepath.Join(laidUnder, laid.place())); statError == nil {
-			continue
-		}
-		laying = append(laying, laid)
-	}
-	if len(laying) > 0 {
-		if layError := layCorporaHere(scratch, laying); layError != nil {
-			return nil, gap, "laying the corpora: " + layError.Error()
-		}
-	}
-	return corpora, gap, ""
-}
-
-// landJobCorpusChecked checks each corpus's source holds every pin it is pinned at, and returns the corpora to lay,
-// each with its source as its checkout, the gap of a fork whose mirror holds no commit yet, and why a source refuses
-// the job, naming the corpus and the path.
-func landJobCorpusChecked(pins map[string]corpus.Pins, mirrorsRoot string, corporaRoot string) ([]gateCorpus,
-	string, string) {
-	corpora := []gateCorpus{}
-	gap := ""
-	for _, each := range corpus.All {
-		source, known := landJobCorpusSources[each.Name]
-		if !known {
-			return nil, "", "no source on this box is named for the corpus " + each.Name
-		}
-		held := append([]string{pins[each.Name].Checkout}, pins[each.Name].Held...)
-		if held[0] == "" {
-			return nil, "", fmt.Sprintf("the merge pins no commit of %s, so its tests would skip on a green gate",
-				each.Name)
-		}
-		if source.archive != "" {
-			directory := filepath.Join(corporaRoot, source.archive+held[0])
-			if information, statError := os.Stat(directory); statError != nil || !information.IsDir() {
-				return nil, "", fmt.Sprintf("%s's source %s isn't on this box, so the job refuses rather than let "+
-					"its tests skip", each.Name, directory)
-			}
-			corpora = append(corpora, gateCorpus{corpus: each, pins: pins[each.Name], checkout: directory,
-				directory: true})
-			continue
-		}
-		mirror := filepath.Join(mirrorsRoot, source.mirror)
-		if source.emptyIsGap {
-			// Ignored: a mirror that can't be read prints nothing here, and is refused below in git's words.
-			newest, newestError := gitOutput(mirror, "rev-list", "--all", "-n", "1")
-			if newestError == nil && newest == "" {
-				gap = "run nowhere: " + each.Name + " not on " + landJobBox
-				continue
-			}
-		}
-		for _, pin := range held {
-			if _, heldError := gitOutput(mirror, "cat-file", "-e", pin+"^{commit}"); heldError != nil {
-				return nil, "", fmt.Sprintf("%s's mirror %s doesn't hold its pin %s, so the job refuses rather than "+
-					"let its tests skip", each.Name, mirror, pin)
-			}
-		}
-		corpora = append(corpora, gateCorpus{corpus: each, pins: pins[each.Name], checkout: mirror, bare: true})
-	}
-	return corpora, gap, ""
-}
-
-// layCorporaHere lays corpora with corpusLayScript run here, its carry written from their mirrors under scratch.
-func layCorporaHere(scratch string, corpora []gateCorpus) error {
-	directory, directoryError := os.MkdirTemp(scratch, "corpora-")
-	if directoryError != nil {
-		return directoryError
-	}
-	defer func() {
-		if removeError := os.RemoveAll(directory); removeError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: the corpora's scratch %s stays: %v\n", directory, removeError)
-		}
-	}()
-	carry := filepath.Join(directory, "corpora.tar.gz")
-	specs, carryError := writeCorpusCarry(carry, directory, corpora)
-	if carryError != nil {
-		return carryError
-	}
-	output, runError := runLandJobScript(directory, corpusLayScript, append([]string{carry}, specs...))
-	fmt.Fprint(streams.Errors, corpusLaidLines(string(output)))
-	verdict := readTestJson(output)
-	switch {
-	case verdict.refused != "":
-		return errors.New(verdict.refused)
-	case runError != nil:
-		return fmt.Errorf("the lay ended %s (%s)", describeEnd(runError), lastWords(output, describeEnd(runError)))
 	}
 	return nil
 }
@@ -832,10 +670,9 @@ func (job *landJobRun) measure() (string, int) {
 	return measured, 0
 }
 
-// tests runs the module's tests here as a gate box runs them: macBoxScript, handed the packages the laid tree lists
-// and the corpora laid, through the land job's own bash, its mirrors the land job's and its Go cache the one
-// landJobCacheVariable keeps, and reads the run as a gate box's (readBoxRun, verdictLine). share is the pool token's
-// environment for a step.
+// tests runs the module's tests here as a gate box runs them: macBoxScript, handed the packages the laid tree lists,
+// through the land job's own bash, its mirrors the land job's and its Go cache the one landJobCacheVariable keeps, and
+// reads the run as a gate box's (readBoxRun, verdictLine). share is the pool token's environment for a step.
 func (job *landJobRun) tests(share func(string) []string) (string, int) {
 	covered, readGatedWorkspaceError := readGatedWorkspace(job.tree)
 	if readGatedWorkspaceError != nil {
@@ -873,8 +710,7 @@ func (job *landJobRun) tests(share func(string) []string) (string, int) {
 	}
 	// Ignored: a tree with no TypeScript gitlink needs no pin, and the script skips an empty one.
 	pin, _ := gitOutput(job.repository, "rev-parse", "--verify", "--quiet", job.merge+":TypeScript")
-	arguments := append([]string{job.merge, pin, strings.Join(races, ","), corporaArgument(job.corpora)},
-		listing.packages...)
+	arguments := append([]string{job.merge, pin, strings.Join(races, ",")}, listing.packages...)
 	fmt.Fprintf(streams.Errors, "cohere-dev: testing %s here, %d packages, %s\n", shortCommit(job.merge),
 		len(listing.packages), job.cacheSaid())
 	streams.Show(streams.Errors)
@@ -887,10 +723,6 @@ func (job *landJobRun) tests(share func(string) []string) (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no verdict from %s's own run, so nothing lands: %s\n", landJobBox,
 			unavailable)
 		return "", 1
-	}
-	verdict.corpora = corporaNamed(job.corpora)
-	if job.corpusGap != "" {
-		verdict.unlaidCorpora = append(verdict.unlaidCorpora, job.corpusGap)
 	}
 	code, where := verdictLine(job.tree, covered, verdict, "shared uid, "+job.cacheSaid())
 	if code != 0 {

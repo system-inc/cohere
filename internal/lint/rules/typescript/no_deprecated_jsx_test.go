@@ -222,8 +222,8 @@ func TestNoDeprecatedInJsx(test *testing.T) {
 				"\n" +
 				"const anotherExample = <Tab.List deprecatedProp=\"oh no\" />;\n" +
 				"      ",
-			jsx:                true,
-			withInstalledTypes: true,
+			jsx:                  true,
+			withReactModuleTypes: true,
 			expected: []noDeprecatedFinding{
 				{messageId: "deprecated", name: "deprecatedProp", reason: ""},
 			},
