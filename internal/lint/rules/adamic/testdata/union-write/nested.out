@@ -1,0 +1,3 @@
+source 498d04b91874c42a130a8a7844cd1096bb5a610bb78c991ec5e5a67da7304d4d
+exit 1
+stderr TypeError: counter.inner.value.toFixed is not a function

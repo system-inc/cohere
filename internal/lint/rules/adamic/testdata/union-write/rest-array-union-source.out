@@ -1,0 +1,3 @@
+source 3fd543b094df94af09b4b9d53f8340cf97d18150f666f852e1875220f7f52971
+exit 1
+stderr TypeError: (counter.items[0] ?? 0).toFixed is not a function

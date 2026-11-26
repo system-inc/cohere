@@ -1,14 +1,15 @@
 package adamic
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 func TestUnionWriteRefused(test *testing.T) {
@@ -95,17 +96,77 @@ func TestUnionWriteRefused(test *testing.T) {
 	}
 }
 
-// Every refused form is a Node failure. Removing probe() is the control: the
-// exact same program no longer throws, so a runtime check that always fails is caught.
-func TestUnionWriteNodeProbes(test *testing.T) {
+// nodeRecording is one recorded node run of a program, as testdata/union-write/README.md says it was made:
+// the program's sha256, node's exit status, its stdout lines, and the TypeError line node printed, if any.
+type nodeRecording struct {
+	source string
+	exit   int
+	stdout []string
+	stderr []string
+}
+
+// throws reports whether the run ended in an uncaught TypeError.
+func (recording nodeRecording) throws() bool {
+	return recording.exit != 0 && len(recording.stderr) == 1 && strings.HasPrefix(recording.stderr[0], "TypeError: ")
+}
+
+// readNodeRecording reads the recording at path and holds it to program, the exact text node ran, so a
+// program edited without being recorded again fails here instead of passing on a stale run.
+func readNodeRecording(test *testing.T, path, program string) nodeRecording {
+	test.Helper()
+	bytes, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	recording := nodeRecording{exit: -1}
+	for line := range strings.Lines(string(bytes)) {
+		key, value, _ := strings.Cut(strings.TrimSuffix(line, "\n"), " ")
+		switch key {
+		case "source":
+			recording.source = value
+		case "exit":
+			exit, parseError := strconv.Atoi(value)
+			if parseError != nil {
+				test.Fatalf("%s: exit %q: %v", path, value, parseError)
+			}
+			recording.exit = exit
+		case "stdout":
+			recording.stdout = append(recording.stdout, value)
+		case "stderr":
+			recording.stderr = append(recording.stderr, value)
+		default:
+			test.Fatalf("%s: unknown line %q", path, line)
+		}
+	}
+	if recording.exit < 0 {
+		test.Fatalf("%s: no exit line", path)
+	}
+	sum := sha256.Sum256([]byte(program))
+	if recording.source != hex.EncodeToString(sum[:]) {
+		test.Fatalf("%s records another program than the one beside it; record it again (README.md)", path)
+	}
+	return recording
+}
+
+// Every refused form is a Node failure, read from node's recorded run of the probe (README.md beside the
+// probes says how it was made). Removing probe() is the control: the exact same program no longer throws,
+// so a recording that always throws is caught. The rule must report every probe the recording shows
+// throwing, so the rule's verdict and the runtime's agree probe by probe.
+func TestUnionWriteRecordedProbes(test *testing.T) {
 	test.Parallel()
-	needs.Tool(test, "node", "each probe runs under node to show the write it reports really happens")
 	paths, globError := filepath.Glob("testdata/union-write/*.ts")
 	if globError != nil {
 		test.Fatal(globError)
 	}
 	if len(paths) != 54 {
 		test.Fatalf("got %d probes, want 54", len(paths))
+	}
+	recordings, globError := filepath.Glob("testdata/union-write/*.out")
+	if globError != nil {
+		test.Fatal(globError)
+	}
+	if len(recordings) != 2*len(paths) {
+		test.Fatalf("got %d recordings, want a run and a control for each of %d probes", len(recordings), len(paths))
 	}
 	for _, path := range paths {
 		test.Run(filepath.Base(path), func(test *testing.T) {
@@ -114,24 +175,21 @@ func TestUnionWriteNodeProbes(test *testing.T) {
 			if readError != nil {
 				test.Fatal(readError)
 			}
-			run := func(source string) ([]byte, error) {
-				file := filepath.Join(test.TempDir(), "probe.mts")
-				if writeError := os.WriteFile(file, []byte(source), 0o600); writeError != nil {
-					test.Fatal(writeError)
-				}
-				return exec.Command("node", file).CombinedOutput()
-			}
-			output, runError := run(string(bytes))
-			if runError == nil || !strings.Contains(string(output), "TypeError") {
-				test.Fatalf("want Node TypeError, got %v: %s", runError, output)
-			}
-			control := strings.Replace(string(bytes), "\nprobe();", "", 1)
-			if control == string(bytes) {
+			source := string(bytes)
+			control := strings.Replace(source, "\nprobe();", "", 1)
+			if control == source {
 				test.Fatal("probe control did not change the source")
 			}
-			if output, runError := run(control); runError != nil {
-				test.Fatalf("control: %v: %s", runError, output)
+			stem := strings.TrimSuffix(path, ".ts")
+			probe := readNodeRecording(test, stem+".out", source)
+			if !probe.throws() {
+				test.Fatalf("want Node TypeError, recorded exit %d: %q", probe.exit, probe.stderr)
 			}
+			if recorded := readNodeRecording(test, stem+".control.out", control); recorded.exit != 0 ||
+				len(recorded.stderr) != 0 {
+				test.Fatalf("control: recorded exit %d: %q", recorded.exit, recorded.stderr)
+			}
+			rule_testing.ExpectFindings(test, runAdamic(test, UnionWrite, source), "unionWrite")
 		})
 	}
 }
@@ -490,9 +548,10 @@ func TestUnionWriteLegalNeighbours(test *testing.T) {
 	}
 }
 
+// The delete stays quiet at run time too, read from node's recorded runs (testdata/union-write-legal/README.md):
+// the program prints 0, and its control, without clear(counter), prints 1, so the delete really ran.
 func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
 	test.Parallel()
-	needs.Tool(test, "node", "the delete runs under node to show it stays quiet at run time too")
 	bytes, readError := os.ReadFile("testdata/union-write-legal/delete.ts")
 	if readError != nil {
 		test.Fatal(readError)
@@ -504,21 +563,17 @@ func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
 	rule_testing.ExpectClean(test, runAdamic(test, UnionWrite, source))
 	plant := strings.Replace(source, "delete cell.value", "cell.value = 'text'", 1)
 	rule_testing.ExpectFindings(test, runAdamic(test, UnionWrite, plant), "unionWrite")
-	run := func(source string) string {
-		file := filepath.Join(test.TempDir(), "probe.mts")
-		if writeError := os.WriteFile(file, []byte(source), 0o600); writeError != nil {
-			test.Fatal(writeError)
+	recorded := func(path, program, want string) {
+		recording := readNodeRecording(test, path, program)
+		if recording.exit != 0 || len(recording.stderr) != 0 || strings.Join(recording.stdout, "\n") != want {
+			test.Fatalf("%s: recorded exit %d, stdout %q, stderr %q; want exit 0 printing %s",
+				path, recording.exit, recording.stdout, recording.stderr, want)
 		}
-		output, outputError := exec.Command("node", file).CombinedOutput()
-		if outputError != nil {
-			test.Fatalf("Node: %v: %s", outputError, output)
-		}
-		return strings.TrimSpace(string(output))
 	}
-	if got := run(source); got != "0" {
-		test.Fatalf("delete: got %q, want 0", got)
+	recorded("testdata/union-write-legal/delete.out", source, "0")
+	control := strings.Replace(source, "clear(counter);", "", 1)
+	if control == source {
+		test.Fatal("delete control did not change the source")
 	}
-	if got := run(strings.Replace(source, "clear(counter);", "", 1)); got != "1" {
-		test.Fatalf("delete control: got %q, want 1", got)
-	}
+	recorded("testdata/union-write-legal/delete.control.out", control, "1")
 }
