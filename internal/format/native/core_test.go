@@ -6,7 +6,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 )
 
 // TestByteOrderMarksAndCarriageReturnsMatchTheForkInEveryLanguage: main/core.js strips a byte order
@@ -36,10 +36,8 @@ func TestByteOrderMarksAndCarriageReturnsMatchTheForkInEveryLanguage(test *testi
 	}
 
 	options := format_options.Default()
-	oracle, newPrettierError := prettier.New(options)
-	if newPrettierError != nil {
-		test.Fatal(newPrettierError)
-	}
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	oracle := oracle_testing.Open(test, test.Name()).Formatter(options)
 	formatter := Formatter{Options: options}
 	compared := 0
 	for fileName, source := range sources {
