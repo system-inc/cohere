@@ -446,11 +446,13 @@ func TestALandJobRefusesARedTestNamingIt(test *testing.T) {
 
 // A merge that changes what only Swift's checks judge refuses in the preflight, before anything is laid, measured or
 // tested (#5wj23dd): cohere-swift can't be built in a land job's sandbox, so nothing there would check the change, and
-// the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and command/cohere's Swift
-// files are each refused, named.
+// the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and the Swift files of
+// command/cohere and release's dispatch and packaging are each refused, named.
 func TestALandJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
 	test.Parallel()
-	for _, changed := range []string{"swift_language/Package.swift", "command/cohere/swift_binary.go"} {
+	for _, changed := range []string{"swift_language/Package.swift", "command/cohere/swift_binary.go",
+		"internal/release/dispatch/swift.go", "internal/release/dispatch/swift_tree_state_test.go",
+		"internal/release/packaging/swift_package.go"} {
 		test.Run(changed, func(test *testing.T) {
 			test.Parallel()
 			fixture := newLandJobFixture(test)
@@ -471,6 +473,30 @@ func TestALandJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
 			}
 			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
 				test.Errorf("a merge changing %s ran %q", changed, calls)
+			}
+		})
+	}
+}
+
+// A merge that changes a file beside the Swift ones, in a package whose Swift files the preflight refuses, isn't
+// refused: the guard names Swift's files, never their packages whole.
+func TestALandJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
+	test.Parallel()
+	for _, changed := range []string{"command/cohere/discovery.go", "internal/release/dispatch/progress.go",
+		"internal/release/packaging/checksums.go", "internal/release/dispatch/swiftly.go"} {
+		test.Run(changed, func(test *testing.T) {
+			test.Parallel()
+			fixture := newLandJobFixture(test)
+			worktree := fixture.worktree("a")
+			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a change Go judges\n")
+			fixture.git(worktree, "add", ".")
+			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a change Go judges"))
+			// The fixture scripts no measurement, so the job stops there: what matters is that it got past the
+			// preflight and laid the merge.
+			ran := fixture.landJob(fixture.merged())
+			if strings.Contains(ran.errors, "preflight refused") || strings.Contains(ran.errors, "can't be judged") ||
+				!strings.Contains(ran.errors, "land-job step lay ") {
+				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
 			}
 		})
 	}
