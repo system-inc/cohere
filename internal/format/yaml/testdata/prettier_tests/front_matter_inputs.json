@@ -1,0 +1,20 @@
+{
+ "source": "Prettier's format fixtures with YAML front matter, tests/format/**/*.md, in the Prettier fork (system-inc/prettier, at 54c8b90ae), MIT, see LICENSE; normalized as Prettier's core normalizes a file, each value read by src/main/front-matter/parse.js and trimmed",
+ "vendored": true,
+ "inputs": [
+  {"name":"markdown/front-matter/unicode.md","text":"---\ntitle: \"ABC 漢字 🇯🇵\"\n---\n\n## Retrospective\n","value":"title: \"ABC 漢字 🇯🇵\""},
+  {"name":"markdown/yaml/complex.md","text":"---\n- hello:    world\n-         123\n---\n\n# something\n","value":"- hello:    world\n-         123"},
+  {"name":"markdown/yaml/simple-2.md","text":"---\nhello: world\n---\n\nContent\n","value":"hello: world"},
+  {"name":"markdown/yaml/simple.md","text":"---\nhello: world\n---\n","value":"hello: world"},
+  {"name":"markdown/yaml/trailing-spaces.md","text":"---\n           v spaces\n---         \n\nThis paragraph should be considered part of the _markdown_ instead of *yaml*.\n\n---\n","value":"v spaces"},
+  {"name":"misc/check-ignore-pragma/disabled/markdown/front-matter-with-noformat-pragma.md","text":"---\nsomething\n---\n\n<!-- @noformat -->\n\nI     should      be      formatted       !!\n","value":"something"},
+  {"name":"misc/check-ignore-pragma/disabled/markdown/front-matter-with-noprettier-pragma.md","text":"---\nsomething\n---\n\n<!-- @noprettier -->\n\nI     should      be      formatted       !!\n","value":"something"},
+  {"name":"misc/check-ignore-pragma/markdown/front-matter-with-noformat-pragma.md","text":"---\nsomething\n---\n\n<!-- @noformat -->\n\nI     won't       format       !!\n","value":"something"},
+  {"name":"misc/check-ignore-pragma/markdown/front-matter-with-noprettier-pragma.md","text":"---\nsomething\n---\n\n<!-- @noprettier -->\n\nI     won't       format       !!\n\n","value":"something"},
+  {"name":"misc/embedded-language-formatting/in-markdown/front-matter-pandoc.md","text":"---yaml\n  \ntitle: Hello\nslug: home\n\n...\n\nHello world!\n\n","value":"title: Hello\nslug: home"},
+  {"name":"misc/embedded-language-formatting/in-markdown/issue-16342.md","text":"---\nfoo:\n  - bar1\n\n  - bar2\n\n  - bar3\n---\n\nMarkdown\n","value":"foo:\n  - bar1\n\n  - bar2\n\n  - bar3"},
+  {"name":"misc/insert-pragma/markdown/front-matter.md","text":"---\nsomething\n---\n\n# hello world\n\nsome content some content some content some content\n","value":"something"},
+  {"name":"misc/require-pragma/markdown/front-matter-with-pragma.md","text":"---\nsomething\n---\n\n<!-- @prettier -->\n\nI     should      be      formatted       !!\n","value":"something"},
+  {"name":"misc/require-pragma/markdown/front-matter-without-pragma.md","text":"---\nsomething\n---\n\nI     should      stay      as-is   !!\n","value":"something"}
+ ]
+}
