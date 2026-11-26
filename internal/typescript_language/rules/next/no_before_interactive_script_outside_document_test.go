@@ -326,7 +326,7 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotW
 		{
 			// Pins the document predicate in the direction where the union predicate would report.
 			// `is_document_page` tests a prefix with no trailing dot, so this is exempt upstream,
-			// and `nextjs.IsDocumentFile` requires the dot and would report it. Measured: 0.
+			// and `next_js.IsDocumentFile` requires the dot and would report it. Measured: 0.
 			name:     "a file merely beginning with the word document, which upstream exempts for want of a trailing dot",
 			fileName: "pages/_documentation.tsx",
 			source:   "import Script from \"next/script\";\nexport default function Index() {\n  return <Script strategy=\"beforeInteractive\" />;\n}\n",
@@ -394,7 +394,7 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 		{
 			// Pins the document predicate in the direction where the union predicate would silence.
 			// A `_document.tsx` that is not the immediate child of a pages directory is not the
-			// document to `is_document_page`, and `nextjs.IsDocumentFile` would exempt it.
+			// document to `is_document_page`, and `next_js.IsDocumentFile` would exempt it.
 			name:     "a document named file outside any pages directory, which the union predicate would exempt",
 			fileName: "components/_document.tsx",
 			source:   "import Script from \"next/script\";\nexport default function Index() {\n  return <Script strategy=\"beforeInteractive\" />;\n}\n",

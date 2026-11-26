@@ -1,0 +1,108 @@
+package high_level_intermediate_representation
+
+import (
+	"sort"
+
+	"github.com/system-inc/cohere/modules/mutation_aliasing"
+	"github.com/system-inc/cohere/modules/static_single_assignment"
+)
+
+// nestingItem is one entry in upstream's `assertValidBlockNesting` item list.
+type nestingItem struct {
+	start static_single_assignment.EvaluationOrder
+	end   static_single_assignment.EvaluationOrder
+}
+
+// scopeNestingItems turns a scope range table into nesting items.
+func scopeNestingItems(ranges map[ScopeId]mutation_aliasing.MutableRange) []nestingItem {
+	ids := make([]ScopeId, 0, len(ranges))
+	for id := range ranges {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(left, right int) bool { return ids[left] < ids[right] })
+
+	items := make([]nestingItem, 0, len(ids))
+	for _, id := range ids {
+		items = append(items, nestingItem{ranges[id].Start, ranges[id].End})
+	}
+	return items
+}
+
+// programBlockSubtrees is upstream's `ProgramBlockSubtree` contribution to `assertValidBlockNesting`
+// (bundle lines 20956-20967): for every block with a fallthrough, the span from that block's
+// terminal to the first instruction of the fallthrough.
+func programBlockSubtrees(function *Function) []nestingItem {
+	byId := map[static_single_assignment.BlockId]*BasicBlock{}
+	for _, block := range function.Blocks {
+		if block != nil {
+			byId[block.Id] = block
+		}
+	}
+
+	var items []nestingItem
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		fallthroughId, ok := Fallthrough(block.Terminal)
+		if !ok {
+			continue
+		}
+		fallthroughBlock := byId[fallthroughId]
+		if fallthroughBlock == nil {
+			continue
+		}
+		var end static_single_assignment.EvaluationOrder
+		if len(fallthroughBlock.Instructions) > 0 {
+			if first := function.Instructions[fallthroughBlock.Instructions[0]]; first != nil {
+				end = first.Order
+			}
+		}
+		if end == 0 {
+			end = TerminalOrder(fallthroughBlock.Terminal)
+		}
+		items = append(items, nestingItem{TerminalOrder(block.Terminal), end})
+	}
+	return items
+}
+
+// blockNestingViolations is upstream's `recursivelyTraverseItems` invariant (bundle lines
+// 20917-20950), returning the offenders instead of raising.
+//
+// Upstream asserts `disjoint || nested` and stops on the first failure. Counting instead is the same
+// choice `ValidateScopes` made and for the same reason: a linter that stops on a graph it dislikes
+// is worse than one that declines a function, and a count is what a measurement needs.
+func blockNestingViolations(scopes, blocks []nestingItem) int {
+	items := make([]nestingItem, 0, len(scopes)+len(blocks))
+	items = append(items, scopes...)
+	items = append(items, blocks...)
+
+	// Upstream's `rangePreOrderComparator`: earlier start first, then the longer item first, so an
+	// enclosing item is entered before the items it encloses.
+	sort.SliceStable(items, func(left, right int) bool {
+		if items[left].start != items[right].start {
+			return items[left].start < items[right].start
+		}
+		return items[left].end > items[right].end
+	})
+
+	violations := 0
+	var active []nestingItem
+	for _, current := range items {
+		for index := len(active) - 1; index >= 0; index-- {
+			parent := active[index]
+			disjoint := current.start >= parent.end
+			nested := current.end <= parent.end
+			if !disjoint && !nested {
+				violations++
+			}
+			if disjoint {
+				active = active[:index]
+			} else {
+				break
+			}
+		}
+		active = append(active, current)
+	}
+	return violations
+}

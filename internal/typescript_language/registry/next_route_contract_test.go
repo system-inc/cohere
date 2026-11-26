@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
 )
@@ -16,7 +16,7 @@ import (
 // the shapes route files are actually written in: function declarations, async functions, arrow
 // constants, and plain data constants.
 //
-// The paths matter as much as the text. `nextjs.RouteContractExports` decides from the path, so each
+// The paths matter as much as the text. `next_js.RouteContractExports` decides from the path, so each
 // file sits under an `app` segment with the stem Next looks for.
 var nextRouteContractFixtures = map[string]string{
 	"/repository/app/blog/[slug]/page.tsx": `
@@ -105,7 +105,7 @@ export default function sitemap() {
 // naming rule anchors on one, since its message is advice to rename a name that must not change.
 //
 // Every rule runs with nil options, which is the strict case: a consumer that passes no framework
-// list still gets the floor `nextjs.IsRouteContractExport` provides.
+// list still gets the floor `next_js.IsRouteContractExport` provides.
 func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
 	test.Parallel()
 
@@ -116,10 +116,10 @@ func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
 	}
 
 	for filePath, sourceText := range nextRouteContractFixtures {
-		contract := nextjs.RouteContractExports(filePath)
+		contract := next_js.RouteContractExports(filePath)
 		if len(contract) == 0 {
 			test.Fatalf(
-				"%s is not a route file by nextjs.RouteContractExports, so its fixture proves nothing",
+				"%s is not a route file by next_js.RouteContractExports, so its fixture proves nothing",
 				filePath,
 			)
 		}

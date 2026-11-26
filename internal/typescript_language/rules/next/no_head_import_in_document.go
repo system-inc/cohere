@@ -2,7 +2,7 @@ package next
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
@@ -86,7 +86,7 @@ var messageNoHeadImportInDocument = rule.Message{
 // both were measured reporting and not reporting on the release binary before they were written
 // down. The tidier answer is the wrong one and the fixtures pin both directions.
 //
-// `nextjs.IsDocumentFile` is used rather than the neighbouring `nextjs.IsDocumentPage`, and the
+// `next_js.IsDocumentFile` is used rather than the neighbouring `next_js.IsDocumentPage`, and the
 // choice is not a preference. `IsDocumentFile` is that helper's union of the spellings this family
 // drifted into, and its body is this rule's `should_run` transcribed: basename beginning with
 // `_document.`, or basename beginning with `index` while the parent begins with `_document`. Read
@@ -118,7 +118,8 @@ var messageNoHeadImportInDocument = rule.Message{
 // is a forward slash by the time `ctx.SourceFile.FileName()` answers. So the two fixtures were exact
 // duplicates of their forward-slash twins, asserting nothing, and they were deleted rather than left
 // to read as coverage. The separator handling is covered where it can be, in
-// `internal/utilities/nextjs`'s own tests, which call the predicate directly and bypass the harness.
+// `internal/typescript_language/ecmascript/next_js`'s own tests, which call the predicate directly and bypass the
+// harness.
 //
 // A mutant that survives after the fixture written to kill it is not a fixture problem by default.
 //
@@ -138,7 +139,7 @@ var NoHeadImportInDocument = rule.Rule[rule.NoOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Every file that is not the document registers no listener at all rather than testing the
 		// path at every import, which is how upstream spells it too.
-		if !nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {
+		if !next_js.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

@@ -20,9 +20,7 @@ const measureLandingGateVariable = "COHERE_MEASURE_LANDING_GATE"
 // edit loop, and one that names nothing is refused. An entry recorded at or under the budget is refused
 // too, so one cannot be added unmeasured or below the bar; that half judges a number in this file, which no
 // load moves. The live half judges CPU, user plus system time, against a bar a third lower, so the
-// scatter between runs cannot flip it; the wall is logged beside it and judges nothing. An entry whose cost
-// is a corpus skips naming the corpus's variable when it is unset, since its tests then skip and it would
-// read as free.
+// scatter between runs cannot flip it; the wall is logged beside it and judges nothing.
 //
 // The measured half is opt-in, run by the nightly (bench/nightly.zsh) with COHERE_MEASURE_LANDING_GATE set:
 // it judges this desk machine's CPU, so it is a measurement, and no gate runs it (#xc29pnd). The half that
@@ -67,14 +65,7 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 			}
 			needs.OptIn(test, measureLandingGateVariable, "it measures each entry's CPU on this machine, a "+
 				"measurement the nightly makes, not a gate's check")
-			if entry.reads.Name != "" {
-				entry.reads.Root(test)
-			}
-			wall, cpu := measureTests(test, root, entry.pattern, nil)
-			if entry.skippedBy != "" {
-				fastWall, fastCpu := measureTests(test, root, entry.pattern, []string{entry.skippedBy + "=1"})
-				wall, cpu = wall-fastWall, cpu-fastCpu
-			}
+			wall, cpu := measureTests(test, root, entry.pattern)
 			test.Logf(
 				"%s: %.1fs wall, %.1fs CPU now (recorded %.1fs, %.1fs)",
 				entry.pattern,
@@ -98,13 +89,11 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 }
 
 // measureTests runs one package's tests with -count=1 and returns the wall and the CPU, user plus system,
-// of go test and everything it waited for. The fast tier's variable is never inherited, so a measurement
-// in full is in full whatever ran this test; environment adds it where a caller wants it.
+// of go test and everything it waited for.
 //
-// The test binary is built first, untimed, so the CPU is the tests' and never the compiler's: otherwise
-// whichever of an entry's two measurements came first would pay for the build, and the difference between
-// them would read a compile as the entry's cost.
-func measureTests(test *testing.T, root string, pattern string, environment []string) (wall float64, cpu float64) {
+// The test binary is built first, untimed, so the CPU is the tests' and never the compiler's: otherwise the
+// measurement would read a compile as the entry's cost.
+func measureTests(test *testing.T, root string, pattern string) (wall float64, cpu float64) {
 	test.Helper()
 	deadline, hasDeadline := test.Deadline()
 	timeout := "-timeout=" + inheritedTimeout(deadline, hasDeadline, time.Now())
@@ -119,12 +108,6 @@ func measureTests(test *testing.T, root string, pattern string, environment []st
 	// Uncached: this run is the measurement, and a cached pass replays an old result in no time and no CPU.
 	command := exec.Command("go", "test", "-count=1", timeout, pattern)
 	command.Dir = root
-	for _, variable := range os.Environ() {
-		if !strings.HasPrefix(variable, fastTierVariable+"=") {
-			command.Env = append(command.Env, variable)
-		}
-	}
-	command.Env = append(command.Env, environment...)
 	start := time.Now()
 	output, outputError := command.CombinedOutput()
 	if outputError != nil {

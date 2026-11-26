@@ -1,7 +1,9 @@
 // Package uses holds the uses where the port and the original could plausibly disagree. A deprecated function's
 // literals, a selector chain, a file's start, a dot import, and a method of a deprecated type are all judged alike.
-// They differ in one way: a package-level variable after a deprecated function or method, in after_deprecated.go and
-// shapes.go, which the original judges as if inside that declaration and the port judges by its own.
+// They differ in two ways: a package-level variable after a deprecated function or method, in after_deprecated.go and
+// shapes.go, which the original judges as if inside that declaration and the port judges by its own; and a deprecated
+// constant, variable or type's own use of a deprecated object, in deprecated_declarations.go, which the original
+// reports and the port leaves alone, as both leave a deprecated function's.
 package uses
 
 import (

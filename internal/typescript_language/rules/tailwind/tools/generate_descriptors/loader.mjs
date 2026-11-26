@@ -128,13 +128,14 @@ async function loadInferDataType(tailwindModuleUrl) {
  *
  * Defaults to the entry point's directory, so every repository invocation is unchanged.
  *
- * `entryPointArgument` may be a corpus spelling such as `ahra:app/_theme/styles/theme.css` (see
+ * `entryPointArgument` may be a corpus spelling such as `structure:source/theme/styles/global.css` (see
  * `../corpus.mjs`). `entryPoint` is then the file it names, and `recordedEntryPoint` the spelling,
  * which is what a fixture records so it reads the same on every machine. A path inside this
  * repository, such as a public theme under testdata, is recorded relative to it.
  *
  * `resolveRootArgument` may be a spelling too, so a public theme can borrow a private checkout's
- * install with an invocation that reads the same on every machine: `--resolve-root ahra:`.
+ * install with an invocation that reads the same on every machine, or any directory whose node_modules
+ * holds tailwindcss.
  */
 export async function loadDesignSystem(entryPointArgument, resolveRootArgument, entrySourceOverride) {
     const entryPointLocated = locate(entryPointArgument);

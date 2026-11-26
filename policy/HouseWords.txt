@@ -8,11 +8,13 @@ dropstream # DropStream, the ecommerce fulfillment integration platform, https:/
 godword # the proper name of ahra's module, spelled as one word throughout
 lifecycle # an English word cspell's lists lack
 meross # Meross, the smart home device maker, https://www.meross.com
+micromark # micromark, the markdown parser the house ports, https://github.com/micromark/micromark
 midjourney # Midjourney, the image generation lab, https://www.midjourney.com
 pensieve # the proper name of ahra's module, spelled as one word throughout
 pentair # Pentair, the pool and water equipment maker, https://www.pentair.com
 pinterest # Pinterest, the visual discovery platform, https://www.pinterest.com
 planetscale # PlanetScale, the hosted database platform, https://planetscale.com
 ragdoll # a limp physics body, as in ragdoll physics, https://en.wikipedia.org/wiki/Ragdoll_physics
+staticcheck # Staticcheck, the Go linter the house ports, https://staticcheck.dev
 waitlist # an English word cspell's lists lack
 wattbox # WattBox, Snap One's power management brand, https://www.snapav.com/shop/en/snapav/brands/wattbox

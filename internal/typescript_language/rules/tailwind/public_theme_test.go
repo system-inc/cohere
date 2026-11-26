@@ -10,10 +10,10 @@ import (
 	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind/vendored"
 )
 
-// The public twins of Tailwind assertions that needed a shape only a repository's own stylesheet had
-// (#f598zk0, tiers B and C). Each live original stays where it is, opt-in through its corpus; the twin asks the
-// same question of collapse/testdata/public_theme, which declares the shape on purpose, so it runs on
-// every machine and fails where the original would have skipped.
+// Tailwind assertions that need a shape only a repository's own stylesheet has (#f598zk0, tiers B and C), asked
+// of collapse/testdata/public_theme, which declares each shape on purpose, so they run on every machine. They
+// began as twins of originals that read a consumer's checkout, and replaced them when cohere's tests stopped
+// reading other repositories (#5wj23dd).
 
 // publicThemeSystem is the public theme's design system, over the vendored tailwindcss.
 func publicThemeSystem(test *testing.T) DesignSystemResult {
@@ -32,12 +32,10 @@ func publicThemeSystem(test *testing.T) DesignSystemResult {
 	return loadedDesignSystemResult(system, entryPoint)
 }
 
-// themeSystems are the public theme and ahra's, for an assertion whose expectations were measured on
-// both and agree (#f598zk0, tier C): it runs the same expectations on each, the public one everywhere and
-// ahra's opt-in through its corpus.
+// themeSystems are the themes an assertion whose expectations hold on any theme runs on (#f598zk0, tier C): the
+// public theme, everywhere.
 var themeSystems = []tailwindSystem{
 	{name: "public", load: publicThemeSystem},
-	{name: "ahra", load: classOrderLiveRepositorySystem},
 }
 
 // forEachThemeSystem runs an assertion once per theme system, each as its own subtest.
@@ -51,8 +49,9 @@ func forEachThemeSystem(test *testing.T, run func(test *testing.T, designSystem 
 	}
 }
 
-// TestClassOrderReadsTheRepositoryOnThePublicTheme is TestClassOrderLiveReadsTheRepositoryRatherThanATable's
-// twin: a static `@utility` only the stylesheet declares gets a key, from the design system and not a table.
+// TestClassOrderReadsTheRepositoryOnThePublicTheme is the control that class order reads the repository: a static
+// `@utility` only the stylesheet declares gets a key, from the design system and not a table, so a sort that silently
+// kept reading generated tables fails here while every other order test stays green.
 func TestClassOrderReadsTheRepositoryOnThePublicTheme(test *testing.T) {
 	test.Parallel()
 	designSystem := publicThemeSystem(test)
@@ -72,8 +71,9 @@ func TestClassOrderReadsTheRepositoryOnThePublicTheme(test *testing.T) {
 	}
 }
 
-// TestExistenceIsNotReadFromPropertyTablesOnThePublicTheme is TestExistenceIsNotReadFromPropertyTables'
-// twin. `glow-soft` declares only a custom property, so it exists and no property table can say so.
+// TestExistenceIsNotReadFromPropertyTablesOnThePublicTheme is the known-dirty control for existence: the property
+// tables leave out utilities that declare nothing a rule can compare, so reading existence from them reports valid
+// classes. `glow-soft` declares only a custom property, so it exists and no property table can say so.
 func TestExistenceIsNotReadFromPropertyTablesOnThePublicTheme(test *testing.T) {
 	test.Parallel()
 	designSystem := publicThemeSystem(test)
@@ -93,9 +93,8 @@ func TestExistenceIsNotReadFromPropertyTablesOnThePublicTheme(test *testing.T) {
 	}
 }
 
-// TestExistenceComesFromTheRepositoryOnThePublicThemes is TestExistenceComesFromTheRepositoryRatherThanATable's
-// twin, with the public theme in ahra's place: two design systems that declare different `@utility`
-// blocks must disagree about them, which a generated table cannot do.
+// TestExistenceComesFromTheRepositoryOnThePublicThemes asks two design systems that declare different `@utility`
+// blocks about them, and requires them to disagree, which a rule reading a generated table cannot do.
 func TestExistenceComesFromTheRepositoryOnThePublicThemes(test *testing.T) {
 	test.Parallel()
 	public := publicThemeSystem(test).System
@@ -126,9 +125,8 @@ func TestExistenceComesFromTheRepositoryOnThePublicThemes(test *testing.T) {
 	}
 }
 
-// TestRepositoryNamesAreNoLongerVouchedForOnThePublicThemes is
-// TestRepositoryNamesAreNoLongerVouchedForByTheFramework's twin: names one stylesheet declares are
-// known there and unknown on a system that does not declare them.
+// TestRepositoryNamesAreNoLongerVouchedForOnThePublicThemes: names one stylesheet declares are known there and
+// unknown on a system that does not declare them, so no repository's tokens ride the framework's tables.
 func TestRepositoryNamesAreNoLongerVouchedForOnThePublicThemes(test *testing.T) {
 	test.Parallel()
 	public := publicThemeSystem(test).System
@@ -144,9 +142,9 @@ func TestRepositoryNamesAreNoLongerVouchedForOnThePublicThemes(test *testing.T) 
 	}
 }
 
-// TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme is TestClassOrderRanksByTheReadingThatCompiles'
-// twin (#f598zk0, tier C). The wanted orders are Prettier's Tailwind plugin (0.8.1) over the public
-// theme, measured the way the original's were over ahra's: each list formatted as a className with
+// TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme: a class ranks by the first of its readings that
+// compiles, and a class none of whose readings compile is a null (#f598zk0, tier C). The wanted orders are
+// Prettier's Tailwind plugin (0.8.1) over the public theme: each list formatted as a className with
 // tailwindStylesheet set to collapse/testdata/public_theme/theme.css.
 //
 // `shadow--0` reads first as the theme's `@utility shadow--*` with value `0`, needing a `--shadow-0` the
@@ -184,8 +182,8 @@ func TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme(test *testing.T
 	}
 }
 
-// TestClassExistenceAsksTheEvaluatorForRepositoryRootsOnThePublicTheme is
-// TestClassExistenceAsksTheEvaluatorForRepositoryRoots' twin. The answers are Tailwind's
+// TestClassExistenceAsksTheEvaluatorForRepositoryRootsOnThePublicTheme: existence asks the evaluator for a
+// repository root rather than trusting it, and takes any reading that resolves. The answers are Tailwind's
 // `candidatesToCss` over the public theme: `tone--0-4` has no `--color-tone-0-4`, `surface--2/50` puts a
 // modifier on a utility that takes none, `shadow--0` is reached only by its second reading, and
 // `prose-flow` declares nothing at its own level and still generates CSS.
@@ -205,10 +203,9 @@ func TestClassExistenceAsksTheEvaluatorForRepositoryRootsOnThePublicTheme(test *
 	}
 }
 
-// TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme is TestRepositoryUtilityRootsAreNeverReported's
-// twin, and fails where the original skips: every class here reads as a root the theme declares by
-// `@utility`, so each one is checked, and a theme that stopped declaring them is a failure rather than a
-// skip.
+// TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme: a repository's own `@utility` root is never reported,
+// whatever its value looks like. Every class here reads as a root the theme declares by `@utility`, so each one is
+// checked, and a theme that stopped declaring them is a failure rather than a skip.
 func TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme(test *testing.T) {
 	test.Parallel()
 	system := publicThemeSystem(test).System
@@ -237,10 +234,11 @@ func TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme(test *testing.T)
 	}
 }
 
-// TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme is TestClassOrderLiveDeclinesNoList's question
-// on the public theme (#f598zk0): `pane`, `rail`, `appear`, `swell` and `drift-up` are each declared as a
-// static `@utility` and as a functional one, and a list holding both forms is placed and sorted, never
-// declined. The wanted orders are Prettier's Tailwind plugin (0.8.1) over the public theme.
+// TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme pins that a root declared both ways never costs a list
+// its order (#f598zk0): `pane`, `rail`, `appear`, `swell` and `drift-up` are each declared as a static `@utility`
+// and as a functional one, and a list holding both forms is placed and sorted, never declined. A design system that
+// kept one kind per root once declined a consumer's list on `data-[show=false]:fade-out` this way. The wanted
+// orders are Prettier's Tailwind plugin (0.8.1) over the public theme.
 func TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme(test *testing.T) {
 	test.Parallel()
 	designSystem := publicThemeSystem(test)
@@ -268,8 +266,8 @@ func TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme(test *testing.T) 
 	}
 }
 
-// TestRepositoryUtilitiesAreCompiledOnThePublicTheme is TestRepositoryUtilitiesAreCompiledRatherThanLookedUp's
-// repository half on the public theme (#f598zk0): a class the theme declares by `@utility` is answered by
+// TestRepositoryUtilitiesAreCompiledOnThePublicTheme is the repository half of no-conflicting-classes on the
+// public theme (#f598zk0): a class the theme declares by `@utility` is answered by
 // compiling that block, to the property the block sets, and the same class on a design system that does
 // not declare it is not compiled there. `appear-50` sets only a custom property, which is not a property
 // a conflict can be about, so the repository half declines it rather than answering with nothing.
@@ -305,5 +303,36 @@ func TestRepositoryUtilitiesAreCompiledOnThePublicTheme(test *testing.T) {
 	if _, compiledElsewhere := repositoryClassFacts("surface--2", "", independent); compiledElsewhere {
 		test.Error("surface--2 was answered by compiling a block on a design system that declares none, so " +
 			"the repository half is not reading the repository in front of the rule")
+	}
+}
+
+// TestColorTokensReadAsColorsOnThePublicTheme: a repository's own colour tokens are recognised as colours,
+// which a generated table could not do. `valueIsColorIn` once read `ColorNames`, names generated from one
+// consumer, and a theme declaring a colour the table lacked read `bg-brand` on the wrong arm,
+// `background-image` rather than `background-color`, so it failed to conflict with `bg-red-500`. Asked of
+// the independent theme, so it runs on every machine (#f598zk0): every `--color-*` key reads as a colour,
+// the framework palette's and the theme's own `--color-weird-*` alike.
+func TestColorTokensReadAsColorsOnThePublicTheme(test *testing.T) {
+	test.Parallel()
+	system := publicDesignSystem(test).System
+
+	checkedTokens, ownTokens := 0, 0
+	for _, key := range system.Theme().KeysInNamespaces([]string{"--color"}) {
+		if !valueIsColorIn("bg-"+key, "bg", system) {
+			test.Errorf("the public theme declares --color-%s and `bg-%s` does not read as a colour", key, key)
+		}
+		checkedTokens++
+		if strings.HasPrefix(key, "weird-") {
+			ownTokens++
+		}
+	}
+	// The theme's own keys are the ones no framework table could vouch for, so they must be among
+	// those checked, or the test proves only the palette.
+	if checkedTokens < 200 || ownTokens != 2 {
+		test.Fatalf(
+			"checked %d colour tokens, %d of them the theme's own; want the framework palette and both --color-weird keys",
+			checkedTokens,
+			ownTokens,
+		)
 	}
 }

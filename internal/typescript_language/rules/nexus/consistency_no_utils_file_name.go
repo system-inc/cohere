@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -87,7 +87,7 @@ func typeScriptFileNameWords(projectRoot string, filePath string) (string, []str
 	}
 	fileName := path.Base(filePath)
 	baseName, _, _ := strings.Cut(fileName, ".")
-	if nextjs.IsConventionFile(baseName) || nextjs.IsWrittenByNext(fileName) {
+	if next_js.IsConventionFile(baseName) || next_js.IsWrittenByNext(fileName) {
 		return "", nil, false
 	}
 	words, judged := file_name_words.Words(fileName, file_name_words.LanguageTypeScript)

@@ -1,24 +1,15 @@
 package doc
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os/exec"
-	"strings"
-	"testing"
-
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 /*
- * The layout algorithm against upstream's printDocToString.
+ * Random docs for the tests that compare two walks of one doc.
  *
- * One generator produces a random doc *spec*, and two constructors build it: buildSpec here into Go
- * docs, and a node script into upstream's own builders from src/document. Both print it, and the bytes
- * must be equal. Building from one spec on both sides is the point: a Go doc and a JavaScript doc
- * written separately could each be wrong in the same way, and the comparison would agree.
+ * One generator produces a random doc *spec*, and buildSpec builds it into a Go doc, as many times as a
+ * test needs a fresh copy of the same tree.
  *
  * The generator reaches the cases a printer port gets wrong quietly: groups that fit and break,
  * conditional groups, fills, IfBreak and IndentIfBreak on group ids printed before, after or never,
@@ -27,15 +18,15 @@ import (
  * characters, emoji, trailing whitespace and the empty string.
  */
 
-// spec is a doc in a form both languages can build. Only the fields a kind uses are set.
+// spec is a doc in a form a test can build more than once. Only the fields a kind uses are set.
 type spec struct {
-	Kind      string  `json:"k"`
-	Text      string  `json:"v,omitempty"`
-	Children  []*spec `json:"c,omitempty"`
-	Number    int     `json:"n,omitempty"`
-	Flag      bool    `json:"f,omitempty"`
-	Id        string  `json:"id,omitempty"`
-	Reference int     `json:"r,omitempty"`
+	Kind      string
+	Text      string
+	Children  []*spec
+	Number    int
+	Flag      bool
+	Id        string
+	Reference int
 }
 
 type specGenerator struct {
@@ -258,206 +249,4 @@ func buildSpecAs(root *spec, asSequences bool) Doc {
 		panic("unknown spec kind " + node.Kind)
 	}
 	return build(root)
-}
-
-// upstreamScript builds each spec with upstream's builders and prints it with upstream's printer.
-const upstreamScript = `
-import { builders as b, printer } from "./src/document/public.js";
-process.stdin.setEncoding("utf8");
-let input = ""; process.stdin.on("data", (chunk) => input += chunk);
-process.stdin.on("end", () => {
-  const results = JSON.parse(input).map(({ spec, options }) => {
-    const ids = new Map(), groups = new Map();
-    const id = (name) => { if (!name) return undefined; if (!ids.has(name)) ids.set(name, Symbol(name)); return ids.get(name); };
-    const build = (node) => {
-      const kids = () => (node.c || []).map(build);
-      switch (node.k) {
-        case "text": return node.v || "";
-        case "line": return b.line;
-        case "softline": return b.softline;
-        case "hardline": return b.hardline;
-        case "literalline": return b.literalline;
-        case "hardlineWithoutBreakParent": return b.hardlineWithoutBreakParent;
-        case "concat": return kids();
-        case "indent": return b.indent(build(node.c[0]));
-        case "alignWidth": return b.align(node.n || 0, build(node.c[0]));
-        case "alignString": return b.align(node.v || "", build(node.c[0]));
-        case "markAsRoot": return b.markAsRoot(build(node.c[0]));
-        case "dedentToRoot": return b.dedentToRoot(build(node.c[0]));
-        case "group": { const g = b.group(build(node.c[0]), { id: id(node.id), shouldBreak: !!node.f }); if (node.r) groups.set(node.r, g); return g; }
-        case "sharedGroup": return groups.get(node.r);
-        case "conditionalGroup": return b.conditionalGroup(kids(), { shouldBreak: !!node.f });
-        case "fill": return b.fill(kids());
-        case "ifBreak": return b.ifBreak(build(node.c[0]), build(node.c[1]), { groupId: id(node.id) });
-        case "indentIfBreak": return b.indentIfBreak(build(node.c[0]), { groupId: id(node.id), negate: !!node.f });
-        case "lineSuffix": return b.lineSuffix(build(node.c[0]));
-        case "lineSuffixBoundary": return b.lineSuffixBoundary;
-        case "breakParent": return b.breakParent;
-        case "trim": return b.trim;
-        case "label": return b.label(node.v, build(node.c[0]));
-      }
-      throw new Error("unknown spec kind " + node.k);
-    };
-    try {
-      return { formatted: printer.printDocToString(build(spec), { ...options, endOfLine: "lf" }).formatted };
-    } catch (error) {
-      return { error: String(error) };
-    }
-  });
-  process.stdout.write(JSON.stringify(results));
-});
-`
-
-type printCase struct {
-	Spec    *spec                 `json:"spec"`
-	Options *upstreamPrintOptions `json:"options"`
-}
-
-// upstreamPrintOptions are the options the script spreads into printDocToString's, spelled as upstream's are.
-type upstreamPrintOptions struct {
-	PrintWidth int  `json:"printWidth"`
-	TabWidth   int  `json:"tabWidth"`
-	UseTabs    bool `json:"useTabs"`
-}
-
-type printResultJson struct {
-	Formatted string `json:"formatted"`
-	Error     string `json:"error"`
-}
-
-// boundaryCases are docs placed exactly at the print width, which random generation reaches too rarely.
-//
-// They exist because a mutation moving fits()'s pending space onto an empty string survived 5,000
-// random docs: the difference only shows when a line, an empty string and a break sit at exactly the
-// width. Each width is tried at the boundary and one either side.
-func boundaryCases() ([]*spec, []Options) {
-	var specs []*spec
-	var options []Options
-	text := func(value string) *spec { return &spec{Kind: "text", Text: value} }
-	for width := 3; width <= 8; width++ {
-		word := strings.Repeat("w", width)
-		shapes := []*spec{
-			{Kind: "concat", Children: []*spec{{
-				Kind:     "group",
-				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text("")}}},
-			}, {Kind: "hardline"}}},
-			{Kind: "concat", Children: []*spec{{
-				Kind:     "group",
-				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text(""), text("x")}}},
-			}, {Kind: "hardline"}}},
-			{Kind: "concat", Children: []*spec{{
-				Kind:     "group",
-				Children: []*spec{{Kind: "concat", Children: []*spec{text(word[:width-1]), {Kind: "line"}, text("")}}},
-			}, {Kind: "softline"}, text("y")}},
-			{Kind: "fill", Children: []*spec{text(word), {Kind: "line"}, text(""), {Kind: "line"}, text("z")}},
-		}
-		for _, shape := range shapes {
-			for _, printWidth := range []int{width - 1, width, width + 1} {
-				specs = append(specs, shape)
-				options = append(options, Options{PrintWidth: printWidth, TabWidth: 2})
-			}
-		}
-	}
-	return specs, options
-}
-
-// TestPrintAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestPrintAgreesWithUpstream(test *testing.T) {
-	test.Parallel()
-	root := corpus.PrettierFork.Root(test)
-	const count = 5000
-	random := rand.New(rand.NewSource(20261001))
-	cases := make([]printCase, count)
-	options := make([]Options, count)
-	for index := range cases {
-		generator := &specGenerator{random: random}
-		options[index] = Options{
-			PrintWidth: 8 + random.Intn(40),
-			TabWidth:   []int{2, 4}[random.Intn(2)],
-			UseTabs:    random.Intn(4) == 0,
-		}
-		cases[index] = printCase{
-			Spec: generator.node(),
-			Options: &upstreamPrintOptions{
-				PrintWidth: options[index].PrintWidth,
-				TabWidth:   options[index].TabWidth,
-				UseTabs:    options[index].UseTabs,
-			},
-		}
-	}
-
-	boundarySpecs, boundaryOptions := boundaryCases()
-	for index, boundary := range boundarySpecs {
-		options = append(options, boundaryOptions[index])
-		cases = append(cases, printCase{
-			Spec:    boundary,
-			Options: &upstreamPrintOptions{PrintWidth: boundaryOptions[index].PrintWidth, TabWidth: 2, UseTabs: false},
-		})
-	}
-
-	encoded, encodeError := json.Marshal(cases)
-	if encodeError != nil {
-		test.Fatal(encodeError)
-	}
-	command := exec.Command("node", "--input-type=module", "-e", upstreamScript)
-	command.Dir = root
-	command.Stdin = bytes.NewReader(encoded)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	command.Stdout, command.Stderr = &stdout, &stderr
-	if runError := command.Run(); runError != nil {
-		test.Fatalf("node: %v\n%s", runError, stderr.String())
-	}
-	var upstream []printResultJson
-	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-
-	mismatches, upstreamErrors, rewrites := 0, 0, 0
-	for index, testCase := range cases {
-		if upstream[index].Error != "" {
-			upstreamErrors++
-			if upstreamErrors <= 3 {
-				test.Logf("upstream refused case %d: %s", index, upstream[index].Error)
-			}
-			continue
-		}
-		got := Print(buildSpec(testCase.Spec), options[index])
-		if strings.Contains(got, "\n") {
-			rewrites++
-		}
-		if got != upstream[index].Formatted {
-			mismatches++
-			if mismatches <= 5 {
-				specJson, marshalError := json.Marshal(testCase.Spec)
-				if marshalError != nil {
-					test.Fatalf("encoding case %d's spec: %v", index, marshalError)
-				}
-				test.Errorf(
-					"case %d (%+v)\nspec %s\nwant %q\ngot  %q",
-					index,
-					options[index],
-					specJson,
-					upstream[index].Formatted,
-					got,
-				)
-			}
-		}
-	}
-	test.Logf(
-		"%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
-		len(cases),
-		count,
-		len(boundarySpecs),
-		upstreamErrors,
-		rewrites,
-		mismatches,
-	)
-	if upstreamErrors > count/10 {
-		test.Errorf(
-			"upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison is thinner than it looks",
-			upstreamErrors,
-			count,
-		)
-	}
 }

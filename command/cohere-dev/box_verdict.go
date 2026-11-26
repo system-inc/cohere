@@ -112,10 +112,6 @@ type boxVerdict struct {
 	box string
 	// job is the land-gate job whose box ran the tests, empty when a gate box or a stand-in did.
 	job string
-	// corpora names the corpora the box held, each at its commit, and unlaidCorpora says of each corpus she didn't
-	// hold why it wasn't laid (#5r0vrte). Both are the road's to set; only a gate box holds corpora.
-	corpora       string
-	unlaidCorpora []string
 	// packagesReported is every package the run ended, by import path, in order: each pass, each fail and each
 	// package-level skip, a package with no test files. A split gate holds each half's to exactly the packages it was
 	// given (gate_split.go).
@@ -485,8 +481,6 @@ func runBoxGate(
 	var runError error
 	box := ""
 	job := ""
-	corporaLaid := ""
-	unlaidCorpora := []string{}
 	// wholeBecause is why a gate that would have split runs whole, empty when it splits or was never to.
 	wholeBecause := ""
 	switch setting {
@@ -503,11 +497,6 @@ func runBoxGate(
 		if splitError != nil {
 			return boxVerdict{}, splitError.Error()
 		}
-		corpora, unlaid, corporaError := gateCorpora(worktree, commit)
-		if corporaError != nil {
-			return boxVerdict{}, "the corpora this landing pins can't be read: " + corporaError.Error()
-		}
-		corporaLaid, unlaidCorpora = corporaNamed(corpora), unlaid
 		pin, unavailable := feedGateCommit(worktree, commit)
 		if unavailable != "" {
 			return boxVerdict{}, unavailable
@@ -521,15 +510,14 @@ func runBoxGate(
 			return boxVerdict{}, "the gate's patterns list no package, so no box was sent one"
 		}
 		if splitting && len(boxes) >= 2 {
-			split := runSplitGate(worktree, commit, pin, listing, races, corpora, boxes)
+			split := runSplitGate(worktree, commit, pin, listing, races, boxes)
 			if split.whole == nil {
-				split.verdict.corpora, split.verdict.unlaidCorpora = corporaLaid, unlaidCorpora
 				return split.verdict, split.unavailable
 			}
 			boxes, wholeBecause = split.whole, split.because
 		}
-		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, pin, listing.packages, races, corpora,
-			boxes, wait)
+		output, box, unavailable, runError = runOnGateBoxes(worktree, commit, pin, listing.packages, races, boxes,
+			wait)
 		if unavailable != "" {
 			return boxVerdict{}, unavailable
 		}
@@ -562,7 +550,6 @@ func runBoxGate(
 		return boxVerdict{}, refusal
 	}
 	verdict.job = job
-	verdict.corpora, verdict.unlaidCorpora = corporaLaid, unlaidCorpora
 	if wholeBecause != "" {
 		verdict.wholeBecause = wholeBecause + ", so the whole gate ran on " + box
 	}
@@ -675,6 +662,42 @@ func (verdict boxVerdict) timingReport() string {
 	return strings.Join(parts, "; ")
 }
 
+// skippedOnLanding reads a landing body's count of tests skipped on its gate boxes, its land line's ", N skipped on".
+var skippedOnLanding = regexp.MustCompile(`, ([0-9]+) skipped on `)
+
+// previousSkipped is how many tests main's last landing skipped on its gate boxes, read from its body, and -1 when its
+// body says no count, a landing from before the gate said one.
+func previousSkipped(worktree string) int {
+	// Ignored: a main with no landing body to read has no count to compare, which skipJump reads as -1.
+	body, _ := gitOutput(worktree, "log", "-1", "--first-parent", "--format=%b", "main")
+	if strings.Contains(body, ", nothing it skipped") {
+		return 0
+	}
+	found := skippedOnLanding.FindStringSubmatch(body)
+	if found == nil {
+		return -1
+	}
+	// Ignored: the pattern holds only digits.
+	count, _ := strconv.Atoi(found[1])
+	return count
+}
+
+// skipJumpFloor is the least growth in skipped tests skipJump calls a jump, so a handful more on a small count never
+// reads as one.
+const skipJumpFloor = 20
+
+// skipJump says, loudly, when a gate skipped far more tests than main's last landing did: more than twice as many and
+// at least skipJumpFloor more. 196 against 10 printed and changed nothing twice (#3kpxrdt); a jump that large is a
+// gate that stopped running something, not a box that lacked a tool. It is empty when there is no jump or no count to
+// compare.
+func skipJump(now int, before int) string {
+	if before < 0 || now <= 2*before || now-before < skipJumpFloor {
+		return ""
+	}
+	return fmt.Sprintf("look before trusting this green: %d tests skipped, against %d at main's last landing, so "+
+		"something this gate used to run ran nowhere", now, before)
+}
+
 // failureReport is each failed test and package with its output, and each package's timeout whole, every goroutine's
 // stack included, so a timeout names what it was waiting on.
 func (verdict boxVerdict) failureReport() string {
@@ -738,6 +761,15 @@ func runModuleTests(
 			"fall back to Kirk's Mac: %s\n", unavailable)
 		return 1, ""
 	}
+	return verdictLine(worktree, covered, verdict, sharedBoxTrust)
+}
+
+// verdictLine says a box's verdict on a landing's tests, read whole (readBoxRun), and returns the exit code and where
+// they ran, as the land line says it after what was tested, trust saying what the verdict holds against: a refusal, a
+// failing test or a failing -race run refuses the landing, saying why, and a pass is said with its packages, the tests
+// it skipped or never compiled and where its time went. The land job says its own verdict through it too
+// (land_job_run.go).
+func verdictLine(worktree string, covered project.Workspace, verdict boxVerdict, trust string) (int, string) {
 	if verdict.refused != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s refused to test this landing, so nothing landed: %s\n",
 			verdict.box, verdict.refused)
@@ -772,15 +804,15 @@ func runModuleTests(
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s's tests on %s passed, %d packages\n", verdict.box, platform,
 		verdict.packagesPassed)
-	where := fmt.Sprintf("on %s (%s, %d packages, %s)", verdict.box, platform, verdict.packagesPassed, sharedBoxTrust)
+	where := fmt.Sprintf("on %s (%s, %d packages, %s)", verdict.box, platform, verdict.packagesPassed, trust)
 	// A split gate names which box ran which half (gate_split.go).
 	if verdict.halves != "" {
 		where = fmt.Sprintf("on %s (%s, %d packages: %s, %s)", verdict.box, platform, verdict.packagesPassed,
-			verdict.halves, sharedBoxTrust)
+			verdict.halves, trust)
 	}
 	if verdict.job != "" {
 		where = fmt.Sprintf("on a scratch box (%s, %d packages, %s; land-gate job %s)", platform,
-			verdict.packagesPassed, sharedBoxTrust, verdict.job)
+			verdict.packagesPassed, trust, verdict.job)
 	}
 	if verdict.race != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's -race run passed, %d packages\n", verdict.box,
@@ -812,16 +844,13 @@ func runModuleTests(
 		where += fmt.Sprintf(", %d skipped on %s and run nowhere: %s", len(skipped), verdict.box,
 			strings.Join(skipped, ", "))
 	}
+	if jump := skipJump(len(skipped), previousSkipped(worktree)); jump != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", jump)
+		where += "; " + jump
+	}
 	if optIn := testsNamed(verdict.optIn); len(optIn) > 0 {
 		fmt.Fprintf(streams.Errors, "cohere-dev: opt-in, so run by no gate: %s\n", strings.Join(optIn, ", "))
 		where += "; opt-in, which no gate runs: " + strings.Join(optIn, ", ")
-	}
-	if verdict.corpora != "" {
-		where += "; the corpora laid at their pins: " + verdict.corpora
-	}
-	for _, unlaid := range verdict.unlaidCorpora {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", unlaid)
-		where += "; " + unlaid
 	}
 	if verdict.wholeBecause != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", verdict.wholeBecause)

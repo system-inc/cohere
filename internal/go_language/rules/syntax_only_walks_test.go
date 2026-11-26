@@ -170,10 +170,14 @@ func TestTheRegistrysSyntaxOnlyWalksAreWrapped(test *testing.T) {
 }
 
 // walkedSecond is what analyzer reports, each finding as its position, category and message, over first.go and
-// second.go parsed from sources, under inheritance, the positions table answered as the checker answers it.
-//
-//cohere:ignore consistency-no-any a pass's ResultOf holds each result as any, and inheritance is one
-func walkedSecond(test *testing.T, analyzer *analysis.Analyzer, sources map[string]string, inheritance any) []string {
+// second.go parsed from sources, under inheritance, the positions table answered as the checker answers it. A nil
+// inheritance leaves the pass's result nil, so the rule inherits nothing.
+func walkedSecond(
+	test *testing.T,
+	analyzer *analysis.Analyzer,
+	sources map[string]string,
+	inheritance rule.Inheritance,
+) []string {
 	test.Helper()
 	fileSet := token.NewFileSet()
 	files := []*ast.File{}

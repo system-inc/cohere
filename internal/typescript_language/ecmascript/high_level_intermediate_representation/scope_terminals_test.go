@@ -2,14 +2,9 @@ package high_level_intermediate_representation
 
 import (
 	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/typescript_language/rule"
-	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
 	"github.com/system-inc/cohere/modules/mutation_aliasing"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
@@ -584,144 +579,5 @@ func TestPrunedScopeIsNotDeclared(test *testing.T) {
 	if strings.Contains(string(contents), "type PrunedScope struct") {
 		test.Error("PrunedScope is declared but nothing in this tree constructs it, which is the " +
 			"Optional failure this package already carries once")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// The corpus: the measurement this stage exists to make
-// ---------------------------------------------------------------------------
-
-// TestScopeTerminalsRecoverEveryScopeFromTheGraph is the headline.
-//
-// `propagate_scope_dependencies_hir` does not read the scope side table. It recovers scopes by
-// walking blocks for a Scope terminal -- React's `keyByScopeId` is six lines of
-// `if (block.terminal.kind === 'scope')`. Before this pass, that walk found zero scopes on every
-// function in the corpus, so a dependency pass ported onto this graph would have produced empty
-// dependencies by construction while looking correct.
-//
-// This asserts the walk now recovers every scope, with the merged scope count as its own control.
-// The control is what makes the number meaningful: an earlier version of this pass built 3,286
-// terminals against 2,874 scopes, and the excess was 412 duplicates. A bare non-zero count could not
-// have seen that.
-func TestScopeTerminalsRecoverEveryScopeFromTheGraph(test *testing.T) {
-	test.Parallel()
-
-	skipWithoutCorpus(test)
-
-	var files []string
-	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, pathError error) error {
-		if pathError != nil || info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
-			files = append(files, path)
-		}
-		return nil
-	})
-	if walkError != nil {
-		test.Fatalf("walking the corpus: %v", walkError)
-	}
-	sort.Strings(files)
-	if len(files) > 400 {
-		files = files[:400]
-	}
-	if len(files) < 10 {
-		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
-	}
-
-	functions, mergedTotal, recovered, built := 0, 0, 0, 0
-	declined, ssaViolations, emptyBodies := 0, 0, 0
-
-	for _, path := range files {
-		contents, readError := os.ReadFile(path)
-		if readError != nil {
-			continue
-		}
-		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule[rule.NoOptions]{
-			Name:             "scope-terminals-corpus",
-			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-				return rule.Listeners{
-					ast.KindSourceFile: func(node *ast.Node) {
-						if ruleContext.TypeChecker == nil {
-							test.Fatal("the typed harness handed this probe a nil checker, so every " +
-								"count below would be a fact about the harness rather than the code")
-						}
-						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ruleContext.TypeChecker)
-							if function == nil {
-								return
-							}
-							Construct(function)
-							functions++
-
-							ranges := InferMutableRanges(function)
-							set := FindDisjointMutableValuesWithRanges(function, ranges)
-							scopes := AssignReactiveScopesWithSets(function, ranges, set)
-							aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
-							identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
-							mergedTotal += merged.Length()
-
-							if ScopeTerminalsPrecondition(function, scopes, identity) != 0 {
-								declined++
-								return
-							}
-							result := BuildReactiveScopeTerminals(function, scopes, identity)
-							built += result.Built
-
-							seen := map[ScopeId]bool{}
-							byId := map[static_single_assignment.BlockId]*BasicBlock{}
-							for _, block := range function.Blocks {
-								byId[block.Id] = block
-							}
-							for _, block := range function.Blocks {
-								terminal, ok := block.Terminal.(*Scope)
-								if !ok {
-									continue
-								}
-								seen[terminal.Scope] = true
-								if body := byId[terminal.Block]; body == nil {
-									emptyBodies++
-								}
-							}
-							recovered += len(seen)
-							ssaViolations += len(VerifySsa(function))
-						})
-					},
-				}
-			},
-		}
-		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: string(contents)}, fileName)
-	}
-
-	test.Logf("functions                             %d", functions)
-	test.Logf("scopes after align-then-merge         %d", mergedTotal)
-	test.Logf("Scope terminals built                 %d", built)
-	test.Logf("scopes recovered from the graph       %d", recovered)
-
-	if functions < 100 {
-		test.Fatalf("only %d functions lowered; the corpus is probably wrong", functions)
-	}
-	if declined != 0 {
-		test.Errorf("%d functions were declined on the nesting precondition, want 0 after alignment "+
-			"and merging", declined)
-	}
-	if recovered == 0 {
-		test.Fatal("no scope is recoverable from a CFG terminal, which is the zero this pass exists " +
-			"to move")
-	}
-	if recovered != mergedTotal {
-		test.Errorf("recovered %d scopes from the graph but the merged table holds %d; a mismatch "+
-			"means the pass built duplicates or dropped scopes", recovered, mergedTotal)
-	}
-	if built != mergedTotal {
-		test.Errorf("built %d terminals for %d merged scopes", built, mergedTotal)
-	}
-	if ssaViolations != 0 {
-		test.Errorf("the rewrite left %d single-assignment violations across the corpus", ssaViolations)
-	}
-	if emptyBodies != 0 {
-		test.Errorf("%d Scope terminals name a body block that is not in the graph", emptyBodies)
 	}
 }

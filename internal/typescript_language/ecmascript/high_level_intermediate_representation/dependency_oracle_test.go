@@ -79,9 +79,9 @@ func goldenDependencies(test *testing.T, expectPath string) []string {
 //
 // # Why this exists, and what it replaces
 //
-// `TestHoistableCorpusDistribution` pins 171 deep against 1,435 flat dependencies and its own
-// comment says a gain in `deep` is the over-approximating direction. That is a movement detector,
-// not an oracle: it can say a number changed and cannot say whether the new number is closer to
+// A count of deep against flat dependencies over real code, 171 against 1,435 when this was written,
+// reads a gain in `deep` as the over-approximating direction. That is a movement detector, not an
+// oracle: it can say a number changed and cannot say whether the new number is closer to
 // right. A change that nearly doubled path depth was measured against it and could not be judged.
 //
 // This scores the actual paths against the actual answers, so a depth change is readable as an

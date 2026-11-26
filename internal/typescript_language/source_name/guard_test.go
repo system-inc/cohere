@@ -34,7 +34,7 @@ var tsDecisionsAllowed = map[string]string{
 
 	// A framework's own file convention: Next reads route.ts and its pageExtensions, which can't load .a.
 	"internal/typescript_language/rules/structure/file_context.go: /route.ts": "Next's route handler file convention",
-	"internal/typescript_language/ecmascript/nextjs/contract.go: .ts":         "Next's default pageExtensions",
+	"internal/typescript_language/ecmascript/next_js/contract.go: .ts":        "Next's default pageExtensions",
 
 	// Not a file's extension: what markdown's fenced code names.
 	"internal/format/native/native.go: .ts":                "markdown fence parsers, keyed by the fence's language",

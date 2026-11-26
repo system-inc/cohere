@@ -2,7 +2,7 @@ package next
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/react"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
@@ -38,8 +38,8 @@ var messageNoAsyncClientComponent = rule.Message{
 // # What the gate is
 //
 // A directive, not a path. Several rules in this package gate on which Next.js file a path is, and
-// `internal/utilities/nextjs/paths.go` holds two deliberately disagreeing predicates for that question.
-// Neither applies here: oxc's `run_once` reads `program.directives` and never consults the path, so
+// `internal/typescript_language/ecmascript/next_js/paths.go` holds two deliberately disagreeing predicates for that
+// question. Neither applies here: oxc's `run_once` reads `program.directives` and never consults the path, so
 // this rule runs on every file and decides from the prologue alone. Recorded because the shape of
 // the neighbours invites the wrong assumption.
 //
@@ -90,7 +90,7 @@ var NoAsyncClientComponent = rule.Rule[rule.NoOptions]{
 				}
 
 				sourceFile := node.AsSourceFile()
-				if !nextjs.HasFileDirective(sourceFile, "use client") {
+				if !next_js.HasFileDirective(sourceFile, "use client") {
 					return
 				}
 

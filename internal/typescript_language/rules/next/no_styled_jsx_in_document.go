@@ -3,7 +3,7 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/jsx"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
@@ -53,12 +53,12 @@ var messageNoStyledJsxInDocument = rule.Message{
 // # The document gate, and where it diverges from this rule's own upstream spelling
 //
 // This is the one place the port knowingly disagrees with the rule it was ported from, and it is a
-// disagreement inherited on purpose from `internal/utilities/nextjs`.
+// disagreement inherited on purpose from `internal/typescript_language/ecmascript/next_js`.
 //
 // oxc spells the gate inside this rule as a basename test: `file_name.starts_with("_document.")`,
 // with no directory component at all. The word `pages` appears in this rule's diagnostic text, its
 // doc comment and a doc example, and **never in its executable code**, so `components/_document.tsx`
-// fires upstream. `nextjs.IsDocumentFile` agrees on that and on every other path this rule's own
+// fires upstream. `next_js.IsDocumentFile` agrees on that and on every other path this rule's own
 // spelling decides, including the trailing dot that keeps `_documentation.tsx` silent.
 //
 // It disagrees on exactly one input. The shared helper is the union of the four spellings the family
@@ -81,7 +81,7 @@ var NoStyledJsxInDocument = rule.Rule[rule.NoOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Asked once rather than per element, because it is a property of the file. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
-		if !nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {
+		if !next_js.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

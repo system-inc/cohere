@@ -24,12 +24,6 @@ import (
 
 const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
-// deprecatedReexportSuppression goes on the line above a re-export of a deprecated upstream name, where the
-// re-export's own reference to that name is a use SA1019 would report. The re-export carries upstream's Deprecated
-// paragraph as its own doc, so SA1019 still reports every caller of the shim's name.
-const deprecatedReexportSuppression = "//cohere:ignore SA1019 the shim re-exports upstream whole; " +
-	"a caller of this name is judged where it uses it"
-
 type ExtraShim struct {
 	// ExtraFunctions and ExtraMethods name upstream's unexported functions and methods to re-export by
 	// `//go:linkname`, with no mirror, so the risk is the signature rather than a layout.
@@ -293,14 +287,14 @@ func main() {
 				shimBuilder.WriteString("\n")
 			}
 
-			// A linked function names upstream only inside its directive's text, which SA1019 does not read, so only
-			// a type, constant or variable re-export takes the deprecation and its suppression.
+			// A type, constant or variable re-export of a deprecated name carries upstream's Deprecated paragraph as
+			// its own doc, so SA1019 reports every caller of the shim's name and leaves alone the re-export's own use
+			// of upstream's, as it leaves a deprecated declaration's. A linked function names upstream only inside its
+			// directive's text, which SA1019 does not read, so it takes no deprecation.
 			if deprecation, deprecated := deprecations[name]; deprecated {
 				if _, isFunction := object.(*types.Func); !isFunction {
 					shimBuilder.WriteString("// ")
 					shimBuilder.WriteString(deprecation)
-					shimBuilder.WriteString("\n")
-					shimBuilder.WriteString(deprecatedReexportSuppression)
 					shimBuilder.WriteString("\n")
 				}
 			}

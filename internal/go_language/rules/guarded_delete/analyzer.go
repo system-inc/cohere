@@ -10,15 +10,15 @@
 // directly, reading pattern/match.go for what each construct of the query matches, and reports through
 // staticcheck_report.Report where the original reports through report.Report. Unlike the ports before it, the query's
 // bindings hold syntax, not objects, so its second m, its second key and its second ok are compared with the first as
-// match.go compares two nodes, field by field through reflection, which sameSyntax and sameFields mirror line for
-// line. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
-// the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// match.go compares two nodes, field by field through reflection, by staticcheck_code.SameSyntax, the port of that
+// comparison every port shares. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, and the two differ
+// nowhere they hold.
 package guarded_delete
 
 import (
 	"go/ast"
 	"go/token"
-	"reflect"
 
 	"honnef.co/go/tools/analysis/edit"
 
@@ -26,16 +26,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_report"
-)
-
-// The syntax tree types sameFields skips, found once.
-var (
-	positionType     = reflect.TypeFor[token.Pos]()
-	commentGroupType = reflect.TypeFor[*ast.CommentGroup]()
-	// The comparison names the deprecated ast.Object only to skip its fields, as matchAST does, and matching it by
-	// name as a string would hide that dependency from the compiler.
-	//cohere:ignore SA1019 named only so the comparison can skip these deprecated fields
-	objectType = reflect.TypeFor[*ast.Object]()
 )
 
 // Listener is what the port hears of each package from the dispatcher: every if statement, in preorder.
@@ -104,7 +94,7 @@ func Check(context *rule.Context, statement *ast.IfStmt) {
 	}
 	// `ok` recalls the identifier the initializer bound, which match.go compares with the condition as two nodes: an
 	// identifier, through parentheses, spelled the same, its position and its object never read.
-	if !sameSyntax(found, statement.Cond) {
+	if !staticcheck_code.SameSyntax(found, statement.Cond) {
 		return
 	}
 	call := loneCall(statement.Body.List)
@@ -116,7 +106,8 @@ func Check(context *rule.Context, statement *ast.IfStmt) {
 	// `[m key]` recalls the map and the key the lookup bound, each without its parentheses, as two nodes again: the
 	// same syntax, not the same values, so a key that calls a function is the same key however often it is called,
 	// and two variables spelled alike are one.
-	if !sameSyntax(ast.Unparen(lookup.X), call.Args[0]) || !sameSyntax(ast.Unparen(lookup.Index), call.Args[1]) {
+	if !staticcheck_code.SameSyntax(ast.Unparen(lookup.X), call.Args[0]) ||
+		!staticcheck_code.SameSyntax(ast.Unparen(lookup.Index), call.Args[1]) {
 		return
 	}
 	// The fix prints the call the pattern bound, without the parentheses or the block around it, from its own
@@ -154,177 +145,4 @@ func loneCall(statements []ast.Stmt) *ast.CallExpr {
 			return nil
 		}
 	}
-}
-
-// sameSyntax is whether recalled is the syntax bound holds, as match.go's match compares two syntax values when a
-// binding that holds a node is recalled. Each side sheds what the pattern looks through, the left first, then the
-// right: parentheses, an expression statement, a declaration statement and a labeled statement for what they wrap,
-// and a block and a field list for their lists. Two nodes are then the same field by field, a list and a lone
-// statement or field are a list of one, and an absent value is the same as an absent value alone.
-//
-// Some answers follow from match.go's order rather than from Go's meaning, and are kept since they are the original's:
-// a field with no tag is never the same as another, since an absent tag on the right is compared as an untyped nil
-// with the typed one on the left, so a struct type, an interface with methods or a function type with parameters or
-// results is never the same as itself; and a block of one statement is the same as that statement.
-func sameSyntax(bound any, recalled any) bool {
-	switch node := bound.(type) {
-	case *ast.ParenExpr:
-		return sameSyntax(node.X, recalled)
-	case *ast.ExprStmt:
-		return sameSyntax(node.X, recalled)
-	case *ast.DeclStmt:
-		return sameSyntax(node.Decl, recalled)
-	case *ast.LabeledStmt:
-		return sameSyntax(node.Stmt, recalled)
-	case *ast.BlockStmt:
-		// Only a function declaration's body is ever an absent block, and a binding never holds a declaration.
-		return sameSyntax(node.List, recalled)
-	case *ast.FieldList:
-		if node == nil {
-			return sameSyntax(nil, recalled)
-		}
-		return sameSyntax(node.List, recalled)
-	}
-
-	switch node := recalled.(type) {
-	case *ast.ParenExpr:
-		return sameSyntax(bound, node.X)
-	case *ast.ExprStmt:
-		return sameSyntax(bound, node.X)
-	case *ast.DeclStmt:
-		return sameSyntax(bound, node.Decl)
-	case *ast.LabeledStmt:
-		return sameSyntax(bound, node.Stmt)
-	case *ast.BlockStmt:
-		if node == nil {
-			return sameSyntax(bound, nil)
-		}
-		return sameSyntax(bound, node.List)
-	case *ast.FieldList:
-		if node == nil {
-			return sameSyntax(bound, nil)
-		}
-		return sameSyntax(bound, node.List)
-	case *ast.BasicLit:
-		// An absent literal on the right becomes an untyped nil, which a typed absent one on the left never equals.
-		if node == nil {
-			return sameSyntax(bound, nil)
-		}
-	}
-
-	if bound == nil || recalled == nil {
-		return bound == recalled
-	}
-	boundNode, isBoundNode := bound.(ast.Node)
-	recalledNode, isRecalledNode := recalled.(ast.Node)
-	if isBoundNode && isRecalledNode {
-		return sameFields(boundNode, recalledNode)
-	}
-	// Only a block's and a field list's lists come here as lists, since sameFields compares a node's own lists
-	// itself, so match.go's third kind of list, expressions, never does. As in match.go, a side that is a list of
-	// statements settles the answer as statements, and only then fields are tried.
-	if same, isList := sameAsLists[ast.Stmt](bound, recalled); isList {
-		return same
-	}
-	if same, isList := sameAsLists[*ast.Field](bound, recalled); isList {
-		return same
-	}
-	return false
-}
-
-// sameAsLists compares bound and recalled as lists of Element, as match.go compares a list with a list or a lone
-// element: a lone element on either side is a list of one, and anything else beside a list is never the same. isList
-// is whether either side is a list of Element at all, and only then does same answer.
-func sameAsLists[Element any](bound any, recalled any) (same bool, isList bool) {
-	boundList, isBoundList := bound.([]Element)
-	recalledList, isRecalledList := recalled.([]Element)
-	if !isBoundList && !isRecalledList {
-		return false, false
-	}
-	if !isRecalledList {
-		lone, isElement := recalled.(Element)
-		if !isElement {
-			return false, true
-		}
-		recalledList = []Element{lone}
-	}
-	if !isBoundList {
-		lone, isElement := bound.(Element)
-		if !isElement {
-			return false, true
-		}
-		boundList = []Element{lone}
-	}
-	return sameLists(boundList, recalledList), true
-}
-
-// sameLists is whether two lists are as long and the same element by element.
-func sameLists[Element any](bound []Element, recalled []Element) bool {
-	if len(bound) != len(recalled) {
-		return false
-	}
-	for index := range bound {
-		if !sameSyntax(bound[index], recalled[index]) {
-			return false
-		}
-	}
-	return true
-}
-
-// sameFields is whether two nodes are the same, as match.go's matchAST compares them: of one type, both absent or
-// both present, and then every field the same, positions, comments and the deprecated objects skipped, names and
-// literals by their text, operators, kinds and flags by value, and every node and list of nodes by sameSyntax, so
-// parentheses are looked through at every depth.
-func sameFields(bound ast.Node, recalled ast.Node) bool {
-	boundValue := reflect.ValueOf(bound)
-	recalledValue := reflect.ValueOf(recalled)
-	if boundValue.Type() != recalledValue.Type() {
-		return false
-	}
-	if boundValue.IsNil() || recalledValue.IsNil() {
-		return boundValue.IsNil() == recalledValue.IsNil()
-	}
-	boundValue = boundValue.Elem()
-	recalledValue = recalledValue.Elem()
-	for index := range boundValue.NumField() {
-		boundField := boundValue.Field(index)
-		recalledField := recalledValue.Field(index)
-		if boundField.Type() == positionType || boundField.Type() == objectType ||
-			boundField.Type() == commentGroupType {
-			continue
-		}
-		switch boundField.Kind() {
-		case reflect.Slice:
-			if boundField.Len() != recalledField.Len() {
-				return false
-			}
-			for element := range boundField.Len() {
-				if !sameSyntax(boundField.Index(element).Interface(), recalledField.Index(element).Interface()) {
-					return false
-				}
-			}
-		case reflect.String:
-			if boundField.String() != recalledField.String() {
-				return false
-			}
-		case reflect.Int:
-			// A token, an operator or a literal's kind, and a channel's direction.
-			if boundField.Int() != recalledField.Int() {
-				return false
-			}
-		case reflect.Bool:
-			if boundField.Bool() != recalledField.Bool() {
-				return false
-			}
-		case reflect.Pointer, reflect.Interface:
-			if !sameSyntax(boundField.Interface(), recalledField.Interface()) {
-				return false
-			}
-		default:
-			// Invariant: every field of go/ast's nodes is one of the kinds above, or a position, a comment group or
-			// an object, which are skipped; matchAST panics on any other kind the same way.
-			panic("guarded_delete: a syntax node holds a field of kind " + boundField.Kind().String())
-		}
-	}
-	return true
 }

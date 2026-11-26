@@ -9,7 +9,7 @@
 // Regenerate with:
 //
 //	node internal/typescript_language/rules/tailwind/tools/generate_suggestions/enumerate.mjs \
-//	    --resolve-root ahra: > suggestions.json
+//	    --resolve-root <dir> > suggestions.json
 //	go run ./internal/typescript_language/rules/tailwind/tools/generate_suggestions -input suggestions.json \
 //	    -output internal/typescript_language/rules/tailwind/collapse/framework_suggestions_table.go
 

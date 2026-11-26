@@ -1091,7 +1091,7 @@ func TestConsistencyRequireConstantCasingChecksTheExportedNameForImporters(test 
 }
 
 // TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone covers the floor
-// `nextjs.IsRouteContractExport` sets with no options at all.
+// `next_js.IsRouteContractExport` sets with no options at all.
 //
 // Every clause of this rule would advise on a contract export: PascalCase for `revalidate`, camelCase
 // for an arrow-function `POST`, and dropping the export from a `metadata` nothing imports. Each silent

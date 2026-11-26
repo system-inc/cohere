@@ -647,7 +647,7 @@ by question:
 
     binding      class_members  comments   control_flow_graph   decorators
     high_level_intermediate_representation             imports  jsx
-    literal      module        nextjs     property             react
+    literal      module        next_js    property             react
     reference    regexp        regex_pattern             regex_syntax
     scope        text
 
@@ -1114,7 +1114,7 @@ Scored on `@typescript-eslint/consistent-return`, mutating the rule's `Name` str
     go test ./internal/typescript_language/registry/     CAUGHT, twice
 
 Twice, because two different guards see it: `TestEveryRuleShipsAFixturePair` loses the
-rule's test file, and `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` reports the
+rule's test file, and `TestEveryRegisteredRuleIsReachableFromTheSets` reports the
 renamed name as unreachable from the config. Neither lives in the rule's package and
 neither can.
 
@@ -1857,10 +1857,10 @@ nothing complains. If it is already present, that step is done.
 > is actually registered, and `--lint` names every config key that resolves to nothing.
 
 **Done means enforcing.** A rule registered and enabled nowhere passes every fixture
-and lints zero files. `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` catches
+and lints zero files. `TestEveryRegisteredRuleIsReachableFromTheSets` catches
 this, and it is the one you are most likely to skip, because your own `_test.go` is
 green and that feels like the answer. It is not. Your fixtures prove the rule is
-correct; only the live config proves it is reachable.
+correct; only the sets prove it is reachable.
 
 **Seeing `ctx.scoping()` upstream is not evidence you need the checker.** That table
 answers two different kinds of question and only one of them costs anything:
@@ -1914,8 +1914,8 @@ Most ports land registered and not enabled, because the tree has a cost the rule
 flag and enabling it is a scheduled cleanup rather than a wiring step. That is a normal
 outcome and it is not finished until the guard knows about it.
 
-`TestEveryRegisteredRuleIsReachableFromTheLiveConfig` fails for any registered rule the
-live config cannot resolve, because such a rule passes its own fixtures and lints nothing.
+`TestEveryRegisteredRuleIsReachableFromTheSets` fails for any registered rule the
+sets cannot resolve, because such a rule passes its own fixtures and lints nothing.
 Add an entry to the `deliberatelyNotEnabled` map naming the measured count and why:
 
     "no-continue": "ported and registered, not enabled: 1,191 findings over 3,540 files,

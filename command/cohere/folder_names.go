@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/rule_names"
 	"github.com/system-inc/cohere/internal/settings"
 	"github.com/system-inc/cohere/internal/text_rules/file_name_words"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 )
 
 // A folder's name spells its words out (#zyq63kk). Kirk, Nov 13: "has a folder called docs, i want it to be
@@ -87,7 +87,7 @@ func judgeFolder(relative string, takenWhole func(string) bool) (folderFinding, 
 		return folderFinding{}, false
 	}
 	name := segments[len(segments)-1]
-	if nextjs.IsRoutingFolder(name) {
+	if next_js.IsRoutingFolder(name) {
 		return folderFinding{}, false
 	}
 	parent := ""

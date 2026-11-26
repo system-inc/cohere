@@ -75,12 +75,18 @@ const (
 	performanceReferenceTree = "deeafbf4"
 )
 
-// performanceMarker opens every line the measurement's script prints for Kirk's Mac to read, and
-// performanceRefusedMarker the line it prints when it refuses to measure, its reason after it.
+// performanceMarker opens every line the measurement's script prints for Kirk's Mac to read,
+// performanceRefusedMarker the line it prints when it refuses to measure, its reason after it, and
+// performanceSameBinaryMarker the line it prints, and stops at, when the binary it built is main's.
 const (
-	performanceMarker        = "cohere-dev-performance: "
-	performanceRefusedMarker = performanceMarker + "refused "
+	performanceMarker           = "cohere-dev-performance: "
+	performanceRefusedMarker    = performanceMarker + "refused "
+	performanceSameBinaryMarker = performanceMarker + "the same binary as main's"
 )
+
+// performancePathLine is performanceScript's line setting the path its build and runs read. The land job alone puts the
+// real git's directory first on it (withLandJobGit), so nothing it runs reaches macOS's /usr/bin/git and its xcrun.
+const performancePathLine = `export PATH="$goroot/bin:` + sharedBoxSystemPath + `"`
 
 // The runs the script makes: performanceFills untimed runs before each cold row's rounds fill the binary's system
 // store, the cold rows at the root and at deeafbf4 are timed performanceColdRounds and performanceReferenceRounds
@@ -109,15 +115,19 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 	"milliseconds, the median of the rounds with their minimum and maximum.\n"
 
 // performanceScript is what Shackler runs, from the land that runs it rather than from the tree it measures, so no
-// branch can change how it is measured. Its arguments are the commit, deeafbf4's commit and the counts of fills, cold
-// rounds, deeafbf4's rounds and warm rounds. It works only under performanceScratch:
+// branch can change how it is measured. Its arguments are the commit, deeafbf4's commit, the counts of fills, cold
+// rounds, deeafbf4's rounds and warm rounds, and, from the land job alone, main's binary's sha256
+// (performanceArguments). It works only under performanceScratch:
 //
 //   - It waits for her mirror to hold the commit, as the gate's script does (macBoxMirrorReads).
 //   - It lays the root at the commit and deeafbf4 once, each with its TypeScript at its pin, as #h38e6y7's kit lays
 //     them: clones sharing the mirrors' objects, kept across landings.
 //   - It checks the Go toolchain against its digest (sharedBoxToolchainCheck) and the module cache against go.sum, and
 //     builds the binary with them on a Go cache it keeps under the scratch across landings, so a build compiles only
-//     what changed.
+//     what changed. The module cache is, in a land job (landJobLine), the set the box laid for it when
+//     `GOMODCACHE` names one, read with `GOPROXY=off` and `GOSUMDB=off`, and otherwise a cache of the measurement's
+//     own, filled from the proxy. A binary that is main's, by the sha256 it was handed, says
+//     performanceSameBinaryMarker and stops.
 //   - It makes an empty system store for this binary, says her load before, and runs cohere each time with the
 //     kit's clean environment under /usr/bin/time -l: at the root two untimed fills and the cold rounds, at deeafbf4
 //     two fills and its rounds, at the root one untimed warm run and the warm rounds, and one timeline run. Each run
@@ -126,7 +136,8 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 //
 // Each phase says its milliseconds, so what costs what can be read.
 const performanceScript = `set -euo pipefail
-commit="$1"; reference="$2"; fills="$3"; coldRounds="$4"; referenceRounds="$5"; warmRounds="$6"
+commit="$1"; reference="$2"; fills="$3"; coldRounds="$4"; referenceRounds="$5"; warmRounds="$6"; mainBinary="${7:-}"
+` + landJobLine + `
 ` + macBoxMirrorLine + `
 base=` + performanceScratch + `
 mkdir -p "$base"; cd "$base"
@@ -172,16 +183,33 @@ fi
 rm -f "$safe"; trap - EXIT; unset GIT_CONFIG_GLOBAL
 phase lay
 goroot="` + macBoxGoroot + `"; digest="` + macBoxToolchainDigest + `"
-export PATH="$goroot/bin:` + sharedBoxSystemPath + `"
-` + sharedBoxToolchainCheck + `unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE
+` + performancePathLine + `
+` + sharedBoxToolchainCheck + `# The module set the box laid for a land job, kept before the account's Go settings go.
+# Anywhere else a GOMODCACHE is the account's own, never read.
+laidModules=""
+[ -z "$landJob" ] || laidModules="${GOMODCACHE:-}"
+unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE
 unset GOINSECURE GOSUMDB
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off
 phase toolchain
-# The runs read modules from a cache of the measurement's own, kept under the scratch: loom's account names a cache of
-# its own (GOMODCACHE=~/cache/go-mod on Shackler), and the default held only what this script had downloaded, so
-# deeafbf4's modules were missing and its runs stopped at type errors, which read as a fast row (Nov 21). Every module
-# of both trees' workspaces is downloaded and verified here, before any run, and the runs then go offline.
-export GOMODCACHE="$base/gomodcache"
+# Every module of both trees' workspaces is confirmed and verified here, before any run, and the runs then go offline:
+# a cache that held only some of them left deeafbf4's modules missing, and its runs stopped at type errors, which read
+# as a fast row (Nov 21). A land job has no network, by design, so Loom lays the module set it needs and names it in
+# GOMODCACHE, and a land job's runs read that set with the proxy and the checksum database off: go mod download only
+# confirms each module is there, and offline it fails naming the one that isn't. The checksum database is off because
+# offline it can't answer, and go asks it for a module whose zip hash go.sum doesn't hold, as deeafbf4's older sums
+# can't be made to (J-r0b69ca). A module go.sum holds is held to it, and go mod verify fails one whose bytes changed
+# since the box laid it; one go.sum doesn't hold is trusted as the box laid it. Outside a land job, as on the house
+# Macs and for
+# cohere-dev measure over a gap, or with no set named, the modules come from the proxy into a cache of the
+# measurement's own under the scratch.
+if [ -n "$laidModules" ]; then
+  export GOMODCACHE="$laidModules" GOPROXY=off GOSUMDB=off
+  say "modules the box's laid set at $laidModules, offline"
+else
+  export GOMODCACHE="$base/gomodcache"
+  say "modules this measurement's own cache at $GOMODCACHE, from the proxy"
+fi
 for tree in root deeafbf4; do
   downloaded=$(cd "$tree" && go mod download 2>&1) ||
     refuse "go mod download failed at $tree: $(echo "$downloaded" | tail -n 1)"
@@ -198,7 +226,11 @@ phase build
 say "tested $commit on $(go env GOOS)/$(go env GOARCH)"
 # The binary's digest: a -trimpath build of the same source is the same bytes, so a landing that changed no file the
 # binary compiles builds main's binary again, and its note can say any difference is the box's (#6wnsnq2).
-say "binary $(sha256sum "$base/cohere" | cut -d' ' -f1)"
+binary=$(sha256sum "$base/cohere" | cut -d' ' -f1)
+say "binary $binary"
+# main's binary, when the land job names it (#6ex523f): built again, it is the program main's file already measured,
+# so nothing runs, and the land job keeps main's file.
+if [ -n "$mainBinary" ] && [ "$binary" = "$mainBinary" ]; then echo "` + performanceSameBinaryMarker + `"; exit 0; fi
 say "machine $(sysctl -n hw.ncpu) $(sysctl -n machdep.cpu.brand_string)"
 say "go $(go env GOVERSION)"
 # Her load as gap's own quiet lines read it, and the busiest processes beside it.
@@ -399,21 +431,16 @@ var performanceRows = []struct {
 }
 
 // measurePerformance measures gating, the commit the gate ran on, whose tree is tree, on Shackler, against main's
-// Performance.jsonc at mainCommit, and returns the tree that lands: tree with Performance.jsonc written from the
-// measurement, or tree itself when it has no command/cohere to measure. With it come the sentence the land line and the
-// landing's body say of the measurement, and an exit code, 0 unless it refused the landing, which it has said why.
+// performance file at mainCommit, and returns the tree that lands: tree with the file written from the measurement, or
+// tree itself when it has no command/cohere to measure. With it come the sentence the land line and the landing's body
+// say of the measurement, and an exit code, 0 unless it refused the landing, which it has said why.
 func measurePerformance(worktree string, gating string, tree string, mainCommit string) (string, string, int) {
-	cohereDirectory := strings.TrimPrefix(cohereSource, "./")
-	mode, treeModeError := treeMode(worktree, gating, cohereDirectory)
-	if treeModeError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading whether there is a cohere to measure: %v\n", treeModeError)
-		return "", "", 1
-	}
-	if mode == "" {
-		said := fmt.Sprintf("Nothing measured: %s has no %s, so there is no cohere to time", shortCommit(gating),
-			cohereDirectory)
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
-		return tree, said + ".", 0
+	said, measurable, code := cohereToMeasure(worktree, gating)
+	if !measurable {
+		if code != 0 {
+			return "", "", code
+		}
+		return tree, said, 0
 	}
 	wait, waitError := waitSetting(performanceWaitVariable, os.Getenv(performanceWaitVariable), performanceWaitDefault)
 	if waitError != nil {
@@ -422,19 +449,75 @@ func measurePerformance(worktree string, gating string, tree string, mainCommit 
 	}
 	started := time.Now()
 	output, unavailable, runError := measureOnShackler(worktree, gating, wait)
-	if unavailable != "" {
+	return landMeasurement(worktree, gating, tree, mainCommit, performanceTaken{output: output,
+		unavailable: unavailable, runError: runError, started: started})
+}
+
+// cohereToMeasure says whether gating's tree has a cohere to measure, a command/cohere. A tree without one comes with
+// the sentence the land line and the landing's body say of it, and a tree that can't be read with exit code 1, said.
+func cohereToMeasure(worktree string, gating string) (string, bool, int) {
+	cohereDirectory := strings.TrimPrefix(cohereSource, "./")
+	mode, treeModeError := treeMode(worktree, gating, cohereDirectory)
+	if treeModeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading whether there is a cohere to measure: %v\n", treeModeError)
+		return "", false, 1
+	}
+	if mode == "" {
+		said := fmt.Sprintf("Nothing measured: %s has no %s, so there is no cohere to time", shortCommit(gating),
+			cohereDirectory)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
+		return said + ".", false, 0
+	}
+	return "", true, 0
+}
+
+// performanceTaken is what a measurement's road brought back, the gap to Shackler (measureOnShackler) or the land job's
+// own bash (land_job_run.go): everything the script printed and how it ended, or why it never ran, when it started, and
+// main's binary's sha256 the script was handed, empty when it was handed none.
+type performanceTaken struct {
+	output      []byte
+	unavailable string
+	runError    error
+	started     time.Time
+	mainBinary  string
+}
+
+// landMeasurement is the rest of measurePerformance once a road has measured gating: the tree that lands, tree with the
+// performance file written from what the script said and its note against main's at mainCommit, the sentence said of
+// it, and an exit code, 0 unless it refused the landing, said. When the script said the binary it built is main's,
+// mainBinary, main's file stays as it is, and the sentence says so.
+func landMeasurement(
+	worktree string,
+	gating string,
+	tree string,
+	mainCommit string,
+	taken performanceTaken,
+) (string, string, int) {
+	if taken.unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no measurement from %s, and nothing lands unmeasured: %s\n",
-			performanceBox, unavailable)
+			performanceBox, taken.unavailable)
 		return "", "", 1
 	}
-	measurement, problem := readPerformance(output, gating, runError)
-	if problem != "" {
+	refused := func(problem string) (string, string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's measurement refused the landing, and nothing lands unmeasured: "+
 			"%s\n", performanceBox, problem)
 		return "", "", 1
 	}
+	if taken.mainBinary != "" {
+		same, problem := sameBinaryAsMain(taken.output, gating, taken.mainBinary, taken.runError)
+		if problem != "" {
+			return refused(problem)
+		}
+		if same {
+			return keepMainsPerformance(worktree, gating, tree, mainCommit, taken)
+		}
+	}
+	measurement, problem := readPerformance(taken.output, gating, taken.runError)
+	if problem != "" {
+		return refused(problem)
+	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s measured %s in %s: %s\n", performanceBox, shortCommit(gating),
-		time.Since(started).Round(time.Second), strings.Join(measurement.phases, ", "))
+		time.Since(taken.started).Round(time.Second), strings.Join(measurement.phases, ", "))
 	current := performanceFileOf(measurement, gating, time.Now())
 	previous, found, unread := readPreviousPerformance(worktree, mainCommit)
 	current.Note = performanceNote(current, previous, found, unread)
@@ -450,6 +533,70 @@ func measurePerformance(worktree string, gating string, tree string, mainCommit 
 		return "", "", 1
 	}
 	return measured, fmt.Sprintf("Measured on %s for %s: %s.", performanceBox, performanceFileName, current.Note), 0
+}
+
+// sameBinaryAsMain reads whether the script, handed mainBinary, said the binary it built at commit is main's
+// (performanceSameBinaryMarker), and stopped there. A script that said so of another commit or another digest, or
+// said so and then ended badly, is why it refuses the landing instead.
+func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError error) (bool, string) {
+	tested, binary, same := "", "", false
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(terminalColor.ReplaceAllString(scanner.Text(), ""))
+		if line == performanceSameBinaryMarker {
+			same = true
+		}
+		if rest, found := strings.CutPrefix(line, performanceMarker+"tested "); found {
+			tested, _, _ = strings.Cut(rest, " on ")
+		}
+		if rest, found := strings.CutPrefix(line, performanceMarker+"binary "); found {
+			binary = strings.TrimSpace(rest)
+		}
+	}
+	switch {
+	case !same:
+		return false, ""
+	case runError != nil:
+		return false, fmt.Sprintf("%s said the binary is main's, and then ended %s (%s)", performanceBox,
+			describeEnd(runError), lastWords(output, describeEnd(runError)))
+	case tested != commit || binary != mainBinary:
+		return false, fmt.Sprintf("%s said the binary is main's, having built %q at %q, and main's is %s at %s",
+			performanceBox, binary, tested, mainBinary, shortCommit(commit))
+	}
+	return true, ""
+}
+
+// keepMainsPerformance is the landing's tree when gating builds main's binary: tree with main's performance file at
+// mainCommit, byte for byte, since its numbers are of this very program, and the sentence the landing says of it.
+func keepMainsPerformance(
+	worktree string,
+	gating string,
+	tree string,
+	mainCommit string,
+	taken performanceTaken,
+) (string, string, int) {
+	reading := exec.Command("git", "cat-file", "blob", mainCommit+":"+performanceFileName)
+	reading.Dir = worktree
+	var readingErrors bytes.Buffer
+	reading.Stderr = &readingErrors
+	contents, readError := reading.Output()
+	if readError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading main's %s to keep it: %v: %s\n", performanceFileName,
+			readError, strings.TrimSpace(readingErrors.String()))
+		return "", "", 1
+	}
+	kept, spliceError := spliceIntoTree(worktree, tree, performanceFileName, contents)
+	if spliceError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: keeping main's %s in the landing's tree: %v\n", performanceFileName,
+			spliceError)
+		return "", "", 1
+	}
+	said := fmt.Sprintf("Not measured: %s built %s in %s, the same binary as main's (sha256 %s), so not measured, "+
+		"and main's %s stays.", performanceBox, shortCommit(gating), time.Since(taken.started).Round(time.Second),
+		taken.mainBinary[:min(12, len(taken.mainBinary))], performanceFileName)
+	fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
+	return kept, said, 0
 }
 
 // measure runs the measurement a landing makes, alone, at the commit its arguments name (the worktree's head unless
@@ -522,9 +669,7 @@ func measureOnShackler(worktree string, commit string, wait time.Duration) ([]by
 	}
 	// Encoded, so nothing in the script is read by a shell before the box's bash: gap's command is one argument to ssh.
 	remote := "echo " + base64.StdEncoding.EncodeToString([]byte(performanceScript)) + " | base64 -d | bash -s -- " +
-		commit + " " + performanceReference + " " + strconv.Itoa(performanceFills) + " " +
-		strconv.Itoa(performanceColdRounds) + " " + strconv.Itoa(performanceReferenceRounds) + " " +
-		strconv.Itoa(performanceWarmRounds)
+		strings.Join(performanceArguments(commit, ""), " ")
 	started := time.Now()
 	// asked is how many times her claim has been read. A land always reads it twice before it refuses, so a wait
 	// shorter than one read still reads it again, as the gate's wait does.
@@ -556,6 +701,19 @@ func measureOnShackler(worktree string, commit string, wait time.Duration) ([]by
 		streams.Show(streams.Errors)
 		time.Sleep(again)
 	}
+}
+
+// performanceArguments are performanceScript's arguments for a measurement of commit: deeafbf4's commit, the counts of
+// fills and of each row's rounds, and mainBinary, main's binary's sha256, when it is one: the land job hands it, so a
+// binary that is main's is never timed again, and today's land never does.
+func performanceArguments(commit string, mainBinary string) []string {
+	arguments := []string{commit, performanceReference, strconv.Itoa(performanceFills),
+		strconv.Itoa(performanceColdRounds), strconv.Itoa(performanceReferenceRounds),
+		strconv.Itoa(performanceWarmRounds)}
+	if mainBinary != "" {
+		arguments = append(arguments, mainBinary)
+	}
+	return arguments
 }
 
 // readPerformance reads what the script printed in output, about commit, its gap having ended with runError, and

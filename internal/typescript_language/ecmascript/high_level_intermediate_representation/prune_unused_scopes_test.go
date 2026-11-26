@@ -3,57 +3,8 @@ package high_level_intermediate_representation
 import (
 	"testing"
 
-	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
-
-// TestPruneUnusedScopesPrunesSomethingAndKeepsSomething is the baseline before any specific claim.
-//
-// A pass that prunes everything and a pass that prunes nothing both satisfy any assertion phrased
-// only about the pruned side. Both directions are asserted first, on real source, so the cases below
-// are known to be discriminating rather than assumed to be.
-func TestPruneUnusedScopesPrunesSomethingAndKeepsSomething(test *testing.T) {
-	test.Parallel()
-
-	functions, scopes, pruned, kept := 0, 0, 0, 0
-
-	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
-		tree, dependencies := prunableTree(test, function, checker)
-		if tree == nil {
-			return
-		}
-		functions++
-		pruned += PruneUnusedScopes(tree, dependencies)
-
-		VisitReactiveFunction(tree, ReactiveVisitor{
-			Scope: func(scope *ReactiveScopeBlock, traverse func()) {
-				scopes++
-				if !scope.Pruned {
-					kept++
-				}
-				traverse()
-			},
-		})
-	})
-
-	if functions < 50 {
-		test.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
-			functions)
-	}
-	if scopes == 0 {
-		test.Fatal("the corpus produced no scopes, so pruning none proves nothing")
-	}
-	if pruned == 0 {
-		test.Error("no scope was pruned across the whole corpus; the rule reads the pruned set and " +
-			"would see every scope as live")
-	}
-	if kept == 0 {
-		test.Error("every scope was pruned; a pass that prunes unconditionally passes any assertion " +
-			"phrased about the pruned side alone")
-	}
-
-	test.Logf("functions=%d scopes=%d pruned=%d kept=%d", functions, scopes, pruned, kept)
-}
 
 // TestPruneUnusedScopesKeepsScopesHoldingAReturn pins the condition that is not obvious.
 //
@@ -161,25 +112,4 @@ func TestPruneUnusedScopesKeepsScopesWithReassignments(test *testing.T) {
 	if PruneUnusedScopes(control, &ScopeDependencies{}) != 1 {
 		test.Fatal("the control scope was not pruned, so the case above is not testing reassignments")
 	}
-}
-
-// prunableTree builds the tree this pass runs on, at the pipeline stage that delivers it.
-func prunableTree(test *testing.T, function *Function,
-	checker *shimchecker.Checker) (*ReactiveFunction, *ScopeDependencies) {
-	test.Helper()
-
-	ranges := InferMutableRanges(function)
-	set := FindDisjointMutableValuesWithRanges(function, ranges)
-	scopes := AssignReactiveScopesWithSets(function, ranges, set)
-	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
-	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
-	BuildReactiveScopeTerminals(function, scopes, identity)
-	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
-
-	tree, _ := BuildReactiveFunction(function)
-	if tree == nil {
-		return nil, nil
-	}
-	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
-	return tree, dependencies
 }

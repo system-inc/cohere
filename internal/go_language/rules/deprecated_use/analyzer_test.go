@@ -67,21 +67,32 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 }
 
 // The differences fixture holds the uses whose judgment hangs on the enclosing declaration or on the shape of a
-// selector. The two agree on every one but a package-level variable after a deprecated function or method, whose use
-// the port alone finds (#zvwfe26): after_deprecated.go's, and shapes.go's after a deprecated method and with a function
-// literal for its initializer. shapes.go holds the shapes they agree on beside them: a use inside a deprecated method,
-// a standard library deprecation, the package's own deprecated type, and a group with one spec deprecated. The fixture
-// is a module, whose records the harness reads from its own folder and not from the package below it, so they are
-// given here.
+// selector. The two agree on every one but two kinds. A package-level variable after a deprecated function or method
+// has its use found by the port alone (#zvwfe26): after_deprecated.go's, and shapes.go's after a deprecated method and
+// with a function literal for its initializer. A deprecated constant, variable or type has its own use of a deprecated
+// object found by the original alone (#cvbx8qq): deprecated_declarations.go's, beside the same three uses in
+// declarations that are not deprecated, which both find. shapes.go holds the shapes they agree on beside them: a use
+// inside a deprecated method, a standard library deprecation, the package's own deprecated type, and a group with one
+// spec deprecated. The fixture is a module, whose records the harness reads from its own folder and not from the
+// package below it, so they are given here.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	const reason = "The original keeps the last function declaration it walked until the next one, so it judges a " +
+	const after = "The original keeps the last function declaration it walked until the next one, so it judges a " +
 		"package-level variable after a deprecated function or method as if inside it and misses the use; the port " +
 		"judges each use by the declaration that holds it."
-	const retired = "finds: example.com/differences/library.RetiredFunction is deprecated: use another."
+	const deprecatedDeclaration = "A deprecated declaration of any kind may use deprecated objects, as the original " +
+		"lets a deprecated function; the original exempts only a function, so it reports a deprecated re-export of " +
+		"another package's deprecated name, which the re-export's own doc already deprecates for its callers."
+	const retired = "example.com/differences/library.RetiredFunction is deprecated: use another."
+	const retiredConstant = "example.com/differences/library.RetiredConstant is deprecated: use another."
+	const retiredType = "example.com/differences/library.RetiredType is deprecated: use another."
+	const declarations = "differences/uses/deprecated_declarations.go"
 	parity.RequireOnlyAdjudicated(test, sa1019.Analyzer, Analyzer, analysistest.TestData(), "differences",
-		parity.Record{File: "differences/uses/after_deprecated.go", Line: 13, Text: retired, Reason: reason},
-		parity.Record{File: "differences/uses/shapes.go", Line: 20, Text: retired, Reason: reason},
-		parity.Record{File: "differences/uses/shapes.go", Line: 27, Text: retired, Reason: reason},
+		parity.Record{File: "differences/uses/after_deprecated.go", Line: 13, Text: "finds: " + retired, Reason: after},
+		parity.Record{File: "differences/uses/shapes.go", Line: 20, Text: "finds: " + retired, Reason: after},
+		parity.Record{File: "differences/uses/shapes.go", Line: 27, Text: "finds: " + retired, Reason: after},
+		parity.Record{File: declarations, Line: 10, Text: "drops: " + retiredConstant, Reason: deprecatedDeclaration},
+		parity.Record{File: declarations, Line: 13, Text: "drops: " + retired, Reason: deprecatedDeclaration},
+		parity.Record{File: declarations, Line: 16, Text: "drops: " + retiredType, Reason: deprecatedDeclaration},
 	)
 }

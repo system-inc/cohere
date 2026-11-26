@@ -16,13 +16,16 @@
 // The original keeps state across its walk of every node of the package: the function declaration it is in, whose
 // own deprecation lets it use deprecated objects, is cleared only at a file's start and replaced only at the next
 // declaration, so a package-level variable after a deprecated function in its file is judged as if inside it, and its
-// use of a deprecated object is missed. The port keeps no state: it reads the function declaration a node is in off
-// the node's ancestors, so each declaration is judged by its own (#zvwfe26), and departs from the original there alone:
-// a package-level declaration after a deprecated function or method, which the differences fixture's records hold in
-// after_deprecated.go and shapes.go. Like the original, it misses dot-imported objects, and leaves alone
-// a deprecated object of the standard library its knowledge does not date. The registry runs the port in the
-// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
-// both over the same modules, and the two differ nowhere else they hold.
+// use of a deprecated object is missed. The port keeps no state: it reads the package-level declaration a node is in
+// off the node's ancestors, so each declaration is judged by its own (#zvwfe26), and departs from the original there
+// twice. A package-level declaration after a deprecated function or method is judged by its own, which the differences
+// fixture's records hold in after_deprecated.go and shapes.go. And a deprecated constant, variable or type may use
+// deprecated objects, as a deprecated function may, where the original exempts only a function and reports such a
+// declaration's own use, as a deprecated re-export of another package's deprecated name makes (#cvbx8qq); the records
+// hold it in deprecated_declarations.go. Like the original, it misses dot-imported objects, and leaves alone a
+// deprecated object of the standard library its knowledge does not date. The registry runs the port in the original's
+// place, under its name, and the original stays only as the oracle: the parity tests beside this file run both over
+// the same modules, and the two differ nowhere else they hold.
 package deprecated_use
 
 import (
@@ -71,7 +74,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 )
 
 // Check judges one node of the walk, stack its ancestors: a selector, struct literal or import that reaches a
-// deprecated object or package of another package, but the package's own tests, is reported, unless the function
+// deprecated object or package of another package, but the package's own tests, is reported, unless the package-level
 // declaration it is in is itself deprecated, or the standard library's deprecation came after the version the code
 // targets.
 func Check(context *rule.Context, node ast.Node, stack []ast.Node) {
@@ -84,9 +87,9 @@ func Check(context *rule.Context, node ast.Node, stack []ast.Node) {
 	}
 	switch node := node.(type) {
 	case *ast.SelectorExpr:
-		checkSelector(context, deprecations, node, enclosingFunction(context, stack))
+		checkSelector(context, deprecations, node, enclosingDeclaration(context, stack))
 	case *ast.CompositeLit:
-		checkStructKeys(context, deprecations, node, enclosingFunction(context, stack))
+		checkStructKeys(context, deprecations, node, enclosingDeclaration(context, stack))
 	case *ast.ImportSpec:
 		checkImport(context, deprecations, generators, node)
 	default:
@@ -95,24 +98,39 @@ func Check(context *rule.Context, node ast.Node, stack []ast.Node) {
 	}
 }
 
-// enclosingFunction is the function declaration a node is in, read off stack, its ancestors, or nil for a node of
-// any other declaration: a package-level variable, constant or type is judged as no function's, wherever it sits.
-// Only a file's own declarations hold a function declaration, so the one to look at is the file's child.
-func enclosingFunction(context *rule.Context, stack []ast.Node) types.Object {
+// enclosingDeclaration is what the package-level declaration a node is in declares, read off stack, its ancestors: a
+// function's or method's name, or the names of the constant, variable or type specification, or nil for a node of an
+// import. The file's child is the declaration, and a group's child the specification, whose names share its doc and so
+// its deprecation.
+func enclosingDeclaration(context *rule.Context, stack []ast.Node) []types.Object {
 	if len(stack) < 2 {
 		return nil
 	}
-	function, isFunction := stack[1].(*ast.FuncDecl)
-	if !isFunction {
-		return nil
+	switch declaration := stack[1].(type) {
+	case *ast.FuncDecl:
+		return []types.Object{context.TypesInfo.ObjectOf(declaration.Name)}
+	case *ast.GenDecl:
+		if len(stack) < 3 {
+			return nil
+		}
+		switch specification := stack[2].(type) {
+		case *ast.ValueSpec:
+			objects := make([]types.Object, 0, len(specification.Names))
+			for _, name := range specification.Names {
+				objects = append(objects, context.TypesInfo.ObjectOf(name))
+			}
+			return objects
+		case *ast.TypeSpec:
+			return []types.Object{context.TypesInfo.ObjectOf(specification.Name)}
+		}
 	}
-	return context.TypesInfo.ObjectOf(function.Name)
+	return nil
 }
 
 // checkSelector judges what selector selects: a deprecated object of another package, one that is not the package's
 // own tests', is reported over the selector, or over its name alone when it selects from a type.
 func checkSelector(context *rule.Context, deprecations deprecated.Result, selector *ast.SelectorExpr,
-	enclosing types.Object) {
+	enclosing []types.Object) {
 	object := context.TypesInfo.ObjectOf(selector.Sel)
 	// A method of an instantiated generic type is deprecated as its generic origin is.
 	if function, isFunction := object.(*types.Func); isFunction {
@@ -139,7 +157,7 @@ func checkSelector(context *rule.Context, deprecations deprecated.Result, select
 // `T.Field`. A literal of any other type, a map's or a slice's, is left alone, and the keys stop at the first element
 // that is not a key and value.
 func checkStructKeys(context *rule.Context, deprecations deprecated.Result, literal *ast.CompositeLit,
-	enclosing types.Object) {
+	enclosing []types.Object) {
 	literalType := context.TypesInfo.Types[literal.Type]
 	if !literalType.IsType() {
 		return
@@ -249,8 +267,8 @@ func isOwnTests(packagePath string, usedPath string) bool {
 }
 
 // judge reports the use at node of name, deprecated as deprecation, of the package at packagePath, unless enclosing,
-// the function declaration it is in, is deprecated itself, or the standard library deprecated it after the version
-// the code targets, or deprecated it without knowledge to date it.
+// what the package-level declaration it is in declares, is deprecated itself, or the standard library deprecated it
+// after the version the code targets, or deprecated it without knowledge to date it.
 func judge(
 	context *rule.Context,
 	deprecations deprecated.Result,
@@ -258,7 +276,7 @@ func judge(
 	node ast.Node,
 	name string,
 	packagePath string,
-	enclosing types.Object,
+	enclosing []types.Object,
 ) {
 	standard, isKnown := knowledge.StdlibDeprecations[name]
 	// The standard library has no dot in its paths, the best guess there is, since nothing names its packages. An
@@ -272,10 +290,10 @@ func judge(
 		version.Compare(staticcheck_report.StandardLibraryVersion(context, node), standard.DeprecatedSince) == -1 {
 		return
 	}
-	// A deprecated function may use deprecated objects. Whether enclosing, the package's own, is deprecated is read off
-	// the package's own syntax, so it is no read of another package.
-	if enclosing != nil {
-		if _, isDeprecated := deprecations.Objects[enclosing]; isDeprecated {
+	// A deprecated function, constant, variable or type may use deprecated objects. Whether enclosing, the package's
+	// own, is deprecated is read off the package's own syntax, so it is no read of another package.
+	for _, declared := range enclosing {
+		if _, isDeprecated := deprecations.Objects[declared]; isDeprecated {
 			return
 		}
 	}

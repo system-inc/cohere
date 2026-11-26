@@ -37,7 +37,7 @@ func TestNoStyledJsxInDocumentReports(test *testing.T) {
 			// Invented, and this one is the divergence rather than a confirmation. Upstream is
 			// silent on the directory form: this rule's own gate tests the basename, and
 			// `index.tsx` does not begin with `_document.`. We report, because the shared
-			// `nextjs.IsDocumentFile` is the union of the family's four spellings and one sibling
+			// `next_js.IsDocumentFile` is the union of the family's four spellings and one sibling
 			// accepts this path. Measured on the release binary, which reports nothing here.
 			// Recorded as reporting because that is what our rule decides, and the reason is at the
 			// helper and in this rule's doc comment.

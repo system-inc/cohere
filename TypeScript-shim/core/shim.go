@@ -99,8 +99,6 @@ const ModuleDetectionKindNone = core.ModuleDetectionKindNone
 type ModuleKind = core.ModuleKind
 
 // Deprecated: Do not use outside of options parsing and validation.
-//
-//cohere:ignore SA1019 the shim re-exports upstream whole; a caller of this name is judged where it uses it
 const ModuleKindAMD = core.ModuleKindAMD
 const ModuleKindCommonJS = core.ModuleKindCommonJS
 const ModuleKindES2015 = core.ModuleKindES2015
@@ -115,15 +113,11 @@ const ModuleKindNone = core.ModuleKindNone
 const ModuleKindPreserve = core.ModuleKindPreserve
 
 // Deprecated: Do not use outside of options parsing and validation.
-//
-//cohere:ignore SA1019 the shim re-exports upstream whole; a caller of this name is judged where it uses it
 const ModuleKindSystem = core.ModuleKindSystem
 
 var ModuleKindToModuleResolutionKind = core.ModuleKindToModuleResolutionKind
 
 // Deprecated: Do not use outside of options parsing and validation.
-//
-//cohere:ignore SA1019 the shim re-exports upstream whole; a caller of this name is judged where it uses it
 const ModuleKindUMD = core.ModuleKindUMD
 
 type ModuleResolutionKind = core.ModuleResolutionKind
@@ -131,13 +125,9 @@ type ModuleResolutionKind = core.ModuleResolutionKind
 const ModuleResolutionKindBundler = core.ModuleResolutionKindBundler
 
 // Deprecated: Do not use outside of options parsing and validation.
-//
-//cohere:ignore SA1019 the shim re-exports upstream whole; a caller of this name is judged where it uses it
 const ModuleResolutionKindClassic = core.ModuleResolutionKindClassic
 
 // Deprecated: Do not use outside of options parsing and validation.
-//
-//cohere:ignore SA1019 the shim re-exports upstream whole; a caller of this name is judged where it uses it
 const ModuleResolutionKindNode10 = core.ModuleResolutionKindNode10
 const ModuleResolutionKindNode16 = core.ModuleResolutionKindNode16
 const ModuleResolutionKindNodeNext = core.ModuleResolutionKindNodeNext
@@ -211,8 +201,6 @@ const ScriptTargetES2025 = core.ScriptTargetES2025
 const ScriptTargetES2026 = core.ScriptTargetES2026
 
 // Deprecated: Do not use outside of options parsing and validation.
-//
-//cohere:ignore SA1019 the shim re-exports upstream whole; a caller of this name is judged where it uses it
 const ScriptTargetES5 = core.ScriptTargetES5
 const ScriptTargetESNext = core.ScriptTargetESNext
 const ScriptTargetJSON = core.ScriptTargetJSON

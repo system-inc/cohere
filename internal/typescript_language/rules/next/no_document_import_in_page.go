@@ -2,7 +2,7 @@ package next
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
@@ -68,13 +68,14 @@ var messageNoDocumentImportInPage = rule.Message{
 // here once when the listeners are built rather than at every import, which is the same shape
 // `no-head-element` uses for its own file-level exemption and the same shape upstream uses.
 //
-// **`nextjs.IsDocumentPage` is used here rather than the neighbouring `nextjs.IsDocumentFile`, and
+// **`next_js.IsDocumentPage` is used here rather than the neighbouring `next_js.IsDocumentFile`, and
 // choosing the other one would break the corpus.** IsDocumentFile is the union of the four spellings
 // upstream drifted into across this family, and it is the right answer for the sibling rules whose
 // corpora never vote on the difference. This rule's corpus votes: its fourth failing case is
 // `src/pages/user/_document.tsx`, a file named exactly `_document.tsx` that upstream deliberately
 // reports because it is not the immediate child of a `pages` directory, and IsDocumentFile exempts
-// it. Both predicates and their disagreement are documented at `internal/utilities/nextjs/paths.go`.
+// it. Both predicates and their disagreement are documented at
+// `internal/typescript_language/ecmascript/next_js/paths.go`.
 //
 // Fidelity is to what a rule decides, and here the decision is pinned by a test upstream wrote.
 //
@@ -93,7 +94,7 @@ var NoDocumentImportInPage = rule.Rule[rule.NoOptions]{
 		// The document file is allowed to import the module it exists to implement, so it registers
 		// no listener at all rather than being filtered per import. Upstream spells this the same
 		// way, in `should_run`.
-		if nextjs.IsDocumentPage(ruleContext.SourceFile.FileName().AsString()) {
+		if next_js.IsDocumentPage(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 

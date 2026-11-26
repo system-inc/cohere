@@ -6,7 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/module"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 )
 
@@ -89,7 +89,7 @@ var messageNoPageCustomFontOutsideDefaultExport = rule.Message{
 // Upstream spells it as a bare basename test, `file_name.starts_with("_document.")`, with no
 // directory component at all and no `pages` requirement. That is byte-identical to the spelling in
 // `no_styled_jsx_in_document.rs:100`, so this rule takes the same shelf predicate its sibling
-// takes, `nextjs.IsDocumentFile`, and inherits the same single stated divergence.
+// takes, `next_js.IsDocumentFile`, and inherits the same single stated divergence.
 //
 // Measured on the release binary with a control rule (`google-font-display`) firing on all six
 // paths, so a silence here is a real answer rather than a rule that never ran:
@@ -106,7 +106,7 @@ var messageNoPageCustomFontOutsideDefaultExport = rule.Message{
 // `no_head_import_in_document` accepts. Reproducing this rule's private spelling would make it the
 // second Go answer to a question the shelf already answers, and nothing could ever catch the two
 // drifting, because each rule's corpus was written against its own spelling and passes either way.
-// `nextjs.IsDocumentPage` would be wrong here in the other direction: it requires a `pages` split,
+// `next_js.IsDocumentPage` would be wrong here in the other direction: it requires a `pages` split,
 // which would silence `components/_document.tsx`, a path upstream treats as the document.
 //
 // # Whether it fires outside the document
@@ -123,7 +123,7 @@ var NoPageCustomFont = rule.Rule[rule.NoOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// A property of the file, so it is asked once rather than at every element. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
-		inDocument := nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString())
+		inDocument := next_js.IsDocumentFile(ruleContext.SourceFile.FileName().AsString())
 
 		// Collected once at rule entry rather than by a stateful visitor, because
 		// `export default CustomDocument;` may sit below the JSX it exports and upstream's answer

@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/imports"
-	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/nextjs"
+	"github.com/system-inc/cohere/internal/typescript_language/ecmascript/next_js"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 	"github.com/system-inc/cohere/internal/typescript_language/type_checking"
 	"github.com/system-inc/cohere/policy"
@@ -279,7 +279,7 @@ var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasin
 				// the clauses rather than beside the consumer's list, because that list is optional
 				// and this floor is not.
 				if exported &&
-					nextjs.IsRouteContractExport(imports.NormalizedFileName(ruleContext.SourceFile), declaredName) {
+					next_js.IsRouteContractExport(imports.NormalizedFileName(ruleContext.SourceFile), declaredName) {
 					return
 				}
 

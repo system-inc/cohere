@@ -197,7 +197,7 @@ func (e *editGraph) getForward(d, k int) int {
 
 // bdone decides if the backward path has reached the lower left corner
 //
-//cohere:ignore U1000 only upstream's tests, which are not copied, call it
+//cohere:ignore U1000 only backward calls it, and only upstream's tests, which are not copied, call that
 func (e *editGraph) bdone(D, k int) (bool, lcs) {
 	// x, y, k are relative to the rectangle
 	x := e.vb.get(D, k)
