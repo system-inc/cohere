@@ -3,9 +3,10 @@
 //
 // The live oracle formatted every fixture under every option set on every run, and yaml, css and markdown
 // spent minutes of the module's test time in it. Its answers change only when the bundles do, so they are
-// recorded once, keyed by everything an answer depends on, and stamped with the bundles' digest. A golden
-// recorded from other bundles fails the test loudly, naming the command that records it again, rather
-// than comparing the native printers against an oracle nothing loads any more. Recording is its own run:
+// recorded once, keyed by everything an answer depends on, and stamped with the bundles' digest. Every golden
+// is held to one pinned digest (see pinnedBundlesDigest), so a plain run reads no bundle, and a golden stamped
+// with any other is refused rather than compared. Recording is its own run, refused unless the bundles it
+// records from are the pinned ones:
 //
 //	COHERE_UPDATE_ORACLE=1 go test ./internal/format/yaml
 //
@@ -33,6 +34,13 @@ import (
 
 // UpdateVariable, set to anything, records the oracle's answers anew instead of reading them.
 const UpdateVariable = "COHERE_UPDATE_ORACLE"
+
+// pinnedBundlesDigest is the digest of the Prettier 3.9.6 fork bundles that recorded every golden
+// here. It is pinned rather than computed because those bundles leave cohere (#mjecaaw): once they are gone no
+// golden can be recorded again, and the goldens stand as the fork's word. A golden stamped with any other
+// digest came from other bundles and is refused. Until the bundles are deleted a recording still runs, but
+// only when the embedded bundles' live digest is this one, so nothing is recorded against changed bundles.
+const pinnedBundlesDigest = "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98"
 
 // ErrNotRecorded is an answer asked for that the golden does not hold: the fixtures changed since it was
 // recorded.
@@ -71,40 +79,69 @@ type Golden struct {
 	runtimeError error
 }
 
-// Open reads the golden at testdata/oracle/<name>.json.gz for the bundles this build embeds. When recording,
-// it starts empty and writes what the test asked for when the test ends.
+// Open reads the golden at testdata/oracle/<name>.json.gz, which must be stamped with pinnedBundlesDigest. A
+// plain run reads no bundle. When recording, it starts empty and writes what the test asked for when the test
+// ends, refusing first unless the embedded bundles are the pinned ones.
 func Open(test testing.TB, name string) *Golden {
 	test.Helper()
-	digest, bundlesDigestError := BundlesDigest()
-	if bundlesDigestError != nil {
-		test.Fatal(bundlesDigestError)
+	golden, openError := openAt(
+		test,
+		filepath.Join("testdata", "oracle", name+".json.gz"),
+		os.Getenv(UpdateVariable) != "",
+		BundlesDigest,
+	)
+	if openError != nil {
+		test.Fatal(openError)
 	}
+	return golden
+}
+
+// openAt is Open for the golden at path. bundlesDigest is asked for the embedded bundles' live digest only when
+// recording; it is an argument so a test can hold that a plain run never asks it.
+func openAt(
+	test testing.TB,
+	path string,
+	update bool,
+	bundlesDigest func() (string, error),
+) (*Golden, error) {
 	golden := &Golden{
 		test:        test,
-		path:        filepath.Join("testdata", "oracle", name+".json.gz"),
-		digest:      digest,
-		update:      os.Getenv(UpdateVariable) != "",
+		path:        path,
+		digest:      pinnedBundlesDigest,
+		update:      update,
 		answers:     map[string]Answer{},
 		loadRuntime: loadBundleRuntime,
 	}
 	if golden.update {
+		liveDigest, bundlesDigestError := bundlesDigest()
+		if bundlesDigestError != nil {
+			return nil, fmt.Errorf("not recording %s: %w", path, bundlesDigestError)
+		}
+		if liveDigest != golden.digest {
+			return nil, fmt.Errorf(
+				"not recording %s: the embedded Prettier bundles are %s, and every golden is pinned to %s",
+				path,
+				liveDigest,
+				golden.digest,
+			)
+		}
 		test.Cleanup(golden.write)
-		return golden
+		return golden, nil
 	}
-	answers, readError := read(golden.path, digest)
+	answers, readError := read(golden.path, golden.digest)
 	if readError != nil {
-		test.Fatalf(
-			"%v: record them with %s=1 go test -run '^%s$' in this package",
+		return nil, fmt.Errorf(
+			"%w: record them with %s=1 go test -run '^%s$' in this package",
 			readError,
 			UpdateVariable,
 			test.Name(),
 		)
 	}
 	golden.answers = answers
-	return golden
+	return golden, nil
 }
 
-// read is a golden's answers, refused when the bundles that recorded them are not these.
+// read is a golden's answers, refused when it is stamped with any digest but digest.
 func read(path string, digest string) (map[string]Answer, error) {
 	// A golden is named for its test, byte for byte. A case-insensitive disk (macOS's) opens
 	// TestFormatSCSSMatchesTheFork.json.gz for TestFormatScssMatchesTheFork and a case-sensitive one (a Linux
@@ -143,7 +180,7 @@ func read(path string, digest string) (map[string]Answer, error) {
 	}
 	if contents.Digest != digest {
 		return nil, fmt.Errorf(
-			"%s was recorded from Prettier bundles %s, and this build embeds %s",
+			"%s was recorded from Prettier bundles %s, and every golden is pinned to %s",
 			path,
 			contents.Digest,
 			digest,
@@ -262,7 +299,7 @@ var bundlesDigest struct {
 	digestError error
 }
 
-// BundlesDigest is the digest of the Prettier bundles this build embeds, read once.
+// BundlesDigest is the digest of the Prettier bundles this build embeds, read once, and only by a recording.
 func BundlesDigest() (string, error) {
 	bundlesDigest.once.Do(func() {
 		bundles, bundlesError := prettier.Bundles()

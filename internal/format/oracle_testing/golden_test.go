@@ -91,12 +91,14 @@ func TestKeysDoNotRunTogether(test *testing.T) {
 	}
 }
 
-// TestTheBundlesHaveADigest: the digest every golden is stamped with is readable from this build.
-func TestTheBundlesHaveADigest(test *testing.T) {
+// TestTheBundlesAreThePinnedOnes: while the bundles are still embedded, they are the ones every golden is
+// pinned to, so a change to them is caught here rather than at the next recording.
+func TestTheBundlesAreThePinnedOnes(test *testing.T) {
 	test.Parallel()
 	digest, bundlesDigestError := BundlesDigest()
-	if bundlesDigestError != nil || len(digest) != 64 {
-		test.Fatalf("no digest for the embedded bundles: %q, %v", digest, bundlesDigestError)
+	if bundlesDigestError != nil || digest != pinnedBundlesDigest {
+		test.Fatalf("the embedded bundles are %q (%v), and every golden is pinned to %s", digest,
+			bundlesDigestError, pinnedBundlesDigest)
 	}
 }
 
@@ -193,5 +195,54 @@ func TestAPlainEvaluateNeverBuildsTheRuntime(test *testing.T) {
 	}
 	if golden.runtime != nil {
 		test.Error("a plain Evaluate left a runtime behind")
+	}
+}
+
+// TestAGoldenStampedOtherwiseIsRefused: Open holds every golden to the pinned digest, so one stamped with any
+// other is refused, not compared.
+func TestAGoldenStampedOtherwiseIsRefused(test *testing.T) {
+	test.Parallel()
+	path := writeGolden(test, record{Digest: "recorded", Answers: map[string]Answer{"k": {Output: "x"}}})
+	if _, openError := openAt(test, path, false, BundlesDigest); openError == nil ||
+		!strings.Contains(openError.Error(), "pinned to "+pinnedBundlesDigest) {
+		test.Fatalf("a golden stamped with another digest was opened: %v", openError)
+	}
+	// The control: the same answers stamped with the pinned digest open.
+	pinned := writeGolden(test, record{Digest: pinnedBundlesDigest, Answers: map[string]Answer{"k": {Output: "x"}}})
+	golden, openError := openAt(test, pinned, false, BundlesDigest)
+	if openError != nil || golden.answers["k"].Output != "x" {
+		test.Fatalf("a golden stamped with the pinned digest was refused: %v", openError)
+	}
+}
+
+// TestAPlainOpenNeverReadsTheBundles: a plain run compares a golden's stamp with the pinned digest and never
+// asks the embedded bundles for theirs, so it reads no bundle.
+func TestAPlainOpenNeverReadsTheBundles(test *testing.T) {
+	test.Parallel()
+	path := writeGolden(test, record{Digest: pinnedBundlesDigest, Answers: map[string]Answer{"k": {Output: "x"}}})
+	golden, openError := openAt(test, path, false, func() (string, error) {
+		test.Error("a plain Open asked the bundles for their digest")
+		return "", errors.New("a plain run reads no bundle")
+	})
+	if openError != nil || golden.answers["k"].Output != "x" {
+		test.Fatalf("a plain Open of a pinned golden failed: %v", openError)
+	}
+}
+
+// TestARecordingFromOtherBundlesIsRefused: a recording runs only when the embedded bundles are the pinned ones,
+// so no golden is recorded against changed bundles while they are still here.
+func TestARecordingFromOtherBundlesIsRefused(test *testing.T) {
+	test.Parallel()
+	path := filepath.Join(test.TempDir(), "golden.json.gz")
+	changed := func() (string, error) { return "changed", nil }
+	if _, openError := openAt(test, path, true, changed); openError == nil ||
+		!strings.Contains(openError.Error(), "the embedded Prettier bundles are changed") {
+		test.Fatalf("a recording from bundles other than the pinned ones was let through: %v", openError)
+	}
+	// The control: bundles with the pinned digest record. Its Cleanup writes an empty golden to the temporary
+	// directory, which nothing reads.
+	pinned := func() (string, error) { return pinnedBundlesDigest, nil }
+	if _, openError := openAt(test, path, true, pinned); openError != nil {
+		test.Fatalf("a recording from the pinned bundles was refused: %v", openError)
 	}
 }
