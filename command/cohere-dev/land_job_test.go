@@ -392,12 +392,12 @@ func TestALandJobRefusesAMergeOntoAnotherMain(test *testing.T) {
 	}
 }
 
-// The gate's Go cache by landCache (#s50bcnr), sharedBoxGate run for real with bash against a planted toolchain:
-// unset, every go test carries -count=1 on a cache made empty for the job and gone after it, as on every gate box; set,
-// no go test carries it, the cache is landCache's gocache, and it stays for the next job. No go test in the gate's
-// scripts spells -count=1 itself, so the one setting is what every go test reads. landCache also says the run is the
-// land job's, so set, go mod download and go mod verify read the module set `GOMODCACHE` names with `GOPROXY=off`,
-// and unset, they read Go's default cache, the `GOMODCACHE` named never read.
+// The gate's Go cache by landCache (#s50bcnr), sharedBoxGate run for real with bash against a planted toolchain: unset,
+// every go test carries -count=1 on a cache made empty for the job and gone after it, as on every gate box; set, no go
+// test carries it, the cache is landCache's gocache, and it stays for the next job. No go test in the gate's scripts
+// spells -count=1 itself, so the one setting is what every go test reads. landCache also says the run is the land
+// job's, so set, go mod download and go mod verify read the module set `GOMODCACHE` names with `GOPROXY=off` and
+// `GOSUMDB=off`, and unset, they read Go's default cache, the `GOMODCACHE` named never read.
 func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -443,9 +443,12 @@ func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 			if len(asked) != 3 || !strings.HasPrefix(asked[2], "test test ") {
 				test.Fatalf("the gate asked for %q, want go mod download, go mod verify and the module's tests", asked)
 			}
-			modules, said := " | modcache  | proxy ", boxModulesMarker+"Go's default cache, from the proxy\n"
+			modules, said := " | modcache  | proxy  | sum database ", boxModulesMarker+
+				"Go's default cache, from the proxy\n"
 			if kept {
-				modules, said = " | modcache "+laid+" | proxy off", boxModulesMarker+"the box's laid set at "+laid+
+				modules, said = " | modcache "+
+					laid+
+					" | proxy off | sum database off", boxModulesMarker+"the box's laid set at "+laid+
 					", offline\n"
 			}
 			if asked[0] != "download"+modules || asked[1] != "verify"+modules ||
