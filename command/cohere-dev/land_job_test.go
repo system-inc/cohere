@@ -44,9 +44,9 @@ type landJobFixture struct {
 // macBoxScript, writes each kind to `calls`, and keeps the setting of needs.SwiftUnlaidVariable it ran under in
 // `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`; with no
 // `tests.run` it prints where its modules came from, as a land job's gate says it, then a passing run of every package
-// it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and then, unless one
-// failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at the path it names,
-// as a run that compiles grows the cache.
+// it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and then, unless
+// one failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at the path it
+// names, as a run that compiles grows the cache.
 const landJobShell = `#!/bin/sh
 replies="$LAND_JOB_REPLIES"
 staged="$replies/stdin.$$"
