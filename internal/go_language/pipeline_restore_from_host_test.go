@@ -333,6 +333,12 @@ func TestEachBuildsRecordSaysWhereItsTimeWent(test *testing.T) {
 			got.WaitMilliseconds != want.WaitMilliseconds {
 			test.Errorf("build %d's record says %+v, want the times %+v", index, got, want)
 		}
+		// Every build loaded and linted, so both times were measured, and a measured time is written whatever the
+		// machine's speed, since the record rounds it up (#cqqs9tp).
+		if run.loading == 0 || run.linting == 0 {
+			test.Errorf("build %d measured its load as %s and its lint as %s, want both measured", index, run.loading,
+				run.linting)
+		}
 		if got.LoadMilliseconds == 0 || got.LintMilliseconds == 0 {
 			test.Errorf("build %d's record says it loaded in %d ms and linted in %d ms, want both written", index,
 				got.LoadMilliseconds, got.LintMilliseconds)

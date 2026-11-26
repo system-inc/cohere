@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_language/check/parity"
+	"github.com/system-inc/cohere/internal/go_language/check/parity/staticcheck_fixtures"
 	"github.com/system-inc/cohere/internal/go_language/rules/staticcheck_wants"
 )
 
-// The reader over staticcheck's own fixtures, read where the module cache keeps the release go.mod requires. These
-// tests sit outside the package, since parity, which finds that directory, imports the package itself.
+// The reader over staticcheck's own fixtures, the release go.mod requires, as staticcheck_fixtures keeps them. These
+// tests read the package from outside it, as parity does.
 
 // staticcheckDiagnosticNotes is how many diag notes the Go files of staticcheck v0.8.1's check fixtures hold outside
 // sa5012's, counted apart from this reader: every diag name after a comma, a space or the opening of a line's first
@@ -94,11 +94,11 @@ func TestReadWithFactsReadsStaticchecksFixtures(test *testing.T) {
 	}
 }
 
-// staticchecksFixtures is every testdata folder of staticcheck's checks the house ports, in the module go.mod
+// staticchecksFixtures is every testdata folder of staticcheck's checks the house ports, in the release go.mod
 // requires.
 func staticchecksFixtures(test *testing.T) []string {
 	test.Helper()
-	module := parity.StaticcheckDirectory(test)
+	module := staticcheck_fixtures.Directory(test)
 	fixtures := []string{}
 	for _, checks := range []string{"staticcheck", "simple", "stylecheck", "quickfix"} {
 		found, globError := filepath.Glob(filepath.Join(module, checks, "*", "testdata"))

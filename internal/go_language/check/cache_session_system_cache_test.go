@@ -2,7 +2,6 @@ package check
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -18,6 +17,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // countedFact is the fact countingFactRule's analyzer learns, which it never exports: an analyzer with a fact type
@@ -68,16 +68,6 @@ func standardLibraryModule(test *testing.T) string {
 		}
 	}
 	return directory
-}
-
-// goRootOf is go env's `GOROOT`, failing the test when go env fails.
-func goRootOf(test *testing.T) string {
-	test.Helper()
-	output, runError := exec.Command("go", "env", "GOROOT").Output()
-	if runError != nil {
-		test.Fatalf("reading GOROOT with go env: %v", runError)
-	}
-	return strings.TrimSpace(string(output))
 }
 
 // standardLibraryContext is what a test's standard-library keys share, under stamp, with goRoot.
@@ -135,7 +125,7 @@ func filesKeyed(loaded []*packages.Package, module string) (int, int) {
 // Not parallel: it reads cache.FilesHashed, which every test in the process that keys a package moves.
 func TestARunHashesEachFileOnce(test *testing.T) {
 	directory := standardLibraryModule(test)
-	goRoot := goRootOf(test)
+	goRoot := go_root.GoRoot(test)
 	rules := []rule.Rule{countingFactRule(&sync.Map{})}
 	caching := testCaching(test, rules)
 	caching.StandardLibrary = &StandardLibraryCaching{System: systemStore(test),
@@ -212,7 +202,7 @@ func TestARunWithoutAStoreNamesEveryStandardLibraryRead(test *testing.T) {
 	every := rules.All()
 	system := systemStore(test)
 	run := runSessionWith(test, directory, systemCacheCaching(system, standardLibraryContext("check tests",
-		goRootOf(test))), every, every)
+		go_root.GoRoot(test))), every, every)
 	withReads := 0
 	for keyed, key := range run.session.standardLibraryKeys {
 		entry, _, stored := storedEntryAt(system, key)
@@ -240,7 +230,7 @@ func TestAStandardLibraryPackageFromTheSystemCacheIsNeverAnalyzedOrParsed(test *
 	test.Parallel()
 
 	directory := standardLibraryModule(test)
-	goRoot := goRootOf(test)
+	goRoot := go_root.GoRoot(test)
 	runs := &sync.Map{}
 	rules := []rule.Rule{countingFactRule(runs)}
 	system := systemStore(test)
@@ -307,7 +297,7 @@ func TestAStandardLibraryEntryIsReadOnlyUnderItsOwnContext(test *testing.T) {
 	test.Parallel()
 
 	directory := standardLibraryModule(test)
-	goRoot := goRootOf(test)
+	goRoot := go_root.GoRoot(test)
 	runs := &sync.Map{}
 	rules := []rule.Rule{countingFactRule(runs)}
 	system := systemStore(test)
@@ -363,7 +353,7 @@ func TestTheProjectStoreHoldsNoStandardLibraryEntryWhileTheSystemCacheIsKept(tes
 	test.Parallel()
 
 	directory := standardLibraryModule(test)
-	context := standardLibraryContext("check tests", goRootOf(test))
+	context := standardLibraryContext("check tests", go_root.GoRoot(test))
 	rules := []rule.Rule{countingFactRule(&sync.Map{})}
 	system := systemStore(test)
 	caching := testCaching(test, rules)
@@ -418,7 +408,7 @@ func optionClauseAnalyzer() *analysis.Analyzer {
 func TestAGivenStandardLibraryPackageIsNeverKeptInTheSystemCache(test *testing.T) {
 	test.Parallel()
 
-	goRoot := goRootOf(test)
+	goRoot := go_root.GoRoot(test)
 	directory := filepath.Join(goRoot, "src", "unicode", "utf8")
 	analyzer := optionClauseAnalyzer()
 	rules := []rule.Rule{houseRule(analyzer)}

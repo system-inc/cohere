@@ -2,16 +2,15 @@ package odd_slice_argument
 
 import (
 	"go/types"
-	"sync/atomic"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_language/fact_resolver"
 )
 
-// NewPushAnalyzer is newPushAnalyzer, for the differential beside this file, which sits outside the package.
-func NewPushAnalyzer(judged *atomic.Int64) *analysis.Analyzer {
-	return newPushAnalyzer(judged)
+// NewPushAnalyzer is newPushAnalyzer, for the probes beside this file, which sit outside the package.
+func NewPushAnalyzer() *analysis.Analyzer {
+	return newPushAnalyzer()
 }
 
 // PushMarked is whether push's result on pass's package holds parameter marked, and whether pass holds push's result
@@ -22,12 +21,6 @@ func PushMarked(pass *analysis.Pass, push *analysis.Analyzer, parameter *types.V
 		return false, false
 	}
 	return pushed[parameter], true
-}
-
-// IsMark is whether fact is the push's mark.
-func IsMark(fact analysis.Fact) bool {
-	_, isMark := fact.(*evenElements)
-	return isMark
 }
 
 // Ask is ask, whether parameter is marked as a reader in reader holds it.
@@ -43,12 +36,6 @@ var DefinitionAnalyzer = definitionAnalyzer
 func Definition(pass *analysis.Pass) (map[types.Object]bool, bool) {
 	defined, isDefined := pass.ResultOf[definitionAnalyzer].(definitionResult)
 	return defined, isDefined
-}
-
-// IsDefinitionMark is whether fact is the definition's mark.
-func IsDefinitionMark(fact analysis.Fact) bool {
-	_, isMark := fact.(*evenByDefinition)
-	return isMark
 }
 
 // Whole is whole, every parameter of home marked as the resolver computes a package whole for the store.

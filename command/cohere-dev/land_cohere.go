@@ -54,11 +54,11 @@ type cohereRecord struct {
 // `--host-build-only` does, and print the records.
 var gateCohereArguments = []string{"--no-fix", "--json"}
 
-// landJobCohereArguments are the land job's run of cohere: the gate's, naming every language but swift and every
-// format, since cohere-swift can't be built in a land job's sandbox (needs.SwiftUnlaid). Both flags are named, since
-// naming --languages alone checks no format. A language or format cohere adds later is left out here until it is named,
-// and the run's own record names it as left out.
-var landJobCohereArguments = append(slices.Clone(gateCohereArguments), "--languages", "go,typescript", "--formats",
+// integrateJobCohereArguments are the integrate job's run of cohere: the gate's, naming every language but swift and
+// every format, since cohere-swift can't be built in an integrate job's sandbox (needs.SwiftUnlaid). Both flags are
+// named, since naming --languages alone checks no format. A language or format cohere adds later is left out here until
+// it is named, and the run's own record names it as left out.
+var integrateJobCohereArguments = append(slices.Clone(gateCohereArguments), "--languages", "go,typescript", "--formats",
 	"json,markdown,yaml,css,graphql")
 
 // checkCohere builds cohere at the worktree's tree and runs it with arguments at its root, `--no-fix --json` and what a

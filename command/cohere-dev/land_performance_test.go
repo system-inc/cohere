@@ -708,7 +708,7 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 	home := filepath.Join(directory, "home")
 	scratch := filepath.Join(home, "scratch", "system_cohere_tools", "performance")
-	// readScript runs text, the script as the test laid it or as the land job sets it, once, with extra in its
+	// readScript runs text, the script as the test laid it or as the integrate job sets it, once, with extra in its
 	// environment, and reads what it said; read runs the script as the test laid it.
 	readScript := func(text string, extra ...string) ([]byte, performanceMeasurement, string) {
 		test.Helper()
@@ -802,30 +802,37 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		}
 	}
 
-	// The modules both trees' runs read: in a land job (landJobSetting) with a set laid and named in
+	// The modules both trees' runs read: in an integrate job (integrateJobSetting) with a set laid and named in
 	// `GOMODCACHE`, as Loom names one, that set with the proxy and the checksum database off, go mod download only
 	// confirming each module is there; anywhere else, as on main, a cache of the measurement's own under the scratch,
-	// filled from the proxy as Go sets it, an account's `GOMODCACHE` never read, and so in a land job with no set
+	// filled from the proxy as Go sets it, an account's `GOMODCACHE` never read, and so in an integrate job with no set
 	// named.
-	landJobScript, landJobError := replacedOnce(script, landJobLine, landJobSetting)
-	if landJobError != nil {
-		test.Fatal(landJobError)
+	integrateJobScript, integrateJobError := replacedOnce(script, integrateJobLine, integrateJobSetting)
+	if integrateJobError != nil {
+		test.Fatal(integrateJobError)
 	}
 	ownCache, laid := filepath.Join(scratch, "gomodcache"), filepath.Join(directory, "laid modules")
 	ownSaid := "modules this measurement's own cache at " + ownCache + ", from the proxy"
 	for _, modulesCase := range []struct {
 		name                                   string
-		landJob                                bool
+		integrateJob                           bool
 		named, cache, proxy, sumDatabase, said string
 	}{
-		{name: "outside a land job with no module cache named, its own cache from the proxy", cache: ownCache,
+		{name: "outside an integrate job with no module cache named, its own cache from the proxy", cache: ownCache,
 			said: ownSaid},
-		{name: "outside a land job, an account's module cache is never read", named: laid, cache: ownCache,
+		{name: "outside an integrate job, an account's module cache is never read", named: laid, cache: ownCache,
 			said: ownSaid},
-		{name: "in a land job with no module set named, its own cache from the proxy", landJob: true,
+		{name: "in an integrate job with no module set named, its own cache from the proxy", integrateJob: true,
 			cache: ownCache, said: ownSaid},
-		{name: "in a land job, the module set laid for it read offline", landJob: true, named: laid, cache: laid,
-			proxy: "off", sumDatabase: "off", said: "modules the box's laid set at " + laid + ", offline"},
+		{
+			name:         "in an integrate job, the module set laid for it read offline",
+			integrateJob: true,
+			named:        laid,
+			cache:        laid,
+			proxy:        "off",
+			sumDatabase:  "off",
+			said:         "modules the box's laid set at " + laid + ", offline",
+		},
 	} {
 		// Not parallel: each case runs the script in the one scratch the cases before it laid, and reads the one
 		// record of go mod's calls.
@@ -838,8 +845,8 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 				extra = append(extra, "GOMODCACHE="+modulesCase.named)
 			}
 			text := script
-			if modulesCase.landJob {
-				text = landJobScript
+			if modulesCase.integrateJob {
+				text = integrateJobScript
 			}
 			output, _, problem := readScript(text, extra...)
 			if problem != "" {
@@ -863,7 +870,7 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 
 	// Handed main's binary, which is the one it builds here, the script says so after its build and stops before any
-	// run, as the land job reads it (#6ex523f).
+	// run, as the integrate job reads it (#6ex523f).
 	sum := sha256.Sum256([]byte(binaryScript))
 	mainBinary := hex.EncodeToString(sum[:])
 	ranBefore := len(readMaybeMissing(test, runs))

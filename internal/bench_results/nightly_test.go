@@ -84,8 +84,9 @@ func TestTheNightlyGuardOpensNoQuietWindow(test *testing.T) {
 
 	home := test.TempDir()
 	state := test.TempDir()
-	// A top of its own, so the night reads no process of the machine's, and through no setuid program, which a land
-	// job's sandbox refuses to start: it prints two samples, as top -l 2 does, and the guard keeps the second's.
+	// A top of its own, so the night reads no process of the machine's, and through no setuid program, which an
+	// integrate job's sandbox refuses to start: it prints two samples, as top -l 2 does, and the guard keeps the
+	// second's.
 	tools := test.TempDir()
 	if writeError := executable_testing.WriteFile(
 		filepath.Join(tools, "top"),
