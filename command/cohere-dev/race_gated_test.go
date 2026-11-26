@@ -281,6 +281,13 @@ func TestConcurrencyTestsAreFoundByNameAndFile(test *testing.T) {
 // goroutineStartersDirectory is the package whose exported functions are the house's ways to start goroutines.
 var goroutineStartersDirectory = filepath.Join("..", "..", "internal", "go_language", "bounded")
 
+// skippersDirectories are the packages whose exported functions are the house's ways for a test to skip: the needs a
+// test states (needs.Tool, OptIn, NoRace, SwiftLaid, Platform) and cgo translation's requirement.
+var skippersDirectories = []string{
+	filepath.Join("..", "..", "internal", "testing", "needs"),
+	filepath.Join("..", "..", "internal", "go_language", "cgo_testing"),
+}
+
 // concurrencyCallNames are the calls the guard reads as starting goroutines: an errgroup's or a WaitGroup's Go, and
 // every exported function or method of the bounded package that starts one, read from that package's code
 // (goroutineStarters), so a new way to start goroutines there is a site wherever it is called (#q1v0ern).
@@ -289,15 +296,55 @@ var concurrencyCallNames = sync.OnceValues(func() ([]string, error) {
 	return append([]string{"Go"}, starters...), startersError
 })
 
-// goroutineStarters is every exported function and method of the non-test Go files of directory whose body starts a
-// goroutine, by a go statement or a Go call, or calls a function or method of the package that does, followed to a
-// fixed point, by its bare name.
+// skipCallNames are the calls the guard reads as a test skipping: testing's own, and every exported function of the
+// skippers' packages that skips, read from their code (skippers), so a claimant that skips through a need doesn't
+// count toward a site's claims (#q1v0ern, the Go Square's S6).
+var skipCallNames = sync.OnceValues(func() ([]string, error) {
+	names := []string{"Skip", "Skipf", "SkipNow"}
+	for _, directory := range skippersDirectories {
+		found, foundError := skippers(directory)
+		if foundError != nil {
+			return nil, foundError
+		}
+		names = append(names, found...)
+	}
+	return names, nil
+})
+
+// goroutineStarters is every exported function and method of the non-test Go files of directory that starts a
+// goroutine, by a go statement or a Go call, itself or through the package's own functions.
 func goroutineStarters(directory string) ([]string, error) {
+	return exportedReaching(directory, func(node ast.Node) bool {
+		if _, isGo := node.(*ast.GoStmt); isGo {
+			return true
+		}
+		call, isCall := node.(*ast.CallExpr)
+		return isCall && calleeName(call) == "Go"
+	})
+}
+
+// skippers is every exported function and method of the non-test Go files of directory that skips its test, by a
+// Skip, Skipf or SkipNow call, itself or through the package's own functions.
+func skippers(directory string) ([]string, error) {
+	return exportedReaching(directory, func(node ast.Node) bool {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			return false
+		}
+		name := calleeName(call)
+		return name == "Skip" || name == "Skipf" || name == "SkipNow"
+	})
+}
+
+// exportedReaching is every exported function and method of the non-test Go files of directory whose body holds a
+// node matches is true of, or calls a function or method of the package that does, followed to a fixed point, by its
+// bare name. Every file is read, whatever its build constraints, so a function that does so under one build counts.
+func exportedReaching(directory string, matches func(ast.Node) bool) ([]string, error) {
 	entries, readError := os.ReadDir(directory)
 	if readError != nil {
 		return nil, readError
 	}
-	starts := map[string]bool{}
+	reaches := map[string]bool{}
 	calls := map[string][]string{}
 	for _, entry := range entries {
 		name := entry.Name()
@@ -316,13 +363,14 @@ func goroutineStarters(directory string) ([]string, error) {
 			}
 			caller := function.Name.Name
 			ast.Inspect(function.Body, func(node ast.Node) bool {
-				switch node := node.(type) {
-				case *ast.GoStmt:
-					starts[caller] = true
-				case *ast.CallExpr:
-					if callee := calleeName(node); callee == "Go" {
-						starts[caller] = true
-					} else if callee != "" {
+				if node == nil {
+					return true
+				}
+				if matches(node) {
+					reaches[caller] = true
+				}
+				if call, isCall := node.(*ast.CallExpr); isCall {
+					if callee := calleeName(call); callee != "" {
 						calls[caller] = append(calls[caller], callee)
 					}
 				}
@@ -333,21 +381,21 @@ func goroutineStarters(directory string) ([]string, error) {
 	for changed := true; changed; {
 		changed = false
 		for caller, callees := range calls {
-			if !starts[caller] && slices.ContainsFunc(callees, func(callee string) bool { return starts[callee] }) {
-				starts[caller] = true
+			if !reaches[caller] && slices.ContainsFunc(callees, func(callee string) bool { return reaches[callee] }) {
+				reaches[caller] = true
 				changed = true
 			}
 		}
 	}
 	exported := []string{}
-	for name := range starts {
+	for name := range reaches {
 		if token.IsExported(name) {
 			exported = append(exported, name)
 		}
 	}
 	slices.Sort(exported)
 	if len(exported) == 0 {
-		return nil, fmt.Errorf("%s exports no function that starts goroutines, so the guard reads no call as one",
+		return nil, fmt.Errorf("%s exports no function the guard is reading for, so it would read no call as one",
 			directory)
 	}
 	return exported, nil
@@ -383,8 +431,8 @@ func startsGoroutines(node ast.Node) bool {
 	case *ast.GoStmt:
 		return true
 	case *ast.CallExpr:
-		// Ignored: a bounded package the guard can't read fails every narrowed entry's check, which asks the names
-		// first (narrowedRaceRunRefusals), so here the names it could read are enough.
+		// Ignored: concurrencySites and bodyConcurrentTests, the guard's only ways here, return the error of a bounded
+		// package they can't read before anything reaches this.
 		names, _ := concurrencyCallNames()
 		return slices.Contains(names, calleeName(node))
 	}
@@ -418,6 +466,9 @@ func declarationName(function *ast.FuncDecl) string {
 // outside any function, a package variable's literal, named for the file's package scope. Every file is read,
 // whatever its build constraints, so a site only another platform compiles still needs its claims.
 func concurrencySites(directory string) ([]string, error) {
+	if _, namesError := concurrencyCallNames(); namesError != nil {
+		return nil, namesError
+	}
 	entries, readError := os.ReadDir(directory)
 	if readError != nil {
 		return nil, readError
@@ -458,21 +509,24 @@ func concurrencySites(directory string) ([]string, error) {
 // files that does, followed through such functions however deep. A test whose concurrency lives in its own file
 // reaches no site of the package's code, so the sites alone would leave it out (#q1v0ern).
 func bodyConcurrentTests(directory string) ([]string, error) {
+	if _, namesError := concurrencyCallNames(); namesError != nil {
+		return nil, namesError
+	}
 	return testsReaching(directory, startsGoroutines)
 }
 
-// skippingTests is every top-level test of directory's test files that may skip: a Skip, Skipf or SkipNow call, or a
-// call of a Require helper (cgo_testing.RequireTranslation and its kind skip when the box lacks what they require),
+// skippingTests is every top-level test of directory's test files that may skip: a call skipCallNames reads as one,
+// testing's own or a need's that skips when the box lacks what it needs (needs.OptIn, cgo_testing.RequireTranslation),
 // in its own body or a function of the package's test files it calls. A claimant that may skip on a gate box may run
 // nothing there, so it never counts toward a site's claims (#q1v0ern, the Go Square's S6).
 func skippingTests(directory string) ([]string, error) {
+	names, namesError := skipCallNames()
+	if namesError != nil {
+		return nil, namesError
+	}
 	return testsReaching(directory, func(node ast.Node) bool {
 		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			return false
-		}
-		name := calleeName(call)
-		return name == "Skip" || name == "Skipf" || name == "SkipNow" || strings.HasPrefix(name, "Require")
+		return isCall && slices.Contains(names, calleeName(call))
 	})
 }
 
@@ -670,8 +724,15 @@ func claimSkips(test *testing.T, entry raceEntry, root string, claim raceClaim) 
 	test.Helper()
 	claimingDirectory := filepath.Join(root, filepath.FromSlash(entry.directory))
 	if claim.from != "" {
+		if claim.from == entry.directory {
+			return false, fmt.Sprintf("names its own entry, %s, as another's", claim.from)
+		}
+		if !regexp.MustCompile(`^J-[0-9a-z]{7}$`).MatchString(claim.census) {
+			return false, fmt.Sprintf("from %s names its census as %q, no Loom job's id: a claim from another entry "+
+				"is counted by that entry's census", claim.from, claim.census)
+		}
 		index := slices.IndexFunc(raceGated, func(other raceEntry) bool { return other.directory == claim.from })
-		if index < 0 || raceGated[index].kept == nil || claim.from == entry.directory {
+		if index < 0 || raceGated[index].kept == nil {
 			return false, fmt.Sprintf("names %s, which is no other narrowed entry of the -race list", claim.from)
 		}
 		if !slices.Contains(raceGated[index].kept.tests(), claim.test) {
@@ -730,6 +791,28 @@ func TestConcurrencySitesAndBodyConcurrentTestsAreReadFromTheCode(test *testing.
 	}
 }
 
+// The guard reads the bounded package's ways to start goroutines, and the needs' ways to skip, by following each
+// exported function through the package's own calls: an exported function that starts or skips only through an
+// unexported helper is one, the helper itself is not, and one that does neither is not.
+func TestStartersAndSkippersAreFollowedThroughTheirPackagesHelpers(test *testing.T) {
+	test.Parallel()
+	directory := filepath.Join("testdata", "race_starters")
+	starters, startersError := goroutineStarters(directory)
+	if startersError != nil {
+		test.Fatal(startersError)
+	}
+	if want := []string{"Start"}; !slices.Equal(starters, want) {
+		test.Errorf("the fixture's starters read %v, want %v", starters, want)
+	}
+	found, skippersError := skippers(directory)
+	if skippersError != nil {
+		test.Fatal(skippersError)
+	}
+	if want := []string{"Needs"}; !slices.Equal(found, want) {
+		test.Errorf("the fixture's skippers read %v, want %v", found, want)
+	}
+}
+
 // A narrowed entry's list is refused for each way it can fail its package, and a whole list is taken: so dropping a
 // claimed test, a site claimed once or one goroutine wide, a claimant that may skip counted as one of the two, a new
 // site, a stale one, a concurrent test left out, a run beside the list, an empty list, and a claim from no other
@@ -737,7 +820,8 @@ func TestConcurrencySitesAndBodyConcurrentTestsAreReadFromTheCode(test *testing.
 // functions, a method of a generic type and a package variable's literal, each keyed apart.
 func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 	test.Parallel()
-	directory := filepath.Join("testdata", "race_sites")
+	// Read from the module root, as the guard reads the list, so a claim from check reads check's own package.
+	directory := "command/cohere-dev/testdata/race_sites"
 	claimedTwice := func(site string) raceSite {
 		return raceSite{site: site, claims: []raceClaim{{test: "TestFansOut", width: 2},
 			{test: "TestDirect", width: 2}}}
@@ -778,6 +862,19 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 		"a claimant that may skip": {func(entry *raceEntry) {
 			entry.kept.sites[2].claims[0].test = "TestSkips"
 		}, "sites.go:pool.run#1 has 1 kept tests at least two goroutines wide that never skip"},
+		"a claimant that may skip through a need": {func(entry *raceEntry) {
+			entry.kept.sites[2].claims[0].test = "TestOptsIn"
+		}, "sites.go:pool.run#1 has 1 kept tests at least two goroutines wide that never skip"},
+		"a claim from another entry that it doesn't keep": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims[0] = raceClaim{test: "TestDirect", width: 2, from: "internal/go_language/check",
+				census: "J-0000000"}
+		}, "which internal/go_language/check's run doesn't keep"},
+		"a claim from the entry's own directory": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims[0].from = directory
+		}, "names its own entry"},
+		"a claim from another entry with no census": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims[0] = raceClaim{test: "TestDirect", width: 2, from: "internal/go_language/check"}
+		}, "no Loom job's id: a claim from another entry"},
 		"a site no test claims": {func(entry *raceEntry) {
 			entry.kept.sites = slices.Delete(entry.kept.sites, 3, 4)
 		}, "starts goroutines at sites.go:besides#1, which no kept test claims"},
@@ -795,11 +892,12 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 			"keeps no test"},
 		"a claim from no other narrowed entry": {func(entry *raceEntry) {
 			entry.kept.sites[0].claims[0].from = "internal/edit"
+			entry.kept.sites[0].claims[0].census = "J-0000000"
 		}, "names internal/edit, which is no other narrowed entry"},
 	} {
 		entry := raceEntry{directory: directory, kept: whole()}
 		change.change(&entry)
-		refusals := strings.Join(narrowedRaceRunRefusals(test, entry, "."), "; ")
+		refusals := strings.Join(narrowedRaceRunRefusals(test, entry, filepath.Join("..", "..")), "; ")
 		if (change.refusal == "") != (refusals == "") || !strings.Contains(refusals, change.refusal) {
 			test.Errorf("%s: the list is refused as %q, want %q", name, refusals, change.refusal)
 		}

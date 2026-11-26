@@ -307,15 +307,18 @@ var raceGated = []raceEntry{
 					// Both claimants above may skip on a gate box, one without cgo translation and one on one core, so
 					// check's restores, which drive the same restore here under check's own run, hold it.
 					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 32,
-						from: "internal/go_language/check"},
+						from:   "internal/go_language/check",
+						census: "J-jt23dev"},
 					{test: "TestARecordWrittenThroughWhoseHostRecordMovedIsAMiss", width: 33,
-						from: "internal/go_language/check"},
+						from:   "internal/go_language/check",
+						census: "J-jt23dev"},
 				}},
 				{site: "load.go:loadUnder#1", claims: []raceClaim{
 					// bounded.Beside starts one goroutine and returns at once, so its caller goes on beside it: two
-					// live, the census's one started there and the load returning.
+					// live, the census's one started there and the load returning. Each claimant's collection runs
+					// there, once its beforeInputs lets it go, while the test's own goroutines wait on it.
 					{test: "TestALoadReturnsBeforeItsInputsAreCollected", width: 2},
-					{test: "TestAPanicCollectingALoadsInputsReachesItsWaiter", width: 2},
+					{test: "TestALoadsInputsAreCollectedWithEverySlotHeld", width: 2},
 				}},
 				{site: "loader.go:loader.load#2", claims: []raceClaim{
 					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},

@@ -39,6 +39,9 @@ type raceClaim struct {
 	// site from that package: a site of one package's code another package's kept test drives wide is held to a
 	// -race run all the same. Empty is the entry's own package.
 	from string
+	// census is the Loom job that counted a claim from another entry, whose census is not this list's. Empty for the
+	// entry's own tests, counted by the list's census.
+	census string
 }
 
 // minimumSiteClaims is how many kept tests each site of a narrowed package needs, so one test renamed or changed
