@@ -6,7 +6,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 )
 
 // Each snippet goes through this printer and through the embedded Prettier fork, and the two outputs must
@@ -192,11 +192,10 @@ func formatOptionSets() map[string]format_options.Options {
 
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
-		oracle, newPrettierError := prettier.New(options)
-		if newPrettierError != nil {
-			test.Fatal(newPrettierError)
-		}
+		oracle := golden.Formatter(options)
 		for _, testCase := range formatCases {
 			expected, formatError := oracle.Format("Probe.graphql", testCase.source)
 			if formatError != nil {
@@ -265,10 +264,8 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 // on a shorthand query.
 func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 	test.Parallel()
-	oracle, newPrettierError := prettier.New(format_options.Default())
-	if newPrettierError != nil {
-		test.Fatal(newPrettierError)
-	}
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	oracle := oracle_testing.Open(test, test.Name()).Formatter(format_options.Default())
 	for _, source := range []string{"query { }\n", "query { a() }\n", "\"description\" { a }\n", "type T { a: }\n"} {
 		if _, formatError := oracle.Format("Probe.graphql", source); formatError == nil {
 			test.Fatalf("the oracle accepted %q", source)
