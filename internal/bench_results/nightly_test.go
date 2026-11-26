@@ -94,10 +94,10 @@ func TestTheNightlyGuardOpensNoQuietWindow(test *testing.T) {
 	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	// The isolation tier, the landing measurement and the live walks are off: they run real tests for minutes,
-	// which this test of the bench's quiet window has no use for.
+	// The isolation tier and the landing measurement are off: they run real tests for minutes, which this test of
+	// the bench's quiet window has no use for.
 	night := exec.Command(zsh, filepath.Join(bench, "nightly.zsh"), "--state", state, "--projects", "ahra",
-		"--cohere", "/usr/bin/true", "--isolation", "off", "--landing", "off", "--live", "off")
+		"--cohere", "/usr/bin/true", "--isolation", "off", "--landing", "off")
 	// zsh writes a here-string's temporary file under `TMPPREFIX`, /tmp/zsh unless set, never under `TMPDIR`, so the
 	// night is given one inside the test's own temporary directory.
 	night.Env = append(os.Environ(), "COHERE_DEV_HOME="+home, "TMPPREFIX="+filepath.Join(test.TempDir(), "zsh"),

@@ -9,7 +9,7 @@ import "testing"
 //
 // On `<` the copy is tried first, then autolink, then core htmlText. The copy and core accept the same
 // inputs, so core never wins here: where the copy fails, core is tried and fails the same way (the "all
-// fail" fixtures run that path). Core winning is covered by TestHtmlTextEvents, without the override.
+// fail" fixtures run that path). Core wins only without the override, the case htmlTextFixtures hold.
 var htmlTextOverrideFixtures = []string{
 	// Which construct wins on `<`: autolink, the copy, or none of the three.
 	"a <ab:c> d",
@@ -66,12 +66,6 @@ var htmlTextOverrideFixtures = []string{
 	"# a <b c=\"d\"> e",
 	"a <b c=\"d\n  e\">\n===",
 	"a <b c=\"d\n  e\"> f\n\ng <h\n  i> j",
-}
-
-func TestHtmlTextOverrideEvents(test *testing.T) {
-	test.Parallel()
-	compareEvents(test, htmlTextOverrideFixtures)
-	compareEvents(test, htmlTextFixtures)
 }
 
 // TestHtmlTextOverrideOrder checks the combined text constructs on `<`: the copy, then autolink, then core.

@@ -112,4 +112,4 @@ the test runner (not files that run their own process's top level, and nothing q
   binding's default, which cannot make a later finding false.
 - `gofmt -l` and `go vet` clean through the overlay. The whole suite is green apart from the two expected under
   an overlay: `TestRulesFlagListsEveryRegisteredRule` (480 against 481) and
-  `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` (this rule is not in the live config yet).
+  `TestEveryRegisteredRuleIsReachableFromTheSets` (this rule is not in a set yet).

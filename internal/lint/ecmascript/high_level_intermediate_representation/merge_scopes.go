@@ -74,7 +74,6 @@
 // 1,701 function-expression use-operands are visited and are candidates for the skip.
 // None of the 116,476 identifiers carries a type, which is why the real gate cannot be asked.
 // Recorded as `MergeGapPrimitiveOperandSkip` so a consumer can decline on it.
-// `TestMergeFunctionOperandSkipUpperBound` pins the bound together with its control.
 //
 // # Divergence from React: the widening minimises here, and upstream's own guard is why that is safe
 //
@@ -145,9 +144,8 @@
 //
 // The stack discipline itself depends on one property of this graph that upstream gets for free from
 // its own construction: evaluation order must be monotone along the block sequence, or a scope could
-// end before the sweep reaches it. Measured over all 685 corpus functions: 0 non-monotone steps.
-// `TestMergeAssumesMonotoneEvaluationOrder` pins it, because it is an assumption this file makes
-// about a table another file produces.
+// end before the sweep reaches it. Measured over 685 functions of real code: 0 non-monotone steps.
+// It is an assumption this file makes about a table another file produces.
 //
 // # Determinism, which two Go maps would otherwise destroy
 //
@@ -158,7 +156,6 @@
 // range comparator resolves the same way on every run. Without that, two scopes ending at the same
 // instruction would union in a random order and hand different representatives to different runs --
 // the shape that makes a cache non-reproducible without ever producing a wrong answer.
-// `TestMergeIsDeterministic` runs the pass twice over the corpus and compares.
 package high_level_intermediate_representation
 
 import (
@@ -318,7 +315,7 @@ func collectScopeInfo(function *Function, scopes *ReactiveScopes) (starts, ends 
 		// happens to emit rather than of the algorithm: a terminal whose operand is the sole
 		// appearance of a value is well-formed, and the sweep would silently stop seeing that scope.
 		// The verdict expires if lowering gains a terminal form that can hold a value no instruction
-		// touches. `TestMergeRegistersScopesFromTerminals` pins the zero so the expiry is visible.
+		// touches.
 		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) { record(place) })
 	}
 
@@ -402,8 +399,7 @@ func indexOfScope(stack []ScopeId, scope ScopeId) int {
 // It also changes real answers, and the check that shows it is not the obvious one. Reversing the
 // comparator leaves the union count identical at 412, so a count assertion still reads as equivalent;
 // the scope partition differs in 5 functions, which is only visible by comparing groups and ranges.
-// `TestAlignVoidsTheMergesComparatorVerdicts` runs that comparison with the unaligned table as its
-// control, where the two spellings still agree on every function.
+// On the unaligned table, the control, the two spellings agree on every function.
 func sortByStartDescending(scopes []ScopeId, rangeOf func(ScopeId) mutation_aliasing.MutableRange) {
 	sort.SliceStable(scopes, func(left, right int) bool {
 		return rangeOf(scopes[left]).Start > rangeOf(scopes[right]).Start

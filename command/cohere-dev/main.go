@@ -401,13 +401,7 @@ func countsOnce(arguments []string) bool {
 
 // goTest runs go test with the caller's terminal, under the bound when there is one, and returns its exit code.
 func goTest(base []string, arguments []string, limit *bound) int {
-	environment, uncovered, testEnvironmentError := testEnvironment(base)
-	if testEnvironmentError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
-		return 2
-	}
-	defer printUncovered(streams.Errors, uncovered)
-	return runAttached(limit, "", environment, "go", append([]string{"test"}, arguments...))
+	return runAttached(limit, "", base, "go", append([]string{"test"}, arguments...))
 }
 
 // holderLine describes the run holding a token: who, where, since when and what it runs.

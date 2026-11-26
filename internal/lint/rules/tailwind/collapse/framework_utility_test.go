@@ -7,9 +7,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 type wave1Fixture struct {
@@ -41,7 +38,7 @@ type wave1Fixture struct {
 // nothing and is counted separately from one where both produced the same reading, because folding
 // silence into equality is how a table that stopped answering scores perfectly.
 //
-// Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
+// Run on the public theme's oracle (#f598zk0), against the design system it records.
 func TestFrameworkFunctionalUtilitiesMatchTailwind(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "wave1_fixtures.json", func(test *testing.T, fixtureName string) {
@@ -250,20 +247,6 @@ func loadWave1Fixture(test *testing.T, name string) wave1Fixture {
 		)
 	}
 	return fixture
-}
-
-// loadWave1DesignSystem loads ahra's design system, which the wave fixtures were captured against: a skip
-// naming the variable when the corpus is unset, and a failure when it is set and does not load.
-func loadWave1DesignSystem(test *testing.T) *LoadedDesignSystem {
-	test.Helper()
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
-		EntryPoint:          corpus.Resolve(test, "ahra:app/_theme/styles/theme.css"),
-		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
-	})
-	if loadDesignSystemError != nil {
-		test.Fatalf("%s is set, but its design system does not load: %v", corpus.Ahra.Variable, loadDesignSystemError)
-	}
-	return system
 }
 
 // TestFrameworkStaticValuesDeclareTheirRootsProperty records what the static lookup can and cannot show.

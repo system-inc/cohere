@@ -30,8 +30,7 @@ type wave2bFixture struct {
 // Scored as a lattice for the same reason wave 1 is: mutual silence is counted apart from agreement,
 // because a table that stopped answering scores perfectly on any comparison that folds the two.
 //
-// Each wave runs on the public theme's oracle and on ahra's (#f598zk0), each against the design system
-// it records.
+// Each wave runs on the public theme's oracle (#f598zk0), against the design system it records.
 func TestFrameworkMultiDeclarationUtilitiesMatchTailwind(test *testing.T) {
 	test.Parallel()
 	for _, name := range []string{
