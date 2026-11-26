@@ -506,15 +506,13 @@ func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 	}
 }
 
-// A merge that changes what only Swift's checks judge refuses in the preflight, before anything is laid, measured or
-// tested (#5wj23dd): cohere-swift can't be built in an integrate job's sandbox, so nothing there would check the
-// change, and the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and the Swift
-// files of command/cohere and release's dispatch and packaging are each refused, named.
-func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
+// A merge that changes Swift's own paths, the Swift package and the Swift files of command/cohere and release's
+// dispatch and packaging, passes the preflight to be laid like any other (#je1r32a, Kirk's one-time bridge): the tests
+// that build cohere-swift skip by name (needs.SwiftLaid), and its Swift is proven on a Mac beside it.
+func TestAnIntegrateJobLaysAMergeChangingSwiftsOwnPaths(test *testing.T) {
 	test.Parallel()
 	for _, changed := range []string{"swift_language/Package.swift", "command/cohere/swift_binary.go",
-		"internal/release/dispatch/swift.go", "internal/release/dispatch/swift_tree_state_test.go",
-		"internal/release/packaging/swift_package.go"} {
+		"internal/release/dispatch/swift.go", "internal/release/packaging/swift_package.go"} {
 		test.Run(changed, func(test *testing.T) {
 			test.Parallel()
 			fixture := newIntegrateJobFixture(test)
@@ -522,41 +520,10 @@ func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T)
 			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a Swift change\n")
 			fixture.git(worktree, "add", ".")
 			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a Swift change"))
-			ran := fixture.integrateJob(fixture.merged())
-			if ran.exit != 1 || ran.integrated != "" {
-				test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit,
-					ran.lastLine, ran.errors)
-			}
-			for _, want := range []string{needs.SwiftUnlaid + ", so the merge's change to " + changed,
-				"integrate-job step preflight refused in "} {
-				if !strings.Contains(ran.errors, want) {
-					test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
-				}
-			}
-			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
-				test.Errorf("a merge changing %s ran %q", changed, calls)
-			}
-		})
-	}
-}
-
-// A merge that changes a file beside the Swift ones, in a package whose Swift files the preflight refuses, isn't
-// refused: the guard names Swift's files, never their packages whole.
-func TestAnIntegrateJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
-	test.Parallel()
-	for _, changed := range []string{"command/cohere/discovery.go", "internal/release/dispatch/progress.go",
-		"internal/release/packaging/checksums.go", "internal/release/dispatch/swiftly.go"} {
-		test.Run(changed, func(test *testing.T) {
-			test.Parallel()
-			fixture := newIntegrateJobFixture(test)
-			worktree := fixture.worktree("a")
-			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a change Go judges\n")
-			fixture.git(worktree, "add", ".")
-			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a change Go judges"))
 			// The fixture scripts no measurement, so the job stops there: what matters is that it got past the
 			// preflight and laid the merge.
 			ran := fixture.integrateJob(fixture.merged())
-			if strings.Contains(ran.errors, "preflight refused") || strings.Contains(ran.errors, "can't be judged") ||
+			if strings.Contains(ran.errors, "preflight refused") ||
 				!strings.Contains(ran.errors, "integrate-job step lay ") {
 				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
 			}
