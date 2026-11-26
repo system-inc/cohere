@@ -205,7 +205,7 @@ var glueParseFixtures = []glueParseFixture{
 // as agreement.
 func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 	test.Parallel()
-	oracle := newBundleOracle(test)
+	golden := oracle_testing.Open(test, test.Name())
 	identical, refusedByBoth, different, nullEnds := 0, 0, 0, 0
 	fail := func(format string, arguments ...any) {
 		different++
@@ -214,7 +214,7 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 		}
 	}
 	for _, fixture := range glueParseFixtures {
-		answer, oracleError := oracle.answer(
+		answer, oracleError := golden.Evaluate(
 			oracle_testing.Key("cssParse", fixture.text),
 			glueParseScript,
 			fixture.text,
