@@ -9,6 +9,7 @@
 //	go run ./command/cohere-dev land                  one merge commit onto main, gated, one landing at a time
 //	go run ./command/cohere-dev land --train <heads>  two to four accepted units landed under one gate
 //	go run ./command/cohere-dev integrate-job --merge <sha>  Loom's job on Shackler: a merge measured and gated
+//	go run ./command/cohere-dev integrate-job --fill  Loom's cold fill: main's tip gated as laid, measuring nothing
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //	go run ./command/cohere-dev quiet on|off|wait     a quiet window: no job starts but the one it is for (quiet.go)
 //	go run ./command/cohere-dev worktree <name>       a hand's worktree, made or moved to main by git (worktree.go)
@@ -93,6 +94,8 @@ func usage() int {
 		"       cohere-dev land --train <head> <head> [<head> [<head>]] --task <id> [--message <what landed>]\n"+
 		"       cohere-dev measure [<commit>]   the landing's measurement on Shackler alone, landing nothing\n"+
 		"       cohere-dev integrate-job --merge <sha> --task <id> [--message <what it integrates>]\n"+
+		"       cohere-dev integrate-job --fill --task <id>   main's tip judged as laid, filling the cache, measuring "+
+		"nothing\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [--through <name>] [why] | off | wait]\n"+
 		"         every job but status, quiet and worktree takes --through <name>, for the run a window lets through\n"+

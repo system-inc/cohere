@@ -38,6 +38,14 @@ import (
 //     own functions, a step whose inputs a passed run keyed replaying it (integrateJobReplay).
 //  6. Landing: nothing is committed or pushed. The last lines say what Loom's finisher needs to make the landing on
 //     Kirk's Mac (landingLines): the performance file, the tested tree's hash, and the landing's whole message.
+//
+// With --fill it judges no merge but the commit it runs at, main's tip itself (#fnrchck, Loom's ruling): the job Loom's
+// runner lets fill the shared Go cache does the same work at main an integration does, so its verdict compares with an
+// integration's at the same tree step by step. Its preflight lays the mirrors, waits for the commit to reach them, and
+// runs only what reads the tree, the gitlinks; what judges a candidate has nothing new to judge (fillPreflight). It
+// lays that commit's tree as a merge's is laid, measures nothing, its account saying so once, runs the tests and the
+// checks as an integration does, and its last line is `filled <tree>`, with no finisher's lines, nothing committed or
+// pushed.
 
 // integrateJobCacheVariable is the integrate job's kept directory: its Go build and test cache, `gocache`, kept across
 // jobs, and its replay store, `steps`. Unset, the integrate job's tests run as a gate box's do, on an empty cache with
@@ -91,26 +99,34 @@ const integrateJobMarker = "land-job: "
 var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // integrateJobOptions are what integrate-job is told: the merge Loom made, the task it finishes, and what it integrates
-// when its commits don't say it in one subject.
+// when its commits don't say it in one subject; or, with Fill, that it judges the commit it runs at, filling.
 type integrateJobOptions struct {
 	Merge   string
 	Task    string
 	Message string
+	Fill    bool
 }
 
 // parseIntegrateJobOptions reads `--merge <sha>`, `--task <id>` and `--message <what it integrates>`, each also as
-// `--name=value`, the merge, whole, and the task required.
+// `--name=value`, the merge, whole, and the task required; or `--fill` and `--task <id>`, a fill taking no merge and no
+// message, since it lands nothing.
 func parseIntegrateJobOptions(arguments []string) (integrateJobOptions, error) {
 	options := integrateJobOptions{}
+	named := map[string]bool{}
 	for index := 0; index < len(arguments); index++ {
+		if arguments[index] == "--fill" {
+			options.Fill = true
+			continue
+		}
 		name, value, joined := strings.Cut(strings.TrimPrefix(arguments[index], "--"), "=")
 		if !strings.HasPrefix(arguments[index], "--") || (name != "merge" && name != "task" && name != "message") {
 			return integrateJobOptions{}, fmt.Errorf(
-				"integrate-job takes --merge <sha>, --task <id> and --message <what "+
-					"it integrates>, and %q is none of them",
+				"integrate-job takes --merge <sha>, --task <id>, --message <what "+
+					"it integrates> and --fill, and %q is none of them",
 				arguments[index],
 			)
 		}
+		named[name] = true
 		if !joined {
 			if index+1 == len(arguments) {
 				return integrateJobOptions{}, fmt.Errorf("--%s needs a value", name)
@@ -127,6 +143,18 @@ func parseIntegrateJobOptions(arguments []string) (integrateJobOptions, error) {
 			options.Message = strings.TrimSpace(value)
 		}
 	}
+	if options.Fill {
+		for _, name := range []string{"merge", "message"} {
+			if named[name] {
+				return integrateJobOptions{}, fmt.Errorf("integrate-job --fill judges the commit it runs at and lands "+
+					"nothing, so it takes no --%s", name)
+			}
+		}
+		if options.Task == "" {
+			return integrateJobOptions{}, errors.New("integrate-job --fill needs --task <id>")
+		}
+		return options, nil
+	}
 	if !fullCommit.MatchString(options.Merge) || options.Task == "" {
 		return integrateJobOptions{}, errors.New("integrate-job needs --merge <the merge's whole sha> and --task <id>")
 	}
@@ -137,7 +165,8 @@ func parseIntegrateJobOptions(arguments []string) (integrateJobOptions, error) {
 type integrateJobRun struct {
 	options integrateJobOptions
 	started time.Time
-	// running is the commit the job runs at, main as the merge's first parent must be, and candidate its second.
+	// running is the commit the job runs at, main as the merge's first parent must be, and candidate its second. A fill
+	// judges running itself, so merge is running and there is no candidate.
 	running   string
 	candidate string
 	merge     string
@@ -210,6 +239,9 @@ func integrateJob(arguments []string) int {
 			"working directory has no HEAD\n", integrateJobCommitVariable)
 		return 1
 	}
+	if options.Fill {
+		job.merge = job.running
+	}
 	home, homeError := os.UserHomeDir()
 	if homeError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: finding the integrate job's home for its scratch: %v\n", homeError)
@@ -264,8 +296,12 @@ func integrateJob(arguments []string) int {
 	job.say("step total %s", integrateJobSeconds(time.Since(job.started)))
 	job.sayDisk("after")
 	if code != 0 {
-		fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job refused after %s, so nothing integrates\n",
-			integrateJobSeconds(time.Since(job.started)))
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: integrate-job refused after %s, so nothing %s\n",
+			integrateJobSeconds(time.Since(job.started)),
+			map[bool]string{false: "integrates", true: "fills"}[options.Fill],
+		)
 		return code
 	}
 	return 0
@@ -369,22 +405,33 @@ func settingOr(variable string, fallback string) string {
 	return fallback
 }
 
-// integrate runs the job's steps in order and returns the exit code.
+// integrate runs the job's steps in order and returns the exit code. A fill runs them but the measurement, which its
+// account says once it skipped, and ends on `filled <tree>`, the laid tree, never the finisher's lines.
 func (job *integrateJobRun) integrate() int {
-	for _, step := range []struct {
+	steps := []struct {
 		name string
 		work func() (string, int)
 	}{
 		{"preflight", job.preflight},
 		{"lay", job.lay},
 		{"measure", job.measure},
-	} {
+	}
+	if job.options.Fill {
+		steps = steps[:2]
+		steps[0].work = job.fillPreflight
+	}
+	for _, step := range steps {
 		if code := job.step(step.name, step.work); code != 0 {
 			return code
 		}
 	}
+	if job.options.Fill {
+		job.integratedTree = job.mergeTree
+		job.say("measure skipped: a fill measures nothing")
+	}
 	// The tests and the checks run through one pool token, each taking its share as the pool is when it starts.
-	code := withSteppedToken("integrate job of "+shortCommit(job.merge), func(share func(string) []string) int {
+	code := withSteppedToken(map[bool]string{false: "integrate job of ", true: "fill job at "}[job.options.Fill]+
+		shortCommit(job.merge), func(share func(string) []string) int {
 		if code := job.step("tests", func() (string, int) { return job.tests(share) }); code != 0 {
 			return code
 		}
@@ -396,6 +443,11 @@ func (job *integrateJobRun) integrate() int {
 	}
 	if code != 0 {
 		return code
+	}
+	if job.options.Fill {
+		streams.Show(streams.Errors)
+		fmt.Fprintf(streams.Output, "filled %s\n", job.mergeTree)
+		return 0
 	}
 	lines, linesError := job.landingLines()
 	if linesError != nil {
@@ -432,8 +484,10 @@ func (job *integrateJobRun) step(name string, work func() (string, int)) int {
 
 // awaitMerge waits, up to integrateJobMergeWait, for the merge to reach the job's repository, which borrows the mirror,
 // and refuses once it hasn't, saying the mirror held no merge: the bridge's carry is the road's, so the refusal names
-// it and never reads as a red of the merge. A merge already there costs one look.
+// it and never reads as a red of the merge. A merge already there costs one look. A fill waits so for the commit it
+// runs at, which its words name a commit.
 func (job *integrateJobRun) awaitMerge() int {
+	judged := map[bool]string{false: "merge", true: "commit"}[job.options.Fill]
 	wait := integrateJobMergeWait
 	if setting := strings.TrimSpace(os.Getenv(integrateJobMergeWaitVariable)); setting != "" {
 		parsed, parseError := time.ParseDuration(setting)
@@ -455,14 +509,14 @@ func (job *integrateJobRun) awaitMerge() int {
 			return 0
 		}
 		if time.Since(started) >= wait {
-			fmt.Fprintf(streams.Errors, "cohere-dev: %s held no merge %s after %s of waiting: Loom's bridge hasn't "+
-				"carried it there, which is the road's to fix and never a red of this merge (#hq61wfg)\n", job.mirror,
-				job.merge, wait)
+			fmt.Fprintf(streams.Errors, "cohere-dev: %s held no %s %s after %s of waiting: Loom's bridge hasn't "+
+				"carried it there, which is the road's to fix and never a red of this %s (#hq61wfg)\n", job.mirror,
+				judged, job.merge, wait, judged)
 			return 1
 		}
 		if !said {
-			fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job waits up to %s for the merge %s to reach %s\n", wait,
-				shortCommit(job.merge), job.mirror)
+			fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job waits up to %s for the %s %s to reach %s\n", wait,
+				judged, shortCommit(job.merge), job.mirror)
 			streams.Show(streams.Errors)
 		}
 		time.Sleep(poll)
@@ -474,16 +528,10 @@ func integrateJobSeconds(spent time.Duration) string {
 	return fmt.Sprintf("%.1fs", spent.Seconds())
 }
 
-// preflight lays the integrate job's mirrors, borrowing the house's, waits for the merge to reach them (awaitMerge),
-// reads it, refuses one whose first parent isn't the commit the job runs at, and runs integrateJobPreflight on its
-// parents.
+// preflight reaches the merge in the integrate job's mirrors (reachMerge), reads it, refuses one whose first parent
+// isn't the commit the job runs at, and runs integrateJobPreflight on its parents.
 func (job *integrateJobRun) preflight() (string, int) {
-	if layError := layIntegrateJobMirrors(filepath.Join(job.mirror, "objects"), job.mirrors,
-		[]string{filepath.Join(filepath.Dir(job.mirror), "TypeScript.git", "objects")}); layError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: laying the integrate job's mirrors in %s: %v\n", job.mirrors, layError)
-		return "", 1
-	}
-	if code := job.awaitMerge(); code != 0 {
+	if code := job.reachMerge(); code != 0 {
 		return "", code
 	}
 	parents, parentsError := gitOutput(job.repository, "rev-list", "--parents", "-n", "1", job.merge)
@@ -500,22 +548,6 @@ func (job *integrateJobRun) preflight() (string, int) {
 		return "", 1
 	}
 	job.candidate = fields[2]
-	// The merge is kept on a ref of the integrate job's own, so the tree laid from it is never left dangling.
-	if _, updateError := gitOutput(
-		job.repository,
-		"update-ref",
-		"refs/integrate-job/merge",
-		job.merge,
-	); updateError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", updateError)
-		return "", 1
-	}
-	mergeTree, treeError := gitOutput(job.repository, "rev-parse", job.merge+"^{tree}")
-	if treeError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", treeError)
-		return "", 1
-	}
-	job.mergeTree = mergeTree
 	message := job.options.Message
 	if message == "" {
 		// On the PR road no --message is given, and GitHub's merge group commit carries the pull request's title.
@@ -553,6 +585,53 @@ func (job *integrateJobRun) preflight() (string, int) {
 	job.commits, job.subject = commits, subject
 	return subject + ", " + shortCommit(job.candidate) + " merged onto main at " + shortCommit(job.running) + " as " +
 		shortCommit(job.merge), 0
+}
+
+// fillPreflight is a fill's first step: the commit the job runs at reached in the mirrors as a merge is (reachMerge),
+// and of integrateJobPreflight's checks the one that reads only the tree, its submodules recorded as gitlinks
+// (checkGitlinks). The rest judge a candidate, and a fill has none,
+// main's tip being already landed: the merge's two parents, main holding the candidate (heldByMain), the commits'
+// subjects and their task, the landing's subject and --message, and the Swift guard, which reads what a merge changes
+// against main (integrateJobSwiftRefusal).
+func (job *integrateJobRun) fillPreflight() (string, int) {
+	if code := job.reachMerge(); code != 0 {
+		return "", code
+	}
+	if checkGitlinksError := checkGitlinks(job.repository, job.merge); checkGitlinksError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkGitlinksError)
+		return "", 1
+	}
+	return "main at " + shortCommit(job.merge) + ", no candidate to judge", 0
+}
+
+// reachMerge lays the integrate job's mirrors, borrowing the house's, waits for what it judges, the merge or a fill's
+// commit, to reach them (awaitMerge), keeps it on a ref of the job's own, so the tree laid from it is never left
+// dangling, and reads its tree.
+func (job *integrateJobRun) reachMerge() int {
+	if layError := layIntegrateJobMirrors(filepath.Join(job.mirror, "objects"), job.mirrors,
+		[]string{filepath.Join(filepath.Dir(job.mirror), "TypeScript.git", "objects")}); layError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: laying the integrate job's mirrors in %s: %v\n", job.mirrors, layError)
+		return 1
+	}
+	if code := job.awaitMerge(); code != 0 {
+		return code
+	}
+	if _, updateError := gitOutput(
+		job.repository,
+		"update-ref",
+		"refs/integrate-job/merge",
+		job.merge,
+	); updateError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", updateError)
+		return 1
+	}
+	mergeTree, treeError := gitOutput(job.repository, "rev-parse", job.merge+"^{tree}")
+	if treeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", treeError)
+		return 1
+	}
+	job.mergeTree = mergeTree
+	return 0
 }
 
 // integrateJobPreflight is the integrate job's first step, every refusal it can make without a gate, in seconds: what
