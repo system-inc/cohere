@@ -962,8 +962,6 @@ func typeName(value InstructionValue) string {
 	}
 }
 
-// itoa is shared with lower_corpus_test.go, which declared it first.
-
 // TestCaptureReceiverIsAliasedExactlyOnce pins upstream's receiver-alias guard.
 //
 // `compute_effects_for_legacy_signature` aliases the receiver into the result unless the receiver's
@@ -1073,4 +1071,16 @@ function f(lib: { doThing(v: object): void }, v: object) { lib.doThing(v); retur
 		test.Fatal("calling a method must not record that the method itself was mutated; " +
 			"mutatesCallee is false for a MethodCall")
 	}
+}
+
+// itoa writes a non-negative integer in decimal.
+func itoa(value int) string {
+	if value == 0 {
+		return "0"
+	}
+	digits := ""
+	for remaining := value; remaining > 0; remaining /= 10 {
+		digits = string(rune('0'+remaining%10)) + digits
+	}
+	return digits
 }

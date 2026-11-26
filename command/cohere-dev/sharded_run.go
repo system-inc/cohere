@@ -34,17 +34,17 @@ const boxShardListingMarker = "cohere-dev-gate: listed "
 // index from 1, then the shard's tests, each separated by a space.
 const boxShardMarker = "cohere-dev-gate: shard "
 
-// sharedBoxShards is sharedBoxGate's run of the sharded package, given its import path as sharded and testsFailed,
-// which it sets to 1 when a shard fails. A listing that fails is a package that doesn't build, and one listing no test
-// has nothing to deal, so either runs as one go test, which reports it as the gate always has. Otherwise there is a
-// shard per two cores, the cores being the box's core budget when she has one, at least one shard and never more than
-// the tests listed, and each runs on 2 threads. The shards' outputs are printed after all have ended, each whole after
-// its marker, so Kirk's Mac reads every event under the shard that ran it.
-const sharedBoxShards = `listing=$(go test -count=1 -list '.*' "$sharded" 2>&1) || listing=""
+// sharedBoxShards is sharedBoxGate's run of the sharded package, given its import path as sharded, countFlag
+// (sharedBoxCacheBlock) and testsFailed, which it sets to 1 when a shard fails. A listing that fails is a package that
+// doesn't build, and one listing no test has nothing to deal, so either runs as one go test, which reports it as the
+// gate always has. Otherwise there is a shard per two cores, the cores being the box's core budget when she has one, at
+// least one shard and never more than the tests listed, and each runs on 2 threads. The shards' outputs are printed
+// after all have ended, each whole after its marker, so Kirk's Mac reads every event under the shard that ran it.
+const sharedBoxShards = `listing=$(go test $countFlag -list '.*' "$sharded" 2>&1) || listing=""
 # go test runs tests, examples and fuzz targets' seeds; a benchmark runs only under -bench, so none is dealt.
 listed=$(printf '%s\n' "$listing" | grep -E '^(Test|Example|Fuzz)[^[:space:]]*$' || true)
 if [ -z "$listed" ]; then
-  go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json "$sharded" |
+  go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json "$sharded" |
     grep -vE '"Action":"(start|run|pause|cont)"' || testsFailed=1
 else
   cores="${` + boxCoreBudgetVariable + `:-}"
@@ -66,7 +66,7 @@ else
   shardProcesses=""
   shard=0
   while [ "$shard" -lt "$shardCount" ]; do
-    GOMAXPROCS=2 go test -count=1 -timeout ` + sharedBoxTestTimeout + ` -json -run "^(${shardNames[shard]// /|})$" \
+    GOMAXPROCS=2 go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -run "^(${shardNames[shard]// /|})$" \
       "$sharded" > "$shards/$shard" 2>&1 &
     shardProcesses="$shardProcesses $!"
     shard=$((shard + 1))

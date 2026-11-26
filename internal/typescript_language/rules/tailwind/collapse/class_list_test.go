@@ -11,27 +11,23 @@ import (
 )
 
 // classListOracles are the `getClassList()` captures BuildClassList is held to: the public theme and a
-// synthetic one, on every machine, and two consumer themes through their corpora. Two consumers rather
-// than one is what shows the list is built from the run's theme rather than from one repository's
-// measurement: ahra and www-connected-app share Structure but not their own `@theme`, and their lists
-// differ by 150 classes. The synthetic theme holds the shapes none of the others write; see its header.
+// synthetic one, on every machine. Two themes rather than one is what shows the list is built from the
+// run's theme rather than from one measurement: they declare different `@theme` and `@utility` content, so
+// a list carried over from either fails the other. The synthetic theme holds the shapes the public one
+// doesn't write; see its header.
 //
-// Regenerate from the repository root with:
+// Regenerate from the repository root with, R being any directory whose node_modules holds tailwindcss 4.3.3:
 //
 //	T=internal/typescript_language/rules/tailwind/tools/generate_suggestions
 //	D=internal/typescript_language/rules/tailwind/collapse/testdata
-//	node $T/class_list.mjs $D/public_theme/theme.css --resolve-root ahra: > $D/class_list_public.txt.gz
-//	node $T/class_list.mjs $D/class_list_theme/theme.css --resolve-root ahra: > $D/class_list_synthetic.txt.gz
-//	node $T/class_list.mjs ahra:app/_theme/styles/theme.css > $D/class_list.txt.gz
-//	node $T/class_list.mjs connected:app/_theme/styles/theme.css > $D/class_list_connected.txt.gz
+//	node $T/class_list.mjs $D/public_theme/theme.css --resolve-root $R > $D/class_list_public.txt.gz
+//	node $T/class_list.mjs $D/class_list_theme/theme.css --resolve-root $R > $D/class_list_synthetic.txt.gz
 var classListOracles = []struct {
 	name string
 	file string
 }{
 	{name: "public", file: "class_list_public.txt.gz"},
 	{name: "synthetic", file: "class_list_synthetic.txt.gz"},
-	{name: "ahra", file: "class_list.txt.gz"},
-	{name: "connected", file: "class_list_connected.txt.gz"},
 }
 
 // TestClassListAgreesWithTailwind holds BuildClassList to Tailwind's own class list, class for class,

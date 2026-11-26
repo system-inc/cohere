@@ -18,7 +18,7 @@ import (
 // linter check's key, `unused-disable` or discovery's folder check, configures the linter rather than a rule.
 //
 // Here rather than beside the sets, because it needs the whole rule set, and the configuration package's test
-// binary does not link it (see BenchmarkLoadForTheLiveConfiguration).
+// binary does not link it (see BenchmarkLoadForAProjectConfiguration).
 func TestEveryKeyInEverySetReachesARegisteredRule(test *testing.T) {
 	test.Parallel()
 	names := Names()

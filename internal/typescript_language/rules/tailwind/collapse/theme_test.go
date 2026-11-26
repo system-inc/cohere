@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/repository"
 	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind/vendored"
 )
 
@@ -23,8 +23,9 @@ import (
 // namespace that has no ignored siblings, which is most of them.
 //
 // The corpus has two halves and needs both. The repository half is the exit criterion for this
-// component: two real repositories on the same Tailwind, whose themes differ, diffed key by key
-// against what Tailwind built from the same files. The synthetic half reaches the branches a real
+// component: a repository's theme diffed key by key against what Tailwind built from the same files.
+// It was two real repositories on the same Tailwind, whose themes differ, and is now the public theme,
+// since cohere's tests no longer read other repositories (#5wj23dd). The synthetic half reaches the branches a real
 // theme never does, `initial` deletion, namespace clearing, `@theme default` losing to a
 // non-default value, prefixes, and the dot-to-underscore retry, which is roughly half of `theme.ts`
 // and all of the half where a port fails silently.
@@ -107,21 +108,13 @@ type themeOptionFixture struct {
 // tailwindPackageRoots maps a repository case's name to the tailwindcss install its theme resolves
 // `@import "tailwindcss"` against.
 //
-// Both are 4.3.3, which is the point: the two repositories differ by their own `@theme` content on
-// an identical framework, so a table generated from either one is wrong for the other. That is the
-// defect this whole component exists to fix, and the corpus is what proves it is real rather than
-// theorized. Both are the vendored snapshot of 4.3.3, which is that identical framework, on any machine
-// (#sycrdr6).
-//
 // The public theme's copy of the fixture (#f598zk0) carries one repository case, testdata/public_theme, on
-// the same vendored framework.
+// the vendored snapshot of 4.3.3, so it loads on any machine (#sycrdr6).
 func tailwindPackageRoots(test *testing.T) map[string]string {
 	test.Helper()
 	snapshot := vendored.TailwindPackageRootForTest(test)
 	return map[string]string{
-		"ahra":              snapshot,
-		"www-connected-app": snapshot,
-		"public":            snapshot,
+		"public": snapshot,
 	}
 }
 
@@ -146,10 +139,10 @@ func loadThemeCorpus(test *testing.T, name string) themeCorpus {
 // buildThemeForCase builds a Theme the way the case demands: a synthetic case is parsed from its
 // inline stylesheet, a repository case is loaded from disk through its whole import graph.
 //
-// A repository case's stylesheet is spelled inside its corpus, so the case skips naming the variable
-// when that corpus is unset, and fails when it is set and lacks the stylesheet. It skips loudly: a
-// silently absent repository half would turn the exit criterion into a synthetic-only suite that
-// still prints a green line, which is exactly the failure mode this slice has been bitten by.
+// A repository case's stylesheet is a path inside this repository, so a case whose stylesheet is
+// missing fails rather than skips: a silently absent repository half would turn the exit criterion
+// into a synthetic-only suite that still prints a green line, which is exactly the failure mode this
+// slice has been bitten by.
 func buildThemeForCase(test *testing.T, aCase themeCase) (*Theme, []SkippedDirective, bool) {
 	test.Helper()
 
@@ -169,8 +162,8 @@ func buildThemeForCase(test *testing.T, aCase themeCase) (*Theme, []SkippedDirec
 	return loader.theme, loader.skipped, true
 }
 
-// loadRepositoryTheme loads a repository case's theme from its corpus, through the vendored tailwindcss
-// its name maps to.
+// loadRepositoryTheme loads a repository case's theme from the stylesheet it records inside this
+// repository, through the vendored tailwindcss its name maps to.
 func loadRepositoryTheme(test *testing.T, aCase themeCase) (*Theme, []SkippedDirective) {
 	test.Helper()
 	packageRoot, ok := tailwindPackageRoots(test)[aCase.Name]
@@ -180,7 +173,7 @@ func loadRepositoryTheme(test *testing.T, aCase themeCase) (*Theme, []SkippedDir
 	if _, statError := os.Stat(filepath.Join(packageRoot, "index.css")); statError != nil {
 		test.Fatalf("the vendored tailwindcss for %q is not at %s: %v", aCase.Name, packageRoot, statError)
 	}
-	entryPath := corpus.Resolve(test, aCase.EntryPath)
+	entryPath := repository.Path(test, aCase.EntryPath)
 	theme, skipped, loadThemeFromFileError := LoadThemeFromFile(entryPath, NodeStylesheetResolver(packageRoot))
 	if loadThemeFromFileError != nil {
 		test.Fatalf("load %s: %v", entryPath, loadThemeFromFileError)
@@ -188,49 +181,16 @@ func loadRepositoryTheme(test *testing.T, aCase themeCase) (*Theme, []SkippedDir
 	return theme, skipped
 }
 
-// coveredRepositoryCases is how many of the fixture's repository cases have their corpus set, which is
-// how many a run must check: the rest skip, naming their variable. A case recorded as a path inside this
-// repository, such as the public theme's, needs no corpus and is always covered.
-func coveredRepositoryCases(test *testing.T, fixture themeCorpus) int {
-	test.Helper()
-	covered := 0
-	for _, aCase := range fixture.Cases {
-		if aCase.Source != "repository" {
-			continue
-		}
-		repositoryCorpus, _, spelled, spelledError := corpus.Spelled(aCase.EntryPath)
-		if spelledError != nil {
-			test.Fatalf("repository case %q records %q: %v", aCase.Name, aCase.EntryPath, spelledError)
-		}
-		if !spelled {
-			if filepath.IsAbs(aCase.EntryPath) {
-				test.Fatalf(
-					"repository case %q records the absolute path %q, which reads the same on no other machine",
-					aCase.Name,
-					aCase.EntryPath,
-				)
-			}
-			covered++
-			continue
-		}
-		if repositoryCorpus.Covered() {
-			covered++
-		}
-	}
-	return covered
-}
-
 // TestThemeMatchesTailwind is the differential: every answer the port gives, against the answer
 // Tailwind gave for the same question.
 //
 // The counts are printed on success rather than only on failure. A suite that compared twelve
 // answers and a suite that compared two hundred thousand are indistinguishable from a green line,
-// and this component's whole claim is about scale: it is checked against two real design systems,
+// and this component's whole claim is about scale: it is checked against a design system Tailwind built,
 // not against a reading.
 //
-// Run on the public theme's copy of the fixture and on ahra's (#f598zk0). Their synthetic cases are the
-// same; the public copy's repository case is testdata/public_theme, so the repository half runs on every
-// machine.
+// Run on the public theme's copy of the fixture (#f598zk0): its repository case is testdata/public_theme,
+// so the repository half runs on every machine.
 func TestThemeMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "theme_fixtures.json", func(test *testing.T, fixtureName string) {
@@ -431,14 +391,13 @@ func expectThemeMatchesTailwind(test *testing.T, fixture themeCorpus) {
 	}
 
 	// Coverage. A count that has never been shown to be large is not a large count, and a suite
-	// that skipped its repository half would otherwise report the same green line as one that ran
-	// it. Every repository case whose corpus is set must have run; the rest skipped naming their
-	// variable, so the run says what it did not compare.
-	if covered := coveredRepositoryCases(test, fixture); repositoriesChecked != covered {
+	// that lost its repository half would otherwise report the same green line as one that ran it.
+	// Every repository case the fixture records must have run.
+	if repositoriesChecked != fixture.RepositoryCaseCount {
 		test.Errorf(
-			"%d repository cases ran and %d have their corpus set: the exit criterion for this component is a comparison against two real design systems",
+			"ran %d of %d repository cases: the exit criterion for this component is a comparison against a real design system",
 			repositoriesChecked,
-			covered,
+			fixture.RepositoryCaseCount,
 		)
 	}
 	if syntheticChecked != fixture.SyntheticCaseCount {
@@ -459,75 +418,6 @@ func expectThemeMatchesTailwind(test *testing.T, fixture themeCorpus) {
 	)
 }
 
-// TestThemeRepositoriesDiffer is the measurement the whole port argues from.
-//
-// cohere shipped generated tables built from one repository and linted three with them. That is
-// only a defect if two repositories on the same Tailwind actually resolve different themes, so this
-// asserts it directly rather than leaving it as the premise of a design document. If this test ever
-// passes trivially because the two themes became identical, the assertion below fails rather than
-// quietly succeeding.
-func TestThemeRepositoriesDiffer(test *testing.T) {
-	test.Parallel()
-	fixture := loadThemeCorpus(test, "theme_fixtures.json")
-
-	type resolved struct {
-		name string
-		keys map[string]string
-		size int
-	}
-	var themes []resolved
-
-	for _, aCase := range fixture.Cases {
-		if aCase.Source != "repository" {
-			continue
-		}
-		theme, _ := loadRepositoryTheme(test, aCase)
-		keys := make(map[string]string, theme.Size())
-		for _, entry := range theme.Entries() {
-			keys[entry.Key] = entry.Value
-		}
-		themes = append(themes, resolved{name: aCase.Name, keys: keys, size: theme.Size()})
-	}
-
-	if len(themes) < 2 {
-		test.Fatalf("need two repositories to compare, have %d", len(themes))
-	}
-
-	first, second := themes[0], themes[1]
-
-	var onlyInFirst int
-	var onlyInSecond int
-	var differingValues int
-	for key, value := range first.keys {
-		otherValue, present := second.keys[key]
-		switch {
-		case !present:
-			onlyInFirst++
-		case otherValue != value:
-			differingValues++
-		}
-	}
-	for key := range second.keys {
-		if _, present := first.keys[key]; !present {
-			onlyInSecond++
-		}
-	}
-
-	if onlyInFirst == 0 && onlyInSecond == 0 && differingValues == 0 {
-		test.Errorf(
-			"%s and %s resolved identical themes; the argument for this port is that they do not, "+
-				"so either the corpus regressed to one repository or the loader is not reading the repository in front of it",
-			first.name, second.name,
-		)
-	}
-
-	test.Logf(
-		"%s resolved %d entries, %s resolved %d: %d keys only in %s, %d only in %s, %d shared keys with different values",
-		first.name, first.size, second.name, second.size,
-		onlyInFirst, first.name, onlyInSecond, second.name, differingValues,
-	)
-}
-
 // TestThemeLoaderReportsSkippedDirectives pins which directives the loader knows it is not acting
 // on.
 //
@@ -535,40 +425,42 @@ func TestThemeRepositoriesDiffer(test *testing.T) {
 // runs. That is a real gap in this component, and the honest handling is to report it: a
 // repository that started declaring theme values in TypeScript would produce a theme quietly short
 // by that many keys, and this is what makes that arrive as a visible directive rather than as a
-// wrong count. See the boundary note in themeloader.go.
+// wrong count. See the boundary note in themeloader.go. testdata/directives_theme writes an `@config`
+// and an `@plugin` in a file its entry point imports, so the loader must find each where it was written.
 func TestThemeLoaderReportsSkippedDirectives(test *testing.T) {
 	test.Parallel()
-	fixture := loadThemeCorpus(test, "theme_fixtures.json")
-
-	ran := 0
-	for _, aCase := range fixture.Cases {
-		if aCase.Source != "repository" {
-			continue
-		}
-		_, skipped := loadRepositoryTheme(test, aCase)
-
-		// Both corpus repositories carry exactly one `@config`, pointing at a TypeScript file used
-		// for content globs. Anything else appearing here is a change in what the repository asks
-		// of Tailwind and must be read rather than absorbed.
-		if len(skipped) != 1 {
-			test.Errorf("%s: expected 1 skipped directive, got %d: %v", aCase.Name, len(skipped), skipped)
-			continue
-		}
-		if skipped[0].Name != "@config" {
-			test.Errorf("%s: skipped %s, expected @config", aCase.Name, skipped[0].Name)
-		}
-		ran++
+	entryPoint, absolutePathError := filepath.Abs(filepath.Join("testdata", "directives_theme", "theme.css"))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
+	}
+	theme, skipped, loadThemeFromFileError := LoadThemeFromFile(
+		entryPoint,
+		NodeStylesheetResolver(vendored.TailwindPackageRootForTest(test)),
+	)
+	if loadThemeFromFileError != nil {
+		test.Fatalf("loading the directives theme: %v", loadThemeFromFileError)
 	}
 
-	if ran == 0 {
-		test.Fatal("the fixture holds no repository case, so this test checked nothing")
+	var names []string
+	for _, directive := range skipped {
+		names = append(names, directive.Name+" "+directive.Parameters)
+		if filepath.Base(directive.Path) != "settings.css" {
+			test.Errorf("%s %s was reported in %s, and it is written in settings.css", directive.Name,
+				directive.Parameters, directive.Path)
+		}
 	}
-	test.Logf("%d repositories each skip exactly one @config directive", ran)
+	if want := []string{"@config './tailwind.config.ts'", "@plugin './plugin.js'"}; !slices.Equal(names, want) {
+		test.Errorf("skipped %q, want %q", names, want)
+	}
+	if value, found := theme.Get([]string{"--color-signal"}); !found || value != "#dc2626" {
+		test.Errorf("--color-signal read %q, %v beside the skipped directives; the theme in that file must still load",
+			value, found)
+	}
 }
 
 // TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph is TestThemeLoaderReportsSkippedDirectives'
-// Tailwind half on a design system in testdata (#f598zk0), asked of LoadDesignSystem, which is what
-// production loads through, rather than of the test-only theme loader. testdata/directives_theme writes an
+// question asked of LoadDesignSystem (#f598zk0), which is what production loads through, rather than of the
+// test-only theme loader. testdata/directives_theme writes an
 // `@config` and an `@plugin` in a file its entry point imports, so each must be found where it was
 // written, and the theme beside them still loads.
 func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(test *testing.T) {

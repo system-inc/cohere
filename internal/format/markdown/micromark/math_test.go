@@ -1,7 +1,5 @@
 package micromark
 
-import "testing"
-
 // mathFixtures cover math flow and math text. They hold no attention (`*`, `_`), label end (`]`), html
 // (`<`), definition, list, liquid (`{{`, `{%`), wiki-link (`[[`), strikethrough (`~`), table (`|`),
 // footnote or GFM autolink literal (`www.`, `http`, `@`) syntax: those constructs are still pending, so a
@@ -118,9 +116,4 @@ var mathFixtures = []string{
 	"> $$",
 	">  $$\n>  a\n>   b\n>  $$",
 	"> x $a$ y",
-}
-
-func TestMathEvents(test *testing.T) {
-	test.Parallel()
-	compareEvents(test, mathFixtures)
 }

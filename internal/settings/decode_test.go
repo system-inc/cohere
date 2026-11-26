@@ -300,30 +300,31 @@ func TestUnconfiguredIsNotScopedOff(test *testing.T) {
 	}
 }
 
-// TestTheLiveGuardRuleGetsItsOptions is the specific rule that was inert, against the real configuration.
-func TestTheLiveGuardRuleGetsItsOptions(test *testing.T) {
+// TestTheGuardRuleGetsItsOptionsThroughTheSets is the specific rule that was inert, configured with options
+// as a project configures it, on top of the sets it extends (projectConfigurationPath).
+func TestTheGuardRuleGetsItsOptionsThroughTheSets(test *testing.T) {
 	test.Parallel()
-	loaded, loadError := Load(liveConfigPath(test))
+	loaded, loadError := Load(projectConfigurationPath())
 	if loadError != nil {
-		test.Fatalf("loading the live config: %v", loadError)
+		test.Fatalf("loading the project config: %v", loadError)
 	}
 
 	elements := loaded.Resolve("libraries/structure/source/api/Fetch.ts").RawOptionsFor("boundary-no-project-import")
 	if len(elements) == 0 {
 		test.Fatal(
-			"boundary-no-project-import received no options from the live config, which is the inert-rule defect",
+			"boundary-no-project-import received no options from the project config, which is the inert-rule defect",
 		)
 	}
 	if len(elements) != 1 {
 		test.Fatalf(
-			"boundary-no-project-import takes one option element and the live config gives it %d",
+			"boundary-no-project-import takes one option element and the project config gives it %d",
 			len(elements),
 		)
 	}
 
 	var typed guardOptions
 	if decodeError := json.Unmarshal(elements[0], &typed); decodeError != nil {
-		test.Fatalf("the live options did not decode: %v", decodeError)
+		test.Fatalf("the project config's options did not decode: %v", decodeError)
 	}
 	if typed.LibraryDirectory != "/libraries/structure/" {
 		test.Fatalf("libraryDirectory did not survive the round trip: %q", typed.LibraryDirectory)

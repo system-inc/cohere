@@ -17,7 +17,7 @@
 // back unchanged and is not reported. A pass that cannot tell what upstream would do stops the passes
 // after it, so the class is printed as the earlier ones left it. That is the direction this rule's comment insists
 // on: a missing pass is a finding that does not appear, never one that appears wrongly.
-// canonical_singles.json is Tailwind's own answer for every class on the public theme and ahra, and
+// canonical_singles_public.json is Tailwind's own answer for every class on the public theme, and
 // TestCanonicalizeAgreesWithTailwind fails on any class this answers differently, except the ones listed
 // in canonicalUnported, each under the pass that would rewrite it.
 //

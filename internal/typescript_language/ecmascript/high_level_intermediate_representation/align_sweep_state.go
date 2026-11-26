@@ -56,8 +56,6 @@
 //
 // So the merge must be re-run behind this pass rather than reused. `AlignThenMergeReactiveScopes`
 // below is the composed spelling and is what a consumer should call.
-// `TestAlignMustRunBeforeTheMerge` pins both rows of that table, so a future reordering fails loudly
-// rather than silently costing 30 violations.
 //
 // # The four widening mechanisms, each measured separately
 //
@@ -96,7 +94,6 @@
 // terminal. So excluding `branch` is exactly what makes upstream's uniqueness invariant hold here.
 // React's own lowering does the same thing (bundle line 23129 lowers a `for` test to a `branch`
 // whose fallthrough is the shared continuation block), so this is agreement rather than divergence.
-// `TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded` pins both halves.
 //
 // # Divergence from React: the widening minimises here, and it is safe for a different reason than
 // # the merge's
@@ -137,17 +134,16 @@
 // block, which happens at most once per block, so its total churn is bounded by the block count.
 // `activeScopes` is a set filtered at each block boundary and added to only from places the sweep is
 // already visiting. Nothing revisits anything and there is no fixpoint, so the structure forbids
-// iteration rather than converging. `TestAlignIsASingleSweep` pins the visit count.
+// iteration rather than converging.
 //
 // Like the merge, the sweep rests on evaluation order being monotone along the block sequence, which
-// is an assumption about what `Construct` produces rather than about this file.
-// `TestMergeAssumesMonotoneEvaluationOrder` already pins that at 0 non-monotone steps, and this pass
-// inherits it rather than re-measuring the same table.
+// is an assumption about what `Construct` produces rather than about this file. The merge measured it
+// at 0 non-monotone steps, and this pass inherits that rather than re-measuring the same table.
 //
 // The visit count is measured against the blocks of functions that have scopes rather than against
 // every block, because a function with no scope returns before the sweep begins: 49 of 677 corpus
-// functions, carrying 217 blocks. Getting that denominator wrong is how `TestAlignIsASingleSweep`
-// first failed, on a pass that was already correct.
+// functions, carrying 217 blocks. Getting that denominator wrong is how the visit count first read as a
+// failure, on a pass that was already correct.
 //
 // # Determinism, which a Go map would otherwise destroy
 //
@@ -156,8 +152,7 @@
 // insertion order explicitly and every widening is applied through that ordered slice, so two scopes
 // widened at one block boundary are written in the same sequence on every run. The writes are
 // commutative min/max so the order cannot change the answer, but recording it keeps a future
-// non-commutative addition from being a silent nondeterminism. `TestAlignIsDeterministic` runs the
-// pass twice over the corpus and compares.
+// non-commutative addition from being a silent nondeterminism.
 package high_level_intermediate_representation
 
 import (

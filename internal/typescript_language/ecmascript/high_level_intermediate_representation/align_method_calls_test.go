@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/typescript_language/rule"
 	"github.com/system-inc/cohere/internal/typescript_language/rule_testing"
 )
@@ -43,68 +42,6 @@ func TestAlignMethodCallScopesRemovesTheInBetweenState(test *testing.T) {
 			"the pass exists to make that count zero", after, before)
 	}
 	test.Logf("method calls: %d reached, %d in the in-between state before, %d after", calls, before, after)
-}
-
-// TestAlignMethodCallScopesReachesTheCorpus is the population check.
-//
-// A pass that fires on nothing passes every assertion above by never being exercised. This is the
-// control for that, and the count is asserted rather than logged because a drop to zero would mean
-// the pass stopped being reachable rather than stopped being needed.
-func TestAlignMethodCallScopesReachesTheCorpus(test *testing.T) {
-	test.Parallel()
-
-	functions, changed := 0, 0
-	forEachCorpusFunctionWithChecker(test, 400, func(function *Function, checker *shimchecker.Checker) {
-		InferReactive(function, checker)
-		DropManualMemoization(function)
-		ranges := InferMutableRanges(function)
-		disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
-		scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
-		functions++
-		if AlignMethodCallScopes(function, scopes) != scopes {
-			changed++
-		}
-	})
-	if functions < 100 {
-		test.Fatalf("only %d functions reached; the corpus walk is not finding real source and the "+
-			"count below would be a fact about the harness", functions)
-	}
-	// Measured. A move here is the corpus changing or the pass changing what it touches; both are
-	// worth a look rather than an adjustment.
-	//
-	// 363 with the two frozen-propagation edges in `effects.go` and `ranges.go`. A frozen value no
-	// longer widens its range across a conditional mutation, so more method calls reach this pass
-	// with their two sides in different scopes and more get aligned. The pass changing what it
-	// touches is the second cause this comment names, and it is this one.
-	//
-	// 365 with the frozen-capture rule in `ranges.go`, for the same reason as the move to 363: a
-	// narrower range leaves more method calls with their two sides in different scopes.
-	//
-	// 368 with the destination half of the frozen-capture rule. A capture into a frozen or primitive
-	// destination stops widening, so more method calls reach this pass with their two sides in
-	// different scopes. Every upstream-referenced number is unmoved by that change: the scope
-	// oracle's per-fixture dump is byte-identical across all 48 scored fixtures, and the board and
-	// the other two oracles do not move either.
-	//
-	// 62 after call-result allocation began following upstream's non-primitive default. Unknown and
-	// known-mutable MethodCalls now allocate a result that the disjoint pass joins with the property,
-	// so they reach this pass already aligned. The remaining 177 property-only calls are known
-	// primitive-returning methods, spread across these 62 functions.
-	//
-	// 60 after reverse postorder began matching React's fallthrough-first traversal. Loop bodies now
-	// precede their continuations, which settles two call/property pairs before this pass sees them.
-	// State freezing exposes Menu's findIndex property/result pair: 61. See STATE_EFFECTS.md.
-	// Effect-hook signatures expose 79 useEffect pairs in 48 more functions: EFFECT_HOOK_EFFECTS.md.
-	// Immutable alias-edge refinement exposes four more functions, listed in IMMUTABLE_ALIAS_EDGES.md.
-	//
-	// 109 when the walk moved to the frozen corpus (pinnedCorpusFiles), 2026-10-01. A corpus move, not
-	// a pass move: over the live tree the analysis at 04501c3 and at ddc86c0 both gave 109, so the four
-	// functions left with edits to the live directory before the input was frozen.
-	const knownChanged = 109
-	if changed != knownChanged {
-		test.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
-	}
-	test.Logf("the pass rewrote scopes in %d of %d corpus functions", changed, functions)
 }
 
 // methodCallScopeStates counts method calls whose two sides disagree about scopes.

@@ -117,8 +117,8 @@ func TestTheGatesShardsDealEveryListedTestOnceAcrossTwoThreadProcesses(test *tes
 				listFails = "1"
 			}
 			bash := exec.Command("bash", "-s")
-			bash.Stdin = strings.NewReader("set -euo pipefail\nsharded=" + boxShardedPackage + "\ntestsFailed=0\n" +
-				sharedBoxShards + "echo \"testsFailed=$testsFailed\"\n")
+			bash.Stdin = strings.NewReader("set -euo pipefail\nsharded=" + boxShardedPackage +
+				"\ncountFlag=-count=1\ntestsFailed=0\n" + sharedBoxShards + "echo \"testsFailed=$testsFailed\"\n")
 			// Only what the block reads: nothing of the machine's own Go settings reaches it.
 			bash.Env = []string{"PATH=" + stand + ":/usr/bin:/bin", "TMPDIR=" + test.TempDir(),
 				"SHARD_CALLS=" + calls, "SHARD_STARTED=" + started, fmt.Sprintf("SHARD_EXPECTED=%d", row.shards),
