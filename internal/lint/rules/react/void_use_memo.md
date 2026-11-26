@@ -15,7 +15,3 @@ Validates that useMemos always return a value and that the result of the useMemo
 ## Why this recommendation
 
 Stylistic, but the tree already satisfies it, so enabling costs nothing and prevents drift.
-
-## Violations
-
-None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
