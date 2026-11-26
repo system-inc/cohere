@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -43,8 +44,9 @@ type integrateJobFixture struct {
 // `tests` for macBoxScript, writes each kind to `calls`, and keeps the setting of needs.SwiftUnlaidVariable it ran
 // under in `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`; with no
 // `tests.run` it prints where its modules came from, as an integrate job's gate says it, then a passing run of every
-// package it was handed, but `tests.fails`, which fails, and then, unless one failed, a passing -race run of each race
-// token's package.
+// package it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and then,
+// unless one failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at the
+// path it names, as a run that compiles grows the cache.
 const integrateJobShell = `#!/bin/sh
 replies="$INTEGRATE_JOB_REPLIES"
 staged="$replies/stdin.$$"
@@ -63,6 +65,8 @@ fi
 [ "$kind" = tests ] || exit 1
 fails=$(cat "$replies/tests.fails" 2>/dev/null || true)
 echo "` + boxModulesMarker + `the box's laid set at /opt/loom-tools/gomod-cohere, offline"
+cached=$(cat "$replies/tests.cached" 2>/dev/null || true)
+[ ! -e "$replies/tests.grows" ] || echo entry > "$(cat "$replies/tests.grows")"
 echo "` + boxMarker + `$commit on $INTEGRATE_JOB_PLATFORM"
 races="$3"
 shift 3
@@ -74,6 +78,8 @@ for package in "$@"; do
     echo '{"Action":"fail","Package":"'"$package"'","Test":"TestPlantedFailure"}'
     echo '{"Action":"fail","Package":"'"$package"'","Elapsed":1}'; failed=1; continue
   fi
+  [ "$package" != "$cached" ] ||
+    printf '%s\n' '{"Action":"output","Package":"'"$package"'","Output":"ok  \t'"$package"'\t(cached)\n"}'
   echo '{"Action":"pass","Package":"'"$package"'","Elapsed":1}'
 done
 [ "$failed" = 0 ] || exit 1
@@ -687,9 +693,9 @@ func TestTheIntegrateJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
 	directory := test.TempDir()
-	environment := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+	environment := append(append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@example.com")
+		"GIT_COMMITTER_EMAIL=test@example.com"), gitWithoutMaintenance...)
 	git := func(where string, arguments ...string) string {
 		test.Helper()
 		command := exec.Command("git", arguments...)
@@ -751,6 +757,71 @@ func TestTheIntegrateJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	if objects := git(filepath.Join(mirrors, "cohere.git"), "count-objects", "-v"); !strings.Contains(objects,
 		"count: 0\n") || !strings.Contains(objects, "in-pack: 0\n") {
 		test.Errorf("the integrate job's cohere mirror copied objects:\n%s", objects)
+	}
+}
+
+// The account the Square rows (#ged8ew1), parsed from a fixture run's log: every step's seconds and the job's total,
+// the kept cache before and after with the entries it gained, read from the entry count and said so, the packages that
+// ran and replayed `(cached)` for the plain run and the -race run, and the free space and integrate path size before
+// and after, each disk line with its own seconds.
+func TestAnIntegrateJobsAccountLinesParse(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	fixture.reply("tests.cached", "example.com/fixture/alpha")
+	cache := filepath.Join(test.TempDir(), "cache")
+	writeFixtureFile(test, filepath.Join(cache, "gocache", "kept-entry"), "entry\n")
+	fixture.reply("tests.grows", filepath.Join(cache, "gocache", "new-entry"))
+	ran := fixture.integrateJob(fixture.merged(), integrateJobCacheVariable+"="+cache)
+	if ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+	}
+	said := map[string]string{}
+	for _, line := range strings.Split(ran.errors, "\n") {
+		if rest, found := strings.CutPrefix(line, integrateJobMarker); found {
+			fields := strings.Fields(rest)
+			if len(fields) >= 2 {
+				said[fields[0]+" "+fields[1]] = rest
+			}
+		}
+	}
+	seconds := regexp.MustCompile(`^step [a-z-]+ [0-9]+\.[0-9]s$`)
+	for _, step := range []string{"preflight", "lay", "measure", "tests", "checks", "vet", "rule-cpu", "isolation",
+		"docs-data", "self-check", "total"} {
+		if !seconds.MatchString(said["step "+step]) {
+			test.Errorf("the account's %s step reads %q", step, said["step "+step])
+		}
+	}
+	for key, want := range map[string]*regexp.Regexp{
+		"build cache": regexp.MustCompile(`^build cache gained 1 entries: compiled against cached is read from the ` +
+			`entry count`),
+		"packages tests":  regexp.MustCompile(`^packages tests 1 ran, 1 replayed \(cached\)$`),
+		"packages -race":  regexp.MustCompile(`^packages -race (none run|[0-9]+ ran, 0 replayed \(cached\))$`),
+		"disk before":     regexp.MustCompile(`^disk before integrate path [0-9]+ KiB, .* \(du -sk, [0-9.]+s\)$`),
+		"disk after":      regexp.MustCompile(`^disk after integrate path [0-9]+ KiB, .* \(du -sk, [0-9.]+s\)$`),
+		"measure skipped": nil,
+	} {
+		if want == nil {
+			if said[key] != "" {
+				test.Errorf("a measured job says %q", said[key])
+			}
+			continue
+		}
+		if !want.MatchString(said[key]) {
+			test.Errorf("the account's %q line reads %q, want %s", key, said[key], want)
+		}
+	}
+	for _, want := range []*regexp.Regexp{
+		regexp.MustCompile(`(?m)^` + integrateJobMarker +
+			`build cache before [0-9]+ KiB, 1 entries \(du -sk and a count, `),
+		regexp.MustCompile(`(?m)^` + integrateJobMarker +
+			`build cache after [0-9]+ KiB, 2 entries \(du -sk and a count, `),
+		regexp.MustCompile(`(?m)^` + integrateJobMarker + `disk before free [0-9]+ KiB \(df -k, [0-9.]+s\)$`),
+		regexp.MustCompile(`(?m)^` + integrateJobMarker + `disk after free [0-9]+ KiB \(df -k, [0-9.]+s\)$`),
+	} {
+		if !want.MatchString(ran.errors) {
+			test.Errorf("the account doesn't match %s:\n%s", want, ran.errors)
+		}
 	}
 }
 
