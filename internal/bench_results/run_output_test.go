@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// The reader reads real runs. Each file in testdata/run-output is a `cohere --json` run's whole log,
+// The reader reads real runs. Each file this test reads is a `cohere --json` run's whole log,
 // stdout and stderr together as quiet_machine.sh keeps it, captured from cohere at 91cf8e39 on a project of
 // three files: a cold run under --no-cache, a warm run that took every file from the cache, an edit run
 // after a comment was added to one file, and a run with a debugger statement and an unused constant in a
