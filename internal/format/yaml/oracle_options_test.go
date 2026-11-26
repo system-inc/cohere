@@ -1,18 +1,15 @@
 package yaml
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -20,12 +17,9 @@ import (
 // and every repository leaves at "preserve", and a file path the formatter does not route (.prettierrc). These
 // run the same embedded bundles in their own runtime, with the option given.
 
-// Its answers are recorded (see oracle_testing), so the runtime is built only when they are recorded again.
+// Its answers are recorded (see oracle_testing), so the bundles run only when they are recorded again.
 type optionsOracle struct {
-	golden    *oracle_testing.Golden
-	once      sync.Once
-	runtime   *goja.Runtime
-	loadError error
+	golden *oracle_testing.Golden
 }
 
 func newOptionsOracle(test *testing.T) *optionsOracle {
@@ -33,21 +27,15 @@ func newOptionsOracle(test *testing.T) *optionsOracle {
 	return &optionsOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
-func (oracle *optionsOracle) load() {
-	bundles, bundlesError := prettier.Bundles()
-	if bundlesError != nil {
-		oracle.loadError = bundlesError
-		return
-	}
-	runtime := goja.New()
-	for _, name := range prettier.BundleFiles {
-		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
-			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
-			return
-		}
-	}
-	oracle.runtime = runtime
-}
+// optionsScript formats __input's source at its file path with its parser and options.
+const optionsScript = `(() => {
+	const input = JSON.parse(__input);
+	return prettier.format(input.source, {
+		filepath: input.filePath, parser: input.parser, plugins: prettierPlugins, proseWrap: input.proseWrap,
+		printWidth: input.printWidth, tabWidth: input.tabWidth, useTabs: input.useTabs, singleQuote: input.singleQuote,
+		bracketSpacing: input.bracketSpacing, trailingComma: input.trailingComma, endOfLine: input.endOfLine,
+	});
+})()`
 
 func (oracle *optionsOracle) format(
 	text string,
@@ -57,60 +45,35 @@ func (oracle *optionsOracle) format(
 	proseWrap string,
 ) (string, error) {
 	key := oracle_testing.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
-	return oracle.golden.Answer(key, func() (string, error) {
-		oracle.once.Do(oracle.load)
-		if oracle.loadError != nil {
-			return "", oracle.loadError
-		}
-		return oracle.formatLive(text, filePath, parser, options, proseWrap)
+	input, marshalError := json.Marshal(struct {
+		Source         string `json:"source"`
+		FilePath       string `json:"filePath"`
+		Parser         string `json:"parser"`
+		ProseWrap      string `json:"proseWrap"`
+		PrintWidth     int    `json:"printWidth"`
+		TabWidth       int    `json:"tabWidth"`
+		UseTabs        bool   `json:"useTabs"`
+		SingleQuote    bool   `json:"singleQuote"`
+		BracketSpacing bool   `json:"bracketSpacing"`
+		TrailingComma  string `json:"trailingComma"`
+		EndOfLine      string `json:"endOfLine"`
+	}{
+		text,
+		filePath,
+		parser,
+		proseWrap,
+		options.PrintWidth,
+		options.TabWidth,
+		options.UseTabs,
+		options.SingleQuote,
+		options.BracketSpacing,
+		options.TrailingComma,
+		options.EndOfLine,
 	})
-}
-
-func (oracle *optionsOracle) formatLive(
-	text string,
-	filePath string,
-	parser string,
-	options format_options.Options,
-	proseWrap string,
-) (string, error) {
-	setGlobalsError := errors.Join(
-		oracle.runtime.Set("__source", text),
-		oracle.runtime.Set("__filePath", filePath),
-		oracle.runtime.Set("__parser", parser),
-		oracle.runtime.Set("__proseWrap", proseWrap),
-		oracle.runtime.Set("__printWidth", options.PrintWidth),
-		oracle.runtime.Set("__tabWidth", options.TabWidth),
-		oracle.runtime.Set("__useTabs", options.UseTabs),
-		oracle.runtime.Set("__singleQuote", options.SingleQuote),
-		oracle.runtime.Set("__bracketSpacing", options.BracketSpacing),
-		oracle.runtime.Set("__trailingComma", options.TrailingComma),
-		oracle.runtime.Set("__endOfLine", options.EndOfLine),
-	)
-	if setGlobalsError != nil {
-		return "", fmt.Errorf("setting the format's options in the oracle runtime: %w", setGlobalsError)
+	if marshalError != nil {
+		return "", fmt.Errorf("encoding the oracle's input: %w", marshalError)
 	}
-	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
-		filepath: __filePath, parser: __parser, plugins: prettierPlugins, proseWrap: __proseWrap,
-		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,
-		bracketSpacing: __bracketSpacing, trailingComma: __trailingComma, endOfLine: __endOfLine,
-	})`)
-	if runStringError != nil {
-		return "", runStringError
-	}
-	// prettier.format returns a promise; each RunString drains goja's job queue, so pump until settled.
-	promise, isPromise := value.Export().(*goja.Promise)
-	if !isPromise {
-		return value.String(), nil
-	}
-	for pump := 0; pump < 100000 && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, runStringError := oracle.runtime.RunString("0"); runStringError != nil {
-			return "", runStringError
-		}
-	}
-	if promise.State() != goja.PromiseStateFulfilled {
-		return "", fmt.Errorf("%v", promise.Result())
-	}
-	return promise.Result().String(), nil
+	return oracle.golden.Evaluate(key, optionsScript, string(input))
 }
 
 // proseWrapFixtures are the inputs whose words the always and never branches join and split: multi-line

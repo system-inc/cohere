@@ -1,17 +1,14 @@
 package markdown
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // The proseWrap oracle. Every corpus prints with proseWrap "preserve", where a line break returns before
@@ -20,12 +17,9 @@ import (
 // the port with the same setting.
 
 // proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own. Its answers are
-// recorded (see oracle_testing), so the runtime is built only when they are recorded again.
+// recorded (see oracle_testing), so the bundles run only when they are recorded again.
 type proseWrapOracle struct {
-	golden    *oracle_testing.Golden
-	once      sync.Once
-	runtime   *goja.Runtime
-	loadError error
+	golden *oracle_testing.Golden
 }
 
 func newProseWrapOracle(test *testing.T) *proseWrapOracle {
@@ -33,72 +27,31 @@ func newProseWrapOracle(test *testing.T) *proseWrapOracle {
 	return &proseWrapOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
-func (oracle *proseWrapOracle) load() {
-	bundles, bundlesError := prettier.Bundles()
-	if bundlesError != nil {
-		oracle.loadError = bundlesError
-		return
-	}
-	runtime := goja.New()
-	for _, name := range prettier.BundleFiles {
-		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
-			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
-			return
-		}
-	}
-	oracle.runtime = runtime
-}
+// proseWrapScript formats __input's source as the markdown at fixture.md, with its options.
+const proseWrapScript = `(() => {
+	const input = JSON.parse(__input);
+	return prettier.format(input.source, {
+		filepath: "fixture.md", parser: "markdown", plugins: prettierPlugins, proseWrap: input.proseWrap,
+		printWidth: input.printWidth, tabWidth: input.tabWidth, useTabs: input.useTabs, singleQuote: input.singleQuote,
+	});
+})()`
 
-// format is the recorded answer for text, keyed by everything formatLive passes the bundles: the text, the
+// format is the recorded answer for text, keyed by everything the script passes the bundles: the text, the
 // file path, the parser, the options and the proseWrap.
 func (oracle *proseWrapOracle) format(text string, options format_options.Options, proseWrap string) (string, error) {
 	key := oracle_testing.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
-	return oracle.golden.Answer(key, func() (string, error) {
-		oracle.once.Do(oracle.load)
-		if oracle.loadError != nil {
-			return "", oracle.loadError
-		}
-		return oracle.formatLive(text, options, proseWrap)
-	})
-}
-
-func (oracle *proseWrapOracle) formatLive(
-	text string,
-	options format_options.Options,
-	proseWrap string,
-) (string, error) {
-	setError := errors.Join(
-		oracle.runtime.Set("__source", text),
-		oracle.runtime.Set("__proseWrap", proseWrap),
-		oracle.runtime.Set("__printWidth", options.PrintWidth),
-		oracle.runtime.Set("__tabWidth", options.TabWidth),
-		oracle.runtime.Set("__useTabs", options.UseTabs),
-		oracle.runtime.Set("__singleQuote", options.SingleQuote),
-	)
-	if setError != nil {
-		return "", fmt.Errorf("setting the oracle's inputs: %w", setError)
+	input, marshalError := json.Marshal(struct {
+		Source      string `json:"source"`
+		ProseWrap   string `json:"proseWrap"`
+		PrintWidth  int    `json:"printWidth"`
+		TabWidth    int    `json:"tabWidth"`
+		UseTabs     bool   `json:"useTabs"`
+		SingleQuote bool   `json:"singleQuote"`
+	}{text, proseWrap, options.PrintWidth, options.TabWidth, options.UseTabs, options.SingleQuote})
+	if marshalError != nil {
+		return "", fmt.Errorf("encoding the oracle's input: %w", marshalError)
 	}
-	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
-		filepath: "fixture.md", parser: "markdown", plugins: prettierPlugins, proseWrap: __proseWrap,
-		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,
-	})`)
-	if runStringError != nil {
-		return "", runStringError
-	}
-	// prettier.format returns a promise; each RunString drains goja's job queue, so pump until settled.
-	promise, isPromise := value.Export().(*goja.Promise)
-	if !isPromise {
-		return value.String(), nil
-	}
-	for pump := 0; pump < 100000 && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, runStringError := oracle.runtime.RunString("0"); runStringError != nil {
-			return "", runStringError
-		}
-	}
-	if promise.State() != goja.PromiseStateFulfilled {
-		return "", fmt.Errorf("prettier.format did not fulfil: %v", promise.Result())
-	}
-	return promise.Result().String(), nil
+	return oracle.golden.Evaluate(key, proseWrapScript, string(input))
 }
 
 // proseWrapFixtures are prose the always and never branches print differently from preserve: long

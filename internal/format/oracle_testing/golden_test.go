@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dop251/goja"
 )
 
 func writeGolden(test *testing.T, contents record) string {
@@ -167,5 +170,28 @@ func TestARecordingThatPanicsWritesNoGolden(test *testing.T) {
 	answers, readError := read(path, "embedded")
 	if readError != nil || len(answers) != 1 || answers[Key("given")].Output != "given" {
 		test.Fatalf("a recording that finished wrote %v, %v", answers, readError)
+	}
+}
+
+// TestAPlainEvaluateNeverBuildsTheRuntime: a plain run reads Evaluate's answer from the golden and never builds
+// the runtime that records it, so no JavaScript runs and the bundles are never evaluated.
+func TestAPlainEvaluateNeverBuildsTheRuntime(test *testing.T) {
+	test.Parallel()
+	golden := &Golden{
+		test:    test,
+		path:    filepath.Join(test.TempDir(), "golden.json.gz"),
+		digest:  "embedded",
+		answers: map[string]Answer{Key("k"): {Output: "recorded"}},
+		loadRuntime: func() (*goja.Runtime, error) {
+			test.Error("a plain Evaluate built the runtime")
+			return nil, errors.New("a plain run has no runtime")
+		},
+	}
+	answer, evaluateError := golden.Evaluate(Key("k"), `throw new Error("the script ran")`, "input")
+	if evaluateError != nil || answer != "recorded" {
+		test.Fatalf("a plain Evaluate answered %q, %v, not the recorded answer", answer, evaluateError)
+	}
+	if golden.runtime != nil {
+		test.Error("a plain Evaluate left a runtime behind")
 	}
 }

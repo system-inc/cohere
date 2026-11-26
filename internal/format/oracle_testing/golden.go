@@ -26,6 +26,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -61,6 +62,13 @@ type Golden struct {
 	// panic reaches Cleanup before the test is marked failed, so without this write would save a golden
 	// missing every answer after the panic, and the next plain run would read it as the fork's word.
 	unfinished bool
+	// The runtime Evaluate records through, built by loadRuntime on the first recording Evaluate and never on a
+	// plain run. loadRuntime is a field so a test can hold that it is never called.
+	loadRuntime  func() (*goja.Runtime, error)
+	runtimeOnce  sync.Once
+	runtimeMutex sync.Mutex
+	runtime      *goja.Runtime
+	runtimeError error
 }
 
 // Open reads the golden at testdata/oracle/<name>.json.gz for the bundles this build embeds. When recording,
@@ -72,11 +80,12 @@ func Open(test testing.TB, name string) *Golden {
 		test.Fatal(bundlesDigestError)
 	}
 	golden := &Golden{
-		test:    test,
-		path:    filepath.Join("testdata", "oracle", name+".json.gz"),
-		digest:  digest,
-		update:  os.Getenv(UpdateVariable) != "",
-		answers: map[string]Answer{},
+		test:        test,
+		path:        filepath.Join("testdata", "oracle", name+".json.gz"),
+		digest:      digest,
+		update:      os.Getenv(UpdateVariable) != "",
+		answers:     map[string]Answer{},
+		loadRuntime: loadBundleRuntime,
 	}
 	if golden.update {
 		test.Cleanup(golden.write)
