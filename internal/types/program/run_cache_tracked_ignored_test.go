@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,51 +16,71 @@ import (
 // An index keyed on what it decides replays through what git rewrites it for and nothing else (#m1daxxk): a recorded
 // run whose index a `git status` rewrote replays, and one whose index newly tracks an ignored file does not. The record
 // goes through the cache table and back, as a real run's does, so the key's root is anchored and spelled with the
-// rest.
+// rest. Each index is one real git wrote, recorded under testdata with the commands that made it, and laid into a
+// temporary tree, so no test here starts git: the matcher reads only an index's entries, never its stat data
+// against the files on disk, so laid bytes read as git's own.
+
+// trackedIgnoredIndexes holds the recorded indexes; its README.md names the git and the commands that wrote them.
+const trackedIgnoredIndexes = "testdata/tracked-ignored-index"
+
+// trackedIgnoredFiles is the tree the indexes were recorded over: an ignore file, the source file a run reads,
+// another tracked beside it that the run never reads, whose stat data a `git status` refreshed, and an ignored log.
+var trackedIgnoredFiles = map[string]string{
+	".gitignore": "*.log\n",
+	"main.go":    "package main\n",
+	"other.go":   "package main\n",
+	"debug.log":  "a log\n",
+}
 
 // trackedIgnoredTree is a repository a run read: its index, its ignore file and a source file, with another source
-// file tracked beside it that the run never read, whose stat data a `git status` refreshes.
+// file tracked beside it that the run never read.
 type trackedIgnoredTree struct {
 	test  *testing.T
 	root  string
 	index string
 }
 
+// newTrackedIgnoredTree is the recorded tree laid in a temporary directory, its index as the first commit left it.
 func newTrackedIgnoredTree(test *testing.T) *trackedIgnoredTree {
 	test.Helper()
-	if _, lookPathError := exec.LookPath("git"); lookPathError != nil {
-		test.Skip("no git on PATH")
-	}
 	root, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
 	if resolveSymlinksError != nil {
 		test.Fatal(resolveSymlinksError)
 	}
 	tree := &trackedIgnoredTree{test: test, root: root, index: filepath.Join(root, ".git", "index")}
-	tree.git("init", "-q", "-b", "main")
-	for name, contents := range map[string]string{
-		".gitignore": "*.log\n",
-		"main.go":    "package main\n",
-		"other.go":   "package main\n",
-		"debug.log":  "a log\n",
-	} {
-		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
-			test.Fatal(writeError)
-		}
-	}
-	tree.git("add", ".gitignore", "main.go", "other.go")
-	tree.git("commit", "-q", "-m", "first")
+	writeTrackedIgnoredFiles(test, root)
+	tree.lay("committed.index")
 	return tree
 }
 
-// git runs git in the tree with no configuration but the repository's own.
-func (tree *trackedIgnoredTree) git(arguments ...string) {
+// writeTrackedIgnoredFiles writes the recorded tree's files into directory.
+func writeTrackedIgnoredFiles(test *testing.T, directory string) {
+	test.Helper()
+	for name, contents := range trackedIgnoredFiles {
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+}
+
+// lay puts the recorded index named name in place of the tree's index the way git does, written to index.lock and
+// renamed over it. The rename gives the index a new inode, so a run keyed on its stat sees it moved even where the
+// clock is too coarse to move its modification time, and two recordings of one size cannot read as one file.
+func (tree *trackedIgnoredTree) lay(name string) {
 	tree.test.Helper()
-	command := exec.Command("git", append([]string{"-c", "user.name=cohere", "-c", "user.email=cohere@localhost",
-		"-c", "core.excludesFile=/dev/null"}, arguments...)...)
-	command.Dir = tree.root
-	command.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "HOME="+tree.root)
-	if output, runError := command.CombinedOutput(); runError != nil {
-		tree.test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), runError, output)
+	contents, readError := os.ReadFile(filepath.Join(trackedIgnoredIndexes, name))
+	if readError != nil {
+		tree.test.Fatal(readError)
+	}
+	if makeError := os.MkdirAll(filepath.Dir(tree.index), 0o755); makeError != nil {
+		tree.test.Fatal(makeError)
+	}
+	lock := tree.index + ".lock"
+	if writeError := os.WriteFile(lock, contents, 0o644); writeError != nil {
+		tree.test.Fatal(writeError)
+	}
+	if renameError := os.Rename(lock, tree.index); renameError != nil {
+		tree.test.Fatal(renameError)
 	}
 }
 
@@ -107,19 +126,15 @@ func (tree *trackedIgnoredTree) recorded(keyed bool) *program.RunCache {
 	return read.Runs["run"]
 }
 
-// rewriteIndexWithStatus has `git status` rewrite the index by refreshing the stat data of a tracked file the run
-// never read, and fails the test if the index's bytes did not move, since the case would then prove nothing.
+// rewriteIndexWithStatus lays the index a `git status` wrote when it refreshed the stat data of a tracked file the
+// run never read, and fails the test if the index's bytes did not move, since the case would then prove nothing.
 func (tree *trackedIgnoredTree) rewriteIndexWithStatus() {
 	tree.test.Helper()
 	before, readError := os.ReadFile(tree.index)
 	if readError != nil {
 		tree.test.Fatal(readError)
 	}
-	later := time.Now().Add(2 * time.Second)
-	if changeTimesError := os.Chtimes(filepath.Join(tree.root, "other.go"), later, later); changeTimesError != nil {
-		tree.test.Fatal(changeTimesError)
-	}
-	tree.git("status", "--porcelain")
+	tree.lay("status-rewritten.index")
 	after, readError := os.ReadFile(tree.index)
 	if readError != nil {
 		tree.test.Fatal(readError)
@@ -146,7 +161,7 @@ func TestAnIndexKeyedOnWhatItDecidesReplaysThroughAGitStatus(test *testing.T) {
 		test.Errorf("a run keyed on the index's bytes replays after `git status` rewrote them: %v", checkError)
 	}
 
-	tree.git("add", "-f", "debug.log")
+	tree.lay("tracks-ignored.index")
 	checkError := keyed.Check("key")
 	if !errors.Is(checkError, program.ErrRunCacheMiss) || !strings.Contains(checkError.Error(), "are tracked") {
 		test.Errorf("a run replays over an index that newly tracks an ignored file: %v", checkError)
@@ -189,25 +204,25 @@ func TestAWorktreesIndexNamedThroughALinkReplays(test *testing.T) {
 	if resolved == linked {
 		test.Skip("the temp directory is reached through no link here, so its spellings cannot differ")
 	}
-	main := &trackedIgnoredTree{test: test, root: filepath.Join(linked, "main")}
-	if makeError := os.MkdirAll(main.root, 0o755); makeError != nil {
+	// A worktree as `git worktree add` leaves one, as much of it as the matcher reads: its files, and a `.git` file
+	// whose pointer names its git directory in the main checkout by the real path, as git writes it, holding the
+	// recorded index. The git directory's commondir is left out, since without it the matcher reads the same SHA-1
+	// index, and the main checkout's own files decide nothing here.
+	worktree := filepath.Join(linked, "worktree")
+	if makeError := os.MkdirAll(worktree, 0o755); makeError != nil {
 		test.Fatal(makeError)
 	}
-	main.git("init", "-q", "-b", "main")
-	for name, contents := range map[string]string{".gitignore": "*.log\n", "main.go": "package main\n",
-		"other.go": "package main\n"} {
-		if writeError := os.WriteFile(filepath.Join(main.root, name), []byte(contents), 0o644); writeError != nil {
-			test.Fatal(writeError)
-		}
+	writeTrackedIgnoredFiles(test, worktree)
+	gitDirectory := filepath.Join(resolved, "main", ".git", "worktrees", "worktree")
+	pointer := []byte("gitdir: " + gitDirectory + "\n")
+	if writeError := os.WriteFile(filepath.Join(worktree, ".git"), pointer, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	main.git("add", "-A")
-	main.git("commit", "-q", "-m", "first")
-	worktree := filepath.Join(linked, "worktree")
-	main.git("worktree", "add", "-q", worktree)
 
 	// The index as the caller spells it, through the link, and the file git's pointer names, by its real path.
 	tree := &trackedIgnoredTree{test: test, root: worktree,
 		index: filepath.Join(linked, "main", ".git", "worktrees", "worktree", "index")}
+	tree.lay("committed.index")
 	matcher, newError := gitignore.New(worktree)
 	if newError != nil {
 		test.Fatal(newError)

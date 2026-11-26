@@ -16,24 +16,16 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
-// tokenRangeCorpusVariable names more roots for the proof below, separated by the path list separator: a real
-// tree, such as ahra, read the way the fixtures are. Unset, the proof reads the repository's fixtures alone.
-const tokenRangeCorpusVariable = "COHERE_TOKEN_RANGE_CORPUS"
-
 // TokenRange finds a node's first token with the compiler's trivia skip, where it used to build a scanner per
 // call (scanner.GetRangeOfTokenAtPosition): 252 MB and 1.5M objects of a cold ahra run (#9xfg09f).
 // It keeps only the start, so the two agree exactly when they agree on every node's start. Findings identical
 // on four consumers would only show that no current rule reached a shape where they differ, so this compares
-// them on every node of every file: the repository's fixtures, JSX, templates and JSDoc among them, and a real
-// tree when the variable names one. A start one past the scanner's is the mutant it must catch. The scanner's
-// start is clamped to the node's end, since a range never starts past its end; see TokenRange.
+// them on every node of every file of the repository's fixtures, JSX, templates and JSDoc among them. A start one
+// past the scanner's is the mutant it must catch. The scanner's start is clamped to the node's end, since a range
+// never starts past its end; see TokenRange.
 func TestTokenRangeStartsWhereTheScannerDoes(test *testing.T) {
 	test.Parallel()
-	roots := []string{repositoryRoot(test)}
-	if extra := os.Getenv(tokenRangeCorpusVariable); extra != "" {
-		roots = append(roots, filepath.SplitList(extra)...)
-	}
-	files := corpusFiles(test, roots)
+	files := corpusFiles(test, repositoryRoot(test))
 	if len(files) < 50 {
 		test.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
 	}
@@ -87,9 +79,9 @@ func repositoryRoot(test *testing.T) string {
 	}
 }
 
-// corpusFiles is every TypeScript and JavaScript source under roots, outside dependency, build and cache
+// corpusFiles is every TypeScript and JavaScript source under root, outside dependency, build and cache
 // directories and the TypeScript checkout, each parsed.
-func corpusFiles(test *testing.T, roots []string) []*ast.SourceFile {
+func corpusFiles(test *testing.T, root string) []*ast.SourceFile {
 	test.Helper()
 	kinds := map[string]core.ScriptKind{".ts": core.ScriptKindTS, ".mts": core.ScriptKindTS, ".cts": core.ScriptKindTS,
 		".tsx": core.ScriptKindTSX, ".js": core.ScriptKindJS, ".jsx": core.ScriptKindJSX, ".mjs": core.ScriptKindJS}
@@ -102,38 +94,36 @@ func corpusFiles(test *testing.T, roots []string) []*ast.SourceFile {
 		"TypeScript":   true,
 	}
 	var files []*ast.SourceFile
-	for _, root := range roots {
-		// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has
-		// none to return.
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
-			if pathError != nil {
-				return nil
-			}
-			if entry.IsDir() {
-				if path != root && skipped[entry.Name()] {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			kind, handled := kinds[strings.ToLower(filepath.Ext(path))]
-			if !handled || entry.Type()&fs.ModeSymlink != 0 {
-				return nil
-			}
-			contents, readError := os.ReadFile(path)
-			if readError != nil {
-				return nil
-			}
-			fileName := tspath.NormalizePath(path)
-			if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-				FileName: tspath.RootedFilePath(fileName),
-				PathKey:  tspath.PathKey(fileName),
-			},
-				string(contents), kind); sourceFile != nil {
-				files = append(files, sourceFile)
+	// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has
+	// none to return.
+	filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if path != root && skipped[entry.Name()] {
+				return filepath.SkipDir
 			}
 			return nil
-		})
-	}
+		}
+		kind, handled := kinds[strings.ToLower(filepath.Ext(path))]
+		if !handled || entry.Type()&fs.ModeSymlink != 0 {
+			return nil
+		}
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return nil
+		}
+		fileName := tspath.NormalizePath(path)
+		if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+			FileName: tspath.RootedFilePath(fileName),
+			PathKey:  tspath.PathKey(fileName),
+		},
+			string(contents), kind); sourceFile != nil {
+			files = append(files, sourceFile)
+		}
+		return nil
+	})
 	return files
 }
 
