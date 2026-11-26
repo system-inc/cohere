@@ -15,3 +15,7 @@ Disallow the use of `console`
 ## Why this recommendation
 
 Formatting, which Prettier already decides. Turning it on creates a second authority that can disagree.
+
+## What fixing looks like
+
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

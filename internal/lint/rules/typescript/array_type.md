@@ -20,3 +20,7 @@ Not a house-style conflict: the codebase already writes `readonly T[]` 213 times
 > which moved this from **No** to **Maybe**. The first pass classified rules by
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
+
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.

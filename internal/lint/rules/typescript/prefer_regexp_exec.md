@@ -16,6 +16,10 @@ Enforce `RegExp#exec` over `String#match` if no global flag is provided
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
 
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
+
 ## Status: ported 2026-09-06, registered and NOT enabled
 
 The audit's 170 and the port's 179 differ, and the port is the one that matches the installed rule:

@@ -15,3 +15,7 @@ Require any function or method that returns a Promise to be marked async
 ## Why this recommendation
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
+
+## What fixing looks like
+
+Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.

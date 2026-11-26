@@ -16,6 +16,10 @@ Require or disallow initialization in variable declarations
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
 
+## What fixing looks like
+
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.
+
 ## Ported? No, and the reason is measured
 
 **Declined 2026-09-06.** Not ported as a bare core rule, and the line item should be read as

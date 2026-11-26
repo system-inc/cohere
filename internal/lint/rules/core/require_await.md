@@ -21,3 +21,7 @@ The 637 this document used to cite were the `generateMetadata` world: Next.js ro
 `export async function generateMetadata(): Promise<Metadata>` without awaiting. That world is gone. On
 2026-10-01, 43 route files write `generateMetadata` without `async`, and none of the 22 that keep it
 reports here.
+
+## What fixing looks like
+
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

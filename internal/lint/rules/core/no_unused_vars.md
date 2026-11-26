@@ -31,3 +31,7 @@ The stated reason is wrong (it is a correctness rule, not formatting), but the v
 > which moved this from **Strong No** to **No**. The first pass classified rules by
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
+
+## What fixing looks like
+
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.
