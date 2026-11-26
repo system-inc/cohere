@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"errors"
@@ -141,13 +142,27 @@ func newLandJobFixture(test *testing.T) *landJobFixture {
 // and returns it.
 func (fixture *landJobFixture) merged() string {
 	fixture.test.Helper()
+	merge := fixture.unmirroredMerge()
+	fixture.mirrorMerge(merge)
+	return merge
+}
+
+// unmirroredMerge makes the merge Loom makes, of worktree a's head onto main, and puts only main in the mirror, as a
+// job that starts before Loom's bridge has carried its merge finds it.
+func (fixture *landJobFixture) unmirroredMerge() string {
+	fixture.test.Helper()
 	candidate := fixture.git(fixture.worktree("a"), "rev-parse", "HEAD")
 	tree := strings.Fields(fixture.git(fixture.repository, "merge-tree", "--write-tree", "main", candidate))[0]
 	merge := fixture.git(fixture.repository, "commit-tree", tree, "-p", "main", "-p", candidate, "-m",
 		"Merge a onto main")
-	fixture.git(fixture.repository, "push", "-q", fixture.mirror, "main:refs/heads/main",
-		merge+":refs/heads/merge")
+	fixture.git(fixture.repository, "push", "-q", fixture.mirror, "main:refs/heads/main")
 	return merge
+}
+
+// mirrorMerge puts merge in the mirror, as Loom's bridge carries it there.
+func (fixture *landJobFixture) mirrorMerge(merge string) {
+	fixture.test.Helper()
+	fixture.git(fixture.repository, "push", "-q", fixture.mirror, merge+":refs/heads/merge")
 }
 
 // reply writes what the stand-in bash answers from file in the replies directory.
@@ -498,6 +513,74 @@ func TestALandJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
 				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
 			}
 		})
+	}
+}
+
+// A merge Loom's bridge never carries to the mirror refuses in the preflight once the job has waited its bound, saying
+// the mirror held no merge, the road's gap and never a red of the merge (Loom's condition 2 on #hq61wfg), and nothing
+// is laid, measured or tested.
+func TestALandJobRefusesAMergeThatNeverReachesTheMirror(test *testing.T) {
+	test.Parallel()
+	fixture := newLandJobFixture(test)
+	merge := fixture.unmirroredMerge()
+	ran := fixture.landJob(merge, landJobMergeWaitVariable+"=1s")
+	if ran.exit != 1 || ran.landed != "" {
+		test.Fatalf("the land job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit, ran.lastLine,
+			ran.errors)
+	}
+	for _, want := range []string{"land-job waits up to 1s for the merge " + shortCommit(merge),
+		fixture.mirror + " held no merge " + merge + " after 1s of waiting", "never a red of this merge",
+		"land-job step preflight refused in "} {
+		if !strings.Contains(ran.errors, want) {
+			test.Errorf("the land job doesn't say %q:\n%s", want, ran.errors)
+		}
+	}
+	if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
+		test.Errorf("a merge the mirror never held ran %q", calls)
+	}
+}
+
+// A merge the bridge carries to the mirror while the job waits for it is judged as one that was there from the start:
+// the job says it waits, the merge arrives, and the preflight passes it on to be laid. The merge is carried only once
+// the job has said it waits, so the wait is what let it through.
+func TestALandJobWaitsForItsMergeToReachTheMirror(test *testing.T) {
+	test.Parallel()
+	fixture := newLandJobFixture(test)
+	merge := fixture.unmirroredMerge()
+	job := exec.Command(fixture.wrapper, "land-job", "--merge", merge, "--task", fixtureTask, "--message",
+		"a module measured and gated")
+	job.Dir = fixture.job
+	job.Env = append(append(fixture.environment, landJobCommitVariable+"="+fixture.git(fixture.repository,
+		"rev-parse", "main")), landJobMergeWaitVariable+"=10m")
+	errorOutput, pipeError := job.StderrPipe()
+	if pipeError != nil {
+		test.Fatal(pipeError)
+	}
+	if startError := job.Start(); startError != nil {
+		test.Fatal(startError)
+	}
+	var said strings.Builder
+	lines := bufio.NewScanner(errorOutput)
+	carried := false
+	for lines.Scan() {
+		said.WriteString(lines.Text() + "\n")
+		if !carried && strings.Contains(lines.Text(), "land-job waits up to 10m0s for the merge") {
+			fixture.mirrorMerge(merge)
+			carried = true
+		}
+	}
+	if scanError := lines.Err(); scanError != nil {
+		test.Fatal(scanError)
+	}
+	// Ignored: the fixture scripts no measurement, so the job ends there, and what it said is what's read.
+	_ = job.Wait()
+	if !carried {
+		test.Fatalf("the land job never said it waits for its merge:\n%s", said.String())
+	}
+	// The fixture scripts no measurement, so the job stops there: what matters is that it got past the preflight and
+	// laid the merge.
+	if strings.Contains(said.String(), "held no merge") || !strings.Contains(said.String(), "land-job step lay ") {
+		test.Errorf("a merge carried while the job waited wasn't laid:\n%s", said.String())
 	}
 }
 
