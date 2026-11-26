@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
 	"github.com/system-inc/cohere/internal/testing/needs"
@@ -429,8 +430,23 @@ func (job *landJobRun) preflight() (string, int) {
 		return "", 1
 	}
 	job.mergeTree = mergeTree
+	message := job.options.Message
+	if message == "" {
+		// On the PR road no --message is given, and GitHub's merge group commit carries the pull request's title.
+		mergeMessage, messageError := gitOutput(job.repository, "log", "-1", "--format=%B", job.merge)
+		if messageError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: reading the merge's message: %v\n", messageError)
+			return "", 1
+		}
+		title, refusal := pullRequestTitle(mergeMessage, job.options.Task)
+		if refusal != "" {
+			fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
+			return "", 1
+		}
+		message = title
+	}
 	commits, subject, refusal, preflightError := landJobPreflight(job.repository, job.running, job.candidate,
-		job.merge, landingOptions{Task: job.options.Task, Message: job.options.Message})
+		job.merge, landingOptions{Task: job.options.Task, Message: message})
 	if preflightError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", preflightError)
 		return "", 1
@@ -510,6 +526,72 @@ func landJobPreflight(
 // landJobSwiftDirectories, whose tests that build it skip in a land job (needs.SwiftLaid). Until Machines lays Swift on
 // Shackler (#je1r32a) no land job checks them, so a change to them is never landed unchecked. Renames are read as a
 // removal and an addition, so a file moved out of the package is still the package's change.
+// pullRequestMergeSubject is the first line GitHub writes on a merge group's commit, naming the pull request it merges.
+var pullRequestMergeSubject = regexp.MustCompile(`^Merge pull request #([0-9]+) from \S+$`)
+
+// pullRequestTaskSuffix is the task a pull request's title names at its end, `(#<id>)`, as Zach's check holds every
+// title to.
+var pullRequestTaskSuffix = regexp.MustCompile(`\s*\(#([0-9a-z]+)\)$`)
+
+// pullRequestTitleAllowed is the punctuation a pull request's title may carry into a landing's subject beside letters,
+// digits and spaces (Loom's ruling as the trust seat on #hq61wfg).
+const pullRequestTitleAllowed = ",.:;()'/_-+"
+
+// pullRequestTitle is what landed, read from message, a merge's whole message, when it is a merge group's commit:
+// GitHub's `Merge pull request #<n> from <branch>`, a blank line, then the pull request's title (#hq61wfg, Jobs' road
+// as Loom ruled it). The title's trailing `(#<task>)` is dropped once it names task, the one --task says, and the rest
+// is held to one line of letters, digits, spaces and pullRequestTitleAllowed, then cut at a word so that `Land
+// #<task>: <title>` fits subjectLimit. A message of no merge group is no title, empty and no refusal, and the landing
+// says what landed as before. A title that breaks a rule is refused naming the pull request's number and the rule,
+// never its words, since a title is anyone's text; and it is only ever read as a value, never through a shell.
+func pullRequestTitle(message string, task string) (string, string) {
+	lines := strings.Split(strings.TrimRight(message, "\n"), "\n")
+	named := pullRequestMergeSubject.FindStringSubmatch(lines[0])
+	if named == nil {
+		return "", ""
+	}
+	number := named[1]
+	if len(lines) != 3 || lines[1] != "" {
+		return "", fmt.Sprintf("pull request #%s's merge carries %d lines, not its subject, a blank line and its "+
+			"title, so its title can't be read", number, len(lines))
+	}
+	title := strings.TrimSpace(lines[2])
+	if suffix := pullRequestTaskSuffix.FindStringSubmatch(title); suffix != nil {
+		if suffix[1] != task {
+			return "", fmt.Sprintf("pull request #%s's title names a task that isn't #%s, the one this job judges",
+				number, task)
+		}
+		title = strings.TrimSpace(strings.TrimSuffix(title, suffix[0]))
+	}
+	for offset, character := range title {
+		if unicode.IsLetter(character) || unicode.IsDigit(character) || character == ' ' ||
+			strings.ContainsRune(pullRequestTitleAllowed, character) {
+			continue
+		}
+		return "", fmt.Sprintf("pull request #%s's title holds a character outside letters, digits, spaces and %s at "+
+			"byte %d, so it's refused and its words aren't repeated", number, pullRequestTitleAllowed, offset)
+	}
+	if title == "" {
+		return "", fmt.Sprintf("pull request #%s's title says nothing beside its task", number)
+	}
+	room := subjectLimit - len([]rune("Land #"+task+": "))
+	if words := strings.Fields(title); len([]rune(title)) > room {
+		cut := ""
+		for _, word := range words {
+			if len([]rune(cut))+1+len([]rune(word)) > room && cut != "" {
+				break
+			}
+			cut = strings.TrimSpace(cut + " " + word)
+		}
+		title = cut
+	}
+	if len([]rune(title)) > room {
+		return "", fmt.Sprintf("pull request #%s's title opens with a word too long for the landing's subject's %d "+
+			"characters", number, subjectLimit)
+	}
+	return title, ""
+}
+
 // landJobSwiftDirectories are the packages whose Swift files landJobSwiftRefusal refuses: command/cohere runs
 // cohere-swift, and release's dispatch and packaging build it.
 var landJobSwiftDirectories = []string{"command/cohere/", "internal/release/dispatch/", "internal/release/packaging/"}
