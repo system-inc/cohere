@@ -430,6 +430,11 @@ var unsettledFixtures = map[string]bool{
 	"a: [\n  # c\n]": true,
 	// A comment alone in an empty flow mapping prints after a lone comma, which does not parse.
 	"a: {\n  # c\n}": true,
+	// The yaml-test-suite's M5DY, Spec Example 2.11: the second key, a flow sequence, drops its `?` and prints as an
+	// implicit key on the line after the first pair's explicit `?` and `:`, which the fork's parser refuses on a second
+	// pass ("Map comment with trailing content" at 5:1).
+	"? - Detroit Tigers\n  - Chicago cubs\n:\n  - 2001-07-23\n\n" +
+		"? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n": true,
 }
 
 // secondPass is what is wrong with expected, the fork's output for input, formatted again under options and
