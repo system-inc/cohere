@@ -207,7 +207,7 @@ func inTheOrderGiven(string, []*types.Var) {
 // parameter the definition marks beyond it is a departure, returned and never a failure.
 func holdToDefinition(test *testing.T, directory string, patterns []string, order askOrder) held {
 	test.Helper()
-	push := odd_slice_argument.NewPushAnalyzer(nil)
+	push := odd_slice_argument.NewPushAnalyzer()
 	probe := &analysis.Analyzer{
 		Name:       "definition_probe",
 		Doc:        "holds the marks of the package, however the rule computes them, to the definition's",
@@ -397,4 +397,50 @@ func requireDepartures(test *testing.T, found held, want []string) {
 	if !slices.Equal(found.departures, slices.Sorted(slices.Values(want))) {
 		test.Errorf("the push departs on %q, want %q", found.departures, want)
 	}
+}
+
+// parametersOf is every named parameter of every function and function literal in home's syntax, receivers left out.
+func parametersOf(home *fact_resolver.Package) []*types.Var {
+	var parameters []*types.Var
+	for _, defined := range home.Info().Defs {
+		parameter, isParameter := defined.(*types.Var)
+		if isParameter && !parameter.IsField() && parameter.Kind() == types.ParamVar {
+			parameters = append(parameters, parameter)
+		}
+	}
+	slices.SortFunc(parameters, func(left, right *types.Var) int { return cmp.Compare(left.Pos(), right.Pos()) })
+	return parameters
+}
+
+// functionsInReach is every function and method of root and of every package below it, in the order of their full
+// names.
+func functionsInReach(root *types.Package) []*types.Func {
+	var functions []*types.Func
+	seen := map[*types.Package]bool{}
+	var visit func(reached *types.Package)
+	visit = func(reached *types.Package) {
+		if seen[reached] {
+			return
+		}
+		seen[reached] = true
+		for _, imported := range reached.Imports() {
+			visit(imported)
+		}
+		scope := reached.Scope()
+		for _, name := range scope.Names() {
+			switch object := scope.Lookup(name).(type) {
+			case *types.Func:
+				functions = append(functions, object)
+			case *types.TypeName:
+				if named, isNamed := object.Type().(*types.Named); isNamed {
+					functions = append(functions, slices.Collect(named.Methods())...)
+				}
+			}
+		}
+	}
+	visit(root)
+	slices.SortFunc(functions, func(left, right *types.Func) int {
+		return cmp.Compare(left.FullName(), right.FullName())
+	})
+	return functions
 }
