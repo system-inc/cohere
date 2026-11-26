@@ -19,8 +19,8 @@ import (
 // home, so it waits its turn with everyone else's and starts no trim of its own (#d0x1fhp). test's closing
 // gate set `HOME` to a scratch directory with the go cache passed through, and ran in a pool of its own.
 // Status reads the same poolDirectory every token is taken from, and names it. An account whose home in the user
-// database can't be written, /var/empty in a land job's sandbox on Shackler (J-5xseq90), has no machine's pool to make,
-// so the test skips there, naming the home.
+// database can't be written, /var/empty in an integrate job's sandbox on Shackler (J-5xseq90), has no machine's pool to
+// make, so the test skips there, naming the home.
 func TestARunUnderAScratchHomeUsesTheMachinesPool(test *testing.T) {
 	test.Parallel()
 	account, currentError := user.Current()

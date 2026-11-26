@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-// The replay store (landJobReplay): a pass is recorded under its key and replayed on a matching key without running,
-// a key that misses runs, a failure is never recorded, a step with no key always runs and records nothing, and a store
-// with no directory always runs.
-func TestTheLandJobsReplayStoreReplaysOnlyAPass(test *testing.T) {
+// The replay store (integrateJobReplay): a pass is recorded under its key and replayed on a matching key without
+// running, a key that misses runs, a failure is never recorded, a step with no key always runs and records nothing, and
+// a store with no directory always runs.
+func TestTheIntegrateJobsReplayStoreReplaysOnlyAPass(test *testing.T) {
 	test.Parallel()
-	store := landJobReplay{directory: test.TempDir()}
+	store := integrateJobReplay{directory: test.TempDir()}
 	key := ""
 	keyed := func(string) (string, []string, error) { return key, []string{"internal/a.go", "internal/b.go"}, nil }
 	runs := 0
@@ -21,7 +21,7 @@ func TestTheLandJobsReplayStoreReplaysOnlyAPass(test *testing.T) {
 	for _, row := range []struct {
 		name     string
 		key      string
-		store    landJobReplay
+		store    integrateJobReplay
 		work     func() (int, string)
 		wantRuns int
 		wantCode int
@@ -33,7 +33,7 @@ func TestTheLandJobsReplayStoreReplaysOnlyAPass(test *testing.T) {
 			"the docs data, replayed from a pass at key 1111"},
 		{"a miss runs", "2222", store, passing, 3, 0, "the docs data"},
 		{"no key runs", "", store, passing, 4, 0, "the docs data"},
-		{"no store runs", "1111", landJobReplay{}, passing, 5, 0, "the docs data"},
+		{"no store runs", "1111", integrateJobReplay{}, passing, 5, 0, "the docs data"},
 		{"a key that is a path runs", "../1111", store, passing, 6, 0, "the docs data"},
 	} {
 		key = row.key

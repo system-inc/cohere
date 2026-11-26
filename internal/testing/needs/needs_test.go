@@ -14,9 +14,9 @@ import (
 const needsChildVariable = "COHERE_NEEDS_CHILD"
 
 // A test missing its tool or its platform, one that can't run under -race in a binary built with it, or one that
-// builds cohere-swift in a land job, where it can't be built, is reported skipped, naming what it lacks and why, never
-// failed and never passed. Shown through a child test binary run with an empty path, since a skip ends the test it is
-// in.
+// builds cohere-swift in an integrate job, where it can't be built, is reported skipped, naming what it lacks and why,
+// never failed and never passed. Shown through a child test binary run with an empty path, since a skip ends the test
+// it is in.
 func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 	test.Parallel()
 	switch os.Getenv(needsChildVariable) {

@@ -48,12 +48,12 @@ func NoRace(test testing.TB, why string) {
 	}
 }
 
-// SwiftUnlaidVariable is set to SwiftUnlaidSetting by `cohere-dev land-job` for the tests it runs, on Shackler, where
-// cohere-swift can't be built: its build fetches packages from github.com, writes Swift's caches and starts SwiftPM's
-// own sandbox, none of which a land job's sandbox allows (#5wj23dd). It stays until Machines lays Swift there
-// (#je1r32a). SwiftUnlaid is what the skip, the land job's refusal and its account all say.
+// SwiftUnlaidVariable is set to SwiftUnlaidSetting by `cohere-dev integrate-job` for the tests it runs, on Shackler,
+// where cohere-swift can't be built: its build fetches packages from github.com, writes Swift's caches and starts
+// SwiftPM's own sandbox, none of which an integrate job's sandbox allows (#5wj23dd). It stays until Machines lays Swift
+// there (#je1r32a). SwiftUnlaid is what the skip, the integrate job's refusal and its account all say.
 const (
-	SwiftUnlaidVariable = "COHERE_DEV_LAND_JOB_SWIFT"
+	SwiftUnlaidVariable = "COHERE_DEV_INTEGRATE_JOB_SWIFT"
 	SwiftUnlaidSetting  = "unlaid"
 	SwiftUnlaid         = "Swift checked nowhere: cohere-swift isn't laid on Shackler (#je1r32a)"
 )

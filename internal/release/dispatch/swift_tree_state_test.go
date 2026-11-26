@@ -166,7 +166,7 @@ func TestTheSwiftBuildIsHandedOnlyTheStatedTreeState(test *testing.T) {
 // the expression under test is the one cohere-swift builds with.
 func TestTheSwiftManifestPrefersTheStatedTreeState(test *testing.T) {
 	test.Parallel()
-	// A land job, where cohere-swift can't be built, skips it by name.
+	// An integrate job, where cohere-swift can't be built, skips it by name.
 	needs.SwiftLaid(test)
 	if runtime.GOOS != "darwin" {
 		test.Skip("cohere-swift is built only on macOS")

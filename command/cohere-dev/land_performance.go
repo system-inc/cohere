@@ -84,8 +84,9 @@ const (
 	performanceSameBinaryMarker = performanceMarker + "the same binary as main's"
 )
 
-// performancePathLine is performanceScript's line setting the path its build and runs read. The land job alone puts the
-// real git's directory first on it (withLandJobGit), so nothing it runs reaches macOS's /usr/bin/git and its xcrun.
+// performancePathLine is performanceScript's line setting the path its build and runs read. The integrate job alone
+// puts the real git's directory first on it (withIntegrateJobGit), so nothing it runs reaches macOS's /usr/bin/git and
+// its xcrun.
 const performancePathLine = `export PATH="$goroot/bin:` + sharedBoxSystemPath + `"`
 
 // The runs the script makes: performanceFills untimed runs before each cold row's rounds fill the binary's system
@@ -116,7 +117,7 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 
 // performanceScript is what Shackler runs, from the land that runs it rather than from the tree it measures, so no
 // branch can change how it is measured. Its arguments are the commit, deeafbf4's commit, the counts of fills, cold
-// rounds, deeafbf4's rounds and warm rounds, and, from the land job alone, main's binary's sha256
+// rounds, deeafbf4's rounds and warm rounds, and, from the integrate job alone, main's binary's sha256
 // (performanceArguments). It works only under performanceScratch:
 //
 //   - It waits for her mirror to hold the commit, as the gate's script does (macBoxMirrorReads).
@@ -124,7 +125,7 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 //     them: clones sharing the mirrors' objects, kept across landings.
 //   - It checks the Go toolchain against its digest (sharedBoxToolchainCheck) and the module cache against go.sum, and
 //     builds the binary with them on a Go cache it keeps under the scratch across landings, so a build compiles only
-//     what changed. The module cache is, in a land job (landJobLine), the set the box laid for it when
+//     what changed. The module cache is, in an integrate job (integrateJobLine), the set the box laid for it when
 //     `GOMODCACHE` names one, read with `GOPROXY=off` and `GOSUMDB=off`, and otherwise a cache of the measurement's
 //     own, filled from the proxy. A binary that is main's, by the sha256 it was handed, says
 //     performanceSameBinaryMarker and stops.
@@ -137,7 +138,7 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 // Each phase says its milliseconds, so what costs what can be read.
 const performanceScript = `set -euo pipefail
 commit="$1"; reference="$2"; fills="$3"; coldRounds="$4"; referenceRounds="$5"; warmRounds="$6"; mainBinary="${7:-}"
-` + landJobLine + `
+` + integrateJobLine + `
 ` + macBoxMirrorLine + `
 base=` + performanceScratch + `
 mkdir -p "$base"; cd "$base"
@@ -184,25 +185,24 @@ rm -f "$safe"; trap - EXIT; unset GIT_CONFIG_GLOBAL
 phase lay
 goroot="` + macBoxGoroot + `"; digest="` + macBoxToolchainDigest + `"
 ` + performancePathLine + `
-` + sharedBoxToolchainCheck + `# The module set the box laid for a land job, kept before the account's Go settings go.
-# Anywhere else a GOMODCACHE is the account's own, never read.
+` + sharedBoxToolchainCheck + `# The module set the box laid for an integrate job, kept before the account's Go
+# settings go. Anywhere else a GOMODCACHE is the account's own, never read.
 laidModules=""
-[ -z "$landJob" ] || laidModules="${GOMODCACHE:-}"
+[ -z "$integrateJob" ] || laidModules="${GOMODCACHE:-}"
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE
 unset GOINSECURE GOSUMDB
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off
 phase toolchain
 # Every module of both trees' workspaces is confirmed and verified here, before any run, and the runs then go offline:
 # a cache that held only some of them left deeafbf4's modules missing, and its runs stopped at type errors, which read
-# as a fast row (Nov 21). A land job has no network, by design, so Loom lays the module set it needs and names it in
-# GOMODCACHE, and a land job's runs read that set with the proxy and the checksum database off: go mod download only
-# confirms each module is there, and offline it fails naming the one that isn't. The checksum database is off because
-# offline it can't answer, and go asks it for a module whose zip hash go.sum doesn't hold, as deeafbf4's older sums
-# can't be made to (J-r0b69ca). A module go.sum holds is held to it, and go mod verify fails one whose bytes changed
-# since the box laid it; one go.sum doesn't hold is trusted as the box laid it. Outside a land job, as on the house
-# Macs and for
-# cohere-dev measure over a gap, or with no set named, the modules come from the proxy into a cache of the
-# measurement's own under the scratch.
+# as a fast row (Nov 21). An integrate job has no network, by design, so Loom lays the module set it needs and names it
+# in GOMODCACHE, and an integrate job's runs read that set with the proxy and the checksum database off: go mod download
+# only confirms each module is there, and offline it fails naming the one that isn't. The checksum database is off
+# because offline it can't answer, and go asks it for a module whose zip hash go.sum doesn't hold, as deeafbf4's older
+# sums can't be made to (J-r0b69ca). A module go.sum holds is held to it, and go mod verify fails one whose bytes
+# changed since the box laid it; one go.sum doesn't hold is trusted as the box laid it. Outside an integrate job, as on
+# the house Macs and for cohere-dev measure over a gap, or with no set named, the modules come from the proxy into a
+# cache of the measurement's own under the scratch.
 if [ -n "$laidModules" ]; then
   export GOMODCACHE="$laidModules" GOPROXY=off GOSUMDB=off
   say "modules the box's laid set at $laidModules, offline"
@@ -228,8 +228,8 @@ say "tested $commit on $(go env GOOS)/$(go env GOARCH)"
 # binary compiles builds main's binary again, and its note can say any difference is the box's (#6wnsnq2).
 binary=$(sha256sum "$base/cohere" | cut -d' ' -f1)
 say "binary $binary"
-# main's binary, when the land job names it (#6ex523f): built again, it is the program main's file already measured,
-# so nothing runs, and the land job keeps main's file.
+# main's binary, when the integrate job names it (#6ex523f): built again, it is the program main's file already
+# measured, so nothing runs, and the integrate job keeps main's file.
 if [ -n "$mainBinary" ] && [ "$binary" = "$mainBinary" ]; then echo "` + performanceSameBinaryMarker + `"; exit 0; fi
 say "machine $(sysctl -n hw.ncpu) $(sysctl -n machdep.cpu.brand_string)"
 say "go $(go env GOVERSION)"
@@ -471,9 +471,9 @@ func cohereToMeasure(worktree string, gating string) (string, bool, int) {
 	return "", true, 0
 }
 
-// performanceTaken is what a measurement's road brought back, the gap to Shackler (measureOnShackler) or the land job's
-// own bash (land_job_run.go): everything the script printed and how it ended, or why it never ran, when it started, and
-// main's binary's sha256 the script was handed, empty when it was handed none.
+// performanceTaken is what a measurement's road brought back, the gap to Shackler (measureOnShackler) or the integrate
+// job's own bash (integrate_job_run.go): everything the script printed and how it ended, or why it never ran, when it
+// started, and main's binary's sha256 the script was handed, empty when it was handed none.
 type performanceTaken struct {
 	output      []byte
 	unavailable string
@@ -704,8 +704,8 @@ func measureOnShackler(worktree string, commit string, wait time.Duration) ([]by
 }
 
 // performanceArguments are performanceScript's arguments for a measurement of commit: deeafbf4's commit, the counts of
-// fills and of each row's rounds, and mainBinary, main's binary's sha256, when it is one: the land job hands it, so a
-// binary that is main's is never timed again, and today's land never does.
+// fills and of each row's rounds, and mainBinary, main's binary's sha256, when it is one: the integrate job hands it,
+// so a binary that is main's is never timed again, and today's land never does.
 func performanceArguments(commit string, mainBinary string) []string {
 	arguments := []string{commit, performanceReference, strconv.Itoa(performanceFills),
 		strconv.Itoa(performanceColdRounds), strconv.Itoa(performanceReferenceRounds),

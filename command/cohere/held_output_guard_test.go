@@ -227,7 +227,7 @@ func procPipeHolders(root string) ([]string, error) {
 // "pid <pid> <command>: <parent, start and command line>", and whether it holds the pipe at all: a process that has
 // exited holds nothing, and neither does one of this process's own running children, a command another test is still
 // running or the lsof asking. Its parent, start and command line are read in process (process_reading), never through
-// ps, which is setuid on macOS and refused in a land job's sandbox; one that can't be read is named with why.
+// ps, which is setuid on macOS and refused in an integrate job's sandbox; one that can't be read is named with why.
 func describeHolder(pid string, command string) (string, bool) {
 	id, parseError := strconv.Atoi(pid)
 	if parseError != nil {

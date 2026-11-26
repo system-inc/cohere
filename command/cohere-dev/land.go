@@ -616,7 +616,7 @@ func testedNamed(covered project.Workspace) string {
 }
 
 // goVet runs go vet of patterns in the worktree, in environment, writing to the terminal, and returns its exit code:
-// the gate's first step, and one of the land job's checks (land_job_run.go).
+// the gate's first step, and one of the integrate job's checks (integrate_job_run.go).
 func goVet(worktree string, patterns []string, environment []string) int {
 	vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
 	vet.Dir, vet.Env = worktree, environment

@@ -10,22 +10,23 @@ import (
 	"github.com/system-inc/cohere/internal/command_line/streams"
 )
 
-// The land job's replay store (#etpnnw1): a check whose inputs are a passed run's needn't run again, so a land job that
-// keeps a directory (landJobCacheVariable) records each pass under the key its inputs read as, and a later job whose
-// key matches replays it. Keys are another hand's work, an inputKey for each step (docsDataKey, swiftTestsKey), so the
-// store takes a key function of that shape, and the docs data check is wired to a placeholder that never keys it.
+// The integrate job's replay store (#etpnnw1): a check whose inputs are a passed run's needn't run again, so an
+// integrate job that keeps a directory (integrateJobCacheVariable) records each pass under the key its inputs read as,
+// and a later job whose key matches replays it. Keys are another hand's work, an inputKey for each step (docsDataKey,
+// swiftTestsKey), so the store takes a key function of that shape, and the docs data check is wired to a placeholder
+// that never keys it.
 
 // docsDataPlaceholderKey keys the docs data check for the replay store until docsDataKey, being written beside this
-// as an inputKey, lands and takes its place: it gives no key, so the check always runs and nothing is recorded.
+// as an inputKey, is integrated and takes its place: it gives no key, so the check always runs and nothing is recorded.
 func docsDataPlaceholderKey(string) (string, []string, error) {
 	return "", nil, nil
 }
 
-// landJobReplay is the land job's store of steps that passed, `<directory>/steps/<step>/<key>`, each written only on a
-// pass, holding what the land job said of it and the inputs its key read. A step whose key matches a record replays it
-// rather than running, since its inputs are those of a pass; a step with no key, or a store with no directory, as when
-// landJobCacheVariable is unset, always runs.
-type landJobReplay struct {
+// integrateJobReplay is the integrate job's store of steps that passed, `<directory>/steps/<step>/<key>`, each written
+// only on a pass, holding what the integrate job said of it and the inputs its key read. A step whose key matches a
+// record replays it rather than running, since its inputs are those of a pass; a step with no key, or a store with no
+// directory, as when integrateJobCacheVariable is unset, always runs.
+type integrateJobReplay struct {
 	directory string
 }
 
@@ -36,7 +37,7 @@ var replayKeyPattern = regexp.MustCompile(`^[0-9A-Za-z_][0-9A-Za-z_.-]{0,127}$`)
 // run runs work, the step named step, at root, or replays a pass of it whose key, key's of root, matches, and returns
 // its exit code and what the account says of it, empty when it checked nothing. A pass that checked something is
 // recorded under its key; a failure never is.
-func (store landJobReplay) run(
+func (store integrateJobReplay) run(
 	step string,
 	key func(root string) (string, []string, error),
 	root string,
@@ -95,7 +96,7 @@ func writeReplayRecord(record string, contents string) error {
 		writeError = os.Rename(staged.Name(), record)
 	}
 	if writeError != nil {
-		// Ignored: the staged file is the land job's own scratch, and the write's own error is the one said.
+		// Ignored: the staged file is the integrate job's own scratch, and the write's own error is the one said.
 		_ = os.Remove(staged.Name())
 	}
 	return writeError

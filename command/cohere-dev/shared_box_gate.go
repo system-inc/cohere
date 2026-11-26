@@ -8,39 +8,40 @@ package main
 //
 //   - The Go toolchain is the one pinned here, by a digest of its whole tree, read before anything of it runs. A
 //     swapped `go`, `compile` or standard-library source differs from the Go project's own archive.
-//   - The account's Go settings are never read, but for the module set a land job is handed (below): no env.sh, no go
-//     env file, no toolchain switch, the path set here.
+//   - The account's Go settings are never read, but for the module set an integrate job is handed (below): no env.sh,
+//     no go env file, no toolchain switch, the path set here.
 //   - `go mod download` has every module the workspace names, other platforms' included, and `go mod verify` passes
 //     before any test runs, so the module cache is whole and matches go.sum. A box that never held a module only
 //     another platform needs failed the tests that list for that platform, though its own build never asked
-//     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8). A land job
-//     has no network, by design, so Loom lays the module set it needs and names it in `GOMODCACHE`, which the gate
-//     keeps in the land job alone (the one run whose landJob is set, landJobLine), kept cache or none, and reads with
-//     `GOPROXY=off` and `GOSUMDB=off`: the download then only confirms each module is there, and offline it fails
-//     naming the one that isn't. The checksum database is off because offline it can't answer: go asks it for a module
-//     whose zip hash go.sum doesn't hold (J-r0b69ca, a module go.work.sum names only by its go.mod), and a line go.sum
-//     does hold still binds, and verify fails a module whose bytes changed since the box laid it; one go.sum doesn't
-//     hold is trusted as the box laid it. Outside the land job, or with no set named, the download fetches from the
-//     proxy into Go's default cache.
-//   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it, but in the land job
-//     (below).
+//     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8). An integrate
+//     job has no network, by design, so Loom lays the module set it needs and names it in `GOMODCACHE`, which the gate
+//     keeps in the integrate job alone (the one run whose integrateJob is set, integrateJobLine), kept cache or none,
+//     and reads with `GOPROXY=off` and `GOSUMDB=off`: the download then only confirms each module is there, and offline
+//     it fails naming the one that isn't. The checksum database is off because offline it can't answer: go asks it for
+//     a module whose zip hash go.sum doesn't hold (J-r0b69ca, a module go.work.sum names only by its go.mod), and a
+//     line go.sum does hold still binds, and verify fails a module whose bytes changed since the box laid it; one
+//     go.sum doesn't hold is trusted as the box laid it. Outside the integrate job, or with no set named, the download
+//     fetches from the proxy into Go's default cache.
+//   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it, but in the integrate
+//     job (below).
 //
 // It is the exception to the house's rule against -count=1 in a gate. That rule holds because Go's test cache is
-// keyed honestly, and on a cache any job can write it isn't. Kirk's Mac's own runs keep the cache, and so does the land
-// job on Shackler (land_job_run.go, #s50bcnr), whose cache is a directory no other job writes: there sharedBoxGate runs
-// with the cache that job keeps and without -count=1 (sharedBoxCacheBlock), so a package nothing changed replays.
+// keyed honestly, and on a cache any job can write it isn't. Kirk's Mac's own runs keep the cache, and so does the
+// integrate job on Shackler (integrate_job_run.go, #s50bcnr), whose cache is a directory no other job writes: there
+// sharedBoxGate runs with the cache that job keeps and without -count=1 (sharedBoxCacheBlock), so a package nothing
+// changed replays.
 
-// sharedBoxCacheBlock is sharedBoxGate's choice of Go cache, by landCache, which every script that runs it sets
-// before it: empty on every gate box and scratch box (macBoxLandCacheLine), so the box's environment never keeps a
-// cache there, and the land job's kept directory on Shackler alone. Empty, the cache is made empty for this job and
-// removed after it, and countFlag is -count=1, which every go test the gate runs carries: today's cold, correct run.
-// Set, the cache is landCache's gocache, kept across the land job's jobs, and countFlag is empty, so Go's honest keys
-// replay every package whose inputs didn't change as "(cached)".
-const sharedBoxCacheBlock = `# The Go cache: this job's own, empty, on a shared box, or the land job's, kept.
+// sharedBoxCacheBlock is sharedBoxGate's choice of Go cache, by integrateCache, which every script that runs it sets
+// before it: empty on every gate box and scratch box (macBoxIntegrateCacheLine), so the box's environment never keeps a
+// cache there, and the integrate job's kept directory on Shackler alone. Empty, the cache is made empty for this job
+// and removed after it, and countFlag is -count=1, which every go test the gate runs carries: today's cold, correct
+// run. Set, the cache is integrateCache's gocache, kept across the integrate job's jobs, and countFlag is empty, so
+// Go's honest keys replay every package whose inputs didn't change as "(cached)".
+const sharedBoxCacheBlock = `# The Go cache: this job's own, empty, on a shared box, or the integrate job's, kept.
 countFlag=-count=1
-if [ -n "${landCache:-}" ]; then
-  gocache="$landCache/gocache"
-  mkdir -p "$gocache" || refuse "the land job's Go cache $gocache couldn't be made"
+if [ -n "${integrateCache:-}" ]; then
+  gocache="$integrateCache/gocache"
+  mkdir -p "$gocache" || refuse "the integrate job's Go cache $gocache couldn't be made"
   countFlag=""
 else
   gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
@@ -106,14 +107,15 @@ const sharedBoxTestTimeout = "30m"
 // account's to change, so it trusts nothing the box kept any more than /usr/bin does.
 const sharedBoxSystemPath = "/usr/bin:/bin:/usr/sbin:/sbin"
 
-// sharedBoxPathLine is sharedBoxGate's line setting the tests' path. The land job alone puts the real git's directory
-// first on it (withLandJobGit), so its tests never run macOS's /usr/bin/git, whose xcrun can't write its cache there.
+// sharedBoxPathLine is sharedBoxGate's line setting the tests' path. The integrate job alone puts the real git's
+// directory first on it (withIntegrateJobGit), so its tests never run macOS's /usr/bin/git, whose xcrun can't write its
+// cache there.
 const sharedBoxPathLine = `export PATH="$goroot/bin:$nodePath` + sharedBoxSystemPath + `"`
 
 // sharedBoxSystemPathAfter is sharedBoxGate's first line: the system's own directories put last on the path the gate
 // was handed, so the digests of the toolchain and of node, which run before sharedBoxPathLine, find sha256sum, find,
-// sort and the rest on a path that leaves them out. A land job in Shackler's sandbox is handed a path without /sbin,
-// where macOS keeps sha256sum, and under set -e a check that can't find it ends the script with no refusal said
+// sort and the rest on a path that leaves them out. An integrate job in Shackler's sandbox is handed a path without
+// /sbin, where macOS keeps sha256sum, and under set -e a check that can't find it ends the script with no refusal said
 // (#5wj23dd). The path line that follows names its own directories whole, so nothing after it reads this one.
 const sharedBoxSystemPathAfter = `export PATH="$PATH:` + sharedBoxSystemPath + `"`
 
@@ -140,14 +142,14 @@ const boxBudgetMarker = "cohere-dev-gate: budget "
 const boxModulesMarker = "cohere-dev-gate: modules "
 
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
-// goroot, digest, node, nodeDigest, races (racePatterns' tokens, comma-separated), landCache (sharedBoxCacheBlock) and
-// landJob (landJobLine) as variables, and the packages to test as its arguments: the module's patterns, or import
-// paths, which a gate Mac is handed. It prints boxMarker before the tests, boxRaceMarker before the -race run once the
-// module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box. When boxShardedPackage is
-// among its arguments, the plain go test runs the rest, and that package runs after it in shards (sharedBoxShards), the
-// run failing once both have when either failed. The -race run is one go test of the plain tokens, then one of each
-// token's package with its run, every one through the same filter so the run after the marker reads as one stream, and
-// a failure of any is the run's, after the rest have run.
+// goroot, digest, node, nodeDigest, races (racePatterns' tokens, comma-separated), integrateCache (sharedBoxCacheBlock)
+// and integrateJob (integrateJobLine) as variables, and the packages to test as its arguments: the module's patterns,
+// or import paths, which a gate Mac is handed. It prints boxMarker before the tests, boxRaceMarker before the -race run
+// once the module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box. When
+// boxShardedPackage is among its arguments, the plain go test runs the rest, and that package runs after it in shards
+// (sharedBoxShards), the run failing once both have when either failed. The -race run is one go test of the plain
+// tokens, then one of each token's package with its run, every one through the same filter so the run after the marker
+// reads as one stream, and a failure of any is the run's, after the rest have run.
 const sharedBoxGate = sharedBoxSystemPathAfter + `
 refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 # step says how many seconds the step it names took, from the end of the one before it (#bc8nf0r).
@@ -159,14 +161,14 @@ if [ -e "$node/bin/node" ]; then
   [ "$nodeFound" = "$nodeDigest" ] || refuse "the node at $node/bin/node digests to $nodeFound, not the pinned $nodeDigest"
   nodePath="$node/bin:"
 fi
-# The module set the box laid for a land job, the one run whose landJob is set, with a kept cache or without one,
-# kept before the account's Go settings go. Anywhere else a GOMODCACHE is the account's own, never read.
+# The module set the box laid for an integrate job, the one run whose integrateJob is set, with a kept cache or without
+# one, kept before the account's Go settings go. Anywhere else a GOMODCACHE is the account's own, never read.
 laidModules=""
-[ -z "${landJob:-}" ] || laidModules="${GOMODCACHE:-}"
+[ -z "${integrateJob:-}" ] || laidModules="${GOMODCACHE:-}"
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
 ` + sharedBoxPathLine + `
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
-# A land job has no network, so the set the box laid is read with the proxy and the checksum database off, go.sum
+# An integrate job has no network, so the set the box laid is read with the proxy and the checksum database off, go.sum
 # holding what it names and go mod verify below what the box laid. With none laid, the modules come from the proxy
 # into Go's default cache.
 if [ -n "$laidModules" ]; then
@@ -187,7 +189,7 @@ if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
 fi
 ` + sharedBoxCacheBlock + `# The shards' outputs and the run's own temporary directory, when the script before this
 # made one, go with the cache, and a kept cache stays.
-trap '[ -n "${landCache:-}" ] || rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
+trap '[ -n "${integrateCache:-}" ] || rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
 export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 step toolchain

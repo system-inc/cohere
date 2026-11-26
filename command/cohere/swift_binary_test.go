@@ -258,7 +258,7 @@ func killChildAtCleanup(test *testing.T, path string) {
 		if parseError != nil {
 			return
 		}
-		// Read in this process, never through ps, which is setuid on macOS and refused in a land job's sandbox.
+		// Read in this process, never through ps, which is setuid on macOS and refused in an integrate job's sandbox.
 		command, commandError := process_reading.Command(child)
 		if errors.Is(commandError, process_reading.ErrNoProcess) {
 			// No process holds the id, so the child has ended and there is nothing to end.

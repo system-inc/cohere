@@ -18,13 +18,14 @@ import (
 	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
-// landJobFixture is a land job ready to judge a merge in a mirror: a candidate, worktree a's head, bringing a module
-// with one package and a command/cohere, so there is a cohere to measure; the mirror, a bare repository the merge is
-// put in; the job's own tree, a directory with no history; go stood in for by one that records each call and lists
-// the module's packages; cohere on the tree by a clean run, keeping its arguments one a line in cohereArguments; bash,
-// for the land job's two scripts, by landJobShell, answering from replies; and the land job's git by gitStandIn, in a
-// directory whose name a shell has to quote, which records each call in gitCalls and runs the test's own git.
-type landJobFixture struct {
+// integrateJobFixture is an integrate job ready to judge a merge in a mirror: a candidate, worktree a's head, bringing
+// a module with one package and a command/cohere, so there is a cohere to measure; the mirror, a bare repository the
+// merge is put in; the job's own tree, a directory with no history; go stood in for by one that records each call and
+// lists the module's packages; cohere on the tree by a clean run, keeping its arguments one a line in cohereArguments;
+// bash, for the integrate job's two scripts, by integrateJobShell, answering from replies; and the integrate job's git
+// by gitStandIn, in a directory whose name a shell has to quote, which records each call in gitCalls and runs the
+// test's own git.
+type integrateJobFixture struct {
 	*landFixture
 	replies    string
 	goCalls    string
@@ -37,15 +38,15 @@ type landJobFixture struct {
 	job             string
 }
 
-// landJobShell stands in for bash in the land job's scripts. It keeps the script it was handed in `<kind>.script` and
-// its arguments, one a line, in `<kind>.arguments`, the kind `measure` for performanceScript and `tests` for
-// macBoxScript, writes each kind to `calls`, and keeps the setting of needs.SwiftUnlaidVariable it ran under in
-// `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`; with no
-// `tests.run` it prints where its modules came from, as a land job's gate says it, then a passing run of every package
-// it was handed, but `tests.fails`, which fails, and then, unless one failed, a passing -race run of each race token's
-// package.
-const landJobShell = `#!/bin/sh
-replies="$LAND_JOB_REPLIES"
+// integrateJobShell stands in for bash in the integrate job's scripts. It keeps the script it was handed in
+// `<kind>.script` and its arguments, one a line, in `<kind>.arguments`, the kind `measure` for performanceScript and
+// `tests` for macBoxScript, writes each kind to `calls`, and keeps the setting of needs.SwiftUnlaidVariable it ran
+// under in `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`; with no
+// `tests.run` it prints where its modules came from, as an integrate job's gate says it, then a passing run of every
+// package it was handed, but `tests.fails`, which fails, and then, unless one failed, a passing -race run of each race
+// token's package.
+const integrateJobShell = `#!/bin/sh
+replies="$INTEGRATE_JOB_REPLIES"
 staged="$replies/stdin.$$"
 cat > "$staged"
 if grep -q '` + performanceMarker + `' "$staged"; then kind=measure; else kind=tests; fi
@@ -62,7 +63,7 @@ fi
 [ "$kind" = tests ] || exit 1
 fails=$(cat "$replies/tests.fails" 2>/dev/null || true)
 echo "` + boxModulesMarker + `the box's laid set at /opt/loom-tools/gomod-cohere, offline"
-echo "` + boxMarker + `$commit on $LAND_JOB_PLATFORM"
+echo "` + boxMarker + `$commit on $INTEGRATE_JOB_PLATFORM"
 races="$3"
 shift 3
 failed=0
@@ -84,9 +85,9 @@ for token in $(printf '%s' "$races" | tr , ' '); do
 done
 `
 
-func newLandJobFixture(test *testing.T) *landJobFixture {
+func newIntegrateJobFixture(test *testing.T) *integrateJobFixture {
 	test.Helper()
-	fixture := &landJobFixture{landFixture: newLandFixture(test), replies: test.TempDir(), home: test.TempDir(),
+	fixture := &integrateJobFixture{landFixture: newLandFixture(test), replies: test.TempDir(), home: test.TempDir(),
 		mirror: filepath.Join(test.TempDir(), "cohere.git"), job: test.TempDir()}
 	stand := test.TempDir()
 	fixture.goCalls = filepath.Join(stand, "go-calls")
@@ -94,13 +95,13 @@ func newLandJobFixture(test *testing.T) *landJobFixture {
 	// the docs data check, failing it when asked.
 	goStandIn := "#!/bin/sh\necho \"$* | proxy ${GOPROXY:-} | sum database ${GOSUMDB:-}\" >> '" + fixture.goCalls +
 		"'\n" +
-		"if [ \"$1\" = run ]; then [ -z \"$LAND_JOB_DOCS_FAILS\" ] || exit 1; exit 0; fi\n" + macBoxGoList
+		"if [ \"$1\" = run ]; then [ -z \"$INTEGRATE_JOB_DOCS_FAILS\" ] || exit 1; exit 0; fi\n" + macBoxGoList
 	if writeError := executable_testing.WriteFile(filepath.Join(filepath.Dir(fixture.log), "go"), []byte(goStandIn),
 		0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	shell := filepath.Join(stand, "shell")
-	if writeError := executable_testing.WriteFile(shell, []byte(landJobShell), 0o755); writeError != nil {
+	if writeError := executable_testing.WriteFile(shell, []byte(integrateJobShell), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	cohere := filepath.Join(stand, "cohere")
@@ -114,7 +115,7 @@ func newLandJobFixture(test *testing.T) *landJobFixture {
 		test.Fatal(lookError)
 	}
 	fixture.gitCalls = filepath.Join(stand, "git-calls")
-	fixture.gitStandIn = filepath.Join(stand, "the land job's git", "git")
+	fixture.gitStandIn = filepath.Join(stand, "the integrate job's git", "git")
 	if makeError := os.MkdirAll(filepath.Dir(fixture.gitStandIn), 0o755); makeError != nil {
 		test.Fatal(makeError)
 	}
@@ -122,10 +123,10 @@ func newLandJobFixture(test *testing.T) *landJobFixture {
 		shellQuoted(fixture.gitCalls)+"\nexec "+shellQuoted(testGit)+" \"$@\"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	fixture.environment = append(fixture.environment, "HOME="+fixture.home, landJobShellVariable+"="+shell,
-		"LAND_JOB_REPLIES="+fixture.replies, "LAND_JOB_PLATFORM="+runtime.GOOS+"/"+runtime.GOARCH,
-		gateCohereVariable+"="+cohere, landJobMirrorVariable+"="+fixture.mirror,
-		landJobGitVariable+"="+fixture.gitStandIn)
+	fixture.environment = append(fixture.environment, "HOME="+fixture.home, integrateJobShellVariable+"="+shell,
+		"INTEGRATE_JOB_REPLIES="+fixture.replies, "INTEGRATE_JOB_PLATFORM="+runtime.GOOS+"/"+runtime.GOARCH,
+		gateCohereVariable+"="+cohere, integrateJobMirrorVariable+"="+fixture.mirror,
+		integrateJobGitVariable+"="+fixture.gitStandIn)
 	worktree := fixture.worktree("a")
 	writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
 	writeFixtureFile(test, filepath.Join(worktree, "alpha", "alpha_test.go"),
@@ -139,7 +140,7 @@ func newLandJobFixture(test *testing.T) *landJobFixture {
 
 // merged makes the merge Loom makes, of worktree a's head onto main, puts it in the mirror with main and the candidate,
 // and returns it.
-func (fixture *landJobFixture) merged() string {
+func (fixture *integrateJobFixture) merged() string {
 	fixture.test.Helper()
 	candidate := fixture.git(fixture.worktree("a"), "rev-parse", "HEAD")
 	tree := strings.Fields(fixture.git(fixture.repository, "merge-tree", "--write-tree", "main", candidate))[0]
@@ -151,34 +152,34 @@ func (fixture *landJobFixture) merged() string {
 }
 
 // reply writes what the stand-in bash answers from file in the replies directory.
-func (fixture *landJobFixture) reply(file string, contents string) {
+func (fixture *integrateJobFixture) reply(file string, contents string) {
 	fixture.test.Helper()
 	writeFixtureFile(fixture.test, filepath.Join(fixture.replies, file), contents)
 }
 
-// landJobRan is what a land job did: its exit, what it printed to its output and its errors, and the tree it named on
-// its last line, empty when it named none.
-type landJobRan struct {
-	exit     int
-	output   string
-	errors   string
-	landed   string
-	lastLine string
+// integrateJobRan is what an integrate job did: its exit, what it printed to its output and its errors, and the tree it
+// named on its last line, empty when it named none.
+type integrateJobRan struct {
+	exit       int
+	output     string
+	errors     string
+	integrated string
+	lastLine   string
 }
 
-// landJob runs land-job on merge in the job's own tree, which has no history, as Loom runs it, at main unless
+// integrateJob runs integrate-job on merge in the job's own tree, which has no history, as Loom runs it, at main unless
 // environment names another commit.
-func (fixture *landJobFixture) landJob(merge string, environment ...string) landJobRan {
+func (fixture *integrateJobFixture) integrateJob(merge string, environment ...string) integrateJobRan {
 	fixture.test.Helper()
-	job := exec.Command(fixture.wrapper, "land-job", "--merge", merge, "--task", fixtureTask, "--message",
+	job := exec.Command(fixture.wrapper, "integrate-job", "--merge", merge, "--task", fixtureTask, "--message",
 		"a module measured and gated")
 	job.Dir = fixture.job
-	job.Env = append(append(fixture.environment, landJobCommitVariable+"="+fixture.git(fixture.repository,
+	job.Env = append(append(fixture.environment, integrateJobCommitVariable+"="+fixture.git(fixture.repository,
 		"rev-parse", "main")), environment...)
 	var output bytes.Buffer
 	var errorOutput bytes.Buffer
 	job.Stdout, job.Stderr = &output, &errorOutput
-	ran := landJobRan{}
+	ran := integrateJobRan{}
 	if runError := job.Run(); runError != nil {
 		var exited *exec.ExitError
 		if !errors.As(runError, &exited) {
@@ -189,14 +190,14 @@ func (fixture *landJobFixture) landJob(merge string, environment ...string) land
 	ran.output, ran.errors = output.String(), errorOutput.String()
 	lines := strings.Split(strings.TrimSpace(ran.output), "\n")
 	ran.lastLine = lines[len(lines)-1]
-	if landed, found := strings.CutPrefix(ran.lastLine, "landed "); found {
-		ran.landed = landed
+	if integrated, found := strings.CutPrefix(ran.lastLine, "integrated "); found {
+		ran.integrated = integrated
 	}
 	return ran
 }
 
 // arguments is what the stand-in bash was handed for kind, one a line, nil when that script never ran.
-func (fixture *landJobFixture) arguments(kind string) []string {
+func (fixture *integrateJobFixture) arguments(kind string) []string {
 	fixture.test.Helper()
 	said := strings.TrimSuffix(string(readMaybeMissing(fixture.test, filepath.Join(fixture.replies,
 		kind+".arguments"))), "\n")
@@ -206,7 +207,7 @@ func (fixture *landJobFixture) arguments(kind string) []string {
 	return strings.Split(said, "\n")
 }
 
-// landingSaid is what a land job's last lines say, as Loom's finisher reads them: the performance file, nil when
+// landingSaid is what an integrate job's last lines say, as Loom's finisher reads them: the performance file, nil when
 // unchanged, the tree, and the message.
 type landingSaid struct {
 	performance []byte
@@ -215,19 +216,19 @@ type landingSaid struct {
 	message     string
 }
 
-// readLanding reads a land job's output as Loom's finisher does, failing the test when its lines aren't in order.
+// readLanding reads an integrate job's output as Loom's finisher does, failing the test when its lines aren't in order.
 func readLanding(test *testing.T, output string) landingSaid {
 	test.Helper()
 	lines := strings.Split(strings.TrimSuffix(output, "\n"), "\n")
-	begin := slices.Index(lines, landJobMarker+"message begin")
-	end := slices.Index(lines, landJobMarker+"message end")
+	begin := slices.Index(lines, integrateJobMarker+"message begin")
+	end := slices.Index(lines, integrateJobMarker+"message end")
 	if begin != 2 || end <= begin || end != len(lines)-2 {
 		test.Fatalf("the landing's lines are out of order:\n%s", output)
 	}
 	said := landingSaid{message: strings.Join(lines[begin+1:end], "\n") + "\n"}
-	performance, found := strings.CutPrefix(lines[0], landJobMarker+"performance ")
-	tree, treeFound := strings.CutPrefix(lines[1], landJobMarker+"tree ")
-	if !found || !treeFound || lines[len(lines)-1] != "landed "+tree {
+	performance, found := strings.CutPrefix(lines[0], integrateJobMarker+"performance ")
+	tree, treeFound := strings.CutPrefix(lines[1], integrateJobMarker+"tree ")
+	if !found || !treeFound || lines[len(lines)-1] != "integrated "+tree {
 		test.Fatalf("the landing's lines don't read:\n%s", output)
 	}
 	said.tree = tree
@@ -243,9 +244,9 @@ func readLanding(test *testing.T, output string) landingSaid {
 	return said
 }
 
-// rebuilt is the tree Loom's finisher makes from what the land job said: the merge's tree, with the performance file
-// written when it changed.
-func (fixture *landJobFixture) rebuilt(merge string, said landingSaid) string {
+// rebuilt is the tree Loom's finisher makes from what the integrate job said: the merge's tree, with the performance
+// file written when it changed.
+func (fixture *integrateJobFixture) rebuilt(merge string, said landingSaid) string {
 	fixture.test.Helper()
 	tree := fixture.git(fixture.repository, "rev-parse", merge+"^{tree}")
 	if said.unchanged {
@@ -258,30 +259,31 @@ func (fixture *landJobFixture) rebuilt(merge string, said landingSaid) string {
 	return rebuilt
 }
 
-// A merge whose candidate is clean would land (#etpnnw1, #hnbb5vr): measured first, on a script handed no binary of
-// main's since main holds no performance file, then tested, then checked, all on the merge's tree laid from the mirror.
-// Nothing is committed or pushed: the last lines are the performance file, the tested tree, which the finisher
+// A merge whose candidate is clean would integrate (#etpnnw1, #hnbb5vr): measured first, on a script handed no binary
+// of main's since main holds no performance file, then tested, then checked, all on the merge's tree laid from the
+// mirror. Nothing is committed or pushed: the last lines are the performance file, the tested tree, which the finisher
 // rebuilds from the merge and that file to the same hash, and the landing's message, `Land #<task>: <what>` with the
-// gate's account, the measurement's note and every step's seconds, then `landed <tree>`. With COHERE_LAND_CACHE set
-// the tests' script keeps the land job's cache, and unset it keeps the gate box's none; either way it reads the land
-// job's own mirrors. Every git the job starts is the one it says it found (#5wj23dd): its own reads, the direct calls,
-// and its packages', each through the stand-in, and both scripts carry that git's directory first on their path.
-func TestALandJobPassesAMergeAndSaysItsLanding(test *testing.T) {
+// gate's account, the measurement's note and every step's seconds, then `integrated <tree>`. With
+// COHERE_INTEGRATE_CACHE set the tests' script keeps the integrate job's cache, and unset it keeps the gate box's none;
+// either way it reads the integrate job's own mirrors. Every git the job starts is the one it says it found (#5wj23dd):
+// its own reads, the direct calls, and its packages', each through the stand-in, and both scripts carry that git's
+// directory first on their path.
+func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 	test.Parallel()
 	for _, kept := range []bool{false, true} {
 		test.Run(map[bool]string{false: "no kept cache", true: "a kept cache"}[kept], func(test *testing.T) {
 			test.Parallel()
-			fixture := newLandJobFixture(test)
+			fixture := newIntegrateJobFixture(test)
 			fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
 			merge := fixture.merged()
 			environment := []string{}
-			cache := filepath.Join(test.TempDir(), "land cache")
+			cache := filepath.Join(test.TempDir(), "integrate cache")
 			if kept {
-				environment = append(environment, landJobCacheVariable+"="+cache)
+				environment = append(environment, integrateJobCacheVariable+"="+cache)
 			}
-			ran := fixture.landJob(merge, environment...)
-			if ran.exit != 0 || ran.landed == "" {
-				test.Fatalf("the land job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+			ran := fixture.integrateJob(merge, environment...)
+			if ran.exit != 0 || ran.integrated == "" {
+				test.Fatalf("the integrate job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
 			}
 			if calls := string(readMaybeMissing(test, filepath.Join(fixture.replies, "calls"))); calls !=
 				"measure\ntests\n" {
@@ -299,44 +301,49 @@ func TestALandJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 					"lists", tested)
 			}
 			script := string(readMaybeMissing(test, filepath.Join(fixture.replies, "tests.script")))
-			mirrors := filepath.Join(fixture.home, landJobScratch, "mirrors")
-			wantCache := macBoxLandCacheLine
+			mirrors := filepath.Join(fixture.home, integrateJobScratch, "mirrors")
+			wantCache := macBoxIntegrateCacheLine
 			if kept {
-				wantCache = "landCache='" + cache + "'"
+				wantCache = "integrateCache='" + cache + "'"
 			}
-			// The gate box's run, but for its path, which puts the land job's git first (below).
-			gate, gateError := withLandJobGit(sharedBoxGate, sharedBoxPathLine, fixture.gitStandIn)
+			// The gate box's run, but for its path, which puts the integrate job's git first (below).
+			gate, gateError := withIntegrateJobGit(sharedBoxGate, sharedBoxPathLine, fixture.gitStandIn)
 			if gateError != nil {
 				test.Fatal(gateError)
 			}
 			if !strings.Contains(script, "\nmirrors='"+mirrors+"'; tries=1; pause=0\n"+wantCache+"\n") ||
 				!strings.HasSuffix(script, gate) {
-				test.Errorf("the tests' script doesn't read the land job's mirrors with %s, or isn't the gate box's:"+
-					"\n%.600s", wantCache, script)
+				test.Errorf(
+					"the tests' script doesn't read the integrate job's mirrors with %s, or isn't the gate box's:"+
+						"\n%.600s",
+					wantCache,
+					script,
+				)
 			}
-			// The tests run as the land job's, kept cache or none, so the gate reads the module set Loom laid for the
-			// job offline.
-			if !strings.Contains(script, "\n"+landJobSetting+"\n") || strings.Contains(script, "\n"+landJobLine+"\n") {
-				test.Errorf("the tests' script doesn't say it is the land job's:\n%.600s", script)
+			// The tests run as the integrate job's, kept cache or none, so the gate reads the module set Loom laid for
+			// the job offline.
+			if !strings.Contains(script, "\n"+integrateJobSetting+"\n") ||
+				strings.Contains(script, "\n"+integrateJobLine+"\n") {
+				test.Errorf("the tests' script doesn't say it is the integrate job's:\n%.600s", script)
 			}
-			// The tests skip what builds cohere-swift, which can't be built in a land job's sandbox, and cohere on the
-			// tree checks every language and format but Swift.
+			// The tests skip what builds cohere-swift, which can't be built in an integrate job's sandbox, and cohere
+			// on the tree checks every language and format but Swift.
 			if unlaid := string(readMaybeMissing(test, filepath.Join(fixture.replies, "tests.swift"))); unlaid !=
 				needs.SwiftUnlaidSetting {
 				test.Errorf("the tests ran with %s=%q, want %q", needs.SwiftUnlaidVariable, unlaid,
 					needs.SwiftUnlaidSetting)
 			}
 			checked := string(readMaybeMissing(test, fixture.cohereArguments))
-			if checked != strings.Join(landJobCohereArguments, "\n")+"\n" || strings.Contains(checked, "swift") ||
+			if checked != strings.Join(integrateJobCohereArguments, "\n")+"\n" || strings.Contains(checked, "swift") ||
 				!strings.Contains(checked, "--languages\ngo,typescript\n") {
 				test.Errorf("cohere on the tree was handed %q, want every language but swift:\n%s",
-					landJobCohereArguments, checked)
+					integrateJobCohereArguments, checked)
 			}
-			// The measurement runs as the land job's, so it reads the module set Loom laid for the job.
+			// The measurement runs as the integrate job's, so it reads the module set Loom laid for the job.
 			measuring := string(readMaybeMissing(test, filepath.Join(fixture.replies, "measure.script")))
-			if !strings.Contains(measuring, "\n"+landJobSetting+"\n") || strings.Contains(measuring,
-				"\n"+landJobLine+"\n") {
-				test.Errorf("the measurement's script doesn't say it is the land job's:\n%.600s", measuring)
+			if !strings.Contains(measuring, "\n"+integrateJobSetting+"\n") || strings.Contains(measuring,
+				"\n"+integrateJobLine+"\n") {
+				test.Errorf("the measurement's script doesn't say it is the integrate job's:\n%.600s", measuring)
 			}
 			first := "export PATH=" + shellQuoted(filepath.Dir(fixture.gitStandIn)+":")
 			for _, row := range []struct{ kind, script, line string }{
@@ -345,32 +352,43 @@ func TestALandJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 			} {
 				if strings.Contains(row.script, "\n"+row.line+"\n") || !strings.Contains(row.script,
 					"\n"+first+strings.TrimPrefix(row.line, "export PATH=")+"\n") {
-					test.Errorf("the %s script's path doesn't put the land job's git first:\n%s", row.kind, row.script)
+					test.Errorf(
+						"the %s script's path doesn't put the integrate job's git first:\n%s",
+						row.kind,
+						row.script,
+					)
 				}
 			}
-			if want := "cohere-dev: land-job runs the git at " + fixture.gitStandIn + "\n"; !strings.
+			if want := "cohere-dev: integrate-job runs the git at " + fixture.gitStandIn + "\n"; !strings.
 				HasPrefix(ran.errors, want) {
-				test.Errorf("the land job doesn't open with %q:\n%s", want, ran.errors)
+				test.Errorf("the integrate job doesn't open with %q:\n%s", want, ran.errors)
 			}
 			said := readLanding(test, ran.output)
-			// The land job's own read, its direct call for the tested tree's file, and its package's listing.
+			// The integrate job's own read, its direct call for the tested tree's file, and its package's listing.
 			called := string(readMaybeMissing(test, fixture.gitCalls))
 			for _, want := range []string{"rev-list --parents -n 1 " + merge + "\n",
 				"cat-file blob " + said.tree + ":" + performanceFileName + "\n", "ls-files --stage -z\n"} {
 				if !strings.Contains(called, want) {
-					test.Errorf("the land job's git wasn't asked %q, so another git ran it; it was asked:\n%s", want,
-						called)
+					test.Errorf(
+						"the integrate job's git wasn't asked %q, so another git ran it; it was asked:\n%s",
+						want,
+						called,
+					)
 				}
 			}
 			if said.unchanged || !bytes.HasPrefix(said.performance, []byte(performanceHeader)) {
 				test.Errorf("the performance line isn't a measured file:\n%s", said.performance)
 			}
 			if rebuilt := fixture.rebuilt(merge, said); rebuilt != said.tree {
-				test.Errorf("the finisher rebuilds %s from the lines, and the land job said %s", rebuilt, said.tree)
+				test.Errorf(
+					"the finisher rebuilds %s from the lines, and the integrate job said %s",
+					rebuilt,
+					said.tree,
+				)
 			}
 			for _, want := range []string{
 				"Land #" + fixtureTask + ": a module measured and gated\n\n",
-				"Gated by cohere-dev land-job on Shackler in ",
+				"Gated by cohere-dev integrate-job on Shackler in ",
 				": go test of the module on Shackler (" + runtime.GOOS + "/" + runtime.GOARCH + ", 2 packages, " +
 					"shared uid, ",
 				", go vet, cohere on the tree, 0 findings and no gaps.",
@@ -393,11 +411,11 @@ func TestALandJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 }
 
 // A merge that builds main's binary keeps main's file (#6ex523f): the script is handed main's binary's sha256, says it
-// built that very binary and stops before any run, and the land job says the performance file is unchanged, the
+// built that very binary and stops before any run, and the integrate job says the performance file is unchanged, the
 // tested tree the merge's own, and that it is the same binary as main's, so not measured.
-func TestALandJobKeepsMainsFileForTheSameBinary(test *testing.T) {
+func TestAnIntegrateJobKeepsMainsFileForTheSameBinary(test *testing.T) {
 	test.Parallel()
-	fixture := newLandJobFixture(test)
+	fixture := newIntegrateJobFixture(test)
 	previous := sameBinaryPerformance(test, previousPerformance(test, performancePreviousCommit, performanceBox,
 		performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000)))
 	writeFixtureFile(test, filepath.Join(fixture.repository, performanceFileName), string(previous))
@@ -406,16 +424,16 @@ func TestALandJobKeepsMainsFileForTheSameBinary(test *testing.T) {
 	fixture.reply("measure.run", performanceMarker+"tested COMMIT on darwin/arm64\n"+performanceMarker+"binary "+
 		performanceFixtureBinary+"\n"+performanceSameBinaryMarker+"\n")
 	merge := fixture.merged()
-	ran := fixture.landJob(merge)
-	if ran.exit != 0 || ran.landed == "" {
-		test.Fatalf("the land job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+	ran := fixture.integrateJob(merge)
+	if ran.exit != 0 || ran.integrated == "" {
+		test.Fatalf("the integrate job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
 	}
 	if measured := fixture.arguments("measure"); len(measured) != 7 || measured[6] != performanceFixtureBinary {
 		test.Errorf("the measurement was handed %q, want main's binary last", measured)
 	}
 	said := readLanding(test, ran.output)
 	if !said.unchanged || said.tree != fixture.git(fixture.repository, "rev-parse", merge+"^{tree}") {
-		test.Errorf("the land job said the file changed, or a tree %s other than the merge's", said.tree)
+		test.Errorf("the integrate job said the file changed, or a tree %s other than the merge's", said.tree)
 	}
 	if want := "the same binary as main's (sha256 " + performanceFixtureBinary[:12] + "), so not measured"; !strings.
 		Contains(said.message, want) {
@@ -423,51 +441,51 @@ func TestALandJobKeepsMainsFileForTheSameBinary(test *testing.T) {
 	}
 }
 
-// A red test refuses: the land job names the test and its output, exits 1, and says no landing.
-func TestALandJobRefusesARedTestNamingIt(test *testing.T) {
+// A red test refuses: the integrate job names the test and its output, exits 1, and says no landing.
+func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 	test.Parallel()
-	fixture := newLandJobFixture(test)
+	fixture := newIntegrateJobFixture(test)
 	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
 	fixture.reply("tests.fails", "example.com/fixture/alpha")
-	ran := fixture.landJob(fixture.merged())
-	if ran.exit != 1 || ran.landed != "" || strings.Contains(ran.output, landJobMarker) {
-		test.Fatalf("the land job exited %d and said %q, want 1 and no landing:\n%s", ran.exit, ran.output,
+	ran := fixture.integrateJob(fixture.merged())
+	if ran.exit != 1 || ran.integrated != "" || strings.Contains(ran.output, integrateJobMarker) {
+		test.Fatalf("the integrate job exited %d and said %q, want 1 and no landing:\n%s", ran.exit, ran.output,
 			ran.errors)
 	}
 	for _, want := range []string{"Shackler's tests on", "failed, so nothing landed",
-		"example.com/fixture/alpha TestPlantedFailure", "planted: it fails", "land-job step tests refused in ",
-		"land-job refused after "} {
+		"example.com/fixture/alpha TestPlantedFailure", "planted: it fails", "integrate-job step tests refused in ",
+		"integrate-job refused after "} {
 		if !strings.Contains(ran.errors, want) {
-			test.Errorf("the land job doesn't say %q:\n%s", want, ran.errors)
+			test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
 		}
 	}
 }
 
 // A merge that changes what only Swift's checks judge refuses in the preflight, before anything is laid, measured or
-// tested (#5wj23dd): cohere-swift can't be built in a land job's sandbox, so nothing there would check the change, and
-// the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and the Swift files of
-// command/cohere and release's dispatch and packaging are each refused, named.
-func TestALandJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
+// tested (#5wj23dd): cohere-swift can't be built in an integrate job's sandbox, so nothing there would check the
+// change, and the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and the Swift
+// files of command/cohere and release's dispatch and packaging are each refused, named.
+func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
 	test.Parallel()
 	for _, changed := range []string{"swift_language/Package.swift", "command/cohere/swift_binary.go",
 		"internal/release/dispatch/swift.go", "internal/release/dispatch/swift_tree_state_test.go",
 		"internal/release/packaging/swift_package.go"} {
 		test.Run(changed, func(test *testing.T) {
 			test.Parallel()
-			fixture := newLandJobFixture(test)
+			fixture := newIntegrateJobFixture(test)
 			worktree := fixture.worktree("a")
 			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a Swift change\n")
 			fixture.git(worktree, "add", ".")
 			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a Swift change"))
-			ran := fixture.landJob(fixture.merged())
-			if ran.exit != 1 || ran.landed != "" {
-				test.Fatalf("the land job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit,
+			ran := fixture.integrateJob(fixture.merged())
+			if ran.exit != 1 || ran.integrated != "" {
+				test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit,
 					ran.lastLine, ran.errors)
 			}
 			for _, want := range []string{needs.SwiftUnlaid + ", so the merge's change to " + changed,
-				"land-job step preflight refused in "} {
+				"integrate-job step preflight refused in "} {
 				if !strings.Contains(ran.errors, want) {
-					test.Errorf("the land job doesn't say %q:\n%s", want, ran.errors)
+					test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
 				}
 			}
 			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
@@ -479,22 +497,22 @@ func TestALandJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
 
 // A merge that changes a file beside the Swift ones, in a package whose Swift files the preflight refuses, isn't
 // refused: the guard names Swift's files, never their packages whole.
-func TestALandJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
+func TestAnIntegrateJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
 	test.Parallel()
 	for _, changed := range []string{"command/cohere/discovery.go", "internal/release/dispatch/progress.go",
 		"internal/release/packaging/checksums.go", "internal/release/dispatch/swiftly.go"} {
 		test.Run(changed, func(test *testing.T) {
 			test.Parallel()
-			fixture := newLandJobFixture(test)
+			fixture := newIntegrateJobFixture(test)
 			worktree := fixture.worktree("a")
 			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a change Go judges\n")
 			fixture.git(worktree, "add", ".")
 			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a change Go judges"))
 			// The fixture scripts no measurement, so the job stops there: what matters is that it got past the
 			// preflight and laid the merge.
-			ran := fixture.landJob(fixture.merged())
+			ran := fixture.integrateJob(fixture.merged())
 			if strings.Contains(ran.errors, "preflight refused") || strings.Contains(ran.errors, "can't be judged") ||
-				!strings.Contains(ran.errors, "land-job step lay ") {
+				!strings.Contains(ran.errors, "integrate-job step lay ") {
 				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
 			}
 		})
@@ -503,32 +521,33 @@ func TestALandJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
 
 // A merge whose first parent isn't the commit the job runs at refuses before anything is laid, measured or tested:
 // its code wouldn't be the main it judges.
-func TestALandJobRefusesAMergeOntoAnotherMain(test *testing.T) {
+func TestAnIntegrateJobRefusesAMergeOntoAnotherMain(test *testing.T) {
 	test.Parallel()
-	fixture := newLandJobFixture(test)
+	fixture := newIntegrateJobFixture(test)
 	merge := fixture.merged()
 	elsewhere := fixture.git(fixture.worktree("b"), "rev-parse", "HEAD")
-	ran := fixture.landJob(merge, landJobCommitVariable+"="+elsewhere)
-	if ran.exit != 1 || ran.landed != "" {
-		test.Fatalf("the land job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit, ran.lastLine,
+	ran := fixture.integrateJob(merge, integrateJobCommitVariable+"="+elsewhere)
+	if ran.exit != 1 || ran.integrated != "" {
+		test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit, ran.lastLine,
 			ran.errors)
 	}
 	if want := "and this job runs at " + shortCommit(elsewhere); !strings.Contains(ran.errors, want) {
-		test.Errorf("the land job doesn't say %q:\n%s", want, ran.errors)
+		test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
 	}
 	if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
 		test.Errorf("a merge onto another main ran %q", calls)
 	}
 }
 
-// The gate's Go cache by landCache (#s50bcnr), sharedBoxGate run for real with bash against a planted toolchain: unset,
-// every go test carries -count=1 on a cache made empty for the job and gone after it, as on every gate box; set, no go
-// test carries it, the cache is landCache's gocache, and it stays for the next job. No go test in the gate's scripts
-// spells -count=1 itself, so the one setting is what every go test reads. landJob says the run is the land job's, kept
-// cache or none, so set, go mod download and go mod verify read the module set `GOMODCACHE` names with `GOPROXY=off`
-// and `GOSUMDB=off`, and unset, they read Go's default cache, the `GOMODCACHE` named never read. Loom's runner sets no
-// COHERE_LAND_CACHE, and a land job keyed on the kept cache alone went to a proxy it can't reach.
-func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
+// The gate's Go cache by integrateCache (#s50bcnr), sharedBoxGate run for real with bash against a planted toolchain:
+// unset, every go test carries -count=1 on a cache made empty for the job and gone after it, as on every gate box; set,
+// no go test carries it, the cache is integrateCache's gocache, and it stays for the next job. No go test in the gate's
+// scripts spells -count=1 itself, so the one setting is what every go test reads. integrateJob says the run is the
+// integrate job's, kept cache or none, so set, go mod download and go mod verify read the module set `GOMODCACHE` names
+// with `GOPROXY=off` and `GOSUMDB=off`, and unset, they read Go's default cache, the `GOMODCACHE` named never read.
+// Loom's runner sets no COHERE_INTEGRATE_CACHE, and an integrate job keyed on the kept cache alone went to a proxy it
+// can't reach.
+func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
 	needs.Tool(test, "sha256sum", "the gate digests the toolchain with it, as the boxes do")
@@ -546,12 +565,12 @@ func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	}
 	digest := toolchainDigest(test, goroot)
 	for _, row := range []struct {
-		name          string
-		kept, landJob bool
+		name               string
+		kept, integrateJob bool
 	}{
 		{name: "unset"},
-		{name: "set", kept: true, landJob: true},
-		{name: "a land job with no kept cache", landJob: true},
+		{name: "set", kept: true, integrateJob: true},
+		{name: "an integrate job with no kept cache", integrateJob: true},
 	} {
 		kept := row.kept
 		test.Run(row.name, func(test *testing.T) {
@@ -560,18 +579,18 @@ func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 			writeFixtureFile(test, filepath.Join(tree, "go.mod"), "module example.com/module\n\ngo 1.27\n")
 			log := filepath.Join(test.TempDir(), "asked")
 			temporary := test.TempDir()
-			landCache := ""
+			integrateCache := ""
 			if kept {
-				landCache = filepath.Join(test.TempDir(), "land cache")
+				integrateCache = filepath.Join(test.TempDir(), "integrate cache")
 			}
-			landJob := ""
-			if row.landJob {
-				landJob = "1"
+			integrateJob := ""
+			if row.integrateJob {
+				integrateJob = "1"
 			}
 			script := "set -euo pipefail\n" + `goroot="$1"; digest="$2"; node="$3"; nodeDigest="$4"; races="$5"; ` +
-				`landCache="$6"; landJob="$7"; shift 7` + "\n" + sharedBoxGate
+				`integrateCache="$6"; integrateJob="$7"; shift 7` + "\n" + sharedBoxGate
 			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, filepath.Join(tree, "no-node"),
-				strings.Repeat("0", 64), "", landCache, landJob, "./...")
+				strings.Repeat("0", 64), "", integrateCache, integrateJob, "./...")
 			laid := filepath.Join(test.TempDir(), "laid modules")
 			gate.Dir = tree
 			gate.Env = append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+test.TempDir(),
@@ -586,7 +605,7 @@ func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 			}
 			modules, said := " | modcache  | proxy  | sum database ", boxModulesMarker+
 				"Go's default cache, from the proxy\n"
-			if row.landJob {
+			if row.integrateJob {
 				modules, said = " | modcache "+
 					laid+
 					" | proxy off | sum database off", boxModulesMarker+"the box's laid set at "+laid+
@@ -597,7 +616,7 @@ func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				test.Errorf("the gate asked go mod for %q and %q, want each with %q, saying %q:\n%s", asked[0],
 					asked[1], modules, said, output)
 			}
-			cache := filepath.Join(landCache, "gocache")
+			cache := filepath.Join(integrateCache, "gocache")
 			if !kept {
 				entries := listMaybeMissing(test, temporary)
 				if len(entries) != 0 {
@@ -611,32 +630,35 @@ func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				return
 			}
 			if strings.Contains(asked[2], "-count") || !strings.Contains(asked[2], "| cache "+cache+" empty yes ") {
-				test.Errorf("set, the tests ran %q, want no -count on the land job's cache %s", asked[2], cache)
+				test.Errorf("set, the tests ran %q, want no -count on the integrate job's cache %s", asked[2], cache)
 			}
 			if information, statError := os.Stat(cache); statError != nil || !information.IsDir() {
-				test.Errorf("the land job's cache didn't stay after the gate: %v", statError)
+				test.Errorf("the integrate job's cache didn't stay after the gate: %v", statError)
 			}
 		})
 	}
 }
 
 // The tests' temporary directory on a gate Mac, macBoxTemporaryBlock run for real with bash: a new one each run under
-// the account's `TMPDIR`, while with landCache set it is one path each run inside the kept cache, emptied first, so go
-// test's cache, which keys a test on the `TMPDIR` it read, replays across land jobs. Neither is ever under /tmp, which
-// a land job in Shackler's sandbox may not write (J-7dhfcty).
-func TestTheLandJobsTemporaryDirectoryIsOnePath(test *testing.T) {
+// the account's `TMPDIR`, while with integrateCache set it is one path each run inside the kept cache, emptied first,
+// so go test's cache, which keys a test on the `TMPDIR` it read, replays across integrate jobs. Neither is ever under
+// /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
+func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
 	if strings.Contains(macBoxTemporaryBlock, "/tmp/") {
 		test.Errorf("the block names a fixed path under /tmp:\n%s", macBoxTemporaryBlock)
 	}
-	temporary, kept := test.TempDir(), filepath.Join(test.TempDir(), "land cache")
-	run := func(landCache string) string {
+	temporary, kept := test.TempDir(), filepath.Join(test.TempDir(), "integrate cache")
+	run := func(integrateCache string) string {
 		test.Helper()
 		bash := exec.Command("bash", "-s")
 		bash.Env = append(os.Environ(), "TMPDIR="+temporary)
-		bash.Stdin = strings.NewReader("set -euo pipefail\nrefuse() { echo \"refused $*\"; exit 1; }\nlandCache=" +
-			shellQuoted(landCache) + "\n" + macBoxTemporaryBlock + "touch \"$gatetemp/left\"\necho \"$gatetemp\"\n")
+		bash.Stdin = strings.NewReader("set -euo pipefail\nrefuse() { echo \"refused $*\"; exit 1; }\nintegrateCache=" +
+			shellQuoted(integrateCache) +
+			"\n" +
+			macBoxTemporaryBlock +
+			"touch \"$gatetemp/left\"\necho \"$gatetemp\"\n")
 		output, bashError := bash.CombinedOutput()
 		if bashError != nil {
 			test.Fatalf("the block failed: %v\n%s", bashError, output)
@@ -657,11 +679,11 @@ func TestTheLandJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 	}
 }
 
-// The land job's mirrors, read by macBoxScript run for real with bash: a merge held only in the cohere mirror, and its
-// TypeScript pin held only in the TypeScript mirror beside it, are fetched through the land job's borrowing mirrors and
-// checked out in the scratch tree, nothing copied, before the script reaches sharedBoxGate, which here finds no
-// toolchain.
-func TestTheLandJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
+// The integrate job's mirrors, read by macBoxScript run for real with bash: a merge held only in the cohere mirror, and
+// its TypeScript pin held only in the TypeScript mirror beside it, are fetched through the integrate job's borrowing
+// mirrors and checked out in the scratch tree, nothing copied, before the script reaches sharedBoxGate, which here
+// finds no toolchain.
+func TestTheIntegrateJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
 	directory := test.TempDir()
@@ -697,15 +719,15 @@ func TestTheLandJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	merge := git(checkout, "commit-tree", "-p", "HEAD", "-m", "the merge", git(checkout, "rev-parse", "HEAD^{tree}"))
 	git(directory, "init", "-q", "--bare", filepath.Join(house, "cohere.git"))
 	git(checkout, "push", "-q", filepath.Join(house, "cohere.git"), merge+":refs/heads/merge")
-	mirrors := filepath.Join(directory, "home", landJobScratch, "mirrors")
+	mirrors := filepath.Join(directory, "home", integrateJobScratch, "mirrors")
 	for range 2 {
 		// Laid again, as the next job lays them, they are kept and borrow anew.
-		if layError := layLandJobMirrors(filepath.Join(house, "cohere.git", "objects"), mirrors,
+		if layError := layIntegrateJobMirrors(filepath.Join(house, "cohere.git", "objects"), mirrors,
 			[]string{filepath.Join(house, "TypeScript.git", "objects")}); layError != nil {
 			test.Fatal(layError)
 		}
 	}
-	script, scriptError := withLandJobMirrors(macBoxScript, mirrors)
+	script, scriptError := withIntegrateJobMirrors(macBoxScript, mirrors)
 	if scriptError != nil {
 		test.Fatal(scriptError)
 	}
@@ -728,16 +750,16 @@ func TestTheLandJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	}
 	if objects := git(filepath.Join(mirrors, "cohere.git"), "count-objects", "-v"); !strings.Contains(objects,
 		"count: 0\n") || !strings.Contains(objects, "in-pack: 0\n") {
-		test.Errorf("the land job's cohere mirror copied objects:\n%s", objects)
+		test.Errorf("the integrate job's cohere mirror copied objects:\n%s", objects)
 	}
 }
 
-// A land job named no pool home hangs its pool from the job's own home, never the account's home in the system's user
-// database, which in Shackler's sandbox is /var/empty, where the job can make nothing (J-5xseq90). The fixture names
-// none here, as Loom's runner names none.
-func TestALandJobsPoolHangsFromItsOwnHome(test *testing.T) {
+// An integrate job named no pool home hangs its pool from the job's own home, never the account's home in the system's
+// user database, which in Shackler's sandbox is /var/empty, where the job can make nothing (J-5xseq90). The fixture
+// names none here, as Loom's runner names none.
+func TestAnIntegrateJobsPoolHangsFromItsOwnHome(test *testing.T) {
 	test.Parallel()
-	fixture := newLandJobFixture(test)
+	fixture := newIntegrateJobFixture(test)
 	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
 	merge := fixture.merged()
 	named := fixture.environment
@@ -747,25 +769,25 @@ func TestALandJobsPoolHangsFromItsOwnHome(test *testing.T) {
 			fixture.environment = append(fixture.environment, variable)
 		}
 	}
-	ran := fixture.landJob(merge)
-	if ran.exit != 0 || ran.landed == "" {
-		test.Fatalf("the land job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+	ran := fixture.integrateJob(merge)
+	if ran.exit != 0 || ran.integrated == "" {
+		test.Fatalf("the integrate job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
 	}
 	pool := filepath.Join(userCacheDirectoryIn(fixture.home), "cohere", "test-slots")
 	if information, statError := os.Stat(pool); statError != nil || !information.IsDir() {
-		test.Errorf("the land job's pool isn't under its home at %s: %v", pool, statError)
+		test.Errorf("the integrate job's pool isn't under its home at %s: %v", pool, statError)
 	}
 }
 
-// A land job handed a laid module set in `GOMODCACHE` runs its own go commands offline (#5wj23dd): the test listing,
-// go vet and every other go it starts run with `GOPROXY=off` and `GOSUMDB=off`, whatever the account set, since the
-// job has no network to reach either. Handed none, they run as the account set them.
-func TestALandJobsGoReadsItsLaidModulesOffline(test *testing.T) {
+// An integrate job handed a laid module set in `GOMODCACHE` runs its own go commands offline (#5wj23dd): the test
+// listing, go vet and every other go it starts run with `GOPROXY=off` and `GOSUMDB=off`, whatever the account set,
+// since the job has no network to reach either. Handed none, they run as the account set them.
+func TestAnIntegrateJobsGoReadsItsLaidModulesOffline(test *testing.T) {
 	test.Parallel()
 	for _, laid := range []bool{false, true} {
 		test.Run(map[bool]string{false: "no laid set", true: "a laid set"}[laid], func(test *testing.T) {
 			test.Parallel()
-			fixture := newLandJobFixture(test)
+			fixture := newIntegrateJobFixture(test)
 			fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
 			merge := fixture.merged()
 			fixture.environment = append(withoutModuleCache(fixture.environment),
@@ -775,31 +797,31 @@ func TestALandJobsGoReadsItsLaidModulesOffline(test *testing.T) {
 				fixture.environment = append(fixture.environment, "GOMODCACHE="+test.TempDir())
 				want = " | proxy off | sum database off"
 			}
-			ran := fixture.landJob(merge)
-			if ran.exit != 0 || ran.landed == "" {
-				test.Fatalf("the land job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+			ran := fixture.integrateJob(merge)
+			if ran.exit != 0 || ran.integrated == "" {
+				test.Fatalf("the integrate job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
 			}
 			called := strings.Split(strings.TrimSpace(string(readMaybeMissing(test, fixture.goCalls))), "\n")
 			for _, asked := range []string{"list ", "vet "} {
 				if !slices.ContainsFunc(called, func(line string) bool { return strings.HasPrefix(line, asked) }) {
-					test.Errorf("the land job never ran go %s, so nothing here says how it ran:\n%s", asked,
+					test.Errorf("the integrate job never ran go %s, so nothing here says how it ran:\n%s", asked,
 						strings.Join(called, "\n"))
 				}
 			}
 			for _, line := range called {
 				if !strings.HasSuffix(line, want) {
-					test.Errorf("a go the land job ran isn't under%s: %s", want, line)
+					test.Errorf("a go the integrate job ran isn't under%s: %s", want, line)
 				}
 			}
 		})
 	}
 }
 
-// The land job's git (#5wj23dd): on a Mac the first that is an executable file of the Command Line Tools' git and the
-// one in the developer directory `xcode-select -p` names, each laid under a root of the test's own, never
+// The integrate job's git (#5wj23dd): on a Mac the first that is an executable file of the Command Line Tools' git and
+// the one in the developer directory `xcode-select -p` names, each laid under a root of the test's own, never
 // /usr/bin/git, the shim whose xcrun can't write its cache in a job's sandbox, even reached through a link; and none
 // of them a refusal naming both. Anywhere else it is the git on the path, whatever the developer tools hold.
-func TestTheLandJobsGitIsTheDeveloperToolsOwn(test *testing.T) {
+func TestTheIntegrateJobsGitIsTheDeveloperToolsOwn(test *testing.T) {
 	test.Parallel()
 	xcode := "/Applications/Xcode.app/Contents/Developer"
 	xcodeGit := filepath.Join(xcode, "usr", "bin", "git")
@@ -900,11 +922,12 @@ func TestTheLandJobsGitIsTheDeveloperToolsOwn(test *testing.T) {
 	})
 }
 
-// Each script the land job runs puts its git's directory first on its path (withLandJobGit), quoted so bash reads a
-// directory of any name back whole, and otherwise the path the script sets itself, which every other run of it keeps.
-func TestTheLandJobsScriptsPutItsGitFirstOnTheirPath(test *testing.T) {
+// Each script the integrate job runs puts its git's directory first on its path (withIntegrateJobGit), quoted so bash
+// reads a directory of any name back whole, and otherwise the path the script sets itself, which every other run of it
+// keeps.
+func TestTheIntegrateJobsScriptsPutItsGitFirstOnTheirPath(test *testing.T) {
 	test.Parallel()
-	needs.Tool(test, "bash", "the land job's scripts are bash scripts")
+	needs.Tool(test, "bash", "the integrate job's scripts are bash scripts")
 	git := filepath.Join(test.TempDir(), "the job's $git `dir`", "git")
 	pathOf := func(line string) string {
 		test.Helper()
@@ -921,18 +944,18 @@ func TestTheLandJobsScriptsPutItsGitFirstOnTheirPath(test *testing.T) {
 		{"the tests'", macBoxScript, sharedBoxPathLine},
 		{"the measurement's", performanceScript, performancePathLine},
 	} {
-		replaced, replacedError := withLandJobGit(row.script, row.line, git)
+		replaced, replacedError := withIntegrateJobGit(row.script, row.line, git)
 		if replacedError != nil {
 			test.Errorf("%s script: %v", row.name, replacedError)
 			continue
 		}
-		line, lineError := withLandJobGit("\n"+row.line+"\n", row.line, git)
+		line, lineError := withIntegrateJobGit("\n"+row.line+"\n", row.line, git)
 		if lineError != nil {
 			test.Fatal(lineError)
 		}
 		line = strings.TrimSpace(line)
 		if strings.Contains(replaced, "\n"+row.line+"\n") || !strings.Contains(replaced, "\n"+line+"\n") {
-			test.Errorf("%s script keeps its own path line, or lacks the land job's:\n%s", row.name, replaced)
+			test.Errorf("%s script keeps its own path line, or lacks the integrate job's:\n%s", row.name, replaced)
 		}
 		if got, want := pathOf(line), filepath.Dir(git)+":"+pathOf(row.line); got != want {
 			test.Errorf("%s script's path is %q, want %q", row.name, got, want)
