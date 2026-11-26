@@ -1,0 +1,42 @@
+Generated from seed 23: random names, ignore files at random depths, and about a quarter of
+the files tracked whatever the patterns say, as `git add -f` tracks them.
+
+repository .
+	a/keep
+	"back\\slash/.hidden/out/br[ack]et"
+	"back\\slash/.hidden/x.log"
+	"back\\slash/deep"
+	keep
+-- .gitignore --
+?/
+[a-c]/back\\slash/*.tmp   
+star\*/ab/[[:alpha:]]
+-- a/.gitignore --
+# **/[ab]
+*.tmp/
+ab/x.log
+-- a/keep --
+-- "back\\slash/#hash/a" --
+-- "back\\slash/.gitignore" --
+deep
+*/\?\ 
+*.tmp/back\\slash/abc\ 
+# *.log
+-- "back\\slash/.hidden/#hash" --
+-- "back\\slash/.hidden/deep" --
+-- "back\\slash/.hidden/out/#hash" --
+-- "back\\slash/.hidden/out/br[ack]et" --
+-- "back\\slash/.hidden/x.log" --
+-- "back\\slash/Dot.go/" --
+-- "back\\slash/a" --
+-- "back\\slash/abc/.gitignore" --
+
+\!bang
+x.log/ab/**
+[[:alpha:]]/b
+[[:alpha:]]/
+-- "back\\slash/abc/build" --
+-- "back\\slash/deep" --
+-- "back\\slash/star*" --
+-- build --
+-- keep --

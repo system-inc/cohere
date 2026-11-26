@@ -1,0 +1,5 @@
+::	.gitignore
+.gitignore:2:*	Dot.go
+.gitignore:4:![[:alpha:]]	b
+.gitignore:2:*	deep
+.gitignore:2:*	sp ace

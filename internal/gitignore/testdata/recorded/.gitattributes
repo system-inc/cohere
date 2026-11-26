@@ -1,0 +1,6 @@
+# The recorded trees hold ignore-file lines that end in a carriage return and a newline, and lines and names that end
+# in spaces, which git answered for as written, so git keeps these bytes as they are rather than normalizing them to
+# the line feeds the root's attributes give every other text file.
+*.txtar -text
+*.check-ignore -text
+*.check-ignore-no-index -text
