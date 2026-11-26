@@ -15,7 +15,3 @@ Enforce or disallow spaces inside of curly braces in JSX attributes and expressi
 ## Why this recommendation
 
 Incompatible with ESLint 10: the rule calls an API this version removed, so it throws rather than reports.
-
-## Violations
-
-None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.

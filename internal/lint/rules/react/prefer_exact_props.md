@@ -16,10 +16,6 @@ Prefer exact proptype definitions
 
 Stylistic, but the tree already satisfies it, so enabling costs nothing and prevents drift.
 
-## Violations
-
-None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-
 ## Ported? No, and the reason is measured
 
 **Declined 2026-09-06.** Not ported, and the recommendation above should be read as superseded

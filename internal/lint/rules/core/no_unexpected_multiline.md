@@ -20,7 +20,3 @@ Not a formatting preference: it catches ASI hazards that Prettier's output canno
 > which moved this from **Strong No** to **Yes**. The first pass classified rules by
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
-
-## Violations
-
-None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.

@@ -20,7 +20,3 @@ It is a no-unused-vars helper for the legacy JSX transform, not formatting; on R
 > which moved this from **Strong No** to **No**. The first pass classified rules by
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
-
-## Violations
-
-None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.

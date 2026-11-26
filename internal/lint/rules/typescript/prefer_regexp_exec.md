@@ -16,54 +16,6 @@ Enforce `RegExp#exec` over `String#match` if no global flag is provided
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
 
-## Violations
-
-170 in the tree. Showing the first few.
-
-**`app/(os-layout)/contacts/_components/ContactsListView.tsx:27`**
-
-```
-const match = birthDate.match(/(\d{4})?-?(\d{2})-(\d{2})/);
-```
-
-> Use the `RegExp#exec()` method instead
-
-**`libraries/structure/code-quality/lint/rules/ReactComponentRequirePropertiesTypeSuffixRule.ts:54`**
-
-```
-const match = name.match(/[A-Z][a-z]+$/);
-```
-
-> Use the `RegExp#exec()` method instead
-
-**`libraries/structure/command-line/StructureAnalyzer.ts:610`**
-
-```
-const [, minimumLinesDigits] = argument.match(/^--min-lines=(\d+)$/) ?? [];
-```
-
-> Use the `RegExp#exec()` method instead
-
-**`libraries/structure/command-line/StructureAnalyzer.ts:616`**
-
-```
-const [, windowDigits] = argument.match(/^--window=(\d+)$/) ?? [];
-```
-
-> Use the `RegExp#exec()` method instead
-
-**`libraries/structure/command-line/StructureDoctor.ts:48`**
-
-```
-const [, matchedIdentifier] = content.match(/identifier:\s*['"]([^'"]+)['"]/) ?? [];
-```
-
-> Use the `RegExp#exec()` method instead
-
-### What fixing looks like
-
-Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-
 ## Status: ported 2026-09-06, registered and NOT enabled
 
 The audit's 170 and the port's 179 differ, and the port is the one that matches the installed rule:
