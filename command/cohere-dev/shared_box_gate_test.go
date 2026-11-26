@@ -93,7 +93,7 @@ func withoutModuleCache(environment []string) []string {
 // cache made empty for the job, with the account's Go settings left unread, an account's `GOMODCACHE` among them, so go
 // mod download and go mod verify read Go's default cache with the proxy as Go sets it, and the cache is gone after.
 // Shown by running the gate's own script with bash against a planted toolchain whose go records what it is asked. The
-// land job's module set, the one `GOMODCACHE` it reads, is TestTheLandJobsCacheIsKeptAndDropsCountOne's.
+// integrate job's module set, the one `GOMODCACHE` it reads, is TestTheIntegrateJobsCacheIsKeptAndDropsCountOne's.
 func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -108,12 +108,16 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 		node string
 		// raceFails is whether the gate fails for its -race runs alone, every one of them asked first.
 		raceFails bool
-		// accountModules is whether the account names a module cache in `GOMODCACHE`, which outside the land job is
-		// never read.
+		// accountModules is whether the account names a module cache in `GOMODCACHE`, which outside the integrate job
+		// is never read.
 		accountModules bool
 	}{
 		{name: "a toolchain as pinned runs the tests", node: "pinned"},
-		{name: "an account's module cache is never read outside the land job", node: "pinned", accountModules: true},
+		{
+			name:           "an account's module cache is never read outside the integrate job",
+			node:           "pinned",
+			accountModules: true,
+		},
 		{
 			name: "the plain tokens' -race run failing fails the gate, after the token with a run has run",
 			node: "pinned",
@@ -304,10 +308,10 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 	}
 }
 
-// A shared box's gate handed a path that holds nothing but the toolchain's own directory, as a land job's sandbox hands
-// it one without /sbin, still digests the toolchain and runs the tests: the system's directories go last on the path
-// before the first check (sharedBoxSystemPathAfter), so sha256sum, find and sort are found, and set -e never ends the
-// script before it says a word (#5wj23dd).
+// A shared box's gate handed a path that holds nothing but the toolchain's own directory, as an integrate job's sandbox
+// hands it one without /sbin, still digests the toolchain and runs the tests: the system's directories go last on the
+// path before the first check (sharedBoxSystemPathAfter), so sha256sum, find and sort are found, and set -e never ends
+// the script before it says a word (#5wj23dd).
 func TestASharedBoxGateDigestsOnAPathWithoutTheSystemsDirectories(test *testing.T) {
 	test.Parallel()
 	bash := needs.Tool(test, "bash", "the gate is a bash script")

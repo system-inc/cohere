@@ -30,7 +30,7 @@ type canonicalSinglesFixture struct {
 type canonicalUnportedFixture map[string][]string
 
 // TestCanonicalizeAgreesWithTailwind holds the port to Tailwind's canonicalizer, class by class, on the
-// public theme and on ahra's (#15swfzq).
+// public theme (#15swfzq).
 //
 // Three outcomes per class, and only two are allowed. The port gives Tailwind's answer. Or Tailwind
 // rewrites the class and the port gives something else, because a pass that rewrites it is not ported:

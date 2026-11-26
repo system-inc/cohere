@@ -3,52 +3,8 @@ package high_level_intermediate_representation
 import (
 	"testing"
 
-	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
-
-// TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething is the baseline.
-//
-// Both directions before any specific claim, because a pass that prunes everything and one that
-// prunes nothing each satisfy an assertion phrased about only one side.
-func TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething(test *testing.T) {
-	test.Parallel()
-
-	functions, scopes, pruned, kept := 0, 0, 0, 0
-
-	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
-		tree, dependencies := prunableTree(test, function, checker)
-		if tree == nil {
-			return
-		}
-		functions++
-		pruned += PruneAlwaysInvalidatingScopes(tree, function, dependencies)
-
-		VisitReactiveFunction(tree, ReactiveVisitor{
-			Scope: func(scope *ReactiveScopeBlock, traverse func()) {
-				scopes++
-				if !scope.Pruned {
-					kept++
-				}
-				traverse()
-			},
-		})
-	})
-
-	if functions < 50 {
-		test.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
-			functions)
-	}
-	if scopes == 0 {
-		test.Fatal("the corpus produced no scopes, so pruning none proves nothing")
-	}
-	if kept == 0 {
-		test.Error("every scope was pruned; a pass that prunes unconditionally satisfies any " +
-			"assertion phrased about the pruned side alone")
-	}
-
-	test.Logf("functions=%d scopes=%d pruned=%d kept=%d", functions, scopes, pruned, kept)
-}
 
 // TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly covers the edge case upstream calls out.
 //

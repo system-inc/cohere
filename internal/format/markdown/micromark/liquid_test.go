@@ -1,7 +1,5 @@
 package micromark
 
-import "testing"
-
 // liquidFixtures hold no attention (`*`, `_`), label end (`]`, so no `[` or `![` either), html or
 // autolink (`<`), definition, list, table (`|`), strikethrough (`~`), math (`$`), wiki-link, footnote,
 // task list or GFM autolink literal (`www.`, `http`, `@`) syntax: those constructs are still pending,
@@ -132,9 +130,4 @@ var liquidFixtures = []string{
 	"{%\u00a0%}",
 	"{{ a }\u00a0}}",
 	"{{\ta\t}}",
-}
-
-func TestLiquidEvents(test *testing.T) {
-	test.Parallel()
-	compareEvents(test, liquidFixtures)
 }

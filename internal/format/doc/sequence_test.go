@@ -87,8 +87,8 @@ func boolText(value bool) string {
 
 // TestOnlyPartsAsksWhetherADocIsAnArray walks every Go file under internal/format and fails on a type
 // assertion or type switch case naming Concat or Sequence anywhere but Parts. A walk that asks for one and
-// not the other would treat a *Sequence as some other doc on exactly the path the corpus may not reach,
-// so every walk asks Parts, which knows both.
+// not the other would treat a *Sequence as some other doc on exactly the path no test may reach, so every
+// walk asks Parts, which knows both.
 func TestOnlyPartsAsksWhetherADocIsAnArray(test *testing.T) {
 	test.Parallel()
 

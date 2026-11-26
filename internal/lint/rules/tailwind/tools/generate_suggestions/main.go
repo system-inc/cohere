@@ -2,7 +2,7 @@
 //
 // Usage:
 //
-//	node internal/lint/rules/tailwind/tools/generate_suggestions/enumerate.mjs --resolve-root ahra: > suggestions.json
+//	node internal/lint/rules/tailwind/tools/generate_suggestions/enumerate.mjs --resolve-root <dir> > suggestions.json
 //	go run ./internal/lint/rules/tailwind/tools/generate_suggestions -input suggestions.json \
 //	    -output internal/lint/rules/tailwind/collapse/framework_suggestions_table.go [-check]
 //
@@ -135,7 +135,7 @@ func render(file suggestionsFile) ([]byte, error) {
 //
 // Regenerate with:
 //
-//	node internal/lint/rules/tailwind/tools/generate_suggestions/enumerate.mjs --resolve-root ahra: > suggestions.json
+//	node internal/lint/rules/tailwind/tools/generate_suggestions/enumerate.mjs --resolve-root <dir> > suggestions.json
 //	go run ./internal/lint/rules/tailwind/tools/generate_suggestions -input suggestions.json \
 //	    -output internal/lint/rules/tailwind/collapse/framework_suggestions_table.go
 

@@ -84,8 +84,9 @@ func TestTheNightlyGuardOpensNoQuietWindow(test *testing.T) {
 
 	home := test.TempDir()
 	state := test.TempDir()
-	// A top of its own, so the night reads no process of the machine's, and through no setuid program, which a land
-	// job's sandbox refuses to start: it prints two samples, as top -l 2 does, and the guard keeps the second's.
+	// A top of its own, so the night reads no process of the machine's, and through no setuid program, which an
+	// integrate job's sandbox refuses to start: it prints two samples, as top -l 2 does, and the guard keeps the
+	// second's.
 	tools := test.TempDir()
 	if writeError := executable_testing.WriteFile(
 		filepath.Join(tools, "top"),
@@ -94,10 +95,10 @@ func TestTheNightlyGuardOpensNoQuietWindow(test *testing.T) {
 	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	// The isolation tier, the landing measurement and the live walks are off: they run real tests for minutes,
-	// which this test of the bench's quiet window has no use for.
+	// The isolation tier and the landing measurement are off: they run real tests for minutes, which this test of
+	// the bench's quiet window has no use for.
 	night := exec.Command(zsh, filepath.Join(bench, "nightly.zsh"), "--state", state, "--projects", "ahra",
-		"--cohere", "/usr/bin/true", "--isolation", "off", "--landing", "off", "--live", "off")
+		"--cohere", "/usr/bin/true", "--isolation", "off", "--landing", "off")
 	// zsh writes a here-string's temporary file under `TMPPREFIX`, /tmp/zsh unless set, never under `TMPDIR`, so the
 	// night is given one inside the test's own temporary directory.
 	night.Env = append(os.Environ(), "COHERE_DEV_HOME="+home, "TMPPREFIX="+filepath.Join(test.TempDir(), "zsh"),

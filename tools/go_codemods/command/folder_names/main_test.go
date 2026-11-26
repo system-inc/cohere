@@ -3,14 +3,15 @@ package main
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
 
-// writeRepository writes files into a new git repository and commits them, so git mv has history to carry.
-func writeRepository(test *testing.T, files map[string]string) string {
+// writeTree writes files under a new root. It is no git repository: the tests move with a recordingMover, never
+// gitMove, so nothing reads one.
+func writeTree(test *testing.T, files map[string]string) string {
 	root := test.TempDir()
 	for name, contents := range files {
 		filename := filepath.Join(root, name)
@@ -21,17 +22,38 @@ func writeRepository(test *testing.T, files map[string]string) string {
 			test.Fatal(writeError)
 		}
 	}
-	for _, arguments := range [][]string{
-		{"init", "-q"},
-		{"add", "."},
-		{"-c", "user.name=fixture", "-c", "user.email=fixture@example.com", "commit", "-q", "-m", "fixture"},
-	} {
-		command := exec.Command("git", append([]string{"-C", root}, arguments...)...)
-		if combined, gitError := command.CombinedOutput(); gitError != nil {
-			test.Fatalf("git %v: %v: %s", arguments, gitError, combined)
-		}
-	}
 	return root
+}
+
+// movedFolder is one move a recordingMover made, relative to the root.
+type movedFolder struct {
+	source      string
+	destination string
+}
+
+// recordingMover moves a folder as git mv does on disk, with one rename, and records each move: what gitMove would
+// have been asked, so a test sees each folder handed to the mover whole, from and to its paths.
+type recordingMover struct {
+	moves []movedFolder
+}
+
+func (recorder *recordingMover) move(root string, source string, destination string) error {
+	recorder.moves = append(recorder.moves, movedFolder{source: source, destination: destination})
+	return os.Rename(
+		filepath.Join(root, filepath.FromSlash(source)),
+		filepath.Join(root, filepath.FromSlash(destination)),
+	)
+}
+
+// statFile is the file's information, whose identity os.SameFile compares: a rename keeps it, and a file deleted
+// and written anew does not.
+func statFile(test *testing.T, root string, name string) os.FileInfo {
+	test.Helper()
+	information, statError := os.Stat(filepath.Join(root, name))
+	if statError != nil {
+		test.Fatal(statError)
+	}
+	return information
 }
 
 func readFile(test *testing.T, root string, name string) string {
@@ -121,7 +143,7 @@ import "strings"
 // Upper reads goengine as a word, not a package.
 func Upper(goengine string) string { return strings.ToUpper(goengine) }
 `
-	root := writeRepository(test, withFiles(fixtureModule, map[string]string{
+	root := writeTree(test, withFiles(fixtureModule, map[string]string{
 		"user/user.go": `package user
 
 import (
@@ -171,9 +193,12 @@ var value = goengine.Run()
 `,
 		"other/other.go": untouched,
 	}))
+	notesBefore := statFile(test, root, "goengine/data/notes.txt")
+	markerBefore := statFile(test, root, "goengine/markertype/marker.go")
 
 	var output bytes.Buffer
-	if exitCode := run(root, fixtureMoves, false, &output); exitCode != 0 {
+	recorder := &recordingMover{}
+	if exitCode := run(root, fixtureMoves, false, recorder.move, &output); exitCode != 0 {
 		test.Fatalf("exit %d:\n%s", exitCode, output.String())
 	}
 	for _, gone := range []string{"goengine", "go_engine/markertype"} {
@@ -288,12 +313,19 @@ var value = go_engine.Run()
 	if strings.Contains(output.String(), "mismatch:") {
 		test.Errorf("mismatches:\n%s", output.String())
 	}
-	status, statusError := exec.Command("git", "-C", root, "status", "--porcelain").Output()
-	if statusError != nil {
-		test.Fatal(statusError)
+	// Each folder went to the mover whole, the outer first and the nested one from inside its parent's new folder,
+	// which is what lets git mv carry the history. A file that is not Go, and one rewritten after the move, are the
+	// files the mover moved, not new ones written in their place.
+	wantMoves := []movedFolder{
+		{source: "goengine", destination: "go_engine"},
+		{source: "go_engine/markertype", destination: "go_engine/marker_type"},
 	}
-	if !strings.Contains(string(status), "R  goengine/data/notes.txt -> go_engine/data/notes.txt") {
-		test.Errorf("git mv did not carry the history:\n%s", status)
+	if !slices.Equal(recorder.moves, wantMoves) {
+		test.Errorf("moved %v, want %v", recorder.moves, wantMoves)
+	}
+	if !os.SameFile(notesBefore, statFile(test, root, "go_engine/data/notes.txt")) ||
+		!os.SameFile(markerBefore, statFile(test, root, "go_engine/marker_type/marker.go")) {
+		test.Error("a moved file was written anew rather than moved")
 	}
 }
 
@@ -310,9 +342,10 @@ var go_engine = 2
 // Use reads the engine.
 func Use() int { return goengine.Run() + go_engine }
 `
-	root := writeRepository(test, withFiles(fixtureModule, map[string]string{"user/user.go": user}))
+	root := writeTree(test, withFiles(fixtureModule, map[string]string{"user/user.go": user}))
 	var output bytes.Buffer
-	if exitCode := run(root, fixtureMoves, false, &output); exitCode != 1 {
+	recorder := &recordingMover{}
+	if exitCode := run(root, fixtureMoves, false, recorder.move, &output); exitCode != 1 {
 		test.Fatalf("exit %d, want 1:\n%s", exitCode, output.String())
 	}
 	if !strings.Contains(
@@ -321,7 +354,8 @@ func Use() int { return goengine.Run() + go_engine }
 	) {
 		test.Errorf("no refusal for the package-level name:\n%s", output.String())
 	}
-	if !exists(root, "goengine/engine.go") ||
+	if len(recorder.moves) > 0 ||
+		!exists(root, "goengine/engine.go") ||
 		exists(root, "go_engine") ||
 		readFile(test, root, "user/user.go") != user {
 		test.Error("a refused pass changed the tree")
@@ -331,12 +365,14 @@ func Use() int { return goengine.Run() + go_engine }
 // A dry run proves the moves in memory and changes nothing.
 func TestFolderNamesDryRunWritesNothing(test *testing.T) {
 	test.Parallel()
-	root := writeRepository(test, fixtureModule)
+	root := writeTree(test, fixtureModule)
 	var output bytes.Buffer
-	if exitCode := run(root, fixtureMoves, true, &output); exitCode != 0 {
+	recorder := &recordingMover{}
+	if exitCode := run(root, fixtureMoves, true, recorder.move, &output); exitCode != 0 {
 		test.Fatalf("exit %d:\n%s", exitCode, output.String())
 	}
-	if !strings.Contains(output.String(), "dry run: proven in memory") || exists(root, "go_engine") ||
+	if !strings.Contains(output.String(), "dry run: proven in memory") || len(recorder.moves) > 0 ||
+		exists(root, "go_engine") ||
 		readFile(test, root, "goengine/engine.go") != fixtureModule["goengine/engine.go"] {
 		test.Errorf("the dry run changed the tree or proved nothing:\n%s", output.String())
 	}
@@ -399,7 +435,7 @@ func TestFolderNamesMappingComposesNestedMoves(test *testing.T) {
 // way: crosscompile's only file is cross_compile_test.go.
 func TestFolderNamesRenameAPackageWithOnlyTestFiles(test *testing.T) {
 	test.Parallel()
-	root := writeRepository(test, map[string]string{
+	root := writeTree(test, map[string]string{
 		"go.work": "go 1.27\n\nuse .\n",
 		"go.mod":  "module fixture\n\ngo 1.27\n",
 		"crosscompile/cross_compile_test.go": `package crosscompile
@@ -411,7 +447,8 @@ func TestCompiles(test *testing.T) {}
 	})
 	moves := []folderMove{{OldFolder: "crosscompile", NewFolder: "cross_compile", NewPackage: "cross_compile"}}
 	var output bytes.Buffer
-	if exitCode := run(root, moves, false, &output); exitCode != 0 {
+	recorder := &recordingMover{}
+	if exitCode := run(root, moves, false, recorder.move, &output); exitCode != 0 {
 		test.Fatalf("exit %d:\n%s", exitCode, output.String())
 	}
 	want := `package cross_compile
@@ -426,9 +463,15 @@ func TestCompiles(test *testing.T) {}
 	if exists(root, "crosscompile") || !strings.Contains(output.String(), "1 package clauses") {
 		test.Errorf("the folder did not move or the clause was not counted:\n%s", output.String())
 	}
+	if wantMoves := []movedFolder{{source: "crosscompile", destination: "cross_compile"}}; !slices.Equal(
+		recorder.moves,
+		wantMoves,
+	) {
+		test.Errorf("moved %v, want %v", recorder.moves, wantMoves)
+	}
 }
 
-// A move whose parent stays may land under another parent, a new shelf git mv needs made first, and every importer
+// A move whose parent stays may land under another parent, a new shelf the mover needs made first, and every importer
 // follows; a move into a folder that itself moves is refused.
 func TestFolderNamesMoveOntoANewShelf(test *testing.T) {
 	test.Parallel()
@@ -438,12 +481,13 @@ func TestFolderNamesMoveOntoANewShelf(test *testing.T) {
 	}); mappingError == nil {
 		test.Error("a move into a folder that moves was accepted")
 	}
-	root := writeRepository(test, fixtureModule)
+	root := writeTree(test, fixtureModule)
 	moves := []folderMove{
 		{OldFolder: "goengine/markertype", NewFolder: "shelf/marker_type", NewPackage: "marker_type"},
 	}
 	var output bytes.Buffer
-	if exitCode := run(root, moves, false, &output); exitCode != 0 {
+	recorder := &recordingMover{}
+	if exitCode := run(root, moves, false, recorder.move, &output); exitCode != 0 {
 		test.Fatalf("exit %d:\n%s", exitCode, output.String())
 	}
 	if exists(root, "goengine/markertype") || !exists(root, "shelf/marker_type/marker.go") {
@@ -452,5 +496,11 @@ func TestFolderNamesMoveOntoANewShelf(test *testing.T) {
 	got := readFile(test, root, "goengine/load/load.go")
 	if !strings.Contains(got, `import "fixture/shelf/marker_type"`) || !strings.Contains(got, "marker_type.Marker") {
 		test.Errorf("the importer did not follow:\n%s", got)
+	}
+	if wantMoves := []movedFolder{{source: "goengine/markertype", destination: "shelf/marker_type"}}; !slices.Equal(
+		recorder.moves,
+		wantMoves,
+	) {
+		test.Errorf("moved %v, want %v", recorder.moves, wantMoves)
 	}
 }

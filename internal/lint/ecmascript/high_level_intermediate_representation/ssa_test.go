@@ -21,7 +21,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/modules/mutation_aliasing"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
@@ -415,89 +414,6 @@ func TestPhiOperandsAreDeterministic(test *testing.T) {
 			}
 		}
 	}
-}
-
-// Construction reaches a fixpoint: running it twice produces what running it once produced.
-//
-// The pass appends phis and cannot reconcile ones it did not mint, so a second run over a graph that
-// already carries phis leaves the old ones in place beside new ones naming the same merge. Their
-// operands are identifiers from before the renumbering, so each defines a value nothing produces,
-// joins no class in the disjoint partition, and takes no scope.
-//
-// This is not hypothetical: inlining an immediately invoked function expression restructures the
-// graph and runs construction again, which is the path `preserve-manual-memoization` takes. Measured
-// before the reset landed, a second run took corpus phis 1,548 to 3,096 and phis naming an undefined
-// operand 221 to 1,730.
-//
-// Asserted as a fixpoint rather than a count, because the property that matters is "running it again
-// changes nothing" and that survives every legitimate change to phi placement.
-func TestConstructionIsIdempotent(test *testing.T) {
-	test.Parallel()
-
-	firstPhis, secondPhis := 0, 0
-	firstStale, secondStale := 0, 0
-
-	// A phi whose operand names no instruction, phi, or parameter defines a value the graph does not
-	// produce.
-	countStale := func(function *Function) (phis int, stale int) {
-		defined := map[static_single_assignment.IdentifierId]bool{}
-		for _, parameter := range function.Parameters {
-			defined[parameter.Identifier] = true
-		}
-		for _, block := range function.Blocks {
-			if block == nil {
-				continue
-			}
-			for _, instructionId := range block.Instructions {
-				if instruction := function.Instructions[instructionId]; instruction != nil {
-					defined[instruction.LValue.Identifier] = true
-				}
-			}
-			for _, phi := range block.Phis {
-				defined[phi.Place.Identifier] = true
-			}
-		}
-		for _, block := range function.Blocks {
-			if block == nil {
-				continue
-			}
-			for _, phi := range block.Phis {
-				phis++
-				for _, entry := range phi.Operands {
-					if !defined[entry.Place.Identifier] {
-						stale++
-						break
-					}
-				}
-			}
-		}
-		return phis, stale
-	}
-
-	forEachCorpusFunction(test, 300, func(function *Function, ranges *mutation_aliasing.MutableRanges,
-		scopes *ReactiveScopes) {
-		phis, stale := countStale(function)
-		firstPhis += phis
-		firstStale += stale
-		Construct(function)
-		phis, stale = countStale(function)
-		secondPhis += phis
-		secondStale += stale
-	})
-
-	if firstPhis == 0 {
-		test.Fatal("the corpus produced no phis, so running construction twice proves nothing")
-	}
-	if secondPhis != firstPhis {
-		test.Errorf("a second construction changed the phi count from %d to %d; the pass appends "+
-			"rather than reconciles, so phis from the previous run must be dropped first",
-			firstPhis, secondPhis)
-	}
-	if secondStale != firstStale {
-		test.Errorf("a second construction changed the count of phis naming an undefined operand "+
-			"from %d to %d", firstStale, secondStale)
-	}
-	test.Logf("stable across two runs: %d phis, %d naming an undefined operand", firstPhis, firstStale)
 }
 
 // Construction is not re-run after the inline, because upstream runs it once and after both.

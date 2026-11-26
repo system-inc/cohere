@@ -3,9 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"io"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
@@ -61,38 +59,34 @@ const (
 // for 3 minutes, before the box refuses. A test replaces the line to point the script at mirrors of its own.
 const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 
-// macBoxLandCacheLine is macBoxScript's and landGateScript's line setting landCache, sharedBoxGate's kept Go cache
-// (sharedBoxCacheBlock), to none: set in the script itself, so no variable in a shared box's environment can keep a
-// cache there. The land job on Shackler alone replaces it with its own setting (land_job_run.go).
-const macBoxLandCacheLine = `landCache=""`
+// macBoxIntegrateCacheLine is macBoxScript's and landGateScript's line setting integrateCache, sharedBoxGate's kept Go
+// cache (sharedBoxCacheBlock), to none: set in the script itself, so no variable in a shared box's environment can keep
+// a cache there. The integrate job on Shackler alone replaces it with its own setting (integrate_job_run.go).
+const macBoxIntegrateCacheLine = `integrateCache=""`
 
-// landJobLine is the line of macBoxScript, landGateScript and performanceScript saying the script runs in no land job:
-// set in the script itself, so no variable in an account's environment can make it one. The land job alone replaces it
-// with landJobSetting (land_job_run.go), which is what lets each script read the module set Loom laid for the job, with
-// a kept cache or without one (sharedBoxGate, land_performance.go).
+// integrateJobLine is the line of macBoxScript, landGateScript and performanceScript saying the script runs in no
+// integrate job: set in the script itself, so no variable in an account's environment can make it one. The integrate
+// job alone replaces it with integrateJobSetting (integrate_job_run.go), which is what lets each script read the module
+// set Loom laid for the job, with a kept cache or without one (sharedBoxGate, land_performance.go).
 const (
-	landJobLine    = `landJob=""`
-	landJobSetting = `landJob=1`
+	integrateJobLine    = `integrateJob=""`
+	integrateJobSetting = `integrateJob=1`
 )
 
 // macBoxTemporaryBlock makes gatetemp, the tests' temporary directory: a new one each run on a gate box, under the
-// account's `TMPDIR`, and with landCache set, one path every land job, inside the kept cache, made empty first. go
-// test's cache keys a test on the `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job would
-// miss every package that makes one. Never a fixed /tmp: a land job in Shackler's sandbox may write its own tmp and its
-// kept cache, and /tmp refused it (J-7dhfcty). The land job is serial (land_job_run.go), so no two runs share the path.
-const macBoxTemporaryBlock = `if [ -n "$landCache" ]; then
-  gatetemp="$landCache/temporary"
+// account's `TMPDIR`, and with integrateCache set, one path every integrate job, inside the kept cache, made empty
+// first. go test's cache keys a test on the `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job
+// would miss every package that makes one. Never a fixed /tmp: an integrate job in Shackler's sandbox may write its own
+// tmp and its kept cache, and /tmp refused it (J-7dhfcty). The integrate job is serial (integrate_job_run.go), so no
+// two runs share the path.
+const macBoxTemporaryBlock = `if [ -n "$integrateCache" ]; then
+  gatetemp="$integrateCache/temporary"
   { chmod -R u+w "$gatetemp" 2>/dev/null || true; rm -rf "$gatetemp"; } || refuse "$gatetemp couldn't be emptied"
-  mkdir -p "$landCache" && mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
+  mkdir -p "$integrateCache" && mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
 else
   gatetemp=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate.XXXXXX") || refuse "no temporary directory could be made"
 fi
 `
-
-// macBoxCorpusVariables is every corpus's variable, which the gate's Mac script unsets before it sets the laid ones, so
-// a variable another org left in loom's environment never points a test at a copy the gate didn't lay. A test holds it
-// to internal/testing/corpus's list.
-const macBoxCorpusVariables = "COHERE_CORPUS_AHRA COHERE_CORPUS_STRUCTURE COHERE_CORPUS_CONNECTED COHERE_PRETTIER_FORK"
 
 // macBoxMirrorReads is how a Mac's script reads her mirrors, given base, mirrors, tries, pause and refuse before it: it
 // writes the configuration file naming both mirrors safe, removed when the script ends unless it is removed sooner, and
@@ -126,20 +120,18 @@ held() {
 
 // macBoxScript is what a gate box runs, from the land that runs it rather than from the tree it tests, so no branch can
 // change what tests it. Its arguments are the commit, its TypeScript pin, racePatterns' tokens comma-separated, each
-// `./<directory>` or `./<directory>@<run>`, the corpora the landing pins (corporaArgument) and the module's test
-// patterns. It sets each corpus's variable to the copy laid under macBoxScratch/corpora, and when one isn't laid there
-// it names what it lacks (corpusUnlaidMarker) and tests nothing, for the lander to lay it (gate_corpus.go). It works
-// only under macBoxScratch, in a bare repository and one tree that last across landings, so the tree's path stays one
-// path. It waits for the box's mirror to hold the commit, refusing once it has waited 3 minutes, fetches the commit and
-// the pin, checks them out, and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the mirrors
-// through macBoxMirrorReads, and removes the configuration file naming them safe before any test runs. On a gate box it
-// keeps no Go cache (macBoxLandCacheLine) and is no land job (landJobLine); the land job runs it on Shackler with its
+// `./<directory>` or `./<directory>@<run>`, and the module's test patterns. It works only under macBoxScratch, in a
+// bare repository and one tree that last across landings, so the tree's path stays one path. It waits for the box's
+// mirror to hold the commit, refusing once it has waited 3 minutes, fetches the commit and the pin, checks them out,
+// and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the mirrors through macBoxMirrorReads,
+// and removes the configuration file naming them safe before any test runs. On a gate box it keeps no Go cache
+// (macBoxIntegrateCacheLine) and is no integrate job (integrateJobLine); the integrate job runs it on Shackler with its
 // mirrors, its cache when one is kept, and its own setting.
 const macBoxScript = `set -euo pipefail
-commit="$1"; pin="$2"; races="$3"; corpora="$4"; shift 4
+commit="$1"; pin="$2"; races="$3"; shift 3
 ` + macBoxMirrorLine + `
-` + macBoxLandCacheLine + `
-` + landJobLine + `
+` + macBoxIntegrateCacheLine + `
+` + integrateJobLine + `
 base=` + macBoxScratch + `
 mkdir -p "$base"; cd "$base"
 refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
@@ -160,17 +152,8 @@ if [ -n "$pin" ]; then
   git -C tree/TypeScript checkout -q --detach --force "$pin"
 fi
 rm -f "$safe"; trap - EXIT
-# No corpus variable the account's environment carries reaches the tests: every org on the box runs as loom.
-unset ` + macBoxCorpusVariables + `
-unlaid=""
-for laid in $(echo "$corpora" | tr , ' '); do
-  [ "$laid" != - ] || continue
-  variable="${laid%%=*}"; place="${laid#*=}"
-  if [ -e "$base/corpora/$place" ]; then export "$variable=$base/corpora/$place"; else unlaid="$unlaid $place"; fi
-done
-[ -z "$unlaid" ] || { echo "` + corpusUnlaidMarker + `${unlaid# }"; exit 0; }
-# The tests' temporary directory, made anew under the account's TMPDIR, or one path inside the land job's kept cache,
-# and never under a fixed /tmp, which a land job in Shackler's sandbox may not write (J-7dhfcty).
+# The tests' temporary directory, made anew under the account's TMPDIR, or one path inside the integrate job's kept
+# cache, and never under a fixed /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
 ` + macBoxTemporaryBlock + `trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
 export TMPDIR="$gatetemp"
 cd tree
@@ -235,16 +218,9 @@ func feedGateCommit(worktree string, commit string) (string, string) {
 var macBoxCoreBudgets = map[string]int{"Marin": 10}
 
 // macBoxRemoteCommand is the command gap runs over ssh on the gate box named box: macBoxScript, given commit, its pin,
-// the race tokens, the corpora and the packages to test, by import path, every package the gate lists for the whole
-// gate and a half's for a split one (gate_split.go), with box's core budget when macBoxCoreBudgets names one.
-func macBoxRemoteCommand(
-	box string,
-	commit string,
-	pin string,
-	races []string,
-	corpora []gateCorpus,
-	packages []string,
-) string {
+// the race tokens and the packages to test, by import path, every package the gate lists for the whole gate and a
+// half's for a split one (gate_split.go), with box's core budget when macBoxCoreBudgets names one.
+func macBoxRemoteCommand(box string, commit string, pin string, races []string, packages []string) string {
 	budget := ""
 	if cores, budgeted := macBoxCoreBudgets[box]; budgeted {
 		budget = fmt.Sprintf("%s=%d ", boxCoreBudgetVariable, cores)
@@ -252,8 +228,7 @@ func macBoxRemoteCommand(
 	// Encoded, so nothing in the script is read by a shell before the box's bash: gap's command is one argument to ssh.
 	return "echo " + base64.StdEncoding.EncodeToString([]byte(macBoxScript)) + " | base64 -d | " + budget +
 		"bash -s -- " +
-		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' '" + corporaArgument(corpora) + "' " +
-		strings.Join(packages, " ")
+		commit + " '" + pin + "' '" + strings.Join(races, ",") + "' " + strings.Join(packages, " ")
 }
 
 // gateBoxHeld reads box's claim, `gap --box <Mac>`, which exits 0 only while she is free, and returns what holds her,
@@ -266,43 +241,18 @@ func gateBoxHeld(worktree string, box string) string {
 	return ""
 }
 
-// runOnGateBox runs remote on box in her gap, writing what it does to lines, and returns everything gap printed,
-// whether gap said she stayed held, so remote never ran, and how gap ended. It returns why nothing ran instead, which
-// refuses the landing: she lacked a corpus and laying it failed, or she still lacks it once laid.
-func runOnGateBox(
-	worktree string,
-	box string,
-	remote string,
-	corpora []gateCorpus,
-	lines io.Writer,
-) ([]byte, bool, string, error) {
+// runOnGateBox runs remote on box in her gap, and returns everything gap printed, whether gap said she stayed held, so
+// remote never ran, and how gap ended.
+func runOnGateBox(worktree string, box string, remote string) ([]byte, bool, error) {
 	output, runError := loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh", box,
 		remote)
-	// A box that lacks a corpus the landing pins tests nothing and names it, so it is laid there, in a gap of its own,
-	// and the box is asked once more. Laid once, a corpus stays for every landing that pins it.
-	if places := unlaidIn(output); len(places) > 0 && !gapHeld(runError, output) {
-		laid, layError := layCorpora(worktree, box, corpora, places, lines)
-		// Ignored: a line to the terminal that never arrives loses nothing the verdict needs, and the stream keeps its
-		// error for streams.Finish to report.
-		fmt.Fprint(lines, corpusLaidLines(laid))
-		if layError != nil {
-			return nil, false, fmt.Sprintf("%s lacks %s, and laying it failed: %v", box, strings.Join(places, ", "),
-				layError), nil
-		}
-		output, runError = loomCombined(worktree, "loom", "gap", "--box", box, "--within", gateGapBound, "--", "ssh",
-			box, remote)
-		if places := unlaidIn(output); len(places) > 0 {
-			return nil, false, fmt.Sprintf("%s still lacks %s after it was laid there", box,
-				strings.Join(places, ", ")), nil
-		}
-	}
-	return output, gapHeld(runError, output), "", runError
+	return output, gapHeld(runError, output), runError
 }
 
 // runOnGateBoxes runs the module's tests, packages by import path as the gate listed them, on the first of boxes that
 // is free, through gap, the commit already in Loom's feed with its pin (feedGateCommit), and returns everything gap
 // printed, the box it ran on and how gap ended. It returns why no box ran them instead, which refuses the landing:
-// every box stayed held for wait, or a corpus a box lacked couldn't be laid.
+// every box stayed held for wait.
 //
 // A Mac's gap waits on another org's claim for as long as a claim may stand rather than refusing, so each box's claim
 // is read first, `gap --box <Mac>`, which exits 0 only while she is free, and a held one is passed over. A box taken
@@ -313,13 +263,11 @@ func runOnGateBoxes(
 	pin string,
 	packages []string,
 	races []string,
-	corpora []gateCorpus,
 	boxes []string,
 	wait time.Duration,
 ) ([]byte, string, string, error) {
 	// A whole gate's command is made for each box in turn, since each may hold her own core budget.
-	remoteFor := func(box string) string { return macBoxRemoteCommand(box, commit, pin, races, corpora, packages) }
-	lines := gateLines{lock: &sync.Mutex{}}
+	remoteFor := func(box string) string { return macBoxRemoteCommand(box, commit, pin, races, packages) }
 	started := time.Now()
 	// asked is how many times every box has been asked. A land always asks twice before it refuses, so a wait shorter
 	// than one round of asking still asks again: on a loaded box one round outlasted a 2s wait (Sun2, Nov 16).
@@ -336,10 +284,7 @@ func runOnGateBoxes(
 			fmt.Fprintf(streams.Errors, "cohere-dev: testing %s on %s in her gap; the land lock stays held while it "+
 				"runs\n", shortCommit(commit), box)
 			streams.Show(streams.Errors)
-			output, stayedHeld, unavailable, runError := runOnGateBox(worktree, box, remoteFor(box), corpora, lines)
-			if unavailable != "" {
-				return nil, "", unavailable, nil
-			}
+			output, stayedHeld, runError := runOnGateBox(worktree, box, remoteFor(box))
 			if stayedHeld {
 				words := box + " (" + lastWords(output, describeEnd(runError)) + ")"
 				fmt.Fprintf(streams.Errors, "cohere-dev: %s is held: %s\n", box, words)

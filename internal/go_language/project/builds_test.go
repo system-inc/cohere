@@ -1,15 +1,16 @@
 package project
 
 import (
-	"encoding/json"
 	"go/build"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // testHost is the host every fixture's builds are read for, so a test reads alike on any machine: a Mac on arm64
@@ -328,7 +329,9 @@ func TestHostBuildIsWhatGoEnvironmentReads(test *testing.T) {
 
 // cohere's own census at the worktree's root, under the host go env reads and the toolchain's own targets: the
 // builds are printed, the host's first and every one on its architecture, and every file is compiled by one or
-// unbuilt with a reason.
+// unbuilt with a reason. The host is this test binary's own target, which go env reads when the environment names
+// none and go test runs the binary it built, so a wrong target read for it fails here rather than shaping only the
+// builds printed (#z8m9dpg). Its cgo has no reading but go_root's, whose own tests hold it to cmd/go's rule.
 func TestBuildsForCoheresOwnCensus(test *testing.T) {
 	test.Parallel()
 	root, rootError := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -347,7 +350,11 @@ func TestBuildsForCoheresOwnCensus(test *testing.T) {
 	if portsError != nil {
 		test.Fatal(portsError)
 	}
-	host := hostAt(test, root)
+	host := hostAt(test)
+	if host.OperatingSystem != runtime.GOOS || host.Architecture != runtime.GOARCH {
+		test.Fatalf("the host read is %s, and this test binary runs as %s/%s, go env's own target", host,
+			runtime.GOOS, runtime.GOARCH)
+	}
 	builds, unbuilt := buildsFor(test, census, host, ports)
 	requireEachCompiledOnce(test, census, builds, unbuilt)
 	for _, each := range builds {
@@ -362,31 +369,15 @@ func TestBuildsForCoheresOwnCensus(test *testing.T) {
 	}
 }
 
-// hostAt is the host's build in root as cohere-go's loader reads it: the target, cgo and `GOFLAGS` from go env, as
-// load's constraintContext asks, with `GOFLAGS`' `-tags` as the context's tags. go env reads no package, so the
-// test's cache key needs nothing recorded for it, and the test reads no `GOFLAGS` of its own.
-func hostAt(test *testing.T, root string) Build {
+// hostAt is the host's build as cohere-go's loader reads it from go env (load's constraintContext), read in this
+// process: the target go/build.Default reads, as go env does from the environment or the binary's own, cgo as
+// go_root decides it, and `GOFLAGS`, with its `-tags` as the context's tags. `GOFLAGS` is the environment's,
+// which cohere-dev's test sets whole, so go env would read no go env file's in its place.
+func hostAt(test *testing.T) Build {
 	test.Helper()
-	environmentCommand := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS")
-	environmentCommand.Dir = root
-	environmentCommand.Env = os.Environ()
-	reported, environmentError := environmentCommand.Output()
-	if environmentError != nil {
-		test.Fatalf("go env: %v", environmentError)
-	}
-	var values struct {
-		Goos       string `json:"GOOS"`
-		Goarch     string `json:"GOARCH"`
-		CgoEnabled string `json:"CGO_ENABLED"`
-		Goflags    string `json:"GOFLAGS"`
-	}
-	if decodeError := json.Unmarshal(reported, &values); decodeError != nil {
-		test.Fatalf("reading go env's answer %q: %v", reported, decodeError)
-	}
-	goFlags := strings.Fields(values.Goflags)
+	goFlags := strings.Fields(os.Getenv("GOFLAGS"))
 	buildContext := build.Default
-	buildContext.GOOS, buildContext.GOARCH, buildContext.CgoEnabled = values.Goos, values.Goarch,
-		values.CgoEnabled == "1"
+	buildContext.CgoEnabled = go_root.CgoEnabled(test)
 	buildContext.BuildTags = nil
 	for _, flag := range goFlags {
 		if tags, isTags := strings.CutPrefix(strings.TrimLeft(flag, "-"), "tags="); isTags {

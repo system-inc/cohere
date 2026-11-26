@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -15,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/testing/needs"
 	"github.com/system-inc/cohere/internal/testing/process_reading"
 )
 
@@ -37,8 +35,14 @@ import (
 const heldOutputDeadline = 2 * time.Minute
 
 // watchForHeldOutput checks every interval for a goroutine waiting on an exited command's output, and
-// calls fail with a report once one has waited past deadline. It returns a function that stops the watch.
-func watchForHeldOutput(deadline time.Duration, interval time.Duration, fail func(report string)) func() {
+// calls fail with a report, naming the processes holders lists, once one has waited past deadline. It returns a
+// function that stops the watch. TestMain's watch lists them with pipeHolders.
+func watchForHeldOutput(
+	deadline time.Duration,
+	interval time.Duration,
+	holders func() ([]string, error),
+	fail func(report string),
+) func() {
 	stop := make(chan struct{})
 	go func() {
 		firstSeen := map[string]time.Time{}
@@ -63,7 +67,7 @@ func watchForHeldOutput(deadline time.Duration, interval time.Duration, fail fun
 					continue
 				}
 				if now.Sub(firstSeen[identifier]) >= deadline {
-					fail(heldOutputReport(stack, now.Sub(firstSeen[identifier])))
+					fail(heldOutputReport(stack, now.Sub(firstSeen[identifier]), holders))
 					return
 				}
 			}
@@ -97,16 +101,16 @@ func goroutinesWaitingOnOutput() map[string]string {
 }
 
 // heldOutputReport says which goroutine is stuck, for how long, and who holds the other end of the pipes
-// this process reads.
-func heldOutputReport(stack string, waited time.Duration) string {
+// this process reads, as holders lists them.
+func heldOutputReport(stack string, waited time.Duration, holders func() ([]string, error)) string {
 	var report strings.Builder
 	fmt.Fprintf(&report, "a command exited and its output has stayed open at least %s since:\n\n%s\n\n",
 		waited.Round(time.Second), stack)
-	holders, pipeHoldersError := pipeHolders()
+	listed, holdersError := holders()
 	switch {
-	case pipeHoldersError != nil:
-		fmt.Fprintf(&report, "the holders could not be listed: %v\n", pipeHoldersError)
-	case len(holders) == 0:
+	case holdersError != nil:
+		fmt.Fprintf(&report, "the holders could not be listed: %v\n", holdersError)
+	case len(listed) == 0:
 		report.WriteString(
 			"no other process holds the other end of any pipe this process reads, so the read end was most " +
 				"likely closed out from under the poller: look for a second *os.File made on one descriptor " +
@@ -117,7 +121,7 @@ func heldOutputReport(stack string, waited time.Duration) string {
 		report.WriteString(
 			"processes, other than this one's running children, holding the other end of a pipe this process reads:\n",
 		)
-		for _, holder := range holders {
+		for _, holder := range listed {
 			fmt.Fprintf(&report, "  %s\n", holder)
 		}
 	}
@@ -227,7 +231,7 @@ func procPipeHolders(root string) ([]string, error) {
 // "pid <pid> <command>: <parent, start and command line>", and whether it holds the pipe at all: a process that has
 // exited holds nothing, and neither does one of this process's own running children, a command another test is still
 // running or the lsof asking. Its parent, start and command line are read in process (process_reading), never through
-// ps, which is setuid on macOS and refused in a land job's sandbox; one that can't be read is named with why.
+// ps, which is setuid on macOS and refused in an integrate job's sandbox; one that can't be read is named with why.
 func describeHolder(pid string, command string) (string, bool) {
 	id, parseError := strconv.Atoi(pid)
 	if parseError != nil {
@@ -296,65 +300,81 @@ func failHeldOutput(report string) {
 }
 
 // The watch names the process that holds a command's output open after the command has exited. The
-// command here is a shell that starts a sleep in the background and exits: the sleep inherits the pipe, so
-// the test's wait for output hangs exactly as a leaked descendant would make it. Run in a child test
-// binary, since the watch ends the binary it runs in.
+// command here is this test binary, starting a sleeping child of its own that holds its output and exiting: the
+// child inherits the pipe, so the test's wait for output hangs exactly as a leaked descendant would make it. Run in
+// a child test binary, since the watch ends the binary it runs in.
+//
+// The holders come from a lookup of the helper's own, which names the one process its command started, from the id
+// the command wrote, rather than from lsof and ps over every process on the machine: the tests read only what they
+// started. procPipeHolders is shown on a proc tree of its own below; the lsof reading is not run here.
 //
 // Nothing here times the watch, since load stretches it (#wwhrpm0). It took 25.27s at the load of the cold
 // rebuilds after a cache clear, which outlasted a 25s sleep and a 20s bound, and failed a healthy run. The
-// sleep never ends within a run, so it outlasts the watch at any load, and the test kills it by the pid the
-// report names. A watch that never fires leaves the helper waiting on the sleep, a hang go test's -timeout
-// fails.
+// holder sleeps until this test's lifeline is gone, so it outlasts the watch at any load, and ends with the test. A
+// watch that never fires leaves the helper waiting on the holder, a hang go test's -timeout fails.
 func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	test.Parallel()
-	if os.Getenv("COHERE_HELD_OUTPUT_HELPER") == "1" {
-		watchForHeldOutput(2*time.Second, 200*time.Millisecond, failHeldOutput)
+	if lifeline := os.Getenv("COHERE_HELD_OUTPUT_HELPER"); lifeline != "" {
+		holderFile := filepath.Join(filepath.Dir(lifeline), "holder")
+		started := func() ([]string, error) {
+			holder, readError := os.ReadFile(holderFile)
+			if readError != nil {
+				return nil, readError
+			}
+			return []string{
+				"pid " + string(holder) + " " + string(ownChildSleep) + ": this test binary's own child",
+			}, nil
+		}
+		watchForHeldOutput(2*time.Second, 200*time.Millisecond, started, failHeldOutput)
 		// Ignored: the command is here to hang on its output. The watch ends this binary first, or the Fatal
 		// below says it did not, so how the command ends is never read.
-		_, _ = exec.Command("/bin/sh", "-c", "sleep 100000 & echo started").CombinedOutput()
-		test.Fatal("the command's output closed while its background sleep still held it")
+		_, _ = ownChild(test, ownChildStartHolder, lifeline, holderFile).CombinedOutput()
+		test.Fatal("the command's output closed while the holder it started still held it")
 	}
 	if runtime.GOOS == "windows" {
-		test.Skip("lsof names a pipe's holders, and Windows has no lsof")
-	}
-	if runtime.GOOS != "linux" {
-		needs.Tool(test, "lsof", "lsof names a pipe's holders here")
+		test.Skip("a Windows child inherits its parent's output by handle, which this has never been run to show")
 	}
 
+	lifeline := ownChildLifeline(test)
 	helper := exec.Command(os.Args[0], "-test.run=^TestAHeldOutputNamesItsHolder$", "-test.count=1")
-	helper.Env = append(os.Environ(), "COHERE_HELD_OUTPUT_HELPER=1")
+	helper.Env = append(os.Environ(), "COHERE_HELD_OUTPUT_HELPER="+lifeline)
+	test.Cleanup(func() {
+		if helper.Process != nil {
+			// Ignored: the helper was waited for, so Go knows it ended and signals nothing; a kill is here only for a
+			// run that stopped before the wait.
+			_ = helper.Process.Kill()
+		}
+	})
 	outputFile, createError := os.Create(test.TempDir() + "/output")
 	if createError != nil {
 		test.Fatal(createError)
 	}
 	// Ignored: the helper writes it, through descriptors of its own, and this one is never written.
 	defer outputFile.Close()
-	// A file, not a buffer: the helper's sleep inherits whatever the helper writes to, and a buffer's pipe
-	// would hang this test on the same sleep.
+	// A file, not a buffer: the helper's holder inherits whatever the helper writes to, and a buffer's pipe
+	// would hang this test on the same holder.
 	helper.Stdout, helper.Stderr = outputFile, outputFile
 	runError := helper.Run()
 	output, readError := os.ReadFile(outputFile.Name())
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	if sleeper := regexp.MustCompile(`pid (\d+) sleep`).FindSubmatch(output); sleeper != nil {
-		if pid, convertError := strconv.Atoi(string(sleeper[1])); convertError == nil {
-			if process, findError := os.FindProcess(pid); findError == nil {
-				// Ignored: a sleep already gone is the outcome the kill asks for.
-				_ = process.Kill()
-			}
-		}
-	}
 	if runError == nil {
 		test.Fatalf("the helper passed, so the watch never fired:\n%s", output)
 	}
-	for _, want := range []string{"held output: a command exited", "TestAHeldOutputNamesItsHolder", "sleep 100000"} {
+	holder, readError := os.ReadFile(filepath.Join(filepath.Dir(lifeline), "holder"))
+	if readError != nil {
+		test.Fatalf("the helper's command never wrote its holder's id: %v\n%s", readError, output)
+	}
+	for _, want := range []string{
+		"held output: a command exited",
+		"TestAHeldOutputNamesItsHolder",
+		"holding the other end of a pipe this process reads:\n  pid " + string(holder) + " " +
+			string(ownChildSleep) + ":",
+	} {
 		if !bytes.Contains(output, []byte(want)) {
 			test.Errorf("the report does not say %q:\n%s", want, output)
 		}
-	}
-	if bytes.Contains(output, []byte(" lsof:")) {
-		test.Errorf("the report names the lsof that asked, which is this process's own running child:\n%s", output)
 	}
 }
 

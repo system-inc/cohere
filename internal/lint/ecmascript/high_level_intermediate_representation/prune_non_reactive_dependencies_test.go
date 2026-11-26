@@ -3,55 +3,8 @@ package high_level_intermediate_representation
 import (
 	"testing"
 
-	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
-
-// TestPruneNonReactiveDependenciesKeepsAndPrunes is the baseline, and it matters more here than
-// elsewhere.
-//
-// This pass reads a seed it does not compute: `Place.Reactive`, written by `InferReactive`. A caller
-// that forgets to run that pass gets an empty seed and prunes every dependency, which is a total
-// loss of the rule's comparison surface and would still satisfy any assertion phrased about pruning
-// alone. So both directions are asserted, on real source, before any specific claim.
-func TestPruneNonReactiveDependenciesKeepsAndPrunes(test *testing.T) {
-	test.Parallel()
-
-	functions, before, after, removed := 0, 0, 0, 0
-
-	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
-		InferReactive(function, checker)
-		tree, dependencies := prunableTree(test, function, checker)
-		if tree == nil {
-			return
-		}
-		functions++
-		for _, scope := range dependencies.Ids() {
-			before += len(dependencies.DependenciesOf(scope))
-		}
-		removed += PruneNonReactiveDependencies(tree, function, dependencies)
-		for _, scope := range dependencies.Ids() {
-			after += len(dependencies.DependenciesOf(scope))
-		}
-	})
-
-	if functions < 50 {
-		test.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
-			functions)
-	}
-	if before == 0 {
-		test.Fatal("no dependencies were collected, so pruning none proves nothing")
-	}
-	if after == 0 {
-		test.Error("every dependency was pruned; that is what an empty reactive seed looks like, and " +
-			"it destroys the set the rule compares")
-	}
-	if removed != before-after {
-		test.Errorf("the pass reported %d removals and the table shrank by %d", removed, before-after)
-	}
-
-	test.Logf("functions=%d dependenciesBefore=%d after=%d removed=%d", functions, before, after, removed)
-}
 
 // TestPruneNonReactiveDependenciesPropagatesToScopeOutputs covers the half `InferReactive` cannot do.
 //

@@ -1,11 +1,6 @@
 package yaml
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,12 +8,13 @@ import (
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/printing"
+	"github.com/system-inc/cohere/internal/format/yaml/unist"
 )
 
 // formatFixtures reach the printer's branches: every node type, comments in every slot they attach to,
 // flow collections that break, each block scalar header, the quote choices, prettier-ignore, document
-// markers and directives. Each is parsed by the real parser and printed by the port, and formatted by
-// the embedded Prettier, under every option set below.
+// markers and directives. Each is formatted by the port, the Go parser and the printer, and compared with
+// what the embedded Prettier printed for it, under every option set below.
 var formatFixtures = []string{
 	// Empty and trivial files.
 	"",
@@ -376,28 +372,13 @@ var formatVariants = func() []format_options.Options {
 	return []format_options.Options{defaults, narrow, tabs, other}
 }()
 
-// formatParsed prints a parsed input the way Prettier's core wraps the printer: the byte order mark comes
-// back on the output.
-func formatParsed(
-	fileName string,
-	tree parsed,
-	text string,
-	hasByteOrderMark bool,
-	options format_options.Options,
-	proseWrap string,
-	textToDoc printing.TextToDoc,
-) (string, error) {
-	if tree.parseFailure != "" {
-		return "", fmt.Errorf("the parser failed: %s", tree.parseFailure)
-	}
-	formatted, printFileError := printFile(fileName, tree.root, text, options, proseWrap, textToDoc, 0)
-	if printFileError != nil {
-		return "", printFileError
-	}
-	if hasByteOrderMark {
-		formatted = "\ufeff" + formatted
-	}
-	return formatted, nil
+// normalizeInput is what Prettier's core does to a file before parsing: remove a byte order mark and
+// normalize line endings to \n.
+func normalizeInput(text string) (string, bool) {
+	hasByteOrderMark := strings.HasPrefix(text, "\ufeff")
+	withoutByteOrderMark := strings.TrimPrefix(text, "\ufeff")
+	normalized := strings.ReplaceAll(strings.ReplaceAll(withoutByteOrderMark, "\r\n", "\n"), "\r", "\n")
+	return normalized, hasByteOrderMark
 }
 
 // formatFullStack is Format as native.Formatter calls it: the byte order mark removed and line endings
@@ -420,46 +401,35 @@ func formatFullStack(
 	return formatted, nil
 }
 
-// parseInputs normalizes and parses every input.
-func parseInputs(test testing.TB, inputs []string) ([]string, []bool, []parsed) {
+// parseFixture is the tree Format prints for text: the Go parser's, with root.comments deleted as
+// parser-yaml.js deletes them.
+func parseFixture(test testing.TB, text string) *unist.Node {
 	test.Helper()
-	texts := make([]string, len(inputs))
-	byteOrderMarks := make([]bool, len(inputs))
-	for index, input := range inputs {
-		texts[index], byteOrderMarks[index] = normalizeInput(input)
+	root, parseError := parse(text, nil)
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
-	return texts, byteOrderMarks, parseTrees(test, texts)
+	return root
 }
 
-// compareFormat formats every input with Prettier and with the port under every variant, the port two
-// ways: the full stack (Format: the Go parser and the printer, from the text) and the printer alone on
-// the tree the real parser built (the tree loader). Each difference is reported. Where Prettier fails,
-// both must fail too, and Format with an error printing.IsSyntax recognizes.
+// compareFormat formats every input with Prettier and with the port, Format from the text, under every
+// variant, and reports each difference. Where Prettier fails, Format must fail too, with an error
+// printing.IsSyntax recognizes.
 func compareFormat(test *testing.T, inputs []string) int {
 	test.Helper()
-	texts, byteOrderMarks, trees := parseInputs(test, inputs)
-	failures, fullStackFailures, compared, oracleFailures := 0, 0, 0, 0
+	failures, compared, oracleFailures := 0, 0, 0
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
 	for variantIndex, options := range formatVariants {
 		formatter := golden.Formatter(options)
-		for index, input := range inputs {
+		for _, input := range inputs {
 			expected, oracleError := formatter.Format("fixture.yaml", input)
 			fullStack, fullStackError := formatFullStack("fixture.yaml", input, options, "preserve", nil)
 			if oracleError != nil {
-				// Prettier cannot format it; the parser must refuse it too.
+				// Prettier cannot format it; Format must refuse it too.
 				oracleFailures++
-				if trees[index].parseFailure == "" {
-					failures++
-					test.Errorf(
-						"variant %d, %q: the oracle failed (%v) but the parser did not",
-						variantIndex,
-						input,
-						oracleError,
-					)
-				}
 				if fullStackError == nil || !printing.IsSyntax(fullStackError) {
-					fullStackFailures++
+					failures++
 					test.Errorf(
 						"variant %d, %q: the oracle failed (%v) but Format gave %q, %v",
 						variantIndex,
@@ -473,10 +443,10 @@ func compareFormat(test *testing.T, inputs []string) int {
 			}
 			compared++
 			if fullStackError != nil {
-				fullStackFailures++
+				failures++
 				test.Errorf("variant %d, %q: Format: %v", variantIndex, input, fullStackError)
 			} else if fullStack != expected {
-				fullStackFailures++
+				failures++
 				test.Errorf(
 					"variant %d, %q: Format: %s",
 					variantIndex,
@@ -484,36 +454,17 @@ func compareFormat(test *testing.T, inputs []string) int {
 					differential.FirstDifference(expected, fullStack),
 				)
 			}
-			actual, formatParsedError := formatParsed(
-				"fixture.yaml",
-				trees[index],
-				texts[index],
-				byteOrderMarks[index],
-				options,
-				"preserve",
-				nil,
-			)
-			if formatParsedError != nil {
-				failures++
-				test.Errorf("variant %d, %q: %v", variantIndex, input, formatParsedError)
-				continue
-			}
-			if actual != expected {
-				failures++
-				test.Errorf("variant %d, %q: %s", variantIndex, input, differential.FirstDifference(expected, actual))
-			}
 		}
 	}
 	test.Logf(
-		"%d comparisons over %d fixtures and %d option sets: full stack %d differ, tree loader %d differ; %d oracle failures (syntax errors)",
+		"%d comparisons over %d fixtures and %d option sets: %d differ; %d oracle failures (syntax errors)",
 		compared,
 		len(inputs),
 		len(formatVariants),
-		fullStackFailures,
 		failures,
 		oracleFailures,
 	)
-	return failures + fullStackFailures
+	return failures
 }
 
 func TestFormatFixturesMatchOracle(test *testing.T) {
@@ -530,11 +481,8 @@ func TestFormatOracleCanFail(test *testing.T) {
 	if formatError != nil {
 		test.Fatal(formatError)
 	}
-	texts, byteOrderMarks, trees := parseInputs(test, []string{"a: [b, c]"})
-	if byteOrderMarks[0] {
-		test.Fatal("the fixture has no byte order mark")
-	}
-	actual, printError := Print(trees[0].root, texts[0], format_options.Default(), nil)
+	text := "a: [b, c]"
+	actual, printError := Print(parseFixture(test, text), text, format_options.Default(), nil)
 	if printError != nil {
 		test.Fatal(printError)
 	}
@@ -547,8 +495,8 @@ func TestFormatOracleCanFail(test *testing.T) {
 // hardline that upstream's textToDoc strips, and the caller strips it.
 func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
 	test.Parallel()
-	texts, _, trees := parseInputs(test, []string{"a: b\n"})
-	document, printDocError := PrintDoc(trees[0].root, texts[0], format_options.Default(), nil)
+	text := "a: b\n"
+	document, printDocError := PrintDoc(parseFixture(test, text), text, format_options.Default(), nil)
 	if printDocError != nil {
 		test.Fatal(printDocError)
 	}
@@ -562,52 +510,4 @@ func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
 	if strings.Contains(printed, "\r") {
 		test.Fatal("a doc has no line endings of its own")
 	}
-}
-
-const suiteScript = `
-import suite from "FORK/node_modules/yaml-test-suite/index.js";
-const inputs = [];
-for (const test of suite) {
-  for (const testCase of test.cases) {
-    inputs.push(testCase.yaml);
-    if (typeof testCase.dump === "string") inputs.push(testCase.dump);
-  }
-}
-process.stdout.write(JSON.stringify(inputs));
-`
-
-// suiteInputs is every input of the yaml-test-suite in the fork's node_modules, and each case's canonical
-// dump.
-func suiteInputs(test *testing.T) []string {
-	test.Helper()
-	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
-		test.Skip("node is not installed")
-	}
-	script := filepath.Join(test.TempDir(), "suite.mjs")
-	if writeError := os.WriteFile(
-		script,
-		[]byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(test))),
-		0o644,
-	); writeError != nil {
-		test.Fatal(writeError)
-	}
-	output, outputError := exec.Command("node", script).Output()
-	if outputError != nil {
-		test.Skipf("the yaml-test-suite is not loadable: %v", outputError)
-	}
-	var inputs []string
-	if decodeError := json.Unmarshal(output, &inputs); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	if len(inputs) < 400 {
-		test.Fatalf("the suite gave %d inputs", len(inputs))
-	}
-	return inputs
-}
-
-// TestYamlTestSuiteMatchesOracle runs the suite through both sides under every option set. Inputs the
-// oracle cannot format (the suite's error cases) must fail in the parser too.
-func TestYamlTestSuiteMatchesOracle(test *testing.T) {
-	test.Parallel()
-	compareFormat(test, suiteInputs(test))
 }

@@ -139,38 +139,69 @@ func TestLayoutVerdictsUnderATag(test *testing.T) {
 
 // On linux, Plain gains Describe in a file only the build compiles. Plain's method set moves, so every use of Plain
 // counts, its conversion to an interface among them, and so does every use of Wrapper, which embeds Plain and promotes
-// Describe, even through a pointer. Asking whether a value implements Describer reads nothing of Plain.
+// Describe, even through a pointer. Asking whether a value implements Describer reads nothing of Plain. Speaking, in a
+// file only the host compiles, embeds Describer in linux's, so Announcer, which embeds Speaking, moves with it, and
+// Announces, a method value of an Announcer, is dependent. Plains, Pair instantiated with Plain, is dependent through
+// its type argument, while Pair, its method Swapped, the generic PairOf, and SwapsWholes, a method value of Pair[int],
+// are not. Titled and Carrier embed Describer, which no build changes, and Described, a method value promoted through
+// Carrier's embedded interface, and TitleEach, generic over a Titled, are independent.
 func TestMethodsVerdictsOnLinux(test *testing.T) {
 	test.Parallel()
 
 	judged := judge(test, "methods", linuxBuild)
 	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
-		"type Plain":       true,
-		"type Describer":   false,
-		"func Boxed":       true,
-		"func IsDescriber": false,
-		"type Wrapper":     true,
-		"func Wrapped":     true,
-		"type Count":       false,
-		"func Counted":     false,
+		"type Plain":          true,
+		"type Describer":      false,
+		"func Boxed":          true,
+		"func IsDescriber":    false,
+		"type Wrapper":        true,
+		"func Wrapped":        true,
+		"type Count":          false,
+		"func Counted":        false,
+		"type Titled":         false,
+		"type Carrier":        false,
+		"func Described":      false,
+		"type Speaking":       true,
+		"type Announcer":      true,
+		"func Announces":      true,
+		"type Pair":           false,
+		"method Pair.Swapped": false,
+		"func PairOf":         false,
+		"func Plains":         true,
+		"func SwapsCounts":    false,
+		"func SwapsWholes":    false,
+		"func TitleEach":      false,
 	})
 }
 
-// Under the tag build, Count gains Tagged in the tag's file, so Count and what uses it are dependent, and Plain is
-// as the host has it.
+// Under the tag build, Count gains Tagged in the tag's file, so Count and what uses it are dependent, SwapsCounts, a
+// method value of Pair[Count], among them, and Plain and Speaking are as the host has them.
 func TestMethodsVerdictsUnderATag(test *testing.T) {
 	test.Parallel()
 
 	judged := judge(test, "methods", taggedBuild)
 	expectVerdicts(test, verdicts(test, judged.host, judged.dependence), map[string]bool{
-		"type Plain":       false,
-		"type Describer":   false,
-		"func Boxed":       false,
-		"func IsDescriber": false,
-		"type Wrapper":     false,
-		"func Wrapped":     false,
-		"type Count":       true,
-		"func Counted":     true,
+		"type Plain":          false,
+		"type Describer":      false,
+		"func Boxed":          false,
+		"func IsDescriber":    false,
+		"type Wrapper":        false,
+		"func Wrapped":        false,
+		"type Count":          true,
+		"func Counted":        true,
+		"type Titled":         false,
+		"type Carrier":        false,
+		"func Described":      false,
+		"type Speaking":       false,
+		"type Announcer":      false,
+		"func Announces":      false,
+		"type Pair":           false,
+		"method Pair.Swapped": false,
+		"func PairOf":         false,
+		"func Plains":         false,
+		"func SwapsCounts":    true,
+		"func SwapsWholes":    false,
+		"func TitleEach":      false,
 	})
 }
 

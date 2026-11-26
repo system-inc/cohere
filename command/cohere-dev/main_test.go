@@ -282,8 +282,8 @@ func printOwnNiceness(test *testing.T) {
 // to a person; --full-priority keeps the priority it was started with, for a timed measurement, and never
 // reaches go test (#2qc6j8g). Shown at nice 19 through COHERE_DEV_NICENESS, since the house runs its tests
 // at nice 10 already, where a run that failed to lower itself would look the same as one that did. Each nice is read
-// in process (process_reading), never through ps, which is setuid on macOS and refused in a land job's sandbox, so the
-// stand-in go is this test binary, run as niceHelperVariable says.
+// in process (process_reading), never through ps, which is setuid on macOS and refused in an integrate job's sandbox,
+// so the stand-in go is this test binary, run as niceHelperVariable says.
 func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 	test.Parallel()
 	if os.Getenv(niceHelperVariable) != "" {
@@ -323,8 +323,7 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		if outputError != nil {
 			test.Fatalf("cohere-dev test %v: %v\n%s", arguments, outputError, output)
 		}
-		// The stand-in's own line; the wrapper's notes, such as the corpora a private home leaves uncovered,
-		// are around it.
+		// The stand-in's own line; the wrapper's notes are around it.
 		line := ""
 		for _, candidate := range strings.Split(string(output), "\n") {
 			if strings.HasPrefix(candidate, "nice=") {

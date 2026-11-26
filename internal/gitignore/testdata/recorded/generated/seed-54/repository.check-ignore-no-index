@@ -1,0 +1,12 @@
+.gitignore:2:*	br[ack]et
+.gitignore:2:*	star*
+.gitignore:2:*	star*/.gitignore
+.gitignore:2:*	star*/a
+.gitignore:2:*	star*/ab
+.gitignore:2:*	star*/ab/#hash
+.gitignore:2:*	star*/ab/node_modules
+.gitignore:2:*	star*/ab/star*
+.gitignore:2:*	star*/deep
+.gitignore:2:*	star*/deep/.gitignore
+.gitignore:2:*	star*/out
+.gitignore:2:*	star*/star*
