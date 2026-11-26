@@ -1,7 +1,5 @@
 package micromark
 
-import "testing"
-
 // codeTextFixtures hold no attention, label end, autolink, html, character reference, strikethrough,
 // math, liquid, wiki-link, fenced code (a bare "```" line), GFM autolink literal (`www.`, `http`, `@`)
 // or container syntax: those constructs are still pending, so a fixture leaning on them would differ for
@@ -105,9 +103,4 @@ var codeTextFixtures = []string{
 	"    `a`",
 	"***\n`a`",
 	"`a`\n***",
-}
-
-func TestCodeTextEvents(test *testing.T) {
-	test.Parallel()
-	compareEvents(test, codeTextFixtures)
 }

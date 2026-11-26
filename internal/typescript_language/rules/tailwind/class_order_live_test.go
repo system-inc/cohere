@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/testing/corpus"
 	tailwindcollapse "github.com/system-inc/cohere/internal/typescript_language/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind/vendored"
 )
@@ -33,10 +32,13 @@ import (
 //
 // # The ground truth
 //
-// `internal/typescript_language/rules/tailwind/collapse/testdata/variant_fixtures.json` holds 2,400 class lists
-// captured from `designSystem.getClassOrder(classes)` on the two corpus repositories, plus 37 synthetic cases built to
-// separate rules that agree on ordinary input. `sorted` is what Tailwind returned. Nothing here asserts against what
-// the Go code produces; the fixture is the authority and the Go side is the thing under test.
+// `internal/typescript_language/rules/tailwind/collapse/testdata/variant_fixtures.json` holds synthetic cases built to
+// separate rules that agree on ordinary input, each class list captured from
+// `designSystem.getClassOrder(classes)`. `sorted` is what Tailwind returned. Nothing here asserts
+// against what the Go code produces; the fixture is the authority and the Go side is the thing under
+// test. Each case carries its own stylesheet, so the suite runs on every machine. The class lists two
+// consumer repositories wrote left the fixture when cohere's tests stopped reading other repositories
+// (#5wj23dd).
 
 // classOrderLiveCorpus is the slice of variant_fixtures.json this suite reads.
 type classOrderLiveCorpus struct {
@@ -127,47 +129,6 @@ func classOrderLiveLoadCorpus(test *testing.T) []classOrderLiveList {
 		test.Fatal("the fixture yielded no multi-class lists, so every assertion below would pass vacuously")
 	}
 	return lists
-}
-
-// classOrderLiveSystems builds one live design system per entry point the corpus names.
-//
-// Built from the repository on disk rather than from the fixture, which is the whole point of the
-// swap: the thing under test is the rule reading the repository in front of it. The fixture spells each
-// entry point inside its corpus, so an unset corpus skips the test naming its variable, and a corpus
-// that is set but lacks the stylesheet fails.
-func classOrderLiveSystems(test *testing.T, lists []classOrderLiveList) map[string]DesignSystemResult {
-	test.Helper()
-
-	systems := map[string]DesignSystemResult{}
-	for _, list := range lists {
-		if list.entryPath == "" {
-			continue
-		}
-		if _, built := systems[list.entryPath]; built {
-			continue
-		}
-		entryPoint := corpus.Resolve(test, list.entryPath)
-		packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
-		if packageRoot == "" {
-			systems[list.entryPath] = DesignSystemResult{
-				Error: fmt.Errorf("no installed tailwindcss beside %s", entryPoint),
-			}
-			continue
-		}
-		system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
-			EntryPoint:          entryPoint,
-			TailwindPackageRoot: packageRoot,
-		})
-		if loadDesignSystemError != nil {
-			systems[list.entryPath] = DesignSystemResult{Error: loadDesignSystemError}
-			continue
-		}
-		systems[list.entryPath] = DesignSystemResult{
-			System: system,
-			Table:  tailwindcollapse.NewTable(system),
-		}
-	}
-	return systems
 }
 
 // classOrderLiveMeasurement is what one pass over the corpus found.
@@ -349,80 +310,6 @@ func classOrderLiveReversed(classes []string) []string {
 	return reversed
 }
 
-// TestClassOrderLiveMatchesTailwindOverTheCorpus is the acceptance test for the swap.
-//
-// The shipped depth-first rule disagreed with Tailwind on 15 of 4,265 separable pairs across 7
-// class lists, measured by `TestDepthFirstDisagreesWithTailwindOnTheCorpus` in `internal/tailwind`.
-// After the swap that must be zero, and it must be zero over a population that did not shrink, which
-// is what the placed-class floor below is for.
-//
-// The floor is a floor rather than an equality so that a fixture gaining or losing a handful of classes
-// does not fail it. Both corpora, ahra and connected, must be set for this to run, and it skips naming
-// the variable when either is not.
-func TestClassOrderLiveMatchesTailwindOverTheCorpus(test *testing.T) {
-	test.Parallel()
-	lists := classOrderLiveLoadCorpus(test)
-	systems := classOrderLiveSystems(test, lists)
-	measurement := classOrderLiveMeasure(test, lists, systems)
-
-	test.Logf(
-		"live rule vs Tailwind: %d disagreeing pairs of %d compared pairs across %d lists "+
-			"(%d classes placed, %d lists declined)",
-		measurement.disagreeingPairs, measurement.comparedPairs, measurement.lists,
-		measurement.placedClasses, measurement.listsSkipped,
-	)
-	for _, example := range measurement.examples {
-		test.Log("  " + example)
-	}
-
-	// The population guard, and it comes first on purpose. Every assertion below is satisfiable by a
-	// rule that placed nothing, so the denominator is checked before the rate.
-	//
-	// # The floor is tight because a loose one let a real mutation through
-	//
-	// This was written as `< 5000` first, on the reasoning that the corpus holds ~11,300 classes and
-	// half of that was clearly "still measuring something". Then the mutation that removes the
-	// evaluator escalation in `readingFor` was run against it: every repository `@utility` root goes
-	// unanswerable, 724 lists drop out, the population falls from 11,307 to 7,103, and the
-	// disagreement count stays at zero because the classes that would have disagreed are simply not
-	// being asked about any more. The suite passed.
-	//
-	// That is precisely the failure this task exists to prevent, arriving inside the test written to
-	// prevent it: a number that improves because a rule went quiet. A floor only works if it is set
-	// near the real population rather than at a number that merely sounds large.
-	//
-	// 11,000 of the 11,307 currently placed. Tight enough that losing one class category fails, loose
-	// enough that a fixture gaining or losing a handful of classes does not. `listsDeclined` is
-	// asserted separately for the same reason: a decline is how classes leave the population, so its
-	// count is the leading indicator and it is currently 1.
-	if measurement.comparedPairs == 0 {
-		test.Fatal("no pairs were compared, so this measured nothing")
-	}
-	if measurement.placedClasses < 11000 {
-		test.Fatalf(
-			"the rule placed %d classes and the corpus holds 11,307; a population that dropped this "+
-				"far means the rule stopped answering for a whole category of class, and the zero "+
-				"disagreements below would be measuring its silence rather than its correctness",
-			measurement.placedClasses,
-		)
-	}
-	if measurement.listsSkipped > 10 {
-		test.Errorf(
-			"the rule declined %d of %d lists; it declined 1 when this was measured, and a rise means "+
-				"classes are leaving the population rather than being ordered correctly",
-			measurement.listsSkipped, measurement.lists+measurement.listsSkipped,
-		)
-	}
-
-	if measurement.disagreeingPairs != 0 {
-		test.Errorf(
-			"the live rule disagrees with Tailwind on %d of %d pairs across %d lists; the swap was "+
-				"supposed to take this to zero",
-			measurement.disagreeingPairs, measurement.comparedPairs, measurement.disagreeingLists,
-		)
-	}
-}
-
 // TestClassOrderLiveStackedVariantsSortByMaskNotByDepth is the known-dirty control.
 //
 // This is the bug the swap exists to fix, stated as the smallest input that shows it. The shipped
@@ -487,63 +374,6 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(test *testing.T) {
 			})
 		}
 	})
-}
-
-// TestClassOrderLiveReadsTheRepositoryRatherThanATable is the control that the swap actually happened.
-//
-// Every other test here would pass against the generated tables, because the generated tables were
-// generated from this repository and agree with it almost everywhere. What cannot pass against them
-// is a class whose reading exists only because this repository declared it: `markdown-content` is one
-// of ahra's own `@utility` blocks, present in the live design system and absent from Tailwind.
-//
-// So this asserts the rule places a class no framework table contains. Without it, a swap that
-// silently kept reading the old tables would show green on the whole suite above.
-func TestClassOrderLiveReadsTheRepositoryRatherThanATable(test *testing.T) {
-	test.Parallel()
-	designSystem := classOrderLiveRepositorySystem(test)
-
-	// `markdown-content` is declared by this repository's own `app/_theme/styles/utilities.css` and
-	// exists nowhere in Tailwind. Asserted through HasUtility first, so a repository that renames the
-	// block fails here with a readable reason rather than further down with a confusing one.
-	const repositoryClass = "markdown-content"
-	if !designSystem.System.HasUtility(repositoryClass, tailwindcollapse.UtilityKindStatic) {
-		test.Skipf("this repository no longer declares `@utility %s`, so there is nothing only it knows",
-			repositoryClass)
-	}
-
-	keys, unplaceable, resolved := classOrderKeys(
-		[]string{repositoryClass, "flex"}, designSystem.System, designSystem.Table)
-	if !resolved {
-		test.Fatalf("the rule could not place %q, which this repository's own stylesheet declares; "+
-			"that means it is not reading the repository", unplaceable)
-	}
-	if _, placed := keys[repositoryClass]; !placed {
-		test.Fatalf("%q got no key, so the rule is answering from a framework table rather than from "+
-			"this repository", repositoryClass)
-	}
-}
-
-// classOrderLiveRepositorySystem builds the design system of ahra, the corpus these tests were written
-// against.
-//
-// Skips naming the variable when the corpus is unset, so a checkout elsewhere reports "not measured"
-// rather than "broken", and fails when it is set but lacks the stylesheet or its installed tailwindcss.
-func classOrderLiveRepositorySystem(test *testing.T) DesignSystemResult {
-	test.Helper()
-
-	entryPoint := corpus.Resolve(test, "ahra:app/_theme/styles/theme.css")
-	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
-	if packageRoot == "" {
-		test.Fatalf("%s is set, but there is no installed tailwindcss beside %s", corpus.Ahra.Variable, entryPoint)
-	}
-	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
-		EntryPoint:          entryPoint,
-		TailwindPackageRoot: packageRoot,
-	})
-	if loadDesignSystemError != nil {
-		test.Fatalf("loading the design system: %v", loadDesignSystemError)
-	}
-	return loadedDesignSystemResult(system, entryPoint)
 }
 
 // TestClassOrderLiveDeclinesRatherThanPartiallySorting pins the fail-safe.
@@ -656,118 +486,4 @@ func TestClassOrderLiveUnrankedLeadInSourceOrder(test *testing.T) {
 			}
 		}
 	})
-}
-
-// TestClassOrderLiveDeclinesNoList pins that the rule orders every corpus list.
-//
-// `TestClassOrderLiveMatchesTailwindOverTheCorpus` reports how many lists it declined, and a decline is
-// how classes leave the population, so an unexplained one is exactly the thing that would let a future
-// silence hide. This test used to name the one list the rule could not order, `ahra/list-179` on
-// `data-[show=false]:fade-out`: sixteen roots in ahra are declared both as a static `@utility` and as a
-// functional one, the design system kept one kind per root, and the bare class read as a functional
-// candidate with no value. Since a root keeps both kinds (TestARootDeclaredBothWaysKeepsBothKinds), that
-// list is placed, and measured again for #f598zk0 the corpus declines none of its 2,396 lists. So any
-// decline now is a class the rule stopped answering for, and fails here by name.
-//
-// TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme is the same question on the public theme,
-// where it runs everywhere.
-func TestClassOrderLiveDeclinesNoList(test *testing.T) {
-	test.Parallel()
-	lists := classOrderLiveLoadCorpus(test)
-	systems := classOrderLiveSystems(test, lists)
-
-	declined := map[string]string{}
-	for _, list := range lists {
-		designSystem, hasSystem := systems[list.entryPath]
-		if !hasSystem || designSystem.Error != nil {
-			continue
-		}
-		_, placeable := partitionUnranked(classOrderLiveReversed(list.sorted), designSystem)
-		if _, unplaceable, resolved := classOrderKeys(
-			placeable, designSystem.System, designSystem.Table); !resolved {
-			declined[list.name] = unplaceable
-		}
-	}
-
-	for name, unplaceable := range declined {
-		test.Logf("declined %s on %q", name, unplaceable)
-	}
-
-	for name, unplaceable := range declined {
-		test.Errorf(
-			"%s declined on %q; the rule orders every corpus list, so it has stopped answering for a class it used to place",
-			name,
-			unplaceable,
-		)
-	}
-}
-
-// A class ranks by the first of its readings that compiles, and a class none of whose readings
-// compile is a null. Both answers quoted from Prettier's Tailwind plugin over this repository's
-// theme on 2026-10-02, where literals holding either shape were declined until #vf1hd6j's
-// acceptance found them: 12 in ahra and 18 in www-phi-health.
-//
-// `shadow--0` reads first as the repository's `@utility shadow--*` with value `0`, needing a
-// `--shadow-0` nobody declared, and second as the framework's `shadow` with value `-0`, which finds
-// `--shadow--0`. `hover:content--0-4` reads as `@utility content--*` with value `0-4`, needing a
-// `--color-content-0-4` the theme does not have, and as nothing else.
-func TestClassOrderRanksByTheReadingThatCompiles(test *testing.T) {
-	test.Parallel()
-	designSystem := classOrderLiveRepositorySystem(test)
-
-	for _, testCase := range []struct {
-		input, want []string
-	}{
-		{
-			[]string{"shadow--0", "background--0", "border--0", "border"},
-			[]string{"border", "border--0", "background--0", "shadow--0"},
-		},
-		{
-			[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"},
-			[]string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"},
-		},
-		{
-			[]string{"flex", "dark:bg-transparent", "hover:content--0-4"},
-			[]string{"hover:content--0-4", "flex", "dark:bg-transparent"},
-		},
-	} {
-		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
-		if !decided {
-			test.Errorf("%v was declined; every class in it has Tailwind answer", testCase.input)
-			continue
-		}
-		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {
-			test.Errorf("%v ordered as %v, the plugin writes %v", testCase.input, ordered, testCase.want)
-		}
-	}
-}
-
-// Existence asks the evaluator for a repository root rather than trusting it, and takes any reading
-// that resolves rather than only the first.
-//
-// The dead ones are classes the plugin ranks null over this theme: `content--0-4` has no
-// `--color-content-0-4`, and `background--2/50` puts a modifier on a utility that takes none. Both
-// sat on Structure sites with no-unknown-classes reporting nothing. The live ones are the controls,
-// and `shadow--0` is the one only a second reading reaches.
-func TestClassExistenceAsksTheEvaluatorForRepositoryRoots(test *testing.T) {
-	test.Parallel()
-	designSystem := classOrderLiveRepositorySystem(test)
-
-	for _, dead := range []string{"content--0-4", "hover:content--0-4", "background--2/50"} {
-		if classExistsIn(dead, designSystem.System) {
-			test.Errorf("%q generates no CSS and was read as existing", dead)
-		}
-	}
-	for _, live := range []string{
-		"content--1",
-		"content--4",
-		"background--2",
-		"shadow--0",
-		"hover:shadow--3",
-		"markdown-content",
-	} {
-		if !classExistsIn(live, designSystem.System) {
-			test.Errorf("%q generates CSS and was read as unknown", live)
-		}
-	}
 }

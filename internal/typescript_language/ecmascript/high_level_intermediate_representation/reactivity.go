@@ -896,8 +896,7 @@ func (state *reactivity) terminalTestIsReactive(terminal Terminal) bool {
 // filled by walking every block's chain up to the root, plus another map for the frontier's duplicates:
 // quadratic allocation in the block count, and with the collector off every byte of it a fresh page.
 // That was about a quarter of preserve-manual-memoization's CPU on ahra, 736 to 536ms (#hekjpw3). The
-// answer is the same, order included, and TestPostDominatorFrontiersMatchTheChainWalk holds the old
-// walk beside it.
+// answer is the same, order included, measured against the old walk when the change landed.
 func (state *reactivity) postDominatorFrontiers() (
 	frontiers map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
 ) {

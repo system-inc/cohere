@@ -13,23 +13,19 @@ import (
 )
 
 // signatureOracles are Tailwind's own signatures, by hash, for every class arbitraryUtilities searches
-// and for the classes a repository writes, on three themes.
+// and for the classes a repository writes, on the public theme.
 //
-// Regenerate from the repository root with:
+// Regenerate from the repository root with, R being any directory whose node_modules holds tailwindcss 4.3.3:
 //
 //	T=internal/typescript_language/rules/tailwind/tools/generate_signatures
 //	D=internal/typescript_language/rules/tailwind/collapse/testdata
-//	node $T/signatures.mjs $D/public_theme/theme.css --resolve-root ahra: \
+//	node $T/signatures.mjs $D/public_theme/theme.css --resolve-root $R \
 //	    --targets $D/canonical_singles_public.json > $D/signatures_public.txt.gz
-//	node $T/signatures.mjs ahra:app/_theme/styles/theme.css --targets $D/canonical_singles.json > $D/signatures.txt.gz
-//	node $T/signatures.mjs connected:app/_theme/styles/theme.css > $D/signatures_connected.txt.gz
 var signatureOracles = []struct {
 	name string
 	file string
 }{
 	{name: "public", file: "signatures_public.txt.gz"},
-	{name: "ahra", file: "signatures.txt.gz"},
-	{name: "connected", file: "signatures_connected.txt.gz"},
 }
 
 // signatureOracleEntry is one class's line: its signature's hash under each feature set and the

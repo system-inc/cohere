@@ -1,0 +1,316 @@
+package settings
+
+import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// projectConfigurationPath is a project's config composed the way a Structure app's is: the sets cohere
+// carries that such an app extends, with an overlay of its own rules, ignores and an override on top. It
+// is committed under testdata, so every machine reads the same bytes, and the sets it extends are the
+// ones cohere embeds, so a change to a set shows up here rather than at the next full run. The registry's
+// wiring test reads it too (internal/typescript_language/registry).
+func projectConfigurationPath() string {
+	return filepath.Join("testdata", "project", "CohereSettings.json")
+}
+
+// TestAgainstAProjectOnTheSets loads a project's file through the sets cohere carries rather than a
+// hand-written model of them.
+//
+// A test that models a set can drift from the set. This one reads the sets' own bytes through the chain a
+// project extends, so a set whose override stops applying fails here.
+func TestAgainstAProjectOnTheSets(test *testing.T) {
+	test.Parallel()
+
+	loaded, loadError := Load(projectConfigurationPath())
+	if loadError != nil {
+		test.Fatalf("loading the project config: %v", loadError)
+	}
+
+	// Prove the input is real before asserting anything about it. A config that parsed to zero rules
+	// would make every assertion below pass vacuously, which is the failure mode this project keeps
+	// finding.
+	if len(loaded.Rules) < 100 {
+		test.Fatalf("only %d rules loaded from the project config, so its sets did not load", len(loaded.Rules))
+	}
+	if len(loaded.Overrides) == 0 || len(loaded.IgnorePatterns) == 0 {
+		test.Fatalf(
+			"overrides=%d ignorePatterns=%d, expected both non-empty",
+			len(loaded.Overrides),
+			len(loaded.IgnorePatterns),
+		)
+	}
+
+	// Generated code gets every rule (#c076xbg). The one override left is the GraphQL output's
+	// abbreviation rule, waiting on a wire decision; everything else runs there, and on any other
+	// generated file nothing is off.
+	graphQlOutput := loaded.Resolve("libraries/structure/source/api/graphql/GraphQlOperations.generated.ts")
+	if graphQlOutput.Enabled("nexus/consistency-no-abbreviated-identifier") {
+		test.Error("the GraphQL output's interim abbreviation override did not apply")
+	}
+	workerBundle := loaded.Resolve(
+		"libraries/structure/source/api/web-sockets/shared-worker/WebSocketSharedWorkerCode.generated.ts",
+	)
+	// The folder spelling the ruling retired: a `generated/` override coming back would turn rules off here.
+	inGeneratedFolder := loaded.Resolve("libraries/structure/source/api/graphql/generated/GraphQlOperations.ts")
+	for _, ruleName := range []string{
+		"nexus/consistency-require-type-suffix",
+		"nexus/consistency-no-abbreviated-identifier",
+		"@typescript-eslint/no-explicit-any",
+	} {
+		if !graphQlOutput.Enabled(ruleName) && ruleName != "nexus/consistency-no-abbreviated-identifier" {
+			test.Errorf("%s is off for the GraphQL output; generated code gets every rule", ruleName)
+		}
+		if !workerBundle.Enabled(ruleName) {
+			test.Errorf("%s is off for a generated file; generated code gets every rule", ruleName)
+		}
+		if !inGeneratedFolder.Enabled(ruleName) {
+			test.Errorf("%s is off inside a generated/ folder; generated code gets every rule", ruleName)
+		}
+	}
+
+	// The same rule must still run on authored source, or the override is too broad.
+	authored := loaded.Resolve("libraries/structure/source/components/buttons/Button.tsx")
+	if !authored.Enabled("nexus/consistency-require-type-suffix") {
+		test.Error("consistency-require-type-suffix stopped running on authored source")
+	}
+
+	// The other two override blocks: a set's, for next-env.d.ts, and the project's own, for modules/**.
+	if loaded.Resolve("next-env.d.ts").Enabled("structure/consistency-require-organized-imports") {
+		test.Error("the next-env.d.ts override did not apply")
+	}
+	if loaded.Resolve("modules/finance/connections/QuickBooksAdapter.ts").Enabled("structure/network-no-direct-fetch") {
+		test.Error("the modules/** override did not apply")
+	}
+	if !loaded.Resolve("libraries/structure/source/api/Fetch.ts").Enabled("structure/network-no-direct-fetch") {
+		test.Error("the modules/** override leaked outside modules/")
+	}
+
+	// Ignored paths.
+	if !loaded.Resolve("node_modules/react/index.d.ts").Ignored {
+		test.Error("node_modules was not ignored")
+	}
+	if loaded.Resolve("libraries/structure/source/components/buttons/Button.tsx").Ignored {
+		test.Error("real source was ignored")
+	}
+}
+
+// TestBothPathsAgreeOnEveryPluginDefault is the gate on removing the hand-written lines.
+//
+// The sets name all forty plugin-default rules by hand, which reproduces oxlint's behaviour
+// in the wrong layer. Removing those lines is only safe if the plugin declaration resolves the same
+// forty, and this is what shows it: the config is loaded as written, then loaded again with every
+// plugin-default line stripped, and the two results are compared rule by rule.
+//
+// Without this the removal is the change, and a silent disagreement between the two paths looks
+// exactly like a successful migration.
+//
+// # This guard was vacuous once, and the reason generalises
+//
+// The first version read `Load`'s result. `Load` merges the plugin defaults into `Rules`, so a rule
+// arriving only through the declaration is indistinguishable there from one named by hand -- the
+// exact distinction this test exists to measure. Checked by deleting three plugin-default lines from
+// a copy of the live config: the test passed and reported all forty still named by hand.
+//
+// The shape: a test comparing two paths cannot read the surface where they have already been merged,
+// and that surface is usually the convenient one because it is what every consumer uses. Reading the
+// file directly is why this can now fail.
+//
+// # The severity difference, which is real and is the reason nothing is being removed yet
+//
+// The two paths agree on which rules run and disagree on how loudly. The hand-written lines say
+// `error`; `warn_correctness` contributes `warn`, and the inventory records all forty as `warn`.
+// So the hand-written lines are not reproducing the gate's behaviour, they are strengthening it --
+// forty rules currently fail this build that only warn in the tool being replaced.
+//
+// That is a decision somebody made and did not write down, and it is not this test's to reverse.
+// The test therefore asserts membership exactly and reports severity rather than requiring it to
+// match, so the difference is visible instead of blocking or being smoothed away.
+func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
+	test.Parallel()
+	asWritten, loadError := Load(projectConfigurationPath())
+	if loadError != nil {
+		test.Fatalf("loading the project config: %v", loadError)
+	}
+
+	// Every plugin-default rule must be reachable through the declaration alone.
+	fromPlugins := RulesFromPlugins(asWritten.Plugins, map[string]RuleSetting{})
+	if len(fromPlugins) != len(PluginDefaultRules) {
+		test.Fatalf("the project config's plugins resolve %d of %d plugin-default rules; a rule whose "+
+			"plugin is not declared would be lost the moment its hand-written line came out",
+			len(fromPlugins), len(PluginDefaultRules))
+	}
+
+	// Read what the file names rather than what `Load` returned. `Load` merges the plugin defaults
+	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
+	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
+	// merged map made this guard pass on a config with three lines deliberately removed.
+	namedInFile, ruleNamesInChainError := ruleNamesInChain(projectConfigurationPath())
+	if ruleNamesInChainError != nil {
+		test.Fatalf("reading the rules block: %v", ruleNamesInChainError)
+	}
+
+	missingByHand, severityDiffers := 0, 0
+	for ruleName := range PluginDefaultRules {
+		byHand, named := namedInFile[ruleName]
+		if !named {
+			// Reachable through the declaration and not named by hand. Not a failure -- it is the
+			// state this whole change is heading toward -- but counted so the number is visible.
+			missingByHand++
+			continue
+		}
+		if byHand.Severity != PluginDefaultSeverity {
+			severityDiffers++
+		}
+	}
+
+	test.Logf("plugin-default rules: %d resolved from the declaration, %d also named by hand, "+
+		"%d of those at a severity the declaration would not contribute",
+		len(fromPlugins), len(PluginDefaultRules)-missingByHand, severityDiffers)
+
+	if severityDiffers > 0 {
+		test.Logf("the hand-written lines set %d rules to a severity `warn_correctness` does not "+
+			"contribute, so removing them would lower those rules to warn. Ruled 2026-08-25 that "+
+			"they stay at error: parity is the criterion for which rules run rather than how "+
+			"loudly, and this set holds no rule whose violation is arguably fine. See "+
+			"`PluginDefaultSeverity` for the full reasoning before deleting any of them.",
+			severityDiffers)
+	}
+
+	// The forty are a deliberate override, so all forty being named is the expected state and a
+	// drop is what wants attention. Asserted rather than logged: if a cleanup pass removes some of
+	// these lines believing them redundant, this is the check that says otherwise, and a log line
+	// in a passing test is not something anyone reads.
+	if missingByHand != 0 {
+		test.Errorf("%d plugin-default rules are no longer named in the config, so they have dropped "+
+			"from error to warn. If that was deliberate, update this test and say so; if it was a "+
+			"cleanup removing lines that looked redundant, the lines were load-bearing and the "+
+			"reasoning is on `PluginDefaultSeverity`", missingByHand)
+	}
+}
+
+// ruleNamesInChain returns the rules named by hand anywhere in the config's extends chain, before any
+// plugin default is merged in, the project's own file winning over the tiers it extends.
+//
+// Separate from `Load` on purpose. `Load` returns the resolved result, which is the right answer for
+// every consumer and the wrong one for a test asking which of two paths a rule arrived by.
+//
+// The whole chain rather than the one file, since a project's config is an overlay on the house tiers
+// (#rkm5a31), now the sets cohere carries (#njhfftt): the forty lines moved into the Nexus tier, so
+// reading a project's file alone reported all forty dropped to warn while every one still ran at error.
+func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
+	sources, sourcesOfError := SourcesOf(path)
+	if sourcesOfError != nil {
+		return nil, sourcesOfError
+	}
+	named := map[string]RuleSetting{}
+	for index := len(sources) - 1; index >= 0; index-- {
+		contents, sourceContentsError := SourceContents(sources[index])
+		if sourceContentsError != nil {
+			return nil, sourceContentsError
+		}
+		layer, ruleNamesInContentsError := ruleNamesInContents(contents)
+		if ruleNamesInContentsError != nil {
+			return nil, fmt.Errorf("reading the rules block of %s: %w", sources[index], ruleNamesInContentsError)
+		}
+		for name, setting := range layer {
+			named[name] = setting
+		}
+	}
+	return named, nil
+}
+
+// ruleNamesInContents is the same read, over bytes rather than a path.
+//
+// Split out so the guard above can be exercised against a modified config without writing one. That
+// matters more than it looks: the lines this guards are the sets cohere embeds, so any check needing a
+// mutated copy on disk would have to mutate the artifact it guards, or write one somewhere and hope
+// the two stay comparable.
+//
+// Stated as a property to keep rather than an accident of how this was written: **a guard that can be
+// fed its own defect in-process is verifiable by anyone, at any time, without touching what it
+// protects.** `TestTheGuardCatchesARemovedLine` is what that buys, and it is the difference between
+// running a guard and verifying one.
+func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
+	var raw struct {
+		Rules map[string]json.RawMessage `json:"rules"`
+	}
+	if decodeError := json.Unmarshal(contents, &raw); decodeError != nil {
+		return nil, decodeError
+	}
+
+	named := map[string]RuleSetting{}
+	for name, value := range raw.Rules {
+		setting, parseRuleSettingError := parseRuleSetting(value)
+		if parseRuleSettingError != nil {
+			return nil, parseRuleSettingError
+		}
+		// The config writes `react/no-children-prop` and the table keys on the same spelling the
+		// inventory uses, so both are recorded and a lookup finds either.
+		named[name] = setting
+		if _, bare, namespaced := strings.Cut(name, "/"); namespaced {
+			named[bare] = setting
+		}
+	}
+	return named, nil
+}
+
+// TestTheGuardCatchesARemovedLine feeds the guard the defect it exists to catch.
+//
+// `TestBothPathsAgreeOnEveryPluginDefault` is the condition on removing the forty `error` lines, and
+// an earlier version of it could not fail: it read `Load`'s result, where the two paths have already
+// been merged, so a rule arriving only through the declaration was indistinguishable from one named
+// by hand. Three lines were deleted from a copy of the config and it passed, reporting all
+// forty still named.
+//
+// Running a guard and seeing green is not verifying a guard. This verifies it, by reproducing the
+// removal in-process and asserting the count moves.
+//
+// It writes nothing. The lines being guarded are the sets cohere embeds, so a check that needed a
+// mutated copy on disk would either touch the artifact it guards or drift from it; `ruleNamesInContents`
+// exists so this one does neither.
+func TestTheGuardCatchesARemovedLine(test *testing.T) {
+	test.Parallel()
+	intact, ruleNamesInChainError := ruleNamesInChain(projectConfigurationPath())
+	if ruleNamesInChainError != nil {
+		test.Fatalf("reading the rules blocks: %v", ruleNamesInChainError)
+	}
+	unnamed := func(named map[string]RuleSetting) int {
+		missing := 0
+		for ruleName := range PluginDefaultRules {
+			if _, present := named[ruleName]; !present {
+				missing++
+			}
+		}
+		return missing
+	}
+
+	// The control: as shipped, every plugin-default rule is named by hand. If this is ever not true
+	// the mutation below proves nothing, because the count was already moving.
+	if before := unnamed(intact); before != 0 {
+		test.Fatalf("%d plugin-default rules are already unnamed before any mutation, so this test "+
+			"cannot attribute a change to the removal", before)
+	}
+
+	// Remove three by hand, the way a cleanup pass believing them redundant would.
+	removed := []string{"no-const-assign", "getter-return", "constructor-super"}
+	stripped := map[string]RuleSetting{}
+	for name, setting := range intact {
+		stripped[name] = setting
+	}
+	for _, name := range removed {
+		if _, present := stripped[name]; !present {
+			test.Fatalf("%q is not named in the project config's chain, so removing it models nothing; pick a "+
+				"rule the config actually carries", name)
+		}
+		delete(stripped, name)
+	}
+
+	if after := unnamed(stripped); after != len(removed) {
+		test.Errorf("after removing %d plugin-default lines the guard counts %d unnamed; it must count "+
+			"exactly the removals or it cannot tell a cleanup from a no-op", len(removed), after)
+	}
+}

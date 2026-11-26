@@ -144,12 +144,13 @@ func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(test *testing.T) {
 // 58fb982 rewired `HasUtility` onto the ported registrations and the leak closed; this commit deleted
 // the table itself.
 //
-// So the assertion inverts: the framework statics must carry none of the repository's own names. It
-// checks against the blocks this repository declares rather than a hardcoded list, so a repository
-// adding a utility extends the check automatically.
+// So the assertion inverts: the framework statics must carry none of a repository's own names. It
+// checks against the blocks the public theme declares rather than a hardcoded list, so a static
+// `@utility` added there extends the check automatically, and a framework table regenerated from a
+// theme rather than from Tailwind fails here.
 func TestFrameworkStaticsCarryNoRepositoryTokens(test *testing.T) {
 	test.Parallel()
-	system := loadWave1DesignSystem(test)
+	system := publicThemeSystem(test)
 
 	declared := system.RepositoryStaticUtilityNames()
 	if len(declared) == 0 {

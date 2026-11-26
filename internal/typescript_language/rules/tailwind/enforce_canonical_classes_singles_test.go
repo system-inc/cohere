@@ -161,7 +161,7 @@ func TestCanonicalSinglesStaySilent(test *testing.T) {
 		{name: "a class nothing rewrites", source: `const element = <div className="px-4 bg-red-500" />;`},
 		{
 			// Tailwind would rewrite it, through themeToVarUtility, which is not ported. Silent rather than
-			// wrong, and listed in canonical_unported.json.
+			// wrong, and listed in canonical_unported_public.json.
 			name:   "a rewrite only an unported pass makes",
 			source: `const element = <div className="w-[theme(maxWidth.md)]" />;`,
 		},

@@ -1,0 +1,29 @@
+{
+    "extends": ["cohere:react", "cohere:next", "cohere:tailwind", "cohere:system-inc/structure"],
+    "rules": {
+        "nexus/boundary-no-project-import": [
+            "error",
+            {
+                "libraryDirectory": "/libraries/structure/",
+                "allowed": ["@project/ProjectSettings", "@project/package.json"]
+            }
+        ],
+        "nexus/correctness-no-write-only-collection": "error"
+    },
+    "ignorePatterns": [
+        {
+            "pattern": "data/**",
+            "reason": "What the project writes as it runs, not source.",
+            "kind": "generated"
+        }
+    ],
+    "overrides": [
+        {
+            "files": ["modules/**"],
+            "reason": "modules/** are command lines and servers, where fetch is the transport.",
+            "rules": {
+                "structure/network-no-direct-fetch": "off"
+            }
+        }
+    ]
+}

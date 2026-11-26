@@ -22,12 +22,12 @@ import (
 // corpus whose variant set matches the one it was generated from, which is why a table generated
 // from this repository passed on this repository for as long as it did.
 //
-// The corpus has three halves and needs all three. The repository half is the exit criterion: 2,400
-// real class lists from two repositories, sorted by Tailwind, each compared class by class. The
-// synthetic half reaches the pairs a real corpus never writes, and one of those pairs is what
-// answers this component's open question. The `@custom-variant` half separates a custom variant
-// that appends a new position from one that overwrites a framework name in place, which look the
-// same in a stylesheet and behave differently in the sort.
+// The corpus has two halves and needs both. The synthetic half reaches the pairs a real class list
+// rarely writes, and one of those pairs is what answers this component's open question. The
+// `@custom-variant` half separates a custom variant that appends a new position from one that
+// overwrites a framework name in place, which look the same in a stylesheet and behave differently
+// in the sort. The class lists two consumer repositories wrote left the fixture when cohere's tests
+// stopped reading other repositories (#5wj23dd).
 
 type variantOrderCorpus struct {
 	TailwindVersion     string             `json:"tailwindVersion"`
@@ -262,12 +262,9 @@ func TestVariantOrderMatchesTailwind(test *testing.T) {
 	)
 }
 
-// variantOrderRegistryForCase finds the registry a case should be compared under.
-//
-// A repository's class lists live in a case of their own, separate from the case carrying that
-// repository's registry, so the lists are matched back to their repository by name prefix. Falling
-// back to the framework registry rather than skipping is deliberate: a synthetic case is built on a
-// default design system and has no registry of its own.
+// variantOrderRegistryForCase finds the registry a case should be compared under: its own, or else
+// the framework's. Falling back to the framework registry rather than skipping is deliberate: a
+// synthetic case is built on a default design system and has no registry of its own.
 func variantOrderRegistryForCase(
 	test *testing.T,
 	corpus variantOrderCorpus,
@@ -282,12 +279,6 @@ func variantOrderRegistryForCase(
 		return nil
 	}
 
-	repository := strings.TrimSuffix(aCase.Name, "/class-lists")
-	for _, candidate := range corpus.Cases {
-		if candidate.Registry != nil && candidate.Name == repository {
-			return candidate.Registry
-		}
-	}
 	for _, candidate := range corpus.Cases {
 		if candidate.Registry != nil && candidate.Name == "framework-default" {
 			return candidate.Registry
@@ -297,8 +288,8 @@ func variantOrderRegistryForCase(
 	return nil
 }
 
-// variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which both corpus repositories
-// inherit unchanged.
+// variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which every case in the
+// fixture inherits unchanged.
 //
 // Hardcoded here and only here, in the test's resolver, never in variant_registry.go. The port reads
 // breakpoints from the theme; this table exists so the differential can answer the same question
@@ -318,9 +309,9 @@ var variantOrderDefaultContainerScale = map[string]string{
 //
 // Tailwind resolves these through the theme's `--breakpoint` and `--container` namespaces, which
 // is a sibling component. Rather than depend on it, the resolver reads the value straight off the
-// variant when it is arbitrary and falls back to the default scale by name, which is what both
-// repositories in the corpus use. A name this cannot resolve reports false, which is upstream's own
-// `null` branch and is ordered rather than skipped.
+// variant when it is arbitrary and falls back to the default scale by name, which is what every case
+// in the fixture uses. A name this cannot resolve reports false, which is upstream's own `null` branch
+// and is ordered rather than skipped.
 func variantOrderBreakpointResolverFor(
 	aCase variantOrderCase,
 	corpus variantOrderCorpus,
@@ -780,11 +771,11 @@ func TestRegistrationOrderIsSharedWithinAGroup(test *testing.T) {
 // name overwrites the registration in place: `Variants.set` assigns kind, applyFn and compounds
 // onto the existing record and never touches `order`.
 //
-// Both repositories in this corpus do the second kind. `libraries/structure/source/theme/styles/
-// global.css` declares `@custom-variant dark` with a `:has()` selector, which completely replaces
-// the CSS `dark:` emits, and leaves its sort position exactly where the framework put it. Their
-// variant registries are therefore identical to the framework's, which is a real finding rather
-// than a missing measurement: for ordering purposes an overriding custom variant is invisible.
+// The fixture's `custom-variant/custom-variant-overrides-framework` case does the second kind: its
+// `@custom-variant dark` completely replaces the CSS `dark:` emits, and leaves its sort position
+// exactly where the framework put it. Its variant registry is therefore identical to the
+// framework's, which is a real finding rather than a missing measurement: for ordering purposes an
+// overriding custom variant is invisible.
 func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(test *testing.T) {
 	test.Parallel()
 	corpus := loadVariantOrderCorpus(test)
@@ -859,22 +850,6 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(test *testing.T) {
 			"a new custom variant should append past the framework's last order %d, but `sidebar` took %d",
 			highestFramework, appendedOrder,
 		)
-	}
-
-	// Both repositories, asserted rather than assumed: this is the claim that a per-repository port
-	// is needed at all, and it deserves to fail loudly if a repository ever adds a new variant name.
-	for _, repository := range []string{"ahra", "www-connected-app"} {
-		registry := registries[repository]
-		if registry == nil {
-			test.Errorf("%s has no registry in the fixture", repository)
-			continue
-		}
-		if len(registry.Entries) != len(framework.Entries) {
-			test.Logf(
-				"%s registers %d variants against the framework's %d, so it adds names of its own",
-				repository, len(registry.Entries), len(framework.Entries),
-			)
-		}
 	}
 }
 
@@ -1193,44 +1168,5 @@ func TestBitmaskExceedsSixtyFourBits(test *testing.T) {
 	}
 	if mask.Sign() == 0 {
 		test.Error("the mask is zero, which is what a uint64 shift past the word width would produce")
-	}
-}
-
-// TestCorpusHoldsRealClassLists guards the population every count above is a count of.
-//
-// A fixture that regenerated to zero repository class lists would leave every differential passing
-// vacuously and every logged percentage a percentage of nothing.
-func TestCorpusHoldsRealClassLists(test *testing.T) {
-	test.Parallel()
-	corpus := loadVariantOrderCorpus(test)
-
-	classListsByRepository := map[string]int{}
-	classesByRepository := map[string]int{}
-	for _, aCase := range corpus.Cases {
-		if aCase.Source != "repository" || len(aCase.ClassLists) == 0 {
-			continue
-		}
-		repository := strings.TrimSuffix(aCase.Name, "/class-lists")
-		for _, classList := range aCase.ClassLists {
-			classListsByRepository[repository]++
-			classesByRepository[repository] += len(classList.Classes)
-		}
-	}
-
-	if len(classListsByRepository) < 2 {
-		test.Fatalf(
-			"the corpus holds class lists from %d repositories and the argument for this port needs two",
-			len(classListsByRepository),
-		)
-	}
-	for repository, count := range classListsByRepository {
-		if count < 100 {
-			test.Errorf(
-				"%s contributed only %d class lists, which is too few to measure agreement on",
-				repository,
-				count,
-			)
-		}
-		test.Logf("%s: %d class lists, %d classes", repository, count, classesByRepository[repository])
 	}
 }

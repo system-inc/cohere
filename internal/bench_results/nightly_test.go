@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
@@ -25,6 +26,15 @@ else
   print "planted bench: no quiet window marker while the bench runs"
 fi
 exit 1
+`
+
+// standInBusiest is the command standInTop's second sample names.
+const standInBusiest = "stand-in-busiest"
+
+// standInTop is the night's top in TestTheNightlyGuardOpensNoQuietWindow: two samples, as `top -l 2` prints them,
+// the second naming standInBusiest, which is what the guard keeps.
+const standInTop = `#!/bin/sh
+printf 'COMMAND PID %%CPU\nfirst-sample 1 0.0\nCOMMAND PID %%CPU\n` + standInBusiest + ` 42 87.5\n'
 `
 
 // The nightly guard opens no quiet window on this Mac (Kirk, 2026-11-12, #8sqsgee): a window holds every repository's
@@ -74,11 +84,24 @@ func TestTheNightlyGuardOpensNoQuietWindow(test *testing.T) {
 
 	home := test.TempDir()
 	state := test.TempDir()
-	// The isolation tier, the landing measurement and the live walks are off: they run real tests for minutes,
-	// which this test of the bench's quiet window has no use for.
+	// A top of its own, so the night reads no process of the machine's, and through no setuid program, which a land
+	// job's sandbox refuses to start: it prints two samples, as top -l 2 does, and the guard keeps the second's.
+	tools := test.TempDir()
+	if writeError := executable_testing.WriteFile(
+		filepath.Join(tools, "top"),
+		[]byte(standInTop),
+		0o755,
+	); writeError != nil {
+		test.Fatal(writeError)
+	}
+	// The isolation tier and the landing measurement are off: they run real tests for minutes, which this test of
+	// the bench's quiet window has no use for.
 	night := exec.Command(zsh, filepath.Join(bench, "nightly.zsh"), "--state", state, "--projects", "ahra",
-		"--cohere", "/usr/bin/true", "--isolation", "off", "--landing", "off", "--live", "off")
-	night.Env = append(os.Environ(), "COHERE_DEV_HOME="+home)
+		"--cohere", "/usr/bin/true", "--isolation", "off", "--landing", "off")
+	// zsh writes a here-string's temporary file under `TMPPREFIX`, /tmp/zsh unless set, never under `TMPDIR`, so the
+	// night is given one inside the test's own temporary directory.
+	night.Env = append(os.Environ(), "COHERE_DEV_HOME="+home, "TMPPREFIX="+filepath.Join(test.TempDir(), "zsh"),
+		"PATH="+tools+string(os.PathListSeparator)+os.Getenv("PATH"))
 	output, runError := night.CombinedOutput()
 	if runError != nil {
 		test.Fatalf("the night exited %v:\n%s", runError, output)
@@ -119,7 +142,8 @@ func TestTheNightlyGuardOpensNoQuietWindow(test *testing.T) {
 	if _, has := fields["window"]; has {
 		test.Errorf("the tonight file still records a window:\n%s", tonight)
 	}
-	if _, has := fields["busiestAfterBench"]; !has {
-		test.Errorf("the tonight file does not say what held the cores after the bench:\n%s", tonight)
+	if busiest, has := fields["busiestAfterBench"]; !has || !strings.Contains(string(busiest), standInBusiest) {
+		test.Errorf("the tonight file does not say what held the cores after the bench, %s:\n%s", standInBusiest,
+			tonight)
 	}
 }

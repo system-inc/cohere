@@ -10,12 +10,8 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/repository"
 )
-
-// prefixIndexCorpusVariable names directories whose Go files the index is also held to the walk over, separated as
-// the platform separates a path list, so a run can reach a tree too large to keep in this repository.
-const prefixIndexCorpusVariable = "COHERE_ABBREVIATION_CORPUS"
 
 // Find looks up the one prefix entry a name could begin with rather than walking EarlyPrefixes and LatePrefixes
 // (#fex6s0v). That is a claim that the lookup gives the very entry the walk stopped at, in each phase, so this holds
@@ -23,15 +19,15 @@ const prefixIndexCorpusVariable = "COHERE_ABBREVIATION_CORPUS"
 // itself, the message id, every value and every spelling. It holds both vocabularies, Policy and NameWords, which
 // internal/text_rules/file_name_words reads through the same Find.
 //
-// The names are every word of cohere-go rule's fixtures, the corpus find_equivalence_test.go reads for the
-// vocabulary (this repository's words, the ahra tree's identifiers, and every abbreviation in every form), every word
-// of every Go file under the directories COHERE_ABBREVIATION_CORPUS names, and each prefix entry's abbreviation
-// followed by each allowed segment, as in `dbInnoDbRows`, the one shape that reaches an early prefix's allowed-segment
-// exemption, which no code in either tree holds. A word is a run of letters, digits, underscores and dollar signs, so
-// every identifier is one, and a word in a comment or a string is a name someone could write.
+// The names are every word of cohere-go rule's fixtures, the names find_equivalence_test.go reads for the
+// vocabulary (this repository's words, the ahra tree's identifiers, and every abbreviation in every form), and each
+// prefix entry's abbreviation followed by each allowed segment, as in `dbInnoDbRows`, the one shape that reaches an
+// early prefix's allowed-segment exemption, which no code in this repository holds. A word is a run of letters,
+// digits, underscores and dollar signs, so every identifier is one, and a word in a comment or a string is a name
+// someone could write.
 func TestFindAgreesWithThePrefixWalk(test *testing.T) {
 	test.Parallel()
-	root, rootError := corpus.RepositoryRoot()
+	root, rootError := repository.Root()
 	if rootError != nil {
 		test.Fatal(rootError)
 	}
@@ -42,20 +38,11 @@ func TestFindAgreesWithThePrefixWalk(test *testing.T) {
 		test.Fatalf("read %d words from the rule's fixtures, too few to have read them", len(fixtureWords))
 	}
 	test.Logf("the rule's fixtures: %d distinct words", len(fixtureWords))
-	directoryWords := []string{}
-	for _, directory := range filepath.SplitList(os.Getenv(prefixIndexCorpusVariable)) {
-		if directory == "" {
-			continue
-		}
-		words := wordsUnder(test, directory, func(path string) bool { return strings.HasSuffix(path, ".go") })
-		test.Logf("%s: %d distinct words", directory, len(words))
-		directoryWords = append(directoryWords, words...)
-	}
 	for vocabularyName, vocabulary := range map[string]*Vocabulary{"Policy": Policy, "NameWords": NameWords} {
 		test.Run(vocabularyName, func(test *testing.T) {
 			test.Parallel()
 			names := map[string]bool{}
-			for _, word := range slices.Concat(fixtureWords, directoryWords, equivalenceCorpus(test, vocabulary)) {
+			for _, word := range slices.Concat(fixtureWords, equivalenceCorpus(test, vocabulary)) {
 				names[word] = true
 			}
 			for _, entry := range slices.Concat(vocabulary.EarlyPrefixes, vocabulary.LatePrefixes) {

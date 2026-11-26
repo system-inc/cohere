@@ -1,11 +1,10 @@
 package tailwind
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/typescript_language/rules/tailwind/vendored"
 )
 
 // The live table is verified against Tailwind, not against itself.
@@ -16,97 +15,20 @@ import (
 // system and scores it against Tailwind's own readings in the fixture corpus, case for case, under
 // the same rules descriptor_test.go uses for the measured table.
 //
-// Measured on both corpus repositories: 6,808 of 6,808 scored cases on ahra, and 6,806 of 6,806 on
-// www-connected-app against that repository's own extraction. The second run is not automated here
-// because it needs a fixture file generated against that repository, which is untracked for the same
-// reason the table is. Reproduce it with:
-//
-//	node internal/typescript_language/rules/tailwind/tools/generate_descriptor_table/fixtures.mjs \
-//	    connected:app/_theme/styles/theme.css > /tmp/connected_fixtures.json
-//
-// The corpus repositories are read through internal/testing/corpus. When one is unset the test skips naming
-// its variable rather than passing, since a silent pass is what a broken lookup looks like, and when
-// one is set but lacks its stylesheet or tailwindcss the test fails.
+// Measured on two consumer repositories when it was written: 6,808 of 6,808 scored cases on one and
+// 6,806 of 6,806 on the other. It now runs on the public theme's oracle, which every machine has
+// (#f598zk0, #5wj23dd).
 
-// corpusRepositories are the design systems the port is measured on.
-//
-// Both are named rather than one, because the two halves this file composes can only be told apart
-// by a system whose theme differs, and a single repository would let a per-repository token pass as
-// a framework fact.
-var corpusRepositories = []struct {
-	name     string
-	spelling string
-}{
-	{name: "ahra", spelling: "ahra:app/_theme/styles/theme.css"},
-	{name: "connected", spelling: "connected:app/_theme/styles/theme.css"},
-}
-
-// liveEntryPointFor resolves a corpus repository's stylesheet and the tailwindcss installed beside it: a
-// skip naming the variable when the corpus is unset, and a failure when it is set but lacks either.
-func liveEntryPointFor(test testing.TB, spelling string) (entryPoint, packageRoot string) {
-	test.Helper()
-	entryPoint = corpus.Resolve(test, spelling)
-	packageRoot = findTailwindPackageRootForTest(filepath.Dir(entryPoint))
-	if packageRoot == "" {
-		test.Fatalf("%s holds no installed tailwindcss reachable from %s", spelling, entryPoint)
-	}
-	return entryPoint, packageRoot
-}
-
-// liveTableForOracle is liveTableFor for the design system an oracle records: a corpus repository with
-// the tailwindcss installed beside it, as before, or a repository path such as the public theme's over
-// the vendored tailwindcss.
+// liveTableForOracle is the design system an oracle records, by the entry point its fixture names, with
+// the table NewTable builds from it.
 func liveTableForOracle(test *testing.T, entryPoint string) (*LoadedDesignSystem, *Table) {
 	test.Helper()
-	_, _, spelled, spelledError := corpus.Spelled(entryPoint)
-	if spelledError != nil {
-		test.Fatalf("reading the corpus %s names: %v", entryPoint, spelledError)
-	}
-	if spelled {
-		return liveTableFor(test, entryPoint)
-	}
 	system := oracleSystem(test, entryPoint)
 	table := NewTable(system)
 	if table == nil {
 		test.Fatalf("NewTable returned nil for %s", entryPoint)
 	}
 	return system, table
-}
-
-// liveTableFor loads a repository's design system and builds its table, or skips.
-func liveTableFor(test *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
-	test.Helper()
-	entryPoint, packageRoot := liveEntryPointFor(test, spelling)
-	system, loadDesignSystemError := LoadDesignSystem(
-		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
-	)
-	if loadDesignSystemError != nil {
-		test.Fatalf("loading the design system at %s: %v", entryPoint, loadDesignSystemError)
-	}
-	table := NewTable(system)
-	if table == nil {
-		test.Fatalf("NewTable returned nil for %s", entryPoint)
-	}
-	return system, table
-}
-
-// findTailwindPackageRootForTest walks up looking for an installed tailwindcss.
-//
-// A copy of the rules package's walk rather than an import, because internal/tailwind must not
-// depend on internal/rules/tailwind; the dependency runs the other way.
-func findTailwindPackageRootForTest(start string) string {
-	directory := start
-	for {
-		candidate := filepath.Join(directory, "node_modules", "tailwindcss")
-		if info, statError := os.Stat(filepath.Join(candidate, "index.css")); statError == nil && !info.IsDir() {
-			return candidate
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			return ""
-		}
-		directory = parent
-	}
 }
 
 // TestLiveTableAgreesWithTailwindOverTheFixtureCorpus is the contract.
@@ -120,7 +42,7 @@ func findTailwindPackageRootForTest(start string) string {
 // this constructor is that its checked-in half was measured to be a fact about the framework.
 // Tailwind is the only thing that can refuse it.
 //
-// Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
+// Run on the public theme's oracle (#f598zk0), against the design system it records.
 func TestLiveTableAgreesWithTailwindOverTheFixtureCorpus(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "descriptor_fixtures.json", func(test *testing.T, fixtureName string) {
@@ -199,26 +121,9 @@ func expectLiveTableAgreesWithTailwind(test *testing.T, fixtures *descriptorFixt
 	}
 }
 
-// TestLiveTableCarriesTheRepositoryTheme asserts the per-repository half is actually present.
-//
-// This is the test the whole task turns on. A table that silently described bare Tailwind while
-// claiming to describe this repository would answer most classes correctly and be wrong on exactly
-// the tokens the repository added, which is the failure the port exists to remove and the one no
-// aggregate agreement number would surface.
-func TestLiveTableCarriesTheRepositoryTheme(test *testing.T) {
-	test.Parallel()
-	for _, repository := range corpusRepositories {
-		test.Run(repository.name, func(test *testing.T) {
-			test.Parallel()
-			system, table := liveTableFor(test, repository.spelling)
-			checkTableCarriesTheTheme(test, repository.name, system, table)
-		})
-	}
-}
-
-// checkTableCarriesTheTheme is the composition TestLiveTableCarriesTheRepositoryTheme asserts, shared with
-// its public twin: namespaces longest-first and drawn from the theme, and every `@utility` block composed
-// into the table, functional ones marked PerDeclaration.
+// checkTableCarriesTheTheme is the composition a table built from a repository's theme must carry, so a table that
+// silently described bare Tailwind fails on exactly the tokens the repository added: namespaces longest-first and
+// drawn from the theme, and every `@utility` block composed into the table, functional ones marked PerDeclaration.
 func checkTableCarriesTheTheme(test *testing.T, name string, system *LoadedDesignSystem, table *Table) {
 	test.Helper()
 
@@ -332,8 +237,8 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(test *testing.T) {
 //
 // Without this, "the evaluator picks it up" is a claim in a comment. A comment cannot fail.
 //
-// Run on the public theme's oracle and on ahra's (#f598zk0): each copy's fixtures, its measured table and
-// its live table come from one design system.
+// Run on the public theme's oracle (#f598zk0): its fixtures, its measured table and its live table come from
+// one design system.
 func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "descriptor_fixtures.json", func(test *testing.T, fixtureName string) {
@@ -431,13 +336,28 @@ func TestLiveTableIsNilWithoutADesignSystem(test *testing.T) {
 	}
 }
 
+// benchmarkPublicTheme is the public theme's stylesheet and the vendored tailwindcss it loads over, for a
+// benchmark, which has no test to hand vendored.TailwindPackageRootForTest.
+func benchmarkPublicTheme(benchmark *testing.B) (entryPoint, packageRoot string) {
+	benchmark.Helper()
+	entryPoint, absolutePathError := filepath.Abs(filepath.Join("testdata", "public_theme", "theme.css"))
+	if absolutePathError != nil {
+		benchmark.Fatalf("resolving the public theme: %v", absolutePathError)
+	}
+	packageRoot, rootError := vendored.TailwindPackageRoot()
+	if rootError != nil {
+		benchmark.Fatalf("locating the tailwindcss snapshot: %v", rootError)
+	}
+	return entryPoint, packageRoot
+}
+
 // BenchmarkNewTable is what the table costs on top of the design system it is built from.
 //
 // The relevant comparison is `518fec5`'s 78.758µs for the design system build itself. This runs on
 // the same counted path, once per program, so the question a reader has is whether adding it changed
 // the order of magnitude of a per-run cost, not whether it is fast in isolation.
 func BenchmarkNewTable(benchmark *testing.B) {
-	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
+	entryPoint, packageRoot := benchmarkPublicTheme(benchmark)
 	system, loadDesignSystemError := LoadDesignSystem(
 		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
 	)
@@ -458,7 +378,7 @@ func BenchmarkNewTable(benchmark *testing.B) {
 //
 // Load plus table, which is what `loadDesignSystemForProgram` does once per program.
 func BenchmarkLoadDesignSystemWithTable(benchmark *testing.B) {
-	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
+	entryPoint, packageRoot := benchmarkPublicTheme(benchmark)
 
 	benchmark.ReportAllocs()
 	benchmark.ResetTimer()
