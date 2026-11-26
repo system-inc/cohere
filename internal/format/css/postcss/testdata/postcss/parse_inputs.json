@@ -1,0 +1,595 @@
+{
+    "about": "The inputs of TestParseAgreesWithPostcss (oracle_test.go) and TestParseNeverPanics (parse_test.go). postcss 8.5.16's answers for them are recorded in parse_answers.json.gz by record-postcss.mjs, attached to #yah3d69; a changed or added input is recorded again there. malformed says postcss refuses the whole text.",
+    "inputs": [
+        {
+            "name": "one rule",
+            "text": "a{b:c}"
+        },
+        {
+            "name": "nested rules",
+            "text": ".a {\n  color: red;\n  .b { color: blue }\n  &:hover { x: y; }\n  > li { a: b }\n}\n"
+        },
+        {
+            "name": "deep nesting with at-rules",
+            "text": ".a { @media (x) { .b { @supports (y) { c: d } } } }"
+        },
+        {
+            "name": "empty rules",
+            "text": "a{} b { } c {\n}\n{}\n{ a: b }"
+        },
+        {
+            "name": "selector lists",
+            "text": "a,\nb , c>d~e+f, [x=\"y\"], :is(a, b)::before {}"
+        },
+        {
+            "name": "selector with brackets and parens",
+            "text": "a[title=\"x}y\"], a:not([x]) , a:nth-child(2n+1){b:c}"
+        },
+        {
+            "name": "hacks",
+            "text": "a{_b:c;*d:e}"
+        },
+        {
+            "name": "progid",
+            "text": "a{filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#1', endColorstr='#2')}"
+        },
+        {
+            "name": "import",
+            "text": "@import url(foo.css);\n@import 'a.css' screen;\n@import \"b.css\" layer(x) supports(display: grid);"
+        },
+        {
+            "name": "charset",
+            "text": "@charset \"utf-8\";"
+        },
+        {
+            "name": "media",
+            "text": "@media (min-width: 100px) and (max-width:200px) { a { b: c } }\n@media screen{}\n@media print,screen{a{b:c}}"
+        },
+        {
+            "name": "font-face",
+            "text": "@font-face{font-family:x;src:url(a.woff2) format('woff2'),url(\"b.woff\") format(\"woff\");font-display:swap}"
+        },
+        {
+            "name": "layer statements and blocks",
+            "text": "@layer base, components, utilities;\n@layer base { html { a: b } }\n@layer { }"
+        },
+        {
+            "name": "tailwind at-rules",
+            "text": "@import \"tailwindcss\";\n@theme inline {\n  --color-x: red;\n  --font-*: initial;\n}\n@custom-variant dark (&:where(.dark, .dark *));\n@utility tab-4 { tab-size: 4; }\n.a { @apply flex items-center; }\n@source \"../node_modules\";"
+        },
+        {
+            "name": "keyframes",
+            "text": "@keyframes spin { from { transform: rotate(0deg) } 50.5% { opacity: .5 } to { transform: rotate(360deg) } }"
+        },
+        {
+            "name": "supports",
+            "text": "@supports (display:grid) and (not (display:inline-grid)){a{b:c}}"
+        },
+        {
+            "name": "at-rule closed by brace",
+            "text": "a { @apply x y }\nb { @apply z   }\nc { @foo /* c */ }"
+        },
+        {
+            "name": "at-rule at end of file",
+            "text": "@foo bar"
+        },
+        {
+            "name": "bare at-rule at end of file",
+            "text": "@foo"
+        },
+        {
+            "name": "at-rule with trailing spaces at end of file",
+            "text": "@foo bar   \n"
+        },
+        {
+            "name": "at-rule name then spaces at end of file",
+            "text": "@foo   "
+        },
+        {
+            "name": "at-rule with comment params",
+            "text": "@foo /* c */;\n@foo bar /* c */ ;\n@foo/* c */bar;"
+        },
+        {
+            "name": "at-rule params with brackets",
+            "text": "@foo [a;b] (c{d}) ;\n@bar (a;{) {}"
+        },
+        {
+            "name": "at-rule params with braces in brackets",
+            "text": "@foo ({ x }) { a: b }"
+        },
+        {
+            "name": "at-rule then a free semicolon",
+            "text": "@foo;;"
+        },
+        {
+            "name": "at-rule directly followed",
+            "text": "@media(x){}@media{}"
+        },
+        {
+            "name": "at-word ended by each delimiter",
+            "text": "@a\"b\";@c'd';@e#f;@g/h;@i\\j;@k[l];"
+        },
+        {
+            "name": "important",
+            "text": "a{b:c!important}"
+        },
+        {
+            "name": "important with spaces",
+            "text": "a{b:c ! important}"
+        },
+        {
+            "name": "important uppercase",
+            "text": "a{b:c !IMPORTANT}"
+        },
+        {
+            "name": "important then semicolon",
+            "text": "a{b:c! important ;}"
+        },
+        {
+            "name": "important then comment",
+            "text": "a{b:c !important /* x */}"
+        },
+        {
+            "name": "comment then important",
+            "text": "a{b:c /* x */ !important}"
+        },
+        {
+            "name": "important then spaces",
+            "text": "a{b:c!important  }"
+        },
+        {
+            "name": "important alone",
+            "text": "a{b: !important}"
+        },
+        {
+            "name": "important without bang",
+            "text": "a{b:c important}"
+        },
+        {
+            "name": "important split by a comment",
+            "text": "a{b:c ! /* x */ important}"
+        },
+        {
+            "name": "important twice",
+            "text": "a{b:c !important !important}"
+        },
+        {
+            "name": "important with tabs and newlines",
+            "text": "a{b:c\t!\n\timportant\n}"
+        },
+        {
+            "name": "important on a custom property",
+            "text": "a{--x: y !important}"
+        },
+        {
+            "name": "between with spaces and comments",
+            "text": "a{b /* x */ : /* y */ c}"
+        },
+        {
+            "name": "value spacing",
+            "text": "a{  b  :  c  d  ;  e:f  }"
+        },
+        {
+            "name": "colon in value after another word",
+            "text": "a{b:c url(x:y)}"
+        },
+        {
+            "name": "comments everywhere",
+            "text": "/* a */ a /* b */ , c /* c */ { /* d */ b /* e */ : /* f */ c /* g */ ; /* h */ } /* i */"
+        },
+        {
+            "name": "comment inside a value",
+            "text": "a{b:c/* x */d; e:f, /* y */ g; h:i /* z */; j:/* k */l}"
+        },
+        {
+            "name": "comment with one safe neighbor",
+            "text": "a /* x */b, c/* y */ d{e:f /* z */g; h:i/* w */ j}"
+        },
+        {
+            "name": "comments in selectors",
+            "text": "a/* x */,b{} a /* x */{} a,/* x */b{} a/* x */b{}"
+        },
+        {
+            "name": "empty and blank comments",
+            "text": "/**/ /*   */ /*\n\n*/"
+        },
+        {
+            "name": "comment padding",
+            "text": "/*  text  */ /*\ttext\n*/ /* \u00a0text\u3000 */ /*\ufeffx*/"
+        },
+        {
+            "name": "comment only",
+            "text": "/* only */"
+        },
+        {
+            "name": "comment in at-rule params",
+            "text": "@media /* a */ screen /* b */ and (x) /* c */ {}"
+        },
+        {
+            "name": "comment star slash adjacent",
+            "text": "a{b:c/**/}/**//**/"
+        },
+        {
+            "name": "strings with escapes",
+            "text": "a{content:\"a\\\"b\";b:'c\\'d';c:\"\\\\\";d:\"\\\\\\\"\";}"
+        },
+        {
+            "name": "string with escaped newline",
+            "text": "a{b:\"multi\\\nline\"}"
+        },
+        {
+            "name": "strings with braces",
+            "text": "a{content:\"}\"; b: '{'; c: \";\"}"
+        },
+        {
+            "name": "url unquoted",
+            "text": "a{b:url(foo.png)}"
+        },
+        {
+            "name": "url with spaces",
+            "text": "a{b:url( foo.png )}"
+        },
+        {
+            "name": "url single quoted",
+            "text": "a{b:url('a b.png')}"
+        },
+        {
+            "name": "url double quoted",
+            "text": "a{b:url(\"x\")}"
+        },
+        {
+            "name": "url data",
+            "text": "a{b:url(data:image/svg+xml;charset=utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%3E)}"
+        },
+        {
+            "name": "url with escaped paren",
+            "text": "a{b:url(a\\)b)}"
+        },
+        {
+            "name": "url empty",
+            "text": "a{b:url()}"
+        },
+        {
+            "name": "url with newline",
+            "text": "a { b: url(foo\n) }"
+        },
+        {
+            "name": "url uppercase",
+            "text": "a{b:URL(x;y)}"
+        },
+        {
+            "name": "url after a word elsewhere",
+            "text": "a{b:url x (y)}"
+        },
+        {
+            "name": "bad paren content",
+            "text": "a{b:x(a\n);c:y(\"q\");d:z(a/b);e:w(a\\b)}"
+        },
+        {
+            "name": "line terminator before a bad character",
+            "text": "a{b:x(\u2028\n)}"
+        },
+        {
+            "malformed": true,
+            "name": "line terminator then url",
+            "text": "a{b:x(\u2028\n\nurl) (y}"
+        },
+        {
+            "name": "nested parens",
+            "text": "a{b:calc(1px + (2px * var(--x, 3px)))}"
+        },
+        {
+            "name": "square brackets",
+            "text": "a{grid-template-areas: [a] \"b\"; grid-template-columns: [full-start] 1fr [full-end]}"
+        },
+        {
+            "name": "custom property json-like",
+            "text": "a{--x:{a:b}}"
+        },
+        {
+            "name": "custom property json",
+            "text": "a{--x: {\"a\": [1, 2], \"b\": {\"c\": null}}; --y: [1,{\"a\":2}]}"
+        },
+        {
+            "name": "custom property empty",
+            "text": "a{--empty:;}"
+        },
+        {
+            "name": "custom property space",
+            "text": "a{--empty: ;}"
+        },
+        {
+            "name": "custom property trailing spaces",
+            "text": "a{--x:   }"
+        },
+        {
+            "name": "custom property value trailing spaces",
+            "text": "a{--x: 1px  }"
+        },
+        {
+            "name": "custom property comment",
+            "text": "a{--x:a/* c */b; --y: /* only */; --z:a /* c */}"
+        },
+        {
+            "name": "custom property empty block",
+            "text": ":root{--a:{}}"
+        },
+        {
+            "name": "custom property block with semicolons",
+            "text": ":root{--a:{b:c;d:e};--f:g}"
+        },
+        {
+            "name": "custom property at end of file",
+            "text": "--x: y  "
+        },
+        {
+            "name": "semicolon missing at block end",
+            "text": "a{b:c;d:e}"
+        },
+        {
+            "name": "doubled semicolons",
+            "text": "a{b:c;;d:e;;}"
+        },
+        {
+            "name": "leading semicolon",
+            "text": "a{;b:c}"
+        },
+        {
+            "name": "free semicolon after rule",
+            "text": "a{};b{}  ;  c{} ; ; d{}"
+        },
+        {
+            "name": "free semicolon past the end",
+            "text": "a{}  ;"
+        },
+        {
+            "name": "free semicolon before non-ASCII",
+            "text": "a{}   ;é{}"
+        },
+        {
+            "name": "semicolon after at-rule block",
+            "text": "@media x{};"
+        },
+        {
+            "name": "declaration at end of file",
+            "text": "a: b"
+        },
+        {
+            "name": "declaration at end of file with trailing space",
+            "text": "a: b  \n"
+        },
+        {
+            "name": "byte order mark",
+            "text": "\ufeffa{b:c}"
+        },
+        {
+            "name": "reversed byte order mark",
+            "text": "\ufffea{}"
+        },
+        {
+            "name": "byte order mark later",
+            "text": "a{}\ufeffb{}"
+        },
+        {
+            "name": "CRLF",
+            "text": "a {\r\n  b: c;\r\n}\r\n@media x {\r\n  d { e: f }\r\n}\r\n"
+        },
+        {
+            "name": "CR only",
+            "text": "a{\rb:c\r}\r"
+        },
+        {
+            "name": "form feed",
+            "text": "a{\fb:c\f}"
+        },
+        {
+            "name": "non-ASCII",
+            "text": ".é { content: \"日本語 😀\"; --x: 😀; } /* ✓ */ 😀 { a: b }"
+        },
+        {
+            "name": "non-ASCII positions across lines",
+            "text": "a{b:c}\n😀{x:y}\n@media 😀{}\n😀😀 { z: 😀 }"
+        },
+        {
+            "name": "escapes",
+            "text": "a\\:b{c:d} .\\31 0{} a{b:\\\\} .a\\\\b{} .x\\{{}"
+        },
+        {
+            "name": "escaped astral character",
+            "text": ".a\\😀{b:c}"
+        },
+        {
+            "name": "hex escape then space",
+            "text": ".\\E9 x{}"
+        },
+        {
+            "name": "colon first in a block",
+            "text": "a{:b}"
+        },
+        {
+            "name": "string first in a block",
+            "text": "a{\"x\":b}"
+        },
+        {
+            "name": "brackets first",
+            "text": "a{(x):b}"
+        },
+        {
+            "name": "progid before a colon",
+            "text": "a{b:progid:c}"
+        },
+        {
+            "name": "semicolon inside brackets at top",
+            "text": "a(b;c){}"
+        },
+        {
+            "name": "custom property with brace before colon",
+            "text": "--x{a:b}"
+        },
+        {
+            "name": "important inside a custom property block",
+            "text": "a{--x:{b:c !important}}"
+        },
+        {
+            "name": "important lookalikes",
+            "text": "a{b:important;c:!important;d:x!imp;e:x !important!important}"
+        },
+        {
+            "name": "between with a symbol word",
+            "text": "a{b + :c}"
+        },
+        {
+            "name": "empty",
+            "text": ""
+        },
+        {
+            "name": "whitespace only",
+            "text": "  \n\t "
+        },
+        {
+            "malformed": true,
+            "name": "unclosed block",
+            "text": "a{"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed block after a declaration",
+            "text": "a{b:c"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed nested block",
+            "text": "a{b{c:d}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed block on a later line",
+            "text": "😀 {\r\n x { y: z }"
+        },
+        {
+            "malformed": true,
+            "name": "unexpected close",
+            "text": "}"
+        },
+        {
+            "malformed": true,
+            "name": "unexpected close later",
+            "text": "a{b:c}\n}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed string",
+            "text": "a{b:\"c}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed single quoted string",
+            "text": "a{b:'c\\'}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed comment",
+            "text": "/* x"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed url",
+            "text": "a{b:url(x}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed paren",
+            "text": "a{b:c(d}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed paren with semicolon",
+            "text": "a{b:(c;}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed square bracket",
+            "text": "a{b:[c}"
+        },
+        {
+            "malformed": true,
+            "name": "unknown word at top",
+            "text": "a b"
+        },
+        {
+            "malformed": true,
+            "name": "unknown word in block",
+            "text": "a{b c}"
+        },
+        {
+            "malformed": true,
+            "name": "unknown word before colon",
+            "text": "a{b c:d}"
+        },
+        {
+            "malformed": true,
+            "name": "unknown word non-ASCII",
+            "text": "a{😀😀 x}"
+        },
+        {
+            "malformed": true,
+            "name": "double colon",
+            "text": "a{b::c}"
+        },
+        {
+            "malformed": true,
+            "name": "missed semicolon",
+            "text": "a{b:c d:e}"
+        },
+        {
+            "malformed": true,
+            "name": "missed semicolon after non-ASCII",
+            "text": "a{b:😀 c:d}"
+        },
+        {
+            "malformed": true,
+            "name": "missed semicolon after a string",
+            "text": "a{b:\"x\" c:d}"
+        },
+        {
+            "malformed": true,
+            "name": "at-rule without name",
+            "text": "@{}"
+        },
+        {
+            "malformed": true,
+            "name": "at-rule without name before space",
+            "text": "a{} @ b{}"
+        },
+        {
+            "malformed": true,
+            "name": "semicolon with no colon",
+            "text": "a{b;}"
+        },
+        {
+            "malformed": true,
+            "name": "backslash at end",
+            "text": "a{b:c}\\"
+        },
+        {
+            "malformed": true,
+            "name": "word then brace at top",
+            "text": "a b}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed at-rule block",
+            "text": "@media x{a{b:c}"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed bracket in a custom property block",
+            "text": "a{--x:{a:b}"
+        },
+        {
+            "malformed": true,
+            "name": "important word with a word character between",
+            "text": "a{b x:c}"
+        }
+    ]
+}
