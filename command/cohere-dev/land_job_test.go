@@ -527,9 +527,9 @@ func TestTheLandJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
 	directory := test.TempDir()
-	environment := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+	environment := append(append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@example.com")
+		"GIT_COMMITTER_EMAIL=test@example.com"), gitWithoutMaintenance...)
 	git := func(where string, arguments ...string) string {
 		test.Helper()
 		command := exec.Command("git", arguments...)
@@ -623,9 +623,9 @@ func TestTheLandJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 func TestTheLandJobsCorpusSourcesRefuseOrNameTheForksGap(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
-	environment := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+	environment := append(append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@example.com")
+		"GIT_COMMITTER_EMAIL=test@example.com"), gitWithoutMaintenance...)
 	git := func(where string, arguments ...string) string {
 		test.Helper()
 		command := exec.Command("git", arguments...)
@@ -721,9 +721,9 @@ func TestTheLandJobsCarryTakesADirectoryAndRefusesABareSubmodule(test *testing.T
 		"conversation") {
 		test.Errorf("the carry holds:\n%s\nwant %s/package.json and nothing of data", listing, laid.place())
 	}
-	environment := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+	environment := append(append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
-		"GIT_COMMITTER_EMAIL=test@example.com")
+		"GIT_COMMITTER_EMAIL=test@example.com"), gitWithoutMaintenance...)
 	git := func(where string, arguments ...string) string {
 		test.Helper()
 		command := exec.Command("git", arguments...)
