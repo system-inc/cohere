@@ -9,25 +9,26 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_language/check/parity"
+	"github.com/system-inc/cohere/internal/go_language/check/parity/staticcheck_fixtures"
 )
 
 // upstreamPackage is the import path upstreamTree gives the fixture, its folder's name in staticcheck's testdata.
 const upstreamPackage = "Directives"
 
 // upstreamTree is a tree laid out by import path, made for the test, holding staticcheck's fixture for SA9009 byte for
-// byte as the module cache keeps it, which the harness loads as it loads testdata. The go1.0 folder sets the language
+// byte as the release keeps it, which the harness loads as it loads testdata. The go1.0 folder sets the language
 // version of staticcheck's run, which SA9009 never reads.
 //
 // The check judges whether a comment starts in its line's first column, and the fixture's cases are comments indented
 // before it, which gofmt would move there, so a gofmt-clean copy would test nothing; the repository's gofmt guard walks
-// testdata, so an unchanged copy cannot live there, and this copies it into a tree of the test's own instead.
+// testdata, so staticcheck_fixtures keeps it under another name, and this copies it into a tree of the test's own.
 func upstreamTree(test *testing.T) string {
 	test.Helper()
-	upstreamFixture := filepath.Join(parity.StaticcheckDirectory(test), "staticcheck", "sa9009", "testdata", "go1.0",
-		"Directives", "pkg.go")
+	upstreamFixture := filepath.Join(staticcheck_fixtures.Directory(test, "staticcheck", "sa9009", "testdata", "go1.0",
+		"Directives"), "pkg.go")
 	contents, readError := os.ReadFile(upstreamFixture)
 	if readError != nil {
-		test.Fatalf("reading staticcheck's fixture for SA9009, which the module must keep: %v", readError)
+		test.Fatalf("reading staticcheck's fixture for SA9009, which staticcheck_fixtures keeps: %v", readError)
 	}
 	tree := test.TempDir()
 	directory := filepath.Join(tree, "src", upstreamPackage)
