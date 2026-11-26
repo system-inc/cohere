@@ -1,27 +1,22 @@
 package abbreviation
 
 import (
-	"io/fs"
 	"maps"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
-	"unicode"
 
-	"github.com/system-inc/cohere/internal/testing/corpus"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Find tests each form as literal text before it runs a pattern, and drops the prefix pattern for a comparison
 // (#300qvxj). That is a claim that the literal tests only ever say no where the patterns would, so this holds the
-// Find that ships to the Find it replaced, kept below as it was, over every name real code has written.
+// Find that ships to the Find it replaced, kept below as it was, over every name the vocabulary generates.
 //
-// The corpus is every word in this repository's own Go and TypeScript, the 82,367 identifiers from the ahra tree
-// the nexus gate's test reads, and every abbreviation in every form a name can hold it in. A finding must agree
-// field for field: the form, the entry, the message id and every value.
+// The corpus is SyntheticNames, every abbreviation in every form a name can hold it in, and SyntheticCleanNames, the
+// expansions joined to each other and to plain words, both generated from the vocabulary's own tables. A finding must
+// agree field for field: the form, the entry, the message id and every value.
 func TestFindAgreesWithTheRegularExpressionFind(test *testing.T) {
 	test.Parallel()
 	reference := newRegexpOnlyFind(test, Policy)
@@ -47,110 +42,21 @@ func TestFindAgreesWithTheRegularExpressionFind(test *testing.T) {
 	test.Logf("%d names compared", len(names))
 }
 
-// equivalenceCorpus is the names the two Finds are compared over, each once.
+// equivalenceCorpus is the names the two Finds are compared over, each once: the vocabulary's synthetic names and its
+// clean ones, both generated from its own tables, so the comparison reads nothing but what is committed and spends
+// nothing on walking a tree.
 func equivalenceCorpus(test *testing.T, vocabulary *Vocabulary) []string {
 	test.Helper()
-	root, rootError := corpus.RepositoryRoot()
-	if rootError != nil {
-		test.Fatal(rootError)
-	}
 	names := map[string]bool{}
-	// Words rather than parsed identifiers: a word in a comment or a string is a name someone could write, and a
-	// larger corpus only makes the agreement stronger.
-	isWordRune := func(character rune) bool {
-		return unicode.IsLetter(character) || unicode.IsDigit(character) || character == '_' || character == '$'
-	}
-	sourceFiles := 0
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
-		}
-		if entry.IsDir() {
-			// Microsoft's TypeScript checkout is someone else's code, and git's own directory is no code at all.
-			if entry.Name() == ".git" || entry.Name() == "node_modules" || path == filepath.Join(root, "TypeScript") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, ".ts") && !strings.HasSuffix(path, ".tsx") {
-			return nil
-		}
-		contents, readError := os.ReadFile(path)
-		if readError != nil {
-			return readError
-		}
-		sourceFiles++
-		for _, word := range strings.FieldsFunc(string(contents), func(character rune) bool {
-			return !isWordRune(character)
-		}) {
-			names[word] = true
-		}
-		return nil
-	})
-	if walkError != nil {
-		test.Fatal(walkError)
-	}
-
-	identifiers, readError := os.ReadFile(filepath.Join(root, "internal", "lint", "rules", "nexus", "testdata",
-		"identifiers.txt"))
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	for _, identifier := range strings.Split(strings.TrimSpace(string(identifiers)), "\n") {
-		names[identifier] = true
-	}
-
-	abbreviations := slices.Collect(maps.Keys(vocabulary.WholeByName))
-	for _, entries := range [][]*Entry{vocabulary.EarlyPrefixes, vocabulary.LatePrefixes, vocabulary.Suffixes,
-		vocabulary.Segments} {
-		for _, entry := range entries {
-			abbreviations = append(abbreviations, entry.Abbreviation)
-		}
-	}
-	for _, abbreviation := range abbreviations {
-		word := Capitalize(abbreviation)
-		for _, name := range []string{
-			abbreviation, word, strings.ToUpper(abbreviation), abbreviation + "s", word + "s", abbreviation + "É",
-			abbreviation + "Name", abbreviation + "name", abbreviation + "_name", abbreviation + "2",
-			word + "Name", word + "name", word + "2", word + "é", "_" + abbreviation, "$" + abbreviation,
-			"user" + word, "user" + word + "Name", "user" + word + "2", "user" + word + "s", "user" + word + "é",
-			"user_" + abbreviation, "user_" + word, "User" + word, "USER" + word, "user2" + word, "é" + word,
-			"Inno" + word, "inno" + word + "Index", "user" + strings.ToUpper(abbreviation),
-		} {
-			names[name] = true
-		}
-		// Two abbreviations together, which is where the phase order decides which one reports.
-		for _, other := range abbreviations {
-			names[abbreviation+Capitalize(other)] = true
-			names[word+Capitalize(other)+"Name"] = true
-		}
-	}
-	// Each keyword term's spellings where they read as the keyword, where they run on into a longer word, and beside a
-	// bare use of the letters or another abbreviation.
-	for _, keywordTerm := range policy.KeywordTerms.KeywordTerms {
-		for _, spelling := range keywordTerm.Spellings {
-			for _, name := range []string{
-				spelling, "is" + spelling, spelling + "s", spelling + "ness", spelling + "2", spelling + "Name",
-				"No" + spelling, "Top" + spelling, "TOP" + spelling, spelling + Capitalize(keywordTerm.Term),
-				Capitalize(keywordTerm.Term) + spelling, spelling + "Src", "user" + spelling + "Cmd",
-			} {
-				names[name] = true
-			}
-		}
-	}
-	for name := range vocabulary.AllowedNames {
+	for _, name := range slices.Concat(SyntheticNames(vocabulary), SyntheticCleanNames(vocabulary)) {
 		names[name] = true
 	}
-	for _, segment := range vocabulary.AllowedSegments {
-		names[segment] = true
-		names[strings.ToLower(segment[:1])+segment[1:]+"Index"] = true
-		names["read"+segment+"Name"] = true
-	}
-
-	// A corpus that failed to load would agree with anything.
-	if sourceFiles < 1000 || len(names) < 100000 {
-		test.Fatalf("read %d source files and %d names, too few to have read the repository", sourceFiles,
-			len(names))
+	// A corpus that came back nearly empty would agree with anything. The floor scales with the vocabulary, since the
+	// names are made from it: measured on 2026-11-25, Policy's 75 abbreviations gave 65,170 names and NameWords' 2 gave
+	// 893, where the floor asks 7,500 and 200. It was 100,000 while the corpus also read the repository's words and a
+	// recording of another tree's identifiers, which no generated corpus of these vocabularies reaches.
+	if minimum := 100 * len(vocabulary.abbreviations()); len(names) < minimum {
+		test.Fatalf("generated %d names, fewer than the %d its vocabulary should give", len(names), minimum)
 	}
 	return slices.Sorted(maps.Keys(names))
 }
