@@ -149,19 +149,19 @@ var proseWrapFixtures = []string{
 }
 
 // unsettledProseWrapFixtures are unsettledFixtures and the inputs whose fork output only a proseWrap other than
-// preserve leaves unsettled, each named with why.
-var unsettledProseWrapFixtures = func() map[string]string {
+// preserve leaves unsettled, held to the fork's recorded second pass as unsettledFixtures are.
+var unsettledProseWrapFixtures = func() map[string]bool {
 	union := maps.Clone(unsettledFixtures)
-	keptTrailingLines := "under proseWrap never, the trailing lines a `>+` scalar keeps print once more, so each " +
-		"pass adds one"
-	union["a: >+\n  x\n\n"] = keptTrailingLines
-	union["a:\n  - |-\n    x\n  - >+\n    y\n\nb: c"] = keptTrailingLines
+	// Under proseWrap never, the trailing lines a `>+` scalar keeps print once more, so each pass adds one.
+	union["a: >+\n  x\n\n"] = true
+	union["a:\n  - |-\n    x\n  - >+\n    y\n\nb: c"] = true
 	return union
 }()
 
 func TestProseWrapMatchesOracle(test *testing.T) {
 	test.Parallel()
 	oracle := newOptionsOracle(test)
+	forkAgain := &optionsOracle{golden: oracle_testing.Open(test, test.Name()+"SecondPass")}
 	inputs := append(append([]string{}, proseWrapFixtures...), formatFixtures...)
 	failures, compared := 0, 0
 	unsettled := map[string]bool{}
@@ -192,6 +192,9 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 					expected,
 					options,
 					proseWrap,
+					func() (string, error) {
+						return forkAgain.format(expected, "fixture.yaml", "yaml", options, proseWrap)
+					},
 				); wrong != "" {
 					failures++
 					test.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, wrong)

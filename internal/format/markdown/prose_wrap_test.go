@@ -116,17 +116,19 @@ var proseWrapFixtures = []string{
 	"*a*\nb", "a\n*b*", "**中文**\nabc", "`a`\n中文", "a[^1]\nb\n\n[^1]: c\nd", "[^1]: a\n  b",
 }
 
-// unsettledProseWrapFixtures are the inputs whose fork output the fork itself would rewrite, so the port, which prints
-// as the fork does, rewrites it on a second pass too: each named with why. One listed here that settles fails, so the
-// list only shrinks.
-var unsettledProseWrapFixtures = map[string]string{
-	"> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c": "under proseWrap always, the blank quoted line after the " +
-		"ignored list prints twice, so each pass adds one",
+// unsettledProseWrapFixtures are the inputs whose fork output the fork itself rewrites, so the port, which prints as
+// the fork does, rewrites it on a second pass too. Their second pass is held to the fork's own, recorded beside the
+// first in <test>SecondPass.json.gz, so a change to it in either direction fails, settling included. One whose
+// recorded second pass settles everywhere fails too, so the list only shrinks.
+var unsettledProseWrapFixtures = map[string]bool{
+	// Under proseWrap always, the blank quoted line after the ignored list prints twice, so each pass adds one.
+	"> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c": true,
 }
 
 func TestProseWrapFixturesMatchOracle(test *testing.T) {
 	test.Parallel()
 	oracle := newProseWrapOracle(test)
+	forkAgain := &proseWrapOracle{golden: oracle_testing.Open(test, test.Name()+"SecondPass")}
 	unsettled := map[string]bool{}
 	for _, proseWrap := range []string{"always", "never", "preserve"} {
 		for variantIndex, options := range formatVariants {
@@ -155,19 +157,25 @@ func TestProseWrapFixturesMatchOracle(test *testing.T) {
 				}
 				// Formatted output formats to itself, or every run rewrites what the last one wrote.
 				again, againError := formatWithProseWrap(expected, options, proseWrap, nil)
-				settled := againError == nil && again == expected
-				if _, listed := unsettledProseWrapFixtures[input]; listed {
-					unsettled[input] = unsettled[input] || !settled
-				} else if !settled {
+				if unsettledProseWrapFixtures[input] {
+					want, wantError := forkAgain.format(expected, options, proseWrap)
+					unsettled[input] = unsettled[input] || wantError != nil || want != expected
+					if (againError != nil) != (wantError != nil) || again != want {
+						test.Errorf("%s, variant %d, %q: formatted again, not as the fork formats it again (%v, the "+
+							"fork %v): %s", proseWrap, variantIndex, input, againError, wantError,
+							differential.FirstDifference(want, again))
+					}
+				} else if againError != nil || again != expected {
 					test.Errorf("%s, variant %d, %q: formatted again (%v): %s", proseWrap, variantIndex, input,
 						againError, differential.FirstDifference(expected, again))
 				}
 			}
 		}
 	}
+	// Only a clean run judges the list: an input whose first pass differed never reached its second.
 	for input := range unsettledProseWrapFixtures {
-		if !unsettled[input] {
-			test.Errorf("%q formats to itself on a second pass now, so take it out of unsettledProseWrapFixtures",
+		if !test.Failed() && !unsettled[input] {
+			test.Errorf("the fork formats %q to itself on a second pass, so take it out of unsettledProseWrapFixtures",
 				input)
 		}
 	}

@@ -214,23 +214,27 @@ func formatOptionSets() map[string]format_options.Options {
 	}
 }
 
-// unsettledCases are the cases whose fork output the fork itself would rewrite, so Format, which prints as the fork
-// does, rewrites it on a second pass too: each named with why. One listed here that settles fails, so the list only
-// shrinks.
-var unsettledCases = map[string]string{
-	"selectors: combinators, pseudo-classes, pseudo-elements, attributes, namespaces, lists": "`|b`, a type in no " +
-		"namespace, prints as `,|b`, and each pass adds a line holding a lone comma before it",
-	"long comma lists and space lists break at the print width": "a grid property keeps the line breaks of its " +
-		"source, so the second pass keeps the breaks the first chose and lays the value out again",
+// unsettledCases are the cases whose fork output the fork itself rewrites, so Format, which prints as the fork does,
+// rewrites it on a second pass too. Their second pass is held to the fork's own, recorded beside the first in
+// <test>SecondPass.json.gz, so a change to it in either direction fails, settling included. One whose recorded
+// second pass settles everywhere fails too, so the list only shrinks.
+var unsettledCases = map[string]bool{
+	// `|b`, a type in no namespace, prints as `,|b`, and each pass adds a line holding a lone comma before it.
+	"selectors: combinators, pseudo-classes, pseudo-elements, attributes, namespaces, lists": true,
+	// A grid property keeps the line breaks of its source, so the second pass keeps the breaks the first chose and
+	// lays the value out again.
+	"long comma lists and space lists break at the print width": true,
 }
 
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
+	secondPass := oracle_testing.Open(test, test.Name()+"SecondPass")
 	unsettled := map[string]bool{}
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Formatter(options)
+		forkAgain := secondPass.Formatter(options)
 		for _, testCase := range formatCases {
 			expected, formatError := oracle.Format("Probe.css", testCase.source)
 			if formatError != nil {
@@ -267,18 +271,23 @@ func TestFormatMatchesTheFork(test *testing.T) {
 			}
 			// Formatted output formats to itself, or every run rewrites what the last one wrote.
 			again, againError := Format(expected, options, nil)
-			settled := againError == nil && again == expected
-			if _, listed := unsettledCases[testCase.name]; listed {
-				unsettled[testCase.name] = unsettled[testCase.name] || !settled
-			} else if !settled {
+			if unsettledCases[testCase.name] {
+				want, wantError := forkAgain.Format("Probe.css", expected)
+				unsettled[testCase.name] = unsettled[testCase.name] || wantError != nil || want != expected
+				if (againError != nil) != (wantError != nil) || again != want {
+					test.Errorf("%s (%s): formatted again, not as the fork formats it again (%v, the fork %v):\n%s",
+						testCase.name, optionsName, againError, wantError, firstDifference(want, again))
+				}
+			} else if againError != nil || again != expected {
 				test.Errorf("%s (%s): formatted again (%v):\n%s", testCase.name, optionsName, againError,
 					firstDifference(expected, again))
 			}
 		}
 	}
+	// Only a clean run judges the list: a case whose first pass differed never reached its second.
 	for name := range unsettledCases {
-		if !unsettled[name] {
-			test.Errorf("%s formats to itself on a second pass now, so take it out of unsettledCases", name)
+		if !test.Failed() && !unsettled[name] {
+			test.Errorf("the fork formats %s to itself on a second pass, so take it out of unsettledCases", name)
 		}
 	}
 }
