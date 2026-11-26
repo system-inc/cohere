@@ -53,21 +53,22 @@ func TestRunOutputReadsRealRuns(test *testing.T) {
 	}
 }
 
-// A run that did less than a developer's is refused, never timed (#7z52pqf). Both logs are real. On cohere's
-// root, a benchmark copy with no git: cohere-go refused to run and cohere-swift read no input, and
-// only the format project between them checked anything, so a reader of the last summary alone saw the
-// Swift error but would have timed a pass had the projects printed in another order. On ahra, a copy without
-// the route types Next's dev server generates: 161 type errors, fixes held, and no rule run. And the cohere
-// root's log again with the reasons taken out of its failed projects (`error` and `phasesNotRun`), so a
-// refusal that forgets to say why is still never timed. And ahra's October tree on today's dependencies under
-// main's cohere, whose 2 type errors kept lint from running though no gap says so.
+// A run that did less than a developer's is refused, never timed (#7z52pqf). On cohere's root, a real log
+// of a benchmark copy with no git: cohere-go refused to run and cohere-swift read no input, and only the
+// format project between them checked anything, so a reader of the last summary alone saw the Swift error
+// but would have timed a pass had the projects printed in another order. And the cohere root's log again
+// with the reasons taken out of its failed projects (`error` and `phasesNotRun`), so a refusal that forgets
+// to say why is still never timed. The other two are written for this test in the shape of real runs on a
+// Next app, over a made-up shop's route tree: a copy without the route types Next's dev server generates,
+// 161 type errors, fixes held, and no rule run; and an older tree on newer dependencies, whose 2 type errors
+// kept lint from running though no gap says so.
 func TestRunOutputRefusesARunThatCheckedLess(test *testing.T) {
 	test.Parallel()
 	for name, wantReason := range map[string]string{
-		"no-git-cohere-root.txt":         `the project "." did less than a developer's run: The Go engine did not run`,
-		"missing-generated-ahra.txt":     `the project "." did less than a developer's run: generated files it asks for are missing`,
-		"failed-unnamed-cohere-root.txt": `the project "." did less than a developer's run: it failed with nothing reported`,
-		"lint-not-reached-ahra.txt":      `the project "." did less than a developer's run: its lint phase was not reached`,
+		"no-git-cohere-root.txt":            `the project "." did less than a developer's run: The Go engine did not run`,
+		"missing-generated-route-types.txt": `the project "." did less than a developer's run: generated files it asks for are missing`,
+		"failed-unnamed-cohere-root.txt":    `the project "." did less than a developer's run: it failed with nothing reported`,
+		"lint-not-reached-type-errors.txt":  `the project "." did less than a developer's run: its lint phase was not reached`,
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
