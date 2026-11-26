@@ -1,5 +1,5 @@
 {
- "source": "the first 500 of compose/fixtures_test.go's generatedInputs at 69a8e49c5: math/rand/v2 PCG seeded (3, 4), 1 to 24 of its pieces each",
+ "about": "the first 500 of compose/fixtures_test.go's generatedInputs at 69a8e49c5: math/rand/v2 PCG seeded (3, 4), 1 to 24 of its pieces each",
  "inputs": [
   {"name":"1","text":"~|2!foo \\u00e9... !!int  !!str true # c!foo \"!!str !!omap ---1.0 >\\x4\r\n\n%"},
   {"name":"2","text":"#!!int \t|- :   # c #? b*a"},

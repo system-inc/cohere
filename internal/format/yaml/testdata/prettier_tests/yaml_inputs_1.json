@@ -1,5 +1,5 @@
 {
- "source": "Prettier's YAML format fixtures, tests/format/yaml/**/*.{yml,yaml} but yaml-test-suite/ and the spec/ examples the yaml-test-suite holds, in the Prettier fork (system-inc/prettier, at 54c8b90ae), MIT, see LICENSE; normalized as Prettier's core normalizes a file; half 1 of 2, in path order",
+ "about": "Prettier's YAML format fixtures, tests/format/yaml/**/*.{yml,yaml} but yaml-test-suite/ and the spec/ examples the yaml-test-suite holds, in the Prettier fork (system-inc/prettier, at 54c8b90ae), MIT, see LICENSE; normalized as Prettier's core normalizes a file; half 1 of 2, in path order",
  "vendored": true,
  "inputs": [
   {"name":"yaml/_errors_/block-scalar-with-spaces-only.yml","text":"empty block scalar: >\n \n  \n   \n # comment\n"},

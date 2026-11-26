@@ -11,7 +11,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
-	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // The composer oracle: the fork's own eemeli/yaml, 2.9.0, parsing each input with
@@ -28,8 +28,10 @@ import (
 // the same depth-first order, and a node's srcToken is written as that number with its type and offset.
 // A number is written as its IEEE 754 bits, so -0, the infinities and every last bit compare exactly.
 //
-// Upstream's strings are recorded (see upstream_testing), so no node runs here: each answers file under
-// testdata/eemeli_yaml holds, per input, the text it was recorded for and the string upstream wrote.
+// Upstream's strings are recorded (see package recorded), so no node runs here: each answers file under
+// testdata/eemeli_yaml holds, per input, the text it was recorded for (or, for a vendored input, the text's
+// digest) and the string upstream wrote. The recorder is record-yaml.mjs, attached to #jddr94a, usage in
+// its header.
 
 // eemeliYamlDirectory holds the inputs and upstream's recorded answers for them.
 var eemeliYamlDirectory = filepath.Join("testdata", "eemeli_yaml")
@@ -37,29 +39,63 @@ var eemeliYamlDirectory = filepath.Join("testdata", "eemeli_yaml")
 // suiteDirectory holds the yaml-test-suite's cases, shared with the other YAML packages.
 var suiteDirectory = filepath.Join("..", "testdata", "yaml_test_suite")
 
-// composeAnswer is one recorded answer: the input's name, its text or, for a vendored input, the text's
-// digest, and the string upstream's serializer wrote for it, or "throw " and the error when composing threw.
+// corpusDirectory holds the corpus, Prettier's own format fixtures, shared with the other YAML packages.
+var corpusDirectory = filepath.Join("..", "testdata", "prettier_tests")
+
+// composeAnswer is one recorded answer: the input it was recorded for, and the string upstream's
+// serializer wrote for it, or "throw " and the error when composing threw.
 type composeAnswer struct {
-	Name   string `json:"name"`
-	Text   string `json:"text"`
-	Sha256 string `json:"sha256"`
+	recorded.RecordedFor
 	Output string `json:"output"`
 }
 
-// recordedOutputs reads an answers file and pairs it with the inputs, returning upstream's string for each
-// input, in the inputs' order, and the file's source and date.
-func recordedOutputs(test *testing.T, answersFile string, inputs []upstream_testing.Input) ([]string, string) {
+// readInputs reads inputs files, with the entries their answers are matched by.
+func readInputs(test *testing.T, paths ...string) ([]recorded.Input, []recorded.Entry) {
+	test.Helper()
+	inputs, entries, readInputsError := recorded.ReadInputs(paths...)
+	if readInputsError != nil {
+		test.Fatal(readInputsError)
+	}
+	return inputs, entries
+}
+
+// recordedOutputs reads an answers file and pairs it with the inputs' entries, returning upstream's string
+// for each input, in the inputs' order, and the file's source and date.
+func recordedOutputs(test *testing.T, answersFile string, entries []recorded.Entry) ([]string, string) {
 	test.Helper()
 	path := filepath.Join(eemeliYamlDirectory, answersFile)
-	answers := upstream_testing.ReadAnswers[composeAnswer](test, path)
-	byName := upstream_testing.Match(test, path, inputs, answers.Answers, func(answer composeAnswer) (string, string) {
-		return answer.Name, upstream_testing.RecordedFor(answer.Text, answer.Sha256)
-	})
-	outputs := make([]string, len(inputs))
-	for index, input := range inputs {
-		outputs[index] = byName[input.Name].Output
+	answers, readJsonError := recorded.ReadJson[recorded.Answers[composeAnswer]](path)
+	if readJsonError != nil {
+		test.Fatal(readJsonError)
+	}
+	answerEntries := make([]recorded.Entry, len(answers.Answers))
+	for index, answer := range answers.Answers {
+		answerEntries[index] = answer.Entry()
+	}
+	indexes, matchError := recorded.Match(entries, answerEntries)
+	if matchError != nil {
+		test.Fatalf("%s: %v: record them again with record-yaml.mjs, attached to #jddr94a", path, matchError)
+	}
+	outputs := make([]string, len(entries))
+	for position, index := range indexes {
+		outputs[position] = answers.Answers[index].Output
 	}
 	return outputs, answers.Source + ", recorded " + answers.Recorded
+}
+
+// parts are the numbered inputs files of directory named prefix (recorded.Parts), each with its answers
+// file, answersPrefix and the same number.
+func parts(test *testing.T, directory string, prefix string, answersPrefix string) ([]string, []string) {
+	test.Helper()
+	paths, partsError := recorded.Parts(directory, prefix)
+	if partsError != nil {
+		test.Fatal(partsError)
+	}
+	answersFiles := make([]string, len(paths))
+	for index := range paths {
+		answersFiles[index] = fmt.Sprintf("%s%d.json.gz", answersPrefix, index+1)
+	}
+	return paths, answersFiles
 }
 
 // composeText parses and composes text as yaml-unist-parser does, returning the tokens too.
@@ -388,11 +424,12 @@ func compareOutputs(
 	test *testing.T,
 	label string,
 	answersFile string,
-	inputs []upstream_testing.Input,
+	inputs []recorded.Input,
+	entries []recorded.Entry,
 	limit int,
 ) (failures int) {
 	test.Helper()
-	expected, source := recordedOutputs(test, answersFile, inputs)
+	expected, source := recordedOutputs(test, answersFile, entries)
 	threw, withErrors, withWarnings := 0, 0, 0
 	for index, input := range inputs {
 		actual := portOutput(input.Text)
@@ -439,8 +476,8 @@ func truncateInput(input string) string {
 // deleted fixtures_test.go, grouped there by the compose or resolve function they mostly drive.
 func TestDocumentsMatchUpstream(test *testing.T) {
 	test.Parallel()
-	inputs := upstream_testing.ReadInputs(test, filepath.Join(eemeliYamlDirectory, "fixture_inputs.json"))
-	failures := compareOutputs(test, "fixture", "fixture_answers.json.gz", inputs, 60)
+	inputs, entries := readInputs(test, filepath.Join(eemeliYamlDirectory, "fixture_inputs.json"))
+	failures := compareOutputs(test, "fixture", "fixture_answers.json.gz", inputs, entries, 60)
 	test.Logf("%d of %d fixtures match upstream", len(inputs)-failures, len(inputs))
 }
 
@@ -449,8 +486,8 @@ func TestDocumentsMatchUpstream(test *testing.T) {
 // one fixed seed's first 500, the slice that keeps the answers under 50 KB.
 func TestGeneratedDocumentsMatchUpstream(test *testing.T) {
 	test.Parallel()
-	inputs := upstream_testing.ReadInputs(test, filepath.Join(eemeliYamlDirectory, "generated_inputs.json"))
-	failures := compareOutputs(test, "generated", "generated_answers.json.gz", inputs, 40)
+	inputs, entries := readInputs(test, filepath.Join(eemeliYamlDirectory, "generated_inputs.json"))
+	failures := compareOutputs(test, "generated", "generated_answers.json.gz", inputs, entries, 40)
 	test.Logf("%d of %d generated inputs match upstream", len(inputs)-failures, len(inputs))
 }
 
@@ -458,8 +495,8 @@ func TestGeneratedDocumentsMatchUpstream(test *testing.T) {
 // against upstream's for another must differ.
 func TestOracleCanFail(test *testing.T) {
 	test.Parallel()
-	inputs := upstream_testing.ReadInputs(test, filepath.Join(eemeliYamlDirectory, "fixture_inputs.json"))
-	outputs, _ := recordedOutputs(test, "fixture_answers.json.gz", inputs)
+	inputs, entries := readInputs(test, filepath.Join(eemeliYamlDirectory, "fixture_inputs.json"))
+	outputs, _ := recordedOutputs(test, "fixture_answers.json.gz", entries)
 	byText := map[string]string{}
 	for index, input := range inputs {
 		byText[input.Text] = outputs[index]
@@ -469,8 +506,8 @@ func TestOracleCanFail(test *testing.T) {
 		{"a: 1.0", "a: 1", "the values of a: 1 and a: 1.0"},
 		{"[a ]", "[a]", "[a] and [a ]"},
 	} {
-		expected, recorded := byText[each.theirs]
-		if !recorded {
+		expected, answered := byText[each.theirs]
+		if !answered {
 			test.Fatalf("fixture_inputs.json no longer holds %q", each.theirs)
 		}
 		if portOutput(each.mine) == expected {
@@ -483,37 +520,25 @@ func TestOracleCanFail(test *testing.T) {
 func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	compared, failures := 0, 0
-	for part := 1; part <= upstream_testing.SuitePartCount; part++ {
-		inputs := upstream_testing.SuiteInputs(upstream_testing.ReadSuitePart(test, suiteDirectory, part), false)
-		failures += compareOutputs(
-			test,
-			fmt.Sprintf("suite part %d", part),
-			fmt.Sprintf("suite_answers_%d.json.gz", part),
-			inputs,
-			40,
-		)
+	// The cases' yaml alone, as the deleted test compared; the dumps are the unist and format tests'.
+	paths, answersFiles := parts(test, suiteDirectory, "cases_", "suite_answers_")
+	for part, path := range paths {
+		inputs, entries := readInputs(test, path)
+		failures += compareOutputs(test, fmt.Sprintf("suite part %d", part+1), answersFiles[part], inputs, entries, 40)
 		compared += len(inputs)
 	}
 	test.Logf("%d of %d yaml-test-suite cases match upstream", compared-failures, compared)
 }
 
-// corpusDirectory holds the corpus, Prettier's own format fixtures, shared with the other YAML packages.
-var corpusDirectory = filepath.Join("..", "testdata", "prettier_tests")
-
 // TestCorpusMatchesUpstream compares every YAML file of the corpus: Prettier's own YAML format fixtures
-// but its spec examples, which the yaml-test-suite holds, half by half.
+// but the spec examples the yaml-test-suite holds, half by half.
 func TestCorpusMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	compared, failures := 0, 0
-	for half := 1; half <= upstream_testing.CorpusHalfCount; half++ {
-		inputs := upstream_testing.ReadCorpusHalf(test, corpusDirectory, half)
-		failures += compareOutputs(
-			test,
-			fmt.Sprintf("corpus half %d", half),
-			fmt.Sprintf("corpus_answers_%d.json.gz", half),
-			inputs,
-			40,
-		)
+	paths, answersFiles := parts(test, corpusDirectory, "yaml_inputs_", "corpus_answers_")
+	for half, path := range paths {
+		inputs, entries := readInputs(test, path)
+		failures += compareOutputs(test, fmt.Sprintf("corpus half %d", half+1), answersFiles[half], inputs, entries, 40)
 		compared += len(inputs)
 	}
 	test.Logf("%d of %d files match upstream's documents", compared-failures, compared)

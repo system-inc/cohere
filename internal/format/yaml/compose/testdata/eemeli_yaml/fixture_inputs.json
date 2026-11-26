@@ -1,5 +1,5 @@
 {
- "source": "compose/fixtures_test.go's fixtures at 69a8e49c5, then the controls of compose/oracle_test.go's TestOracleCanFail",
+ "about": "compose/fixtures_test.go's fixtures at 69a8e49c5, then the controls of compose/oracle_test.go's TestOracleCanFail",
  "inputs": [
   {"name":"1","text":""},
   {"name":"2","text":"\n"},

@@ -1,5 +1,5 @@
 {
- "source": "Prettier's YAML format fixtures, tests/format/yaml/**/*.{yml,yaml} but yaml-test-suite/ and the spec/ examples the yaml-test-suite holds, in the Prettier fork (system-inc/prettier, at 54c8b90ae), MIT, see LICENSE; normalized as Prettier's core normalizes a file; half 2 of 2, in path order",
+ "about": "Prettier's YAML format fixtures, tests/format/yaml/**/*.{yml,yaml} but yaml-test-suite/ and the spec/ examples the yaml-test-suite holds, in the Prettier fork (system-inc/prettier, at 54c8b90ae), MIT, see LICENSE; normalized as Prettier's core normalizes a file; half 2 of 2, in path order",
  "vendored": true,
  "inputs": [
   {"name":"yaml/flow-sequence/comment-between.yml","text":"[\n? 123\n# comment\n: 456\n]\n"},

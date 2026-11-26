@@ -11,7 +11,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // The parse oracle: yaml-unist-parser 3.2.0's parse(text, { uniqueKeys: false }), from the fork's
@@ -25,8 +25,10 @@ import (
 // the other, and every Parent is the node upstream's _parent is. Where upstream throws, Parse must fail
 // with the same name and message, and for a YAMLSyntaxError the same position.
 //
-// Upstream's trees are recorded (see upstream_testing), so no node runs here: each answers file under
-// testdata/yaml_unist_parser holds, per input, the text it was recorded for and upstream's tree or error.
+// Upstream's trees are recorded (see package recorded), so no node runs here: each answers file under
+// testdata/yaml_unist_parser holds, per input, the text it was recorded for (or, for a vendored input, the
+// text's digest) and upstream's tree or error. The recorder is record-yaml.mjs, attached to #jddr94a, usage
+// in its header.
 
 // yamlUnistParserDirectory holds the inputs and upstream's recorded answers for them.
 var yamlUnistParserDirectory = filepath.Join("testdata", "yaml_unist_parser")
@@ -84,48 +86,75 @@ type oracleResult struct {
 	Error *jsonError      `json:"error"`
 }
 
-// parseAnswer is one recorded answer: the input's name, its text or, for a vendored input, the text's
-// digest, and upstream's tree or its error.
+// parseAnswer is one recorded answer: the input it was recorded for, and upstream's tree or its error.
 type parseAnswer struct {
-	Name   string          `json:"name"`
-	Text   string          `json:"text"`
-	Sha256 string          `json:"sha256"`
-	Root   json.RawMessage `json:"root"`
-	Error  *jsonError      `json:"error"`
+	recorded.RecordedFor
+	Root  json.RawMessage `json:"root"`
+	Error *jsonError      `json:"error"`
 }
 
-// recordedParses reads an answers file and pairs it with the inputs, returning upstream's result for each
-// input, in the inputs' order, and the file's source and date.
-func recordedParses(test *testing.T, answersFile string, inputs []upstream_testing.Input) ([]oracleResult, string) {
+// readInputs reads inputs files, with the entries their answers are matched by.
+func readInputs(test *testing.T, paths ...string) ([]recorded.Input, []recorded.Entry) {
+	test.Helper()
+	inputs, entries, readInputsError := recorded.ReadInputs(paths...)
+	if readInputsError != nil {
+		test.Fatal(readInputsError)
+	}
+	return inputs, entries
+}
+
+// recordedParses reads an answers file and pairs it with the inputs' entries, returning upstream's result
+// for each input, in the inputs' order, and the file's source and date.
+func recordedParses(test *testing.T, answersFile string, entries []recorded.Entry) ([]oracleResult, string) {
 	test.Helper()
 	path := filepath.Join(yamlUnistParserDirectory, answersFile)
-	answers := upstream_testing.ReadAnswers[parseAnswer](test, path)
-	byName := upstream_testing.Match(test, path, inputs, answers.Answers, func(answer parseAnswer) (string, string) {
-		return answer.Name, upstream_testing.RecordedFor(answer.Text, answer.Sha256)
-	})
-	results := make([]oracleResult, len(inputs))
-	for index, input := range inputs {
-		answer := byName[input.Name]
+	answers, readJsonError := recorded.ReadJson[recorded.Answers[parseAnswer]](path)
+	if readJsonError != nil {
+		test.Fatal(readJsonError)
+	}
+	answerEntries := make([]recorded.Entry, len(answers.Answers))
+	for index, answer := range answers.Answers {
+		answerEntries[index] = answer.Entry()
+	}
+	indexes, matchError := recorded.Match(entries, answerEntries)
+	if matchError != nil {
+		test.Fatalf("%s: %v: record them again with record-yaml.mjs, attached to #jddr94a", path, matchError)
+	}
+	results := make([]oracleResult, len(entries))
+	for position, index := range indexes {
+		answer := answers.Answers[index]
 		if (answer.Root == nil) == (answer.Error == nil) {
-			test.Fatalf("%s: %q holds neither a tree nor an error, or both", path, input.Name)
+			test.Fatalf("%s: %q holds neither a tree nor an error, or both", path, answer.Name)
 		}
-		results[index] = oracleResult{Root: answer.Root, Error: answer.Error}
+		results[position] = oracleResult{Root: answer.Root, Error: answer.Error}
 	}
 	return results, answers.Source + ", recorded " + answers.Recorded
 }
 
-// fixtureInputs are the hand-written fixtures of the deleted parse_test.go, then the texts
-// TestOracleCanFail and TestComparisonSeesEveryField compare against.
-func fixtureInputs(test *testing.T) []upstream_testing.Input {
+// parts are the numbered inputs files of directory named prefix (recorded.Parts), each with its answers
+// file, answersPrefix and the same number.
+func parts(test *testing.T, directory string, prefix string, answersPrefix string) ([]string, []string) {
 	test.Helper()
-	return upstream_testing.ReadInputs(test, filepath.Join(yamlUnistParserDirectory, "fixture_inputs.json"))
+	paths, partsError := recorded.Parts(directory, prefix)
+	if partsError != nil {
+		test.Fatal(partsError)
+	}
+	answersFiles := make([]string, len(paths))
+	for index := range paths {
+		answersFiles[index] = fmt.Sprintf("%s%d.json.gz", answersPrefix, index+1)
+	}
+	return paths, answersFiles
 }
+
+// fixtureInputs is fixture_inputs.json: the hand-written fixtures of the deleted parse_test.go, then the
+// texts TestOracleCanFail and TestComparisonSeesEveryField compare against.
+var fixtureInputs = filepath.Join(yamlUnistParserDirectory, "fixture_inputs.json")
 
 // recordedFixtures is upstream's recorded result for each fixture's text.
 func recordedFixtures(test *testing.T) map[string]oracleResult {
 	test.Helper()
-	inputs := fixtureInputs(test)
-	results, _ := recordedParses(test, "fixture_answers.json.gz", inputs)
+	inputs, entries := readInputs(test, fixtureInputs)
+	results, _ := recordedParses(test, "fixture_answers.json.gz", entries)
 	byText := make(map[string]oracleResult, len(inputs))
 	for index, input := range inputs {
 		byText[input.Text] = results[index]
@@ -136,8 +165,8 @@ func recordedFixtures(test *testing.T) map[string]oracleResult {
 // recordedFixture is upstream's recorded result for text, which must be one of the fixtures.
 func recordedFixture(test *testing.T, byText map[string]oracleResult, text string) oracleResult {
 	test.Helper()
-	result, recorded := byText[text]
-	if !recorded {
+	result, answered := byText[text]
+	if !answered {
 		test.Fatalf("fixture_inputs.json no longer holds %q", text)
 	}
 	return result
@@ -378,11 +407,12 @@ func compareAll(
 	test *testing.T,
 	label string,
 	answersFile string,
-	inputs []upstream_testing.Input,
+	inputs []recorded.Input,
+	entries []recorded.Entry,
 	maximumReported int,
 ) (failures int, errored int) {
 	test.Helper()
-	expected, source := recordedParses(test, answersFile, inputs)
+	expected, source := recordedParses(test, answersFile, entries)
 	for index, input := range inputs {
 		if expected[index].Error != nil {
 			errored++

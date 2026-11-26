@@ -9,12 +9,13 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
-	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // The tree loader: trees yaml-unist-parser 3.2.0 built, loaded for the printer, so the printer is measured
-// apart from the Go parser. Each tree is recorded (see upstream_testing): parse(text, { uniqueKeys: false })
+// apart from the Go parser. Each tree is recorded (see package recorded): parse(text, { uniqueKeys: false })
 // with root.comments deleted as parser-yaml.js deletes them, written as JSON. _parent is non-enumerable,
 // so JSON leaves it out and the loader sets Parent the way defineParents does. Offsets come back in
 // UTF-16 units and are converted to bytes against the text, the conversion layer 3 does once.
@@ -59,11 +60,9 @@ type jsonNode struct {
 // loaderAnswer is one recorded tree: the input's name, its text or, for a vendored input, the text's
 // digest, and the tree, or the parser's message when it threw.
 type loaderAnswer struct {
-	Name   string          `json:"name"`
-	Text   string          `json:"text"`
-	Sha256 string          `json:"sha256"`
-	Root   json.RawMessage `json:"root"`
-	Error  *string         `json:"error"`
+	recorded.RecordedFor
+	Root  json.RawMessage `json:"root"`
+	Error *string         `json:"error"`
 }
 
 // parsed is one input's tree, or the parser's error.
@@ -72,27 +71,75 @@ type parsed struct {
 	parseFailure string
 }
 
-// loaderInputs are the inputs loader_answers.json.gz was recorded for: TestLoaderConvertsOffsets's text,
-// then the corpus's front matter values.
-func loaderInputs(test testing.TB) []upstream_testing.Input {
-	test.Helper()
-	inputs := upstream_testing.ReadInputs(test, filepath.Join(yamlUnistParserDirectory, "loader_inputs.json"))
-	frontMatter := upstream_testing.ReadFrontMatter(test, corpusDirectory)
-	return append(inputs, upstream_testing.FrontMatterValues(frontMatter)...)
+// frontMatterFile is one of the corpus's markdown files with YAML front matter: the file, its front matter
+// as mdast reads it, and the value the front matter embed formats, trimmed as the embed trims it.
+type frontMatterFile struct {
+	file        recorded.Input
+	frontMatter *mdast.FrontMatter
+	value       string
 }
 
-// recordedTrees reads an answers file, pairs it with the inputs, and loads every tree, in the inputs'
-// order.
-func recordedTrees(test testing.TB, answersFile string, inputs []upstream_testing.Input) []parsed {
+// readInputs reads inputs files, with the entries their answers are matched by.
+func readInputs(test testing.TB, paths ...string) ([]recorded.Input, []recorded.Entry) {
+	test.Helper()
+	inputs, entries, readInputsError := recorded.ReadInputs(paths...)
+	if readInputsError != nil {
+		test.Fatal(readInputsError)
+	}
+	return inputs, entries
+}
+
+// readFrontMatter reads the corpus's markdown files and their front matter. Every one must hold yaml
+// front matter for mdast, as it did for Prettier's own parser when the corpus was recorded.
+func readFrontMatter(test testing.TB) []frontMatterFile {
+	test.Helper()
+	files, _ := readInputs(test, filepath.Join(corpusDirectory, "front_matter_inputs.json"))
+	frontMatters := make([]frontMatterFile, len(files))
+	for index, file := range files {
+		frontMatter, _ := mdast.ParseFrontMatter(file.Text)
+		if frontMatter == nil || frontMatter.Language != "yaml" {
+			test.Fatalf("%s holds no yaml front matter for mdast", file.Name)
+		}
+		frontMatters[index] = frontMatterFile{file: file, frontMatter: frontMatter, value: trim(frontMatter.Value)}
+	}
+	return frontMatters
+}
+
+// loaderInputs are the inputs loader_answers.json.gz was recorded for, with their entries:
+// TestLoaderConvertsOffsets's text, then the corpus's front matter values, each under its file's name and
+// " (front matter)". The corpus is vendored, so a value's answer records its digest, which also holds
+// mdast to reading the value Prettier's own front matter parser read.
+func loaderInputs(test testing.TB) ([]recorded.Input, []recorded.Entry) {
+	test.Helper()
+	inputs, entries := readInputs(test, filepath.Join(yamlUnistParserDirectory, "loader_inputs.json"))
+	for _, frontMatter := range readFrontMatter(test) {
+		input := recorded.Input{Name: frontMatter.file.Name + " (front matter)", Text: frontMatter.value}
+		inputs = append(inputs, input)
+		entries = append(entries, recorded.Entry{Name: input.Name, Input: recorded.Digest([]byte(input.Text))})
+	}
+	return inputs, entries
+}
+
+// recordedTrees reads an answers file, pairs it with the inputs' entries, and loads every tree, in the
+// inputs' order.
+func recordedTrees(test testing.TB, answersFile string, inputs []recorded.Input, entries []recorded.Entry) []parsed {
 	test.Helper()
 	path := filepath.Join(yamlUnistParserDirectory, answersFile)
-	answers := upstream_testing.ReadAnswers[loaderAnswer](test, path)
-	byName := upstream_testing.Match(test, path, inputs, answers.Answers, func(answer loaderAnswer) (string, string) {
-		return answer.Name, upstream_testing.RecordedFor(answer.Text, answer.Sha256)
-	})
+	answers, readJsonError := recorded.ReadJson[recorded.Answers[loaderAnswer]](path)
+	if readJsonError != nil {
+		test.Fatal(readJsonError)
+	}
+	answerEntries := make([]recorded.Entry, len(answers.Answers))
+	for index, answer := range answers.Answers {
+		answerEntries[index] = answer.Entry()
+	}
+	indexes, matchError := recorded.Match(entries, answerEntries)
+	if matchError != nil {
+		test.Fatalf("%s: %v: record them again with record-yaml.mjs, attached to #jddr94a", path, matchError)
+	}
 	results := make([]parsed, len(inputs))
 	for index, input := range inputs {
-		answer := byName[input.Name]
+		answer := answers.Answers[indexes[index]]
 		switch {
 		case (answer.Root == nil) == (answer.Error == nil):
 			test.Fatalf("%s: %q holds neither a tree nor an error, or both", path, input.Name)
@@ -187,8 +234,8 @@ func loadTree(node *jsonNode, offsets unitOffsets, parent *unist.Node) *unist.No
 // printer slices by goes through it.
 func TestLoaderConvertsOffsets(test *testing.T) {
 	test.Parallel()
-	inputs := loaderInputs(test)
-	trees := recordedTrees(test, "loader_answers.json.gz", inputs)
+	inputs, entries := loaderInputs(test)
+	trees := recordedTrees(test, "loader_answers.json.gz", inputs, entries)
 	text := inputs[0].Text
 	if text != "é: 🍐\n'中': \"x\"\n" {
 		test.Fatalf("loader_inputs.json's first text is %q, not the astral and multi-byte one", text)

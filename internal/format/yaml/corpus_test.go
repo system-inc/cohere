@@ -11,11 +11,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/printing"
-	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
-
-// javaScriptSpaceText is the set String.prototype.trim removes, for markdown's front matter value.
-const javaScriptSpaceText = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
 // formatParsed prints a parsed input the way Prettier's core wraps the printer: the byte order mark comes
 // back on the output.
@@ -130,9 +127,13 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 	}
 
 	// The YAML files.
-	for half := 1; half <= upstream_testing.CorpusHalfCount; half++ {
-		inputs := upstream_testing.ReadCorpusHalf(test, corpusDirectory, half)
-		trees := recordedTrees(test, fmt.Sprintf("corpus_answers_%d.json.gz", half), inputs)
+	halves, partsError := recorded.Parts(corpusDirectory, "yaml_inputs_")
+	if partsError != nil {
+		test.Fatal(partsError)
+	}
+	for half, path := range halves {
+		inputs, entries := readInputs(test, path)
+		trees := recordedTrees(test, fmt.Sprintf("corpus_answers_%d.json.gz", half+1), inputs, entries)
 		for index, input := range inputs {
 			expected, oracleError := formatter.Format(input.Name, input.Text)
 			fullStack, fullStackError := formatFullStack(input.Name, input.Text, options, "preserve", nil)
@@ -162,32 +163,21 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 	}
 
 	// The front matter of the markdown files, each value's tree from the loader's recording.
-	frontMatters := upstream_testing.ReadFrontMatter(test, corpusDirectory)
-	loaderTexts := loaderInputs(test)
+	// Each value's tree is matched by its digest (loaderInputs), so mdast reads the value Prettier's front
+	// matter parser read, or the embed is fed another text and the match fails.
+	loaderTexts, loaderEntries := loaderInputs(test)
 	trees := map[string]parsed{}
-	for index, tree := range recordedTrees(test, "loader_answers.json.gz", loaderTexts) {
+	for index, tree := range recordedTrees(test, "loader_answers.json.gz", loaderTexts, loaderEntries) {
 		trees[loaderTexts[index].Name] = tree
 	}
-	for _, input := range frontMatters {
-		// mdast must read the value Prettier's front matter parser read, or the embed is fed another text.
-		frontMatter, _ := mdast.ParseFrontMatter(input.Text)
-		if frontMatter == nil ||
-			frontMatter.Language != "yaml" ||
-			strings.Trim(frontMatter.Value, javaScriptSpaceText) != input.Value {
-			fail(
-				"front matter, %s: mdast reads %+v, where Prettier read the value %q",
-				input.Name,
-				frontMatter,
-				input.Value,
-			)
-			continue
-		}
-		tree, recorded := trees[input.Name+" (front matter)"]
-		if !recorded {
+	for _, each := range readFrontMatter(test) {
+		input, frontMatter := each.file, each.frontMatter
+		tree, answered := trees[input.Name+" (front matter)"]
+		if !answered {
 			test.Fatalf("loader_answers.json.gz has no tree for %s's front matter", input.Name)
 		}
 		// The Go parser must refuse exactly the values the real one refuses.
-		if _, parseError := parse(input.Value, nil); (parseError != nil) != (tree.parseFailure != "") {
+		if _, parseError := parse(each.value, nil); (parseError != nil) != (tree.parseFailure != "") {
 			fail(
 				"front matter, %s: the Go parser disagrees (real: %q, Go: %v)",
 				input.Name,
@@ -208,9 +198,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		}
 		expected := frontMatterBlock(formatted, frontMatter.EndDelimiter)
 		compared++
-		fullStack, fullStackError := embedFrontMatter(frontMatter, input.Value, tree, true, options)
+		fullStack, fullStackError := embedFrontMatter(frontMatter, each.value, tree, true, options)
 		compare("front matter, full stack", input.Name, expected, fullStack, fullStackError)
-		loaded, loadedError := embedFrontMatter(frontMatter, input.Value, tree, false, options)
+		loaded, loadedError := embedFrontMatter(frontMatter, each.value, tree, false, options)
 		compare("front matter, tree loader", input.Name, expected, loaded, loadedError)
 	}
 	test.Logf(
