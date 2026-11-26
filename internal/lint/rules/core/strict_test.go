@@ -13,7 +13,7 @@ import (
 // strictFile is where the corpus pretends to live.
 //
 // A `.js` file, because upstream's corpus is JavaScript run as a script, and a TypeScript file is
-// strict whatever its shape (`alwaysStrict`), so on a `.ts` path every script row collapses into the
+// strict whatever its shape and its tsconfig, so on a `.ts` path every script row collapses into the
 // `implied` judgment. The rows ran there until #hks3djf, which proved the script arms against a file
 // kind that can never reach them in a real run.
 const strictFile = "/repository/source/Strict.js"
@@ -509,7 +509,7 @@ func TestStrictReadsTypeScriptParameterLists(test *testing.T) {
 // The case that found it is api's Base ProjectSecrets.test.ts, a Jest file with no import or export.
 // TypeScript's module detection makes it a script, and the rule asked for a directive in each of its
 // top-level functions, while ESLint, whose flat config parses every `.ts` file as a module, was silent
-// (#hks3djf). The compiler's `alwaysStrict` makes the file strict, and that is upstream's
+// (#hks3djf). The compiler makes every TypeScript file strict, and that is upstream's
 // `impliedStrict`. Every row was replayed through the installed rule with the TypeScript parser and
 // `impliedStrict` on, the fixed source included.
 func TestStrictReadsATypeScriptFileAsImpliedStrict(test *testing.T) {
@@ -567,13 +567,14 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(test *testing.T) {
 	})
 }
 
-// The verdict follows the tsconfig, read through the program a real run has.
+// The verdict follows the compiler, which no tsconfig changes, read through the program a real run has.
 //
-// The syntax-only harness has no program and reads the default options, so these rows build one.
-// `strict: false` turns `alwaysStrict` off with it, and the script arms come back. An explicit
-// `alwaysStrict` beside it turns them off again, which separates reading the option from reading
-// `strict`.
-func TestStrictFollowsTheCompilersAlwaysStrict(test *testing.T) {
+// tsgo binds every TypeScript file as strict whatever `strict` and `alwaysStrict` say (see
+// CompilerImpliesStrict), so a `strict: false` script is as implied as any other (Kirk's ruling, #8skx4es).
+// That row is the one that discriminates: a rule reading `strict`, or `alwaysStrict` through it, asks
+// the script for a directive there, as this rule did before. The JavaScript control in
+// TestStrictReadsATypeScriptFileAsImpliedStrict keeps a rule that read every file as implied red.
+func TestStrictFollowsTheCompilerWhateverTheTsconfigSays(test *testing.T) {
 	test.Parallel()
 
 	files := map[string]string{"Strict.ts": "function foo(): number { return 1; }\nfoo();"}
@@ -592,12 +593,12 @@ func TestStrictFollowsTheCompilersAlwaysStrict(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, Strict, files, "Strict.ts"))
 	})
-	test.Run("strict off leaves a script sloppy", func(test *testing.T) {
+	test.Run("strict off still implies it", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(test, Strict, files,
-			"Strict.ts", withConfiguration(`"strict": false`)), "function")
+		rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, Strict, files,
+			"Strict.ts", withConfiguration(`"strict": false`)))
 	})
-	test.Run("alwaysStrict on its own implies it", func(test *testing.T) {
+	test.Run("alwaysStrict beside strict off implies it", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, Strict, files,
 			"Strict.ts", withConfiguration(`"strict": false, "alwaysStrict": true`)))
@@ -691,14 +692,14 @@ func TestStrictCollapsesEveryModeInAModule(test *testing.T) {
 // spelling of the options can select the `implied` mode.
 //
 // The mode itself is reachable since #hks3djf, through the file rather than the options: a
-// TypeScript file under `alwaysStrict` is upstream's `impliedStrict`, proven in
+// TypeScript file, whatever its tsconfig, is upstream's `impliedStrict`, proven in
 // TestStrictReadsATypeScriptFileAsImpliedStrict. The seventeen rows stay unimported because they are
 // JavaScript, which the compiler does not make strict.
 func TestStrictHasNoImpliedMode(test *testing.T) {
 	test.Parallel()
 
 	// Upstream has no `implied` option either: `impliedStrict` is a parser feature, and here the
-	// file kind and the tsconfig stand in for it. An option spelling would be a second way to say
+	// file kind stands in for it. An option spelling would be a second way to say
 	// the same thing that could disagree with the first. `module` is refused for the same reason:
 	// the file's own imports select it.
 	for _, mode := range []string{"safe", "global", "function", "never", "implied", "module"} {

@@ -125,9 +125,8 @@ var NoImplicitGlobals = rule.Rule[NoImplicitGlobalsSettings]{
 	// Asks only whether a name resolves to any symbol, never reading a declaration, and no function
 	// body can declare a name another file sees, so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	// `alwaysStrict` decides whether a TypeScript script can leak, so the cached verdict has to
-	// follow the tsconfig.
-	ProgramReads: rule.ReadsCompilerOptions,
+	// No compiler option decides whether a TypeScript script can leak (CompilerImpliesStrict), so the
+	// verdict doesn't follow the tsconfig.
 
 	Run: func(ruleContext rule.Context, options rule.Given[NoImplicitGlobalsSettings]) rule.Listeners {
 		settings, ok := options.Read()
@@ -260,7 +259,7 @@ func reportGlobalVariableLeaks(ruleContext rule.Context, node *ast.Node) {
 			binary := current.AsBinaryExpression()
 			if binary != nil && binary.OperatorToken != nil &&
 				binary.OperatorToken.Kind == ast.KindEqualsToken &&
-				!liesInStrictModeCode(ruleContext, current) {
+				!liesInStrictModeCode(current) {
 				reportIfTargetIsUndeclared(ruleContext, binary.Left)
 			}
 
@@ -276,7 +275,7 @@ func reportGlobalVariableLeaks(ruleContext rule.Context, node *ast.Node) {
 			// pattern and an initialized declaration: byte identical findings under both spellings.
 			initializer := current.AsForInOrOfStatement().Initializer
 			if initializer != nil && initializer.Kind != ast.KindVariableDeclarationList &&
-				!liesInStrictModeCode(ruleContext, current) {
+				!liesInStrictModeCode(current) {
 				reportIfTargetIsUndeclared(ruleContext, initializer)
 			}
 		}
@@ -338,14 +337,14 @@ func reportIfTargetIsUndeclared(ruleContext rule.Context, target *ast.Node) {
 // Four sources of strictness are checked. A `use strict` directive at the top of the file or of any
 // enclosing function body. A class, whose body is strict by specification with no directive written
 // anywhere: the source a port is most likely to miss, and it costs a false positive on ordinary code
-// rather than a missed finding. A module, which is strict throughout. And the compiler: under
-// `alwaysStrict` every TypeScript file is bound and emitted as strict, which is ESLint's
+// rather than a missed finding. A module, which is strict throughout. And the compiler: every
+// TypeScript file is bound and emitted as strict whatever its tsconfig says, which is ESLint's
 // `ecmaFeatures.impliedStrict`, where eslint-scope likewise records no implicit global (#hks3djf).
 //
 // The last two settled #jjfa7qb's 34 leak rows. The port this replaced followed oxc, which reports a
 // leak in a module, and ran ESLint's corpus as modules where ESLint reports nothing. Under the authority
 // rule, and on first principles, an assignment that throws leaks nothing.
-func liesInStrictModeCode(ruleContext rule.Context, node *ast.Node) bool {
+func liesInStrictModeCode(node *ast.Node) bool {
 	for ancestor := node; ancestor != nil; ancestor = ancestor.Parent {
 		// A class body is strict by specification, with no directive to find.
 		if ast.IsClassLike(ancestor) {
@@ -356,7 +355,7 @@ func liesInStrictModeCode(ruleContext rule.Context, node *ast.Node) bool {
 		switch {
 		case ast.IsSourceFile(ancestor):
 			file := ancestor.AsSourceFile()
-			if file.ExternalModuleIndicator != nil || type_checking.CompilerImpliesStrict(ruleContext, file) {
+			if file.ExternalModuleIndicator != nil || type_checking.CompilerImpliesStrict(file) {
 				return true
 			}
 			statements = file.Statements.Nodes
