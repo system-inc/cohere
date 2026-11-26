@@ -22,3 +22,18 @@ func (worker *pool) run(each *pool) {
 }
 
 func plain() int { return 1 }
+
+// Beside stands in for bounded.Beside: a call by its name is a site, as the guard reads bounded's own starters.
+func Beside(work func()) func() { return work }
+
+func besides() { Beside(func() {}) }
+
+func init() { go func() {}() }
+
+func init() { go func() {}() }
+
+type set[Value any] struct{ values []Value }
+
+func (each *set[Value]) walk() { go func() {}() }
+
+var started = func() bool { go func() {}(); return true }()

@@ -32,6 +32,10 @@ type raceSite struct {
 type raceClaim struct {
 	test  string
 	width int
+	// from, when it isn't empty, is the directory of another narrowed entry whose run keeps test and drives this
+	// site from that package: a site of one package's code another package's kept test drives wide is held to a
+	// -race run all the same. Empty is the entry's own package.
+	from string
 }
 
 // minimumSiteClaims is how many kept tests each site of a narrowed package needs, so one test renamed or changed
@@ -46,7 +50,10 @@ func (kept *raceKept) tests() []string {
 	}
 	for _, site := range kept.sites {
 		for _, claim := range site.claims {
-			names = append(names, claim.test)
+			// A claim from another entry is that entry's to run.
+			if claim.from == "" {
+				names = append(names, claim.test)
+			}
 		}
 	}
 	slices.Sort(names)

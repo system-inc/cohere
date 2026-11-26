@@ -23,3 +23,10 @@ func TestFansOut(test *testing.T) { fanOut([]int{1, 2}) }
 func TestRuns(test *testing.T) { (&pool{}).run(&pool{}) }
 
 func TestPlain(test *testing.T) { plain() }
+
+func TestSkips(test *testing.T) {
+	test.Skip("skips on some boxes")
+	fanOut([]int{1, 2})
+}
+
+func TestBesides(test *testing.T) { besides() }

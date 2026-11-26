@@ -160,44 +160,46 @@ var raceGated = []raceEntry{
 			},
 			sites: []raceSite{
 				{site: "cache_session.go:CacheSession.fanOut#1", claims: []raceClaim{
-					{"TestAPackageAboveADeclinedOneIsJudgedAgainstItsOwnRendering", 4},
-					{"TestTheHostRestoresDecidedOnEveryCoreAreTheOnesDecidedOnOne", 8},
+					{test: "TestAPackageAboveADeclinedOneIsJudgedAgainstItsOwnRendering", width: 4},
+					{test: "TestTheHostRestoresDecidedOnEveryCoreAreTheOnesDecidedOnOne", width: 8},
 				}},
 				{site: "cache_session.go:CacheSession.fanOut#2", claims: []raceClaim{
-					{"TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", 6},
-					{"TestAHitIsAMissForEveryColumnPlacedRefuses", 2},
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 6},
+					{test: "TestAHitIsAMissForEveryColumnPlacedRefuses", width: 2},
 				}},
 				{site: "cache_session.go:CacheSession.fanOutDeciding#1", claims: []raceClaim{
-					{"TestTheHostRestoresDecidedOnEveryCoreAreTheOnesDecidedOnOne", 8},
-					{"TestEveryReaderOfAnAnswerTheBuildCannotAskIsDeclinedOnEverySlot", 4},
+					{test: "TestTheHostRestoresDecidedOnEveryCoreAreTheOnesDecidedOnOne", width: 8},
+					{test: "TestEveryReaderOfAnAnswerTheBuildCannotAskIsDeclinedOnEverySlot", width: 4},
+					{test: "TestEveryRestoreThatHoldsIsWrittenThroughOnEverySlot", width: 4},
 				}},
 				{site: "cache_session.go:CacheSession.fanOutDeciding#2", claims: []raceClaim{
-					{"TestARecordWrittenThroughWhoseHostRecordMovedIsAMiss", 8},
-					{"TestARestoreReadingAnOwnerTheBuildRanNothingOnIsDeclined", 6},
+					{test: "TestARecordWrittenThroughWhoseHostRecordMovedIsAMiss", width: 8},
+					{test: "TestARestoreReadingAnOwnerTheBuildRanNothingOnIsDeclined", width: 6},
 				}},
 				{site: "cache_session.go:CacheSession.fanOutWriting#1", claims: []raceClaim{
-					{"TestEveryEntryRewrittenWithItsAnswersIsReadWholeBesideTheOthers", 4},
-					{"TestEveryEntryWhosePlacedAnswersGrewIsWrittenAgainBesideTheOthers", 4},
+					{test: "TestEveryEntryRewrittenWithItsAnswersIsReadWholeBesideTheOthers", width: 4},
+					{test: "TestEveryEntryWhosePlacedAnswersGrewIsWrittenAgainBesideTheOthers", width: 4},
+					{test: "TestEveryRestoreThatHoldsIsWrittenThroughOnEverySlot", width: 2},
 				}},
 				{site: "cache_session.go:CacheSession.fanOutWriting#2", claims: []raceClaim{
-					{"TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", 8},
-					{"TestAPackageWithoutReadsIsUntouchedOnlyWhenItsClosureIsClean", 2},
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 8},
+					{test: "TestAPackageWithoutReadsIsUntouchedOnlyWhenItsClosureIsClean", width: 2},
 				}},
 				{site: "cache_session_answers.go:CacheSession.rewriteEarlier#1", claims: []raceClaim{
-					{"TestEveryEntryRewrittenWithItsAnswersIsReadWholeBesideTheOthers", 8},
-					{"TestEveryEntryWhosePlacedAnswersGrewIsWrittenAgainBesideTheOthers", 8},
+					{test: "TestEveryEntryRewrittenWithItsAnswersIsReadWholeBesideTheOthers", width: 8},
+					{test: "TestEveryEntryWhosePlacedAnswersGrewIsWrittenAgainBesideTheOthers", width: 8},
 				}},
 				{site: "check.go:recordUnreachedTypes#1", claims: []raceClaim{
-					{"TestEveryNeverMarkedDependencyNoActionReachedIsHandedItsDeclarations", 2},
-					{"TestEveryNeverMarkedRootTheRunDoesNotAnalyzeIsHandedItsDeclarations", 2},
+					{test: "TestEveryNeverMarkedDependencyNoActionReachedIsHandedItsDeclarations", width: 2},
+					{test: "TestEveryNeverMarkedRootTheRunDoesNotAnalyzeIsHandedItsDeclarations", width: 2},
 				}},
 				{site: "check.go:recordUnreachedTypes#2", claims: []raceClaim{
-					{"TestAPackagesTypeReadsAreEveryForeignObjectItReached", 8},
-					{"TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal", 8},
+					{test: "TestAPackagesTypeReadsAreEveryForeignObjectItReached", width: 8},
+					{test: "TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal", width: 8},
 				}},
 				{site: "host_run.go:HostRun.computeDependence#1", claims: []raceClaim{
-					{"TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", 77},
-					{"TestAPackageWithoutReadsIsUntouchedOnlyWhenItsClosureIsClean", 3},
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 77},
+					{test: "TestAPackageWithoutReadsIsUntouchedOnlyWhenItsClosureIsClean", width: 3},
 				}},
 			},
 		},
@@ -272,48 +274,60 @@ var raceGated = []raceEntry{
 			},
 			sites: []raceSite{
 				{site: "in_process_lister.go:inProcessLister.match#1", claims: []raceClaim{
-					{"TestInProcessListingIsGoListsAnswer", 3},
-					{"TestAListingFingerprintIsReadOnceARunForEachSetOfInputs", 2},
+					{test: "TestInProcessListingIsGoListsAnswer", width: 3},
+					{test: "TestAListingFingerprintIsReadOnceARunForEachSetOfInputs", width: 2},
 				}},
 				{site: "in_process_lister.go:inProcessLister.packagesIn#1", claims: []raceClaim{
-					{"TestADeclinedRestoreLeavesItsImportsScopesAsChecked", 4},
-					{"TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", 3},
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 4},
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 3},
 				}},
 				{site: "in_process_lister.go:inProcessLister.prefetchStandardLibrary#1", claims: []raceClaim{
-					{"TestAListingFingerprintIsReadOnceARunForEachSetOfInputs", 4},
-					{"TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds", 7},
+					{test: "TestAListingFingerprintIsReadOnceARunForEachSetOfInputs", width: 4},
+					{test: "TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds", width: 7},
 				}},
 				{site: "in_process_lister.go:inProcessLister.prefetchStandardLibrary#2", claims: []raceClaim{
-					{"TestADeclinedRestoreLeavesItsImportsScopesAsChecked", 13},
-					{"TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", 189},
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 13},
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 189},
 				}},
 				{site: "in_process_lister.go:inProcessLister.load#1", claims: []raceClaim{
-					{"TestADeclinedRestoreLeavesItsImportsScopesAsChecked", 2},
-					{"TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", 12},
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 12},
 				}},
 				{site: "kept_listing.go:steadyFingerprint#1", claims: []raceClaim{
-					{"TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", 3},
-					{"TestASteadyFingerprintIsKeyedByEachListAlone", 2},
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 3},
+					{test: "TestASteadyFingerprintIsKeyedByEachListAlone", width: 2},
 				}},
 				{site: "lister_state.go:listerState.fetch#1", claims: []raceClaim{
-					{"TestADeclinedRestoreLeavesItsImportsScopesAsChecked", 2},
-					{"TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", 2},
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
 				}},
 				{site: "loader.go:loader.load#1", claims: []raceClaim{
-					{"TestACgoProjectsPackageIsRestoredFromExportData", 2},
-					{"TestRestoredPackagesCheckedFromSourceClaimInTheSameOrderEveryLoad", 2},
+					{test: "TestACgoProjectsPackageIsRestoredFromExportData", width: 2},
+					{test: "TestRestoredPackagesCheckedFromSourceClaimInTheSameOrderEveryLoad", width: 2},
+					// Both claimants above may skip on a gate box, one without cgo translation and one on one core, so
+					// check's restores, which drive the same restore here under check's own run, hold it.
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 32,
+						from: "internal/go_language/check"},
+					{test: "TestARecordWrittenThroughWhoseHostRecordMovedIsAMiss", width: 33,
+						from: "internal/go_language/check"},
+				}},
+				{site: "load.go:loadUnder#1", claims: []raceClaim{
+					// bounded.Beside starts one goroutine and returns at once, so its caller goes on beside it: two
+					// live, the census's one started there and the load returning.
+					{test: "TestALoadReturnsBeforeItsInputsAreCollected", width: 2},
+					{test: "TestAPanicCollectingALoadsInputsReachesItsWaiter", width: 2},
 				}},
 				{site: "loader.go:loader.load#2", claims: []raceClaim{
-					{"TestADeclinedRestoreLeavesItsImportsScopesAsChecked", 2},
-					{"TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", 2},
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
 				}},
 				{site: "loader.go:loader.parseClaimed#1", claims: []raceClaim{
-					{"TestADeclinedRestoreLeavesItsImportsScopesAsChecked", 2},
-					{"TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", 2},
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
 				}},
 				{site: "loader.go:loader.parseClaimed#2", claims: []raceClaim{
-					{"TestADeclinedRestoreLeavesItsImportsScopesAsChecked", 2},
-					{"TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", 2},
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
 				}},
 			},
 		},
