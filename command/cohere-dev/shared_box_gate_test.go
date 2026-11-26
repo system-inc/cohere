@@ -390,8 +390,8 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 		}
 	}
 	if len(tests) != 3 || tests[1] != "test -race ./internal/edit" ||
-		tests[2] != "test -race -run "+goLanguage.run+" ./internal/go_language" {
+		tests[2] != "test -race -run "+goLanguage.keptRun()+" ./internal/go_language" {
 		test.Fatalf("Kirk's Mac ran go tests %q, want the module's, then its -race run of ./internal/edit, then "+
-			"./internal/go_language's with -run %s:\n%s", tests, goLanguage.run, recorded)
+			"./internal/go_language's with -run %s:\n%s", tests, goLanguage.keptRun(), recorded)
 	}
 }

@@ -72,9 +72,10 @@ func (fixture *macBoxFixture) remoteArguments(box string) (string, string) {
 	return string(found[5]), string(found[4])
 }
 
-// The fixture's race tokens, as racePatterns writes them for its tree.
-var splitFixtureRaces = "./internal/edit,./internal/go_language@" +
-	"Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad"
+// The fixture's race tokens, as racePatterns writes them for its tree: internal/go_language's carries its entry's run,
+// read from the list, so the fixture follows the run as the list changes it.
+var splitFixtureRaces = "./internal/edit,./internal/go_language@" + raceGated[slices.IndexFunc(raceGated,
+	func(entry raceEntry) bool { return entry.directory == "internal/go_language" })].keptRun()
 
 // A landing with both gate boxes free splits its tests across them, both on the commit being landed (#bc8nf0r). With
 // no times kept yet it is the Square's starting split, internal/go_language alone on Sun2 and every other package and
