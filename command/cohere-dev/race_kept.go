@@ -4,7 +4,10 @@ import "slices"
 
 // raceKept is the tests a narrowed -race run keeps. A race that only a test left out reaches leaves the race gate:
 // that test still runs in the plain test step, so what it checks still holds, and only race detection over its
-// scenario is lost (#q1v0ern, the Go Square's ruling).
+// scenario is lost (#q1v0ern, the Go Square's ruling). A site is a place the package's own code starts goroutines:
+// code of the package that runs at once only because it is handed to another package's workers, a closure the
+// checker's scheduler or the type-read walks run, is no site of its own, and is watched under -race only as far as
+// the kept tests reach it.
 type raceKept struct {
 	// census is the Loom job that counted each claim's width, so the widths can be read back.
 	census string
