@@ -52,7 +52,7 @@ func TestTheIntegrateJobsReplayStoreReplaysOnlyAPass(test *testing.T) {
 		test.Errorf("the store holds %q, want the two passes' keys alone", names)
 	}
 	recorded := string(readMaybeMissing(test, filepath.Join(store.directory, "steps", "docs-data", "1111")))
-	if recorded != "the docs data\ninternal/a.go\ninternal/b.go\n" {
+	if recorded != "the docs data\nrecorded by \ninternal/a.go\ninternal/b.go\n" {
 		test.Errorf("the record reads %q, want what was said and the inputs", recorded)
 	}
 }

@@ -28,6 +28,10 @@ func docsDataPlaceholderKey(string) (string, []string, error) {
 // directory, as when integrateJobCacheVariable is unset, always runs.
 type integrateJobReplay struct {
 	directory string
+	// by names the merge a record is written for, which a replay says, and say prints the account's line of a replay
+	// (integrate_job_run_account.go), nil to print none.
+	by  string
+	say func(line string)
 }
 
 // replayKeyPattern is a key the store files a record under: a name of letters, digits, dots, dashes and underscores,
@@ -60,16 +64,21 @@ func (store integrateJobReplay) run(
 	}
 	record := filepath.Join(store.directory, "steps", step, keyed)
 	if recorded, readError := os.ReadFile(record); readError == nil {
-		said, _, _ := strings.Cut(string(recorded), "\n")
+		said, rest, _ := strings.Cut(string(recorded), "\n")
+		by, _, _ := strings.Cut(rest, "\n")
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s replayed: its inputs are a pass's, key %s (%s)\n", step, keyed,
 			record)
+		if store.say != nil {
+			store.say(fmt.Sprintf("skipped %s: replayed, key %s, %s", step, keyed[:min(12, len(keyed))], by))
+		}
 		return 0, said + ", replayed from a pass at key " + keyed[:min(12, len(keyed))]
 	}
 	code, said := work()
 	if code != 0 || said == "" {
 		return code, said
 	}
-	if recordError := writeReplayRecord(record, said+"\n"+strings.Join(inputs, "\n")+"\n"); recordError != nil {
+	contents := said + "\nrecorded by " + shortCommit(store.by) + "\n" + strings.Join(inputs, "\n") + "\n"
+	if recordError := writeReplayRecord(record, contents); recordError != nil {
 		// The step passed, which is the landing's verdict; a record left unwritten only means the next job runs it.
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s passed, and its record couldn't be written: %v\n", step,
 			recordError)
