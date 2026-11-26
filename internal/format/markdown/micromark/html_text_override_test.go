@@ -1,6 +1,9 @@
 package micromark
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // htmlTextOverrideFixtures exercise the fork's html-text copy through the full extension set, the way
 // Prettier parses. They avoid the same pending constructs htmlTextFixtures do (see there), and center on
@@ -9,7 +12,7 @@ import "testing"
 //
 // On `<` the copy is tried first, then autolink, then core htmlText. The copy and core accept the same
 // inputs, so core never wins here: where the copy fails, core is tried and fails the same way (the "all
-// fail" fixtures run that path). Core wins only without the override, the case htmlTextFixtures hold.
+// fail" fixtures run that path). Core winning is covered by TestHtmlTextEvents, without the override.
 var htmlTextOverrideFixtures = []string{
 	// Which construct wins on `<`: autolink, the copy, or none of the three.
 	"a <ab:c> d",
@@ -66,6 +69,13 @@ var htmlTextOverrideFixtures = []string{
 	"# a <b c=\"d\"> e",
 	"a <b c=\"d\n  e\">\n===",
 	"a <b c=\"d\n  e\"> f\n\ng <h\n  i> j",
+}
+
+// TestHtmlTextOverrideEvents runs htmlTextOverrideFixtures, and htmlTextFixtures again, through the full extension
+// set, one recording for both lists.
+func TestHtmlTextOverrideEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, slices.Concat(htmlTextOverrideFixtures, htmlTextFixtures))
 }
 
 // TestHtmlTextOverrideOrder checks the combined text constructs on `<`: the copy, then autolink, then core.

@@ -1,6 +1,9 @@
 package micromark
 
-import "strings"
+import (
+	"strings"
+	"testing"
+)
 
 // gfmFootnoteFixtures hold no link reference definition, raw html, table, strikethrough, task list item,
 // autolink literal, math, liquid or wiki-link syntax (`[[`): those constructs are still pending stubs, so a
@@ -129,4 +132,9 @@ var gfmFootnoteFixtures = []string{
 	// Non-ASCII and astral characters beside and inside.
 	"[^😀]: x\n\né[^😀]𝔸",
 	"[^a]: 😀\n\n😀![^a]😀",
+}
+
+func TestGfmFootnoteEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, gfmFootnoteFixtures)
 }

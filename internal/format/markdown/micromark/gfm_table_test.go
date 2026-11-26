@@ -1,5 +1,11 @@
 package micromark
 
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
+
 // gfmTableFixtures hold no definition, html text, strikethrough, autolink literal, footnote, task list
 // item, math, liquid or wiki-link syntax: those constructs are still pending, so a fixture leaning on them
 // would differ for reasons that are not the table's. That rules out `[`, `<`, `~`, `$`, `{`, `@` and
@@ -125,4 +131,34 @@ var gfmTableFixtures = []string{
 	"|a|\r|-|\r|b|\r",
 	"|a|\r\n|-|\n|b|\r",
 	"|a|b|\r\n|:-|-:|\r\n\r\n|c|",
+}
+
+func TestGfmTableEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, gfmTableFixtures)
+}
+
+// TestGfmTableAlignMatchesUpstream compares every fixture's table alignments with upstream's recorded `_align`,
+// which the event descriptions leave out and mdast-util-gfm-table reads.
+func TestGfmTableAlignMatchesUpstream(test *testing.T) {
+	test.Parallel()
+	answers := readEventAnswers(test, "TableAlign", gfmTableFixtures)
+	tables := 0
+	for index, input := range gfmTableFixtures {
+		var actual []string
+		for _, event := range Parse(SourceUnits(input), MarkdownConstructs(), nil) {
+			if event.Enter && event.Token.Type == typeTable {
+				actual = append(actual, strings.Join(event.Token.Align, ","))
+			}
+		}
+		tables += len(actual)
+		expected := answers.Answers[index].Aligns
+		if fmt.Sprint(expected) != fmt.Sprint(actual) {
+			test.Errorf("input %q: want aligns %q, got %q", truncateInput(input), expected, actual)
+		}
+	}
+	if tables == 0 {
+		test.Fatal("no fixture produced a table")
+	}
+	test.Logf("%d tables across %d fixtures", tables, len(gfmTableFixtures))
 }
