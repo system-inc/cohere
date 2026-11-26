@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -478,6 +479,11 @@ func (job *integrateJobRun) preflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: laying the integrate job's mirrors in %s: %v\n", job.mirrors, layError)
 		return "", 1
 	}
+	if shallowError := carryShallow(filepath.Join(job.history, "cohere.git"), filepath.Join(job.mirrors,
+		"cohere.git")); shallowError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: carrying the history's shallow file: %v\n", shallowError)
+		return "", 1
+	}
 	// The merge is read from the history itself, never through the job's repository, whose house objects could vouch
 	// for a merge the runner never laid. The history is root's, and git refuses another owner's repository unless
 	// safe.directory names it, as it is named here for this one read, symlinks resolved as git resolves the path.
@@ -767,6 +773,26 @@ func layTypeScript(mirror string, tree string, pin string) error {
 		return fmt.Errorf("%w: %s", checkoutError, output)
 	}
 	return nil
+}
+
+// carryShallow copies history's shallow file, where its commits stop (Machines' layout on #tbtmxpd), into repository,
+// the job's own cohere.git, which borrows the history's objects: without it a fetch of the merge out of repository
+// walks past the history's end into main's parents, which no object here holds. A history with none leaves repository
+// with none either, so a shallow file an earlier job left in the kept repository never outlives the history it came
+// from.
+func carryShallow(history string, repository string) error {
+	shallow, readError := os.ReadFile(filepath.Join(history, "shallow"))
+	if errors.Is(readError, fs.ErrNotExist) {
+		if removeError := os.Remove(filepath.Join(repository, "shallow")); removeError != nil &&
+			!errors.Is(removeError, fs.ErrNotExist) {
+			return removeError
+		}
+		return nil
+	}
+	if readError != nil {
+		return readError
+	}
+	return os.WriteFile(filepath.Join(repository, "shallow"), shallow, 0o644)
 }
 
 // layIntegrateJobMirrors makes the mirrors the integrate job's scripts read in place of the house's (macBoxMirrors), in

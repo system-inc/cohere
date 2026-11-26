@@ -783,6 +783,35 @@ func TestAnIntegrateJobLaysTheMergesTypeScriptPin(test *testing.T) {
 	}
 }
 
+// The history's shallow file, where its commits stop (Machines' layout on #tbtmxpd), is carried into the job's own
+// cohere.git, which borrows the history's objects, so the tests step's fetch of the merge stops where the history does;
+// and a history with none leaves the kept repository with none, whatever an earlier job left there.
+func TestAnIntegrateJobCarriesItsHistorysShallowFile(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	merge := fixture.merged()
+	main := fixture.git(fixture.repository, "rev-parse", "main")
+	shallow := filepath.Join(fixture.historyRepository(), "shallow")
+	writeFixtureFile(test, shallow, main+"\n")
+	carried := filepath.Join(fixture.home, integrateJobScratch, "mirrors", "cohere.git", "shallow")
+	if ran := fixture.integrateJob(merge); ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+	}
+	if said := string(readMaybeMissing(test, carried)); said != main+"\n" {
+		test.Errorf("the job's cohere.git holds the shallow file %q, want the history's %q", said, main+"\n")
+	}
+	if removeError := os.Remove(shallow); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if ran := fixture.integrateJob(merge); ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d the second time:\n%s", ran.exit, ran.errors)
+	}
+	if _, statError := os.Stat(carried); !errors.Is(statError, os.ErrNotExist) {
+		test.Errorf("a history with no shallow file left the job's cohere.git with one: %v", statError)
+	}
+}
+
 // A merge whose first parent isn't the commit the job runs at refuses before anything is laid, measured or tested:
 // its code wouldn't be the main it judges.
 func TestAnIntegrateJobRefusesAMergeOntoAnotherMain(test *testing.T) {
