@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/testing/needs"
+	"github.com/system-inc/cohere/internal/testing/process_reading"
 )
 
 // A command a test ran has exited, but its captured output never closes: exec's Wait sits in
@@ -159,16 +161,10 @@ func pipeHolders() ([]string, error) {
 			continue
 		}
 		seen[open.pid] = true
-		// Ignored: ps exits nonzero for a pid it no longer finds, and its empty answer is read below.
-		started, _ := exec.Command("ps", "-o", "ppid=,lstart=,command=", "-p", open.pid).Output()
-		// A process ps no longer finds has exited and holds nothing now, the lsof that listed it included.
-		if fields := strings.Fields(string(started)); len(fields) == 0 || fields[0] == self {
-			continue
+		// A process that has exited holds nothing now, the lsof that listed it included.
+		if holder, holds := describeHolder(open.pid, open.command); holds {
+			holders = append(holders, holder)
 		}
-		holders = append(
-			holders,
-			fmt.Sprintf("pid %s %s: %s", open.pid, open.command, strings.TrimSpace(string(started))),
-		)
 	}
 	return holders, nil
 }
@@ -218,17 +214,35 @@ func procPipeHolders(root string) ([]string, error) {
 		if !holds {
 			continue
 		}
-		// Ignored: a process that exited since holds nothing, and its empty name reads as gone below.
+		// Ignored: a process that exited since holds nothing, and describeHolder reads it as gone.
 		command, _ := os.ReadFile(root + "/" + pid + "/comm")
-		// Ignored: ps exits nonzero for a pid it no longer finds, and its empty answer is read below.
-		started, _ := exec.Command("ps", "-o", "ppid=,lstart=,command=", "-p", pid).Output()
-		if fields := strings.Fields(string(started)); len(fields) == 0 || fields[0] == self {
-			continue
+		if holder, holds := describeHolder(pid, strings.TrimSpace(string(command))); holds {
+			holders = append(holders, holder)
 		}
-		holders = append(holders, fmt.Sprintf("pid %s %s: %s", pid, strings.TrimSpace(string(command)),
-			strings.TrimSpace(string(started))))
 	}
 	return holders, nil
+}
+
+// describeHolder is the line pipeHolders gives the process pid, named command, holding one of this process's pipes,
+// "pid <pid> <command>: <parent, start and command line>", and whether it holds the pipe at all: a process that has
+// exited holds nothing, and neither does one of this process's own running children, a command another test is still
+// running or the lsof asking. Its parent, start and command line are read in process (process_reading), never through
+// ps, which is setuid on macOS and refused in a land job's sandbox; one that can't be read is named with why.
+func describeHolder(pid string, command string) (string, bool) {
+	id, parseError := strconv.Atoi(pid)
+	if parseError != nil {
+		return fmt.Sprintf("pid %s %s: not a process id: %v", pid, command, parseError), true
+	}
+	description, describeError := process_reading.Describe(id)
+	switch {
+	case errors.Is(describeError, process_reading.ErrNoProcess):
+		return "", false
+	case describeError != nil:
+		return fmt.Sprintf("pid %s %s: couldn't be described: %v", pid, command, describeError), true
+	case description.Parent == os.Getpid():
+		return "", false
+	}
+	return fmt.Sprintf("pid %s %s: %s", pid, command, description), true
 }
 
 // lsofFile is one open file from lsof's field output.
@@ -347,11 +361,11 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 // On Linux the holders are read from /proc, where both ends of a pipe are one `pipe:[inode]` link. Shown on a proc
 // tree built here, so it runs on any Unix: the process holding the far end of this process's pipe is named with
 // its command, one holding another pipe is not, and neither are this process's standard streams. The holder is
-// this test's parent, a process ps finds that is not this one's child.
+// this test's parent, a process that is running and is not this one's child.
 func TestTheHoldersOfAPipeAreReadFromProc(test *testing.T) {
 	test.Parallel()
 	if runtime.GOOS == "windows" {
-		test.Skip("ps reads a holder's parent and start, and Windows has no ps")
+		test.Skip("a holder's parent and start are read only on macOS and Linux")
 	}
 	root := test.TempDir()
 	self, parent := strconv.Itoa(os.Getpid()), strconv.Itoa(os.Getppid())
