@@ -476,7 +476,7 @@ func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T)
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()
-			home := test.TempDir()
+			home, temporaryRoot := test.TempDir(), test.TempDir()
 			script := strings.Replace(macBoxScript, macBoxMirrorLine, "mirrors="+row.mirrors+"; tries=2; pause=0", 1)
 			script = strings.Replace(script, `goroot="`+macBoxGoroot+`"`, `goroot="`+noGo+`"`, 1)
 			// The toolchain's refusal names the temporary directory, so the test sees what the script set before it.
@@ -488,7 +488,7 @@ func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T)
 			bash := exec.Command("bash", "-s", "--", row.commit, "", "", "./...")
 			bash.Dir = test.TempDir()
 			bash.Stdin = strings.NewReader(script)
-			bash.Env = append(os.Environ(), "HOME="+home, "GIT_CONFIG_NOSYSTEM=1")
+			bash.Env = append(os.Environ(), "HOME="+home, "TMPDIR="+temporaryRoot, "GIT_CONFIG_NOSYSTEM=1")
 			output, bashError := bash.CombinedOutput()
 			if bashError == nil || !strings.Contains(string(output), row.said) {
 				test.Fatalf("the script did not refuse, saying %q (%v):\n%s", row.said, bashError, output)
@@ -503,11 +503,11 @@ func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T)
 			if checkedOut := run(filepath.Join(scratch, "tree"), "rev-parse", "HEAD"); checkedOut != commit {
 				test.Errorf("the scratch tree is at %s, want %s", checkedOut, commit)
 			}
-			// The tests' temporary directory is under /tmp, which macOS reaches through a link, and it goes with the
+			// The tests' temporary directory is under the account's `TMPDIR`, never a fixed /tmp, and it goes with the
 			// run.
 			_, temporary, found := strings.Cut(strings.TrimSpace(string(output)), "temporary at ")
-			if !found || !strings.HasPrefix(temporary, "/tmp/cohere-gate.") {
-				test.Fatalf("the tests' temporary directory wasn't made under /tmp:\n%s", output)
+			if !found || !strings.HasPrefix(temporary, temporaryRoot+"/cohere-gate.") {
+				test.Fatalf("the tests' temporary directory wasn't made under %s:\n%s", temporaryRoot, output)
 			}
 			if _, statError := os.Stat(temporary); !os.IsNotExist(statError) {
 				test.Errorf("the tests' temporary directory %s outlived the run: %v", temporary, statError)

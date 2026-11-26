@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io/fs"
 	"os"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/process_reading"
 )
 
 func TestWholeModuleAndCountOnceAreReadFromTheArguments(test *testing.T) {
@@ -261,14 +263,39 @@ func TestOrdinalSaysAPlaceAsAPersonWould(test *testing.T) {
 	}
 }
 
+// niceHelperVariable, set to anything, has TestARunIsNiceUnlessItAsksForFullPriority stand in for go: it prints how
+// nice it runs and what it was asked, as `nice=<n> <arguments>`, and passes.
+const niceHelperVariable = "COHERE_DEV_TEST_NICE_HELPER"
+
+// printOwnNiceness is the stand-in go's whole run: its own nice, read in process, and the arguments after `--`.
+func printOwnNiceness(test *testing.T) {
+	nice, niceError := process_reading.Niceness(os.Getpid())
+	if niceError != nil {
+		test.Fatal(niceError)
+	}
+	if _, printError := fmt.Printf("nice=%d %s\n", nice, strings.Join(flag.Args(), " ")); printError != nil {
+		test.Fatal(printError)
+	}
+}
+
 // A run makes itself nice, so the go command and test binaries it starts inherit it and yield the machine
 // to a person; --full-priority keeps the priority it was started with, for a timed measurement, and never
 // reaches go test (#2qc6j8g). Shown at nice 19 through COHERE_DEV_NICENESS, since the house runs its tests
-// at nice 10 already, where a run that failed to lower itself would look the same as one that did.
+// at nice 10 already, where a run that failed to lower itself would look the same as one that did. Each nice is read
+// in process (process_reading), never through ps, which is setuid on macOS and refused in a land job's sandbox, so the
+// stand-in go is this test binary, run as niceHelperVariable says.
 func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 	test.Parallel()
+	if os.Getenv(niceHelperVariable) != "" {
+		printOwnNiceness(test)
+		return
+	}
 	if runtime.GOOS == "windows" {
 		test.Skip("nice is a Unix priority")
+	}
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		test.Fatal(executableError)
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
 	build_inputs.Record(test, ".", ".")
@@ -279,7 +306,8 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 	bin := test.TempDir()
 	if writeError := executable_testing.WriteFile(
 		filepath.Join(bin, "go"),
-		[]byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"),
+		[]byte("#!/bin/sh\n"+niceHelperVariable+"=1 exec '"+executable+
+			"' -test.run='^TestARunIsNiceUnlessItAsksForFullPriority$' -- \"$@\"\n"),
 		0o755,
 	); writeError != nil {
 		test.Fatal(writeError)
@@ -312,13 +340,9 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		}
 		return nice, strings.Join(fields[1:], " ")
 	}
-	output, outputError := exec.Command("ps", "-o", "nice=", "-p", strconv.Itoa(os.Getpid())).Output()
-	if outputError != nil {
-		test.Fatal(outputError)
-	}
-	own, parseError := strconv.Atoi(strings.TrimSpace(string(output)))
-	if parseError != nil {
-		test.Fatalf("ps printed %q for this test's nice", output)
+	own, ownError := process_reading.Niceness(os.Getpid())
+	if ownError != nil {
+		test.Fatal(ownError)
 	}
 
 	if own == 19 {
