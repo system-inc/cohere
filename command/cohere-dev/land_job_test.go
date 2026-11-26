@@ -748,3 +748,28 @@ func TestTheLandJobsCarryTakesADirectoryAndRefusesABareSubmodule(test *testing.T
 		test.Errorf("a bare mirror's submodule carried as %v, want a refusal naming it", carryError)
 	}
 }
+
+// A land job named no pool home hangs its pool from the job's own home, never the account's home in the system's user
+// database, which in Shackler's sandbox is /var/empty, where the job can make nothing (J-5xseq90). The fixture names
+// none here, as Loom's runner names none.
+func TestALandJobsPoolHangsFromItsOwnHome(test *testing.T) {
+	test.Parallel()
+	fixture := newLandJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	merge := fixture.merged()
+	named := fixture.environment
+	fixture.environment = make([]string, 0, len(named))
+	for _, variable := range named {
+		if !strings.HasPrefix(variable, homeVariable+"=") {
+			fixture.environment = append(fixture.environment, variable)
+		}
+	}
+	ran := fixture.landJob(merge)
+	if ran.exit != 0 || ran.landed == "" {
+		test.Fatalf("the land job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+	}
+	pool := filepath.Join(userCacheDirectoryIn(fixture.home), "cohere", "test-slots")
+	if information, statError := os.Stat(pool); statError != nil || !information.IsDir() {
+		test.Errorf("the land job's pool isn't under its home at %s: %v", pool, statError)
+	}
+}

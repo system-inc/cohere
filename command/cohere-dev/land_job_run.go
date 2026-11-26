@@ -175,6 +175,17 @@ func landJob(arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: finding the land job's home for its scratch: %v\n", homeError)
 		return 1
 	}
+	// The pool hangs from the account's home in the system's user database, never `HOME` (poolHome), so that a gate
+	// with a scratch `HOME` still shares the machine's pool. A land job runs alone in an account of its own, whose home
+	// in that database is /var/empty in Shackler's sandbox (J-5xseq90: "mkdir /var/empty/Library"), so its pool hangs
+	// from the job's own home, unless one is named.
+	if os.Getenv(homeVariable) == "" {
+		if setError := os.Setenv(homeVariable, home); setError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: hanging the land job's pool from its home %s: %v\n", home,
+				setError)
+			return 1
+		}
+	}
 	job.scratch = filepath.Join(home, landJobScratch)
 	job.mirrors = filepath.Join(job.scratch, "mirrors")
 	job.repository = filepath.Join(job.mirrors, "cohere.git")
