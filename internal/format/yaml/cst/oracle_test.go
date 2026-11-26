@@ -8,7 +8,7 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // The CST oracle: the fork's own eemeli/yaml, 2.9.0, parsing each input with
@@ -22,9 +22,10 @@ import (
 // An input can also be fed in chunks, parse(chunk, true) per chunk and parse('', false) to finish, which
 // drives the lexer's incomplete-input paths (setNext and the buffer it keeps).
 //
-// Upstream's strings are recorded (see upstream_testing), so no node runs here: each answers file under
-// testdata/eemeli_yaml holds, per input and chunk size, the text it was recorded for and the string
-// upstream wrote.
+// Upstream's strings are recorded (see package recorded), so no node runs here: each answers file under
+// testdata/eemeli_yaml holds, per input and chunk size, the text it was recorded for (or, for a vendored
+// input, the text's digest) and the string upstream wrote. The recorder is record-yaml.mjs, attached to
+// #jddr94a, usage in its header.
 
 // eemeliYamlDirectory holds the inputs and upstream's recorded answers for them.
 var eemeliYamlDirectory = filepath.Join("testdata", "eemeli_yaml")
@@ -32,40 +33,61 @@ var eemeliYamlDirectory = filepath.Join("testdata", "eemeli_yaml")
 // suiteDirectory holds the yaml-test-suite's cases, shared with the other YAML packages.
 var suiteDirectory = filepath.Join("..", "testdata", "yaml_test_suite")
 
+// corpusDirectory holds the corpus, Prettier's own format fixtures, shared with the other YAML packages.
+var corpusDirectory = filepath.Join("..", "testdata", "prettier_tests")
+
 // oracleInput is one parse: the whole text at once when Chunk is 0, else Chunk code units at a time.
 type oracleInput struct {
 	Name  string
 	Text  string
 	Chunk int
-	// Vendored says the parse's answer records its text's digest (see upstream_testing).
-	Vendored bool
+	// Recorded is what the parse's answer records of the text: the text, or a vendored text's digest.
+	Recorded string
 }
 
 // parseKey is a parse's name in an answers file: its input's name and its chunk size.
 func parseKey(name string, chunk int) string { return fmt.Sprintf("%s, chunk %d", name, chunk) }
 
-// tokensAnswer is one recorded answer: the input's name, the chunk size, the text or, for a vendored input,
-// the text's digest, and the string upstream's serializer wrote for it, or "throw" when parsing threw.
+// tokensAnswer is one recorded answer: the input it was recorded for, the chunk size, and the string
+// upstream's serializer wrote for it, or "throw" when parsing threw.
 type tokensAnswer struct {
-	Name   string `json:"name"`
+	recorded.RecordedFor
 	Chunk  int    `json:"chunk"`
-	Text   string `json:"text"`
-	Sha256 string `json:"sha256"`
 	Output string `json:"output"`
 }
 
-// inputsAt is every input of an inputs file parsed at each chunk size.
-func inputsAt(inputs []upstream_testing.Input, chunks ...int) []oracleInput {
+// readParses reads an inputs file and parses each of its inputs at each chunk size.
+func readParses(test *testing.T, path string, chunks ...int) []oracleInput {
+	test.Helper()
+	inputs, entries, readInputsError := recorded.ReadInputs(path)
+	if readInputsError != nil {
+		test.Fatal(readInputsError)
+	}
 	parses := make([]oracleInput, 0, len(inputs)*len(chunks))
-	for _, input := range inputs {
+	for index, input := range inputs {
 		for _, chunk := range chunks {
 			parses = append(
 				parses,
-				oracleInput{Name: input.Name, Text: input.Text, Chunk: chunk, Vendored: input.Vendored},
+				oracleInput{Name: input.Name, Text: input.Text, Chunk: chunk, Recorded: entries[index].Input},
 			)
 		}
 	}
 	return parses
+}
+
+// parts are the numbered inputs files of directory named prefix (recorded.Parts), each with its answers
+// file, answersPrefix and the same number.
+func parts(test *testing.T, directory string, prefix string, answersPrefix string) ([]string, []string) {
+	test.Helper()
+	paths, partsError := recorded.Parts(directory, prefix)
+	if partsError != nil {
+		test.Fatal(partsError)
+	}
+	answersFiles := make([]string, len(paths))
+	for index := range paths {
+		answersFiles[index] = fmt.Sprintf("%s%d.json.gz", answersPrefix, index+1)
+	}
+	return paths, answersFiles
 }
 
 // recordedOutputs reads an answers file and pairs it with the parses, returning upstream's string for
@@ -73,21 +95,25 @@ func inputsAt(inputs []upstream_testing.Input, chunks ...int) []oracleInput {
 func recordedOutputs(test *testing.T, answersFile string, parses []oracleInput) ([]string, string) {
 	test.Helper()
 	path := filepath.Join(eemeliYamlDirectory, answersFile)
-	answers := upstream_testing.ReadAnswers[tokensAnswer](test, path)
-	keyed := make([]upstream_testing.Input, len(parses))
-	for index, parse := range parses {
-		keyed[index] = upstream_testing.Input{
-			Name:     parseKey(parse.Name, parse.Chunk),
-			Text:     parse.Text,
-			Vendored: parse.Vendored,
-		}
+	answers, readJsonError := recorded.ReadJson[recorded.Answers[tokensAnswer]](path)
+	if readJsonError != nil {
+		test.Fatal(readJsonError)
 	}
-	byKey := upstream_testing.Match(test, path, keyed, answers.Answers, func(answer tokensAnswer) (string, string) {
-		return parseKey(answer.Name, answer.Chunk), upstream_testing.RecordedFor(answer.Text, answer.Sha256)
-	})
-	outputs := make([]string, len(parses))
+	parseEntries := make([]recorded.Entry, len(parses))
 	for index, parse := range parses {
-		outputs[index] = byKey[parseKey(parse.Name, parse.Chunk)].Output
+		parseEntries[index] = recorded.Entry{Name: parseKey(parse.Name, parse.Chunk), Input: parse.Recorded}
+	}
+	answerEntries := make([]recorded.Entry, len(answers.Answers))
+	for index, answer := range answers.Answers {
+		answerEntries[index] = recorded.Entry{Name: parseKey(answer.Name, answer.Chunk), Input: answer.Entry().Input}
+	}
+	indexes, matchError := recorded.Match(parseEntries, answerEntries)
+	if matchError != nil {
+		test.Fatalf("%s: %v: record them again with record-yaml.mjs, attached to #jddr94a", path, matchError)
+	}
+	outputs := make([]string, len(parses))
+	for position, index := range indexes {
+		outputs[position] = answers.Answers[index].Output
 	}
 	return outputs, answers.Source + ", recorded " + answers.Recorded
 }
@@ -335,17 +361,14 @@ func truncateInput(input string) string {
 	return input
 }
 
-// fixtureInputs are the hand-written fixtures of the deleted fixtures_test.go, then the controls
-// TestOracleCanFail compares against.
-func fixtureInputs(test *testing.T) []upstream_testing.Input {
-	test.Helper()
-	return upstream_testing.ReadInputs(test, filepath.Join(eemeliYamlDirectory, "fixture_inputs.json"))
-}
+// fixtureInputs is fixture_inputs.json: the hand-written fixtures of the deleted fixtures_test.go, then the
+// controls TestOracleCanFail compares against.
+var fixtureInputs = filepath.Join(eemeliYamlDirectory, "fixture_inputs.json")
 
 // TestTokensMatchUpstream runs every fixture through both sides, whole.
 func TestTokensMatchUpstream(test *testing.T) {
 	test.Parallel()
-	parses := inputsAt(fixtureInputs(test), 0)
+	parses := readParses(test, fixtureInputs, 0)
 	failures := compareOutputs(test, "fixture", "fixture_answers.json.gz", parses, 60)
 	test.Logf("%d of %d fixtures match upstream", len(parses)-failures, len(parses))
 }
@@ -354,7 +377,7 @@ func TestTokensMatchUpstream(test *testing.T) {
 // splits lines, tokens and surrogate pairs at every point the lexer has to buffer across.
 func TestChunkedTokensMatchUpstream(test *testing.T) {
 	test.Parallel()
-	parses := inputsAt(fixtureInputs(test), 1, 2, 3, 5, 8)
+	parses := readParses(test, fixtureInputs, 1, 2, 3, 5, 8)
 	failures := compareOutputs(test, "fixture", "chunked_answers.json.gz", parses, 60)
 	test.Logf("%d of %d chunked parses match upstream", len(parses)-failures, len(parses))
 }
@@ -364,8 +387,7 @@ func TestChunkedTokensMatchUpstream(test *testing.T) {
 // one fixed seed's first 500, the slice that keeps the inputs and answers under 50 KB.
 func TestGeneratedTokensMatchUpstream(test *testing.T) {
 	test.Parallel()
-	inputs := upstream_testing.ReadInputs(test, filepath.Join(eemeliYamlDirectory, "generated_inputs.json"))
-	parses := inputsAt(inputs, 0)
+	parses := readParses(test, filepath.Join(eemeliYamlDirectory, "generated_inputs.json"), 0)
 	failures := compareOutputs(test, "generated", "generated_answers.json.gz", parses, 40)
 	test.Logf("%d of %d generated inputs match upstream", len(parses)-failures, len(parses))
 }
@@ -374,15 +396,15 @@ func TestGeneratedTokensMatchUpstream(test *testing.T) {
 // upstream's for another must differ.
 func TestOracleCanFail(test *testing.T) {
 	test.Parallel()
-	parses := inputsAt(fixtureInputs(test), 0)
+	parses := readParses(test, fixtureInputs, 0)
 	outputs, _ := recordedOutputs(test, "fixture_answers.json.gz", parses)
 	byText := map[string]string{}
 	for index, parse := range parses {
 		byText[parse.Text] = outputs[index]
 	}
 	for _, each := range []struct{ mine, theirs string }{{"a:  b", "a: b"}, {"a: [b,]", "a: [b]"}} {
-		expected, recorded := byText[each.theirs]
-		if !recorded {
+		expected, answered := byText[each.theirs]
+		if !answered {
 			test.Fatalf("fixture_inputs.json no longer holds %q", each.theirs)
 		}
 		if portOutput(oracleInput{Text: each.mine}) == expected {
@@ -395,41 +417,27 @@ func TestOracleCanFail(test *testing.T) {
 // part by part.
 func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
 	test.Parallel()
-	cases, compared, failures := 0, 0, 0
-	for part := 1; part <= upstream_testing.SuitePartCount; part++ {
-		inputs := upstream_testing.SuiteInputs(upstream_testing.ReadSuitePart(test, suiteDirectory, part), false)
-		parses := inputsAt(inputs, 0, 3)
-		failures += compareOutputs(
-			test,
-			fmt.Sprintf("suite part %d", part),
-			fmt.Sprintf("suite_answers_%d.json.gz", part),
-			parses,
-			40,
-		)
-		cases += len(inputs)
+	compared, failures := 0, 0
+	// The cases' yaml alone, as the deleted test compared; the dumps are the unist and format tests'.
+	paths, answersFiles := parts(test, suiteDirectory, "cases_", "suite_answers_")
+	for part, path := range paths {
+		parses := readParses(test, path, 0, 3)
+		failures += compareOutputs(test, fmt.Sprintf("suite part %d", part+1), answersFiles[part], parses, 40)
 		compared += len(parses)
 	}
 	test.Logf("%d of %d yaml-test-suite parses (%d cases, whole and chunked) match upstream",
-		compared-failures, compared, cases)
+		compared-failures, compared, compared/2)
 }
 
-// corpusDirectory holds the corpus, Prettier's own format fixtures, shared with the other YAML packages.
-var corpusDirectory = filepath.Join("..", "testdata", "prettier_tests")
-
 // TestCorpusMatchesUpstream compares every YAML file of the corpus, whole: Prettier's own YAML format
-// fixtures but its spec examples, which the yaml-test-suite holds, half by half.
+// fixtures but the spec examples the yaml-test-suite holds, half by half.
 func TestCorpusMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	compared, failures := 0, 0
-	for half := 1; half <= upstream_testing.CorpusHalfCount; half++ {
-		parses := inputsAt(upstream_testing.ReadCorpusHalf(test, corpusDirectory, half), 0)
-		failures += compareOutputs(
-			test,
-			fmt.Sprintf("corpus half %d", half),
-			fmt.Sprintf("corpus_answers_%d.json.gz", half),
-			parses,
-			40,
-		)
+	paths, answersFiles := parts(test, corpusDirectory, "yaml_inputs_", "corpus_answers_")
+	for half, path := range paths {
+		parses := readParses(test, path, 0)
+		failures += compareOutputs(test, fmt.Sprintf("corpus half %d", half+1), answersFiles[half], parses, 40)
 		compared += len(parses)
 	}
 	test.Logf("%d of %d files match upstream's tokens", compared-failures, compared)

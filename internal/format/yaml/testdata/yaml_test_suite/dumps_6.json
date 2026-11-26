@@ -1,0 +1,32 @@
+{
+ "about": "The canonical dumps of the cases in cases_6.json that have one, each named as its case and \" dump\"; yaml-test-suite 0.1.0 (fisker Cheung's packaging of github.com/yaml/yaml-test-suite, data by Ingy döt Net, MIT, see LICENSE), node_modules/yaml-test-suite/index.js in the Prettier fork, read by node v24.14.1 on 2026-11-25.",
+ "vendored": true,
+ "inputs": [
+  {"name":"U3C3 dump","text":"--- !!str \"foo\"\n"},
+  {"name":"U3XV dump","text":"---\ntop1: &node1\n  &k1 key1: one\ntop2: &node2\n  key2: two\ntop3:\n  &k3 key3: three\ntop4: &node4\n  &k4 key4: four\ntop5: &node5\n  key5: five\ntop6: &val6 six\ntop7: &val7 seven\n"},
+  {"name":"UDM2 dump","text":"- url: http://example.org\n"},
+  {"name":"UDR7 dump","text":"sequence:\n- one\n- two\nmapping:\n  sky: blue\n  sea: green\n"},
+  {"name":"UGM3 dump","text":"--- !<tag:clarkevans.com,2002:invoice>\ninvoice: 34843\ndate: 2001-01-23\nbill-to: &id001\n  given: Chris\n  family: Dumars\n  address:\n    lines: |\n      458 Walkman Dr.\n      Suite #292\n    city: Royal Oak\n    state: MI\n    postal: 48046\nship-to: *id001\nproduct:\n- sku: BL394D\n  quantity: 4\n  description: Basketball\n  price: 450.00\n- sku: BL4438H\n  quantity: 1\n  description: Super Hoop\n  price: 2392.00\ntax: 251.42\ntotal: 4443.52\ncomments: Late afternoon is best. Backup contact is Nancy Billsmer @ 338-4338.\n"},
+  {"name":"UT92 dump","text":"---\nmatches %: 20\n...\n---\n...\n"},
+  {"name":"UV7Q dump","text":"x:\n- x x\n"},
+  {"name":"VJP3/1 dump","text":"---\nk:\n  k: v\n"},
+  {"name":"W42U dump","text":"-\n- |\n  block node\n- - one\n  - two\n- one: two\n"},
+  {"name":"W4TN dump","text":"--- |\n  %!PS-Adobe-2.0\n...\n---\n...\n"},
+  {"name":"WZ62 dump","text":"foo: !!str\n!!str : bar\n"},
+  {"name":"X38W dump","text":"? &a\n- a\n- &b b\n: *b\n*a :\n- c\n- *b\n- d\n"},
+  {"name":"X8DW dump","text":"---\nkey: value\n"},
+  {"name":"XLQ9 dump","text":"--- scalar %YAML 1.2\n...\n"},
+  {"name":"XV9V dump","text":"Folding: \"Empty line\\nas a line feed\"\nChomping: |\n  Clipped empty lines\n"},
+  {"name":"XW4D dump","text":"a: \"double quotes\"\nb: plain value\nc: d\n? - seq1\n: - seq2\ne: &node\n- x: y\nblock: >\n  abcde\n"},
+  {"name":"Y2GN dump","text":"---\nkey: &an:chor value\n"},
+  {"name":"Y79Y/1 dump","text":"foo: |\n  \t\nbar: 1\n"},
+  {"name":"Y79Y/2 dump","text":"- - foo\n"},
+  {"name":"Y79Y/10 dump","text":"- -1\n"},
+  {"name":"YD5X dump","text":"- - name\n  - hr\n  - avg\n- - Mark McGwire\n  - 65\n  - 0.278\n- - Sammy Sosa\n  - 63\n  - 0.288\n"},
+  {"name":"Z67P dump","text":"literal: |\n  value\nfolded: !foo >\n  value\n"},
+  {"name":"Z9M4 dump","text":"---\n- !<tag:example.com,2000:app/foo> \"bar\"\n"},
+  {"name":"ZF4X dump","text":"Mark McGwire:\n  hr: 65\n  avg: 0.278\nSammy Sosa:\n  hr: 63\n  avg: 0.288\n"},
+  {"name":"ZK9H dump","text":"key:\n- - - value\n"},
+  {"name":"ZWK4 dump","text":"---\na: 1\nb:\n&anchor c: 3\n"}
+ ]
+}

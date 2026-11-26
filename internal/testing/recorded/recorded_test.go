@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -112,5 +113,113 @@ func TestDigestIsTheSha256InHex(test *testing.T) {
 	// The SHA-256 of the empty input, as `shasum -a 256` prints it.
 	if digest := Digest(nil); digest != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" {
 		test.Errorf("got %s", digest)
+	}
+}
+
+func TestAVendoredInputIsMatchedByItsDigest(test *testing.T) {
+	test.Parallel()
+	text := "a: b\n"
+	own := Inputs{Inputs: []Input{{Name: "a", Text: text}}}
+	vendored := Inputs{Vendored: true, Inputs: []Input{{Name: "a", Text: text}}}
+	byText := RecordedFor{Name: "a", Text: text}
+	byDigest := RecordedFor{Name: "a", Sha256: Digest([]byte(text))}
+	for name, testCase := range map[string]struct {
+		inputs  Inputs
+		answer  RecordedFor
+		matches bool
+	}{
+		"own input, answered by its text":        {own, byText, true},
+		"vendored input, answered by its digest": {vendored, byDigest, true},
+		"vendored input, answered by its text":   {vendored, byText, false},
+		"own input, answered by a digest":        {own, byDigest, false},
+		"vendored input, edited": {
+			Inputs{Vendored: true, Inputs: []Input{{Name: "a", Text: "a: c\n"}}},
+			byDigest,
+			false,
+		},
+	} {
+		_, matchError := Match(testCase.inputs.Entries(), []Entry{testCase.answer.Entry()})
+		if (matchError == nil) != testCase.matches {
+			test.Errorf("%s: want a match %v, got %v", name, testCase.matches, matchError)
+		}
+	}
+}
+
+func TestAnAnswerFileReadsWithItsRecordedForFields(test *testing.T) {
+	test.Parallel()
+	type answer struct {
+		RecordedFor
+		Output string `json:"output"`
+	}
+	path := filepath.Join(test.TempDir(), "answers.json.gz")
+	text := `{"source": "s", "recorded": "2026-11-25", "answers": [` +
+		`{"name": "a", "text": "x", "output": "1"}, {"name": "b", "sha256": "d", "output": "2"}]}`
+	if writeError := os.WriteFile(path, gzipped(test, text), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	answers, readJsonError := ReadJson[Answers[answer]](path)
+	if readJsonError != nil {
+		test.Fatal(readJsonError)
+	}
+	if len(answers.Answers) != 2 ||
+		answers.Answers[0].Entry() != (Entry{"a", "x"}) ||
+		answers.Answers[1].Entry() != (Entry{"b", "d"}) ||
+		answers.Answers[1].Output != "2" {
+		test.Errorf("read %+v", answers)
+	}
+}
+
+func TestReadInputsKeysEachFileByItsOwnVendoredFlag(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	own := filepath.Join(directory, "own.json")
+	vendored := filepath.Join(directory, "vendored.json")
+	empty := filepath.Join(directory, "empty.json")
+	for path, text := range map[string]string{
+		own:      `{"about": "ours", "inputs": [{"name": "a", "text": "x"}]}`,
+		vendored: `{"about": "theirs", "vendored": true, "inputs": [{"name": "b", "text": "y", "about": "a case"}]}`,
+		empty:    `{"about": "none", "inputs": []}`,
+	} {
+		if writeError := os.WriteFile(path, []byte(text), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	inputs, entries, readInputsError := ReadInputs(own, vendored)
+	if readInputsError != nil {
+		test.Fatal(readInputsError)
+	}
+	if len(inputs) != 2 || inputs[1].Text != "y" || inputs[1].About != "a case" ||
+		entries[0] != (Entry{"a", "x"}) || entries[1] != (Entry{"b", Digest([]byte("y"))}) {
+		test.Errorf("read %+v, %+v", inputs, entries)
+	}
+	_, _, emptyError := ReadInputs(own, empty)
+	if emptyError == nil || !strings.Contains(emptyError.Error(), "no inputs") {
+		test.Errorf("an empty inputs file read as %v", emptyError)
+	}
+}
+
+func TestPartsAreReadInNumberOrderAndNoneIsMissing(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	write := func(name string) {
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte("{}"), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	for part := 1; part <= 10; part++ {
+		write("cases_" + strconv.Itoa(part) + ".json")
+	}
+	parts, partsError := Parts(directory, "cases_")
+	if partsError != nil || len(parts) != 10 || filepath.Base(parts[1]) != "cases_2.json" ||
+		filepath.Base(parts[9]) != "cases_10.json" {
+		test.Fatalf("got %v, %v", parts, partsError)
+	}
+	write("cases_12.json")
+	_, gapError := Parts(directory, "cases_")
+	if gapError == nil || !strings.Contains(gapError.Error(), "cases_11.json") {
+		test.Errorf("a gap at 11 read as %v", gapError)
+	}
+	if _, noneError := Parts(directory, "dumps_"); noneError == nil {
+		test.Error("no parts at all read as no error")
 	}
 }

@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
+	"github.com/system-inc/cohere/internal/format/markdown/mdast"
+	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // TestParseMatchesUpstream compares every fixture: the hand-written fixtures of the deleted parse_test.go,
@@ -16,8 +18,8 @@ import (
 // input in each place, \r\n, tabs, non-ASCII and astral characters), then the control texts.
 func TestParseMatchesUpstream(test *testing.T) {
 	test.Parallel()
-	inputs := fixtureInputs(test)
-	failures, errored := compareAll(test, "fixture", "fixture_answers.json.gz", inputs, 40)
+	inputs, entries := readInputs(test, fixtureInputs)
+	failures, errored := compareAll(test, "fixture", "fixture_answers.json.gz", inputs, entries, 40)
 	test.Logf("%d of %d fixtures match upstream (%d of them errors)", len(inputs)-failures, len(inputs), errored)
 }
 
@@ -26,8 +28,8 @@ func TestParseMatchesUpstream(test *testing.T) {
 // first 500, the slice that keeps the inputs and answers under 50 KB.
 func TestGeneratedParseMatchesUpstream(test *testing.T) {
 	test.Parallel()
-	inputs := upstream_testing.ReadInputs(test, filepath.Join(yamlUnistParserDirectory, "generated_inputs.json"))
-	failures, errored := compareAll(test, "generated", "generated_answers.json.gz", inputs, 30)
+	inputs, entries := readInputs(test, filepath.Join(yamlUnistParserDirectory, "generated_inputs.json"))
+	failures, errored := compareAll(test, "generated", "generated_answers.json.gz", inputs, entries, 30)
 	test.Logf(
 		"%d of %d generated inputs match upstream (%d of them errors)",
 		len(inputs)-failures,
@@ -40,7 +42,7 @@ func TestGeneratedParseMatchesUpstream(test *testing.T) {
 // upstream's for another, where the trees differ in a single position, value, comment slot or error.
 func TestOracleCanFail(test *testing.T) {
 	test.Parallel()
-	recorded := recordedFixtures(test)
+	answers := recordedFixtures(test)
 	cases := []struct{ mine, theirs string }{
 		{"a:  b", "a: b"},         // a position
 		{"a: c", "a: b"},          // a value
@@ -49,7 +51,7 @@ func TestOracleCanFail(test *testing.T) {
 		{"- a\n- b", "- a\n- b\n"},
 	}
 	for _, each := range cases {
-		if differences := compareParse(each.mine, recordedFixture(test, recorded, each.theirs)); len(differences) == 0 {
+		if differences := compareParse(each.mine, recordedFixture(test, answers, each.theirs)); len(differences) == 0 {
 			test.Errorf("the comparison found no difference between %q and %q", each.mine, each.theirs)
 		}
 	}
@@ -60,13 +62,17 @@ func TestOracleCanFail(test *testing.T) {
 func TestYamlTestSuiteParseMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	compared, failures, errored := 0, 0, 0
-	for part := 1; part <= upstream_testing.SuitePartCount; part++ {
-		inputs := upstream_testing.SuiteInputs(upstream_testing.ReadSuitePart(test, suiteDirectory, part), true)
+	paths, answersFiles := parts(test, suiteDirectory, "cases_", "suite_answers_")
+	for part, path := range paths {
+		// A part's dumps sit in dumps_<n>.json beside its cases, and are answered with them.
+		dumps := filepath.Join(suiteDirectory, fmt.Sprintf("dumps_%d.json", part+1))
+		inputs, entries := readInputs(test, path, dumps)
 		partFailures, partErrored := compareAll(
 			test,
-			fmt.Sprintf("suite part %d", part),
-			fmt.Sprintf("suite_answers_%d.json.gz", part),
+			fmt.Sprintf("suite part %d", part+1),
+			answersFiles[part],
 			inputs,
+			entries,
 			30,
 		)
 		compared += len(inputs)
@@ -87,8 +93,8 @@ func TestYamlTestSuiteParseMatchesUpstream(test *testing.T) {
 func TestComparisonSeesEveryField(test *testing.T) {
 	test.Parallel()
 	text := "%YAML 1.2 # d\n---\n- &a !t |2- # i\n   x\n- *a # t\n- ? k\n  : v\n  # e\n# l\n- [b, {c: d}]\n"
-	recorded := recordedFixtures(test)
-	expected := recordedFixture(test, recorded, text)
+	answers := recordedFixtures(test)
+	expected := recordedFixture(test, answers, text)
 	if expected.Error != nil {
 		test.Fatalf("the fixture does not parse: %s", expected.Error.Message)
 	}
@@ -209,7 +215,7 @@ func TestComparisonSeesEveryField(test *testing.T) {
 	}
 	// And the errors: a different message, name or position.
 	errorText := "a: [b"
-	expectedError := recordedFixture(test, recorded, errorText)
+	expectedError := recordedFixture(test, answers, errorText)
 	if expectedError.Error == nil {
 		test.Fatalf("upstream parses %q, which the error corruptions need refused", errorText)
 	}
@@ -231,27 +237,46 @@ func TestComparisonSeesEveryField(test *testing.T) {
 // corpusDirectory holds the corpus, Prettier's own format fixtures, shared with the other YAML packages.
 var corpusDirectory = filepath.Join("..", "testdata", "prettier_tests")
 
+// frontMatterValues are the corpus's front matter values as inputs: each markdown file's YAML front matter
+// value, read by mdast and trimmed as the front matter embed trims it, under the file's name and
+// " (front matter)". The file is vendored, so each value's answer records its digest, which also holds
+// mdast to reading the value Prettier's own parser read when the answer was recorded.
+func frontMatterValues(test *testing.T) ([]recorded.Input, []recorded.Entry) {
+	test.Helper()
+	files, _ := readInputs(test, filepath.Join(corpusDirectory, "front_matter_inputs.json"))
+	values := make([]recorded.Input, len(files))
+	entries := make([]recorded.Entry, len(files))
+	for index, file := range files {
+		frontMatter, _ := mdast.ParseFrontMatter(file.Text)
+		if frontMatter == nil || frontMatter.Language != "yaml" {
+			test.Fatalf("%s holds no yaml front matter for mdast", file.Name)
+		}
+		value := ecmascripttext.TrimWhitespace(frontMatter.Value)
+		values[index] = recorded.Input{Name: file.Name + " (front matter)", Text: value}
+		entries[index] = recorded.Entry{Name: values[index].Name, Input: recorded.Digest([]byte(value))}
+	}
+	return values, entries
+}
+
 // TestCorpusParseMatchesUpstream compares every YAML file of the corpus, Prettier's own YAML format
-// fixtures but its spec examples, which the yaml-test-suite holds, half by half, and the YAML front matter
-// value of every markdown fixture of Prettier's that has one, as Prettier's front matter parser reads it.
+// fixtures but the spec examples the yaml-test-suite holds, half by half, and the YAML front matter value
+// of every markdown fixture of Prettier's that has one.
 func TestCorpusParseMatchesUpstream(test *testing.T) {
 	test.Parallel()
 	compared, failures, errored := 0, 0, 0
-	measure := func(label string, answersFile string, inputs []upstream_testing.Input) {
-		labelFailures, labelErrored := compareAll(test, label, answersFile, inputs, 30)
+	measure := func(label string, answersFile string, inputs []recorded.Input, entries []recorded.Entry) {
+		labelFailures, labelErrored := compareAll(test, label, answersFile, inputs, entries, 30)
 		compared += len(inputs)
 		failures += labelFailures
 		errored += labelErrored
 	}
-	for half := 1; half <= upstream_testing.CorpusHalfCount; half++ {
-		measure(
-			fmt.Sprintf("corpus half %d", half),
-			fmt.Sprintf("corpus_answers_%d.json.gz", half),
-			upstream_testing.ReadCorpusHalf(test, corpusDirectory, half),
-		)
+	paths, answersFiles := parts(test, corpusDirectory, "yaml_inputs_", "corpus_answers_")
+	for half, path := range paths {
+		inputs, entries := readInputs(test, path)
+		measure(fmt.Sprintf("corpus half %d", half+1), answersFiles[half], inputs, entries)
 	}
-	frontMatter := upstream_testing.FrontMatterValues(upstream_testing.ReadFrontMatter(test, corpusDirectory))
-	measure("front matter", "front_matter_answers.json.gz", frontMatter)
+	frontMatter, frontMatterEntries := frontMatterValues(test)
+	measure("front matter", "front_matter_answers.json.gz", frontMatter, frontMatterEntries)
 	test.Logf(
 		"%d of %d inputs match upstream (%d front matter values; %d of them errors)",
 		compared-failures,

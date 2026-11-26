@@ -1,5 +1,5 @@
 {
- "source": "the first 500 of cst/fixtures_test.go's generatedInputs at 69a8e49c5: math/rand/v2 PCG seeded (1, 2), 1 to 24 of its pieces each",
+ "about": "the first 500 of cst/fixtures_test.go's generatedInputs at 69a8e49c5: math/rand/v2 PCG seeded (1, 2), 1 to 24 of its pieces each",
  "inputs": [
   {"name":"1","text":"&a%----  \", \n  \r\n!t,1\n{%*a\\\n#"},
   {"name":"2","text":"&\r"},

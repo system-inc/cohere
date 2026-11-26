@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
-	"github.com/system-inc/cohere/internal/format/yaml/upstream_testing"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // formatFixtures reach the printer's branches: every node type, comments in every slot they attach to,
@@ -605,16 +605,17 @@ func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
 }
 
 // suiteDirectory holds the yaml-test-suite's cases, recorded from the package in the Prettier fork's
-// node_modules (see upstream_testing), with the suite's MIT notices beside them.
+// node_modules (see package recorded), with the suite's MIT notices beside them.
 var suiteDirectory = filepath.Join("testdata", "yaml_test_suite")
 
-// suiteInputs is every input of one part of the yaml-test-suite, and each case's canonical dump.
-func suiteInputs(test *testing.T, part int) []string {
+// suiteInputs is every input of one part of the yaml-test-suite (cases_<n>.json), and each case's canonical
+// dump (dumps_<n>.json).
+func suiteInputs(test *testing.T, cases string, part int) []string {
 	test.Helper()
-	var inputs []string
-	cases := upstream_testing.ReadSuitePart(test, suiteDirectory, part)
-	for _, input := range upstream_testing.SuiteInputs(cases, true) {
-		inputs = append(inputs, input.Text)
+	read, _ := readInputs(test, cases, filepath.Join(suiteDirectory, fmt.Sprintf("dumps_%d.json", part)))
+	inputs := make([]string, len(read))
+	for index, input := range read {
+		inputs[index] = input.Text
 	}
 	return inputs
 }
@@ -624,10 +625,14 @@ func suiteInputs(test *testing.T, part int) []string {
 // is a subtest with a golden of its own, which keeps every golden under 50 KB.
 func TestYamlTestSuiteMatchesOracle(test *testing.T) {
 	test.Parallel()
-	for part := 1; part <= upstream_testing.SuitePartCount; part++ {
-		test.Run(fmt.Sprintf("part_%d", part), func(test *testing.T) {
+	parts, partsError := recorded.Parts(suiteDirectory, "cases_")
+	if partsError != nil {
+		test.Fatal(partsError)
+	}
+	for index, cases := range parts {
+		test.Run(fmt.Sprintf("part_%d", index+1), func(test *testing.T) {
 			test.Parallel()
-			compareFormat(test, suiteInputs(test, part))
+			compareFormat(test, suiteInputs(test, cases, index+1))
 		})
 	}
 }

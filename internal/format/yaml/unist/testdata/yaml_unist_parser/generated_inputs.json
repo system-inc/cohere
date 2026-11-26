@@ -1,5 +1,5 @@
 {
- "source": "the first 500 of unist/parse_test.go's generatedInputs at 69a8e49c5: math/rand/v2 PCG seeded (5, 6), 1 to 24 of its pieces each",
+ "about": "the first 500 of unist/parse_test.go's generatedInputs at 69a8e49c5: math/rand/v2 PCG seeded (5, 6), 1 to 24 of its pieces each",
  "inputs": [
   {"name":"1","text":" # c>&a  # c !foo {b"},
   {"name":"2","text":"\n    \n*a!!set ... \n!!map &a  \n  # c!!pairs "},
