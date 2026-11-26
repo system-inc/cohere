@@ -1,0 +1,5 @@
+.gitignore:1:!**	.gitignore
+.gitignore:1:!**	Dot.go
+::	keep
+.gitignore:1:!**	node_modules
+.gitignore:1:!**	out

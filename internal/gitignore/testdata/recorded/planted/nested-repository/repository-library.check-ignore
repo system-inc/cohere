@@ -1,0 +1,7 @@
+::	.gitignore
+::	debug.log
+::	kept.tmp
+.git/info/exclude:2:local-only	local-only
+.gitignore:1:*.tmp	scratch.tmp
+::	vendor
+::	vendor/module.go
