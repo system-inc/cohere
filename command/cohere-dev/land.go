@@ -595,6 +595,7 @@ func gate(worktree string, commit string, task string) (int, string) {
 		}
 		code, checked = checkCohere(
 			worktree,
+			gateCohereArguments,
 			func() []string { return gateEnvironment(step("building cohere")) },
 			func() []string { return gateEnvironment(step("cohere on the tree")) },
 		)

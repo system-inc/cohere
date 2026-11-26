@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // A Swift run replays over an index git rewrote without changing what it decides, and runs again over one that newly
@@ -28,9 +29,10 @@ import (
 // `git status` rewrites.
 //
 // It builds the child when this checkout's Swift sources changed since the last build, which takes minutes, so -short
-// leaves it out.
+// leaves it out, and a land job, where the child can't be built, skips it by name (needs.SwiftLaid).
 func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testing.T) {
 	test.Parallel()
+	needs.SwiftLaid(test)
 	if testing.Short() {
 		test.Skip("runs the real cohere-swift, built from this checkout when its sources changed")
 	}
@@ -148,6 +150,7 @@ func TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce(test *testin
 // worktree's index without deciding anything, and the run replays through it.
 func TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgnores(test *testing.T) {
 	test.Parallel()
+	needs.SwiftLaid(test)
 	if testing.Short() {
 		test.Skip("runs the real cohere-swift, built from this checkout when its sources changed")
 	}
