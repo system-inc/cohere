@@ -210,19 +210,7 @@ var SwitchExhaustivenessCheck = rule.Rule[SwitchExhaustivenessCheckOptions]{
 		if settings.RequireDefaultForNonUnion == nil {
 			settings.RequireDefaultForNonUnion = type_checking.Reference(false)
 		}
-		// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
-		// when the rule is created. Here it matches no comment, which leaves the real default clause
-		// the only default, the reading that reports rather than the one that silences. A valid one is
-		// read as JavaScript reads it, so a lookaround or a backreference its user wrote compiles, and
-		// `\s` and `\b` mean what they mean upstream (#7mztrdd).
-		commentPattern := defaultCaseCommentPattern
-		if settings.DefaultCaseCommentPattern != nil {
-			// Ignored: an invalid pattern compiles to nil, and a nil pattern matches no comment, as above.
-			commentPattern, _ = esregexp.Compile(*settings.DefaultCaseCommentPattern, "u")
-			if commentPattern != nil && settings.matchTimeout > 0 {
-				commentPattern.Unwrap().MatchTimeout = settings.matchTimeout
-			}
-		}
+		commentPattern := commentPatternFor(settings)
 
 		isLiteralLikeType := func(subjectType *checker.Type) bool {
 			return type_checking.IsTypeFlagSet(
@@ -371,6 +359,29 @@ var SwitchExhaustivenessCheck = rule.Rule[SwitchExhaustivenessCheckOptions]{
 			},
 		}
 	},
+}
+
+// commentPatternFor is the pattern a comment must match to stand in for a default clause.
+//
+// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
+// when the rule is created. Here it matches no comment, which leaves the real default clause
+// the only default, the reading that reports rather than the one that silences. A valid one is
+// read as JavaScript reads it, so a lookaround or a backreference its user wrote compiles, and
+// `\s` and `\b` mean what they mean upstream (#7mztrdd). It keeps esregexp.MatchTimeout unless a
+// test set matchTimeout.
+func commentPatternFor(settings SwitchExhaustivenessCheckOptions) *esregexp.RegExp {
+	if settings.DefaultCaseCommentPattern == nil {
+		return defaultCaseCommentPattern
+	}
+	commentPattern, compileError := esregexp.Compile(*settings.DefaultCaseCommentPattern, "u")
+	if compileError != nil {
+		// An invalid pattern is nil, and a nil pattern matches no comment, as above.
+		return nil
+	}
+	if settings.matchTimeout > 0 {
+		commentPattern.Unwrap().MatchTimeout = settings.matchTimeout
+	}
+	return commentPattern
 }
 
 // defaultCaseComment is upstream's getCommentDefaultCase: the last comment between the end of the last

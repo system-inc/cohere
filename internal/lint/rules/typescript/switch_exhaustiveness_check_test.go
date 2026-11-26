@@ -1471,6 +1471,37 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(test *testing.T) {
 	}
 }
 
+// TestSwitchExhaustivenessCheckCommentPatternKeepsTheBound: a pattern from a config, which cannot set matchTimeout,
+// keeps esregexp.MatchTimeout, and only a set matchTimeout replaces it. A short match settles before regexp2's clock
+// first ticks, so the rule's other tests pass even when every config's pattern is left with no bound at all; this
+// reads the bound off the compiled pattern instead.
+func TestSwitchExhaustivenessCheckCommentPatternKeepsTheBound(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name         string
+		matchTimeout time.Duration
+		want         time.Duration
+	}{
+		{"a config's pattern keeps esregexp.MatchTimeout", 0, esregexp.MatchTimeout},
+		{"a test's bound replaces it", time.Nanosecond, time.Nanosecond},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			commentPattern := commentPatternFor(SwitchExhaustivenessCheckOptions{
+				DefaultCaseCommentPattern: type_checking.Reference("^skip$"),
+				matchTimeout:              testCase.matchTimeout,
+			})
+			if commentPattern == nil {
+				test.Fatal("a valid pattern compiled to nil")
+			}
+			if got := commentPattern.Unwrap().MatchTimeout; got != testCase.want {
+				test.Errorf("compiled with MatchTimeout %s, want %s", got, testCase.want)
+			}
+		})
+	}
+}
+
 // TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran: a user's pattern whose match overruns the time
 // bound (#7mztrdd) is no answer. It may spare a missing default, and must not be reported as the dangerous default
 // case it would be had it matched. The overrun is noted, so the run names it as a gap (#s4dy4e0). `(a|aa)+$`
