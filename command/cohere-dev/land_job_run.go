@@ -7,20 +7,25 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
+	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // cohere-dev land-job: the one command a Loom land job runs on Shackler to judge a merge Loom made for main (#etpnnw1,
 // Kirk's design; its units #s50bcnr, a warm cache, #6ex523f, measurement first, and the seam with Loom, #hnbb5vr). It
 // runs in the job's own tree, main's tip laid with no history, so its code is main's, and Loom runs one at a time, so
-// it takes no land lock. It reads the merge from the mirror landJobMirrorVariable names, refuses one whose first parent
-// isn't the commit it runs at, and lays the merge's tree under its scratch. Each step says one line with its seconds,
-// and the first refusal stops it:
+// it takes no land lock. It runs one git throughout, the developer tools' own (landJobGit), never macOS's shim. It
+// reads the merge from the mirror landJobMirrorVariable names, refuses one whose first parent isn't the commit it runs
+// at, and lays the merge's tree under its scratch. Each step says one line with its seconds, and the first refusal
+// stops it:
 //
 //  1. Preflight: what no gate needs to run for, refused in seconds (landJobPreflight).
 //  2. Lay: the merge's tree and its TypeScript pin under the scratch.
@@ -40,6 +45,9 @@ const landJobCacheVariable = "COHERE_LAND_CACHE"
 // landJobShellVariable names a command run in place of bash for the land job's scripts, for a test: it is handed
 // bash's arguments and the script on its standard input. Unset, bash runs them.
 const landJobShellVariable = "COHERE_DEV_LAND_JOB_SHELL"
+
+// landJobGitVariable names a git run in place of the one landJobGit finds, for a test. Unset, the land job finds it.
+const landJobGitVariable = "COHERE_DEV_LAND_JOB_GIT"
 
 // landJobMirrorVariable is the cohere mirror the land job reads the merge from, where Loom's bridge puts it; unset, it
 // is landJobMirrorDefault. The TypeScript mirror beside it, TypeScript.git, holds every pin.
@@ -131,6 +139,8 @@ type landJobRun struct {
 	ran      []string
 	// cache is the land job's kept directory, empty when landJobCacheVariable is unset.
 	cache string
+	// git is the git every git the job starts runs (landJobGit), first on its own path and on its scripts'.
+	git string
 	// steps is each step that ended, `<step> <seconds>`, for the landing's body.
 	steps []string
 }
@@ -143,7 +153,21 @@ func landJob(arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", parseError)
 		return 2
 	}
-	job := &landJobRun{options: options, started: time.Now(), merge: options.Merge,
+	// The git is found before anything runs one, and its directory goes first on the job's own path, so every git it
+	// starts, its own, its packages' and its children's, is that one, and the account's path is otherwise as it was.
+	git, landJobGitError := landJobGit()
+	if landJobGitError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", landJobGitError)
+		return 1
+	}
+	path := filepath.Dir(git) + string(os.PathListSeparator) + os.Getenv("PATH")
+	if setError := os.Setenv("PATH", path); setError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: putting %s first on the land job's path: %v\n", filepath.Dir(git),
+			setError)
+		return 1
+	}
+	fmt.Fprintf(streams.Errors, "cohere-dev: land-job runs the git at %s\n", git)
+	job := &landJobRun{options: options, started: time.Now(), merge: options.Merge, git: git,
 		cache:  strings.TrimSpace(os.Getenv(landJobCacheVariable)),
 		mirror: settingOr(landJobMirrorVariable, landJobMirrorDefault)}
 	if job.cache != "" && !filepath.IsAbs(job.cache) {
@@ -165,6 +189,38 @@ func landJob(arguments []string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: finding the land job's home for its scratch: %v\n", homeError)
 		return 1
 	}
+	// The pool hangs from the account's home in the system's user database, never `HOME` (poolHome), so that a gate
+	// with a scratch `HOME` still shares the machine's pool. A land job runs alone in an account of its own, whose home
+	// in that database is /var/empty in Shackler's sandbox (J-5xseq90: "mkdir /var/empty/Library"), so its pool hangs
+	// from the job's own home, unless one is named.
+	if os.Getenv(homeVariable) == "" {
+		if setError := os.Setenv(homeVariable, home); setError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: hanging the land job's pool from its home %s: %v\n", home,
+				setError)
+			return 1
+		}
+	}
+	// A land job has no network, so when Loom hands it a laid module set in `GOMODCACHE`, its own go commands read
+	// that set with the proxy and the checksum database off, as its scripts do: the test listing, go vet, the rule CPU
+	// budget, the unit isolation, the docs data, cohere's build and cohere's own go children. Each then fails naming a
+	// module the set lacks, never waiting on a network it can't reach (#5wj23dd).
+	if strings.TrimSpace(os.Getenv("GOMODCACHE")) != "" {
+		for _, setting := range [][2]string{{"GOPROXY", "off"}, {"GOSUMDB", "off"}} {
+			if setError := os.Setenv(setting[0], setting[1]); setError != nil {
+				fmt.Fprintf(streams.Errors, "cohere-dev: setting %s=%s for the land job's laid modules: %v\n",
+					setting[0], setting[1], setError)
+				return 1
+			}
+		}
+	}
+	// cohere-swift can't be built in a land job's sandbox (needs.SwiftUnlaid), so the tests that build it skip by name
+	// (needs.SwiftLaid), cohere on the tree checks every language but Swift (landJobCohereArguments), a merge that
+	// changes what only Swift checks is refused (landJobSwiftRefusal), and the landing's account says so.
+	if setError := os.Setenv(needs.SwiftUnlaidVariable, needs.SwiftUnlaidSetting); setError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: setting %s for the land job's tests: %v\n", needs.SwiftUnlaidVariable,
+			setError)
+		return 1
+	}
 	job.scratch = filepath.Join(home, landJobScratch)
 	job.mirrors = filepath.Join(job.scratch, "mirrors")
 	job.repository = filepath.Join(job.mirrors, "cohere.git")
@@ -175,6 +231,96 @@ func landJob(arguments []string) int {
 		return code
 	}
 	return 0
+}
+
+// commandLineToolsGit is where the Command Line Tools keep the real git on a Mac, and shimGit macOS's /usr/bin/git,
+// which runs xcrun to find the developer tools and caches its answer under the account's temporary directory, which a
+// sandboxed job account can't write (Loom job J-0bgcqrx on Shackler, Nov 25, #5wj23dd).
+const (
+	commandLineToolsGit = "/Library/Developer/CommandLineTools/usr/bin/git"
+	shimGit             = "/usr/bin/git"
+)
+
+// landJobGit is the git the land job runs: the one landJobGitVariable names, or the real one realGit finds here. Its
+// directory goes on a path, so it is refused when it holds the path's separator.
+func landJobGit() (string, error) {
+	git := strings.TrimSpace(os.Getenv(landJobGitVariable))
+	if git != "" && !filepath.IsAbs(git) {
+		return "", fmt.Errorf("%s=%q is no git's whole path", landJobGitVariable, git)
+	}
+	if git == "" {
+		found, realGitError := realGit(runtime.GOOS, "/", xcodeDeveloperDirectory, exec.LookPath)
+		if realGitError != nil {
+			return "", realGitError
+		}
+		git = found
+	}
+	if strings.ContainsRune(filepath.Dir(git), os.PathListSeparator) {
+		return "", fmt.Errorf("the git at %s is in a directory whose name holds %q, so no path can name it", git,
+			os.PathListSeparator)
+	}
+	return git, nil
+}
+
+// realGit is the real git on operatingSystem: on darwin the first that is an executable file of the Command Line
+// Tools' (commandLineToolsGit) and the one in the developer directory developerDirectory names, each under root, `/`
+// but for a test, and never shimGit; anywhere else the git lookPath finds on the path. A Mac with neither refuses,
+// naming both, since the shim would run xcrun.
+func realGit(
+	operatingSystem string,
+	root string,
+	developerDirectory func() (string, error),
+	lookPath func(string) (string, error),
+) (string, error) {
+	if operatingSystem != "darwin" {
+		return lookPath("git")
+	}
+	shim := filepath.Join(root, shimGit)
+	commandLineTools := filepath.Join(root, commandLineToolsGit)
+	if isRealGit(commandLineTools, shim) {
+		return commandLineTools, nil
+	}
+	developer, developerError := developerDirectory()
+	if developerError != nil {
+		return "", fmt.Errorf("no git of the developer tools is at %s, and `xcode-select -p` named no developer "+
+			"directory for the other (%w), so land-job refuses rather than run %s, whose xcrun can't write its cache "+
+			"in a job's sandbox", commandLineTools, developerError, shimGit)
+	}
+	xcode := filepath.Join(root, developer, "usr", "bin", "git")
+	if isRealGit(xcode, shim) {
+		return xcode, nil
+	}
+	return "", fmt.Errorf("no git of the developer tools is at %s or %s, so land-job refuses rather than run %s, "+
+		"whose xcrun can't write its cache in a job's sandbox", commandLineTools, xcode, shimGit)
+}
+
+// isRealGit says whether candidate is an executable file other than shim, either reached through a link.
+func isRealGit(candidate string, shim string) bool {
+	information, statError := os.Stat(candidate)
+	if statError != nil || !information.Mode().IsRegular() || information.Mode().Perm()&0o111 == 0 {
+		return false
+	}
+	resolved, resolveError := filepath.EvalSymlinks(candidate)
+	if resolveError != nil {
+		return false
+	}
+	// Ignored: a root with no shim resolves it to nothing, which no candidate that exists resolves to.
+	shimResolved, _ := filepath.EvalSymlinks(shim)
+	return resolved != shimResolved
+}
+
+// xcodeDeveloperDirectory is the developer directory `xcode-select -p` names, Xcode's or the Command Line Tools'. It
+// is no xcrun shim, so it runs anywhere the land job does.
+func xcodeDeveloperDirectory() (string, error) {
+	output, outputError := exec.Command("xcode-select", "-p").Output()
+	if outputError != nil {
+		return "", outputError
+	}
+	developer := strings.TrimSpace(string(output))
+	if !filepath.IsAbs(developer) {
+		return "", fmt.Errorf("it said %q, no directory's whole path", developer)
+	}
+	return developer, nil
 }
 
 // settingOr is the setting variable holds, or fallback when it holds none.
@@ -293,6 +439,15 @@ func (job *landJobRun) preflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
 		return "", 1
 	}
+	swiftRefusal, swiftError := landJobSwiftRefusal(job.repository, job.merge)
+	if swiftError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", swiftError)
+		return "", 1
+	}
+	if swiftRefusal != "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", swiftRefusal)
+		return "", 1
+	}
 	job.commits, job.subject = commits, subject
 	return subject + ", " + shortCommit(job.candidate) + " merged onto main at " + shortCommit(job.running) + " as " +
 		shortCommit(job.merge), 0
@@ -347,6 +502,37 @@ func landJobPreflight(
 		return nil, "", checkGitlinksError.Error(), nil
 	}
 	return commits, subject, "", nil
+}
+
+// landJobSwiftRefusal is why the land job refuses merge, read from repository, for what it changes against its first
+// parent that only Swift's checks judge, empty when it changes none of it: any path under swift_language/, the Swift
+// package, and the Swift files of the packages that run cohere-swift or build it, swift.go and swift_*.go in
+// landJobSwiftDirectories, whose tests that build it skip in a land job (needs.SwiftLaid). Until Machines lays Swift on
+// Shackler (#je1r32a) no land job checks them, so a change to them is never landed unchecked. Renames are read as a
+// removal and an addition, so a file moved out of the package is still the package's change.
+// landJobSwiftDirectories are the packages whose Swift files landJobSwiftRefusal refuses: command/cohere runs
+// cohere-swift, and release's dispatch and packaging build it.
+var landJobSwiftDirectories = []string{"command/cohere/", "internal/release/dispatch/", "internal/release/packaging/"}
+
+func landJobSwiftRefusal(repository string, merge string) (string, error) {
+	changed, diffError := gitOutput(repository, "diff", "--name-only", "--no-renames", merge+"^1", merge)
+	if diffError != nil {
+		return "", fmt.Errorf("reading what the merge %s changes: %w", shortCommit(merge), diffError)
+	}
+	swift := []string{}
+	for _, changedPath := range strings.Split(changed, "\n") {
+		directory, name := path.Split(changedPath)
+		swiftFile := (name == "swift.go" || strings.HasPrefix(name, "swift_")) && strings.HasSuffix(name, ".go")
+		if strings.HasPrefix(changedPath, "swift_language/") ||
+			(swiftFile && slices.Contains(landJobSwiftDirectories, directory)) {
+			swift = append(swift, changedPath)
+		}
+	}
+	if len(swift) == 0 {
+		return "", nil
+	}
+	return fmt.Sprintf("%s, so the merge's change to %s can't be judged here, and nothing lands", needs.SwiftUnlaid,
+		strings.Join(swift, ", ")), nil
 }
 
 // lay checks the merge's tree out under the land job's scratch, a worktree of its mirror kept across jobs, with its
@@ -462,6 +648,13 @@ func (job *landJobRun) measure() (string, int) {
 		mainBinary = previous.Tools.Binary
 	}
 	script, scriptError := withLandJobMirrors(performanceScript, job.mirrors)
+	if scriptError == nil {
+		// The land job's own setting, so the script reads the module set Loom laid for the job offline.
+		script, scriptError = replacedOnce(script, landJobLine, landJobSetting)
+	}
+	if scriptError == nil {
+		script, scriptError = withLandJobGit(script, performancePathLine, job.git)
+	}
 	if scriptError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", scriptError)
 		return "", 1
@@ -500,8 +693,16 @@ func (job *landJobRun) tests(share func(string) []string) (string, int) {
 		return "", 1
 	}
 	script, scriptError := withLandJobMirrors(macBoxScript, job.mirrors)
+	if scriptError == nil {
+		// The land job's own setting, so the gate reads the module set Loom laid for the job offline, whether or not a
+		// cache is kept: keyed on the kept cache alone, a job with none went to the proxy it can't reach.
+		script, scriptError = replacedOnce(script, landJobLine, landJobSetting)
+	}
 	if scriptError == nil && job.cache != "" {
 		script, scriptError = withLandJobCache(script, job.cache)
+	}
+	if scriptError == nil {
+		script, scriptError = withLandJobGit(script, sharedBoxPathLine, job.git)
 	}
 	if scriptError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", scriptError)
@@ -559,8 +760,8 @@ func (job *landJobRun) landingLines() (string, error) {
 		}
 		performance = base64.StdEncoding.EncodeToString(contents)
 	}
-	gated := fmt.Sprintf("Gated by cohere-dev land-job on %s in %s: %s.", landJobBox,
-		time.Since(job.started).Round(time.Second), strings.Join(job.ran, ", "))
+	gated := fmt.Sprintf("Gated by cohere-dev land-job on %s in %s: %s. %s.", landJobBox,
+		time.Since(job.started).Round(time.Second), strings.Join(job.ran, ", "), needs.SwiftUnlaid)
 	account := gated + "\n\n" + job.measured + "\n\nSteps: " + strings.Join(job.steps, ", ") + "."
 	message := landingMessage(job.subject, "", job.candidate, job.running, job.commits, account, "")
 	fmt.Fprintf(&lines, "%sperformance %s\n", landJobMarker, performance)
@@ -615,7 +816,7 @@ func (job *landJobRun) checks(share func(string) []string) (string, int) {
 	if docsSaid != "" {
 		checked = append(checked, docsSaid)
 	}
-	code, cohereChecked := checkCohere(job.tree,
+	code, cohereChecked := checkCohere(job.tree, landJobCohereArguments,
 		func() []string { return gateEnvironment(share("building cohere")) },
 		func() []string { return gateEnvironment(share("cohere on the tree")) })
 	if code != 0 {
@@ -632,6 +833,17 @@ func (job *landJobRun) checks(share func(string) []string) (string, int) {
 // house's, read once, without waiting: the land job lays them itself just before.
 func withLandJobMirrors(script string, mirrors string) (string, error) {
 	return replacedOnce(script, macBoxMirrorLine, "mirrors="+shellQuoted(mirrors)+"; tries=1; pause=0")
+}
+
+// withLandJobGit is script with its path line, line, putting git's directory first, so what the script runs after it
+// finds the git the land job runs (landJobGit) before the system's /usr/bin/git. Before that line the script reads the
+// land job's own path, which holds the same directory first.
+func withLandJobGit(script string, line string, git string) (string, error) {
+	rest, found := strings.CutPrefix(line, "export PATH=")
+	if !found {
+		return "", fmt.Errorf("the land job's path line %q sets no PATH", line)
+	}
+	return replacedOnce(script, line, "export PATH="+shellQuoted(filepath.Dir(git)+string(os.PathListSeparator))+rest)
 }
 
 // withLandJobCache is macBoxScript with its line of no kept cache, macBoxLandCacheLine, keeping the land job's.

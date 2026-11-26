@@ -8,11 +8,20 @@ package main
 //
 //   - The Go toolchain is the one pinned here, by a digest of its whole tree, read before anything of it runs. A
 //     swapped `go`, `compile` or standard-library source differs from the Go project's own archive.
-//   - The account's Go settings are never read: no env.sh, no go env file, no toolchain switch, the path set here.
-//   - `go mod download` fetches every module the workspace names, other platforms' included, and `go mod verify`
-//     passes before any test runs, so the module cache is whole and matches go.sum. A box that never held a module
-//     only another platform needs failed the tests that list for that platform, though its own build never asked
-//     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8).
+//   - The account's Go settings are never read, but for the module set a land job is handed (below): no env.sh, no go
+//     env file, no toolchain switch, the path set here.
+//   - `go mod download` has every module the workspace names, other platforms' included, and `go mod verify` passes
+//     before any test runs, so the module cache is whole and matches go.sum. A box that never held a module only
+//     another platform needs failed the tests that list for that platform, though its own build never asked
+//     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8). A land job
+//     has no network, by design, so Loom lays the module set it needs and names it in `GOMODCACHE`, which the gate
+//     keeps in the land job alone (the one run whose landJob is set, landJobLine), kept cache or none, and reads with
+//     `GOPROXY=off` and `GOSUMDB=off`: the download then only confirms each module is there, and offline it fails
+//     naming the one that isn't. The checksum database is off because offline it can't answer: go asks it for a module
+//     whose zip hash go.sum doesn't hold (J-r0b69ca, a module go.work.sum names only by its go.mod), and a line go.sum
+//     does hold still binds, and verify fails a module whose bytes changed since the box laid it; one go.sum doesn't
+//     hold is trusted as the box laid it. Outside the land job, or with no set named, the download fetches from the
+//     proxy into Go's default cache.
 //   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it, but in the land job
 //     (below).
 //
@@ -97,6 +106,17 @@ const sharedBoxTestTimeout = "30m"
 // account's to change, so it trusts nothing the box kept any more than /usr/bin does.
 const sharedBoxSystemPath = "/usr/bin:/bin:/usr/sbin:/sbin"
 
+// sharedBoxPathLine is sharedBoxGate's line setting the tests' path. The land job alone puts the real git's directory
+// first on it (withLandJobGit), so its tests never run macOS's /usr/bin/git, whose xcrun can't write its cache there.
+const sharedBoxPathLine = `export PATH="$goroot/bin:$nodePath` + sharedBoxSystemPath + `"`
+
+// sharedBoxSystemPathAfter is sharedBoxGate's first line: the system's own directories put last on the path the gate
+// was handed, so the digests of the toolchain and of node, which run before sharedBoxPathLine, find sha256sum, find,
+// sort and the rest on a path that leaves them out. A land job in Shackler's sandbox is handed a path without /sbin,
+// where macOS keeps sha256sum, and under set -e a check that can't find it ends the script with no refusal said
+// (#5wj23dd). The path line that follows names its own directories whole, so nothing after it reads this one.
+const sharedBoxSystemPathAfter = `export PATH="$PATH:` + sharedBoxSystemPath + `"`
+
 // sharedBoxToolchainCheck refuses, through the refuse its script defines first, a Go toolchain at goroot that isn't the
 // one digest pins: none there, one holding a link, or one whose files digest to another. It runs before anything of the
 // toolchain does, in the gate (sharedBoxGate) and in the landing's measurement on Shackler (land_performance.go), which
@@ -114,16 +134,22 @@ const boxCoreBudgetVariable = "COHERE_DEV_GATE_CORES"
 // boxBudgetMarker opens the line a gate box's run prints when it kept to a core budget, the budget after it.
 const boxBudgetMarker = "cohere-dev-gate: budget "
 
+// boxModulesMarker opens the line a shared box's run prints of where its modules come from: the set the box laid for
+// the job, read offline, or Go's default cache, filled from the proxy. It is for the run's own account, and
+// readTestJson passes over it as it does any line it doesn't read.
+const boxModulesMarker = "cohere-dev-gate: modules "
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
-// goroot, digest, node, nodeDigest, races (racePatterns' tokens, comma-separated) and landCache (sharedBoxCacheBlock)
-// as variables, and the packages to test as its arguments: the module's patterns, or import paths, which a gate Mac is
-// handed. It prints boxMarker before the tests, boxRaceMarker before the -race run once the module passes, and
-// sharedBoxRefusedMarker, ending the run, when it won't trust the box. When boxShardedPackage is among its arguments,
-// the plain go test runs the rest, and that package runs after it in shards (sharedBoxShards), the run failing once
-// both have when either failed. The -race run is one go test of the plain tokens, then one of each token's package with
-// its run, every one through the same filter so the run after the marker reads as one stream, and a failure of any is
-// the run's, after the rest have run.
-const sharedBoxGate = `refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
+// goroot, digest, node, nodeDigest, races (racePatterns' tokens, comma-separated), landCache (sharedBoxCacheBlock) and
+// landJob (landJobLine) as variables, and the packages to test as its arguments: the module's patterns, or import
+// paths, which a gate Mac is handed. It prints boxMarker before the tests, boxRaceMarker before the -race run once the
+// module passes, and sharedBoxRefusedMarker, ending the run, when it won't trust the box. When boxShardedPackage is
+// among its arguments, the plain go test runs the rest, and that package runs after it in shards (sharedBoxShards), the
+// run failing once both have when either failed. The -race run is one go test of the plain tokens, then one of each
+// token's package with its run, every one through the same filter so the run after the marker reads as one stream, and
+// a failure of any is the run's, after the rest have run.
+const sharedBoxGate = sharedBoxSystemPathAfter + `
+refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
 # step says how many seconds the step it names took, from the end of the one before it (#bc8nf0r).
 stepStarted=$(date +%s)
 step() { stepEnded=$(date +%s); echo "` + boxStepMarker + `$1 $((stepEnded - stepStarted))"; stepStarted=$stepEnded; }
@@ -133,9 +159,22 @@ if [ -e "$node/bin/node" ]; then
   [ "$nodeFound" = "$nodeDigest" ] || refuse "the node at $node/bin/node digests to $nodeFound, not the pinned $nodeDigest"
   nodePath="$node/bin:"
 fi
+# The module set the box laid for a land job, the one run whose landJob is set, with a kept cache or without one,
+# kept before the account's Go settings go. Anywhere else a GOMODCACHE is the account's own, never read.
+laidModules=""
+[ -z "${landJob:-}" ] || laidModules="${GOMODCACHE:-}"
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
-export PATH="$goroot/bin:$nodePath` + sharedBoxSystemPath + `"
+` + sharedBoxPathLine + `
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
+# A land job has no network, so the set the box laid is read with the proxy and the checksum database off, go.sum
+# holding what it names and go mod verify below what the box laid. With none laid, the modules come from the proxy
+# into Go's default cache.
+if [ -n "$laidModules" ]; then
+  export GOMODCACHE="$laidModules" GOPROXY=off GOSUMDB=off
+  echo "` + boxModulesMarker + `the box's laid set at $laidModules, offline"
+else
+  echo "` + boxModulesMarker + `Go's default cache, from the proxy"
+fi
 # A box that shares herself with other work gives the gate a budget of cores (macBoxCoreBudgets): two threads a test
 # binary, and half the budget's binaries at once, so the gate's Go work holds that many threads. macOS caps no job's
 # cores, so it is a budget, kept by Go's own settings, and the run says it held one.
