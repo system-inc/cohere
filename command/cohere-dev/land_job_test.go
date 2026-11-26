@@ -36,8 +36,9 @@ type landJobFixture struct {
 // landJobShell stands in for bash in the land job's scripts. It keeps the script it was handed in `<kind>.script` and
 // its arguments, one a line, in `<kind>.arguments`, the kind `measure` for performanceScript and `tests` for
 // macBoxScript, and writes each kind to `calls`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits
-// `<kind>.exit`; with no `tests.run` it prints a passing run of every package it was handed, but `tests.fails`, which
-// fails, and then, unless one failed, a passing -race run of each race token's package.
+// `<kind>.exit`; with no `tests.run` it prints where its modules came from, as a land job's gate says it, then a
+// passing run of every package it was handed, but `tests.fails`, which fails, and then, unless one failed, a passing
+// -race run of each race token's package.
 const landJobShell = `#!/bin/sh
 replies="$LAND_JOB_REPLIES"
 staged="$replies/stdin.$$"
@@ -54,6 +55,7 @@ if [ -e "$replies/$kind.run" ]; then
 fi
 [ "$kind" = tests ] || exit 1
 fails=$(cat "$replies/tests.fails" 2>/dev/null || true)
+echo "` + boxModulesMarker + `the box's laid set at /opt/loom-tools/gomod-cohere, offline"
 echo "` + boxMarker + `$commit on $LAND_JOB_PLATFORM"
 races="$3"
 shift 4
@@ -283,6 +285,12 @@ func TestALandJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 				test.Errorf("the tests' script doesn't read the land job's mirrors with %s, or isn't the gate box's:"+
 					"\n%.600s", wantCache, script)
 			}
+			// The measurement runs as the land job's, so it reads the module set Loom laid for the job.
+			if measuring := string(readMaybeMissing(test, filepath.Join(fixture.replies, "measure.script"))); !strings.
+				Contains(measuring, "\n"+performanceLandJobSetting+"\n") || strings.Contains(measuring,
+				"\n"+performanceLandJobLine+"\n") {
+				test.Errorf("the measurement's script doesn't say it is the land job's:\n%.600s", measuring)
+			}
 			said := readLanding(test, ran.output)
 			if said.unchanged || !bytes.HasPrefix(said.performance, []byte(performanceHeader)) {
 				test.Errorf("the performance line isn't a measured file:\n%s", said.performance)
@@ -387,7 +395,9 @@ func TestALandJobRefusesAMergeOntoAnotherMain(test *testing.T) {
 // The gate's Go cache by landCache (#s50bcnr), sharedBoxGate run for real with bash against a planted toolchain:
 // unset, every go test carries -count=1 on a cache made empty for the job and gone after it, as on every gate box; set,
 // no go test carries it, the cache is landCache's gocache, and it stays for the next job. No go test in the gate's
-// scripts spells -count=1 itself, so the one setting is what every go test reads.
+// scripts spells -count=1 itself, so the one setting is what every go test reads. landCache also says the run is the
+// land job's, so set, go mod download and go mod verify read the module set `GOMODCACHE` names with `GOPROXY=off`,
+// and unset, they read Go's default cache, the `GOMODCACHE` named never read.
 func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -421,14 +431,27 @@ func TestTheLandJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				sharedBoxGate
 			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, filepath.Join(tree, "no-node"),
 				strings.Repeat("0", 64), "", landCache, "./...")
+			laid := filepath.Join(test.TempDir(), "laid modules")
 			gate.Dir = tree
-			gate.Env = append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+test.TempDir())
-			if output, gateError := gate.CombinedOutput(); gateError != nil {
+			gate.Env = append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+test.TempDir(),
+				"GOMODCACHE="+laid, "GOPROXY=https://proxy.example.com")
+			output, gateError := gate.CombinedOutput()
+			if gateError != nil {
 				test.Fatalf("the gate failed: %v\n%s", gateError, output)
 			}
 			asked := strings.Split(strings.TrimSpace(string(readMaybeMissing(test, log))), "\n")
 			if len(asked) != 3 || !strings.HasPrefix(asked[2], "test test ") {
 				test.Fatalf("the gate asked for %q, want go mod download, go mod verify and the module's tests", asked)
+			}
+			modules, said := " | modcache  | proxy ", boxModulesMarker+"Go's default cache, from the proxy\n"
+			if kept {
+				modules, said = " | modcache "+laid+" | proxy off", boxModulesMarker+"the box's laid set at "+laid+
+					", offline\n"
+			}
+			if asked[0] != "download"+modules || asked[1] != "verify"+modules ||
+				!strings.Contains(string(output), said) {
+				test.Errorf("the gate asked go mod for %q and %q, want each with %q, saying %q:\n%s", asked[0],
+					asked[1], modules, said, output)
 			}
 			cache := filepath.Join(landCache, "gocache")
 			if !kept {

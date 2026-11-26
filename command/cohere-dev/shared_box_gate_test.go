@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -18,15 +19,16 @@ import (
 )
 
 // plantedGo stands in for a shared box's go: it answers go env, and records every go mod download, go mod verify and
-// go test it is asked for in GATE_LOG, with the Go settings it ran under and whether its Go cache was empty, so a test
-// can read what the gate asked of it. GATE_VERIFY_FAILS makes go mod verify fail as a tampered module cache would,
-// GATE_DOWNLOAD_FAILS makes go mod download fail as a box cut off from the module proxy would, and GATE_RACE_FAILS
-// makes the -race run of the package it names fail as one that found a race would.
+// go test it is asked for in GATE_LOG, with the Go settings it ran under (a go mod's its module cache and proxy) and
+// whether its Go cache was empty, so a test can read what the gate asked of it. GATE_VERIFY_FAILS makes go mod verify
+// fail as a tampered module cache would, GATE_DOWNLOAD_FAILS makes go mod download fail as a box cut off from the
+// module proxy would, and GATE_RACE_FAILS makes the -race run of the package it names fail as one that found a race
+// would.
 const plantedGo = `#!/bin/sh
 case "$1" in
 env) [ "$2" = GOOS ] && echo linux; [ "$2" = GOARCH ] && echo amd64; exit 0 ;;
 mod)
-  echo "$2" >> "$GATE_LOG"
+  echo "$2 | modcache ${GOMODCACHE:-} | proxy ${GOPROXY:-}" >> "$GATE_LOG"
   if [ "$2" = download ] && [ -n "$GATE_DOWNLOAD_FAILS" ]; then
     echo "example.com/module@v1.0.0: no route to the proxy"; exit 1; fi
   if [ "$2" = verify ] && [ -n "$GATE_VERIFY_FAILS" ]; then echo "example.com/module v1.0.0: dir has been modified"
@@ -78,10 +80,20 @@ func toolchainDigest(test *testing.T, root string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// withoutModuleCache is environment without `GOMODCACHE`, so a script run in a test's environment reads no module set
+// laid for it unless the test lays one, whatever the machine running the test names.
+func withoutModuleCache(environment []string) []string {
+	return slices.DeleteFunc(environment, func(variable string) bool {
+		return strings.HasPrefix(variable, "GOMODCACHE=")
+	})
+}
+
 // A shared box's gate trusts nothing the box kept (#adbkt5t). Its toolchain must digest to the pinned one before any
 // of it runs, its module cache must pass go mod verify before any test, and every test runs with -count=1 on a Go
-// cache made empty for the job, with the account's Go settings left unread, and the cache is gone after. Shown by
-// running the gate's own script with bash against a planted toolchain whose go records what it is asked.
+// cache made empty for the job, with the account's Go settings left unread, an account's `GOMODCACHE` among them, so go
+// mod download and go mod verify read Go's default cache with the proxy as Go sets it, and the cache is gone after.
+// Shown by running the gate's own script with bash against a planted toolchain whose go records what it is asked. The
+// land job's module set, the one `GOMODCACHE` it reads, is TestTheLandJobsCacheIsKeptAndDropsCountOne's.
 func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -96,8 +108,12 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 		node string
 		// raceFails is whether the gate fails for its -race runs alone, every one of them asked first.
 		raceFails bool
+		// accountModules is whether the account names a module cache in `GOMODCACHE`, which outside the land job is
+		// never read.
+		accountModules bool
 	}{
 		{name: "a toolchain as pinned runs the tests", node: "pinned"},
+		{name: "an account's module cache is never read outside the land job", node: "pinned", accountModules: true},
 		{
 			name: "the plain tokens' -race run failing fails the gate, after the token with a run has run",
 			node: "pinned",
@@ -186,9 +202,14 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			writeFixtureFile(test, filepath.Join(tree, "AtOnce|SideBy.planted"), "")
 			log := filepath.Join(test.TempDir(), "asked")
 			temporary := test.TempDir()
-			// The account's own Go settings, which the gate must not read: a cache, flags and a toolchain switch.
-			environment := append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+test.TempDir(),
-				"GOFLAGS=-count=5", "GOTOOLCHAIN=auto", "GOENV="+filepath.Join(test.TempDir(), "env"))
+			// The account's own Go settings, which the gate must not read: a cache, flags, a toolchain switch and a
+			// proxy.
+			environment := append(withoutModuleCache(os.Environ()), "GATE_LOG="+log, "TMPDIR="+temporary,
+				"GOCACHE="+test.TempDir(), "GOFLAGS=-count=5", "GOTOOLCHAIN=auto",
+				"GOENV="+filepath.Join(test.TempDir(), "env"), "GOPROXY=https://proxy.example.com")
+			if row.accountModules {
+				environment = append(environment, "GOMODCACHE="+filepath.Join(test.TempDir(), "account modules"))
+			}
 			if row.plant != nil {
 				environment = row.plant(test, goroot, environment)
 			}
@@ -230,9 +251,14 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 				test.Fatalf("the gate failed: %v, want it failed %t\n%s", gateError, row.raceFails, output)
 			}
 			lines := strings.Split(strings.TrimSpace(string(asked)), "\n")
-			if len(lines) != 5 || lines[0] != "download" || lines[1] != "verify" {
-				test.Fatalf("the gate asked for %q, want go mod download, go mod verify, then the module's tests and "+
-					"the -race run's two go tests", lines)
+			// go mod reads Go's default cache with the proxy Go sets, the account's never read.
+			modules, said := " | modcache  | proxy ", boxModulesMarker+"Go's default cache, from the proxy\n"
+			if len(lines) != 5 || lines[0] != "download"+modules || lines[1] != "verify"+modules {
+				test.Fatalf("the gate asked for %q, want go mod download and go mod verify with %q, then the "+
+					"module's tests and the -race run's two go tests", lines, modules)
+			}
+			if !strings.Contains(string(output), said) {
+				test.Errorf("the gate didn't say %q:\n%s", said, output)
 			}
 			// Past the download, the log reads as the checks below index it: verify, the tests, the -race runs.
 			lines = lines[1:]

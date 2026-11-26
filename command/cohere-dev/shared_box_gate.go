@@ -8,11 +8,18 @@ package main
 //
 //   - The Go toolchain is the one pinned here, by a digest of its whole tree, read before anything of it runs. A
 //     swapped `go`, `compile` or standard-library source differs from the Go project's own archive.
-//   - The account's Go settings are never read: no env.sh, no go env file, no toolchain switch, the path set here.
-//   - `go mod download` fetches every module the workspace names, other platforms' included, and `go mod verify`
-//     passes before any test runs, so the module cache is whole and matches go.sum. A box that never held a module
-//     only another platform needs failed the tests that list for that platform, though its own build never asked
-//     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8).
+//   - The account's Go settings are never read, but for the module set a land job is handed (below): no env.sh, no go
+//     env file, no toolchain switch, the path set here.
+//   - `go mod download` has every module the workspace names, other platforms' included, and `go mod verify` passes
+//     before any test runs, so the module cache is whole and matches go.sum. A box that never held a module only
+//     another platform needs failed the tests that list for that platform, though its own build never asked
+//     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8). A land job
+//     has no network, by design, so Loom lays the module set it needs and names it in `GOMODCACHE`, which the gate
+//     keeps in the land job alone (the one run whose landCache is set, sharedBoxCacheBlock) and reads with
+//     `GOPROXY=off`: the download then only confirms each module is there, and offline it fails naming the one that
+//     isn't. Reading the account's directory is safe because verify holds every module to go.sum, and one whose bytes
+//     differ fails it. Outside the land job, or with no set named, the download fetches from the proxy into Go's
+//     default cache.
 //   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it, but in the land job
 //     (below).
 //
@@ -114,6 +121,11 @@ const boxCoreBudgetVariable = "COHERE_DEV_GATE_CORES"
 // boxBudgetMarker opens the line a gate box's run prints when it kept to a core budget, the budget after it.
 const boxBudgetMarker = "cohere-dev-gate: budget "
 
+// boxModulesMarker opens the line a shared box's run prints of where its modules come from: the set the box laid for
+// the job, read offline, or Go's default cache, filled from the proxy. It is for the run's own account, and
+// readTestJson passes over it as it does any line it doesn't read.
+const boxModulesMarker = "cohere-dev-gate: modules "
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
 // goroot, digest, node, nodeDigest, races (racePatterns' tokens, comma-separated) and landCache (sharedBoxCacheBlock)
 // as variables, and the packages to test as its arguments: the module's patterns, or import paths, which a gate Mac is
@@ -133,9 +145,21 @@ if [ -e "$node/bin/node" ]; then
   [ "$nodeFound" = "$nodeDigest" ] || refuse "the node at $node/bin/node digests to $nodeFound, not the pinned $nodeDigest"
   nodePath="$node/bin:"
 fi
+# The module set the box laid for a land job, the one run whose landCache is set, kept before the account's Go
+# settings go. Anywhere else a GOMODCACHE is the account's own, never read.
+laidModules=""
+[ -z "${landCache:-}" ] || laidModules="${GOMODCACHE:-}"
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
 export PATH="$goroot/bin:$nodePath` + sharedBoxSystemPath + `"
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
+# A land job has no network, so the set the box laid is read with the proxy off, and go mod verify below holds it to
+# go.sum. With none laid, the modules come from the proxy into Go's default cache.
+if [ -n "$laidModules" ]; then
+  export GOMODCACHE="$laidModules" GOPROXY=off
+  echo "` + boxModulesMarker + `the box's laid set at $laidModules, offline"
+else
+  echo "` + boxModulesMarker + `Go's default cache, from the proxy"
+fi
 # A box that shares herself with other work gives the gate a budget of cores (macBoxCoreBudgets): two threads a test
 # binary, and half the budget's binaries at once, so the gate's Go work holds that many threads. macOS caps no job's
 # cores, so it is a budget, kept by Go's own settings, and the run says it held one.
