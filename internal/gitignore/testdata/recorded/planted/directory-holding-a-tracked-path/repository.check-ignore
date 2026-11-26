@@ -1,0 +1,10 @@
+::	.gitignore
+::	build
+.gitignore:1:build/	build/cache
+.gitignore:1:build/	build/cache/blob
+::	build/deep
+::	build/deep/inner.go
+.gitignore:1:build/	build/deep/loose.go
+::	build/kept.go
+.gitignore:1:build/	build/scratch.go
+::	main.go

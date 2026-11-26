@@ -1,0 +1,17 @@
+gitignore(5): "Files already tracked by Git are not affected". value.go is tracked under `*.go`, as
+`git add -f` tracks it, and is not ignored; its untracked sibling is ignored by the pattern.
+
+repository .
+	.gitignore
+	notes.txt
+	value.go
+-- .gitignore --
+*.go
+-- notes.txt --
+notes
+-- other.txt --
+other
+-- sibling.go --
+package value
+-- value.go --
+package value
