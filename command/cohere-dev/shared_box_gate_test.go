@@ -28,7 +28,7 @@ const plantedGo = `#!/bin/sh
 case "$1" in
 env) [ "$2" = GOOS ] && echo linux; [ "$2" = GOARCH ] && echo amd64; exit 0 ;;
 mod)
-  echo "$2 | modcache ${GOMODCACHE:-} | proxy ${GOPROXY:-}" >> "$GATE_LOG"
+  echo "$2 | modcache ${GOMODCACHE:-} | proxy ${GOPROXY:-} | sum database ${GOSUMDB:-}" >> "$GATE_LOG"
   if [ "$2" = download ] && [ -n "$GATE_DOWNLOAD_FAILS" ]; then
     echo "example.com/module@v1.0.0: no route to the proxy"; exit 1; fi
   if [ "$2" = verify ] && [ -n "$GATE_VERIFY_FAILS" ]; then echo "example.com/module v1.0.0: dir has been modified"
@@ -252,7 +252,8 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			}
 			lines := strings.Split(strings.TrimSpace(string(asked)), "\n")
 			// go mod reads Go's default cache with the proxy Go sets, the account's never read.
-			modules, said := " | modcache  | proxy ", boxModulesMarker+"Go's default cache, from the proxy\n"
+			modules, said := " | modcache  | proxy  | sum database ", boxModulesMarker+
+				"Go's default cache, from the proxy\n"
 			if len(lines) != 5 || lines[0] != "download"+modules || lines[1] != "verify"+modules {
 				test.Fatalf("the gate asked for %q, want go mod download and go mod verify with %q, then the "+
 					"module's tests and the -race run's two go tests", lines, modules)

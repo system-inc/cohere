@@ -681,12 +681,17 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	writeFixtureFile(test, binary, binaryScript)
 	goroot := filepath.Join(directory, "go")
 	goScript := "#!/bin/sh\ncase \"$1\" in\n" +
-		"mod) echo \"$2 ${PWD##*/} GOMODCACHE=${GOMODCACHE:-} GOPROXY=${GOPROXY:-}\" >> '" + modules +
+		"mod) echo \"$2 ${PWD##*/} GOMODCACHE=${GOMODCACHE:-} GOPROXY=${GOPROXY:-} GOSUMDB=${GOSUMDB:-}\" >> '" +
+		modules +
 		"'; exit 0 ;;\n" +
 		"env) case \"$2\" in GOOS) echo darwin ;; GOARCH) echo arm64 ;; GOVERSION) echo go1.27.1 ;; esac; exit 0 ;;\n" +
-		"build) echo \"GOCACHE=$GOCACHE CGO_ENABLED=$CGO_ENABLED $*\" >> '" + builds + "'\n" +
+		"build) echo \"GOCACHE=$GOCACHE CGO_ENABLED=$CGO_ENABLED $*\" >> '" +
+		builds +
+		"'\n" +
 		"  while [ \"$#\" -gt 0 ]; do [ \"$1\" != -o ] || output=\"$2\"; shift; done\n" +
-		"  cp '" + binary + "' \"$output\"; chmod +x \"$output\"; exit 0 ;;\nesac\n" +
+		"  cp '" +
+		binary +
+		"' \"$output\"; chmod +x \"$output\"; exit 0 ;;\nesac\n" +
 		"echo \"the stand-in go has no answer for: $*\" >&2; exit 2\n"
 	if makeError := os.MkdirAll(filepath.Join(goroot, "bin"), 0o755); makeError != nil {
 		test.Fatal(makeError)
@@ -798,9 +803,10 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 
 	// The modules both trees' runs read: in a land job (performanceLandJobSetting) with a set laid and named in
-	// `GOMODCACHE`, as Loom names one, that set with the proxy off, go mod download only confirming each module is
-	// there; anywhere else, as on main, a cache of the measurement's own under the scratch, filled from the proxy as Go
-	// sets it, an account's `GOMODCACHE` never read, and so in a land job with no set named.
+	// `GOMODCACHE`, as Loom names one, that set with the proxy and the checksum database off, go mod download only
+	// confirming each module is there; anywhere else, as on main, a cache of the measurement's own under the scratch,
+	// filled from the proxy as Go sets it, an account's `GOMODCACHE` never read, and so in a land job with no set
+	// named.
 	landJobScript, landJobError := replacedOnce(script, performanceLandJobLine, performanceLandJobSetting)
 	if landJobError != nil {
 		test.Fatal(landJobError)
@@ -808,9 +814,9 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	ownCache, laid := filepath.Join(scratch, "gomodcache"), filepath.Join(directory, "laid modules")
 	ownSaid := "modules this measurement's own cache at " + ownCache + ", from the proxy"
 	for _, modulesCase := range []struct {
-		name                      string
-		landJob                   bool
-		named, cache, proxy, said string
+		name                                   string
+		landJob                                bool
+		named, cache, proxy, sumDatabase, said string
 	}{
 		{name: "outside a land job with no module cache named, its own cache from the proxy", cache: ownCache,
 			said: ownSaid},
@@ -819,7 +825,7 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		{name: "in a land job with no module set named, its own cache from the proxy", landJob: true,
 			cache: ownCache, said: ownSaid},
 		{name: "in a land job, the module set laid for it read offline", landJob: true, named: laid, cache: laid,
-			proxy: "off", said: "modules the box's laid set at " + laid + ", offline"},
+			proxy: "off", sumDatabase: "off", said: "modules the box's laid set at " + laid + ", offline"},
 	} {
 		// Not parallel: each case runs the script in the one scratch the cases before it laid, and reads the one
 		// record of go mod's calls.
@@ -842,7 +848,8 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 			want := []string{}
 			for _, tree := range []string{"root", "deeafbf4"} {
 				for _, asked := range []string{"download", "verify"} {
-					want = append(want, asked+" "+tree+" GOMODCACHE="+modulesCase.cache+" GOPROXY="+modulesCase.proxy)
+					want = append(want, asked+" "+tree+" GOMODCACHE="+modulesCase.cache+" GOPROXY="+modulesCase.proxy+
+						" GOSUMDB="+modulesCase.sumDatabase)
 				}
 			}
 			if asked := strings.Split(strings.TrimSpace(string(readMaybeMissing(test, modules))), "\n"); !slices.Equal(

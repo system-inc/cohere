@@ -129,8 +129,9 @@ const performanceHeader = "// Performance.jsonc: main's performance at this comm
 //   - It checks the Go toolchain against its digest (sharedBoxToolchainCheck) and the module cache against go.sum, and
 //     builds the binary with them on a Go cache it keeps under the scratch across landings, so a build compiles only
 //     what changed. The module cache is, in a land job (performanceLandJobLine), the set the box laid for it when
-//     `GOMODCACHE` names one, read with `GOPROXY=off`, and otherwise a cache of the measurement's own, filled from
-//     the proxy. A binary that is main's, by the sha256 it was handed, says performanceSameBinaryMarker and stops.
+//     `GOMODCACHE` names one, read with `GOPROXY=off` and `GOSUMDB=off`, and otherwise a cache of the measurement's
+//     own, filled from the proxy. A binary that is main's, by the sha256 it was handed, says
+//     performanceSameBinaryMarker and stops.
 //   - It makes an empty system store for this binary, says her load before, and runs cohere each time with the
 //     kit's clean environment under /usr/bin/time -l: at the root two untimed fills and the cold rounds, at deeafbf4
 //     two fills and its rounds, at the root one untimed warm run and the warm rounds, and one timeline run. Each run
@@ -198,13 +199,16 @@ phase toolchain
 # Every module of both trees' workspaces is confirmed and verified here, before any run, and the runs then go offline:
 # a cache that held only some of them left deeafbf4's modules missing, and its runs stopped at type errors, which read
 # as a fast row (Nov 21). A land job has no network, by design, so Loom lays the module set it needs and names it in
-# GOMODCACHE, and a land job's runs read that set with the proxy off: go mod download only confirms each module is
-# there, and offline it fails naming the one that isn't. Reading the account's directory is safe because go mod verify
-# holds every module to go.sum, and one whose bytes differ fails it. Outside a land job, as on the house Macs and for
+# GOMODCACHE, and a land job's runs read that set with the proxy and the checksum database off: go mod download only
+# confirms each module is there, and offline it fails naming the one that isn't. The checksum database is off because
+# offline it can't answer, and go asks it for a module whose zip hash go.sum doesn't hold, as deeafbf4's older sums
+# can't be made to (J-r0b69ca). A module go.sum holds is held to it, and go mod verify fails one whose bytes changed
+# since the box laid it; one go.sum doesn't hold is trusted as the box laid it. Outside a land job, as on the house
+# Macs and for
 # cohere-dev measure over a gap, or with no set named, the modules come from the proxy into a cache of the
 # measurement's own under the scratch.
 if [ -n "$laidModules" ]; then
-  export GOMODCACHE="$laidModules" GOPROXY=off
+  export GOMODCACHE="$laidModules" GOPROXY=off GOSUMDB=off
   say "modules the box's laid set at $laidModules, offline"
 else
   export GOMODCACHE="$base/gomodcache"

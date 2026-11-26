@@ -16,10 +16,12 @@ package main
 //     (TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds' windows listing on Sun2, Nov 16, #rr818c8). A land job
 //     has no network, by design, so Loom lays the module set it needs and names it in `GOMODCACHE`, which the gate
 //     keeps in the land job alone (the one run whose landCache is set, sharedBoxCacheBlock) and reads with
-//     `GOPROXY=off`: the download then only confirms each module is there, and offline it fails naming the one that
-//     isn't. Reading the account's directory is safe because verify holds every module to go.sum, and one whose bytes
-//     differ fails it. Outside the land job, or with no set named, the download fetches from the proxy into Go's
-//     default cache.
+//     `GOPROXY=off` and `GOSUMDB=off`: the download then only confirms each module is there, and offline it fails
+//     naming the one that isn't. The checksum database is off because offline it can't answer: go asks it for a module
+//     whose zip hash go.sum doesn't hold (J-r0b69ca, a module go.work.sum names only by its go.mod), and a line go.sum
+//     does hold still binds, and verify fails a module whose bytes changed since the box laid it; one go.sum doesn't
+//     hold is trusted as the box laid it. Outside the land job, or with no set named, the download fetches from the
+//     proxy into Go's default cache.
 //   - Every test runs with -count=1 and a Go cache made empty for this job and removed after it, but in the land job
 //     (below).
 //
@@ -152,10 +154,11 @@ laidModules=""
 unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
 export PATH="$goroot/bin:$nodePath` + sharedBoxSystemPath + `"
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
-# A land job has no network, so the set the box laid is read with the proxy off, and go mod verify below holds it to
-# go.sum. With none laid, the modules come from the proxy into Go's default cache.
+# A land job has no network, so the set the box laid is read with the proxy and the checksum database off, go.sum
+# holding what it names and go mod verify below what the box laid. With none laid, the modules come from the proxy
+# into Go's default cache.
 if [ -n "$laidModules" ]; then
-  export GOMODCACHE="$laidModules" GOPROXY=off
+  export GOMODCACHE="$laidModules" GOPROXY=off GOSUMDB=off
   echo "` + boxModulesMarker + `the box's laid set at $laidModules, offline"
 else
   echo "` + boxModulesMarker + `Go's default cache, from the proxy"
