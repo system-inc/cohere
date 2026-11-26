@@ -624,6 +624,10 @@ func (job *landJobRun) measure() (string, int) {
 		mainBinary = previous.Tools.Binary
 	}
 	script, scriptError := withLandJobMirrors(performanceScript, job.mirrors)
+	if scriptError == nil {
+		// The land job's own setting, so the script reads the module set Loom laid for the job offline.
+		script, scriptError = replacedOnce(script, performanceLandJobLine, performanceLandJobSetting)
+	}
 	if scriptError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", scriptError)
 		return "", 1
