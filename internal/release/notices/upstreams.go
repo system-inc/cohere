@@ -527,6 +527,15 @@ var Upstreams = []Upstream{
 		Carries: "Built Prettier bundles vendored in internal/format/prettier/bundles, which tests compare the formatter against. They bundle many other projects, whose licenses are in internal/format/prettier/bundles/THIRD-PARTY-NOTICES.md.",
 		Reach:   RepositoryOnly, LicenseFile: "prettier.txt",
 	},
+	{
+		Name:        "staticcheck's check fixtures",
+		Url:         "https://pkg.go.dev/honnef.co/go/tools@v0.8.1",
+		License:     "MIT",
+		Version:     "v0.8.1",
+		Carries:     "Every testdata folder of staticcheck's staticcheck, simple, stylecheck and quickfix checks, vendored in internal/go_language/check/parity/staticcheck_fixtures/testdata, which the ports' tests are held to.",
+		Reach:       RepositoryOnly,
+		LicenseFile: "staticcheck.txt",
+	},
 }
 
 // moduleLicenses is each Go module's license, read from its license file, for every module in the build

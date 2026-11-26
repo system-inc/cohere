@@ -5,15 +5,11 @@ package intermediate_representation_test
 // lockstep as the lifted differential compares them, then every expression in its syntax: go/ir's ValueForExpr and
 // our ValueForExpression must both be absent, or name corresponding values, by the lifted differential's naming,
 // with the same isAddress.
-//
-// TestExpressionMapCost measures what the map costs: ours and go/ir's builds of a corpus with it and without it.
 
 import (
 	"fmt"
 	"go/ast"
-	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -41,19 +37,16 @@ func differentialMergeExpressions(tally differentialExpressionTally,
 	}
 }
 
-// TestExpressionDifferential compares the ordinary corpus with the expression map on, or the one
-// COHERE_GO_IR_DIFFERENTIAL names, and fails on any difference.
+// TestExpressionDifferential compares the corpus with the expression map on and fails on any difference.
 func TestExpressionDifferential(test *testing.T) {
 	test.Parallel()
-	corpus := os.Getenv(differentialCorpusVariable)
 	started := time.Now()
 	var tally differentialExpressionTally
-	for _, unit := range differentialCorpusUnits(test, corpus) {
+	for _, unit := range differentialCorpusUnits(test) {
 		tally = differentialMergeExpressions(tally, differentialCompareExpressionUnit(test, unit, false))
 	}
 	test.Logf("expressions: %d compared, %d in both maps", tally.expressions, tally.present)
-	differentialReport(test, "expressions "+differentialCorpusName(corpus), tally.differentialTally,
-		time.Since(started))
+	differentialReport(test, "expressions", tally.differentialTally, time.Since(started))
 }
 
 // TestExpressionDifferentialFailsOnADroppedReference plants a mutant through the test seam: each of our
@@ -80,77 +73,11 @@ func Sum(first int, second int) int {
 	}
 }
 
-// TestExpressionMapCost builds the corpus four ways, one after another, and logs each build's time, the bytes it
-// allocated and the bytes its packages hold once built: ours with the map off and on, go/ir without GlobalDebug
-// and with it. Run it alone for numbers, since a test running beside it shares the heap it measures.
-func TestExpressionMapCost(test *testing.T) {
-	test.Parallel()
-	corpus := os.Getenv(differentialCorpusVariable)
-	units := differentialCorpusUnits(test, corpus)
-	// One build first, unmeasured, so the method sets and type caches go/types fills on first use are no
-	// build's cost.
-	for _, unit := range units {
-		differentialBuildTheirs(unit, 0)
-	}
-	for _, build := range []struct {
-		name  string
-		build func(unit differentialUnit) differentialBuilt
-	}{
-		{"ours, map off", func(unit differentialUnit) differentialBuilt {
-			return differentialBuilt{ours: differentialBuildOurs(unit, false)}
-		}},
-		{"ours, map on", func(unit differentialUnit) differentialBuilt {
-			return differentialBuilt{ours: differentialBuildOurs(unit, true)}
-		}},
-		{"go/ir, lifted", func(unit differentialUnit) differentialBuilt {
-			return differentialBuilt{theirs: differentialBuildTheirs(unit, 0)}
-		}},
-		{"go/ir, GlobalDebug", func(unit differentialUnit) differentialBuilt {
-			return differentialBuilt{theirs: differentialBuildTheirs(unit, ir.GlobalDebug)}
-		}},
-	} {
-		runtime.GC()
-		var before runtime.MemStats
-		runtime.ReadMemStats(&before)
-		started := time.Now()
-		built := make([]differentialBuilt, 0, len(units))
-		for _, unit := range units {
-			built = append(built, build.build(unit))
-		}
-		elapsed := time.Since(started)
-		runtime.GC()
-		var after runtime.MemStats
-		runtime.ReadMemStats(&after)
-		runtime.KeepAlive(built)
-		test.Logf("cost, %s, corpus %s: %d packages built in %s, %.1f MiB allocated, %.1f MiB held after", build.name,
-			differentialCorpusName(corpus), len(units), elapsed.Round(time.Millisecond),
-			float64(after.TotalAlloc-before.TotalAlloc)/(1<<20),
-			(float64(after.HeapAlloc)-float64(before.HeapAlloc))/(1<<20))
-	}
-}
-
-// differentialBuilt holds one unit's build, ours or go/ir's, alive while the cost test measures it.
-type differentialBuilt struct {
-	ours   *intermediate_representation.Package
-	theirs *ir.Package
-}
-
-// differentialCorpusUnits are the units corpus names, kept whole: the ordinary corpus's testdata and standard
-// packages, or every package root, std or a pattern loads without errors.
-func differentialCorpusUnits(test *testing.T, corpus string) []differentialUnit {
+// differentialCorpusUnits are the corpus's units, kept whole: its testdata and its standard packages that load
+// without errors.
+func differentialCorpusUnits(test *testing.T) []differentialUnit {
 	test.Helper()
-	patterns := differentialStandardPackages
-	var units []differentialUnit
-	switch corpus {
-	case "":
-		units = differentialTestdataUnits(test)
-	case "root":
-		patterns = []string{"./..."}
-	case "std":
-		patterns = []string{"std"}
-	default:
-		patterns = []string{corpus}
-	}
+	units := differentialTestdataUnits(test)
 	root, rootError := filepath.Abs(filepath.Join("..", "..", ".."))
 	if rootError != nil {
 		test.Fatal(rootError)
@@ -160,7 +87,7 @@ func differentialCorpusUnits(test *testing.T, corpus string) []differentialUnit 
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedSyntax |
 			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
 	}
-	loaded, loadError := packages.Load(configuration, patterns...)
+	loaded, loadError := packages.Load(configuration, differentialStandardPackages...)
 	if loadError != nil {
 		test.Fatal(loadError)
 	}

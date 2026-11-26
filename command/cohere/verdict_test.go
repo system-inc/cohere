@@ -3,9 +3,7 @@
 package main
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
@@ -31,17 +29,21 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 	if duplicateError != nil {
 		test.Fatal(duplicateError)
 	}
+	// The child is this test binary, which says whether it holds the descriptor. The variable is read from the
+	// environment its command was started with, since the child's own startup takes the variable, as cohere's does.
 	probe := func() string {
-		script := fmt.Sprintf(
-			"if [ -e /dev/fd/%d ]; then echo open; else echo closed; fi; echo ${%s:-unset}",
-			descriptor,
-			VerdictVariable,
-		)
-		output, outputError := exec.Command("/bin/sh", "-c", script).Output()
+		command := ownChild(test, ownChildDescriptor, strconv.Itoa(descriptor))
+		output, outputError := command.Output()
 		if outputError != nil {
 			test.Fatal(outputError)
 		}
-		return strings.Join(strings.Fields(string(output)), " ")
+		variable := "unset"
+		for _, entry := range command.Environ() {
+			if value, isVerdict := strings.CutPrefix(entry, VerdictVariable+"="); isVerdict {
+				variable = value
+			}
+		}
+		return strings.TrimSpace(string(output)) + " " + variable
 	}
 
 	test.Setenv(VerdictVariable, strconv.Itoa(descriptor))

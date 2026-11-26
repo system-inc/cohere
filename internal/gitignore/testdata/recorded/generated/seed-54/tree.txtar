@@ -1,0 +1,33 @@
+Generated from seed 54: random names, ignore files at random depths, and about a quarter of
+the files tracked whatever the patterns say, as `git add -f` tracks them.
+
+repository .
+	.gitignore
+	star*/ab/#hash
+	star*/ab/star*
+-- .git/info/exclude --
+*.tmp
+-- .gitignore --
+*.log\ 
+*
+
+![[:alpha:]]
+-- Dot.go --
+-- b --
+-- br[ack]et --
+-- deep/ --
+-- sp ace --
+-- star*/.gitignore --
+\?   
+deep/build
+-- star*/a --
+-- star*/ab/#hash --
+-- star*/ab/node_modules/ --
+-- star*/ab/star* --
+-- star*/deep/.gitignore --
+!x.log
+# ab/**
+*.tmp/y.tmp/\!bang
+?/deep\ 
+-- star*/out --
+-- star*/star* --

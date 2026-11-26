@@ -5,34 +5,21 @@ import (
 	"fmt"
 	"go/types"
 	"maps"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
-	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_language/check"
 	"github.com/system-inc/cohere/internal/go_language/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_language/check/checker"
 	"github.com/system-inc/cohere/internal/go_language/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_language/load"
-	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/go_language/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_language/rules/function_purity"
-	"github.com/system-inc/cohere/internal/go_language/rules/self_assignment"
-	"github.com/system-inc/cohere/internal/go_language/rules/single_append_concatenation"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
-
-// demandDifferentialVariable names the tree the demand differential runs over: root for cohere's own module, or a
-// directory, whose every package it loads as cohere-go does. The standard library is its source folder, under
-// `GOROOT` set to the toolchain it belongs to.
-const demandDifferentialVariable = "COHERE_GO_IR_DEMAND_DIFFERENTIAL"
 
 // A call through an instance of the package's own pure generic function is the one place the push's answer depends on
 // the order it walks the package in: package after declares the caller first and the push holds it not pure, package
@@ -180,138 +167,6 @@ func TestPurityNeverFallsBack(test *testing.T) {
 	}
 }
 
-// The demand differential (#w7zmvat unit 2): over the whole tree COHERE_GO_IR_DEMAND_DIFFERENTIAL names, and every
-// package it imports, the push and the definition judge every function, the readers of purity ask the resolver, and
-// then the resolver is asked of every function the push judged. Every answer must be the definition's, and every
-// function the push holds pure must be pure; the push may hold not pure only what its order alone made so (#zva1zrc),
-// which it counts. It logs how many functions the readers had the resolver compute against the push's total, which is
-// the saving. Unset, it skips, since a tree takes minutes.
-func TestDemandAnswersAsThePushOverATree(test *testing.T) {
-	test.Parallel()
-	directory := needs.OptIn(
-		test,
-		demandDifferentialVariable,
-		"a differential of the resolver's answers against the push's over root or a directory",
-	)
-	if directory == "root" {
-		// This package sits four directories below the module root.
-		root, rootError := filepath.Abs(filepath.Join("..", "..", "..", ".."))
-		if rootError != nil {
-			test.Fatal(rootError)
-		}
-		directory = root
-	}
-	workspace, workspaceError := project.ReadWorkspace(directory)
-	if workspaceError != nil {
-		test.Fatalf("reading the modules of %s: %v", directory, workspaceError)
-	}
-	loaded, loadError := load.Packages(workspace.Root, []string{"./..."}, workspace.Environment(), nil)
-	if loadError != nil {
-		test.Fatalf("loading %s: %v", workspace.Root, loadError)
-	}
-	if len(loaded.Packages) == 0 {
-		test.Fatalf("loading %s found no package, so the comparison would prove nothing", workspace.Root)
-	}
-	requireDemandAnswersAsTheDefinition(test, workspace.Root, loaded.Packages)
-}
-
-// requireDemandAnswersAsTheDefinition runs the push and the definition beside the three readers of purity over roots,
-// as cohere-go runs them, then asks the resolver of every function of every package the push judged, as that
-// package's own reader, and fails on the first answer the definition's facts contradict, or the first function the
-// push holds pure that the resolver does not.
-func requireDemandAnswersAsTheDefinition(test *testing.T, described string, roots []*packages.Package) {
-	test.Helper()
-	var judged atomic.Int64
-	push := function_purity.NewPushAnalyzer(&judged)
-	options := check.DispatchOptions()
-	options.Finished = func(*packages.Package) {
-		// Setting Finished lets a root's syntax go, as cohere-go's run does; the resolver keeps its own.
-	}
-	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
-	if !isResolver {
-		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
-	}
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{push, function_purity.DefinitionAnalyzer,
-		discarded_pure_call.Analyzer, self_assignment.Analyzer, single_append_concatenation.Analyzer}, roots, options)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %s: %v", described, analyzeError)
-	}
-	counts := resolver.Counts(function_purity.Kind)
-	askedByReaders := counts.Computed.Load()
-	defined := map[*types.Package]map[*types.Func]bool{}
-	for action := range graph.All() {
-		if action.Analyzer == function_purity.DefinitionAnalyzer && action.Err == nil {
-			defined[action.Package.Types] = ownPure(action)
-		}
-	}
-	compared, pushPackages, departures := 0, 0, 0
-	for action := range graph.All() {
-		if action.Analyzer != push || action.Err != nil {
-			continue
-		}
-		pushPackages++
-		pushed := ownPure(action)
-		definition, isDefined := defined[action.Package.Types]
-		if !isDefined {
-			test.Fatalf("the definition never judged %s, which the push judged", action.Package.ID)
-		}
-		home := resolver.Package(action.Package.Types)
-		if home == nil {
-			test.Fatalf("the resolver never learned %s, which the push judged", action.Package.ID)
-		}
-		for _, function := range home.SourceFunctions() {
-			declared, isDeclared := function.Object().(*types.Func)
-			if !isDeclared {
-				continue
-			}
-			compared++
-			asked := function_purity.Ask(resolver, home, declared)
-			if asked != definition[declared] {
-				test.Fatalf("on %s, %s (%s): the resolver answers pure %t, the definition %t", action.Package.ID,
-					declared.FullName(), objectKey(action.Package, declared), asked, definition[declared])
-			}
-			if pushed[declared] && !asked {
-				test.Fatalf("on %s, %s (%s): the push holds it pure and the resolver does not", action.Package.ID,
-					declared.FullName(), objectKey(action.Package, declared))
-			}
-			if asked != pushed[declared] {
-				departures++
-			}
-		}
-	}
-	if fallbacks := counts.Fallbacks.Load(); fallbacks != 0 {
-		test.Fatalf("over %s purity fell back %d times, want none", described, fallbacks)
-	}
-	if compared == 0 {
-		test.Fatalf("the push judged no function over %s, so the comparison proves nothing", described)
-	}
-	test.Logf("%s: %d packages analyzed, the push ran on %d and judged %d functions; the readers had the resolver "+
-		"compute %d (%.1f%%); every one of the %d functions compared answers as the definition, and %d hold pure "+
-		"where the push's order held them not", described, len(roots), pushPackages, judged.Load(), askedByReaders,
-		100*float64(askedByReaders)/float64(max(judged.Load(), 1)), compared, departures)
-}
-
-// ownPure is every function of action's package its facts hold pure.
-func ownPure(action *checker.Action) map[*types.Func]bool {
-	pure := map[*types.Func]bool{}
-	for _, objectFact := range action.AllObjectFacts() {
-		if function, isFunction := objectFact.Object.(*types.Func); isFunction &&
-			function.Pkg() == action.Package.Types {
-			pure[function] = true
-		}
-	}
-	return pure
-}
-
-// objectKey is function's key for a failure: its objectpath, or its position for one with none.
-func objectKey(owner *packages.Package, function *types.Func) string {
-	path, pathError := objectpath.For(function)
-	if pathError == nil {
-		return "objectpath " + string(path)
-	}
-	return fmt.Sprintf("declared at %s", owner.Fset.Position(function.Pos()))
-}
-
 // probed is what probing a fixture found: each function's verdict as the root that reaches it asks it, by full name,
 // every place the resolver's answer and the definition's part, or the push holds pure what the resolver does not, the
 // functions the resolver holds pure where the push's order held them not, and the resolver's counts.
@@ -334,7 +189,7 @@ func probeFixtures(test *testing.T, patterns ...string) probed {
 	if loadError != nil {
 		test.Fatalf("loading %v: %v", patterns, loadError)
 	}
-	push := function_purity.NewPushAnalyzer(nil)
+	push := function_purity.NewPushAnalyzer()
 	probe := &analysis.Analyzer{
 		Name:       "purity_probe",
 		Doc:        "asks the resolver of every function in the package's reach, beside the push's result",

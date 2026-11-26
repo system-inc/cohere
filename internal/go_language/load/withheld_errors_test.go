@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_language/check/checker"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // wrapperFiles are a cgo package that wraps its C names in `_C_` functions, as the standard library's net and
@@ -212,13 +212,8 @@ func TestNetAndOsUserForLinuxWithholdExactlyTheirWrapperCallers(test *testing.T)
 	test.Parallel()
 
 	loadedCgoFixtures(test)
-	command := exec.Command("go", "env", "GOROOT")
-	command.Env = append(os.Environ(), cgoEnvironment...)
-	goRoot, goEnvironmentError := command.Output()
-	if goEnvironmentError != nil {
-		test.Fatalf("reading GOROOT with go env: %v", goEnvironmentError)
-	}
-	source := filepath.Join(strings.TrimSpace(string(goRoot)), "src")
+	// cgoEnvironment sets the target and cgo, none of which moves the root go env names.
+	source := filepath.Join(go_root.GoRoot(test), "src")
 	want := []Withheld{
 		{Package: "net", File: filepath.Join(source, "net", "cgo_unix.go"), Errors: 1},
 		{Package: "os/user", File: filepath.Join(source, "os", "user", "cgo_lookup_unix.go"), Errors: 1},
