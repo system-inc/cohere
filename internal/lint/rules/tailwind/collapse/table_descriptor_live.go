@@ -2,9 +2,9 @@
 //
 // `Table.Lookup` answers the `{order, count}` half of the class-order sort, and until this file
 // existed nothing outside a test could build the thing that answers it. The only two constructions
-// in the tree assembled one from `testdata/descriptor_table.json` plus `descriptor_context.json`,
-// both generated per repository and both deliberately untracked, so the shipped rules had a lookup
-// and no table to call it on.
+// in the tree assemble one from a recorded table plus its context, generated per design system
+// (`testdata/descriptor_table_public.json` and `descriptor_context_public.json`, from the public
+// theme), so the shipped rules had a lookup and no table to call it on.
 //
 // # Why the table is not simply checked in
 //
@@ -50,8 +50,8 @@
 //	Namespaces, KeysByNamespace   the repository's own `@theme`. The per-repository half by
 //	                              definition, and the reason a table cannot be committed.
 //	Statics                       the framework's, plus every static `@utility` the repository
-//	                              declared. ahra declares `markdown-content` and `typing-dots` and
-//	                              www-connected-app declares neither.
+//	                              declared. The public theme declares `surface-card` and
+//	                              `glow-soft`, the independent theme `synthetic-static`.
 //	PerDeclaration                derived by probing the repository's own functional `@utility`
 //	                              blocks. Both corpus repositories report the same 18 roots and they
 //	                              report them because they share the submodule that declares them,

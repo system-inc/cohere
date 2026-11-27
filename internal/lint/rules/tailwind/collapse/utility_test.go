@@ -16,8 +16,8 @@ import (
 // blocks, captured by internal/lint/rules/tailwind/tools/generate_utility and checked in next to this test.
 //
 // The population is chosen so that a clean result is evidence rather than a coincidence. The
-// registry half is the one Phase 0 measured, so the 18 known exceptions are covered exactly as they
-// were reported. The sweep half reaches what `getClassList()` does not advertise and what the
+// registry half is the one Phase 0 measured, so the known exceptions, 5 on the public theme, are
+// covered exactly as they were reported. The sweep half reaches what `getClassList()` does not advertise and what the
 // registry therefore cannot test: fractions, which drive the ratio splice; decimals, where `1.25`
 // survives and `1.3` drops on the same declaration; arbitrary values with and without a typehint;
 // and modifier forms, which are what the four post-conditions gate.
@@ -37,7 +37,7 @@ type utilityCorpus struct {
 	// PerDeclarationRoots is the set of roots Tailwind resolves per declaration, measured rather
 	// than named. See TestUtilityFindsThePerDeclarationRoots.
 	PerDeclarationRoots []string `json:"perDeclarationRoots"`
-	// KnownExceptions is the 18 registry classes the descriptor model mispredicts, as reported by
+	// KnownExceptions is the registry classes the descriptor model mispredicts, as reported by
 	// generate_descriptors. This is the acceptance criterion for this component.
 	KnownExceptions []utilityExceptionFixture `json:"knownExceptions"`
 	// ShadowQuirkProbes is the other exception, recorded and not modelled: four sweep probes hitting
@@ -351,10 +351,11 @@ func TestUtilityMatchesTailwind(test *testing.T) {
 
 // TestUtilityReproducesTheKnownExceptions is the acceptance criterion for this component.
 //
-// These 18 registry classes are what the descriptor table declines by design, and they are enumerated
-// in the fixture by the same tool that measured the model. Reproducing them is the whole reason this
-// evaluator exists, so they are asserted by name and by reading rather than absorbed into the
-// aggregate above: an aggregate that dropped these 18 and gained 18 elsewhere would still be green.
+// These registry classes, 5 on the public theme, are what the descriptor table declines by design, and
+// they are enumerated in the fixture by the same tool that measured the model. Reproducing them is the
+// whole reason this evaluator exists, so they are asserted by name and by reading rather than absorbed
+// into the aggregate above: an aggregate that dropped these 5 and gained 5 elsewhere would still be
+// green.
 //
 // The count is asserted too. If a repository change made the exception set smaller, this component's
 // justification changed and that should be read rather than silently passed.

@@ -6,7 +6,7 @@
 //
 // # What a component fixture cannot reach
 //
-// `descriptor_fixtures.json` hands the Go side a value that has already been decoded: a
+// `descriptor_fixtures_public.json` hands the Go side a value that has already been decoded: a
 // `{kind, root, value, modifier}` the JavaScript extractor parsed, with the question "does Lookup
 // map this to the right reading". That tests the lookup exactly, and it steps over the seam. A class
 // is a *string*. Turning the string into a candidate is `ParseCandidate`'s job, and a suite that
