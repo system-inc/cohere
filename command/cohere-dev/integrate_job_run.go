@@ -776,7 +776,19 @@ func (job *integrateJobRun) lay() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkSubmodulesError)
 		return "", 1
 	}
-	return shortCommit(job.merge) + " at " + job.tree, 0
+	// Every tracked file's time is its content's (stampTreeTimes), so a test whose inputs this merge didn't change
+	// replays from the Go cache in a job that laid the tree fresh, as each does (#e94a6r4).
+	stamped := []string{job.tree}
+	if pin != "" {
+		stamped = append(stamped, filepath.Join(job.tree, "TypeScript"))
+	}
+	for _, tree := range stamped {
+		if stampError := stampTreeTimes(tree); stampError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: stamping %s's times by content: %v\n", tree, stampError)
+			return "", 1
+		}
+	}
+	return shortCommit(job.merge) + " at " + job.tree + ", its times by content", 0
 }
 
 // layTypeScript checks tree's TypeScript out at pin, a worktree of the integrate job's TypeScript mirror kept across
