@@ -150,6 +150,17 @@ const boxBudgetMarker = "cohere-dev-gate: budget "
 // readTestJson passes over it as it does any line it doesn't read.
 const boxModulesMarker = "cohere-dev-gate: modules "
 
+// boxEnvironmentMarker opens each line an integrate job's run prints of the environment its tests start with: a
+// variable's name, then its value for a variable naming a path (boxEnvironmentPaths), or the first 12 hex of its
+// value's sha256 for any other, so no secret reaches a log. go test's cache keys a test on the value of each variable
+// it reads, and two jobs' lines name one whose value moved between them (#ntrewm3), which no setting of `GODEBUG` can
+// show without moving every test's key, since go test keys every test on `GODEBUG` too.
+const boxEnvironmentMarker = "cohere-dev-gate: environment "
+
+// boxEnvironmentPaths are the variables boxEnvironmentMarker's lines say the value of: paths, which hold no secret
+// and are what moves when a job is laid somewhere else.
+const boxEnvironmentPaths = "PATH|HOME|TMPDIR|PWD|GOROOT|GOFLAGS|GOCACHE|GOMODCACHE"
+
 // sharedBoxGate is the gate's run inside a tree checked out at the commit being landed, on a shared box. It takes
 // goroot, digest, node, nodeDigest, races (racePatterns' tokens, comma-separated), integrateCache (sharedBoxCacheBlock)
 // and integrateJob (integrateJobLine) as variables, and the packages to test as its arguments: the module's patterns,
@@ -211,6 +222,16 @@ step toolchain
 downloaded=$(go mod download 2>&1) || refuse "go mod download failed: $(echo "$downloaded" | tail -n 1)"
 verified=$(go mod verify 2>&1) || refuse "go mod verify failed: $(echo "$verified" | tail -n 1)"
 step modules
+# In an integrate job, the environment the tests start with, a line a variable (boxEnvironmentMarker).
+if [ -n "${integrateJob:-}" ]; then
+  for name in $(compgen -e | LC_ALL=C sort); do
+    case "$name" in
+      ` + boxEnvironmentPaths + `) said="${!name}" ;;
+      *) said="sha256 $(printf '%s' "${!name}" | sha256sum | cut -c1-12)" ;;
+    esac
+    echo "` + boxEnvironmentMarker + `$name $said"
+  done
+fi
 # boxShardedPackage, when it is among the arguments, runs apart from the rest, in shards (sharedBoxShards).
 sharded=""; others=""
 for package in "$@"; do

@@ -207,3 +207,15 @@ func freeKilobytes(path string) (int64, error) {
 	}
 	return strconv.ParseInt(fields[3], 10, 64)
 }
+
+// testEnvironment is the environment the tests started with, as the run's boxEnvironmentMarker lines said it, a line a
+// variable in the order said, each the name and its value or its value's hash, without the marker.
+func testEnvironment(output []byte) []string {
+	lines := []string{}
+	for _, line := range strings.Split(string(output), "\n") {
+		if said, isEnvironment := strings.CutPrefix(line, boxEnvironmentMarker); isEnvironment {
+			lines = append(lines, said)
+		}
+	}
+	return lines
+}

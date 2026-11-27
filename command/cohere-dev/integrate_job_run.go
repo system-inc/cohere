@@ -1093,6 +1093,9 @@ func (job *integrateJobRun) tests(share func(string) []string) (string, int) {
 	before := job.readCache()
 	output, runError := runIntegrateJobScript(job.scratch, script, arguments)
 	job.sayCache(before, job.readCache())
+	for _, line := range testEnvironment(output) {
+		job.say("test environment %s", line)
+	}
 	job.sayPackages(output)
 	verdict, unavailable := readBoxRun(output, runError, integrateJobBox, job.merge, races)
 	for _, step := range verdict.steps {
