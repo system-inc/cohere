@@ -16,11 +16,17 @@ import (
 // when the result was saved (cmd/go's computeTestInputsID), and a checkout stamps every file with the moment it was
 // written. So the first warm run compiled from the cache and replayed 70 of 438 packages' tests.
 //
-// stampTreeTimes gives each tracked file and directory of a laid tree a modification time drawn from its git object id
-// (objectTime), so the same content laid again, in any job, reads the same, and changed content reads changed: its
-// blob or tree id is new, so is its time, and its tests run. Go never reads a file's bytes for this key, so the time is
-// what stands in for them, and it now follows them. A file the tree doesn't track, a build's output or a test's
-// scratch, keeps the time it was written, and reads as new, which it is.
+// stampTreeTimes gives each tracked file of a laid tree a modification time drawn from its git blob's id (objectTime),
+// so the same content laid again, in any job, reads the same, and changed content reads changed: its blob id is new, so
+// is its time, and its tests run. Go never reads a file's bytes for this key, so the time is what stands in for them,
+// and it now follows them. A file the tree doesn't track, a build's output or a test's scratch, keeps the time it was
+// written, and reads as new, which it is.
+//
+// Every directory, the root among them, is given one time, directoryTime. Go keys a test that opens a directory on its
+// stat and on the name and stat of every entry in it (cmd/go's hashOpen), so its names and its files' times already
+// say what changed in it. A directory stamped by its tree's id moved whenever anything beneath it changed, and so did
+// the listing of every directory above it: one line changed in documentation/contract/Contract.md reran 30 of 427
+// packages on the Mac with tree-id times, and 14 with one time for every directory (#ntrewm3).
 
 // objectTimeEpoch is where objectTime's range starts, and objectTimeSpan its width in seconds: 1980 to 1997, so a
 // stamped time is always years in the past and never meets Go's rule that a file younger than two seconds can't be
@@ -29,6 +35,10 @@ var (
 	objectTimeEpoch = time.Date(1980, time.January, 1, 0, 0, 0, 0, time.UTC)
 	objectTimeSpan  = uint64(17 * 365 * 24 * 60 * 60)
 )
+
+// directoryTime is the modification time stampTreeTimes gives every directory of a laid tree, the start of
+// objectTime's range, so it is as old as any stamped file and as safe from Go's two-second rule.
+var directoryTime = objectTimeEpoch
 
 // objectTime is the modification time stampTreeTimes gives a git object, from its id: seconds past objectTimeEpoch from
 // the id's first eight bytes, within objectTimeSpan, and nanoseconds from its next eight, so two different objects of
@@ -57,9 +67,9 @@ type treeEntry struct {
 	path string
 }
 
-// stampTreeTimes stamps tree, a checked-out worktree, by its `HEAD`: every tracked file by its blob's id, every
-// directory by its tree's id and the root by `HEAD`'s, the directories last and deepest first, since stamping a file
-// leaves its directory's time alone but nothing else must touch a directory once it is stamped. A symbolic link and a
+// stampTreeTimes stamps tree, a checked-out worktree, by its `HEAD`: every tracked file by its blob's id, and every
+// directory and the root at directoryTime, the directories last and deepest first, since stamping a file leaves its
+// directory's time alone but nothing else must touch a directory once it is stamped. A symbolic link and a
 // submodule's gitlink are left as they are: the link's own time is the link's, and a submodule is a tree of its own,
 // stamped by its own call.
 //
@@ -112,9 +122,13 @@ func stampTreeTimes(tree string) ([]string, error) {
 		return strings.Count(second.path, "/") - strings.Count(first.path, "/")
 	})
 	for _, entry := range slices.Concat(files, directories, []treeEntry{{kind: "tree", id: rootId, path: "."}}) {
-		when, timeError := objectTime(entry.id)
-		if timeError != nil {
-			return nil, fmt.Errorf("stamping %s: %w", entry.path, timeError)
+		when := directoryTime
+		if entry.kind == "blob" {
+			stamp, timeError := objectTime(entry.id)
+			if timeError != nil {
+				return nil, fmt.Errorf("stamping %s: %w", entry.path, timeError)
+			}
+			when = stamp
 		}
 		place := filepath.Join(tree, filepath.FromSlash(entry.path))
 		if changeError := os.Chtimes(place, when, when); changeError != nil {

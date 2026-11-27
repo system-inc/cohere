@@ -1070,6 +1070,10 @@ func (job *integrateJobRun) tests(share func(string) []string) (string, int) {
 	}
 	script, scriptError := withIntegrateJobMirrors(macBoxScript, job.mirrors)
 	if scriptError == nil {
+		// The tree the lay stamped by content, so the tests read the times the cache keyed them on (#ntrewm3).
+		script, scriptError = replacedOnce(script, macBoxLaidTreeLine, "laidTree="+shellQuoted(job.tree))
+	}
+	if scriptError == nil {
 		// The integrate job's own setting, so the gate reads the module set Loom laid for the job offline, whether or
 		// not a cache is kept: keyed on the kept cache alone, a job with none went to the proxy it can't reach.
 		script, scriptError = replacedOnce(script, integrateJobLine, integrateJobSetting)
