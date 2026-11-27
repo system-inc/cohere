@@ -265,14 +265,17 @@ func (fixture *integrateJobFixture) arguments(kind string) []string {
 	return strings.Split(said, "\n")
 }
 
-// landingSaid is what an integrate job's last lines say, as Loom's finisher reads them: the tree and the message.
+// landingSaid is what an integrate job's last lines say, as Loom's finisher reads them: the tree, the message, and the
+// measurement's record, decoded, with its JSON as printed in written, nil when the job said `performance unchanged`.
 type landingSaid struct {
 	tree    string
 	message string
+	record  *performanceFile
+	written string
 }
 
 // readLanding reads an integrate job's output as Loom's finisher does, failing the test when its lines aren't in order
-// or its performance line is anything but `unchanged`, since nothing is written into the tree any more (#6v8r4nn).
+// or its performance line is neither `unchanged` nor a record in padded base64 that reads (#6v8r4nn).
 func readLanding(test *testing.T, output string) landingSaid {
 	test.Helper()
 	lines := strings.Split(strings.TrimSuffix(output, "\n"), "\n")
@@ -282,29 +285,24 @@ func readLanding(test *testing.T, output string) landingSaid {
 		test.Fatalf("the landing's lines are out of order:\n%s", output)
 	}
 	tree, treeFound := strings.CutPrefix(lines[1], integrateJobMarker+"tree ")
-	if lines[0] != integrateJobMarker+"performance unchanged" || !treeFound ||
-		lines[len(lines)-1] != "integrated "+tree {
+	performance, performanceFound := strings.CutPrefix(lines[0], integrateJobMarker+"performance ")
+	if !performanceFound || !treeFound || lines[len(lines)-1] != "integrated "+tree {
 		test.Fatalf("the landing's lines don't read:\n%s", output)
 	}
-	return landingSaid{tree: tree, message: strings.Join(lines[begin+1:end], "\n") + "\n"}
-}
-
-// record is the record the integrate job wrote where Loom's runner collects it, read, and its JSON as written; found
-// is false when it wrote none.
-func (fixture *integrateJobFixture) record() (performanceFile, string, bool) {
-	fixture.test.Helper()
-	contents, readError := os.ReadFile(filepath.Join(fixture.job, integrateJobRecordPath))
-	if os.IsNotExist(readError) {
-		return performanceFile{}, "", false
+	said := landingSaid{tree: tree, message: strings.Join(lines[begin+1:end], "\n") + "\n"}
+	if performance == "unchanged" {
+		return said
 	}
-	if readError != nil {
-		fixture.test.Fatal(readError)
+	contents, decodeError := base64.StdEncoding.DecodeString(performance)
+	if decodeError != nil {
+		test.Fatalf("the performance line holds no padded base64: %v\n%s", decodeError, output)
 	}
 	record := performanceFile{}
 	if unmarshalError := json.Unmarshal(contents, &record); unmarshalError != nil {
-		fixture.test.Fatalf("the record doesn't read: %v\n%s", unmarshalError, contents)
+		test.Fatalf("the performance line's record doesn't read: %v\n%s", unmarshalError, contents)
 	}
-	return record, string(contents), true
+	said.record, said.written = &record, string(contents)
+	return said
 }
 
 // checkMergesOwnTree checks that the tree the integrate job said is the merge's own, with nothing written into it.
@@ -317,7 +315,7 @@ func (fixture *integrateJobFixture) checkMergesOwnTree(merge string, said landin
 
 // A merge whose candidate is clean would integrate (#etpnnw1, #hnbb5vr): measured first, on a script handed no binary
 // of main's since no baseline is named, then tested, then checked, all on the merge's tree laid from the mirror.
-// Nothing is committed or pushed: the last lines say the performance is unchanged, the tested tree is the merge's own
+// Nothing is committed or pushed: the last lines carry the measurement's record, the tested tree is the merge's own
 // (#6v8r4nn), main's old Performance.jsonc carried in it untouched, and the landing's message, `Land #<task>: <what>`
 // with the gate's account, the measurement's note and every step's seconds, then `integrated <tree>`. With
 // COHERE_INTEGRATE_CACHE set the tests' script keeps the integrate job's cache, and unset it keeps the gate box's none;
@@ -425,6 +423,10 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 				}
 			}
 			fixture.checkMergesOwnTree(merge, said)
+			if said.record == nil {
+				test.Fatalf("the landing's lines carry no record:\n%s", ran.output)
+			}
+			checkMeasuredRecord(test, *said.record, merge, fixture.git(fixture.repository, "rev-parse", "main"))
 			if kept := fixture.git(fixture.repository, "rev-parse", said.tree+":Performance.jsonc"); kept != planted {
 				test.Errorf("the tested tree's Performance.jsonc is %s, not the %s main held", kept, planted)
 			}
@@ -453,12 +455,12 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 }
 
 // An integrate job reads its note against the baseline performanceBaselineVariable holds, main's last landed record as
-// Loom hands it, and writes its record where Loom's runner collects it (#6v8r4nn): the stand-in's numbers, the merge
+// Loom hands it, and prints its record on its last lines (#6v8r4nn): the stand-in's numbers, the merge
 // as its commit, main as its parent, measured, and the baseline's commit as what it was read against. With no baseline
 // the note says none was handed and the record names none, and a baseline that doesn't read, not base64, no JSON,
 // JSON that names no commit, `{}` and `null`, or another schema, is said in the note, never fatal. Each way, the
 // landing's tree is the merge's own and nothing is written into it.
-func TestAnIntegrateJobWritesItsRecordAgainstItsBaseline(test *testing.T) {
+func TestAnIntegrateJobPrintsItsRecordAgainstItsBaseline(test *testing.T) {
 	test.Parallel()
 	baseline := previousPerformance(test, performancePreviousCommit, performanceBox,
 		performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000))
@@ -501,13 +503,13 @@ func TestAnIntegrateJobWritesItsRecordAgainstItsBaseline(test *testing.T) {
 			}
 			said := readLanding(test, ran.output)
 			fixture.checkMergesOwnTree(merge, said)
-			record, written, found := fixture.record()
-			if !found {
-				test.Fatalf("the integrate job wrote no record at %s", integrateJobRecordPath)
+			if said.record == nil {
+				test.Fatalf("the landing's lines carry no record:\n%s", ran.output)
 			}
+			record := *said.record
 			checkMeasuredRecord(test, record, merge, fixture.git(fixture.repository, "rev-parse", "main"))
-			if record.Against != row.against || strings.Contains(written, `"against"`) != (row.against != "") {
-				test.Errorf("the record was read against %q, want %q:\n%s", record.Against, row.against, written)
+			if record.Against != row.against || strings.Contains(said.written, `"against"`) != (row.against != "") {
+				test.Errorf("the record was read against %q, want %q:\n%s", record.Against, row.against, said.written)
 			}
 			if !strings.HasPrefix(record.Note, row.note) {
 				test.Errorf("the note reads\n%s\nwant it to open\n%s", record.Note, row.note)
@@ -544,10 +546,10 @@ func TestAnIntegrateJobRecordsTheSameBinaryAsSkipped(test *testing.T) {
 	if want := skipped + ", so not measured."; !strings.Contains(said.message, want) {
 		test.Errorf("the landing's message doesn't say %q:\n%s", want, said.message)
 	}
-	record, written, found := fixture.record()
-	if !found {
-		test.Fatalf("the integrate job wrote no record at %s", integrateJobRecordPath)
+	if said.record == nil {
+		test.Fatalf("the landing's lines carry no record:\n%s", ran.output)
 	}
+	record, written := *said.record, said.written
 	if record.Measured || record.Skipped != skipped || strings.Contains(written, `"checks"`) ||
 		record.Commit != merge || record.Parent != fixture.git(fixture.repository, "rev-parse", "main") ||
 		record.Against != performancePreviousCommit || record.Machine.Name != performanceBox ||
@@ -603,10 +605,11 @@ func TestAnIntegrateJobMeasuresABinaryItsBaselineCantVouchFor(test *testing.T) {
 			if measured := fixture.arguments("measure"); len(measured) != 6 {
 				test.Errorf("the measurement was handed %q, want no binary of the baseline's", measured)
 			}
-			record, _, found := fixture.record()
-			if !found {
-				test.Fatalf("the integrate job wrote no record at %s", integrateJobRecordPath)
+			said := readLanding(test, ran.output)
+			if said.record == nil {
+				test.Fatalf("the landing's lines carry no record:\n%s", ran.output)
 			}
+			record := *said.record
 			checkMeasuredRecord(test, record, merge, fixture.git(fixture.repository, "rev-parse", "main"))
 			if !strings.HasPrefix(record.Note, row.note) {
 				test.Errorf("the note reads\n%s\nwant it to open\n%s", record.Note, row.note)
@@ -653,10 +656,10 @@ func TestAnIntegrateJobRecordsNothingFromABusyBox(test *testing.T) {
 			if want := "Not measured: " + skipped + ", so "; !strings.Contains(said.message, want) {
 				test.Errorf("the landing's message doesn't say %q:\n%s", want, said.message)
 			}
-			record, written, found := fixture.record()
-			if !found {
-				test.Fatalf("the integrate job wrote no record at %s", integrateJobRecordPath)
+			if said.record == nil {
+				test.Fatalf("the landing's lines carry no record:\n%s", ran.output)
 			}
+			record, written := *said.record, said.written
 			if record.Measured || record.Skipped != skipped || strings.Contains(written, `"checks"`) ||
 				strings.Contains(written, `"heldQuiet"`) || record.Machine.Cores != 12 || record.Against != against ||
 				record.Commit != merge {
@@ -666,7 +669,8 @@ func TestAnIntegrateJobRecordsNothingFromABusyBox(test *testing.T) {
 	}
 }
 
-// A red test refuses: the integrate job names the test and its output, exits 1, and says no landing.
+// A red test refuses: the integrate job names the test and its output, exits 1, and says no landing, so the record
+// the measurement made, printed only on the landing's lines once the checks pass, is printed nowhere (#6v8r4nn).
 func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
@@ -683,10 +687,6 @@ func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 		if !strings.Contains(ran.errors, want) {
 			test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
 		}
-	}
-	// The measurement passed, but its record is written only once the checks do, so a refused job leaves none.
-	if _, written, found := fixture.record(); found {
-		test.Errorf("a refused integrate job wrote a record at %s:\n%s", integrateJobRecordPath, written)
 	}
 }
 
@@ -1353,13 +1353,11 @@ func TestAFillPassesMainsTipAndSaysFilled(test *testing.T) {
 
 // A fill measures nothing (#fnrchck): performanceScript never runs, so the stand-in bash is called for the tests
 // alone, the account says once that the measurement was skipped, never a measure step's seconds, and no record is
-// written for Loom's runner to collect (#6v8r4nn), a record a job before left in the directory it starts in removed,
-// so the fill never hands that one on as its own.
+// printed for Loom to keep (#6v8r4nn), since a fill prints no landing's lines.
 func TestAFillRunsNoMeasurement(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
 	fixture.landedMain()
-	writeFixtureFile(test, filepath.Join(fixture.job, integrateJobRecordPath), "a record a job before left\n")
 	ran := fixture.fill()
 	if ran.exit != 0 {
 		test.Fatalf("the fill exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
@@ -1371,8 +1369,8 @@ func TestAFillRunsNoMeasurement(test *testing.T) {
 	if strings.Count(ran.errors, want) != 1 || slices.Contains(accountSteps(ran.errors), "measure") {
 		test.Errorf("the account doesn't say %q once, or says a measure step:\n%s", want, ran.errors)
 	}
-	if left, readError := os.ReadFile(filepath.Join(fixture.job, integrateJobRecordPath)); !os.IsNotExist(readError) {
-		test.Errorf("after the fill a record is at %s (%v):\n%s", integrateJobRecordPath, readError, left)
+	if strings.Contains(ran.output+ran.errors, integrateJobMarker+"performance ") {
+		test.Errorf("the fill printed a performance line:\n%s\n%s", ran.output, ran.errors)
 	}
 }
 

@@ -21,8 +21,8 @@ import (
 // Every landing measures itself (#6wnsnq2), in Kirk's words "nothing gets committed to main without timing numbers".
 // After the gate passes and before the landing is made, cohere-go is run on Shackler, the quiet house Mac that holds
 // numbers of record, and what it measured is a record, the JSON performanceFile, read against the baseline, main's last
-// landed record. The record lives beside main, never in its tree (#6v8r4nn, Kirk's ruling): the integrate job writes
-// it to integrateJobRecordPath for Loom's runner to collect, and Loom hands the next job its baseline in
+// landed record. The record lives beside main, never in its tree (#6v8r4nn, Kirk's ruling): the integrate job prints
+// it on its last lines (landingLines), Loom keeps it by main's commit, and Loom hands the next job its baseline in
 // performanceBaselineVariable. Until #6v8r4nn it was spliced into the landing's tree as Performance.jsonc.
 //
 // Rulings that keep it honest (@system_cohere, on #6wnsnq2):
