@@ -18,6 +18,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // integrateJobFixture is an integrate job ready to judge a merge in a mirror: a candidate, worktree a's head, bringing
@@ -791,7 +792,9 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 			laid := filepath.Join(test.TempDir(), "laid modules")
 			layer := test.TempDir()
 			gate.Dir = tree
-			gate.Env = append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+layer,
+			// The test's own process may run under a runner's cache program, so every row starts from none, and the
+			// rows that are the runner's name a stand-in.
+			gate.Env = append(own_go_cache.Environment(os.Environ(), layer), "GATE_LOG="+log, "TMPDIR="+temporary,
 				"GOMODCACHE="+laid, "GOPROXY=https://proxy.example.com")
 			if row.runner {
 				gate.Env = append(gate.Env, "GOCACHEPROG=loom-job-runner gocacheprog shared layer")

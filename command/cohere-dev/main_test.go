@@ -18,6 +18,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 	"github.com/system-inc/cohere/internal/testing/process_reading"
 )
 
@@ -612,8 +613,8 @@ func TestTheCacheTrimRunsBesideABusyPoolAndKeepsTheFloor(test *testing.T) {
 	insideFloor := put("b0"+strings.Repeat("b", 62)+"-a", 90*time.Minute)
 	// A cap of 6 KB, so the trim brings 12 KB down to three quarters of it.
 	capGigabytes := strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64)
-	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
-		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
+	environment := append(own_go_cache.Environment(outsideThePool(os.Environ()), cache), homeVariable+"="+home,
+		"HOME="+scratchHome(test), tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
 
 	// A run holds a token the whole time, and the trim runs beside it on the other.
 	held, takeSlotError := takeSlot(slots, 2, "a run that holds a token")
@@ -774,8 +775,9 @@ func TestTheCacheTrimWaitsItsTurnWhenEveryTokenIsHeld(test *testing.T) {
 		test.Fatalf("taking token 2: %v", takeSlotError)
 	}
 	trim := exec.Command(wrapper, trimCacheVerb)
-	trim.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
-		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
+	trim.Env = append(own_go_cache.Environment(outsideThePool(os.Environ()), cache), homeVariable+"="+home,
+		"HOME="+scratchHome(test), tokensVariable+"=2",
+		cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
 	if startError := trim.Start(); startError != nil {
 		first.release()
 		second.release()

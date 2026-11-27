@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // A run with `HOME` set to a scratch directory still uses the machine's pool, the one under the account's own
@@ -132,8 +133,8 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 	}
 	scratch := scratchHome(test)
 	trim := exec.Command(wrapper, trimCacheVerb)
-	trim.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratch, "GOCACHE="+cache,
-		tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
+	trim.Env = append(own_go_cache.Environment(outsideThePool(os.Environ()), cache), homeVariable+"="+home,
+		"HOME="+scratch, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
 	output, outputError := trim.CombinedOutput()
 	if exited, ok := outputError.(*exec.ExitError); !ok || exited.ExitCode() != 2 {
 		test.Errorf("the trim of a cache its pool does not guard did not exit 2 (%v):\n%s", outputError, output)

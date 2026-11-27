@@ -16,6 +16,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // plantedGo stands in for a shared box's go: it answers go env, and records every go mod download, go mod verify and
@@ -208,8 +209,8 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			temporary := test.TempDir()
 			// The account's own Go settings, which the gate must not read: a cache, flags, a toolchain switch and a
 			// proxy.
-			environment := append(withoutModuleCache(os.Environ()), "GATE_LOG="+log, "TMPDIR="+temporary,
-				"GOCACHE="+test.TempDir(), "GOFLAGS=-count=5", "GOTOOLCHAIN=auto",
+			environment := append(own_go_cache.Environment(withoutModuleCache(os.Environ()), test.TempDir()),
+				"GATE_LOG="+log, "TMPDIR="+temporary, "GOFLAGS=-count=5", "GOTOOLCHAIN=auto",
 				"GOENV="+filepath.Join(test.TempDir(), "env"), "GOPROXY=https://proxy.example.com")
 			if row.accountModules {
 				environment = append(environment, "GOMODCACHE="+filepath.Join(test.TempDir(), "account modules"))
