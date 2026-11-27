@@ -3,6 +3,10 @@
 // no code of its own. They read every rule file, so an edit to one reruns them, and they live apart from
 // the code they used to share a package with so that the edit reruns them alone: in
 // internal/release/dispatch, every lint edit reran dispatch's Swift and build tests too (#nxgt2ca).
+//
+// They read the whole module's tree, not only the rule files: go test's cache keys this package on every directory
+// listing in it, so a landing that changes any file reruns it, about 8 seconds on the Mac. That is the point of a
+// guard over every file, and why it stays a package of its own and takes no test that judges less (#0zdyk51).
 package guard
 
 import (
