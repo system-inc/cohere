@@ -7,11 +7,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -273,8 +271,9 @@ func integrateJob(arguments []string) int {
 		}
 	}
 	// cohere-swift can't be built in an integrate job's sandbox (needs.SwiftUnlaid), so the tests that build it skip by
-	// name (needs.SwiftLaid), cohere on the tree checks every language but Swift (integrateJobCohereArguments), a merge
-	// that changes what only Swift checks is refused (integrateJobSwiftRefusal), and the landing's account says so.
+	// name (needs.SwiftLaid), cohere on the tree checks every language but Swift (integrateJobCohereArguments), and the
+	// landing's account says so. A merge that changes Swift's own paths is let through on that rule, its Swift proven
+	// on a Mac beside it, Kirk's one-time bridge (#je1r32a).
 	if setError := os.Setenv(needs.SwiftUnlaidVariable, needs.SwiftUnlaidSetting); setError != nil {
 		fmt.Fprintf(
 			streams.Errors,
@@ -574,15 +573,6 @@ func (job *integrateJobRun) preflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
 		return "", 1
 	}
-	swiftRefusal, swiftError := integrateJobSwiftRefusal(job.repository, job.merge)
-	if swiftError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", swiftError)
-		return "", 1
-	}
-	if swiftRefusal != "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", swiftRefusal)
-		return "", 1
-	}
 	job.commits, job.subject = commits, subject
 	return subject + ", " + shortCommit(job.candidate) + " merged onto main at " + shortCommit(job.running) + " as " +
 		shortCommit(job.merge), 0
@@ -592,8 +582,7 @@ func (job *integrateJobRun) preflight() (string, int) {
 // and of integrateJobPreflight's checks the one that reads only the tree, its submodules recorded as gitlinks
 // (checkGitlinks). The rest judge a candidate, and a fill has none,
 // main's tip being already landed: the merge's two parents, main holding the candidate (heldByMain), the commits'
-// subjects and their task, the landing's subject and --message, and the Swift guard, which reads what a merge changes
-// against main (integrateJobSwiftRefusal).
+// subjects and their task, and the landing's subject and --message.
 func (job *integrateJobRun) fillPreflight() (string, int) {
 	if code := job.reachMerge(); code != 0 {
 		return "", code
@@ -750,44 +739,6 @@ func pullRequestTitle(message string, task string) (string, string) {
 			"characters", number, subjectLimit)
 	}
 	return title, ""
-}
-
-// integrateJobSwiftDirectories are the packages whose Swift files integrateJobSwiftRefusal refuses: command/cohere runs
-// cohere-swift, and release's dispatch and packaging build it.
-var integrateJobSwiftDirectories = []string{
-	"command/cohere/",
-	"internal/release/dispatch/",
-	"internal/release/packaging/",
-}
-
-// integrateJobSwiftRefusal is why the integrate job refuses merge, read from repository, for what it changes against
-// its first parent that only Swift's checks judge, empty when it changes none of it: any path under swift_language/,
-// the Swift package, and the Swift files of the packages that run cohere-swift or build it, swift.go and swift_*.go in
-// integrateJobSwiftDirectories, whose tests that build it skip in an integrate job (needs.SwiftLaid). Until Machines
-// lays Swift on Shackler (#je1r32a) no integrate job checks them, so a change to them is never integrated unchecked.
-// Renames are read as a removal and an addition, so a file moved out of the package is still the package's change.
-func integrateJobSwiftRefusal(repository string, merge string) (string, error) {
-	changed, diffError := gitOutput(repository, "diff", "--name-only", "--no-renames", merge+"^1", merge)
-	if diffError != nil {
-		return "", fmt.Errorf("reading what the merge %s changes: %w", shortCommit(merge), diffError)
-	}
-	swift := []string{}
-	for _, changedPath := range strings.Split(changed, "\n") {
-		directory, name := path.Split(changedPath)
-		swiftFile := (name == "swift.go" || strings.HasPrefix(name, "swift_")) && strings.HasSuffix(name, ".go")
-		if strings.HasPrefix(changedPath, "swift_language/") ||
-			(swiftFile && slices.Contains(integrateJobSwiftDirectories, directory)) {
-			swift = append(swift, changedPath)
-		}
-	}
-	if len(swift) == 0 {
-		return "", nil
-	}
-	return fmt.Sprintf(
-		"%s, so the merge's change to %s can't be judged here, and nothing integrates",
-		needs.SwiftUnlaid,
-		strings.Join(swift, ", "),
-	), nil
 }
 
 // lay checks the merge's tree out under the integrate job's scratch, a worktree of its mirror kept across jobs, with
