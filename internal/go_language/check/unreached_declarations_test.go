@@ -2,6 +2,7 @@ package check
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -48,7 +49,7 @@ func unreachedFiles(importsCgo bool) map[string]string {
 // declarations was handed, in the order handed, once the type-read walks have ended. Each hand-on of a package whose
 // reads are marked never waits, ten seconds at most, until a second such hand-on has started, so the walks no action
 // reached run two at once wherever the run's walks have two slots free, rather than one after another as their little
-// work would end them.
+// work would end them, and the test fails when one waited out its ten seconds.
 func handedOn(
 	test *testing.T,
 	analyzed []*packages.Package,
@@ -60,6 +61,8 @@ func handedOn(
 	var handed []string
 	neverStarted := 0
 	secondNever := make(chan struct{})
+	// waitedOut is set when a hand-on gave up waiting for a second, so the two never ran at once.
+	waitedOut := false
 	declarations := func(declared *packages.Package) {
 		lock.Lock()
 		handed = append(handed, declared.ID)
@@ -78,6 +81,9 @@ func handedOn(
 		select {
 		case <-secondNever:
 		case <-time.After(10 * time.Second):
+			lock.Lock()
+			waitedOut = true
+			lock.Unlock()
 		}
 	}
 	result, runError := Run(analyzed, rules, Options{Reads: reads, Declarations: declarations})
@@ -87,6 +93,14 @@ func handedOn(
 	// The hand-ons run in the type-read walks, which run past Run.
 	result.ReadWalks.Wait()
 	lock.Lock()
+	// A run where a hand-on gave up waiting for a second ran the walks one after another, the next only once the
+	// first's ten seconds were out, so it passed without the walks no action reached ever running at once, which is
+	// what its claims say it drives (#tncmrsh). It fails rather than skips: a test that may skip never counts toward a
+	// site's claims.
+	if waitedOut {
+		test.Errorf("a walk of a package no action reached waited out its ten seconds for a second (GOMAXPROCS %d), "+
+			"so this run never had two at once", runtime.GOMAXPROCS(0))
+	}
 	defer lock.Unlock()
 	return slices.Clone(handed)
 }
