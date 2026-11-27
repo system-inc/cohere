@@ -522,32 +522,25 @@ var Upstreams = []Upstream{
 		Reach:       Compiled,
 		LicenseFile: "cspell-dict-software-terms.txt",
 	},
-	{
-		Name: "Prettier's bundled builds", Url: "https://github.com/system-inc/prettier", License: "MIT",
-		Carries: "Built Prettier bundles vendored in internal/format/prettier/bundles, which tests compare the formatter against. They bundle many other projects, whose licenses are in internal/format/prettier/bundles/THIRD-PARTY-NOTICES.md.",
-		Reach:   RepositoryOnly, LicenseFile: "prettier.txt",
-	},
 }
 
 // moduleLicenses is each Go module's license, read from its license file, for every module in the build
 // graph or go.mod. A module missing here stops the generator by name, so a new dependency is read
 // before it is credited.
 var moduleLicenses = map[string]string{
-	"github.com/Microsoft/go-winio":     "MIT",
-	"github.com/klauspost/cpuid/v2":     "MIT",
-	"github.com/dlclark/regexp2/v2":     "MIT",
-	"github.com/zeebo/xxh3":             "BSD-2-Clause",
-	"golang.org/x/sync":                 "BSD-3-Clause",
-	"golang.org/x/sys":                  "BSD-3-Clause",
-	"golang.org/x/text":                 "BSD-3-Clause",
-	"github.com/dop251/goja":            "MIT",
-	"github.com/go-sourcemap/sourcemap": "BSD-2-Clause",
-	"github.com/google/pprof":           "Apache-2.0",
-	"golang.org/x/mod":                  "BSD-3-Clause",
-	"golang.org/x/tools":                "BSD-3-Clause",
-	"github.com/BurntSushi/toml":        "MIT",
-	"golang.org/x/exp/typeparams":       "BSD-3-Clause",
-	"honnef.co/go/tools":                "MIT",
+	"github.com/Microsoft/go-winio": "MIT",
+	"github.com/klauspost/cpuid/v2": "MIT",
+	"github.com/dlclark/regexp2/v2": "MIT",
+	"github.com/zeebo/xxh3":         "BSD-2-Clause",
+	"golang.org/x/sync":             "BSD-3-Clause",
+	"golang.org/x/sys":              "BSD-3-Clause",
+	"golang.org/x/text":             "BSD-3-Clause",
+	"github.com/google/pprof":       "Apache-2.0",
+	"golang.org/x/mod":              "BSD-3-Clause",
+	"golang.org/x/tools":            "BSD-3-Clause",
+	"github.com/BurntSushi/toml":    "MIT",
+	"golang.org/x/exp/typeparams":   "BSD-3-Clause",
+	"honnef.co/go/tools":            "MIT",
 }
 
 // swiftLicense is a Swift package's license expression and its text under licenses/.

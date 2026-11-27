@@ -35,20 +35,15 @@ var widthCases = []string{
 	"中文😀é\t中",     // wide, emoji, a combining mark and a tab in one line
 }
 
-// TestStringWidthAgreesWithUpstream measures the port against the fork's own getStringWidth, the one its
-// standalone bundle exports as prettier.util.getStringWidth, recorded (see oracle_testing) so no JavaScript
-// runs here. The fork's build rewrote the \p{} escapes goja lacks, and a case where goja's answer still
-// differs from node's is left out (see widthCases).
+// TestStringWidthAgreesWithUpstream measures the port against the fork's own getStringWidth. Its answers are
+// what the fork's standalone bundle, run in-process, gave as prettier.util.getStringWidth, recorded (see
+// oracle_testing). A case where that answer differs from node's is left out (see widthCases).
 func TestStringWidthAgreesWithUpstream(test *testing.T) {
 	test.Parallel()
 	golden := oracle_testing.Open(test, test.Name())
 	wide := 0
 	for _, input := range widthCases {
-		answer, answerError := golden.Evaluate(
-			oracle_testing.Key("getStringWidth", input),
-			"String(prettier.util.getStringWidth(__input))",
-			input,
-		)
+		answer, answerError := golden.Answer(oracle_testing.Key("getStringWidth", input))
 		if answerError != nil {
 			test.Fatalf("the oracle failed on %q: %v", input, answerError)
 		}

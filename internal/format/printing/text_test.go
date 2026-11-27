@@ -70,31 +70,13 @@ type textAnswers struct {
 	SkipInlineComment, SkipTrailingComment        int
 }
 
-// textUpstreamScript asks upstream's text utilities, the ones the standalone bundle exports as prettier.util
-// from the fork's src/utilities, about __input's text at its UTF-16 start. false answers as -2, as the Go side
-// spells it.
-const textUpstreamScript = `(() => {
-  const { text, start } = JSON.parse(__input);
-  const u = prettier.util;
-  const f = (value) => value === false ? -2 : value;
-  const back = { backwards: true };
-  return JSON.stringify({
-    SkipWhitespaceForward: f(u.skipWhitespace(text, start)), SkipWhitespaceBackward: f(u.skipWhitespace(text, start, back)),
-    SkipSpacesForward: f(u.skipSpaces(text, start)), SkipSpacesBackward: f(u.skipSpaces(text, start, back)),
-    SkipToLineEnd: f(u.skipToLineEnd(text, start)), SkipEverythingButNewLine: f(u.skipEverythingButNewLine(text, start)),
-    SkipNewlineForward: f(u.skipNewline(text, start)), SkipNewlineBackward: f(u.skipNewline(text, start, back)),
-    HasNewlineForward: u.hasNewline(text, start), HasNewlineBackward: u.hasNewline(text, start, back),
-    IsPreviousLineEmpty: u.isPreviousLineEmpty(text, start),
-    SkipInlineComment: f(u.skipInlineComment(text, start)), SkipTrailingComment: f(u.skipTrailingComment(text, start)),
-  });
-})()`
-
 // textCaseCount is how many generated cases TestTextAgreesWithUpstream holds, the first of seed 20261003.
 // The live differential ran 20,000; this slice keeps the golden small.
 const textCaseCount = 700
 
-// TestTextAgreesWithUpstream is the differential, against upstream's answers recorded (see oracle_testing), so
-// no JavaScript runs here.
+// TestTextAgreesWithUpstream is the differential, against upstream's answers recorded (see oracle_testing): the
+// fork bundle's prettier.util text utilities, the ones the fork's src/utilities export, asked about each text at
+// its UTF-16 start, each answer one textAnswers as JSON, with false spelled -2 as the Go side spells it.
 func TestTextAgreesWithUpstream(test *testing.T) {
 	test.Parallel()
 	random := rand.New(rand.NewSource(20261003))
@@ -136,11 +118,7 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 		if marshalError != nil {
 			test.Fatalf("encoding case %d: %v", index, marshalError)
 		}
-		answer, upstreamError := golden.Evaluate(
-			oracle_testing.Key("textUtilities", string(input)),
-			textUpstreamScript,
-			string(input),
-		)
+		answer, upstreamError := golden.Answer(oracle_testing.Key("textUtilities", string(input)))
 		if upstreamError != nil {
 			test.Fatalf("the oracle failed on %q at %d: %v", text, start, upstreamError)
 		}

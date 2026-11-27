@@ -8,48 +8,27 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
-// The tree oracle: the embedded markdown bundle's own parser, run by goja, the exact code the format
-// oracle runs. Every node of the Go tree must carry the same type, the same fields with the same values
-// (null distinct from absent), and the same positions, offsets converted from UTF-16 to bytes.
+// The tree oracle: the fork's markdown bundle's own parser, the exact code the format oracle ran. Every node of
+// the Go tree must carry the same type, the same fields with the same values (null distinct from absent), and
+// the same positions, offsets converted from UTF-16 to bytes.
 //
-// The trees are recorded (see oracle_testing) as the JSON text upstream's parser serializes, so no JavaScript
-// runs for them and the runtime is built only when they are recorded again.
+// The trees are recorded (see oracle_testing) as the JSON text upstream's parser gave:
+// prettierPlugins.markdown.parsers.markdown.parse on the text, serialized by JSON.stringify with every `data`
+// key (hast hints for HTML output) dropped.
 
 type treeOracle struct {
-	golden    *oracle_testing.Golden
-	once      sync.Once
-	runtime   *goja.Runtime
-	loadError error
+	golden *oracle_testing.Golden
 }
 
 // newTreeOracle answers from the test's golden.
 func newTreeOracle(test *testing.T) *treeOracle {
 	test.Helper()
 	return &treeOracle{golden: oracle_testing.Open(test, test.Name())}
-}
-
-func (oracle *treeOracle) load() {
-	bundles, bundlesError := prettier.Bundles()
-	if bundlesError != nil {
-		oracle.loadError = bundlesError
-		return
-	}
-	runtime := goja.New()
-	for _, name := range []string{"standalone.js", "plugins/markdown.js"} {
-		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
-			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
-			return
-		}
-	}
-	oracle.runtime = runtime
 }
 
 // treeValue is one value of a tree serialized as JSON, upstream's or the port's: an object, a list, a
@@ -145,32 +124,11 @@ func decodeTreeValue(decoder *json.Decoder) (treeValue, error) {
 
 // parse returns upstream's tree, with `data` (hast hints for HTML output) dropped.
 func (oracle *treeOracle) parse(text string) (treeValue, error) {
-	serialized, serializeError := oracle.golden.Answer(oracle_testing.Key("tree", text), func() (string, error) {
-		oracle.once.Do(oracle.load)
-		if oracle.loadError != nil {
-			return "", oracle.loadError
-		}
-		return oracle.serialize(text)
-	})
+	serialized, serializeError := oracle.golden.Answer(oracle_testing.Key("tree", text))
 	if serializeError != nil {
 		return nil, serializeError
 	}
 	return decodeTree([]byte(serialized))
-}
-
-// serialize is upstream's tree for text, as the JSON text the bundle's parser and JSON.stringify give.
-func (oracle *treeOracle) serialize(text string) (string, error) {
-	if setError := oracle.runtime.Set("__text", text); setError != nil {
-		return "", fmt.Errorf("setting the text to parse: %w", setError)
-	}
-	value, runStringError := oracle.runtime.RunString(
-		`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
-		(key, value) => key === "data" ? undefined : value)`,
-	)
-	if runStringError != nil {
-		return "", runStringError
-	}
-	return value.String(), nil
 }
 
 // convertOffsets rewrites every position offset in upstream's tree from UTF-16 units to bytes.

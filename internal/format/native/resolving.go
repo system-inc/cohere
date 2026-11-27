@@ -10,9 +10,9 @@ import (
 	"github.com/system-inc/cohere/internal/gitignore"
 )
 
-// Resolving formats each file with the options its own directory resolves to, the way
-// prettier.Resolving does for the goja formatter, so switching the format phase from one to the other
-// changes the printers and nothing about which options a file is printed with.
+// Resolving formats each file with the options its own directory resolves to, the way the Prettier
+// fork's formatter did, so moving the format phase onto the native printers changed the printers and
+// nothing about which options a file is printed with.
 //
 // It holds no formatters, because a native printer costs nothing to construct: only the run's Resolver,
 // which remembers each directory's options.

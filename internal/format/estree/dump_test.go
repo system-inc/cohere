@@ -14,30 +14,6 @@ import (
 	"github.com/system-inc/cohere/internal/json_value"
 )
 
-// prettierParseScript is the oracle: the fork's own parse (parser "typescript", with the file path, so
-// JSX and sourceType are decided the way Prettier decides them for a real file), through the standalone
-// bundle's prettier.__debug.parse, dumped in the shape dumpValue prints. Offsets are UTF-16 there, and the
-// Go side converts to match.
-const prettierParseScript = `(async () => {
-  const { fileName, text } = JSON.parse(__input);
-  const skip = new Set(["loc","range","comments","tokens","parent","start","end","extra"]);
-  function dump(v) {
-    if (v === null || v === undefined) return null;
-    if (Array.isArray(v)) return v.map(dump);
-    if (typeof v === "bigint" || v instanceof RegExp) return null;
-    if (typeof v !== "object") return v;
-    if (v.type === undefined) { const o = {}; for (const k of Object.keys(v).sort()) o[k] = dump(v[k]); return o; }
-    const o = { type: v.type, range: [v.range[0], v.range[1]] };
-    if (v.__contentEnd !== undefined) o.__contentEnd = v.__contentEnd;
-    for (const k of Object.keys(v).sort()) { if (skip.has(k) || k === "type" || k.startsWith("__")) continue; o[k] = dump(v[k]); }
-    if (o.type === "Literal" && (v.regex || v.bigint)) o.value = null;
-    return o;
-  }
-  const { ast } = await prettier.__debug.parse(text, { parser: "typescript", filepath: fileName, plugins: prettierPlugins });
-  const comments = (ast.comments ?? []).map(c => ({ type: c.type, range: c.range, value: c.value }));
-  return JSON.stringify({ ast: dump(ast), comments });
-})()`
-
 // convertFixtures are the constructs the converter's corpus differential reached, written small and in the
 // repository: decorators, satisfies, enums, overloads and JSX, and the TypeScript around them a converter
 // most easily drops or misplaces. Non-ASCII text and comments are spread through them, since the oracle's
@@ -136,8 +112,10 @@ export = value;
 }
 
 // TestConvertAgreesWithPrettier is the converter's acceptance test: for every fixture, the Go tree and comment
-// list must equal what the fork's own parse produces, property for property, against the fork's answers
-// recorded (see oracle_testing), so no JavaScript runs here. The live differential ran over corpora named by
+// list must equal what the fork's own parse produces, property for property. The fork's answers are recorded
+// (see oracle_testing): its bundle's prettier.__debug.parse with parser "typescript" and the fixture's file
+// path, so JSX and sourceType are decided as Prettier decides them, dumped in the shape dumpValue prints, with
+// offsets in UTF-16, which dumpFile converts to. The live differential ran over corpora named by
 // COHERE_ESTREE_CORPORA; these fixtures hold what that corpus reached.
 func TestConvertAgreesWithPrettier(test *testing.T) {
 	test.Parallel()
@@ -150,11 +128,7 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 		if marshalError != nil {
 			test.Fatalf("%s: %v", fixture.fileName, marshalError)
 		}
-		answer, upstreamError := golden.Evaluate(
-			oracle_testing.Key("typescriptParse", string(input)),
-			prettierParseScript,
-			string(input),
-		)
+		answer, upstreamError := golden.Answer(oracle_testing.Key("typescriptParse", string(input)))
 		if upstreamError != nil {
 			test.Errorf("%s: the fork refused it, so it holds nothing: %v", fixture.fileName, upstreamError)
 			continue

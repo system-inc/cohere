@@ -1,7 +1,6 @@
 package markdown
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -13,11 +12,12 @@ import (
 
 // The proseWrap oracle. Every corpus prints with proseWrap "preserve", where a line break returns before
 // whitespace.js reaches its CJK and Korean rules, and format_options.Options does not carry the option. So
-// these fixtures run the same bundles in their own runtime with proseWrap "always" and "never", against
-// the port with the same setting.
+// these fixtures hold the port, with proseWrap "always" and "never", to what the fork's bundles printed
+// with the same setting.
 
-// proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own. Its answers are
-// recorded (see oracle_testing), so the bundles run only when they are recorded again.
+// proseWrapOracle answers as the fork formatted markdown with a proseWrap of its own: its bundle's
+// prettier.format on the text at fixture.md with parser "markdown", the proseWrap and the options' printWidth,
+// tabWidth, useTabs and singleQuote. Its answers are recorded (see oracle_testing).
 type proseWrapOracle struct {
 	golden *oracle_testing.Golden
 }
@@ -27,31 +27,12 @@ func newProseWrapOracle(test *testing.T) *proseWrapOracle {
 	return &proseWrapOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
-// proseWrapScript formats __input's source as the markdown at fixture.md, with its options.
-const proseWrapScript = `(() => {
-	const input = JSON.parse(__input);
-	return prettier.format(input.source, {
-		filepath: "fixture.md", parser: "markdown", plugins: prettierPlugins, proseWrap: input.proseWrap,
-		printWidth: input.printWidth, tabWidth: input.tabWidth, useTabs: input.useTabs, singleQuote: input.singleQuote,
-	});
-})()`
-
-// format is the recorded answer for text, keyed by everything the script passes the bundles: the text, the
-// file path, the parser, the options and the proseWrap.
+// format is the recorded answer for text, keyed by everything the fork was passed: the text, the file path,
+// the parser, the options and the proseWrap.
 func (oracle *proseWrapOracle) format(text string, options format_options.Options, proseWrap string) (string, error) {
-	key := oracle_testing.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
-	input, marshalError := json.Marshal(struct {
-		Source      string `json:"source"`
-		ProseWrap   string `json:"proseWrap"`
-		PrintWidth  int    `json:"printWidth"`
-		TabWidth    int    `json:"tabWidth"`
-		UseTabs     bool   `json:"useTabs"`
-		SingleQuote bool   `json:"singleQuote"`
-	}{text, proseWrap, options.PrintWidth, options.TabWidth, options.UseTabs, options.SingleQuote})
-	if marshalError != nil {
-		return "", fmt.Errorf("encoding the oracle's input: %w", marshalError)
-	}
-	return oracle.golden.Evaluate(key, proseWrapScript, string(input))
+	return oracle.golden.Answer(
+		oracle_testing.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap),
+	)
 }
 
 // proseWrapFixtures are prose the always and never branches print differently from preserve: long

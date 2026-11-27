@@ -1,7 +1,6 @@
 package yaml
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"strings"
@@ -14,11 +13,11 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// The oracle for what prettier.Formatter cannot be asked: proseWrap, which format_options.Options does not carry
-// and every repository leaves at "preserve", and a file path the formatter does not route (.prettierrc). These
-// run the same embedded bundles in their own runtime, with the option given.
-
-// Its answers are recorded (see oracle_testing), so the bundles run only when they are recorded again.
+// The oracle for what the fork's formatter could not be asked through Options: proseWrap, which
+// format_options.Options does not carry and every repository leaves at "preserve", and a file path the
+// formatter does not route (.prettierrc). Its answers are the fork bundle's prettier.format on the text at the
+// file path with the parser, the proseWrap and the options' printWidth, tabWidth, useTabs, singleQuote,
+// bracketSpacing, trailingComma and endOfLine, recorded (see oracle_testing).
 type optionsOracle struct {
 	golden *oracle_testing.Golden
 }
@@ -28,16 +27,6 @@ func newOptionsOracle(test *testing.T) *optionsOracle {
 	return &optionsOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
-// optionsScript formats __input's source at its file path with its parser and options.
-const optionsScript = `(() => {
-	const input = JSON.parse(__input);
-	return prettier.format(input.source, {
-		filepath: input.filePath, parser: input.parser, plugins: prettierPlugins, proseWrap: input.proseWrap,
-		printWidth: input.printWidth, tabWidth: input.tabWidth, useTabs: input.useTabs, singleQuote: input.singleQuote,
-		bracketSpacing: input.bracketSpacing, trailingComma: input.trailingComma, endOfLine: input.endOfLine,
-	});
-})()`
-
 func (oracle *optionsOracle) format(
 	text string,
 	filePath string,
@@ -45,36 +34,9 @@ func (oracle *optionsOracle) format(
 	options format_options.Options,
 	proseWrap string,
 ) (string, error) {
-	key := oracle_testing.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
-	input, marshalError := json.Marshal(struct {
-		Source         string `json:"source"`
-		FilePath       string `json:"filePath"`
-		Parser         string `json:"parser"`
-		ProseWrap      string `json:"proseWrap"`
-		PrintWidth     int    `json:"printWidth"`
-		TabWidth       int    `json:"tabWidth"`
-		UseTabs        bool   `json:"useTabs"`
-		SingleQuote    bool   `json:"singleQuote"`
-		BracketSpacing bool   `json:"bracketSpacing"`
-		TrailingComma  string `json:"trailingComma"`
-		EndOfLine      string `json:"endOfLine"`
-	}{
-		text,
-		filePath,
-		parser,
-		proseWrap,
-		options.PrintWidth,
-		options.TabWidth,
-		options.UseTabs,
-		options.SingleQuote,
-		options.BracketSpacing,
-		options.TrailingComma,
-		options.EndOfLine,
-	})
-	if marshalError != nil {
-		return "", fmt.Errorf("encoding the oracle's input: %w", marshalError)
-	}
-	return oracle.golden.Evaluate(key, optionsScript, string(input))
+	return oracle.golden.Answer(
+		oracle_testing.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap),
+	)
 }
 
 // proseWrapFixtures are the inputs whose words the always and never branches join and split: multi-line

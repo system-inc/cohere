@@ -16,29 +16,6 @@ import (
 	"github.com/system-inc/cohere/internal/json_value"
 )
 
-// glueParseScript is the oracle: the fork's own parse with parser "css" (prettier.__debug.parse from the
-// standalone bundle, which runs Prettier's core normalization and then the postcss plugin's parsers.css.parse,
-// built from src/language-css/parser-postcss.js), dumped whole: every own enumerable key of every object,
-// sorted, with parent and source.input left out. undefined and null both dump as null, so a key written with
-// undefined (loc.js's `??=`) still counts as present. Offsets are UTF-16 there; the Go side converts its byte
-// offsets to match.
-const glueParseScript = `(async () => {
-  function dump(v) {
-    if (v === undefined || v === null) return null;
-    if (Array.isArray(v)) return v.map(dump);
-    if (typeof v !== "object") return v;
-    const o = {};
-    for (const k of Object.keys(v).sort()) { if (k === "parent" || k === "input") continue; o[k] = dump(v[k]); }
-    return o;
-  }
-  try {
-    const { ast } = await prettier.__debug.parse(__input, { parser: "css", plugins: prettierPlugins });
-    return JSON.stringify(dump(ast));
-  } catch (e) {
-    throw new Error(String(e?.message ?? e).split("\n")[0]);
-  }
-})()`
-
 // glueParseFixture is an inline input; malformed says which way the fork must go on it.
 type glueParseFixture struct {
 	name      string
@@ -194,8 +171,12 @@ var glueParseFixtures = []glueParseFixture{
 // TestParseAgreesWithPrettierCssParser is the glue's acceptance test: for every inline fixture, the Go tree
 // must equal what the fork's parsers.css.parse returns, key for key, Prettier's source.startOffset and
 // endOffset included, and a refusal must be a refusal on both sides. The fork's answers are recorded (see
-// oracle_testing), so no JavaScript runs here. The live differential also walked the corpora
-// COHERE_CSS_CORPORA named; the fixtures hold the constructs it reached.
+// oracle_testing): its bundle's prettier.__debug.parse with parser "css", which runs Prettier's core
+// normalization and then the postcss plugin's parsers.css.parse, dumped whole (every own enumerable key of
+// every object, sorted, parent and source.input left out, undefined as null so a key written with undefined
+// still counts as present), or the first line of its refusal. Offsets are UTF-16 there; the Go side converts
+// its byte offsets to match. The live differential also walked the corpora COHERE_CSS_CORPORA named; the
+// fixtures hold the constructs it reached.
 //
 // On a text with a non-ASCII character, sourceIndex is left out on both sides: it is relative to a
 // value, selector or params string, not to the file, and only absolute offsets are converted from bytes
@@ -214,11 +195,7 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 		}
 	}
 	for _, fixture := range glueParseFixtures {
-		answer, oracleError := golden.Evaluate(
-			oracle_testing.Key("cssParse", fixture.text),
-			glueParseScript,
-			fixture.text,
-		)
+		answer, oracleError := golden.Answer(oracle_testing.Key("cssParse", fixture.text))
 		oracleRefused := oracleError != nil
 		if fixture.malformed != oracleRefused {
 			fail(

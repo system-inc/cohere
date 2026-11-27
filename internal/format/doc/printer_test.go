@@ -259,50 +259,8 @@ func buildSpecAs(root *spec, asSequences bool) Doc {
 	return build(root)
 }
 
-// printUpstreamScript builds __input's spec with upstream's builders and prints it with upstream's printer,
-// both from the standalone bundle's prettier.doc, as the fork's own src/document/public.js exports them.
-const printUpstreamScript = `(() => {
-  const { spec, options } = JSON.parse(__input);
-  const b = prettier.doc.builders;
-  const ids = new Map(), groups = new Map();
-  const id = (name) => { if (!name) return undefined; if (!ids.has(name)) ids.set(name, Symbol(name)); return ids.get(name); };
-  const build = (node) => {
-    const kids = () => (node.Children || []).map(build);
-    switch (node.Kind) {
-      case "text": return node.Text || "";
-      case "line": return b.line;
-      case "softline": return b.softline;
-      case "hardline": return b.hardline;
-      case "literalline": return b.literalline;
-      case "hardlineWithoutBreakParent": return b.hardlineWithoutBreakParent;
-      case "concat": return kids();
-      case "indent": return b.indent(build(node.Children[0]));
-      case "alignWidth": return b.align(node.Number || 0, build(node.Children[0]));
-      case "alignString": return b.align(node.Text || "", build(node.Children[0]));
-      case "markAsRoot": return b.markAsRoot(build(node.Children[0]));
-      case "dedentToRoot": return b.dedentToRoot(build(node.Children[0]));
-      case "group": {
-        const g = b.group(build(node.Children[0]), { id: id(node.Id), shouldBreak: !!node.Flag });
-        if (node.Reference) groups.set(node.Reference, g);
-        return g;
-      }
-      case "sharedGroup": return groups.get(node.Reference);
-      case "conditionalGroup": return b.conditionalGroup(kids(), { shouldBreak: !!node.Flag });
-      case "fill": return b.fill(kids());
-      case "ifBreak": return b.ifBreak(build(node.Children[0]), build(node.Children[1]), { groupId: id(node.Id) });
-      case "indentIfBreak": return b.indentIfBreak(build(node.Children[0]), { groupId: id(node.Id), negate: !!node.Flag });
-      case "lineSuffix": return b.lineSuffix(build(node.Children[0]));
-      case "lineSuffixBoundary": return b.lineSuffixBoundary;
-      case "breakParent": return b.breakParent;
-      case "trim": return b.trim;
-      case "label": return b.label(node.Text, build(node.Children[0]));
-    }
-    throw new Error("unknown spec kind " + node.Kind);
-  };
-  return prettier.doc.printer.printDocToString(build(spec), { ...options, endOfLine: "lf" }).formatted;
-})()`
-
-// upstreamPrintOptions are the options the script spreads into printDocToString's, spelled as upstream's are.
+// upstreamPrintOptions are the options upstream's printDocToString was given, spelled as upstream's are. With
+// the spec, as JSON, they are an answer's key, so their shape and names are fixed by the golden.
 type upstreamPrintOptions struct {
 	PrintWidth int  `json:"printWidth"`
 	TabWidth   int  `json:"tabWidth"`
@@ -349,8 +307,9 @@ func boundaryCases() ([]*spec, []Options) {
 // The live differential ran 5,000; this slice keeps the golden small, and the boundary cases ride beside it.
 const printRandomCount = 800
 
-// TestPrintAgreesWithUpstream is the differential, against upstream's answers recorded (see oracle_testing),
-// so no JavaScript runs here.
+// TestPrintAgreesWithUpstream is the differential, against upstream's answers recorded (see oracle_testing):
+// each spec built with the fork bundle's own prettier.doc.builders, mirroring buildSpec, and printed with its
+// prettier.doc.printer.printDocToString.
 func TestPrintAgreesWithUpstream(test *testing.T) {
 	test.Parallel()
 	random := rand.New(rand.NewSource(20261001))
@@ -379,11 +338,7 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 		if marshalError != nil {
 			test.Fatalf("encoding case %d: %v", index, marshalError)
 		}
-		expected, upstreamError := golden.Evaluate(
-			oracle_testing.Key("printDocToString", string(input)),
-			printUpstreamScript,
-			string(input),
-		)
+		expected, upstreamError := golden.Answer(oracle_testing.Key("printDocToString", string(input)))
 		if upstreamError != nil {
 			upstreamErrors++
 			if upstreamErrors <= 3 {
