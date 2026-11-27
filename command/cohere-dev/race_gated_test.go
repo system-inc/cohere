@@ -543,7 +543,8 @@ func readConcurrencySites(directory string) ([]string, map[string]string, error)
 // statement's call or a call's own, with the body of every function literal it is handed left out (#ta06ckf). A site's
 // claims name it by its ordinal in its function, which moves when a site is taken out and another put in, so a claim
 // also holds the digest of the code it was counted at: a site replaced reads red, and editing what a goroutine does
-// inside its literal leaves its claims standing.
+// inside its literal leaves its claims standing. The trade: two literal launches digest alike, so one replaced by
+// another in the same function keeps the claims the first was counted at.
 func siteDigest(fileSet *token.FileSet, node ast.Node) string {
 	launch := node
 	if statement, isGo := node.(*ast.GoStmt); isGo {
