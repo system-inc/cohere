@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -550,6 +551,19 @@ func skippingTests(directory string) ([]string, error) {
 	})
 }
 
+// testingMethodNames is the method set of testing's *T, *B and *F, read from the package itself, so testsReaching
+// never follows test.Run to a test-file method that happens to share its name (#943pf72, the Go Square's should).
+var testingMethodNames = sync.OnceValue(func() map[string]bool {
+	names := map[string]bool{}
+	for _, kind := range []reflect.Type{reflect.TypeFor[*testing.T](), reflect.TypeFor[*testing.B](),
+		reflect.TypeFor[*testing.F]()} {
+		for method := range kind.Methods() {
+			names[method.Name] = true
+		}
+	}
+	return names
+})
+
 // testsReaching is every top-level test of directory's test files whose body holds a node matches is true of, or
 // calls a function or method of the package's test files that does, followed to a fixed point, by its bare name.
 func testsReaching(directory string, matches func(ast.Node) bool) ([]string, error) {
@@ -590,7 +604,9 @@ func testsReaching(directory string, matches func(ast.Node) bool) ([]string, err
 					reaches[caller] = true
 				}
 				if call, isCall := node.(*ast.CallExpr); isCall {
-					if callee := calleeName(call); callee != "" {
+					// A call named as a method of testing's own is never followed to a test-file method of that name:
+					// every test calls test.Run or test.Helper, and a helper named so would mark them all.
+					if callee := calleeName(call); callee != "" && !testingMethodNames()[callee] {
 						calls[caller] = append(calls[caller], callee)
 					}
 				}
