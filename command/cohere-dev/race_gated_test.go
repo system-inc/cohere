@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"io/fs"
 	"os"
@@ -487,23 +491,31 @@ func declarationName(function *ast.FuncDecl) string {
 // outside any function, a package variable's literal, named for the file's package scope. Every file is read,
 // whatever its build constraints, so a site only another platform compiles still needs its claims.
 func concurrencySites(directory string) ([]string, error) {
+	sites, _, sitesError := readConcurrencySites(directory)
+	return sites, sitesError
+}
+
+// readConcurrencySites is concurrencySites, each with the digest of its own launching code (siteDigest), by key.
+func readConcurrencySites(directory string) ([]string, map[string]string, error) {
 	if _, namesError := concurrencyCallNames(); namesError != nil {
-		return nil, namesError
+		return nil, nil, namesError
 	}
 	entries, readError := os.ReadDir(directory)
 	if readError != nil {
-		return nil, readError
+		return nil, nil, readError
 	}
 	sites := []string{}
+	digests := map[string]string{}
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		parsed, parseError := parser.ParseFile(token.NewFileSet(), filepath.Join(directory, name), nil,
+		fileSet := token.NewFileSet()
+		parsed, parseError := parser.ParseFile(fileSet, filepath.Join(directory, name), nil,
 			parser.SkipObjectResolution)
 		if parseError != nil {
-			return nil, parseError
+			return nil, nil, parseError
 		}
 		// Counted per owner across the file's declarations, so two of one name, two init functions or two package
 		// variables' literals, still give each site a key of its own.
@@ -516,13 +528,54 @@ func concurrencySites(directory string) ([]string, error) {
 			ast.Inspect(declaration, func(node ast.Node) bool {
 				if node != nil && startsGoroutines(node) {
 					ordinals[owner]++
-					sites = append(sites, fmt.Sprintf("%s:%s#%d", name, owner, ordinals[owner]))
+					key := fmt.Sprintf("%s:%s#%d", name, owner, ordinals[owner])
+					sites = append(sites, key)
+					digests[key] = siteDigest(fileSet, node)
 				}
 				return true
 			})
 		}
 	}
-	return sites, nil
+	return sites, digests, nil
+}
+
+// siteDigest is the first eight hex digits of the sha256 of a site's launching code as go/printer prints it, a go
+// statement's call or a call's own, with the body of every function literal it is handed left out (#ta06ckf). A site's
+// claims name it by its ordinal in its function, which moves when a site is taken out and another put in, so a claim
+// also holds the digest of the code it was counted at: a site replaced reads red, and editing what a goroutine does
+// inside its literal leaves its claims standing.
+func siteDigest(fileSet *token.FileSet, node ast.Node) string {
+	launch := node
+	if statement, isGo := node.(*ast.GoStmt); isGo {
+		launch = statement.Call
+	}
+	call, isCall := launch.(*ast.CallExpr)
+	if !isCall {
+		return ""
+	}
+	// A shallow copy, so the file's own syntax keeps its literals' bodies.
+	headless := *call
+	headless.Fun = withoutLiteralBody(call.Fun)
+	headless.Args = make([]ast.Expr, len(call.Args))
+	for index, argument := range call.Args {
+		headless.Args[index] = withoutLiteralBody(argument)
+	}
+	var printed bytes.Buffer
+	// Ignored: printing an expression to a buffer fails only on a node the printer doesn't know, which a parsed call
+	// never holds, and an empty print digests as it is.
+	_ = printer.Fprint(&printed, fileSet, &headless)
+	sum := sha256.Sum256(printed.Bytes())
+	return hex.EncodeToString(sum[:4])
+}
+
+// withoutLiteralBody is expression with the body of a function literal emptied, its signature kept, and expression
+// itself when it is no literal.
+func withoutLiteralBody(expression ast.Expr) ast.Expr {
+	literal, isLiteral := expression.(*ast.FuncLit)
+	if !isLiteral {
+		return expression
+	}
+	return &ast.FuncLit{Type: literal.Type, Body: &ast.BlockStmt{}}
 }
 
 // bodyConcurrentTests is every top-level test of directory's test files that starts goroutines itself: a go statement
@@ -710,7 +763,7 @@ func narrowedRaceRunRefusals(test *testing.T, entry raceEntry, root string) []st
 			refusals = append(refusals, fmt.Sprintf("it leaves out %s, which the guard calls concurrent", name))
 		}
 	}
-	sites, sitesError := concurrencySites(directory)
+	sites, digests, sitesError := readConcurrencySites(directory)
 	if sitesError != nil {
 		test.Fatal(sitesError)
 	}
@@ -720,6 +773,10 @@ func narrowedRaceRunRefusals(test *testing.T, entry raceEntry, root string) []st
 		if !slices.Contains(sites, site.site) {
 			refusals = append(refusals, fmt.Sprintf("it claims %s, which the package's code no longer holds",
 				site.site))
+		} else if site.digest != digests[site.site] {
+			refusals = append(refusals, fmt.Sprintf("its code at %s is not the code its claims were counted at "+
+				"(digest %q, now %q): count them again, as %s did", site.site, site.digest, digests[site.site],
+				kept.census))
 		}
 		wide := []string{}
 		for _, claim := range site.claims {
@@ -890,11 +947,19 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 			},
 		}
 	}
+	// Each site's digest as its code reads now, so the whole list is one its claims were counted at.
+	_, digests, digestsError := readConcurrencySites(filepath.Join("..", "..", directory))
+	if digestsError != nil {
+		test.Fatal(digestsError)
+	}
 	for name, change := range map[string]struct {
 		change  func(entry *raceEntry)
 		refusal string
 	}{
 		"whole": {func(*raceEntry) { /* The whole list, unchanged, which nothing refuses. */ }, ""},
+		"a site whose code is not what its claims were counted at": {func(entry *raceEntry) {
+			entry.kept.sites[1].digest = "00000000"
+		}, "its code at sites.go:fanOut#2 is not the code its claims were counted at"},
 		"a claimed test dropped": {func(entry *raceEntry) {
 			entry.kept.sites[2].claims = entry.kept.sites[2].claims[:1]
 		}, "sites.go:pool.run#1 has 1 kept tests"},
@@ -947,6 +1012,9 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 		}, "names internal/edit, which is no other narrowed entry"},
 	} {
 		entry := raceEntry{directory: directory, kept: whole()}
+		for index := range entry.kept.sites {
+			entry.kept.sites[index].digest = digests[entry.kept.sites[index].site]
+		}
 		change.change(&entry)
 		refusals := strings.Join(narrowedRaceRunRefusals(test, entry, filepath.Join("..", "..")), "; ")
 		if (change.refusal == "") != (refusals == "") || !strings.Contains(refusals, change.refusal) {

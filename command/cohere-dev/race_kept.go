@@ -29,7 +29,10 @@ type raceKeptTest struct {
 // `<file>:<function>#<ordinal>`, the ordinal counting the function's sites in source order from 1. Each claim is a
 // test that drives it at least two goroutines wide.
 type raceSite struct {
-	site   string
+	site string
+	// digest is the site's launching code as its claims were counted at (siteDigest), so a site taken out and another
+	// put in under the same key reads red rather than inheriting the old one's claims.
+	digest string
 	claims []raceClaim
 }
 
