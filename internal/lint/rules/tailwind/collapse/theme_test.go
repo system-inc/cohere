@@ -210,7 +210,9 @@ func coveredRepositoryCases(test *testing.T, fixture themeCorpus) int {
 		covered++
 	}
 	if covered != fixture.RepositoryCaseCount {
-		test.Fatalf("the fixture lists %d repository cases and its header says %d", covered, fixture.RepositoryCaseCount)
+		test.Fatalf(
+			"the fixture lists %d repository cases and its header says %d", covered, fixture.RepositoryCaseCount,
+		)
 	}
 	return covered
 }

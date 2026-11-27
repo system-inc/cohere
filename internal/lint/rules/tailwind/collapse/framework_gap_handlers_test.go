@@ -386,7 +386,9 @@ func TestBlockAndInlineAreDisplayStaticsAndSizingRoots(test *testing.T) {
 		// The static form still reads display, which is what `flex block` conflicting rests on.
 		static, isStatic := FrameworkStaticDeclarations[registration.root]
 		if !isStatic || len(static) != 1 || static[0].Property != "display" {
-			test.Errorf("the static %s declares %v; utilities.ts registers it as a static display", registration.root, static)
+			test.Errorf(
+				"the static %s declares %v; utilities.ts registers it as a static display", registration.root, static,
+			)
 		}
 
 		utility, known := FrameworkMultiDeclarationUtilities[registration.root]
@@ -416,7 +418,9 @@ func TestBlockAndInlineAreDisplayStaticsAndSizingRoots(test *testing.T) {
 
 		descriptor, found := baseDescriptors[registration.root]
 		if !found {
-			test.Errorf("%s has no baseDescriptors row, so there is no measurement to hold the port to", registration.root)
+			test.Errorf(
+				"%s has no baseDescriptors row, so there is no measurement to hold the port to", registration.root,
+			)
 			continue
 		}
 		var valueCells int

@@ -65,7 +65,9 @@ func TestClassOrderPlacesTheSizingForms(test *testing.T) {
 // and an arbitrary value naming a theme value is written with its name.
 func TestCanonicalClassesTreatTheSizingFormsAsUpstream(test *testing.T) {
 	test.Parallel()
-	for _, classes := range []string{"inline-4 w-4", "inline-4 block-4", "block-4 h-4", "block-[13px]", "inline-(--x)"} {
+	for _, classes := range []string{
+		"inline-4 w-4", "inline-4 block-4", "block-4 h-4", "block-[13px]", "inline-(--x)",
+	} {
 		test.Run(classes, func(test *testing.T) {
 			test.Parallel()
 			result := runCanonicalFixture(test, "Component.tsx", `const element = <div className="`+classes+`" />;`)
@@ -104,7 +106,9 @@ func TestConflictingClassesCompareTheSizingProperties(test *testing.T) {
 			rule_testing.ExpectClean(test, result)
 		})
 	}
-	for _, classes := range []string{"inline-4 inline-8", "block-4 block-[13px]", "inline-4 inline-full", "block-(--x) block-80"} {
+	for _, classes := range []string{
+		"inline-4 inline-8", "block-4 block-[13px]", "inline-4 inline-full", "block-(--x) block-80",
+	} {
 		test.Run(classes, func(test *testing.T) {
 			test.Parallel()
 			result := runConflictFixture(test, "Component.tsx", `const element = <div className="`+classes+`" />;`)

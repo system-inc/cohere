@@ -258,12 +258,12 @@ func compareTailwindCandidates(left string, right string) int {
 	for index := 0; index < shorter; index++ {
 		leftByte, rightByte := left[index], right[index]
 
-		if isASCIIDigit(leftByte) && isASCIIDigit(rightByte) {
+		if isAsciiDigit(leftByte) && isAsciiDigit(rightByte) {
 			leftEnd, rightEnd := index+1, index+1
-			for leftEnd < len(left) && isASCIIDigit(left[leftEnd]) {
+			for leftEnd < len(left) && isAsciiDigit(left[leftEnd]) {
 				leftEnd++
 			}
-			for rightEnd < len(right) && isASCIIDigit(right[rightEnd]) {
+			for rightEnd < len(right) && isAsciiDigit(right[rightEnd]) {
 				rightEnd++
 			}
 			leftNumber, rightNumber := left[index:leftEnd], right[index:rightEnd]
@@ -272,7 +272,10 @@ func compareTailwindCandidates(left string, right string) int {
 			// is a `Number`, and ParseFloat rounds a long run the way `Number` does and returns an
 			// infinity past the largest double. Two infinities subtract to NaN, which is falsy too, so
 			// NaN falls through with zero, exactly as `if (diff)` lets it.
+			// Ignored: a run of ASCII digits always parses, and the one error left, out of range, comes with
+			// the infinity the paragraph above relies on.
 			leftValue, _ := strconv.ParseFloat(leftNumber, 64)
+			// Ignored: the same run of digits on the other side, for the same reason.
 			rightValue, _ := strconv.ParseFloat(rightNumber, 64)
 			if difference := leftValue - rightValue; difference != 0 && !math.IsNaN(difference) {
 				if difference < 0 {
@@ -308,8 +311,8 @@ func compareTailwindCandidates(left string, right string) int {
 	return len(left) - len(right)
 }
 
-// isASCIIDigit is upstream's `code >= ZERO && code <= NINE`.
-func isASCIIDigit(character byte) bool {
+// isAsciiDigit is upstream's `code >= ZERO && code <= NINE`.
+func isAsciiDigit(character byte) bool {
 	return character >= '0' && character <= '9'
 }
 
