@@ -19,21 +19,27 @@
  *
  * Usage:
  *
- *   node internal/lint/rules/tailwind/tools/generate_class_order/enumerate.mjs <systems.json>
+ *   node internal/lint/rules/tailwind/tools/generate_class_order/enumerate.mjs <systems.json> [--resolve-root <dir>]
+ *
+ * Each entry of systems.json is `{name, path, corpusRoot}`: the stylesheet, and the tree its corpus is
+ * harvested from, both relative to the working directory. `--resolve-root` names a directory whose
+ * node_modules holds tailwindcss, for a theme with no install above it.
  *
  * Writes the fixture to stdout and its progress to stderr.
  */
 
 import * as NodeFileSystem from 'node:fs';
 import * as NodePath from 'node:path';
-import { recordBeside } from '../corpus.mjs';
+import { locate, recordBeside } from '../corpus.mjs';
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const systemsArgument = process.argv[2];
 if(!systemsArgument) {
-    process.stderr.write('usage: enumerate.mjs <systems.json>\n');
+    process.stderr.write('usage: enumerate.mjs <systems.json> [--resolve-root <dir>]\n');
     process.exit(2);
 }
+const resolveRootFlagIndex = process.argv.indexOf('--resolve-root');
+const resolveRootArgument = resolveRootFlagIndex >= 0 ? process.argv[resolveRootFlagIndex + 1] : undefined;
 
 const systemDefinitions = JSON.parse(NodeFileSystem.readFileSync(NodePath.resolve(systemsArgument), 'utf8'));
 if(!Array.isArray(systemDefinitions) || systemDefinitions.length < 2) {
@@ -105,15 +111,18 @@ function expandRegistry(designSystem) {
  * Carried alongside the registry rather than instead of it, because they are different populations
  * and only one of them contains the case this harness was built to refuse to score. The registry has
  * no null readings by construction, every entry in it being a class the engine advertised. The
- * corpus does: 10 of 1,208 distinct classes on ahra return null, and those ten are precisely where a
+ * corpus does: 8 of 4,972 distinct classes on the public theme return null, and those are precisely where a
  * differential that reads silence as agreement would be blind.
  *
  * Scanned the same way `generate_descriptors/extract.mjs` scans, so the two populations are
  * comparable and the null figure this harness asserts against is the same figure that one measured.
  */
-function scanCorpus(entryPoint) {
-    // `<repo>/app/_theme/styles/theme.css` -> `<repo>`.
-    const corpusRoot = NodePath.dirname(NodePath.dirname(NodePath.dirname(NodePath.dirname(entryPoint))));
+function scanCorpus(entryPoint, corpusRootArgument) {
+    // Named when given, since a theme under testdata keeps its corpus beside it rather than four
+    // directories up. Otherwise `<repo>/app/_theme/styles/theme.css` -> `<repo>`.
+    const corpusRoot = corpusRootArgument
+        ? locate(corpusRootArgument).path
+        : NodePath.dirname(NodePath.dirname(NodePath.dirname(NodePath.dirname(entryPoint))));
     const distinctClasses = new Set();
     let occurrences = 0;
 
@@ -220,18 +229,21 @@ function registrationTables(designSystem) {
 const systems = [];
 for(const definition of systemDefinitions) {
     process.stderr.write(`enumerate.mjs: loading ${definition.name}\n`);
-    const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(definition.path);
+    const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(
+        definition.path,
+        resolveRootArgument,
+    );
 
     const registryClassNames = expandRegistry(designSystem);
-    const corpus = scanCorpus(entryPoint);
+    const corpus = scanCorpus(entryPoint, definition.corpusRoot);
 
     /*
      * The cases, with their readings interned.
      *
-     * 95,136 registry classes carry 379 distinct readings between them, so the readings become a
-     * deduplicated array and each case holds an index into it. Written out flat the fixture is 20 MB
-     * and mostly repetitions of `{"order":[199,200],"count":2}`; interned it is a twentieth of that
-     * and holds exactly the same answers.
+     * 54,305 registry classes carry 377 distinct readings between them, so the readings become a
+     * deduplicated array and each case holds an index into it. Written out flat the cases are mostly
+     * repetitions of `{"order":[199,200],"count":2}`; interned they hold exactly the same answers in
+     * a fraction of the bytes.
      *
      * A null reading gets an index too, rather than a missing field. `readingIndex: -1` is the
      * engine having no answer, and it is a value in the same column as every other answer instead of
@@ -322,20 +334,20 @@ for(const definition of systemDefinitions) {
  * assertion that fails if it ever becomes trivially true. The claim is that a table generated from
  * one repository is wrong for another, and this measures where that is true.
  *
- * It is not where reading the theme result suggests. Theme resolution diverges on *values*: 744
- * entries against 748, with 22 shared keys carrying different values. A reading is `{order, count}`,
- * and order is the index of the declared *property*, so a shared class declaring the same property
- * with a different value reads identically in both. Measured: 95,134 classes are in both registries
- * and every one of them reads the same.
+ * It is not where reading the theme result suggests. Theme resolution diverges mostly on *values*.
+ * A reading is `{order, count}`, and order is the index of the declared *property*, so a shared
+ * class declaring the same property with a different value reads identically in both. Measured on
+ * the public and planted themes: 53,239 classes are in both registries and one reads differently,
+ * `container`, which declares a width per breakpoint, and the planted theme declares more of them.
  *
- * The divergence is in *membership*. 462 registry classes exist in exactly one of the two systems,
- * because a `--color-brand-*` token in one repository's `@theme` is what makes `accent-brand` a
- * class at all. A table generated against ahra has no row that answers `accent-brand`, so it
- * declines a class the engine compiles, which is a silent-side defect rather than a wrong reading.
+ * The divergence is mostly in *membership*. 3,204 registry classes exist in exactly one of the two
+ * systems, because a token in one theme's `@theme` or a root in its `@utility` is what makes a class
+ * such as `-swell-5` exist at all. A table generated against the other theme has no row that answers
+ * it, so it declines a class the engine compiles, which is a silent-side defect rather than a wrong
+ * reading.
  *
- * That is the sharper claim and it is the one asserted: both axes are recorded, so a future Tailwind
- * that starts diverging readings shows up as a number moving off zero rather than as a fixture that
- * quietly still passes.
+ * Both axes are recorded and both are asserted, so the readings axis moving, as well as the
+ * membership axis, shows up as a number changing rather than as a fixture that quietly still passes.
  */
 const divergence = {
     sharedClasses: 0,

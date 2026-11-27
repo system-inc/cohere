@@ -1,10 +1,12 @@
 [
     {
         "name": "public",
-        "path": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css"
+        "path": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
+        "corpusRoot": "internal/lint/rules/tailwind/collapse/testdata/public_repository/source"
     },
     {
         "name": "planted",
-        "path": "internal/lint/rules/tailwind/collapse/testdata/planted_repository/styles/theme.css"
+        "path": "internal/lint/rules/tailwind/collapse/testdata/planted_repository/styles/theme.css",
+        "corpusRoot": "internal/lint/rules/tailwind/collapse/testdata/planted_repository/source"
     }
 ]

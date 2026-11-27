@@ -23,8 +23,8 @@
 //
 // Every class lands in exactly one Outcome. The lattice is the whole design, because the failure
 // this harness was built to refuse is a differential that scores mutual silence as agreement. In the
-// ahra corpus 10 of 1,208 distinct classes return null from Tailwind, and the expanded registry
-// adds 30 more per system where Tailwind advertises a modifier it then refuses. Those are the
+// public theme's corpus 8 of 4,972 distinct classes return null from Tailwind, and the expanded
+// registry adds 30 more per system where Tailwind advertises a modifier it then refuses. Those are the
 // classes most likely to break and the ones a naive differential is blind to, so `BothSilent` is
 // counted, reported, and bounded, never folded into agreement.
 //
@@ -179,12 +179,13 @@ type ControlResult struct {
 type SystemDivergence struct {
 	// SharedRegistryClasses is how many registry classes both systems hold.
 	SharedRegistryClasses int
-	// DivergentReadings is how many of those shared classes read differently. Measured zero: order
-	// indexes the declared property, and two systems declaring the same property with different
+	// DivergentReadings is how many of those shared classes read differently. Measured one,
+	// `container`, which declares one width per breakpoint and the planted theme adds two: order
+	// indexes the declared property, so two systems declaring the same properties with different
 	// values read alike.
 	DivergentReadings int
-	// UniqueToOneSystem is how many registry classes exist in exactly one system. Measured 462, and
-	// this is where the per-repository divergence actually lives.
+	// UniqueToOneSystem is how many registry classes exist in exactly one system. Measured 3,204 of
+	// 53,239 shared, and this is where the per-repository divergence actually lives.
 	UniqueToOneSystem int
 }
 
@@ -193,17 +194,18 @@ type SystemDivergence struct {
 //
 // A threshold rather than an exact count, for the reason the same constant carries in
 // `internal/differential`: the design systems grow, and a harness that must be edited every time a
-// token lands is a harness whose guard gets commented out. The registry measured 95,136 and 95,594
-// expanded across the two systems, so this is roughly a quarter of the smaller and cannot be reached
-// by a misconfigured run.
-const minimumPlausibleRegistryClasses = 20000
+// token lands is a harness whose guard gets commented out. The registry measured 54,305 and 55,377
+// expanded across the two systems, 53,239 of them shared, so the floor sits just under the shared
+// count: a run that lost a utility family falls below it, and a theme gaining a token does not.
+const minimumPlausibleRegistryClasses = 52000
 
-// minimumPlausibleCorpusClasses is the same floor for the corpus, which is two orders smaller.
+// minimumPlausibleCorpusClasses is the same floor for the corpus, which is an order smaller.
 //
 // The corpus is the population that carries Tailwind's null readings, so a run that lost it still
-// compares 190,000 registry classes and looks entirely healthy while having stopped testing the one
-// case this harness was built for.
-const minimumPlausibleCorpusClasses = 400
+// compares 110,000 registry classes and looks entirely healthy while having stopped testing the one
+// case this harness was built for. It measured 4,972 distinct classes on the public theme's tree and
+// 4,756 on the planted one, so the floor sits just under the smaller.
+const minimumPlausibleCorpusClasses = 4500
 
 // maximumPlausibleBothSilentRate bounds the silence.
 //
@@ -211,9 +213,10 @@ const minimumPlausibleCorpusClasses = 400
 // stops them inflating the rate, and that alone does not stop a run drifting into total silence:
 // zero disagreements over zero answered classes is not a failure in any comparison that only looks
 // at divergences. So the silence has a ceiling. Measured, the expanded registry runs 30 Tailwind nulls
-// per system out of 95,136 and the corpus 11 of 1,244 on ahra and 84 of 1,055 on connected, which is
-// under one percent overall; five percent is far enough above that to never fire on a real run and
-// far below any run that has actually gone quiet.
+// per system out of 54,305 and 55,377, and the corpus 8 of 4,972 on the public theme and 6 of 4,756
+// on the planted one, and the classes neither side answers are 28 and 24, under a tenth of a percent;
+// five percent is far enough above that to never fire on a real run and far below any run that has
+// actually gone quiet.
 const maximumPlausibleBothSilentRate = 0.05
 
 // PopulationRegistry and PopulationCorpus are the two populations, named rather than spelled at each
@@ -223,7 +226,7 @@ const maximumPlausibleBothSilentRate = 0.05
 // Tailwind advertises, which is the population; the corpus is what someone happened to write, which is
 // a sample, and an earlier table in this slice built from a corpus missed nine families. They also
 // carry different evidence: the corpus is where Tailwind's null readings live, so a run that lost
-// it still compares 190,000 registry classes and looks healthy while having stopped testing the case
+// it still compares 110,000 registry classes and looks healthy while having stopped testing the case
 // this harness exists for.
 const (
 	PopulationRegistry = "registry"
@@ -239,8 +242,8 @@ type ClassCase struct {
 	// TailwindReading is what Tailwind computed, valid only when TailwindAnswered.
 	TailwindReading Reading
 	// TailwindAnswered is whether Tailwind produced a reading. False is a real measurement and not
-	// missing data: Tailwind declines `border/50`, which it advertised, and 10 corpus classes on
-	// ahra.
+	// missing data: Tailwind declines `border/50`, which it advertised, and 8 corpus classes on the
+	// public theme.
 	TailwindAnswered bool
 }
 

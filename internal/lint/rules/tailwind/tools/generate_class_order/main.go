@@ -5,7 +5,16 @@
 // Usage:
 //
 //	go run ./internal/lint/rules/tailwind/tools/generate_class_order \
-//	    [-systems <systems.json>] [-output <fixture.json>] [-check]
+//	    [-systems <systems.json>] [-output <fixture.json>] [-resolve-root <dir>] [-check]
+//
+// Run from the repository root, where systems.json's paths are relative to. The committed fixture is
+// made on the two themes it names, the public theme with its corpus in public_repository and the
+// planted theme with its corpus in planted_repository, both written in cohere. Node has no tailwindcss
+// of its own here, so -resolve-root names any directory whose node_modules holds tailwindcss 4.3.3,
+// which records nothing of its own in the output:
+//
+//	go run ./command/cohere-dev exec -- go run ./internal/lint/rules/tailwind/tools/generate_class_order \
+//	    -resolve-root $R
 //
 // # Why this tool exists next to six that look like it
 //
@@ -61,12 +70,17 @@ func main() {
 	systems := flag.String(
 		"systems",
 		"",
-		"path to a JSON array of {name, path} naming the design systems to measure, each path a stylesheet, absolute or relative to the working directory (default: systems.json next to this command, which names the public and planted themes relative to the repository root)",
+		"path to a JSON array of {name, path, corpusRoot} naming the design systems to measure, path a stylesheet and corpusRoot the tree its corpus is harvested from, each absolute or relative to the working directory (default: systems.json next to this command, which names the public and planted themes and their generated trees relative to the repository root)",
 	)
 	output := flag.String(
 		"output",
-		filepath.Join("internal", "tailwind", "testdata", "classorder_fixtures.json"),
+		filepath.Join("internal", "lint", "rules", "tailwind", "collapse", "testdata", "classorder_fixtures.json"),
 		"where to write the fixture",
+	)
+	resolveRoot := flag.String(
+		"resolve-root",
+		"",
+		"a directory whose node_modules holds tailwindcss, for a theme with no install above it (default: each theme's own directory)",
 	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
@@ -82,7 +96,7 @@ func main() {
 		systemsPath = filepath.Join(toolDirectory, "systems.json")
 	}
 
-	generated, summary, buildError := build(toolDirectory, systemsPath)
+	generated, summary, buildError := build(toolDirectory, systemsPath, *resolveRoot)
 	if buildError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "build: %v\n", buildError)
@@ -154,6 +168,10 @@ func main() {
 type systemDefinition struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
+	// CorpusRoot is the tree the corpus is harvested from. Given rather than derived, because the
+	// derived one is four directories up from the stylesheet, which is right for a repository's
+	// `app/_theme/styles/theme.css` and arbitrary for a theme under testdata. Empty derives it.
+	CorpusRoot string `json:"corpusRoot,omitempty"`
 }
 
 // fixture is the file this command writes.
@@ -211,7 +229,10 @@ type registration struct {
 }
 
 // build runs the three scripts per design system and folds the results into one fixture.
-func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
+//
+// resolveRoot, when not empty, is handed to every script as `--resolve-root`, so all three load the
+// same Tailwind install for a theme with none above it.
+func build(toolDirectory, systemsPath, resolveRoot string) ([]byte, fixture, error) {
 	definitionBytes, readError := os.ReadFile(systemsPath)
 	if readError != nil {
 		return nil, fixture{}, fmt.Errorf("read %s: %w", systemsPath, readError)
@@ -232,7 +253,14 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 
 	// The populations, the registration tables and the cross-system divergence, in one pass so that
 	// both systems are read from the same process and cannot drift between two.
-	enumerated, runNodeError := runNode(filepath.Join(toolDirectory, "enumerate.mjs"), systemsPath)
+	var resolveRootArguments []string
+	if resolveRoot != "" {
+		resolveRootArguments = []string{"--resolve-root", resolveRoot}
+	}
+	enumerated, runNodeError := runNode(
+		filepath.Join(toolDirectory, "enumerate.mjs"),
+		append([]string{systemsPath}, resolveRootArguments...)...,
+	)
 	if runNodeError != nil {
 		return nil, fixture{}, runNodeError
 	}
@@ -265,9 +293,15 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 		}
 
 		descriptorTablePath := filepath.Join(os.TempDir(), "classorder-table-"+system.Name+".json")
+		extractArguments := append([]string{system.EntryPoint, "--json", descriptorTablePath}, resolveRootArguments...)
+		// The same corpus enumerate.mjs harvested, so the extractor's own corpus floor reads the tree
+		// this fixture records rather than whatever lies four directories above the stylesheet.
+		if definitions[index].CorpusRoot != "" {
+			extractArguments = append(extractArguments, "--corpus-root", definitions[index].CorpusRoot)
+		}
 		if _, runNodeError := runNode(
 			filepath.Join(toolsDirectory, "generate_descriptors", "extract.mjs"),
-			system.EntryPoint, "--json", descriptorTablePath,
+			extractArguments...,
 		); runNodeError != nil {
 			return nil, fixture{}, fmt.Errorf("descriptor table for %s: %w", system.Name, runNodeError)
 		}
@@ -282,7 +316,7 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 
 		context, runNodeError := runNode(
 			filepath.Join(toolsDirectory, "generate_descriptor_table", "context.mjs"),
-			system.EntryPoint,
+			append([]string{system.EntryPoint}, resolveRootArguments...)...,
 		)
 		if runNodeError != nil {
 			return nil, fixture{}, fmt.Errorf("context for %s: %w", system.Name, runNodeError)
