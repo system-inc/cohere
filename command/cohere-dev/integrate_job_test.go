@@ -626,13 +626,24 @@ func TestAnIntegrateJobMeasuresABinaryItsBaselineCantVouchFor(test *testing.T) {
 // A measurement on a box that wasn't quiet records no numbers (#6ex523f, system_cohere's ruling): her one-minute load
 // over a quarter of her cores before or after, as J-ge4cc9w's 8.75 on Shackler's 16, writes a skipped record, measured
 // false with no checks, her load in it and never that she was held quiet, read against the baseline when there is
-// one, and the landing says her load and that a later landing measures.
+// one, and the landing says her load and that a later landing measures. Loaded before and quiet after, and quiet
+// before and loaded after, each skip, so a reading of one side alone is red (the Go Square's should on #s7esk3t).
 func TestAnIntegrateJobRecordsNothingFromABusyBox(test *testing.T) {
 	test.Parallel()
 	for _, row := range []struct {
 		name     string
 		baseline bool
-	}{{"a baseline", true}, {"no baseline", false}} {
+		// line is the stand-in's load line the row loads, loaded the line it says instead, and load the sentence
+		// the skip says of her.
+		line, loaded, load string
+	}{
+		{"a baseline, loaded before", true, "load before 0.89 0.91 1.28", "load before 8.75 7.88 16.96",
+			"her one-minute load 8.75 before and 1.10 after"},
+		{"no baseline, loaded before", false, "load before 0.89 0.91 1.28", "load before 8.75 7.88 16.96",
+			"her one-minute load 8.75 before and 1.10 after"},
+		{"no baseline, loaded after", false, "load after 1.10 0.95 1.27", "load after 9.40 6.12 3.30",
+			"her one-minute load 0.89 before and 9.40 after"},
+	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()
 			fixture := newIntegrateJobFixture(test)
@@ -643,9 +654,8 @@ func TestAnIntegrateJobRecordsNothingFromABusyBox(test *testing.T) {
 					performanceSpreadOf(39000, 38000, 40000))))
 				against = performancePreviousCommit
 			}
-			busy := strings.Replace(shacklerSays([]int64{9900, 9700, 9800}), "load before 0.89 0.91 1.28",
-				"load before 8.75 7.88 16.96", 1)
-			if !strings.Contains(busy, "load before 8.75") {
+			busy := strings.Replace(shacklerSays([]int64{9900, 9700, 9800}), row.line, row.loaded, 1)
+			if !strings.Contains(busy, row.loaded) {
 				test.Fatal("the stand-in's load line wasn't found to replace")
 			}
 			fixture.reply("measure.run", busy)
@@ -656,8 +666,8 @@ func TestAnIntegrateJobRecordsNothingFromABusyBox(test *testing.T) {
 			}
 			said := readLanding(test, ran.output)
 			fixture.checkMergesOwnTree(merge, said)
-			skipped := performanceBox + " wasn't quiet, her one-minute load 8.75 before and 1.10 after on 12 " +
-				"cores, where a quiet box stays at or under 3.00"
+			skipped := performanceBox + " wasn't quiet, " + row.load + " on 12 cores, where a quiet box stays at or " +
+				"under 3.00"
 			if want := "Not measured: " + skipped + ", so "; !strings.Contains(said.message, want) {
 				test.Errorf("the landing's message doesn't say %q:\n%s", want, said.message)
 			}
