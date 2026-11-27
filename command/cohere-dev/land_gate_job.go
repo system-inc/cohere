@@ -64,10 +64,11 @@ const landGateLayFailure = "FAIL lay:"
 const landGateLayExitCode = 3
 
 // landGateScript is the box's run once the tree is laid: sharedBoxGate, unchanged, with its goroot, digest and races
-// taken from its first three arguments and the module's test patterns from the rest, and no kept Go cache.
+// taken from its first three arguments and the module's test patterns from the rest, no kept Go cache, and no integrate
+// job's module set.
 const landGateScript = "set -euo pipefail\n" + `goroot="$1"; digest="$2"; races="$3"; shift 3` + "\n" +
-	`node="` + sharedBoxNode + `"; nodeDigest="` + sharedBoxNodeDigest + `"` + "\n" + macBoxLandCacheLine + "\n" +
-	sharedBoxGate
+	`node="` + sharedBoxNode + `"; nodeDigest="` + sharedBoxNodeDigest + `"` + "\n" + macBoxIntegrateCacheLine + "\n" +
+	integrateJobLine + "\n" + sharedBoxGate
 
 // landGateJobId reads the id from the ask's line, `J-6nrpbay queued, 1st in line, 0 ahead`. Any state is taken, so a
 // job placed at once is still waited on rather than left running with no one to hear it.

@@ -36,7 +36,7 @@ func TestTheGoCommandBuildsFromATrimmedCache(test *testing.T) {
 		test.Helper()
 		command := exec.Command("go", "build", "-o", filepath.Join(test.TempDir(), "trimmed"), ".")
 		command.Dir = outsideModule(test, module)
-		command.Env = append(os.Environ(), "GOCACHE="+cache, "GOFLAGS=", "GOWORK=off")
+		command.Env = append(ownCacheEnvironment(os.Environ(), cache), "GOFLAGS=", "GOWORK=off")
 		if output, outputError := command.CombinedOutput(); outputError != nil {
 			test.Fatalf("go build: %v: %s", outputError, output)
 		}
@@ -52,6 +52,20 @@ func TestTheGoCommandBuildsFromATrimmedCache(test *testing.T) {
 		test.Fatalf("trimmed %+v, want every entry gone", trimmed)
 	}
 	build()
+}
+
+// ownCacheEnvironment is environment with its Go cache set to cache alone: any `GOCACHE` and `GOCACHEPROG` dropped,
+// then `GOCACHE` naming cache and `GOCACHEPROG` empty, since with a cache program named go reads and writes through it
+// and leaves cache empty, as Loom's runner names one for an integrate job (#e94a6r4). It is cohere's
+// own_go_cache.Environment, which this module cannot import.
+func ownCacheEnvironment(environment []string, cache string) []string {
+	own := make([]string, 0, len(environment)+2)
+	for _, entry := range environment {
+		if !strings.HasPrefix(entry, "GOCACHE=") && !strings.HasPrefix(entry, "GOCACHEPROG=") {
+			own = append(own, entry)
+		}
+	}
+	return append(own, "GOCACHE="+cache, "GOCACHEPROG=")
 }
 
 // outsideModule returns directory, a place a test runs the go command, after failing the test unless

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -53,11 +54,18 @@ type cohereRecord struct {
 // `--host-build-only` does, and print the records.
 var gateCohereArguments = []string{"--no-fix", "--json"}
 
-// checkCohere builds cohere at the worktree's tree and runs `cohere --no-fix --json` at its root, and refuses the
-// landing unless every summary passes with 0 findings, 0 type errors and no gap. The boolean reports whether the check
-// ran. build and run are the environments for the build and the run, each asked when it starts, so either widens once
-// the pool goes idle.
-func checkCohere(worktree string, build func() []string, run func() []string) (int, bool) {
+// integrateJobCohereArguments are the integrate job's run of cohere: the gate's, naming every language but swift and
+// every format, since cohere-swift can't be built in an integrate job's sandbox (needs.SwiftUnlaid). Both flags are
+// named, since naming --languages alone checks no format. A language or format cohere adds later is left out here until
+// it is named, and the run's own record names it as left out.
+var integrateJobCohereArguments = append(slices.Clone(gateCohereArguments), "--languages", "go,typescript", "--formats",
+	"json,markdown,yaml,css,graphql")
+
+// checkCohere builds cohere at the worktree's tree and runs it with arguments at its root, `--no-fix --json` and what a
+// run narrows to, and refuses the landing unless every summary passes with 0 findings, 0 type errors and no gap. The
+// boolean reports whether the check ran. build and run are the environments for the build and the run, each asked when
+// it starts, so either widens once the pool goes idle.
+func checkCohere(worktree string, arguments []string, build func() []string, run func() []string) (int, bool) {
 	binary := os.Getenv(gateCohereVariable)
 	if binary == "" {
 		if _, statError := os.Stat(filepath.Join(worktree, cohereSource)); statError != nil {
@@ -84,7 +92,7 @@ func checkCohere(worktree string, build func() []string, run func() []string) (i
 		}
 	}
 	started := time.Now()
-	checking := exec.Command(binary, gateCohereArguments...)
+	checking := exec.Command(binary, arguments...)
 	var output bytes.Buffer
 	checking.Dir, checking.Env = worktree, run()
 	checking.Stdout, checking.Stderr = &output, os.Stderr

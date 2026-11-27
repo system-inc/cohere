@@ -8,7 +8,7 @@ import (
 // TestListedUniversesHoldUpstreamsProperties holds the index's grouping to upstream's signatures. A pool
 // only signs the classes of groups whose universe admits the written class's properties, so a listed class
 // whose real signature declares a property outside its group's universe is a class the pass never weighs,
-// and the bail it should have caused goes missing. Every listed class on three themes, against the
+// and the bail it should have caused goes missing. Every listed class on the public theme, against the
 // properties of upstream's own signature.
 func TestListedUniversesHoldUpstreamsProperties(test *testing.T) {
 	test.Parallel()

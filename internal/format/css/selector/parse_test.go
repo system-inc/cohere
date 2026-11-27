@@ -10,8 +10,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// These run without node. The oracle test is the real check; this pins the shapes Prettier's printer
-// leans on, the byte conversion, and the refusals, so a regression shows in a plain `go test`.
+// These run without node. They pin the shapes Prettier's printer leans on, the byte conversion, and the
+// refusals, so a regression shows in a plain `go test`.
 
 func mustParse(test *testing.T, text string) *estree.Node {
 	test.Helper()

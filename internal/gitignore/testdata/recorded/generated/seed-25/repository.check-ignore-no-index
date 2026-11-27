@@ -1,0 +1,4 @@
+.git/info/exclude:3:*	star*
+.git/info/exclude:3:*	star*/.gitignore
+.git/info/exclude:3:*	y.tmp/star*
+.git/info/exclude:3:*	y.tmp/x.log/q?

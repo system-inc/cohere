@@ -290,8 +290,8 @@ type Try struct {
 // block's final answer, the state the run left behind. That is right under neither answer for a run: the
 // handler can be reached after any prefix of it, so its true value is a join over every prefix. No lowering
 // builds MaybeThrow today (ReactiveFunctionGapUnbuiltTerminals). The one that does should put one throwing
-// instruction per block and answer yes; TestSsaOverRealCodebase fails the day one is built, so that choice
-// can't arrive unmade.
+// instruction per block and answer yes, and the change that builds it has to make that choice, since no test
+// makes it for them.
 type MaybeThrow struct {
 	Continuation static_single_assignment.BlockId
 	Handler      static_single_assignment.BlockId

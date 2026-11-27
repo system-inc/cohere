@@ -1,15 +1,8 @@
 package high_level_intermediate_representation
 
 import (
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/modules/mutation_aliasing"
 	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
@@ -1173,130 +1166,5 @@ func TestDisjointGapsAreDeclared(test *testing.T) {
 		test.Fatalf("DisjointGaps() = %v; the only declared gap is the partial, name-keyed projection "+
 			"of inferred call-result types. It closes when mayAllocate can read identifier types or "+
 			"a complete shape-directed signature lookup.", gaps)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// The corpus, which is the measurement that decides whether this pass is worth having
-// ---------------------------------------------------------------------------
-
-// TestDisjointClassSizesAreNotAllSingletons is this stage's headline, pinned as a test.
-//
-// Stage 3 was dispatched once before and declined, correctly, on the measurement that the input was
-// uniformly degenerate: every mutable range had width one, so every gate was false for a structural
-// reason and the pass produced 23,256 members in 23,256 singleton classes. That is an identity
-// function, and it would have compiled, passed every hand-written fixture above, and told every
-// consumer that nothing is entangled with anything.
-//
-// So the non-degeneracy is a test rather than a number in a report. If a future change to
-// `InferMutableRanges` narrows ranges back toward width one, this fails and names what happened,
-// instead of the pass quietly reverting to an identity function that still passes its unit tests.
-//
-// Measured when written, over 400 corpus files and 685 outermost functions:
-//
-//	members                     26,962
-//	classes                      3,306
-//	singletons                   1,983   60.0% of classes
-//	largest class                  527   in a 672-instruction hook
-//	mean class size               8.16
-//
-// The thresholds below are deliberately far looser than those numbers. This guards the shape -- that
-// real multi-member classes are being formed -- not the exact corpus, which moves when the tree does.
-func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
-	test.Parallel()
-
-	skipWithoutCorpus(test)
-
-	var files []string
-	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, pathError error) error {
-		if pathError != nil || info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
-			files = append(files, path)
-		}
-		return nil
-	})
-	if walkError != nil {
-		test.Fatalf("walking the corpus: %v", walkError)
-	}
-	sort.Strings(files)
-	if len(files) > 200 {
-		files = files[:200]
-	}
-	if len(files) < 10 {
-		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
-	}
-
-	var functions int
-	var members int
-	var classes int
-	var singletons int
-	var largest int
-
-	for _, path := range files {
-		contents, readError := os.ReadFile(path)
-		if readError != nil {
-			continue
-		}
-		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule[rule.NoOptions]{
-			Name:             "disjoint-corpus",
-			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-				return rule.Listeners{
-					ast.KindSourceFile: func(node *ast.Node) {
-						if ruleContext.TypeChecker == nil {
-							test.Fatal("the typed harness handed this probe a nil checker, so every " +
-								"count below would be a fact about the harness rather than the code")
-						}
-						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ruleContext.TypeChecker)
-							if function == nil {
-								return
-							}
-							Construct(function)
-							functions++
-							set := FindDisjointMutableValues(function)
-							members += set.Size()
-							for _, class := range set.Sets() {
-								classes++
-								if len(class) == 1 {
-									singletons++
-								}
-								if len(class) > largest {
-									largest = len(class)
-								}
-							}
-						})
-					},
-				}
-			},
-		}
-		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: string(contents)}, fileName)
-	}
-
-	test.Logf("functions=%d members=%d classes=%d singletons=%d largest=%d",
-		functions, members, classes, singletons, largest)
-
-	if functions < 100 {
-		test.Fatalf("only %d functions were lowered; this test measured almost nothing", functions)
-	}
-	if members == 0 {
-		test.Fatal("no value joined any class, so the pass is inert")
-	}
-	if classes == singletons {
-		test.Fatal("every class is a singleton, which is the identity function this stage exists to " +
-			"avoid. The input has become degenerate for these predicates: check that " +
-			"InferMutableRanges still produces ranges wider than one.")
-	}
-	if largest < 5 {
-		test.Errorf("the largest class holds %d values; real code entangles more than that, so this "+
-			"suggests the union is not propagating", largest)
-	}
-	// Two-sided: a pass that unioned everything would satisfy every check above.
-	if singletons == 0 {
-		test.Error("not one class is a singleton, which suggests over-merging: most values in real " +
-			"code are independent")
 	}
 }

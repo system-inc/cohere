@@ -245,8 +245,8 @@ func (validator *manualMemoValidator) check(
 	// # Why here rather than in the partition or in scope assignment
 	//
 	// Both were built and measured, and both score identically to this. Filtering at scope
-	// construction breaks `TestScopeMatchesTheDisjointSetPartition`, which requires every class to
-	// map to a scope with the same members. Filtering at the partition satisfies that and then
+	// construction breaks the rule that every disjoint class maps to a scope with the same
+	// members. Filtering at the partition satisfies that and then
 	// breaks two more: the hoistable corpus distribution rises 574 deep to 692, which that test
 	// calls the over-approximating direction, and the reactive tree loses instructions in five
 	// functions and emits twenty-two blocks twice. The parameter's membership is load-bearing for

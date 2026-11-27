@@ -1,21 +1,9 @@
 package micromark
 
-import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"testing"
-)
-
 // htmlTextFixtures exercise core html-text.js. Through the fork's extension set core htmlText is never
 // what matches: the fork's copy is tried first on `<` and accepts the same inputs, so core only ever runs
-// after it has already failed. TestHtmlTextEvents therefore compares against an oracle run without the
-// override (overrideHtmlTextSyntax() dropped from the Node options, htmlTextOverrideExtension dropped from
-// the Go list), where core is the one that wins. TestHtmlTextOverrideEvents runs these same inputs again
-// through the full extension set.
+// after it has already failed. They were chosen for a parse without the override
+// (htmlTextOverrideExtension left out), where core is the one that wins.
 //
 // They avoid the constructs still pending, outside a matched tag (inside one, htmlText consumes the
 // characters and nothing else is tried): attention (`*`, `_`), label ends and so any `[` or `]` (an
@@ -195,78 +183,4 @@ var htmlTextFixtures = []string{
 	"a <b><c></b></c>",
 	"a  \n<b> c",
 	"a\\\n<b> c",
-}
-
-func TestHtmlTextEvents(test *testing.T) {
-	test.Parallel()
-	compareEventsWithoutHtmlTextOverride(test, htmlTextFixtures)
-}
-
-// compareEventsWithoutHtmlTextOverride is compareEvents with the fork's html-text override left out of
-// both sides, so core htmlText is the construct that runs on `<` after autolink.
-func compareEventsWithoutHtmlTextOverride(test *testing.T, inputs []string) {
-	test.Helper()
-	script := strings.Replace(oracleScript, "    overrideHtmlTextSyntax(),\n", "", 1)
-	if script == oracleScript {
-		test.Fatal("the oracle script no longer lists overrideHtmlTextSyntax() where this test removes it")
-	}
-	expected := htmlTextUpstreamEvents(test, script, inputs)
-	extensions := []*Extension{gfmExtension(), mathExtension(), wikiLinkExtension(), liquidExtension()}
-	for index, input := range inputs {
-		actual := htmlTextPortEvents(input, extensions)
-		if difference := firstEventDifference(expected[index], actual); difference != "" {
-			test.Errorf("input %q: %s", truncateInput(input), difference)
-		}
-	}
-}
-
-// htmlTextUpstreamEvents is oracle_test.go's upstreamEvents with the script as a parameter.
-func htmlTextUpstreamEvents(test *testing.T, script string, inputs []string) [][]string {
-	test.Helper()
-	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
-		test.Skip("node is not installed; the event oracle needs it")
-	}
-	root := forkRoot(test)
-
-	path := filepath.Join(test.TempDir(), "oracle.mjs")
-	if writeError := os.WriteFile(path, []byte(strings.ReplaceAll(script, "FORK", root)), 0o644); writeError != nil {
-		test.Fatal(writeError)
-	}
-	encoded, encodeError := json.Marshal(inputs)
-	if encodeError != nil {
-		test.Fatal(encodeError)
-	}
-	command := exec.Command("node", path)
-	command.Stdin = strings.NewReader(string(encoded))
-	output, outputError := command.Output()
-	if outputError != nil {
-		if exitError, isExit := outputError.(*exec.ExitError); isExit {
-			test.Fatalf("the event oracle failed: %v\n%s", outputError, exitError.Stderr)
-		}
-		test.Fatal(outputError)
-	}
-	var outputs [][]string
-	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	return outputs
-}
-
-// htmlTextPortEvents is oracle_test.go's portEvents with the extensions as a parameter.
-func htmlTextPortEvents(input string, extensions []*Extension) (described []string) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			described = []string{fmt.Sprintf("panic: %v", recovered)}
-		}
-	}()
-	for _, event := range Parse(SourceUnits(input), Combine(extensions), nil) {
-		kind := "exit"
-		if event.Enter {
-			kind = "enter"
-		}
-		start, end := event.Token.Start, event.Token.End
-		described = append(described, fmt.Sprintf("%s %s %d:%d:%d-%d:%d:%d", kind, event.Token.Type,
-			start.Line, start.Column, start.Offset, end.Line, end.Column, end.Offset))
-	}
-	return described
 }

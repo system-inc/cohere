@@ -6,18 +6,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 )
 
 // What a repository's index decides for a walk, digested, is what a run cache keys the index on (#m1daxxk): the
-// entries the ignore rules exclude, and every gitlink, each by its path and mode. These hold that against git itself
-// and against the index samples cohere-swift reads too, so the two languages' readers agree on what is tracked.
+// entries the ignore rules exclude, and every gitlink, each by its path and mode. These hold that against the indexes
+// git wrote at each step a repository took (digestRecordings) and against the index samples cohere-swift reads too, so
+// the two languages' readers agree on what is tracked.
 
 // swiftSampleIgnore is the `.gitignore` of the repository cohere-swift's samples came from (swiftSamples).
 const swiftSampleIgnore = "*.swift\nIgnored/\n"
@@ -127,92 +126,92 @@ func TestTheSharedFixturesDigestByPathAndMode(test *testing.T) {
 	}
 }
 
-// digestRepository is a real repository for the digest to follow through what git does to its index.
+// digestRecordings is git's index of one small repository at each step a digest test takes it through, and the files
+// of a worktree git added beside it, each as git wrote it. How git made them is in testdata/recorded/README.md.
+var digestRecordings = filepath.Join("testdata", "recorded", "digest")
+
+// readDigestRecording is one of digestRecordings.
+func readDigestRecording(test *testing.T, name string) []byte {
+	test.Helper()
+	contents, readError := os.ReadFile(filepath.Join(digestRecordings, name))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	return contents
+}
+
+// digestRepositoryTree is the tree every digest recording was made over: an ignore file excluding `*.log` and
+// `build/`, one committed source file, and an ignored log beside it, untracked until a step tracks it.
+var digestRepositoryTree = map[string]string{
+	".gitignore":    "*.log\nbuild/\n",
+	"main.go":       "package main\n",
+	"debug.log":     "a log\n",
+	"build/out.txt": "built\n",
+}
+
+// digestRepository is the recorded repository laid out again, for the digest to follow through what git did to its
+// index: each step git took is its recorded index, placed before the digest is read.
 type digestRepository struct {
 	test *testing.T
 	root string
 }
 
-// newDigestRepository is a repository with an ignore file excluding `*.log` and `build/`, one committed source file,
-// and an ignored log beside it, untracked.
-func newDigestRepository(test *testing.T) *digestRepository {
+// layDigestRepository is digestRepositoryTree with the index git wrote at step.
+func layDigestRepository(test *testing.T, step string) *digestRepository {
 	test.Helper()
-	if _, lookPathError := exec.LookPath("git"); lookPathError != nil {
-		test.Skip("no git on PATH")
-	}
-	root, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
-	if resolveSymlinksError != nil {
-		test.Fatal(resolveSymlinksError)
-	}
-	repository := &digestRepository{test: test, root: root}
-	repository.git("init", "-q", "-b", "main")
-	writeTree(test, root, map[string]string{
-		".gitignore":    "*.log\nbuild/\n",
-		"main.go":       "package main\n",
-		"debug.log":     "a log\n",
-		"build/out.txt": "built\n",
-	})
-	repository.git("add", ".gitignore", "main.go")
-	repository.git("commit", "-q", "-m", "first")
+	repository := &digestRepository{test: test, root: test.TempDir()}
+	writeTree(test, repository.root, digestRepositoryTree)
+	repository.place(step)
 	return repository
 }
 
-// git runs git in the repository with no configuration but its own, and an author for commits.
-func (repository *digestRepository) git(arguments ...string) string {
+// place makes the index git wrote at step the repository's own.
+func (repository *digestRepository) place(step string) {
 	repository.test.Helper()
-	command := exec.Command("git", append([]string{"-c", "user.name=cohere", "-c", "user.email=cohere@localhost",
-		"-c", "core.excludesFile=/dev/null"}, arguments...)...)
-	command.Dir = repository.root
-	command.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
-		"HOME="+repository.root)
-	output, runError := command.CombinedOutput()
-	if runError != nil {
-		repository.test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), runError, output)
-	}
-	return string(output)
+	placeIndex(repository.test, filepath.Join(repository.root, ".git"), readDigestRecording(repository.test,
+		step+".index"))
 }
 
-// digest is the repository's digest for a walk of its root, read anew, as a later run reads it.
-func (repository *digestRepository) digest() string {
+// matcher is a matcher for the repository's root, read anew, as a later run reads it, from an index it read.
+func (repository *digestRepository) matcher() *Matcher {
 	repository.test.Helper()
 	matcher, newError := New(repository.root)
 	if newError != nil {
 		repository.test.Fatal(newError)
 	}
-	digest, digestError := matcher.TrackedIgnoredDigest("")
+	if fallback := matcher.IndexFallback(); fallback != nil {
+		repository.test.Fatalf("the recorded index was not read: %v", fallback)
+	}
+	return matcher
+}
+
+// digest is the repository's digest for a walk of scope, "" for its root.
+func (repository *digestRepository) digest(scope string) string {
+	repository.test.Helper()
+	digest, digestError := repository.matcher().TrackedIgnoredDigest(scope)
 	if digestError != nil {
 		repository.test.Fatal(digestError)
 	}
 	return digest
 }
 
-// indexBytes is the index as it is on disk, so a case can show git rewrote it.
-func (repository *digestRepository) indexBytes() []byte {
-	repository.test.Helper()
-	contents, readError := os.ReadFile(filepath.Join(repository.root, ".git", "index"))
-	if readError != nil {
-		repository.test.Fatal(readError)
-	}
-	return contents
-}
-
-// TestTheDigestFollowsWhatTheIndexDecides walks one repository through what git does to an index: what changes which
+// TestTheDigestFollowsWhatTheIndexDecides walks one repository through what git did to its index: what changes which
 // paths the ignore rules exclude are tracked changes the digest, and what rewrites the index without changing that
 // keeps it, each shown to have rewritten the index so the case is the one it claims.
 func TestTheDigestFollowsWhatTheIndexDecides(test *testing.T) {
 	test.Parallel()
-	repository := newDigestRepository(test)
-	first := repository.digest()
+	repository := layDigestRepository(test, "committed")
+	first := repository.digest("")
 
 	// `git add -f` of an ignored file tracks a path the rules exclude.
-	repository.git("add", "-f", "debug.log")
-	forced := repository.digest()
+	repository.place("forced-log")
+	forced := repository.digest("")
 	if forced == first {
 		test.Error("tracking an ignored file with `git add -f` keeps the digest")
 	}
 	// `git rm --cached` of it untracks the path again.
-	repository.git("rm", "-q", "--cached", "debug.log")
-	removed := repository.digest()
+	repository.place("removed-log")
+	removed := repository.digest("")
 	if removed == forced {
 		test.Error("untracking an ignored file with `git rm --cached` keeps the digest")
 	}
@@ -221,17 +220,12 @@ func TestTheDigestFollowsWhatTheIndexDecides(test *testing.T) {
 	}
 
 	// `git status` rewrites an index whose entries' stat data moved, and decides nothing new.
-	before := repository.indexBytes()
-	later := time.Now().Add(2 * time.Second)
-	changeTimesError := os.Chtimes(filepath.Join(repository.root, "main.go"), later, later)
-	if changeTimesError != nil {
-		test.Fatal(changeTimesError)
-	}
-	repository.git("status", "--porcelain")
-	if bytes.Equal(repository.indexBytes(), before) {
+	if bytes.Equal(readDigestRecording(test, "refreshed-by-status.index"), readDigestRecording(test,
+		"removed-log.index")) {
 		test.Fatal("`git status` left the index as it was, so this case proves nothing")
 	}
-	if repository.digest() != first {
+	repository.place("refreshed-by-status")
+	if repository.digest("") != first {
 		test.Error("a `git status` that rewrote the index changed the digest")
 	}
 
@@ -241,18 +235,18 @@ func TestTheDigestFollowsWhatTheIndexDecides(test *testing.T) {
 		"main.go": "package main\n\nfunc main() {}\n",
 		"new.go":  "package main\n",
 	})
-	before = repository.indexBytes()
-	repository.git("add", "main.go", "new.go")
-	if bytes.Equal(repository.indexBytes(), before) {
+	if bytes.Equal(readDigestRecording(test, "added-sources.index"), readDigestRecording(test,
+		"refreshed-by-status.index")) {
 		test.Fatal("`git add` left the index as it was, so this case proves nothing")
 	}
-	if repository.digest() != first {
+	repository.place("added-sources")
+	if repository.digest("") != first {
 		test.Error("`git add` of files the rules do not exclude changed the digest")
 	}
 
 	// A `.gitignore` edit that newly excludes a tracked path changes what that path's tracking decides.
 	writeTree(test, repository.root, map[string]string{".gitignore": "*.log\nbuild/\nnew.go\n"})
-	if repository.digest() == first {
+	if repository.digest("") == first {
 		test.Error("a `.gitignore` edit that newly excludes a tracked path keeps the digest")
 	}
 }
@@ -262,19 +256,19 @@ func TestTheDigestFollowsWhatTheIndexDecides(test *testing.T) {
 // submodules from gitlinks. So does a gitlink the rules do not exclude, appearing.
 func TestTheDigestTellsAGitlinkFromAFile(test *testing.T) {
 	test.Parallel()
-	repository := newDigestRepository(test)
-	commit := strings.TrimSpace(repository.git("rev-parse", "HEAD"))
-	repository.git("add", "-f", "debug.log")
-	asFile := repository.digest()
-	repository.git("rm", "-q", "--cached", "debug.log")
-	repository.git("update-index", "--add", "--cacheinfo", "160000,"+commit+",debug.log")
-	if repository.digest() == asFile {
+	repository := layDigestRepository(test, "forced-log")
+	asFile := repository.digest("")
+	repository.place("gitlink-at-log")
+	if !slices.Contains(repository.matcher().index.entries, indexEntry{path: "debug.log", mode: indexModeGitlink}) {
+		test.Fatal("gitlink-at-log.index holds no gitlink at debug.log, so this case proves nothing")
+	}
+	if repository.digest("") == asFile {
 		test.Error("an ignored path tracked as a gitlink digests as the same path tracked as a file")
 	}
 
-	withoutModule := repository.digest()
-	repository.git("update-index", "--add", "--cacheinfo", "160000,"+commit+",modules/library")
-	if repository.digest() == withoutModule {
+	withoutModule := repository.digest("")
+	repository.place("gitlink-at-log-and-module")
+	if repository.digest("") == withoutModule {
 		test.Error("a gitlink the rules do not exclude, appearing, keeps the digest")
 	}
 }
@@ -283,26 +277,15 @@ func TestTheDigestTellsAGitlinkFromAFile(test *testing.T) {
 // ignored file tracked outside the directory keeps its digest, and one tracked inside changes it.
 func TestTheDigestCoversOnlyItsScope(test *testing.T) {
 	test.Parallel()
-	repository := newDigestRepository(test)
+	repository := layDigestRepository(test, "committed")
 	writeTree(test, repository.root, map[string]string{"service/trace.log": "trace\n"})
-	scoped := func() string {
-		matcher, newError := New(repository.root)
-		if newError != nil {
-			test.Fatal(newError)
-		}
-		digest, digestError := matcher.TrackedIgnoredDigest("service")
-		if digestError != nil {
-			test.Fatal(digestError)
-		}
-		return digest
-	}
-	first := scoped()
-	repository.git("add", "-f", "debug.log")
-	if scoped() != first {
+	first := repository.digest("service")
+	repository.place("forced-log")
+	if repository.digest("service") != first {
 		test.Error("an ignored file tracked outside the scope changed the scope's digest")
 	}
-	repository.git("add", "-f", "service/trace.log")
-	if scoped() == first {
+	repository.place("forced-log-and-service-log")
+	if repository.digest("service") == first {
 		test.Error("an ignored file tracked inside the scope kept the scope's digest")
 	}
 }
@@ -312,7 +295,8 @@ func TestTheDigestCoversOnlyItsScope(test *testing.T) {
 // one listing and the one index they share. Run under -race, it is what says those shared reads are safe.
 func TestTheDigestReadsAWalksListingFromEveryWorker(test *testing.T) {
 	test.Parallel()
-	repository := newDigestRepository(test)
+	// The index git wrote after `git add -A` over this tree and `git add -f` of two of its logs.
+	repository := layDigestRepository(test, "packages")
 	tree := map[string]string{".gitignore": "*.log\nbuild/\n"}
 	for directory := range 24 {
 		name := "package" + strconv.Itoa(directory)
@@ -322,8 +306,6 @@ func TestTheDigestReadsAWalksListingFromEveryWorker(test *testing.T) {
 		tree[name+"/nested/keep.log"] = "kept\n"
 	}
 	writeTree(test, repository.root, tree)
-	repository.git("add", "-A")
-	repository.git("add", "-f", "package3/trace.log", "package17/trace.log")
 	listings := map[string][]os.DirEntry{}
 	walkError := filepath.WalkDir(repository.root, func(visited string, entry os.DirEntry, pathError error) error {
 		if pathError != nil || !entry.IsDir() {
@@ -339,55 +321,64 @@ func TestTheDigestReadsAWalksListingFromEveryWorker(test *testing.T) {
 	if walkError != nil {
 		test.Fatal(walkError)
 	}
-	matcher, newError := New(repository.root)
-	if newError != nil {
-		test.Fatal(newError)
-	}
-	listed, listedError := matcher.WithListing(func(directory string) ([]os.DirEntry, bool) {
+	listed, listedError := repository.matcher().WithListing(func(directory string) ([]os.DirEntry, bool) {
 		entries, found := listings[directory]
 		return entries, found
 	}).TrackedIgnoredDigest("")
 	if listedError != nil {
 		test.Fatal(listedError)
 	}
-	if read := repository.digest(); listed != read {
+	if read := repository.digest(""); listed != read {
 		test.Errorf("a matcher reading a walk's listing digests %s, and one reading the disk %s", listed, read)
 	}
 }
 
 // TestAWorktreeReadsItsRepositorysSharedExclude: a worktree's `.git` is a file, and git reads the exclude file its
 // common directory shares with the main checkout (#vdbcswp). A path only that file lists reads ignored by the line git
-// check-ignore names, by the same absolute path, and `git add -f` of it moves the digest. Its untracked neighbor is
-// not ignored, so the case is the one file.
+// check-ignore named, by the same absolute path, and `git add -f` of it moves the digest. Its untracked neighbor is
+// not ignored, so the case is the one file. The worktree is laid out as git wrote it, with relative paths: its `.git`
+// file, and the gitdir, commondir and index in its git directory below the main checkout's.
 func TestAWorktreeReadsItsRepositorysSharedExclude(test *testing.T) {
 	test.Parallel()
-	repository := newDigestRepository(test)
-	worktree := filepath.Join(filepath.Dir(repository.root), filepath.Base(repository.root)+"-worktree")
-	repository.git("worktree", "add", "--quiet", worktree)
-	writeTree(test, repository.root, map[string]string{".git/info/exclude": "# shared\nsecret.go\n"})
-	writeTree(test, worktree, map[string]string{"secret.go": "package main\n", "plain.go": "package main\n"})
+	base := test.TempDir()
+	mainCheckout := filepath.Join(base, "main")
+	worktree := filepath.Join(base, "worktree")
+	gitDirectory := filepath.Join(mainCheckout, ".git", "worktrees", "worktree")
+	writeTree(test, base, map[string]string{
+		"main/.git/info/exclude":                 "# shared\nsecret.go\n",
+		"main/.git/worktrees/worktree/gitdir":    string(readDigestRecording(test, "worktree-gitdir")),
+		"main/.git/worktrees/worktree/commondir": string(readDigestRecording(test, "worktree-commondir")),
+		"worktree/.git":                          string(readDigestRecording(test, "worktree.git")),
+		"worktree/.gitignore":                    digestRepositoryTree[".gitignore"],
+		"worktree/main.go":                       digestRepositoryTree["main.go"],
+		"worktree/secret.go":                     "package main\n",
+		"worktree/plain.go":                      "package main\n",
+	})
+	placeIndex(test, gitDirectory, readDigestRecording(test, "worktree.index"))
 	inWorktree := &digestRepository{test: test, root: worktree}
 
-	matcher, newError := New(worktree)
-	if newError != nil {
-		test.Fatal(newError)
+	matcher := inWorktree.matcher()
+	if got, want := matcher.IndexFile(), filepath.Join(gitDirectory, "index"); got != want {
+		test.Errorf("the worktree's index file is %s, want %s", got, want)
 	}
-	shared := filepath.ToSlash(filepath.Join(repository.root, ".git", "info", "exclude"))
+	shared := filepath.ToSlash(filepath.Join(mainCheckout, ".git", "info", "exclude"))
 	ignored, source := matcher.Ignored("secret.go", false)
 	if want := shared + ":2:secret.go"; !ignored || source.String() != want {
 		test.Errorf("secret.go reads ignored %v by %q, want ignored by %q", ignored, source.String(), want)
 	}
-	if verbose := strings.TrimSpace(inWorktree.git("check-ignore", "-v", "secret.go")); !strings.HasPrefix(verbose,
-		source.String()+"\t") {
-		test.Errorf("git check-ignore names %q, and the matcher %q", verbose, source.String())
+	// git named the main checkout by its absolute path, which the recording writes `<main>`.
+	verbose := strings.ReplaceAll(string(readDigestRecording(test, "worktree.check-ignore")), "<main>",
+		filepath.ToSlash(mainCheckout))
+	if want := source.String() + "\tsecret.go\n"; verbose != want {
+		test.Errorf("git check-ignore named %q, and the matcher %q", verbose, want)
 	}
 	if ignored, _ := matcher.Ignored("plain.go", false); ignored {
 		test.Error("plain.go, which nothing lists, reads ignored")
 	}
 
-	before := inWorktree.digest()
-	inWorktree.git("add", "-f", "secret.go")
-	if inWorktree.digest() == before {
+	before := inWorktree.digest("")
+	placeIndex(test, gitDirectory, readDigestRecording(test, "worktree-forced-secret.index"))
+	if inWorktree.digest("") == before {
 		test.Error("tracking a file only the shared exclude lists keeps the worktree's digest")
 	}
 }

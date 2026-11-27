@@ -11,7 +11,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/repository"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -50,7 +50,7 @@ func TestFindAgreesWithTheRegularExpressionFind(test *testing.T) {
 // equivalenceCorpus is the names the two Finds are compared over, each once.
 func equivalenceCorpus(test *testing.T, vocabulary *Vocabulary) []string {
 	test.Helper()
-	root, rootError := corpus.RepositoryRoot()
+	root, rootError := repository.Root()
 	if rootError != nil {
 		test.Fatal(rootError)
 	}
